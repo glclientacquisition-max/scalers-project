@@ -318,7 +318,8 @@ async function runGeminiTurn(messages, callSid) {
         temperature: 0.7,
         maxOutputTokens: 300,
         thinkingConfig: {
-          thinkingBudget: 0,
+          // Gemini 3.x: use thinkingLevel. thinkingBudget:0 is ignored → high thinking.
+          thinkingLevel: 'MINIMAL',
         },
       },
     });
