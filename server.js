@@ -71,67 +71,77 @@ function buildMediaStreamUrl(req) {
   return `${wsProto}://${host}/ws/media`;
 }
 
-/** Normalize SautiKit (Twilio-compatible) voice webhook fields. */
+/** Normalize SautiKit voice webhook fields (live payload shape). */
 function extractInboundCallFields(body = {}) {
   const nested = body.call || body.payload || body.data || {};
   const callSid =
+    body.sessionId ||
+    body.SessionId ||
+    body.streamSid ||
     body.CallSid ||
     body.callSid ||
     body.call_sid ||
     body.call_id ||
     body.CallId ||
-    body.CallUUID ||
-    body.callUuid ||
-    body.sessionId ||
-    body.SessionId ||
     nested.id ||
+    nested.sessionId ||
     nested.call_id ||
-    nested.callSid ||
-    nested.CallSid ||
     null;
   const fromNumber =
+    body.callerNumber ||
     body.From ||
     body.from ||
-    body.callerNumber ||
     body.caller_number ||
-    body.Caller ||
-    nested.from ||
-    nested.caller_number ||
     nested.callerNumber ||
+    nested.from ||
     null;
+  // Prefer the number the client actually dialed when present (outbound WebRTC tests).
   const toNumber =
+    body.clientDialedNumber ||
+    body.destinationNumber ||
     body.To ||
     body.to ||
-    body.destinationNumber ||
     body.destination_number ||
-    body.Called ||
     nested.to ||
-    nested.destination_number ||
     null;
   const callSessionState = String(
     body.callSessionState ||
       body.CallSessionState ||
-      body.call_session_state ||
+      body.streamEvent ||
+      body.streamStatus ||
       body.status ||
-      nested.status ||
       ''
   );
-  return { callSid, fromNumber, toNumber, callSessionState };
+  return {
+    callSid,
+    fromNumber,
+    toNumber,
+    callSessionState,
+    streamSid: body.streamSid || null,
+    streamEvent: body.streamEvent || null,
+  };
 }
 
-function shouldSkipMediaStream(callSessionState) {
-  const state = callSessionState.toLowerCase();
-  if (!state) return false;
-  // Only skip terminal / post-stream edges. Allow Ringing + Answered to open Stream.
-  return (
-    state.includes('streamstopped') ||
-    state.includes('streamerror') ||
-    state.includes('completed') ||
-    state.includes('hangup') ||
-    state.includes('failed') ||
-    state.includes('busy') ||
-    state.includes('no-answer')
-  );
+function shouldSkipMediaStream(callSessionState, body = {}) {
+  const state = String(callSessionState || '').toLowerCase();
+  const streamEvent = String(body.streamEvent || '').toLowerCase();
+  if (!state && !streamEvent) return false;
+
+  // Stream already running / finished — never re-issue <Stream/>.
+  const skipTokens = [
+    'streamstarted',
+    'stream-started',
+    'streamstopped',
+    'stream-stopped',
+    'streamerror',
+    'stream-error',
+    'completed',
+    'hangup',
+    'failed',
+    'busy',
+    'no-answer',
+  ];
+  return skipTokens.some((t) => state.includes(t) || streamEvent.includes(t));
 }
 
 // ---------------------------------------------------------------------------
@@ -160,9 +170,10 @@ async function handleVoiceIncoming(req, res) {
     });
     console.log('[voice/incoming] RAW BODY:', JSON.stringify(req.body, null, 2));
 
-    // SautiKit re-invokes the voice URL on StreamStopped / Completed / etc.
+    // SautiKit re-invokes the voice URL on StreamStarted / Completed / etc.
     // Returning another Stream document re-forks and errors — send empty XML.
-    if (shouldSkipMediaStream(callSessionState)) {
+    if (shouldSkipMediaStream(callSessionState, req.body)) {
+      console.log('[voice/incoming] lifecycle edge — empty <Response/> (no re-Stream)');
       return res
         .type('text/xml')
         .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
@@ -180,10 +191,10 @@ async function handleVoiceIncoming(req, res) {
       console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
     }
 
-    const streamUrl = buildMediaStreamUrl(req);
-    // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s
-    // (that was causing immediate Completed + WS 1006). Top-level <Stream/>
-    // is the documented XML form; Connect/Stream alone does not hold the call.
+    const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
+    // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s.
+    // Pass callSid on the WS URL so /ws/media can bind the session without
+    // waiting for the first metadata frame.
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Stream url="${streamUrl}" name="ai-receptionist" track="inbound_track" connect="true" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />
@@ -247,6 +258,8 @@ const server = http.createServer(app);
 const mediaWss = new WebSocketServer({
   server,
   path: '/ws/media',
+  // Disable per-message deflate — audio forks / some proxies misbehave with it.
+  perMessageDeflate: false,
   // SautiKit forks audio with the audio.drachtio.org subprotocol.
   handleProtocols: (protocols) => {
     try {
@@ -277,38 +290,54 @@ function looksLikeJsonText(text) {
 }
 
 mediaWss.on('connection', (ws, req) => {
-  console.log(
-    `[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'} url=${req.url}`
-  );
-
   let sessionCallSid = null;
+  try {
+    const q = new URL(req.url || '', 'http://localhost').searchParams;
+    sessionCallSid = q.get('callSid') || q.get('sessionId') || null;
+  } catch {
+    /* ignore */
+  }
+
+  console.log(
+    `[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'} url=${req.url} callSid=${sessionCallSid || 'unknown'}`
+  );
+  console.log('[ws/media] upgrade headers:', JSON.stringify(req.headers, null, 2));
+
+  try {
+    req.socket.setKeepAlive(true, 10000);
+  } catch {
+    /* ignore */
+  }
+
   ws.isAlive = true;
   ws.on('pong', () => {
     ws.isAlive = true;
   });
 
+  // Count frames so we can see if anything arrives before a 1006.
+  let textFrames = 0;
+  let binaryFrames = 0;
+
   ws.on('message', (data, isBinary) => {
     try {
-      // Normalize every frame shape the `ws` library can emit.
       const buf = toNodeBuffer(data);
       const asText = buf.toString('utf8');
 
-      // Text / JSON control frames (openMetadata, events, etc.)
       if (!isBinary || looksLikeJsonText(asText)) {
+        textFrames += 1;
         if (looksLikeJsonText(asText)) {
           try {
             const parsed = JSON.parse(asText);
             console.log('[WS INCOMING PAYLOAD]', JSON.stringify(parsed, null, 2));
 
-            // Soft-extract identifiers from SautiKit openMetadata / wrappers.
             const meta = parsed.metadata || parsed;
             const maybeSid =
               meta.callSid ||
+              meta.sessionId ||
               meta.call_sid ||
               meta.call_id ||
-              meta.sessionId ||
               meta.streamSid ||
-              parsed.callSid ||
+              parsed.sessionId ||
               parsed.streamSid ||
               null;
             if (maybeSid && !sessionCallSid) {
@@ -326,16 +355,17 @@ mediaWss.on('connection', (ws, req) => {
         } else {
           console.log('[ws/media] text frame:', asText.slice(0, 500));
         }
-        // Stay open — no Twilio-specific validation, no throws, no ws.close().
         return;
       }
 
-      // Binary PCM / media frames
-      console.log(
-        `[ws/media] binary audio frame (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
-      );
+      binaryFrames += 1;
+      // Log first few audio frames verbosely, then every 50th.
+      if (binaryFrames <= 5 || binaryFrames % 50 === 0) {
+        console.log(
+          `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
+        );
+      }
     } catch (err) {
-      // Never let a bad frame take down the socket (avoids abrupt 1006).
       console.error(
         '[ws/media] message handler error (socket kept open):',
         err?.message || err,
@@ -346,12 +376,11 @@ mediaWss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     console.log(
-      `[ws/media] closed code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'}`
+      `[ws/media] closed code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
   });
 
   ws.on('error', (err) => {
-    // Log only — do not rethrow (would surface as 1006).
     console.error('[ws/media] error:', err?.message || err);
   });
 });
