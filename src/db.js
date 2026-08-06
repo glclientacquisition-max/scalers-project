@@ -274,6 +274,83 @@ async function uploadRecordingBuffer({
   };
 }
 
+/**
+ * Mark a call as finished (complete / failed / no_answer) and optionally set duration.
+ * Matches on sautikit_call_sid. Idempotent — safe to call from multiple webhooks.
+ * Does not reopen a call that is already terminal unless upgrading duration.
+ */
+async function updateCallStatus({ callSid, status, durationSeconds, force = false }) {
+  if (!callSid) {
+    throw new Error('[db] updateCallStatus: callSid required');
+  }
+
+  const normalized = String(status || '')
+    .toLowerCase()
+    .replace(/_/g, '-');
+  let finalStatus = 'complete';
+  if (normalized.includes('fail') || normalized.includes('error')) {
+    finalStatus = 'failed';
+  } else if (normalized.includes('no-answer') || normalized.includes('noanswer')) {
+    finalStatus = 'no_answer';
+  } else if (normalized.includes('busy')) {
+    finalStatus = 'failed';
+  } else if (
+    normalized.includes('complete') ||
+    normalized.includes('hangup') ||
+    normalized === 'ended' ||
+    normalized === 'done'
+  ) {
+    finalStatus = 'complete';
+  } else if (status) {
+    // Preserve explicit schema values like complete / failed / no_answer / in_progress.
+    finalStatus = String(status);
+  }
+
+  const existing = await getCall(callSid);
+  if (!existing) {
+    console.warn(`[db] updateCallStatus: no call row for ${callSid}`);
+    return null;
+  }
+
+  const terminalStatuses = new Set(['complete', 'completed', 'failed', 'no_answer']);
+  const alreadyTerminal = terminalStatuses.has(String(existing.status || '').toLowerCase());
+  const patch = {};
+
+  // Prefer explicit failure over a later "complete" from media close.
+  if (!alreadyTerminal || force) {
+    patch.status = finalStatus;
+  } else if (
+    String(existing.status).toLowerCase() === 'complete' &&
+    (finalStatus === 'failed' || finalStatus === 'no_answer')
+  ) {
+    patch.status = finalStatus;
+  }
+
+  if (durationSeconds != null && Number.isFinite(Number(durationSeconds))) {
+    const nextDuration = Math.max(0, Math.round(Number(durationSeconds)));
+    if (existing.duration_seconds == null || existing.duration_seconds === 0 || nextDuration > 0) {
+      // Always accept a positive duration; fill zeros from later webhooks.
+      if (!existing.duration_seconds || nextDuration >= Number(existing.duration_seconds || 0)) {
+        patch.duration_seconds = nextDuration;
+      }
+    }
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return existing;
+  }
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update(patch)
+    .eq('sautikit_call_sid', callSid)
+    .select('*')
+    .maybeSingle();
+
+  throwIfError('updateCallStatus', error);
+  return shapeCall(data);
+}
+
 async function attachRecording({
   callSid,
   recordingUrl,
@@ -389,6 +466,7 @@ module.exports = {
   saveCallerInfo,
   appendTranscript,
   attachRecording,
+  updateCallStatus,
   uploadRecordingBuffer,
   getCall,
   getTenantById,
