@@ -21,7 +21,7 @@ body {
     radial-gradient(1200px 600px at 10% -10%, #d7ebe4 0%, transparent 55%),
     radial-gradient(900px 500px at 100% 0%, #f0e2c8 0%, transparent 50%),
     var(--bg);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
   min-height: 100vh;
 }
 
@@ -29,5 +29,5 @@ h1,
 h2,
 h3,
 .font-display {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: Georgia, "Times New Roman", serif;
 }
