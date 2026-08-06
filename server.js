@@ -20,6 +20,10 @@ const {
   buildLeadText,
   sendOwnerWhatsApp,
 } = require('./src/notifications/whatsapp');
+const {
+  isTelegramConfigured,
+  sendOwnerTelegram,
+} = require('./src/notifications/telegram');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -880,48 +884,60 @@ const mediaKeepalive = setInterval(() => {
 mediaWss.on('close', () => clearInterval(mediaKeepalive));
 
 // ---------------------------------------------------------------------------
-// WhatsApp notification to the business owner. Fires from two different
-// places (save_caller_info tool use, and the recording-status webhook)
-// because either one might complete last — this function is the single
-// gate that only actually sends once both name+reason AND the recording
-// are present, and only once ever per call.
+// Owner lead notification (Telegram interim; WhatsApp when Business is linked).
+// Fires from save_caller_info and recording/events webhooks. Sends once per call.
 // ---------------------------------------------------------------------------
-const whatsappSendInProgress = new Set();
+const ownerNotifyInProgress = new Set();
 
 async function maybeSendWhatsAppNotification(callSid) {
+  // Kept name for call-sites; routes Telegram first, then WhatsApp.
   const call = await db.getCall(callSid);
   if (!call) return;
 
   const hasCallerInfo = Boolean(call.name && call.reason);
-  // Prefer sending once we have name+reason; recording is a nice-to-have.
   if (!hasCallerInfo) return;
 
-  if (whatsappSendInProgress.has(callSid)) return;
+  if (ownerNotifyInProgress.has(callSid)) return;
   if (call.whatsapp_sent) return;
-  whatsappSendInProgress.add(callSid);
+  ownerNotifyInProgress.add(callSid);
 
   try {
-    let ownerNumber =
-      process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+    let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
     let businessName = process.env.BUSINESS_NAME || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       businessName = profile.businessName || businessName;
     } catch (err) {
-      console.warn(`[${callSid}] tenant lookup for WhatsApp failed:`, err?.message || err);
+      console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
+    }
+
+    const lead = {
+      businessName,
+      name: call.name,
+      reason: call.reason,
+      callerNumber: call.from_number,
+      recordingUrl: call.recording_url,
+    };
+
+    // Prefer Telegram until WhatsApp Business is registered on the DID.
+    if (isTelegramConfigured()) {
+      const result = await sendOwnerTelegram({ lead });
+      await db.markWhatsappSent(callSid);
+      console.log(`[${callSid}] Telegram lead notify accepted:`, result?.result?.message_id || result);
+      return;
     }
 
     if (!ownerNumber) {
       console.warn(
-        `[${callSid}] WhatsApp notification skipped: no owner number (tenants.whatsapp_notification_number or BUSINESS_OWNER_WHATSAPP_NUMBER)`
+        `[${callSid}] Owner notify skipped: set TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID (interim) or WhatsApp owner number`
       );
       return;
     }
 
     if (!isWhatsAppConfigured()) {
       console.warn(
-        `[${callSid}] WhatsApp provider not configured (need SAUTIKIT_API_KEY + SAUTIKIT_WHATSAPP_NUMBER_ID). Lead ready:`,
+        `[${callSid}] Owner notify skipped (no Telegram / WhatsApp sender). Lead ready:`,
         {
           name: call.name,
           phone: call.from_number,
@@ -933,21 +949,14 @@ async function maybeSendWhatsAppNotification(callSid) {
       return;
     }
 
-    const lead = {
-      businessName,
-      name: call.name,
-      reason: call.reason,
-      callerNumber: call.from_number,
-      recordingUrl: call.recording_url,
-    };
     const body = buildLeadText(lead);
     const result = await sendOwnerWhatsApp({ to: ownerNumber, body, lead });
     await db.markWhatsappSent(callSid);
     console.log(`[${callSid}] WhatsApp lead notify accepted:`, result);
   } catch (err) {
-    console.error(`[${callSid}] WhatsApp notification failed:`, err?.message || err);
+    console.error(`[${callSid}] Owner notification failed:`, err?.message || err);
   } finally {
-    whatsappSendInProgress.delete(callSid);
+    ownerNotifyInProgress.delete(callSid);
   }
 }
 
@@ -1170,11 +1179,6 @@ server.listen(PORT, () => {
     console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
   }
   console.log(`✓ Supabase database initialized`);
-  if (process.env.PUBLIC_BASE_URL) {
-    console.log(`🌐 PUBLIC_BASE_URL: ${process.env.PUBLIC_BASE_URL}`);
-  } else {
-    console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
-  }
   if (process.env.GEMINI_API_KEY) {
     console.log(`✓ GEMINI_API_KEY present (lazy-loaded on LLM use)`);
   } else {
@@ -1198,6 +1202,11 @@ server.listen(PORT, () => {
     );
   } else {
     console.log(`ℹ SAUTIKIT_API_KEY not set — WhatsApp lead notify disabled`);
+  }
+  if (isTelegramConfigured()) {
+    console.log(`✓ Telegram owner alerts enabled (chat ${process.env.TELEGRAM_CHAT_ID})`);
+  } else {
+    console.log(`ℹ Telegram owner alerts not set (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID)`);
   }
   if (String(process.env.SAUTIKIT_VALIDATE_WEBHOOKS || '').toLowerCase() === 'true') {
     console.log(`✓ SautiKit webhook signature validation ON`);

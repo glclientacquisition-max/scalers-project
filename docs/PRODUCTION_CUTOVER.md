@@ -71,14 +71,16 @@ Subscribe at least: `call.completed`, `recording.ready`.
 
 Safaricom / Airtel call-forwarding should already divert missed/busy/after-hours to the SautiKit DID.
 
-## 4. WhatsApp owner notify
+## 4. Owner alerts (Telegram interim → WhatsApp later)
 
-1. Connect WhatsApp on a SautiKit number (`SAUTIKIT_WHATSAPP_NUMBER_ID`).
-2. Approve a Meta utility template, e.g. body params `{{1}}` name, `{{2}}` phone, `{{3}}` reason.
-3. Set `SAUTIKIT_WHATSAPP_TEMPLATE` to that template name.
-4. Ensure `tenants.whatsapp_notification_number` (or `BUSINESS_OWNER_WHATSAPP_NUMBER`) is the owner’s WhatsApp.
+Until WhatsApp Business is registered on the DID, use Telegram:
 
-Free-form text only works inside Meta’s 24h customer-care window — **templates are required** for cold lead alerts.
+1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → copy token → `TELEGRAM_BOT_TOKEN`
+2. Open your bot, press Start, send `hi`
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` → copy `chat.id` → `TELEGRAM_CHAT_ID`
+4. Restart the voice server
+
+When WhatsApp is connected later, set `SAUTIKIT_WHATSAPP_*` + template; code prefers Telegram when configured.
 
 ## 5. Cutover checklist
 
