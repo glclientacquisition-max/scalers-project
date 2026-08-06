@@ -345,14 +345,44 @@ Aligned with blueprint Phases 0–6.
 
 ---
 
-## 13. Document Control
+## 13. Business rules (missed / busy / after-hours)
+
+| ID | Priority | Rule |
+| --- | --- | --- |
+| REQ-BR-001 | P0 | System is the answering party when the business DID is called or when the customer’s mobile/landline is diverted (busy / no-answer / unreachable / after-hours) onto the SautiKit DID. |
+| REQ-BR-002 | P0 | v1 conversation objective is **lead capture** (name + reason), not full appointment booking. |
+| REQ-BR-003 | P0 | Owner notification is asynchronous post-call (WhatsApp); caller MUST still receive a spoken confirmation on-call. |
+| REQ-BR-004 | P1 | After-hours vs in-hours may share the same agent prompt in v1; schedule-based prompt variants are P2. |
+| REQ-BR-005 | P1 | One DID maps to one `businesses` row; multi-location businesses are separate tenants or future extension. |
+
+---
+
+## 14. API / interface contracts (voice engine)
+
+| Surface | Contract |
+| --- | --- |
+| `POST /voice/incoming` | SautiKit voice callback; verify signature; return Stream/Say; branch on lifecycle; no LLM in request |
+| `POST /voice/events` | `call.completed` / `call.failed` / `recording.ready`; idempotent; update CDR |
+| `POST /voice/stream-status` | stream-started/stopped/error; log + metrics |
+| `WSS /ws/media` | Subprotocol `audio.drachtio.org`; PCM S16LE duplex @ configured rate |
+| `GET /healthz` | Liveness for host platform |
+| DB module | Stable functions listed in REQ-DAT-002 |
+| Notify module | `maybeSendWhatsAppNotification(callSid)` single gate |
+
+Full per-phase build list: [`REQUIREMENTS_BY_PHASE.md`](./REQUIREMENTS_BY_PHASE.md).
+
+---
+
+## 15. Document Control
 
 | Version | Date | Notes |
 | --- | --- | --- |
 | 0.1 | 2026-08-06 | Initial requirements draft from architecture blueprint |
+| 0.2 | 2026-08-06 | Added business rules, API contracts; phase checklist doc |
 
 **Related docs**
 
+- [`REQUIREMENTS_BY_PHASE.md`](./REQUIREMENTS_BY_PHASE.md) — phase deliverables, user stories, env matrix
 - [`ARCHITECTURE_MIGRATION_BLUEPRINT.md`](./ARCHITECTURE_MIGRATION_BLUEPRINT.md)
 - [`TARGET_MODULE_LAYOUT.md`](./TARGET_MODULE_LAYOUT.md)
 - [`supabase/schema.sql`](./supabase/schema.sql)

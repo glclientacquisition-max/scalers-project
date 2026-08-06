@@ -12,6 +12,7 @@ AI receptionist for East African B2B businesses: answers missed / busy / after-h
 ## Production direction
 
 - **Requirements (what to build):** [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
+- **Requirements by phase (checklist):** [docs/REQUIREMENTS_BY_PHASE.md](docs/REQUIREMENTS_BY_PHASE.md)
 - **Architecture & migration plan:** [docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md](docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md)
 
 Target stack: **SautiKit** (telephony) + **Soniox** (STT/TTS) + **Gemini / GPT-4o-mini** + **Supabase**, with a custom Node.js media orchestrator and a Next.js admin dashboard.
