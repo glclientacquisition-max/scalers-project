@@ -1,0 +1,325 @@
+// src/db.js
+// Supabase persistence mapped to the live schema:
+//   tenants(business_name, sautikit_virtual_number, …)
+//   calls(tenant_id, caller_number, sautikit_call_sid, recording_url, summary, …)
+//   transcripts(call_id, speaker, text_content, latency_ms)
+//   storage bucket: call-recordings
+//
+// Preserves the orchestration-facing API used by server.js (async).
+
+const { supabase } = require('./lib/supabaseClient');
+
+const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
+const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
+
+function throwIfError(context, error) {
+  if (error) {
+    const err = new Error(`[db] ${context}: ${error.message}`);
+    err.cause = error;
+    throw err;
+  }
+}
+
+function parseSummary(summary) {
+  if (!summary) return {};
+  if (typeof summary === 'object') return summary;
+  try {
+    const parsed = JSON.parse(summary);
+    return parsed && typeof parsed === 'object' ? parsed : { text: summary };
+  } catch {
+    return { text: summary };
+  }
+}
+
+function serializeSummary(meta) {
+  return JSON.stringify(meta || {});
+}
+
+/** Map a live `calls` row to the shape server.js historically expected from SQLite. */
+function shapeCall(row) {
+  if (!row) return null;
+  const meta = parseSummary(row.summary);
+  return {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    call_sid: row.sautikit_call_sid,
+    from_number: row.caller_number,
+    to_number: meta.to_number || null,
+    name: meta.name || null,
+    reason: meta.reason || null,
+    recording_url: row.recording_url || null,
+    recording_sid: meta.recording_sid || null,
+    recording_path: meta.recording_path || null,
+    status: row.status || null,
+    whatsapp_sent: Boolean(meta.whatsapp_sent),
+    duration_seconds: row.duration_seconds ?? null,
+    created_at: row.created_at,
+    summary: row.summary,
+    _raw: row,
+  };
+}
+
+async function resolveTenantId({ toNumber, tenantId }) {
+  if (tenantId) return tenantId;
+  if (DEFAULT_TENANT_ID) return DEFAULT_TENANT_ID;
+
+  if (toNumber) {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('sautikit_virtual_number', toNumber)
+      .maybeSingle();
+    throwIfError('resolveTenantId(by DID)', error);
+    if (data?.id) return data.id;
+  }
+
+  // Fall back to the first active tenant (single-tenant deployments).
+  const { data: fallback, error: fallbackError } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  throwIfError('resolveTenantId(fallback)', fallbackError);
+  if (fallback?.id) return fallback.id;
+
+  throw new Error(
+    '[db] No tenant_id available. Set TENANT_ID or create a tenants row with sautikit_virtual_number.'
+  );
+}
+
+async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'twilio' }) {
+  const resolvedTenantId = await resolveTenantId({ toNumber, tenantId });
+  const existing = await getCall(callSid);
+  const meta = existing
+    ? parseSummary(existing.summary)
+    : {};
+
+  meta.provider = provider;
+  if (toNumber) meta.to_number = toNumber;
+
+  const row = {
+    tenant_id: resolvedTenantId,
+    caller_number: fromNumber || existing?.from_number || 'unknown',
+    sautikit_call_sid: callSid,
+    status: existing?.status || 'in_progress',
+    summary: serializeSummary(meta),
+  };
+
+  const { data, error } = await supabase
+    .from('calls')
+    .upsert(row, { onConflict: 'sautikit_call_sid' })
+    .select('*')
+    .single();
+
+  throwIfError('upsertCall', error);
+  return shapeCall(data);
+}
+
+async function saveCallerInfo({ callSid, name, reason }) {
+  const existing = await getCall(callSid);
+  if (!existing) {
+    throw new Error(`[db] saveCallerInfo: no call for ${callSid}`);
+  }
+
+  const meta = parseSummary(existing.summary);
+  meta.name = name;
+  meta.reason = reason;
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('*')
+    .maybeSingle();
+
+  throwIfError('saveCallerInfo', error);
+  return shapeCall(data);
+}
+
+/**
+ * Replace transcript turns for a call.
+ * Accepts either the legacy full-text blob ("Caller: …\\nAgent: …") or
+ * an array of { speaker, text, latencyMs }.
+ */
+async function appendTranscript({ callSid, transcript, turns }) {
+  const call = await getCall(callSid);
+  if (!call) {
+    console.warn(`[db] appendTranscript: no call row for ${callSid}`);
+    return null;
+  }
+
+  let rows = turns;
+  if (!rows) {
+    rows = String(transcript || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const caller = /^Caller:\s*(.*)$/i.exec(line);
+        if (caller) return { speaker: 'caller', text: caller[1] };
+        const agent = /^Agent:\s*(.*)$/i.exec(line);
+        if (agent) return { speaker: 'agent', text: agent[1] };
+        return { speaker: 'system', text: line };
+      });
+  }
+
+  // Full replace keeps the blob-style updates from server.js idempotent.
+  const { error: deleteError } = await supabase
+    .from('transcripts')
+    .delete()
+    .eq('call_id', call.id);
+  throwIfError('appendTranscript(delete)', deleteError);
+
+  if (rows.length === 0) return [];
+
+  const payload = rows.map((turn) => ({
+    call_id: call.id,
+    speaker: turn.speaker,
+    text_content: turn.text,
+    latency_ms: turn.latencyMs ?? null,
+  }));
+
+  const { data, error } = await supabase
+    .from('transcripts')
+    .insert(payload)
+    .select('*');
+
+  throwIfError('appendTranscript(insert)', error);
+  return data;
+}
+
+async function getCall(callSid) {
+  const { data, error } = await supabase
+    .from('calls')
+    .select('*')
+    .eq('sautikit_call_sid', callSid)
+    .maybeSingle();
+
+  throwIfError('getCall', error);
+  return shapeCall(data);
+}
+
+async function markWhatsappSent(callSid) {
+  const existing = await getCall(callSid);
+  if (!existing) return false;
+  if (existing.whatsapp_sent) return false;
+
+  const meta = parseSummary(existing.summary);
+  meta.whatsapp_sent = true;
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('id')
+    .maybeSingle();
+
+  throwIfError('markWhatsappSent', error);
+  return Boolean(data);
+}
+
+async function uploadRecordingBuffer({
+  callSid,
+  recordingSid,
+  buffer,
+  contentType = 'audio/mpeg',
+  extension = 'mp3',
+}) {
+  const objectPath = `${callSid}/${recordingSid || Date.now()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(RECORDINGS_BUCKET)
+    .upload(objectPath, buffer, {
+      contentType,
+      upsert: true,
+    });
+
+  throwIfError('uploadRecordingBuffer', uploadError);
+
+  const { data: signed, error: signError } = await supabase.storage
+    .from(RECORDINGS_BUCKET)
+    .createSignedUrl(objectPath, 60 * 60 * 24 * 7);
+
+  throwIfError('createSignedUrl', signError);
+
+  return {
+    recordingPath: objectPath,
+    recordingUrl: signed?.signedUrl || null,
+  };
+}
+
+async function attachRecording({
+  callSid,
+  recordingUrl,
+  recordingSid,
+  sourceUrl,
+  authHeader,
+}) {
+  const existing = await getCall(callSid);
+  if (!existing) {
+    throw new Error(`[db] attachRecording: no call for ${callSid}`);
+  }
+
+  let finalUrl = recordingUrl || sourceUrl || null;
+  let recordingPath = null;
+
+  const downloadUrl = sourceUrl || recordingUrl;
+  if (downloadUrl) {
+    try {
+      const headers = {};
+      if (authHeader) headers.Authorization = authHeader;
+
+      const response = await fetch(downloadUrl, { headers });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} downloading recording`);
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const uploaded = await uploadRecordingBuffer({
+        callSid,
+        recordingSid,
+        buffer,
+        contentType: response.headers.get('content-type') || 'audio/mpeg',
+      });
+      finalUrl = uploaded.recordingUrl || finalUrl;
+      recordingPath = uploaded.recordingPath;
+    } catch (err) {
+      console.warn(
+        `[db] attachRecording: Storage upload failed for ${callSid}, keeping provider URL:`,
+        err?.message || err
+      );
+    }
+  }
+
+  const meta = parseSummary(existing.summary);
+  if (recordingSid) meta.recording_sid = recordingSid;
+  if (recordingPath) meta.recording_path = recordingPath;
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update({
+      recording_url: finalUrl,
+      status: 'complete',
+      summary: serializeSummary(meta),
+    })
+    .eq('sautikit_call_sid', callSid)
+    .select('*')
+    .maybeSingle();
+
+  throwIfError('attachRecording', error);
+  return shapeCall(data);
+}
+
+module.exports = {
+  upsertCall,
+  saveCallerInfo,
+  appendTranscript,
+  attachRecording,
+  uploadRecordingBuffer,
+  getCall,
+  markWhatsappSent,
+  RECORDINGS_BUCKET,
+  shapeCall,
+};
