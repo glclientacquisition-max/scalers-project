@@ -6,6 +6,7 @@ import {
   type CallRow,
   type TranscriptRow,
 } from "@/lib/supabase";
+import { getCurrentTenant } from "@/lib/tenant";
 
 function formatWhen(iso: string) {
   try {
@@ -25,6 +26,9 @@ export default async function CallDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const tenant = await getCurrentTenant();
+  if (!tenant) notFound();
+
   const supabase = getSupabaseAdmin();
 
   const { data: call, error } = await supabase
@@ -33,6 +37,7 @@ export default async function CallDetailPage({
       "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment"
     )
     .eq("id", id)
+    .eq("tenant_id", tenant.id)
     .maybeSingle();
 
   if (error || !call) notFound();
