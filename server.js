@@ -5,10 +5,14 @@
 
 require('dotenv').config();
 const express = require('express');
-const { WebSocketServer } = require('ws');
+const { WebSocketServer, WebSocket } = require('ws');
 const http = require('http');
 const { GoogleGenAI } = require('@google/genai');
 const { createSonioxSttSession, isSonioxConfigured } = require('./src/speech/sonioxStt');
+const {
+  createSonioxTtsSession,
+  isSonioxTtsConfigured,
+} = require('./src/speech/sonioxTts');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -321,6 +325,23 @@ server.on('upgrade', (req, socket, head) => {
   }
 });
 
+/** ~20 ms of mono pcm_s16le @ 16 kHz — matches typical SautiKit inbound frames. */
+const OUTBOUND_PCM_FRAME_BYTES = 640;
+
+function sendPcmToMedia(ws, pcm) {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
+  // Prefer small frames for smoother playback on the telephony side.
+  for (let offset = 0; offset < pcm.length; offset += OUTBOUND_PCM_FRAME_BYTES) {
+    const slice = pcm.subarray(offset, offset + OUTBOUND_PCM_FRAME_BYTES);
+    try {
+      ws.send(slice, { binary: true });
+    } catch (err) {
+      console.warn('[ws/media] outbound PCM send failed:', err?.message || err);
+      break;
+    }
+  }
+}
+
 mediaWss.on('connection', (ws, req) => {
   const connectedAt = Date.now();
   let sessionCallSid = null;
@@ -353,17 +374,123 @@ mediaWss.on('connection', (ws, req) => {
   let textFrames = 0;
   let binaryFrames = 0;
   let stt = null;
-  const transcriptFinals = [];
+  let tts = null;
+  let speaking = false;
+  let turnBusy = false;
+  let utteranceParts = [];
+  let utteranceTimer = null;
+  let messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  const transcriptLog = [];
+  let greetingStarted = false;
+
+  const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
+
+  async function speakText(text) {
+    if (!tts || !text) return;
+    speaking = true;
+    try {
+      await tts.speak(text);
+    } catch (err) {
+      console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
+    } finally {
+      speaking = false;
+    }
+  }
+
+  async function runCallerTurn(userText) {
+    const clean = String(userText || '').replace(/\s+/g, ' ').trim();
+    if (!clean || turnBusy) return;
+    turnBusy = true;
+    console.log(`[ws/media][${sidLabel()}] caller turn: ${clean}`);
+    transcriptLog.push(`Caller: ${clean}`);
+    messages.push({ role: 'user', content: clean });
+
+    try {
+      const geminiPromise = process.env.GEMINI_API_KEY
+        ? runGeminiTurn(messages, sidLabel())
+        : Promise.resolve({
+            spokenText: "Thanks — someone from the business will call you back shortly.",
+            shouldEndCall: true,
+          });
+
+      // Filler overlaps Gemini; cancel it when the real reply is ready.
+      const useFiller = Boolean(tts) && process.env.VOICE_FILLER !== 'off';
+      const fillerText = process.env.VOICE_FILLER || 'Sawa, nakucheckia…';
+      const fillerPromise = useFiller ? speakText(fillerText) : Promise.resolve();
+
+      const result = await geminiPromise;
+      if (useFiller && tts) {
+        try {
+          tts.cancel();
+        } catch {
+          /* ignore */
+        }
+        await fillerPromise.catch(() => {});
+      }
+
+      const reply = result?.spokenText || AI_FALLBACK_LINE;
+      transcriptLog.push(`Agent: ${reply}`);
+      await speakText(reply);
+
+      if (result?.shouldEndCall) {
+        console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
+        setTimeout(() => {
+          try {
+            ws.close(1000, 'end_call');
+          } catch {
+            /* ignore */
+          }
+        }, 800);
+      }
+    } catch (err) {
+      console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
+      await speakText(AI_FALLBACK_LINE);
+    } finally {
+      turnBusy = false;
+    }
+  }
+
+  function flushUtterance() {
+    if (utteranceTimer) {
+      clearTimeout(utteranceTimer);
+      utteranceTimer = null;
+    }
+    if (!utteranceParts.length) return;
+    const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    utteranceParts = [];
+    if (!text) return;
+    runCallerTurn(text).catch((err) => {
+      console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
+    });
+  }
+
+  function scheduleUtteranceFlush() {
+    if (utteranceTimer) clearTimeout(utteranceTimer);
+    // Fallback if Soniox endpoint marker is delayed/missing.
+    utteranceTimer = setTimeout(() => flushUtterance(), 1100);
+  }
+
+  function onSttEvent(evt) {
+    if (evt.type === 'transcript' && evt.text) {
+      // Ignore echo while we are playing TTS (no AEC yet).
+      if (speaking || turnBusy) return;
+      if (evt.isFinal) {
+        utteranceParts.push(evt.text);
+        scheduleUtteranceFlush();
+      }
+      return;
+    }
+    if (evt.type === 'endpoint') {
+      if (speaking || turnBusy) return;
+      flushUtterance();
+    }
+  }
 
   if (isSonioxConfigured()) {
     try {
       stt = createSonioxSttSession({
-        callSid: sessionCallSid || `media_${Date.now()}`,
-        onEvent: (evt) => {
-          if (evt.type === 'transcript' && evt.isFinal && evt.text) {
-            transcriptFinals.push(evt.text);
-          }
-        },
+        callSid: sidLabel(),
+        onEvent: onSttEvent,
       });
       stt.ready.catch((err) => {
         console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
@@ -376,6 +503,40 @@ mediaWss.on('connection', (ws, req) => {
   } else {
     console.warn('[ws/media] SONIOX_API_KEY missing — skipping STT for this call');
   }
+
+  if (isSonioxTtsConfigured()) {
+    try {
+      tts = createSonioxTtsSession({
+        callSid: sidLabel(),
+        onAudio: (pcm) => {
+          if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+        },
+      });
+      tts.ready.catch((err) => {
+        console.error(`[ws/media] Soniox TTS failed to start:`, err?.message || err);
+        tts = null;
+      });
+    } catch (err) {
+      console.error(`[ws/media] Soniox TTS init error:`, err?.message || err);
+      tts = null;
+    }
+  } else {
+    console.warn('[ws/media] SONIOX_VOICE missing — skipping TTS for this call');
+  }
+
+  // Greet once media + TTS are ready (STT can still warm up in parallel).
+  (async () => {
+    if (greetingStarted) return;
+    greetingStarted = true;
+    try {
+      if (tts) await tts.ready;
+      await speakText(GREETING_LINE);
+      transcriptLog.push(`Agent: ${GREETING_LINE}`);
+      messages.push({ role: 'assistant', content: GREETING_LINE });
+    } catch (err) {
+      console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
+    }
+  })();
 
   ws.on('message', (data, isBinary) => {
     try {
@@ -424,7 +585,8 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
         );
       }
-      if (stt) stt.sendAudio(buf);
+      // Gate STT while speaking to reduce TTS echo into the transcript.
+      if (stt && !speaking) stt.sendAudio(buf);
     } catch (err) {
       console.error(
         '[ws/media] message handler error (socket kept open):',
@@ -447,13 +609,20 @@ mediaWss.on('connection', (ws, req) => {
       }
       stt = null;
     }
-    if (sessionCallSid && transcriptFinals.length) {
-      const transcript = transcriptFinals
-        .map((t) => (t.startsWith('Caller:') ? t : `Caller: ${t}`))
-        .join('\n');
-      db.appendTranscript({ callSid: sessionCallSid, transcript }).catch((err) => {
-        console.error(`[ws/media] transcript flush failed:`, err?.message || err);
-      });
+    if (tts) {
+      try {
+        tts.close();
+      } catch {
+        /* ignore */
+      }
+      tts = null;
+    }
+    if (sessionCallSid && transcriptLog.length) {
+      db.appendTranscript({ callSid: sessionCallSid, transcript: transcriptLog.join('\n') }).catch(
+        (err) => {
+          console.error(`[ws/media] transcript flush failed:`, err?.message || err);
+        }
+      );
     }
   });
 
@@ -525,6 +694,10 @@ async function maybeSendWhatsAppNotification(callSid) {
   }
 }
 
+const GREETING_LINE =
+  process.env.VOICE_GREETING ||
+  "Habari, you've reached the business. How can I help you today?";
+
 const SYSTEM_PROMPT = `You are a friendly phone receptionist answering a
 missed call on behalf of a small business in Kenya. Your only job this call:
 1. Get the caller's name.
@@ -532,8 +705,8 @@ missed call on behalf of a small business in Kenya. Your only job this call:
 3. Briefly confirm both back to them in one sentence.
 4. Tell them the business will get back to them soon, then say goodbye.
 
-Speak in warm, natural, conversational English — plain and friendly, the
-way a real receptionist would talk on the phone, not stiff or robotic.
+Speak in warm, natural conversational English or Kiswahili — match the
+caller's language. Sound like a real receptionist, not stiff or robotic.
 
 Keep every reply to 1-2 short sentences — this is a live phone call, not
 chat. When you have both the caller's name and reason, respond with one
@@ -645,14 +818,15 @@ async function runGeminiTurn(messages, callSid) {
       }));
 
     response = await getGeminiClient().models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
       contents,
       config: {
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         temperature: 0.7,
         maxOutputTokens: 300,
+        // gemini-3.6-flash rejects thinkingBudget:0; MINIMAL keeps latency low.
         thinkingConfig: {
-          thinkingBudget: 0,
+          thinkingLevel: 'MINIMAL',
         },
       },
     });
@@ -736,6 +910,11 @@ server.listen(PORT, () => {
     console.log(
       `✓ SONIOX_API_KEY present (STT on /ws/media)${process.env.SONIOX_VOICE ? ` voice=${process.env.SONIOX_VOICE}` : ''}`
     );
+    if (isSonioxTtsConfigured()) {
+      console.log(`✓ SONIOX_VOICE present (TTS replies enabled)`);
+    } else {
+      console.log(`ℹ SONIOX_VOICE not set — STT only, no spoken replies`);
+    }
   } else {
     console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
   }
