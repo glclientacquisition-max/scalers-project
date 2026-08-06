@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "smoke:db": "node scripts/smoke-db.js"
+    "smoke:db": "node scripts/smoke-db.js",
+    "tunnel": "node scripts/tunnel.js",
+    "tunnel:localtunnel": "node scripts/tunnel.js",
+    "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh"
   },
   "dependencies": {
     "@google/genai": "^2.13.0",
