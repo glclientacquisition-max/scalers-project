@@ -115,6 +115,14 @@ begin
   values (NEW.id, v_tenant_id, 'owner')
   on conflict (user_id, tenant_id) do nothing;
 
+  -- Phase C (docs/supabase/did_number_pool.sql): assign next available DID when present.
+  begin
+    perform public.assign_did_from_pool(v_tenant_id);
+  exception
+    when undefined_function then
+      null; -- pool not installed yet
+  end;
+
   return NEW;
 end;
 $$;

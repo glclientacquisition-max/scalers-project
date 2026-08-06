@@ -51,9 +51,23 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
   return null;
 }
 
+/** Claim next available DID from sautikit_did_pool (no-op if already assigned / pool empty). */
+export async function assignDidFromPool(tenantId: string): Promise<string | null> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("assign_did_from_pool", {
+    p_tenant_id: tenantId,
+  });
+  if (error) {
+    // Pool SQL not applied yet — leave pending DID.
+    console.warn("[tenant] assign_did_from_pool:", error.message);
+    return null;
+  }
+  return (data as string) || null;
+}
+
 /**
  * Fallback provisioner if the Auth trigger has not run yet (SQL not applied).
- * Idempotent — safe to call after every signup.
+ * Idempotent — safe to call after every signup. Also retries DID pool assign.
  */
 export async function ensureTenantForUser(opts: {
   userId: string;
@@ -68,7 +82,10 @@ export async function ensureTenantForUser(opts: {
     .limit(1)
     .maybeSingle();
 
-  if (existing?.tenant_id) return existing.tenant_id;
+  if (existing?.tenant_id) {
+    await assignDidFromPool(existing.tenant_id);
+    return existing.tenant_id;
+  }
 
   const businessName = opts.businessName.trim();
   const phone = opts.notificationPhone.trim() || "pending";
@@ -108,6 +125,7 @@ export async function ensureTenantForUser(opts: {
   });
   if (memErr) throw memErr;
 
+  await assignDidFromPool(tenant.id);
   return tenant.id as string;
 }
 
