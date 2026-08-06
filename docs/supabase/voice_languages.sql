@@ -1,12 +1,15 @@
 -- Automatic voice languages: English, Kiswahili, Sheng
 -- Run in the Supabase SQL editor after multi_tenant_onboarding.sql.
 --
--- No onboarding picker — every business gets en/sw/sheng automatically.
+-- No onboarding picker - every business gets en/sw/sheng automatically.
 -- Local Kenyan languages are deferred to a future release.
 --
 -- Adds:
 --   tenants.voice_languages text[]  default {en,sw,sheng}
 --   tenants.voice_language_other text  (reserved for future)
+--
+-- NOTE: Use dollar-quoted prompt text (not escaped string concatenation).
+-- Supabase SQL editor rejects adjacent escaped strings with ERROR 42601.
 
 alter table public.tenants
   add column if not exists voice_languages text[] not null default array['en', 'sw', 'sheng']::text[];
@@ -14,7 +17,7 @@ alter table public.tenants
 alter table public.tenants
   add column if not exists voice_language_other text;
 
--- Existing rows that still have the old {en,sw} default → include Sheng.
+-- Existing rows that still have the old {en,sw} default -> include Sheng.
 update public.tenants
 set voice_languages = array['en', 'sw', 'sheng']::text[]
 where voice_languages is null
@@ -35,43 +38,46 @@ create or replace function public.default_tenant_llm_prompt(
 returns text
 language plpgsql
 immutable
-as $$
+as $fn$
 declare
   v_name text := coalesce(nullif(trim(p_business_name), ''), 'the business');
 begin
   -- p_languages kept for signature compatibility; always describe the auto trio.
   return format(
-    E'You are the live phone receptionist for %s in Kenya.\n\n'
-    E'BUSINESS KNOWLEDGE (update this in Sauti Desk → Business settings):\n'
-    E'- Business name: %s\n'
-    E'- Services: describe what you offer\n'
-    E'- Hours: e.g. Mon–Sat 8:00am–6:00pm EAT\n'
-    E'- Service area: cities / neighborhoods you cover\n'
-    E'- Pricing: quote after understanding the job — do not invent exact prices\n'
-    E'- Payment: e.g. M-Pesa and cash\n'
-    E'- Languages: English, Kiswahili, and Sheng (automatic — match the caller)\n\n'
-    E'Your job on this call:\n'
-    E'1. Answer using ONLY the business knowledge above. If unknown, say the team will follow up.\n'
-    E'2. Get the caller''s name.\n'
-    E'3. Get a short reason for their call.\n'
-    E'4. Confirm name + reason, say the business will get back to them soon, then goodbye.\n\n'
-    E'Conversation rules (live phone — be conclusive and intelligent):\n'
-    E'- Answer the caller''s actual question first — do not stall with holding phrases.\n'
-    E'- Ask at most ONE clarifying question per turn.\n'
-    E'- Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.\n'
-    E'- Keep every spoken reply to 1–2 short sentences.',
+    $prompt$You are the live phone receptionist for %s in Kenya.
+
+BUSINESS KNOWLEDGE (update this in Sauti Desk Business settings):
+- Business name: %s
+- Services: describe what you offer
+- Hours: e.g. Mon-Sat 8:00am-6:00pm EAT
+- Service area: cities / neighborhoods you cover
+- Pricing: quote after understanding the job - do not invent exact prices
+- Payment: e.g. M-Pesa and cash
+- Languages: English, Kiswahili, and Sheng (automatic - match the caller)
+
+Your job on this call:
+1. Answer using ONLY the business knowledge above. If unknown, say the team will follow up.
+2. Get the caller's name.
+3. Get a short reason for their call.
+4. Confirm name + reason, say the business will get back to them soon, then goodbye.
+
+Conversation rules (live phone - be conclusive and intelligent):
+- Answer the caller's actual question first - do not stall with holding phrases.
+- Ask at most ONE clarifying question per turn.
+- Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.
+- Keep every spoken reply to 1-2 short sentences.$prompt$,
     v_name,
     v_name
   );
 end;
-$$;
+$fn$;
 
 create or replace function public.handle_new_user_tenant()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $fn$
 declare
   v_business_name text;
   v_notify_phone text;
@@ -131,4 +137,4 @@ begin
 
   return NEW;
 end;
-$$;
+$fn$;
