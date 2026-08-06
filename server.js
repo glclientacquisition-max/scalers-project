@@ -117,14 +117,21 @@ function shouldSkipMediaStream(callSessionState) {
 // ---------------------------------------------------------------------------
 app.post('/voice/incoming', async (req, res) => {
   try {
-    const { callSid, fromNumber, toNumber, callSessionState } = extractInboundCallFields(req.body);
+    const extracted = extractInboundCallFields(req.body);
+    const fromNumber = extracted.fromNumber;
+    const toNumber = extracted.toNumber;
+    const callSessionState = extracted.callSessionState;
+    // Always have a durable id for Supabase even if SautiKit omits CallSid.
+    const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
 
     console.log('[voice/incoming]', {
       callSid,
+      callSidSource: extracted.callSid ? 'payload' : 'fallback',
       fromNumber,
       toNumber,
       callSessionState: callSessionState || '(initial)',
       host: req.headers.host,
+      bodyKeys: Object.keys(req.body || {}),
     });
 
     // SautiKit re-invokes the voice URL on StreamStopped / Completed / etc.
@@ -135,15 +142,16 @@ app.post('/voice/incoming', async (req, res) => {
         .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
     }
 
-    if (callSid) {
+    try {
       await db.upsertCall({
         callSid,
-        fromNumber,
+        fromNumber: fromNumber || 'unknown',
         toNumber,
         provider: 'sautikit',
       });
-    } else {
-      console.warn('[voice/incoming] No call_sid/CallSid in payload; skipping DB upsert');
+    } catch (dbErr) {
+      // Do not fail the webhook / Stream setup if DB is briefly unavailable.
+      console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
     }
 
     const streamUrl = buildMediaStreamUrl(req);
@@ -210,40 +218,131 @@ const mediaWss = new WebSocketServer({
   path: '/ws/media',
   // SautiKit forks audio with the audio.drachtio.org subprotocol.
   handleProtocols: (protocols) => {
-    const list = Array.from(protocols);
-    if (list.includes('audio.drachtio.org')) return 'audio.drachtio.org';
-    return list[0] || false;
+    try {
+      const list = Array.from(protocols || []);
+      if (list.includes('audio.drachtio.org')) return 'audio.drachtio.org';
+      // Accept whatever the client offered so we never refuse the handshake.
+      return list[0] || 'audio.drachtio.org';
+    } catch {
+      return 'audio.drachtio.org';
+    }
   },
 });
 
+function toNodeBuffer(data) {
+  if (Buffer.isBuffer(data)) return data;
+  if (Array.isArray(data)) return Buffer.concat(data.map((part) => toNodeBuffer(part)));
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof data === 'string') return Buffer.from(data, 'utf8');
+  return Buffer.from(String(data));
+}
+
+function looksLikeJsonText(text) {
+  const trimmed = text.trim();
+  return trimmed.startsWith('{') || trimmed.startsWith('[');
+}
+
 mediaWss.on('connection', (ws, req) => {
-  console.log(`[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'}`);
+  console.log(
+    `[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'} url=${req.url}`
+  );
+
+  let sessionCallSid = null;
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   ws.on('message', (data, isBinary) => {
-    if (!isBinary && typeof data === 'string') {
-      console.log('[ws/media] text frame:', data.slice(0, 500));
-      return;
-    }
-    if (!isBinary && Buffer.isBuffer(data)) {
-      const asText = data.toString('utf8');
-      // First frame from SautiKit is often JSON openMetadata as text.
-      if (asText.startsWith('{') || asText.startsWith('[')) {
-        console.log('[ws/media] text/json frame:', asText.slice(0, 500));
+    try {
+      // Normalize every frame shape the `ws` library can emit.
+      const buf = toNodeBuffer(data);
+      const asText = buf.toString('utf8');
+
+      // Text / JSON control frames (openMetadata, events, etc.)
+      if (!isBinary || looksLikeJsonText(asText)) {
+        if (looksLikeJsonText(asText)) {
+          try {
+            const parsed = JSON.parse(asText);
+            console.log('[WS INCOMING PAYLOAD]', JSON.stringify(parsed, null, 2));
+
+            // Soft-extract identifiers from SautiKit openMetadata / wrappers.
+            const meta = parsed.metadata || parsed;
+            const maybeSid =
+              meta.callSid ||
+              meta.call_sid ||
+              meta.call_id ||
+              meta.sessionId ||
+              meta.streamSid ||
+              parsed.callSid ||
+              parsed.streamSid ||
+              null;
+            if (maybeSid && !sessionCallSid) {
+              sessionCallSid = String(maybeSid);
+              console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
+            }
+          } catch (parseErr) {
+            console.log(
+              '[ws/media] text frame (non-JSON):',
+              asText.slice(0, 500),
+              '| parseError=',
+              parseErr?.message || parseErr
+            );
+          }
+        } else {
+          console.log('[ws/media] text frame:', asText.slice(0, 500));
+        }
+        // Stay open — no Twilio-specific validation, no throws, no ws.close().
         return;
       }
+
+      // Binary PCM / media frames
+      console.log(
+        `[ws/media] binary audio frame (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
+      );
+    } catch (err) {
+      // Never let a bad frame take down the socket (avoids abrupt 1006).
+      console.error(
+        '[ws/media] message handler error (socket kept open):',
+        err?.message || err,
+        err?.stack
+      );
     }
-    const bytes = Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data);
-    console.log(`[ws/media] binary audio frame (${bytes} bytes)`);
   });
 
   ws.on('close', (code, reason) => {
-    console.log(`[ws/media] closed code=${code} reason=${reason?.toString?.() || ''}`);
+    console.log(
+      `[ws/media] closed code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'}`
+    );
   });
 
   ws.on('error', (err) => {
+    // Log only — do not rethrow (would surface as 1006).
     console.error('[ws/media] error:', err?.message || err);
   });
 });
+
+// Keepalive pings so proxies / SautiKit do not idle-drop the media socket.
+const mediaKeepalive = setInterval(() => {
+  for (const ws of mediaWss.clients) {
+    if (ws.isAlive === false) {
+      console.warn('[ws/media] keepalive missed — terminating stale socket');
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    try {
+      ws.ping();
+    } catch (err) {
+      console.warn('[ws/media] ping failed:', err?.message || err);
+    }
+  }
+}, 15000);
+
+mediaWss.on('close', () => clearInterval(mediaKeepalive));
 
 const wss = new WebSocketServer({ server, path: '/ws/relay' });
 
