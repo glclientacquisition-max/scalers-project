@@ -59,18 +59,32 @@ function shapeCall(row) {
   };
 }
 
-async function resolveTenantId({ toNumber, tenantId }) {
+async function resolveTenantId({ toNumber, fromNumber, tenantId }) {
   if (tenantId) return tenantId;
   if (DEFAULT_TENANT_ID) return DEFAULT_TENANT_ID;
 
-  if (toNumber) {
+  const candidates = [toNumber, fromNumber].filter(Boolean);
+  for (const candidate of candidates) {
     const { data, error } = await supabase
       .from('tenants')
       .select('id')
-      .eq('sautikit_virtual_number', toNumber)
+      .eq('sautikit_virtual_number', candidate)
       .maybeSingle();
     throwIfError('resolveTenantId(by DID)', error);
     if (data?.id) return data.id;
+
+    // Also try digit-normalized match for +254 vs 254 variants.
+    const digits = String(candidate).replace(/\D/g, '');
+    if (!digits) continue;
+    const { data: all, error: listError } = await supabase
+      .from('tenants')
+      .select('id, sautikit_virtual_number')
+      .eq('is_active', true);
+    throwIfError('resolveTenantId(list)', listError);
+    const hit = (all || []).find(
+      (row) => String(row.sautikit_virtual_number || '').replace(/\D/g, '') === digits
+    );
+    if (hit?.id) return hit.id;
   }
 
   // Fall back to the first active tenant (single-tenant deployments).
@@ -89,8 +103,18 @@ async function resolveTenantId({ toNumber, tenantId }) {
   );
 }
 
+async function listActiveTenantDids() {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('sautikit_virtual_number')
+    .eq('is_active', true);
+  throwIfError('listActiveTenantDids', error);
+  const fromEnv = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+  return [...new Set([...(data || []).map((r) => r.sautikit_virtual_number).filter(Boolean), ...fromEnv])];
+}
+
 async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'sautikit' }) {
-  const resolvedTenantId = await resolveTenantId({ toNumber, tenantId });
+  const resolvedTenantId = await resolveTenantId({ toNumber, fromNumber, tenantId });
   const existing = await getCall(callSid);
   const meta = existing
     ? parseSummary(existing.summary)
@@ -369,6 +393,7 @@ module.exports = {
   getCall,
   getTenantById,
   getTenantProfile,
+  listActiveTenantDids,
   markWhatsappSent,
   RECORDINGS_BUCKET,
   shapeCall,

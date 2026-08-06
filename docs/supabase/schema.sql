@@ -39,5 +39,10 @@
 -- insert into public.tenants (
 --   business_name, sautikit_virtual_number, whatsapp_notification_number, is_active
 -- ) values (
---   'Demo Business', '+254200000001', '+254700000000', true
+--   'Jirani Home Services', '+254709221536', '+254119774470', true
 -- );
+--
+-- If an older smoke DID is still stored, update it:
+-- update public.tenants
+-- set sautikit_virtual_number = '+254709221536'
+-- where sautikit_virtual_number = '+254200000001';
