@@ -626,6 +626,17 @@ function sendPcmToMedia(ws, pcm) {
   }
 }
 
+/** Best-effort stop of already-queued outbound audio on the media bridge. */
+function clearMediaPlayback(ws) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  try {
+    // Twilio-style clear; raw PCM forks (audio.drachtio.org) may ignore this.
+    ws.send(JSON.stringify({ event: 'clear' }));
+  } catch (err) {
+    console.warn('[ws/media] clear event send failed:', err?.message || err);
+  }
+}
+
 mediaWss.on('connection', (ws, req) => {
   const connectedAt = Date.now();
   let sessionCallSid = null;
@@ -666,7 +677,10 @@ mediaWss.on('connection', (ws, req) => {
   let utteranceParts = [];
   let utteranceTimer = null;
   let fillerTimer = null;
-  let bargedIn = false;
+  /** When true, discard the in-flight Gemini/TTS reply and wait for the caller turn. */
+  let bargeInActive = false;
+  let playbackGeneration = 0;
+  let activePlaybackGeneration = 0;
   let pendingUtterance = null;
   let systemPrompt = buildSystemPrompt();
   let greetingLine = buildGreeting();
@@ -705,30 +719,58 @@ mediaWss.on('connection', (ws, req) => {
 
   async function speakText(text) {
     if (!tts || !text) return;
+    // Starting intentional playback clears a prior barge latch.
+    bargeInActive = false;
     speaking = true;
-    bargedIn = false;
     speakStartedAt = Date.now();
     lastAgentText = String(text);
+    activePlaybackGeneration = ++playbackGeneration;
+    const gen = activePlaybackGeneration;
     try {
       await tts.speak(text);
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
     } finally {
-      speaking = false;
+      if (activePlaybackGeneration === gen) speaking = false;
     }
   }
 
   function cancelSpeech(reason) {
     clearFillerTimer();
-    if (!tts) return;
-    bargedIn = true;
-    console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
-    try {
-      tts.cancel();
-    } catch {
-      /* ignore */
-    }
+    bargeInActive = true;
+    playbackGeneration += 1;
     speaking = false;
+    console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
+    if (tts) {
+      try {
+        tts.cancel();
+      } catch {
+        /* ignore */
+      }
+    }
+    clearMediaPlayback(ws);
+  }
+
+  function discardUnspokenAssistant(reply) {
+    const last = messages[messages.length - 1];
+    if (last?.role === 'assistant' && last.content === reply) {
+      messages.pop();
+    }
+  }
+
+  function maybeBargeIn(text, source) {
+    const agentBusy = speaking || turnBusy;
+    if (!agentBusy) return false;
+    if (text.length <= 2) return false;
+    // Echo filter only matters while TTS audio is in the caller's ear.
+    if (speaking && looksLikeEcho(text)) return false;
+    if (speaking) {
+      const spokenForMs = Date.now() - speakStartedAt;
+      // Tiny grace so the first TTS phonemes do not self-trigger barge-in.
+      if (spokenForMs < 120) return false;
+    }
+    cancelSpeech(source);
+    return true;
   }
 
   function looksLikeEcho(text) {
@@ -764,6 +806,7 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
     turnBusy = true;
+    bargeInActive = false;
     console.log(`[ws/media][${sidLabel()}] caller turn: ${clean}`);
     transcriptLog.push(`Caller: ${clean}`);
     messages.push({ role: 'user', content: clean });
@@ -788,7 +831,7 @@ mediaWss.on('connection', (ws, req) => {
           fillerTimer = setTimeout(() => {
             fillerTimer = null;
             // Reply may already be ready — skip filler.
-            if (turnBusy && !speaking) {
+            if (turnBusy && !speaking && !bargeInActive) {
               fillerStarted = true;
               speakText(fillerText).then(resolve, resolve);
             } else {
@@ -810,10 +853,19 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       const reply = result?.spokenText || AI_FALLBACK_LINE;
+
+      // Caller interrupted while Gemini was generating — drop the unspoken reply.
+      if (bargeInActive) {
+        console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
+        discardUnspokenAssistant(reply);
+        bargeInActive = false;
+        return;
+      }
+
       transcriptLog.push(`Agent: ${reply}`);
       await speakText(reply);
 
-      if (result?.shouldEndCall && !bargedIn) {
+      if (result?.shouldEndCall && !bargeInActive) {
         console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
         setTimeout(() => {
           try {
@@ -825,7 +877,9 @@ mediaWss.on('connection', (ws, req) => {
       }
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
-      await speakText(AI_FALLBACK_LINE);
+      if (!bargeInActive) {
+        await speakText(AI_FALLBACK_LINE);
+      }
     } finally {
       clearFillerTimer();
       turnBusy = false;
@@ -853,7 +907,7 @@ mediaWss.on('connection', (ws, req) => {
 
   function scheduleUtteranceFlush() {
     if (utteranceTimer) clearTimeout(utteranceTimer);
-    // Fallback if Soniox endpoint marker is delayed/missing.
+    // Fallback if Soniox endpoint marker is delayed/missing (tuned near max_endpoint_delay).
     utteranceTimer = setTimeout(() => flushUtterance(), 900);
   }
 
@@ -862,31 +916,35 @@ mediaWss.on('connection', (ws, req) => {
       const text = String(evt.text).trim();
       if (!text) return;
 
-      // Barge-in while agent audio is playing (including during an in-flight turn).
-      if (speaking) {
-        const spokenForMs = Date.now() - speakStartedAt;
-        if (spokenForMs >= 400 && text.length >= 10 && !looksLikeEcho(text)) {
-          cancelSpeech('caller speech');
-          if (evt.isFinal) {
-            utteranceParts.push(text);
-            scheduleUtteranceFlush();
-          }
-        }
+      const isInterim = !evt.isFinal;
+
+      // Instant barge-in on interim tokens while TTS plays or Gemini is generating.
+      if (isInterim) {
+        maybeBargeIn(text, 'interim speech');
         return;
       }
 
-      // Ignore STT while Gemini is thinking / filler pending (no agent audio yet).
-      if (turnBusy) return;
-
-      if (evt.isFinal) {
-        utteranceParts.push(text);
-        scheduleUtteranceFlush();
+      // Finals: barge if needed, then accumulate for the next customer turn.
+      maybeBargeIn(text, 'final speech');
+      if (speaking && !bargeInActive) {
+        // Still playing and not confident it was a barge — ignore finals (echo).
+        return;
       }
+      utteranceParts.push(text);
+      scheduleUtteranceFlush();
       return;
     }
-    if (evt.type === 'endpoint') {
-      if (speaking) return;
-      if (turnBusy) return;
+
+    if (evt.type === 'endpoint' || evt.type === 'finished') {
+      // Do not clear bargeInActive while a Gemini turn is still in flight — that flag
+      // must survive until runCallerTurn discards the unspoken reply.
+      if (!turnBusy) {
+        bargeInActive = false;
+      }
+      if (speaking) {
+        // Rare: endpoint while still speaking without a barge — wait for silence path.
+        return;
+      }
       flushUtterance();
     }
   }
@@ -919,8 +977,9 @@ mediaWss.on('connection', (ws, req) => {
       tts = createSonioxTtsSession({
         callSid: sidLabel(),
         onAudio: (pcm) => {
-          // Drop outbound audio after barge-in cancel.
+          // Drop outbound audio after barge-in cancel / superseded playback generation.
           if (!speaking) return;
+          if (activePlaybackGeneration !== playbackGeneration) return;
           if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         },
       });
