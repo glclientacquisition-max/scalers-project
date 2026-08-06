@@ -98,6 +98,40 @@ function buildMediaStreamUrl(req) {
   return `${wsProto}://${host}/ws/media`;
 }
 
+/** Digits-only phone compare (+2547… vs 2547…). */
+function phoneDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function phonesMatch(a, b) {
+  const da = phoneDigits(a);
+  const db = phoneDigits(b);
+  return Boolean(da && db && da === db);
+}
+
+/**
+ * WebRTC / some SautiKit payloads put our tenant DID in callerNumber.
+ * If `from` matches a known tenant DID, swap so:
+ *   from = customer (caller)
+ *   to   = tenant DID (agent number)
+ */
+function correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids = [] }) {
+  const dids = tenantDids.filter(Boolean);
+  if (!fromNumber || !dids.length) {
+    return { fromNumber, toNumber, swapped: false };
+  }
+  const fromIsTenantDid = dids.some((did) => phonesMatch(fromNumber, did));
+  if (!fromIsTenantDid) {
+    return { fromNumber, toNumber, swapped: false };
+  }
+  // Already looks correct if `to` is also our DID and `from` isn't — shouldn't reach here.
+  return {
+    fromNumber: toNumber || fromNumber,
+    toNumber: fromNumber,
+    swapped: true,
+  };
+}
+
 /** Normalize SautiKit voice webhook fields (live payload shape). */
 function extractInboundCallFields(body = {}) {
   const nested = body.call || body.payload || body.data || {};
@@ -179,11 +213,30 @@ function shouldSkipMediaStream(callSessionState, body = {}) {
 async function handleVoiceIncoming(req, res) {
   try {
     const extracted = extractInboundCallFields(req.body);
-    const fromNumber = extracted.fromNumber;
-    const toNumber = extracted.toNumber;
+    let fromNumber = extracted.fromNumber;
+    let toNumber = extracted.toNumber;
     const callSessionState = extracted.callSessionState;
     // Always have a durable id for Supabase even if SautiKit omits CallSid.
     const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
+
+    // Load tenant DIDs and undo WebRTC/header flips before persisting.
+    let tenantDids = [];
+    try {
+      tenantDids = await db.listActiveTenantDids();
+    } catch (err) {
+      console.warn('[voice/incoming] listActiveTenantDids failed:', err?.message || err);
+      tenantDids = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+    }
+    const corrected = correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids });
+    if (corrected.swapped) {
+      console.warn('[voice/incoming] caller/callee looked flipped (from matched tenant DID) — swapping', {
+        before: { fromNumber, toNumber },
+        after: { fromNumber: corrected.fromNumber, toNumber: corrected.toNumber },
+        tenantDids,
+      });
+    }
+    fromNumber = corrected.fromNumber;
+    toNumber = corrected.toNumber;
 
     console.log('[voice/incoming]', {
       path: req.path || req.url,
@@ -191,6 +244,7 @@ async function handleVoiceIncoming(req, res) {
       callSidSource: extracted.callSid ? 'payload' : 'fallback',
       fromNumber,
       toNumber,
+      swapped: corrected.swapped,
       callSessionState: callSessionState || '(initial)',
       host: req.headers.host,
       bodyKeys: Object.keys(req.body || {}),
