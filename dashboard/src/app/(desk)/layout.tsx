@@ -27,8 +27,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
               Business
             </Link>
             {showOpsNav ? (
-              <Link href="/numbers" className="text-[var(--ink)] hover:text-[var(--accent)]">
-                DID pool
+              <Link href="/admin" className="text-[var(--ink)] hover:text-[var(--accent)]">
+                Admin
               </Link>
             ) : null}
             <form action="/api/logout" method="post">

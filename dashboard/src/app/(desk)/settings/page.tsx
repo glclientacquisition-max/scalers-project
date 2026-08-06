@@ -45,8 +45,8 @@ export default async function SettingsPage() {
         </p>
         {pendingDid ? (
           <p className="mt-2 text-xs text-[var(--ink-soft)]">
-            Waiting for a SautiKit DID from the number pool. Ops can assign one under{" "}
-            <span className="font-medium">DID pool</span> (legacy admin login).
+            Waiting for a phone number from the pool. Platform ops can assign one under{" "}
+            <span className="font-medium">Admin → Businesses</span>.
           </p>
         ) : null}
         <div className="mt-6">

@@ -17,10 +17,11 @@ The Auth trigger provisions a `tenants` row + `tenant_members` mapping. The sign
 
 1. Apply `docs/supabase/did_number_pool.sql` in Supabase.
 2. Point spare SautiKit DIDs’ webhooks at Railway.
-3. Login as ops (`admin@sauti.local` + `DASHBOARD_PASSWORD`) → **DID pool** → add available numbers.
-4. New signups auto-claim the next DID; pending tenants can be assigned from the same page.
+3. Apply `docs/supabase/super_admin_ops.sql` (release/remove business helpers + optional Jirani teardown).
+4. Login as ops (`admin@sauti.local` + `DASHBOARD_PASSWORD`) → **Admin**.
+5. Use **Numbers** to seed DIDs; **Businesses** to assign / release / remove.
 
-See `docs/PRODUCTION_DID_POOL.md`.
+See `docs/PRODUCTION_DID_POOL.md` and `docs/SUPER_ADMIN_REQUIREMENTS.md`.
 
 ## Local
 
