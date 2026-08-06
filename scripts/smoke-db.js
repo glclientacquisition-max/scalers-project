@@ -1,11 +1,40 @@
 #!/usr/bin/env node
-// Smoke-test Supabase calls / transcripts / storage without placing a phone call.
+// Smoke-test Supabase calls / transcripts / storage against the live schema.
 // Usage: node scripts/smoke-db.js
 
 require('dotenv').config();
 
+async function ensureTenant(supabase) {
+  const { data: existing } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) return existing.id;
+
+  const { data, error } = await supabase
+    .from('tenants')
+    .insert({
+      business_name: 'Phase1 Smoke Tenant',
+      sautikit_virtual_number: '+254200000001',
+      whatsapp_notification_number: '+254700000000',
+      is_active: true,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
 async function main() {
+  const { supabase } = require('../src/lib/supabaseClient');
   const db = require('../src/db');
+
+  const tenantId = await ensureTenant(supabase);
+  process.env.TENANT_ID = tenantId;
+  console.log('tenant:', tenantId);
+
   const callSid = `SMOKE_${Date.now()}`;
 
   console.log('upsertCall…');
@@ -13,6 +42,7 @@ async function main() {
     callSid,
     fromNumber: '+254700000001',
     toNumber: '+254200000001',
+    tenantId,
     provider: 'twilio',
   });
   console.log('  call id:', call.id);
@@ -31,7 +61,7 @@ async function main() {
   });
 
   console.log('uploadRecordingBuffer…');
-  const tinyMp3 = Buffer.from('ID3', 'utf8'); // placeholder bytes for Storage ACL check
+  const tinyMp3 = Buffer.from('ID3', 'utf8');
   const uploaded = await db.uploadRecordingBuffer({
     callSid,
     recordingSid: 'SMOKE_REC',
@@ -54,7 +84,11 @@ async function main() {
     reason: finalCall.reason,
     recording_url: Boolean(finalCall.recording_url),
     status: finalCall.status,
+    whatsapp_sent: finalCall.whatsapp_sent,
   });
+
+  const marked = await db.markWhatsappSent(callSid);
+  console.log('markWhatsappSent:', marked);
 
   console.log('✓ smoke-db passed');
 }

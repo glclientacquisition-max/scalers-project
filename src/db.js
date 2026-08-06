@@ -1,7 +1,11 @@
 // src/db.js
-// Supabase persistence for calls, transcripts, and call-recordings storage.
-// Keeps the same function names as the former SQLite db.js so server.js
-// only needs async/await at call sites.
+// Supabase persistence mapped to the live schema:
+//   tenants(business_name, sautikit_virtual_number, …)
+//   calls(tenant_id, caller_number, sautikit_call_sid, recording_url, summary, …)
+//   transcripts(call_id, speaker, text_content, latency_ms)
+//   storage bucket: call-recordings
+//
+// Preserves the orchestration-facing API used by server.js (async).
 
 const { supabase } = require('./lib/supabaseClient');
 
@@ -16,84 +20,173 @@ function throwIfError(context, error) {
   }
 }
 
+function parseSummary(summary) {
+  if (!summary) return {};
+  if (typeof summary === 'object') return summary;
+  try {
+    const parsed = JSON.parse(summary);
+    return parsed && typeof parsed === 'object' ? parsed : { text: summary };
+  } catch {
+    return { text: summary };
+  }
+}
+
+function serializeSummary(meta) {
+  return JSON.stringify(meta || {});
+}
+
+/** Map a live `calls` row to the shape server.js historically expected from SQLite. */
+function shapeCall(row) {
+  if (!row) return null;
+  const meta = parseSummary(row.summary);
+  return {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    call_sid: row.sautikit_call_sid,
+    from_number: row.caller_number,
+    to_number: meta.to_number || null,
+    name: meta.name || null,
+    reason: meta.reason || null,
+    recording_url: row.recording_url || null,
+    recording_sid: meta.recording_sid || null,
+    recording_path: meta.recording_path || null,
+    status: row.status || null,
+    whatsapp_sent: Boolean(meta.whatsapp_sent),
+    duration_seconds: row.duration_seconds ?? null,
+    created_at: row.created_at,
+    summary: row.summary,
+    _raw: row,
+  };
+}
+
 async function resolveTenantId({ toNumber, tenantId }) {
   if (tenantId) return tenantId;
   if (DEFAULT_TENANT_ID) return DEFAULT_TENANT_ID;
-  if (!toNumber) return null;
 
-  const { data, error } = await supabase
+  if (toNumber) {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('sautikit_virtual_number', toNumber)
+      .maybeSingle();
+    throwIfError('resolveTenantId(by DID)', error);
+    if (data?.id) return data.id;
+  }
+
+  // Fall back to the first active tenant (single-tenant deployments).
+  const { data: fallback, error: fallbackError } = await supabase
     .from('tenants')
     .select('id')
-    .eq('did_e164', toNumber)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .maybeSingle();
+  throwIfError('resolveTenantId(fallback)', fallbackError);
+  if (fallback?.id) return fallback.id;
 
-  throwIfError('resolveTenantId', error);
-  return data?.id || null;
+  throw new Error(
+    '[db] No tenant_id available. Set TENANT_ID or create a tenants row with sautikit_virtual_number.'
+  );
 }
 
 async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'twilio' }) {
   const resolvedTenantId = await resolveTenantId({ toNumber, tenantId });
+  const existing = await getCall(callSid);
+  const meta = existing
+    ? parseSummary(existing.summary)
+    : {};
+
+  meta.provider = provider;
+  if (toNumber) meta.to_number = toNumber;
 
   const row = {
-    call_sid: callSid,
-    from_number: fromNumber || null,
-    to_number: toNumber || null,
-    provider,
-    status: 'in_progress',
-    updated_at: new Date().toISOString(),
+    tenant_id: resolvedTenantId,
+    caller_number: fromNumber || existing?.from_number || 'unknown',
+    sautikit_call_sid: callSid,
+    status: existing?.status || 'in_progress',
+    summary: serializeSummary(meta),
   };
-
-  if (resolvedTenantId) {
-    row.tenant_id = resolvedTenantId;
-  }
 
   const { data, error } = await supabase
     .from('calls')
-    .upsert(row, { onConflict: 'call_sid' })
+    .upsert(row, { onConflict: 'sautikit_call_sid' })
     .select('*')
     .single();
 
   throwIfError('upsertCall', error);
-  return data;
+  return shapeCall(data);
 }
 
 async function saveCallerInfo({ callSid, name, reason }) {
+  const existing = await getCall(callSid);
+  if (!existing) {
+    throw new Error(`[db] saveCallerInfo: no call for ${callSid}`);
+  }
+
+  const meta = parseSummary(existing.summary);
+  meta.name = name;
+  meta.reason = reason;
+
   const { data, error } = await supabase
     .from('calls')
-    .update({
-      name,
-      reason,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('call_sid', callSid)
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
     .select('*')
     .maybeSingle();
 
   throwIfError('saveCallerInfo', error);
-  return data;
+  return shapeCall(data);
 }
 
-async function appendTranscript({ callSid, transcript }) {
+/**
+ * Replace transcript turns for a call.
+ * Accepts either the legacy full-text blob ("Caller: …\\nAgent: …") or
+ * an array of { speaker, text, latencyMs }.
+ */
+async function appendTranscript({ callSid, transcript, turns }) {
   const call = await getCall(callSid);
   if (!call) {
     console.warn(`[db] appendTranscript: no call row for ${callSid}`);
     return null;
   }
 
-  const payload = {
+  let rows = turns;
+  if (!rows) {
+    rows = String(transcript || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const caller = /^Caller:\s*(.*)$/i.exec(line);
+        if (caller) return { speaker: 'caller', text: caller[1] };
+        const agent = /^Agent:\s*(.*)$/i.exec(line);
+        if (agent) return { speaker: 'agent', text: agent[1] };
+        return { speaker: 'system', text: line };
+      });
+  }
+
+  // Full replace keeps the blob-style updates from server.js idempotent.
+  const { error: deleteError } = await supabase
+    .from('transcripts')
+    .delete()
+    .eq('call_id', call.id);
+  throwIfError('appendTranscript(delete)', deleteError);
+
+  if (rows.length === 0) return [];
+
+  const payload = rows.map((turn) => ({
     call_id: call.id,
-    call_sid: callSid,
-    content: transcript,
-    updated_at: new Date().toISOString(),
-  };
+    speaker: turn.speaker,
+    text_content: turn.text,
+    latency_ms: turn.latencyMs ?? null,
+  }));
 
   const { data, error } = await supabase
     .from('transcripts')
-    .upsert(payload, { onConflict: 'call_id' })
-    .select('*')
-    .maybeSingle();
+    .insert(payload)
+    .select('*');
 
-  throwIfError('appendTranscript', error);
+  throwIfError('appendTranscript(insert)', error);
   return data;
 }
 
@@ -101,33 +194,32 @@ async function getCall(callSid) {
   const { data, error } = await supabase
     .from('calls')
     .select('*')
-    .eq('call_sid', callSid)
+    .eq('sautikit_call_sid', callSid)
     .maybeSingle();
 
   throwIfError('getCall', error);
-  return data;
+  return shapeCall(data);
 }
 
 async function markWhatsappSent(callSid) {
+  const existing = await getCall(callSid);
+  if (!existing) return false;
+  if (existing.whatsapp_sent) return false;
+
+  const meta = parseSummary(existing.summary);
+  meta.whatsapp_sent = true;
+
   const { data, error } = await supabase
     .from('calls')
-    .update({
-      whatsapp_sent: true,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('call_sid', callSid)
-    .eq('whatsapp_sent', false)
-    .select('call_sid')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('id')
     .maybeSingle();
 
   throwIfError('markWhatsappSent', error);
   return Boolean(data);
 }
 
-/**
- * Download a remote recording (e.g. Twilio) and upload it to the
- * call-recordings Supabase Storage bucket. Returns a durable path + signed URL.
- */
 async function uploadRecordingBuffer({
   callSid,
   recordingSid,
@@ -146,7 +238,6 @@ async function uploadRecordingBuffer({
 
   throwIfError('uploadRecordingBuffer', uploadError);
 
-  // 7-day signed URL for WhatsApp / dashboard playback (private bucket).
   const { data: signed, error: signError } = await supabase.storage
     .from(RECORDINGS_BUCKET)
     .createSignedUrl(objectPath, 60 * 60 * 24 * 7);
@@ -159,11 +250,6 @@ async function uploadRecordingBuffer({
   };
 }
 
-/**
- * Attach a recording to the call row. Prefer uploading bytes to Storage when
- * sourceUrl is provided (downloads via optional basic auth for Twilio).
- * Falls back to storing sourceUrl directly if download/upload fails.
- */
 async function attachRecording({
   callSid,
   recordingUrl,
@@ -171,6 +257,11 @@ async function attachRecording({
   sourceUrl,
   authHeader,
 }) {
+  const existing = await getCall(callSid);
+  if (!existing) {
+    throw new Error(`[db] attachRecording: no call for ${callSid}`);
+  }
+
   let finalUrl = recordingUrl || sourceUrl || null;
   let recordingPath = null;
 
@@ -202,38 +293,23 @@ async function attachRecording({
     }
   }
 
-  const update = {
-    recording_url: finalUrl,
-    recording_sid: recordingSid || null,
-    status: 'complete',
-    updated_at: new Date().toISOString(),
-  };
+  const meta = parseSummary(existing.summary);
+  if (recordingSid) meta.recording_sid = recordingSid;
+  if (recordingPath) meta.recording_path = recordingPath;
 
-  // recording_path is optional — only set when the column exists / upload succeeded.
-  if (recordingPath) {
-    update.recording_path = recordingPath;
-  }
-
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from('calls')
-    .update(update)
-    .eq('call_sid', callSid)
+    .update({
+      recording_url: finalUrl,
+      status: 'complete',
+      summary: serializeSummary(meta),
+    })
+    .eq('sautikit_call_sid', callSid)
     .select('*')
     .maybeSingle();
 
-  // If live schema lacks recording_path, retry without it.
-  if (error && recordingPath && /recording_path/i.test(error.message || '')) {
-    delete update.recording_path;
-    ({ data, error } = await supabase
-      .from('calls')
-      .update(update)
-      .eq('call_sid', callSid)
-      .select('*')
-      .maybeSingle());
-  }
-
   throwIfError('attachRecording', error);
-  return data;
+  return shapeCall(data);
 }
 
 module.exports = {
@@ -245,4 +321,5 @@ module.exports = {
   getCall,
   markWhatsappSent,
   RECORDINGS_BUCKET,
+  shapeCall,
 };
