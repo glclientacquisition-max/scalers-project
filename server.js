@@ -249,29 +249,28 @@ app.post('/voice/recording-status', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. Media + ConversationRelay WebSockets
-//    /ws/media  — SautiKit bidirectional media stream (Localtunnel test path)
-//    /ws/relay  — legacy Twilio ConversationRelay text relay
+// 3. Media WebSocket (/ws/media) — SautiKit audio.drachtio.org fork
+//    Use noServer + manual upgrade so we never fight another WSS on :3000
+//    (dual path-based WSS on one HTTP server is a common cause of bare 1006).
 // ---------------------------------------------------------------------------
 const server = http.createServer(app);
 
 const mediaWss = new WebSocketServer({
-  server,
-  path: '/ws/media',
-  // Disable per-message deflate — audio forks / some proxies misbehave with it.
+  noServer: true,
   perMessageDeflate: false,
-  // SautiKit forks audio with the audio.drachtio.org subprotocol.
   handleProtocols: (protocols) => {
     try {
       const list = Array.from(protocols || []);
       if (list.includes('audio.drachtio.org')) return 'audio.drachtio.org';
-      // Accept whatever the client offered so we never refuse the handshake.
       return list[0] || 'audio.drachtio.org';
     } catch {
       return 'audio.drachtio.org';
     }
   },
 });
+
+// Legacy ConversationRelay path (unused in Phase 2 SautiKit flow).
+const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
 function toNodeBuffer(data) {
   if (Buffer.isBuffer(data)) return data;
@@ -289,7 +288,40 @@ function looksLikeJsonText(text) {
   return trimmed.startsWith('{') || trimmed.startsWith('[');
 }
 
+server.on('upgrade', (req, socket, head) => {
+  try {
+    const pathname = new URL(req.url || '', 'http://localhost').pathname;
+    console.log(`[upgrade] pathname=${pathname} proto=${req.headers['sec-websocket-protocol'] || ''}`);
+
+    if (pathname === '/ws/media') {
+      mediaWss.handleUpgrade(req, socket, head, (ws) => {
+        mediaWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    if (pathname === '/ws/relay') {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    console.warn(`[upgrade] rejecting unknown path ${pathname}`);
+    socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+    socket.destroy();
+  } catch (err) {
+    console.error('[upgrade] error:', err?.message || err);
+    try {
+      socket.destroy();
+    } catch {
+      /* ignore */
+    }
+  }
+});
+
 mediaWss.on('connection', (ws, req) => {
+  const connectedAt = Date.now();
   let sessionCallSid = null;
   try {
     const q = new URL(req.url || '', 'http://localhost').searchParams;
@@ -304,7 +336,10 @@ mediaWss.on('connection', (ws, req) => {
   console.log('[ws/media] upgrade headers:', JSON.stringify(req.headers, null, 2));
 
   try {
-    req.socket.setKeepAlive(true, 10000);
+    if (req.socket) {
+      req.socket.setKeepAlive(true, 10000);
+      req.socket.setNoDelay(true);
+    }
   } catch {
     /* ignore */
   }
@@ -314,7 +349,6 @@ mediaWss.on('connection', (ws, req) => {
     ws.isAlive = true;
   });
 
-  // Count frames so we can see if anything arrives before a 1006.
   let textFrames = 0;
   let binaryFrames = 0;
 
@@ -359,7 +393,6 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       binaryFrames += 1;
-      // Log first few audio frames verbosely, then every 50th.
       if (binaryFrames <= 5 || binaryFrames % 50 === 0) {
         console.log(
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
@@ -375,8 +408,9 @@ mediaWss.on('connection', (ws, req) => {
   });
 
   ws.on('close', (code, reason) => {
+    const ms = Date.now() - connectedAt;
     console.log(
-      `[ws/media] closed code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
+      `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
   });
 
@@ -385,7 +419,6 @@ mediaWss.on('connection', (ws, req) => {
   });
 });
 
-// Keepalive pings so proxies / SautiKit do not idle-drop the media socket.
 const mediaKeepalive = setInterval(() => {
   for (const ws of mediaWss.clients) {
     if (ws.isAlive === false) {
@@ -403,8 +436,6 @@ const mediaKeepalive = setInterval(() => {
 }, 15000);
 
 mediaWss.on('close', () => clearInterval(mediaKeepalive));
-
-const wss = new WebSocketServer({ server, path: '/ws/relay' });
 
 // ---------------------------------------------------------------------------
 // WhatsApp notification to the business owner. Fires from two different
