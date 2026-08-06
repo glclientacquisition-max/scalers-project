@@ -905,12 +905,6 @@ mediaWss.on('connection', (ws, req) => {
     });
   }
 
-  function scheduleUtteranceFlush() {
-    if (utteranceTimer) clearTimeout(utteranceTimer);
-    // Fallback if Soniox endpoint marker is delayed/missing (tuned near max_endpoint_delay).
-    utteranceTimer = setTimeout(() => flushUtterance(), 900);
-  }
-
   function onSttEvent(evt) {
     if (evt.type === 'transcript' && evt.text) {
       const text = String(evt.text).trim();
@@ -918,20 +912,20 @@ mediaWss.on('connection', (ws, req) => {
 
       const isInterim = !evt.isFinal;
 
-      // Instant barge-in on interim tokens while TTS plays or Gemini is generating.
+      // Instant barge-in on interim tokens — stop TTS / discard Gemini audio only.
+      // Do NOT start an LLM turn from interim text (wait for endpoint).
       if (isInterim) {
         maybeBargeIn(text, 'interim speech');
         return;
       }
 
-      // Finals: barge if needed, then accumulate for the next customer turn.
+      // Finals: barge if needed, then buffer until Soniox emits endpoint.
       maybeBargeIn(text, 'final speech');
       if (speaking && !bargeInActive) {
         // Still playing and not confident it was a barge — ignore finals (echo).
         return;
       }
       utteranceParts.push(text);
-      scheduleUtteranceFlush();
       return;
     }
 
@@ -945,6 +939,7 @@ mediaWss.on('connection', (ws, req) => {
         // Rare: endpoint while still speaking without a barge — wait for silence path.
         return;
       }
+      // Only now compile buffered finals and send a customer turn to Gemini.
       flushUtterance();
     }
   }

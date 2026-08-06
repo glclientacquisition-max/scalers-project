@@ -42,15 +42,16 @@ function createSonioxSttSession({ callSid, onEvent = () => {} }) {
         num_channels: 1,
         language_hints: ['en', 'sw'],
         // Faster turn-taking (stt-rt-v5 endpoint detection tuning).
+        // 1200ms max delay gives natural pauses room without fragmenting turns.
         enable_endpoint_detection: true,
         endpoint_latency_adjustment_level: 2,
-        max_endpoint_delay_ms: 800,
+        max_endpoint_delay_ms: 1200,
         endpoint_sensitivity: 0.5,
       };
       ws.send(JSON.stringify(config));
       opened = true;
       console.log(
-        `[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE} endpoint={latencyAdj:2,maxDelayMs:800,sensitivity:0.5}`
+        `[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE} endpoint={latencyAdj:2,maxDelayMs:1200,sensitivity:0.5}`
       );
       while (pending.length) {
         const chunk = pending.shift();
