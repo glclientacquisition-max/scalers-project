@@ -77,39 +77,105 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
+/**
+ * Build the media WebSocket URL from the inbound request host so Localtunnel /
+ * ngrok / production reverse proxies work without hard-coding PUBLIC_BASE_URL.
+ */
+function buildMediaStreamUrl(req) {
+  const host = req.headers.host;
+  if (!host) {
+    throw new Error('Missing Host header — cannot build Stream WebSocket URL');
+  }
+  const forwarded = String(req.headers['x-forwarded-proto'] || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  const wsProto = forwarded === 'http' ? 'ws' : 'wss';
+  return `${wsProto}://${host}/ws/media`;
+}
+
+/** Normalize SautiKit (Twilio-compatible) voice webhook fields. */
+function extractInboundCallFields(body = {}) {
+  const callSid =
+    body.CallSid ||
+    body.callSid ||
+    body.call_sid ||
+    body.call_id ||
+    body.CallId ||
+    null;
+  const fromNumber =
+    body.From ||
+    body.from ||
+    body.callerNumber ||
+    body.caller_number ||
+    null;
+  const toNumber =
+    body.To ||
+    body.to ||
+    body.destinationNumber ||
+    body.destination_number ||
+    null;
+  const callSessionState = String(
+    body.callSessionState || body.CallSessionState || ''
+  );
+  return { callSid, fromNumber, toNumber, callSessionState };
+}
+
+function shouldSkipMediaStream(callSessionState) {
+  const state = callSessionState.toLowerCase();
+  if (!state) return false;
+  return (
+    state.includes('streamstopped') ||
+    state.includes('streamerror') ||
+    state.includes('completed') ||
+    state.includes('hangup') ||
+    state.includes('failed')
+  );
+}
+
 // ---------------------------------------------------------------------------
-// 1. Inbound call webhook — Twilio hits this the moment the forwarded call
-//    reaches your number. Returns TwiML that:
-//      (a) starts a background recording of the whole call
-//      (b) connects the call to ConversationRelay, which streams transcribed
-//          speech to our WebSocket and plays back whatever text we send.
+// 1. Inbound voice webhook — SautiKit POSTs here (voice_callback_url).
+//    Respond with TwiML/XML <Connect><Stream/></Connect> (JSON Stream is still
+//    on SautiKit's roadmap). WebSocket URL is derived from Host (Localtunnel).
 // ---------------------------------------------------------------------------
-app.post('/voice/incoming', validateTwilioWebhook, async (req, res) => {
+app.post('/voice/incoming', async (req, res) => {
   try {
-    const { CallSid, From, To } = req.body;
+    const { callSid, fromNumber, toNumber, callSessionState } = extractInboundCallFields(req.body);
 
-    await db.upsertCall({ callSid: CallSid, fromNumber: From, toNumber: To, provider: 'twilio' });
+    console.log('[voice/incoming]', {
+      callSid,
+      fromNumber,
+      toNumber,
+      callSessionState: callSessionState || '(initial)',
+      host: req.headers.host,
+    });
 
-    const wsUrl = `${PUBLIC_BASE_URL.replace(/^https/, 'wss')}/ws/relay`;
-    const recordingCallback = `${PUBLIC_BASE_URL}/voice/recording-status`;
+    // SautiKit re-invokes the voice URL on StreamStopped / Completed / etc.
+    // Returning another Stream document re-forks and errors — send empty XML.
+    if (shouldSkipMediaStream(callSessionState)) {
+      return res
+        .type('text/xml')
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
 
-    const twiml = `
-      <?xml version="1.0" encoding="UTF-8"?>
-      <Response>
-        <Start>
-          <Recording recordingStatusCallback="${recordingCallback}" recordingStatusCallbackEvent="completed" />
-        </Start>
-        <Connect>
-          <ConversationRelay
-            url="${wsUrl}"
-            welcomeGreeting="Hi! Sorry we missed your call. Can you tell me your name and the reason you're calling?"
-            ttsProvider="Google"
-            voice="en-US-Chirp3-HD-Aoede"
-            language="en-US"
-          />
-        </Connect>
-      </Response>
-    `.trim();
+    if (callSid) {
+      await db.upsertCall({
+        callSid,
+        fromNumber,
+        toNumber,
+        provider: 'sautikit',
+      });
+    } else {
+      console.warn('[voice/incoming] No call_sid/CallSid in payload; skipping DB upsert');
+    }
+
+    const streamUrl = buildMediaStreamUrl(req);
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Connect>
+        <Stream url="${streamUrl}" />
+    </Connect>
+</Response>`;
 
     res.type('text/xml').send(twiml);
   } catch (err) {
@@ -148,15 +214,52 @@ app.post('/voice/recording-status', validateTwilioWebhook, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. ConversationRelay WebSocket — one connection per active call.
-//    Message shapes (from Twilio docs):
-//      inbound:  { type: "setup", callSid, from, to }
-//                { type: "prompt", voicePrompt: "<transcribed caller speech>" }
-//                { type: "interrupt", ... }
-//      outbound: { type: "text", token: "<text to speak>", last: true }
-//                { type: "end", handoffData: "..." }  // ends the call
+// 3. Media + ConversationRelay WebSockets
+//    /ws/media  — SautiKit bidirectional media stream (Localtunnel test path)
+//    /ws/relay  — legacy Twilio ConversationRelay text relay
 // ---------------------------------------------------------------------------
 const server = http.createServer(app);
+
+const mediaWss = new WebSocketServer({
+  server,
+  path: '/ws/media',
+  // SautiKit forks audio with the audio.drachtio.org subprotocol.
+  handleProtocols: (protocols) => {
+    const list = Array.from(protocols);
+    if (list.includes('audio.drachtio.org')) return 'audio.drachtio.org';
+    return list[0] || false;
+  },
+});
+
+mediaWss.on('connection', (ws, req) => {
+  console.log(`[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'}`);
+
+  ws.on('message', (data, isBinary) => {
+    if (!isBinary && typeof data === 'string') {
+      console.log('[ws/media] text frame:', data.slice(0, 500));
+      return;
+    }
+    if (!isBinary && Buffer.isBuffer(data)) {
+      const asText = data.toString('utf8');
+      // First frame from SautiKit is often JSON openMetadata as text.
+      if (asText.startsWith('{') || asText.startsWith('[')) {
+        console.log('[ws/media] text/json frame:', asText.slice(0, 500));
+        return;
+      }
+    }
+    const bytes = Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data);
+    console.log(`[ws/media] binary audio frame (${bytes} bytes)`);
+  });
+
+  ws.on('close', (code, reason) => {
+    console.log(`[ws/media] closed code=${code} reason=${reason?.toString?.() || ''}`);
+  });
+
+  ws.on('error', (err) => {
+    console.error('[ws/media] error:', err?.message || err);
+  });
+});
+
 const wss = new WebSocketServer({ server, path: '/ws/relay' });
 
 // ---------------------------------------------------------------------------
@@ -408,8 +511,9 @@ function parseGeminiResponse(responseText) {
 
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
-  console.log(`📞 Voice webhook: ${PUBLIC_BASE_URL}/voice/incoming`);
-  console.log(`📡 Relay WebSocket: ${PUBLIC_BASE_URL.replace(/^https/, 'wss')}/ws/relay`);
+  console.log(`📞 Voice webhook: POST /voice/incoming (SautiKit XML Stream → /ws/media)`);
+  console.log(`📡 Media WebSocket: /ws/media (Host-based wss URL for Localtunnel)`);
+  console.log(`📡 Relay WebSocket: /ws/relay (legacy Twilio ConversationRelay)`);
   console.log(`✓ Gemini SDK initialized`);
   console.log(`✓ Twilio SDK initialized`);
   console.log(`✓ Supabase database initialized`);
