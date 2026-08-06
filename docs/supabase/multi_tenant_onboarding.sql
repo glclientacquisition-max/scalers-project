@@ -52,8 +52,11 @@ as $$
     E'2. Get the caller''s name.\n'
     E'3. Get a short reason for their call.\n'
     E'4. Confirm name + reason, say the business will get back to them soon, then goodbye.\n\n'
-    E'Speak warm, natural conversational English or Kiswahili — match the caller.\n'
-    E'Keep every spoken reply to 1–2 short sentences.',
+    E'Conversation rules (live phone — be conclusive and intelligent):\n'
+    E'- Answer the caller''s actual question first — do not stall with holding phrases.\n'
+    E'- Ask at most ONE clarifying question per turn.\n'
+    E'- Mirror the caller''s language every turn: English → English, Kiswahili → Kiswahili. If they switch, switch with them.\n'
+    E'- Keep every spoken reply to 1–2 short sentences.',
     coalesce(nullif(trim(p_business_name), ''), 'the business'),
     coalesce(nullif(trim(p_business_name), ''), 'the business')
   );

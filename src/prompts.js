@@ -14,10 +14,18 @@ Pricing: we quote after understanding the job — do not invent exact prices
 Payment: M-Pesa and cash on completion
 Language: English, Kiswahili, and light Sheng are all fine`;
 
+const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and intelligent):
+- Answer the caller's actual question first with a clear, complete reply — do not stall with "let me check" / "sawa nakucheckia" type holding lines.
+- Ask at most ONE clarifying question per turn.
+- If you already have enough to help, give the answer and move the call forward (name → need → confirm → goodbye).
+- Mirror the caller's language every turn: English → English, Kiswahili → Kiswahili. If they switch, switch with them.
+- Keep every spoken reply to 1–2 short sentences. No lists, no markdown, no stage directions.
+- Never invent prices, availability, or guarantees. If unknown, say the team will follow up.`;
+
 function buildGreeting(businessName) {
   const name = (businessName || process.env.BUSINESS_NAME || 'the business').trim();
   if (process.env.VOICE_GREETING) return process.env.VOICE_GREETING;
-  return `Habari, you've reached ${name}. How can I help you today?`;
+  return `Hello, you've reached ${name}. How can I help you today?`;
 }
 
 /**
@@ -37,6 +45,8 @@ function buildSystemPrompt(profile = {}) {
   // Tenant-provided full prompt wins, but we still append the tool/end markers contract.
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
     return `${String(profile.llmSystemPrompt).trim()}
+
+${CONVERSATION_RULES}
 
 When you have both the caller's name and reason, also append:
 ###TOOL###
@@ -58,8 +68,7 @@ Your job on this call:
 3. Get a short reason for their call / what they need.
 4. Briefly confirm name + reason, say the business will get back to them soon, then goodbye.
 
-Speak warm, natural conversational English or Kiswahili — match the caller.
-Keep every spoken reply to 1-2 short sentences (live phone call).
+${CONVERSATION_RULES}
 
 When you have both name and reason, respond with one natural confirmation sentence and append:
 ###TOOL###
@@ -76,4 +85,5 @@ module.exports = {
   buildSystemPrompt,
   buildGreeting,
   DEFAULT_KNOWLEDGE,
+  CONVERSATION_RULES,
 };
