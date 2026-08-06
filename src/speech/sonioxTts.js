@@ -4,10 +4,17 @@
 const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
 
+const { normalizeForTts } = require('./ttsNormalize');
+
 const SONIOX_TTS_URL =
   process.env.SONIOX_TTS_URL || 'wss://tts-rt.soniox.com/tts-websocket';
 const SONIOX_TTS_MODEL = process.env.SONIOX_TTS_MODEL || 'tts-rt-v1';
 const SAMPLE_RATE = Number(process.env.SONIOX_SAMPLE_RATE || 16000);
+/** Slightly under 1.0 often sounds clearer on Kenyan mobile calls. */
+const TTS_SPEED = Math.min(
+  1.3,
+  Math.max(0.7, Number(process.env.SONIOX_TTS_SPEED || 0.95))
+);
 
 function isSonioxTtsConfigured() {
   return Boolean(process.env.SONIOX_API_KEY && process.env.SONIOX_VOICE);
@@ -134,7 +141,7 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
    * @param {{ language?: string }} [opts]
    */
   async function speak(text, opts = {}) {
-    const clean = String(text || '').trim();
+    const clean = normalizeForTts(text);
     if (!clean) return { cancelled: false };
     if (closed) throw new Error('TTS session closed');
 
@@ -142,6 +149,10 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
 
     const streamId = `tts-${randomUUID()}`;
     const language = opts.language || process.env.SONIOX_TTS_LANGUAGE || 'en';
+    const speed =
+      opts.speed != null
+        ? Math.min(1.3, Math.max(0.7, Number(opts.speed)))
+        : TTS_SPEED;
 
     const done = new Promise((resolve, reject) => {
       active.set(streamId, { resolve, reject, cancelled: false });
@@ -152,6 +163,7 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
       model: SONIOX_TTS_MODEL,
       language,
       voice,
+      speed,
       audio_format: 'pcm_s16le',
       sample_rate: SAMPLE_RATE,
       stream_id: streamId,
@@ -160,7 +172,7 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
     sendJson({ text: '', text_end: true, stream_id: streamId });
 
     console.log(
-      `[soniox-tts][${callSid}] speak stream=${streamId} lang=${language} chars=${clean.length}`
+      `[soniox-tts][${callSid}] speak stream=${streamId} lang=${language} speed=${speed} chars=${clean.length}`
     );
 
     return done;

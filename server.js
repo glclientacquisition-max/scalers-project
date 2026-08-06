@@ -24,7 +24,9 @@ const {
 const {
   generateDynamicGreeting,
   pickContextualAck,
+  isNonSubstantiveTurn,
 } = require('./src/conversation/dynamicSpeech');
+const { pickTtsLanguage } = require('./src/speech/ttsNormalize');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
   isWhatsAppConfigured,
@@ -742,7 +744,7 @@ mediaWss.on('connection', (ws, req) => {
     lastAgentText = String(text);
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
-    const language = opts.language || ttsLanguageFor(callLanguage);
+    const language = opts.language || pickTtsLanguage(text, callLanguage) || ttsLanguageFor(callLanguage);
     try {
       await tts.speak(text, { language });
     } catch (err) {
@@ -822,9 +824,17 @@ mediaWss.on('connection', (ws, req) => {
     const clean = String(userText || '').replace(/\s+/g, ' ').trim();
     if (!clean) return;
     if (turnBusy) {
-      pendingUtterance = clean;
+      // Merge continuation fragments into one pending utterance (don't drop context).
+      pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
       return;
     }
+
+    // Skip "Okay." / "Hello?" / "Uh, yeah" — do not spend Gemini latency on noise.
+    if (isBackchannel(clean) || isNonSubstantiveTurn(clean)) {
+      console.log(`[ws/media][${sidLabel()}] skip non-substantive turn: ${clean}`);
+      return;
+    }
+
     turnBusy = true;
     bargeInActive = false;
 
@@ -1052,12 +1062,17 @@ mediaWss.on('connection', (ws, req) => {
       await ensureTenantPrompt();
       if (tts) await tts.ready;
 
+      // Instant local greeting by default (correct business name, no Gemini wait).
+      // Set VOICE_GREETING_MODE=gemini only if you want an LLM-written opener.
       greetingLine = await generateDynamicGreeting({
         businessName,
         callSid: sidLabel(),
         generateText: generateGeminiText,
+        mode: process.env.VOICE_GREETING_MODE || 'instant',
       });
-      console.log(`[ws/media][${sidLabel()}] dynamic greeting: ${greetingLine}`);
+      console.log(
+        `[ws/media][${sidLabel()}] greeting mode=${process.env.VOICE_GREETING_MODE || 'instant'}: ${greetingLine}`
+      );
 
       await speakText(greetingLine);
       transcriptLog.push(`Agent: ${greetingLine}`);
@@ -1442,12 +1457,12 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
         contents,
         config: {
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          // Slightly lower temp → more conclusive, less rambling phone replies.
-          temperature: 0.55,
-          maxOutputTokens: 280,
-          // LOW > MINIMAL for coherent bilingual turns; still voice-latency friendly.
+          // Lower temp + short output → faster, clearer phone replies.
+          temperature: 0.45,
+          maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 160),
+          // MINIMAL keeps voice latency down; set GEMINI_THINKING_LEVEL=LOW if needed.
           thinkingConfig: {
-            thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'LOW',
+            thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
           },
         },
       });
