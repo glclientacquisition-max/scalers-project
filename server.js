@@ -73,27 +73,48 @@ function buildMediaStreamUrl(req) {
 
 /** Normalize SautiKit (Twilio-compatible) voice webhook fields. */
 function extractInboundCallFields(body = {}) {
+  const nested = body.call || body.payload || body.data || {};
   const callSid =
     body.CallSid ||
     body.callSid ||
     body.call_sid ||
     body.call_id ||
     body.CallId ||
+    body.CallUUID ||
+    body.callUuid ||
+    body.sessionId ||
+    body.SessionId ||
+    nested.id ||
+    nested.call_id ||
+    nested.callSid ||
+    nested.CallSid ||
     null;
   const fromNumber =
     body.From ||
     body.from ||
     body.callerNumber ||
     body.caller_number ||
+    body.Caller ||
+    nested.from ||
+    nested.caller_number ||
+    nested.callerNumber ||
     null;
   const toNumber =
     body.To ||
     body.to ||
     body.destinationNumber ||
     body.destination_number ||
+    body.Called ||
+    nested.to ||
+    nested.destination_number ||
     null;
   const callSessionState = String(
-    body.callSessionState || body.CallSessionState || ''
+    body.callSessionState ||
+      body.CallSessionState ||
+      body.call_session_state ||
+      body.status ||
+      nested.status ||
+      ''
   );
   return { callSid, fromNumber, toNumber, callSessionState };
 }
@@ -101,12 +122,15 @@ function extractInboundCallFields(body = {}) {
 function shouldSkipMediaStream(callSessionState) {
   const state = callSessionState.toLowerCase();
   if (!state) return false;
+  // Only skip terminal / post-stream edges. Allow Ringing + Answered to open Stream.
   return (
     state.includes('streamstopped') ||
     state.includes('streamerror') ||
     state.includes('completed') ||
     state.includes('hangup') ||
-    state.includes('failed')
+    state.includes('failed') ||
+    state.includes('busy') ||
+    state.includes('no-answer')
   );
 }
 
@@ -133,6 +157,7 @@ app.post('/voice/incoming', async (req, res) => {
       host: req.headers.host,
       bodyKeys: Object.keys(req.body || {}),
     });
+    console.log('[voice/incoming] RAW BODY:', JSON.stringify(req.body, null, 2));
 
     // SautiKit re-invokes the voice URL on StreamStopped / Completed / etc.
     // Returning another Stream document re-forks and errors — send empty XML.
@@ -155,11 +180,12 @@ app.post('/voice/incoming', async (req, res) => {
     }
 
     const streamUrl = buildMediaStreamUrl(req);
+    // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s
+    // (that was causing immediate Completed + WS 1006). Top-level <Stream/>
+    // is the documented XML form; Connect/Stream alone does not hold the call.
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Connect>
-        <Stream url="${streamUrl}" />
-    </Connect>
+    <Stream url="${streamUrl}" name="ai-receptionist" track="inbound_track" connect="true" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />
 </Response>`;
 
     res.type('text/xml').send(twiml);
