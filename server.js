@@ -205,6 +205,129 @@ function shouldSkipMediaStream(callSessionState, body = {}) {
   return skipTokens.some((t) => state.includes(t) || streamEvent.includes(t));
 }
 
+/** Extract callSid from SautiKit event / lifecycle payloads (many shapes). */
+function extractEventCallSid(body = {}) {
+  return (
+    body.call_sid ||
+    body.callSid ||
+    body.CallSid ||
+    body.sessionId ||
+    body.SessionId ||
+    body.data?.call_sid ||
+    body.data?.callSid ||
+    body.data?.sessionId ||
+    body.payload?.call_sid ||
+    body.payload?.callSid ||
+    null
+  );
+}
+
+/** Pull duration (seconds) from whatever field SautiKit used. */
+function extractEventDurationSeconds(body = {}) {
+  const raw =
+    body.duration_seconds ??
+    body.durationSeconds ??
+    body.durationInSeconds ??
+    body.Duration ??
+    body.duration ??
+    body.call_duration ??
+    body.data?.duration_seconds ??
+    body.data?.durationSeconds ??
+    body.data?.duration ??
+    body.payload?.duration_seconds ??
+    body.payload?.duration ??
+    null;
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Detect call termination from workspace events or voice lifecycle callbacks.
+ * Returns { terminal, status } where status is 'complete' | 'failed' | 'no_answer'.
+ */
+function detectCallTermination(body = {}, kind = '') {
+  const kindStr = String(kind || '').toLowerCase();
+  const event =
+    String(
+      body.event ||
+        body.event_type ||
+        body.type ||
+        body.kind ||
+        body.name ||
+        ''
+    ).toLowerCase();
+  const sessionState = String(
+    body.callSessionState ||
+      body.CallSessionState ||
+      body.streamStatus ||
+      body.status ||
+      body.data?.callSessionState ||
+      body.data?.status ||
+      body.payload?.status ||
+      ''
+  ).toLowerCase();
+
+  const haystack = `${kindStr} ${event} ${sessionState}`;
+
+  if (
+    haystack.includes('no-answer') ||
+    haystack.includes('no_answer') ||
+    haystack.includes('noanswer')
+  ) {
+    return { terminal: true, status: 'no_answer' };
+  }
+  if (
+    haystack.includes('fail') ||
+    haystack.includes('error') ||
+    haystack.includes('busy') ||
+    event === 'call.failed' ||
+    kindStr.includes('call.failed')
+  ) {
+    return { terminal: true, status: 'failed' };
+  }
+  if (
+    haystack.includes('completed') ||
+    haystack.includes('complete') ||
+    haystack.includes('hangup') ||
+    haystack.includes('ended') ||
+    event === 'call.completed' ||
+    event === 'call.ended' ||
+    kindStr.includes('call.completed') ||
+    kindStr.includes('call.ended')
+  ) {
+    // Avoid treating recording.completed alone as call completion when no session state.
+    if (haystack.includes('recording') && !haystack.includes('call') && !sessionState.includes('complet')) {
+      return { terminal: false, status: null };
+    }
+    return { terminal: true, status: 'complete' };
+  }
+
+  return { terminal: false, status: null };
+}
+
+async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, source }) {
+  if (!callSid) {
+    console.warn(`[${source}] termination detected but no callSid — skipping DB update`);
+    return null;
+  }
+  try {
+    const updated = await db.updateCallStatus({
+      callSid,
+      status,
+      durationSeconds,
+    });
+    console.log(`[${source}] marked call ${callSid} status=${status}`, {
+      durationSeconds: durationSeconds ?? null,
+      found: Boolean(updated),
+    });
+    return updated;
+  } catch (err) {
+    console.error(`[${source}] updateCallStatus failed:`, err?.message || err);
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 1. Inbound voice webhook — SautiKit POSTs here (voice_callback_url).
 //    Mounted on BOTH `/` and `/voice/incoming` because some number routing
@@ -254,6 +377,16 @@ async function handleVoiceIncoming(req, res) {
     // SautiKit re-invokes the voice URL on StreamStarted / Completed / etc.
     // Returning another Stream document re-forks and errors — send empty XML.
     if (shouldSkipMediaStream(callSessionState, req.body)) {
+      const termination = detectCallTermination(req.body, callSessionState);
+      if (termination.terminal) {
+        // Fire-and-forget so we still return TwiML immediately.
+        markCallTerminalFromWebhook({
+          callSid: extracted.callSid || callSid,
+          status: termination.status,
+          durationSeconds: extractEventDurationSeconds(req.body),
+          source: 'voice/incoming',
+        }).catch(() => {});
+      }
       console.log('[voice/incoming] lifecycle edge — empty <Response/> (no re-Stream)');
       return res
         .type('text/xml')
@@ -333,31 +466,33 @@ app.post('/voice/recording-status', sautikitWebhookGuard, async (req, res) => {
 // 2b. SautiKit workspace events — call.completed / recording.ready
 // ---------------------------------------------------------------------------
 app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
+  // Always ACK immediately so SautiKit does not retry (DB work is best-effort).
+  res.sendStatus(200);
+
   try {
+    const body = req.body || {};
+    console.log('[VOICE EVENT PAYLOAD]', JSON.stringify(body, null, 2));
+
     const kind =
       req.headers['x-sautikit-event-kind'] ||
-      req.body?.kind ||
-      req.body?.event_type ||
-      req.body?.type ||
+      body.kind ||
+      body.event_type ||
+      body.event ||
+      body.type ||
       '';
-    const body = req.body || {};
-    const callSid =
-      body.call_sid ||
-      body.callSid ||
-      body.sessionId ||
-      body.data?.call_sid ||
-      body.data?.sessionId ||
-      body.payload?.call_sid ||
-      null;
+    const callSid = extractEventCallSid(body);
+    const durationSeconds = extractEventDurationSeconds(body);
 
     console.log('[voice/events]', {
       kind: String(kind),
       callSid,
       eventId: req.headers['x-sautikit-event-id'] || null,
       bodyKeys: Object.keys(body),
+      callSessionState: body.callSessionState || body.CallSessionState || null,
     });
 
     const kindStr = String(kind).toLowerCase();
+    const termination = detectCallTermination(body, kind);
 
     if (kindStr.includes('recording') && callSid) {
       const recordingUrl =
@@ -369,40 +504,36 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
         null;
       const recordingSid = body.recording_sid || body.data?.recording_sid || null;
       if (recordingUrl) {
-        await db.attachRecording({
-          callSid,
-          recordingSid,
-          sourceUrl: recordingUrl,
-          recordingUrl,
-        });
-        await maybeSendWhatsAppNotification(callSid);
-      }
-    }
-
-    if (kindStr.includes('completed') && callSid) {
-      const duration =
-        body.duration_seconds ??
-        body.durationInSeconds ??
-        body.data?.duration_seconds ??
-        null;
-      if (duration != null) {
         try {
-          const call = await db.getCall(callSid);
-          if (call?._raw?.id) {
-            // Duration lives on calls; best-effort via summary if no direct updater.
-            console.log(`[voice/events] call ${callSid} completed duration=${duration}`);
-          }
+          await db.attachRecording({
+            callSid,
+            recordingSid,
+            sourceUrl: recordingUrl,
+            recordingUrl,
+          });
+          await maybeSendWhatsAppNotification(callSid);
         } catch (err) {
-          console.warn('[voice/events] duration log failed:', err?.message || err);
+          console.error('[voice/events] attachRecording failed:', err?.message || err);
         }
       }
-      await maybeSendWhatsAppNotification(callSid);
     }
 
-    res.sendStatus(200);
+    if (termination.terminal && callSid) {
+      await markCallTerminalFromWebhook({
+        callSid,
+        status: termination.status,
+        durationSeconds,
+        source: 'voice/events',
+      });
+      if (termination.status === 'complete') {
+        await maybeSendWhatsAppNotification(callSid);
+      }
+    } else if (termination.terminal && !callSid) {
+      console.warn('[voice/events] terminal event without callSid — cannot update calls row');
+    }
   } catch (err) {
-    console.error('[voice/events] Webhook handling failed:', err);
-    res.sendStatus(500);
+    // Already returned 200; log only so SautiKit does not retry forever.
+    console.error('[voice/events] Webhook handling failed (after 200 ACK):', err);
   }
 });
 
@@ -911,6 +1042,16 @@ mediaWss.on('connection', (ws, req) => {
           console.error(`[ws/media] transcript flush failed:`, err?.message || err);
         }
       );
+    }
+    // Fallback: if SautiKit never posts call.completed, still leave the row finished.
+    if (sessionCallSid) {
+      const durationSeconds = Math.max(0, Math.round(ms / 1000));
+      markCallTerminalFromWebhook({
+        callSid: sessionCallSid,
+        status: 'complete',
+        durationSeconds,
+        source: 'ws/media',
+      }).catch(() => {});
     }
   });
 
