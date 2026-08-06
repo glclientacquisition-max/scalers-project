@@ -1,6 +1,8 @@
 // src/prompts.js
 // Build per-tenant receptionist prompts (business knowledge + call goals).
 
+const { tenantLanguagePolicy, formatVoiceLanguagesLine, normalizeVoiceLanguages } = require('./conversation/languageOptions');
+
 const DEFAULT_KNOWLEDGE = `Business: Jirani Home Services (Nairobi & environs)
 What we do: home repairs and maintenance for homes and small offices.
 Services:
@@ -22,9 +24,16 @@ const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and
 - Keep every spoken reply to 1–2 short sentences. No lists, no markdown, no stage directions.
 - Never invent prices, availability, or guarantees. If unknown, say the team will follow up.`;
 
-function buildGreeting(businessName) {
+function buildGreeting(businessName, voiceLanguages) {
   const name = (businessName || process.env.BUSINESS_NAME || 'the business').trim();
   if (process.env.VOICE_GREETING) return process.env.VOICE_GREETING;
+  const langs = normalizeVoiceLanguages(voiceLanguages);
+  if (langs.includes('sw') && !langs.includes('en') && !langs.includes('sheng')) {
+    return `Habari, umefika ${name}. Naweza kukusaidia vipi leo?`;
+  }
+  if (langs.includes('sheng') && !langs.includes('en')) {
+    return `Niaje, you've reached ${name}. Naweza kukusaidia aje?`;
+  }
   return `Hello, you've reached ${name}. How can I help you today?`;
 }
 
@@ -33,6 +42,8 @@ function buildGreeting(businessName) {
  * @param {string} [profile.businessName]
  * @param {string} [profile.llmSystemPrompt]  full override from tenants.llm_system_prompt
  * @param {string} [profile.knowledge]       facts block (env or default)
+ * @param {string[]} [profile.voiceLanguages]
+ * @param {string|null} [profile.voiceLanguageOther]
  */
 function buildSystemPrompt(profile = {}) {
   const businessName =
@@ -41,12 +52,18 @@ function buildSystemPrompt(profile = {}) {
     (profile.knowledge && String(profile.knowledge).trim()) ||
     (process.env.BUSINESS_KNOWLEDGE && String(process.env.BUSINESS_KNOWLEDGE).trim()) ||
     DEFAULT_KNOWLEDGE;
+  const voiceLanguages = normalizeVoiceLanguages(profile.voiceLanguages);
+  const voiceLanguageOther = profile.voiceLanguageOther || null;
+  const languagePolicy = tenantLanguagePolicy(voiceLanguages, voiceLanguageOther);
+  const languageLine = formatVoiceLanguagesLine(voiceLanguages, voiceLanguageOther);
 
   // Tenant-provided full prompt wins, but we still append the tool/end markers contract.
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
     return `${String(profile.llmSystemPrompt).trim()}
 
 ${CONVERSATION_RULES}
+
+${languagePolicy}
 
 When you have both the caller's name and reason, also append:
 ###TOOL###
@@ -61,6 +78,8 @@ Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
 BUSINESS KNOWLEDGE (use this — do not invent facts outside it):
 ${knowledge}
 
+Languages for this business: ${languageLine}
+
 Your job on this call:
 1. Answer the caller's questions using ONLY the business knowledge above.
    If something is unknown (exact price, availability, custom request), say you'll note it and the team will follow up — never invent prices or guarantees.
@@ -69,6 +88,8 @@ Your job on this call:
 4. Briefly confirm name + reason, say the business will get back to them soon, then goodbye.
 
 ${CONVERSATION_RULES}
+
+${languagePolicy}
 
 When you have both name and reason, respond with one natural confirmation sentence and append:
 ###TOOL###
