@@ -39,6 +39,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {} }) {
         model: SONIOX_MODEL,
         audio_format: 'pcm_s16le',
         sample_rate: SAMPLE_RATE,
+        num_channels: 1,
         language_hints: ['en', 'sw'],
         enable_endpoint_detection: true,
       };
