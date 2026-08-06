@@ -2,16 +2,22 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
 
+/** Strip accidental /rest/v1 suffix from project URL. */
+function normalizeSupabaseUrl(raw: string): string {
+  return raw.replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
+}
+
 export function getSupabaseAdmin(): SupabaseClient {
   if (client) return client;
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
+  if (!rawUrl || !key) {
     throw new Error("Missing SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
   }
+  const url = normalizeSupabaseUrl(rawUrl);
   client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
