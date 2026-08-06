@@ -8,8 +8,8 @@ export async function GET() {
     return NextResponse.json({ error: "ops_only" }, { status: 403 });
   }
   try {
-    const [pool, pendingTenants] = await Promise.all([listDidPool(), listPendingTenants()]);
-    return NextResponse.json({ pool, pendingTenants });
+    const [pool, pendingBusinesses] = await Promise.all([listDidPool(), listPendingTenants()]);
+    return NextResponse.json({ pool, pendingBusinesses, pendingTenants: pendingBusinesses });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

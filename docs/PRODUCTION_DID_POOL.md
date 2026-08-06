@@ -16,7 +16,7 @@ New Sauti Desk signups get a real `+254…` DID from a pre-bought pool instead o
    - Same Stream / media settings as the smoke DID
 
 3. **Seed the pool** (pick one):
-   - Desk: login as `admin@sauti.local` + `DASHBOARD_PASSWORD` → **DID pool** → Add DID  
+   - Desk: login as `admin@sauti.local` + `DASHBOARD_PASSWORD` → **Admin → Numbers**  
    - Or SQL:
 
 ```sql

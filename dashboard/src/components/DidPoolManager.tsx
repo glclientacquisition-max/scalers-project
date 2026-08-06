@@ -6,17 +6,17 @@ import type { DidPoolRow, PendingTenant } from "@/lib/didPool";
 
 export function DidPoolManager({
   pool,
-  pendingTenants,
+  pendingBusinesses,
 }: {
   pool: DidPoolRow[];
-  pendingTenants: PendingTenant[];
+  pendingBusinesses: PendingTenant[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [e164, setE164] = useState("");
   const [notes, setNotes] = useState("");
-  const [assignTenantId, setAssignTenantId] = useState(pendingTenants[0]?.id || "");
+  const [assignBusinessId, setAssignBusinessId] = useState(pendingBusinesses[0]?.id || "");
 
   async function run(body: Record<string, unknown>) {
     setError(null);
@@ -38,10 +38,10 @@ export function DidPoolManager({
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl">Add DID to pool</h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Pre-buy in SautiKit, point voice + events webhooks at Railway, then add here as
-          available. {available} available now.
+        <h2 className="font-display text-2xl tracking-tight">Add number to pool</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)] leading-relaxed">
+          Pre-buy in SautiKit, point voice + events webhooks at Railway, then add here.{" "}
+          <span className="font-medium text-[var(--ink)]">{available} available</span> now.
         </p>
         <form
           className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
@@ -53,7 +53,7 @@ export function DidPoolManager({
           }}
         >
           <label className="block flex-1 text-sm">
-            <span className="font-medium">E.164 number</span>
+            <span className="font-medium">Phone number (E.164)</span>
             <input
               value={e164}
               onChange={(e) => setE164(e.target.value)}
@@ -82,27 +82,29 @@ export function DidPoolManager({
       </div>
 
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl">Assign to pending tenant</h2>
-        {pendingTenants.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">No tenants waiting on a DID.</p>
+        <h2 className="font-display text-2xl tracking-tight">Assign to a business</h2>
+        {pendingBusinesses.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            No businesses are waiting for a phone number.
+          </p>
         ) : (
           <form
             className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
             onSubmit={(e) => {
               e.preventDefault();
-              void run({ action: "assign_next", tenant_id: assignTenantId });
+              void run({ action: "assign_next", tenant_id: assignBusinessId });
             }}
           >
             <label className="block flex-1 text-sm">
-              <span className="font-medium">Tenant</span>
+              <span className="font-medium">Business</span>
               <select
-                value={assignTenantId}
-                onChange={(e) => setAssignTenantId(e.target.value)}
+                value={assignBusinessId}
+                onChange={(e) => setAssignBusinessId(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
               >
-                {pendingTenants.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.business_name}
+                {pendingBusinesses.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.business_name}
                   </option>
                 ))}
               </select>
@@ -120,13 +122,13 @@ export function DidPoolManager({
 
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
 
-      <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--card)]">
-        <table className="w-full text-left text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)]">
+        <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-[var(--bg-deep)]/70 text-[var(--ink-soft)]">
             <tr>
-              <th className="px-4 py-3 font-medium">DID</th>
+              <th className="px-4 py-3 font-medium">Number</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Tenant</th>
+              <th className="px-4 py-3 font-medium">Business</th>
               <th className="px-4 py-3 font-medium">Notes</th>
             </tr>
           </thead>
@@ -142,12 +144,13 @@ export function DidPoolManager({
                 <tr key={row.id} className="border-t border-[var(--line)]/70">
                   <td className="px-4 py-3 font-medium">{row.e164}</td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs">
+                    <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs capitalize">
                       {row.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {row.tenants?.business_name || (row.tenant_id ? row.tenant_id.slice(0, 8) : "—")}
+                    {row.tenants?.business_name ||
+                      (row.tenant_id ? "Linked business" : "—")}
                   </td>
                   <td className="px-4 py-3 text-[var(--ink-soft)]">{row.notes || "—"}</td>
                 </tr>
