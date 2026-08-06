@@ -8,8 +8,8 @@
 --   sautikit_virtual_number text NOT NULL  (pending:<auth_user_id> until DID pool assign)
 --   whatsapp_notification_number text NOT NULL
 --   llm_system_prompt text
---   voice_languages text[]  (en, sw, sheng, kikuyu, … — see voice_languages.sql)
---   voice_language_other text
+--   voice_languages text[]  (auto: en, sw, sheng — see voice_languages.sql; locals later)
+--   voice_language_other text  (reserved)
 --   telecom_wallet_balance_kes numeric
 --   ai_wallet_balance_usd numeric
 --   is_active boolean

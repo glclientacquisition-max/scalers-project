@@ -2,12 +2,6 @@
 
 import { useState } from "react";
 import type { TenantRow } from "@/lib/supabase";
-import { LanguagePicker } from "@/components/LanguagePicker";
-import {
-  DEFAULT_VOICE_LANGUAGES,
-  normalizeVoiceLanguages,
-  type VoiceLanguageCode,
-} from "@/lib/languages";
 
 export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
@@ -15,10 +9,6 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     tenant.whatsapp_notification_number || ""
   );
   const [prompt, setPrompt] = useState(tenant.llm_system_prompt || "");
-  const [languages, setLanguages] = useState<VoiceLanguageCode[]>(
-    normalizeVoiceLanguages(tenant.voice_languages || DEFAULT_VOICE_LANGUAGES)
-  );
-  const [otherLabel, setOtherLabel] = useState(tenant.voice_language_other || "");
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -27,9 +17,6 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     setSaving(true);
     setStatus(null);
     try {
-      if (languages.includes("other") && !otherLabel.trim()) {
-        throw new Error("Name the other Kenyan language you want supported.");
-      }
       const res = await fetch("/api/tenant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,13 +25,11 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           business_name: businessName,
           whatsapp_notification_number: ownerWhatsapp,
           llm_system_prompt: prompt,
-          voice_languages: languages,
-          voice_language_other: languages.includes("other") ? otherLabel.trim() : null,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Save failed");
-      setStatus("Saved. New calls will use these languages and knowledge.");
+      setStatus("Saved. New calls will use this knowledge.");
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -78,13 +63,6 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         />
       </div>
 
-      <LanguagePicker
-        selected={languages}
-        onChange={setLanguages}
-        otherLabel={otherLabel}
-        onOtherLabelChange={setOtherLabel}
-      />
-
       <div>
         <label className="block text-sm font-medium" htmlFor="prompt">
           Receptionist knowledge / system prompt
@@ -98,7 +76,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         />
         <p className="mt-2 text-xs text-[var(--ink-soft)]">
           Loaded into Gemini on each call. Keep services, hours, and area accurate.
-          Language choices above also steer replies even if this text is older.
+          Language is automatic: English, Kiswahili, and Sheng.
         </p>
       </div>
 

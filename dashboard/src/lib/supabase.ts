@@ -53,9 +53,6 @@ export type TenantRow = {
   whatsapp_notification_number: string;
   llm_system_prompt: string | null;
   is_active: boolean | null;
-  /** Onboarding language prefs: en, sw, sheng, kikuyu, … */
-  voice_languages?: string[] | null;
-  voice_language_other?: string | null;
 };
 
 export function parseSummary(summary: string | null): Record<string, unknown> {

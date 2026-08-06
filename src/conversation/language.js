@@ -1,5 +1,5 @@
 // src/conversation/language.js
-// Lightweight caller-language detection for Kenya phone calls (EN / SW).
+// Automatic caller-language detection for Kenya phone calls (EN / SW / Sheng).
 
 const SWAHILI_MARKERS = [
   'habari',
@@ -44,21 +44,16 @@ const SHENG_MARKERS = [
   'niaje',
   'maze',
   'msee',
-  'bro',
   'manze',
-  'poa',
-  'wazi',
+  'poa sana',
   'niko poa',
   'nko poa',
-  'farojes',
   'faro',
   'soft life',
   'nimechill',
   'nimebamba',
   'tuko spot',
-  'nimefika',
   'udae',
-  'rade',
   'msee wangu',
 ];
 
@@ -85,7 +80,7 @@ const ENGLISH_MARKERS = [
   'cleaning',
   'my name',
   'i am',
-  'i\'m',
+  "i'm",
   'can you',
   'could you',
   'what do you',
@@ -127,6 +122,7 @@ const BACKCHANNELS = new Set([
   'ndiyo',
   'eh',
   'eeh',
+  'poa',
 ]);
 
 /**
@@ -134,7 +130,10 @@ const BACKCHANNELS = new Set([
  * @returns {'en'|'sw'|'sheng'|'mixed'|'unknown'}
  */
 function detectCallerLanguage(text) {
-  const raw = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const raw = String(text || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!raw) return 'unknown';
 
   let swHits = 0;
@@ -150,14 +149,16 @@ function detectCallerLanguage(text) {
     if (raw.includes(w)) shengHits += 1;
   }
 
-  // Latin-only short English questions with no SW markers → English.
-  if (!swHits && !shengHits && /\b(i|my|you|we|the|a|an|is|are|can|do|what|how|when|where)\b/.test(raw)) {
+  if (
+    !swHits &&
+    !shengHits &&
+    /\b(i|my|you|we|the|a|an|is|are|can|do|what|how|when|where)\b/.test(raw)
+  ) {
     enHits += 2;
   }
 
-  if (shengHits >= 2 || (shengHits >= 1 && (enHits > 0 || swHits > 0))) {
-    return 'sheng';
-  }
+  // Need a clear Sheng signal — avoid flipping on a single slang word.
+  if (shengHits >= 2) return 'sheng';
 
   if (swHits === 0 && enHits === 0) return 'unknown';
   if (swHits > 0 && enHits > 0) {
@@ -192,14 +193,13 @@ function pickFillerText(lang) {
   if (lang === 'sw') return 'Kidogo…';
   if (lang === 'sheng') return 'One sec…';
   if (lang === 'en') return 'One moment…';
-  // Mixed / unknown — keep neutral English (Kenya callers often expect EN hold).
   return 'One moment…';
 }
 
 /** Soniox TTS language code. */
 function ttsLanguageFor(lang) {
   if (lang === 'sw') return 'sw';
-  // Sheng rides English TTS + prompt style; locals also fall back to EN/SW TTS.
+  // Sheng rides English TTS + prompt style.
   return process.env.SONIOX_TTS_LANGUAGE || 'en';
 }
 
@@ -216,39 +216,28 @@ function isBackchannel(text) {
   if (!t) return true;
   if (t.length <= 2) return true;
   if (BACKCHANNELS.has(t)) return true;
-  // Very short single-token noises.
   if (t.split(' ').length === 1 && t.length <= 4) return true;
   return false;
 }
 
 /**
- * Strong per-turn instruction appended to the system prompt.
+ * Light per-turn language hint — keep soft so Gemini stays fluent.
  * @param {'en'|'sw'|'sheng'|'mixed'|'unknown'|null} lang
- * @param {string[]} [allowedLanguages]
  */
-function languageDirective(lang, allowedLanguages) {
-  const allowed = Array.isArray(allowedLanguages) ? allowedLanguages : [];
-  const shengOk = !allowed.length || allowed.includes('sheng');
-  const allowNote = allowed.length
-    ? ` Stay inside the business-enabled languages: ${allowed.join(', ')}.`
-    : '';
-
+function languageDirective(lang) {
   if (lang === 'en') {
-    return `LANGUAGE LOCK (this call): The caller is speaking English. Reply ONLY in clear conversational English. Do not use Kiswahili words, fillers, or code-switch unless the caller does first.${allowNote}`;
+    return 'Language cue: caller is using English — reply in clear English.';
   }
   if (lang === 'sw') {
-    return `LANGUAGE LOCK (this call): The caller is speaking Kiswahili. Reply mainly in natural Kiswahili (light English loanwords OK). Stay consistent — do not suddenly switch to full English.${allowNote}`;
+    return 'Language cue: caller is using Kiswahili — reply in natural Kiswahili.';
   }
   if (lang === 'sheng') {
-    if (!shengOk) {
-      return `LANGUAGE LOCK (this call): Caller used Sheng-like mix, but Sheng is not enabled for this business. Reply in clear English or Kiswahili (whichever fits best).${allowNote}`;
-    }
-    return `LANGUAGE LOCK (this call): The caller is using Sheng. Reply in natural light Sheng — warm Kenyan street mix, short and clear, not exaggerated slang.${allowNote}`;
+    return 'Language cue: caller is using Sheng — reply in light natural Sheng, short and clear.';
   }
   if (lang === 'mixed') {
-    return `LANGUAGE LOCK (this call): The caller is mixing English and Kiswahili. Mirror their mix naturally; prefer the language of their latest sentence.${allowNote}`;
+    return 'Language cue: caller is mixing English/Kiswahili — mirror lightly; stay clear.';
   }
-  return `LANGUAGE: Match the caller's latest utterance within the business-enabled languages. If they speak English, reply in English. If Kiswahili, reply in Kiswahili. Never answer English with a Kiswahili-only holding phrase.${allowNote}`;
+  return 'Language cue: match the caller in English, Kiswahili, or light Sheng.';
 }
 
 module.exports = {

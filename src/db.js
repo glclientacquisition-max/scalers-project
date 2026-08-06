@@ -425,25 +425,13 @@ async function attachRecording({
 
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active, voice_languages, voice_language_other'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
-
-  // voice_languages.sql not applied yet — fall back.
-  if (error && /voice_language/i.test(error.message || '')) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
-  }
-
   throwIfError('getTenantById', error);
   return data || null;
 }
@@ -470,8 +458,6 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessName: process.env.BUSINESS_NAME || 'the business',
       llmSystemPrompt: null,
       knowledge: process.env.BUSINESS_KNOWLEDGE || null,
-      voiceLanguages: ['en', 'sw'],
-      voiceLanguageOther: null,
     };
   }
 
@@ -482,10 +468,6 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     knowledge: process.env.BUSINESS_KNOWLEDGE || null,
     whatsappNumber: row.whatsapp_notification_number || null,
     did: row.sautikit_virtual_number || null,
-    voiceLanguages: Array.isArray(row.voice_languages)
-      ? row.voice_languages
-      : ['en', 'sw'],
-    voiceLanguageOther: row.voice_language_other || null,
   };
 }
 

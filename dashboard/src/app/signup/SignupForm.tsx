@@ -1,22 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
-import { LanguagePicker } from "@/components/LanguagePicker";
-import {
-  DEFAULT_VOICE_LANGUAGES,
-  type VoiceLanguageCode,
-} from "@/lib/languages";
 import { signupAction, type SignupState } from "./actions";
 
 const initial: SignupState = {};
 
 export function SignupForm() {
   const [state, formAction, pending] = useActionState(signupAction, initial);
-  const [languages, setLanguages] = useState<VoiceLanguageCode[]>([
-    ...DEFAULT_VOICE_LANGUAGES,
-  ]);
-  const [otherLabel, setOtherLabel] = useState("");
 
   if (state.checkEmail) {
     return (
@@ -102,18 +93,10 @@ export function SignupForm() {
           placeholder="+2547…"
         />
         <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-          Where we send missed-call lead alerts (WhatsApp / Telegram later).
+          Where we send missed-call lead alerts (WhatsApp / Telegram later). The receptionist
+          automatically speaks English, Kiswahili, and Sheng.
         </p>
       </div>
-
-      <LanguagePicker
-        selected={languages}
-        onChange={setLanguages}
-        otherLabel={otherLabel}
-        onOtherLabelChange={setOtherLabel}
-        formName="voice_languages"
-        otherFormName="voice_language_other"
-      />
 
       {state.error ? <p className="text-sm text-[var(--warn)]">{state.error}</p> : null}
 
