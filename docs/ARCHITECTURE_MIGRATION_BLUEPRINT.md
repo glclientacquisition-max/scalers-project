@@ -2,7 +2,8 @@
 
 > **Status:** Approved direction for production migration  
 > **Codebase baseline:** `main` (Twilio ConversationRelay + Gemini + SQLite)  
-> **Target:** Hybrid custom stack (SautiKit + Soniox + Gemini/GPT-4o-mini + Supabase)
+> **Target:** Hybrid custom stack (SautiKit + Soniox + Gemini/GPT-4o-mini + Supabase)  
+> **Requirements:** [`REQUIREMENTS.md`](./REQUIREMENTS.md) (functional, NFR, acceptance, phased exit criteria)
 
 ---
 
@@ -298,6 +299,7 @@ TWILIO_WHATSAPP_FROM=
 ### Phase 0 — Blueprint & contracts *(this PR)*
 
 - Document architecture, API corrections, schema, module map
+- Document full product/technical requirements ([`REQUIREMENTS.md`](./REQUIREMENTS.md))
 - No production cutover
 
 ### Phase 1 — Persistence swap (low risk)
