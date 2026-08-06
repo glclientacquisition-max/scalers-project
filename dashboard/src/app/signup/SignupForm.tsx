@@ -1,13 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
+import { LanguagePicker } from "@/components/LanguagePicker";
+import {
+  DEFAULT_VOICE_LANGUAGES,
+  type VoiceLanguageCode,
+} from "@/lib/languages";
 import { signupAction, type SignupState } from "./actions";
 
 const initial: SignupState = {};
 
 export function SignupForm() {
   const [state, formAction, pending] = useActionState(signupAction, initial);
+  const [languages, setLanguages] = useState<VoiceLanguageCode[]>([
+    ...DEFAULT_VOICE_LANGUAGES,
+  ]);
+  const [otherLabel, setOtherLabel] = useState("");
 
   if (state.checkEmail) {
     return (
@@ -96,6 +105,15 @@ export function SignupForm() {
           Where we send missed-call lead alerts (WhatsApp / Telegram later).
         </p>
       </div>
+
+      <LanguagePicker
+        selected={languages}
+        onChange={setLanguages}
+        otherLabel={otherLabel}
+        onOtherLabelChange={setOtherLabel}
+        formName="voice_languages"
+        otherFormName="voice_language_other"
+      />
 
       {state.error ? <p className="text-sm text-[var(--warn)]">{state.error}</p> : null}
 

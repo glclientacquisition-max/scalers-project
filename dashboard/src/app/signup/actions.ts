@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/lib/tenant";
+import { normalizeVoiceLanguages } from "@/lib/languages";
 
 export type SignupState = {
   error?: string;
@@ -29,6 +30,8 @@ export async function signupAction(
   const businessName = String(formData.get("business_name") || "").trim();
   const notificationRaw = String(formData.get("notification_phone") || "").trim();
   const notificationPhone = normalizeKenyaPhone(notificationRaw);
+  const voiceLanguages = normalizeVoiceLanguages(formData.getAll("voice_languages"));
+  const voiceLanguageOther = String(formData.get("voice_language_other") || "").trim();
 
   if (!email || !email.includes("@")) {
     return { error: "Enter a valid email address." };
@@ -41,6 +44,9 @@ export async function signupAction(
   }
   if (!notificationPhone) {
     return { error: "Enter a valid Kenyan phone number (e.g. +2547…)." };
+  }
+  if (voiceLanguages.includes("other") && !voiceLanguageOther) {
+    return { error: "Name the other Kenyan language you want supported." };
   }
 
   let supabase;
@@ -60,6 +66,8 @@ export async function signupAction(
       data: {
         business_name: businessName,
         whatsapp_notification_number: notificationPhone,
+        voice_languages: voiceLanguages,
+        voice_language_other: voiceLanguageOther || null,
       },
       emailRedirectTo: undefined,
     },
@@ -80,12 +88,14 @@ export async function signupAction(
       userId,
       businessName,
       notificationPhone,
+      voiceLanguages,
+      voiceLanguageOther,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[signup] ensureTenantForUser failed:", message);
     return {
-      error: `Account created, but tenant setup failed: ${message}. Apply docs/supabase/multi_tenant_onboarding.sql then retry sign-in.`,
+      error: `Account created, but tenant setup failed: ${message}. Apply docs/supabase/multi_tenant_onboarding.sql and docs/supabase/voice_languages.sql then retry sign-in.`,
     };
   }
 

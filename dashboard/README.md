@@ -7,9 +7,11 @@ Next.js app for reviewing missed-call leads and editing business receptionist kn
 1. Apply SQL in the Supabase SQL editor:  
    `docs/supabase/multi_tenant_onboarding.sql`  
    (creates `tenant_members`, default prompt helper, Auth → tenant trigger)
-2. In Supabase Auth settings, enable **Email** provider. For local demos you can disable “Confirm email”.
-3. Set dashboard env vars (anon + service role).
-4. Open `/signup` to create a workspace (email, password, business name, notification phone).
+2. Apply `docs/supabase/voice_languages.sql`  
+   (English / Kiswahili / Sheng / Kenyan local language options on signup + settings)
+3. In Supabase Auth settings, enable **Email** provider. For local demos you can disable “Confirm email”.
+4. Set dashboard env vars (anon + service role).
+5. Open `/signup` to create a workspace (email, password, business name, notification phone, languages).
 
 The Auth trigger provisions a `tenants` row + `tenant_members` mapping. The signup Server Action also calls a service-role fallback if the trigger has not been applied yet.
 
