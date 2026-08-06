@@ -14,6 +14,14 @@ const {
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
+const {
+  detectCallerLanguage,
+  resolveCallLanguage,
+  pickFillerText,
+  ttsLanguageFor,
+  isBackchannel,
+  languageDirective,
+} = require('./src/conversation/language');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
   isWhatsAppConfigured,
@@ -688,6 +696,9 @@ mediaWss.on('connection', (ws, req) => {
   const transcriptLog = [];
   let greetingStarted = false;
   let profileLoaded = false;
+  /** Sticky call language: 'en' | 'sw' | 'mixed' | 'unknown' */
+  let callLanguage = 'unknown';
+  let fillerUsedThisCall = false;
 
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
 
@@ -717,7 +728,7 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
-  async function speakText(text) {
+  async function speakText(text, opts = {}) {
     if (!tts || !text) return;
     // Starting intentional playback clears a prior barge latch.
     bargeInActive = false;
@@ -726,8 +737,9 @@ mediaWss.on('connection', (ws, req) => {
     lastAgentText = String(text);
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
+    const language = opts.language || ttsLanguageFor(callLanguage);
     try {
-      await tts.speak(text);
+      await tts.speak(text, { language });
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
     } finally {
@@ -762,6 +774,9 @@ mediaWss.on('connection', (ws, req) => {
     const agentBusy = speaking || turnBusy;
     if (!agentBusy) return false;
     if (text.length <= 2) return false;
+    // Ignore short backchannels ("Okay.", "Sawa", "Hello?") so they don't
+    // cancel a real answer mid-sentence.
+    if (isBackchannel(text)) return false;
     // Echo filter only matters while TTS audio is in the caller's ear.
     if (speaking && looksLikeEcho(text)) return false;
     if (speaking) {
@@ -807,22 +822,38 @@ mediaWss.on('connection', (ws, req) => {
     }
     turnBusy = true;
     bargeInActive = false;
-    console.log(`[ws/media][${sidLabel()}] caller turn: ${clean}`);
+
+    const detected = detectCallerLanguage(clean);
+    callLanguage = resolveCallLanguage(callLanguage, detected);
+    console.log(
+      `[ws/media][${sidLabel()}] caller turn lang=${callLanguage} detected=${detected}: ${clean}`
+    );
     transcriptLog.push(`Caller: ${clean}`);
     messages.push({ role: 'user', content: clean });
 
+    const turnSystemPrompt = `${systemPrompt}\n\n${languageDirective(callLanguage)}`;
+
     try {
       const geminiPromise = process.env.GEMINI_API_KEY
-        ? runGeminiTurn(messages, sidLabel(), systemPrompt)
+        ? runGeminiTurn(messages, sidLabel(), turnSystemPrompt)
         : Promise.resolve({
-            spokenText: "Thanks — someone from the business will call you back shortly.",
+            spokenText:
+              callLanguage === 'sw'
+                ? 'Asante — mtu kutoka kwa biashara atakupigia simu hivi karibuni.'
+                : 'Thanks — someone from the business will call you back shortly.',
             shouldEndCall: true,
           });
 
-      // Delayed filler: only if Gemini is still thinking after FILLER_DELAY_MS.
-      const useFiller = Boolean(tts) && process.env.VOICE_FILLER !== 'off';
-      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 450);
-      const fillerText = process.env.VOICE_FILLER || 'Sawa, nakucheckia…';
+      // Delayed filler: only if Gemini is still slow. Default delay is high so
+      // fast replies never say "Sawa, nakucheckia…" on every turn. Language-matched.
+      const fillerMode = process.env.VOICE_FILLER || 'auto';
+      const useFiller =
+        Boolean(tts) &&
+        fillerMode !== 'off' &&
+        // At most one hold phrase per call — avoids the every-turn annoyance.
+        !fillerUsedThisCall;
+      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 1200);
+      const fillerText = pickFillerText(callLanguage);
       let fillerPromise = Promise.resolve();
       let fillerStarted = false;
 
@@ -833,7 +864,14 @@ mediaWss.on('connection', (ws, req) => {
             // Reply may already be ready — skip filler.
             if (turnBusy && !speaking && !bargeInActive) {
               fillerStarted = true;
-              speakText(fillerText).then(resolve, resolve);
+              fillerUsedThisCall = true;
+              console.log(
+                `[ws/media][${sidLabel()}] slow-reply filler lang=${callLanguage}: ${fillerText}`
+              );
+              speakText(fillerText, { language: ttsLanguageFor(callLanguage) }).then(
+                resolve,
+                resolve
+              );
             } else {
               resolve();
             }
@@ -863,7 +901,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       transcriptLog.push(`Agent: ${reply}`);
-      await speakText(reply);
+      await speakText(reply, { language: ttsLanguageFor(callLanguage) });
 
       if (result?.shouldEndCall && !bargeInActive) {
         console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
@@ -878,7 +916,7 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
       if (!bargeInActive) {
-        await speakText(AI_FALLBACK_LINE);
+        await speakText(AI_FALLBACK_LINE, { language: ttsLanguageFor(callLanguage) });
       }
     } finally {
       clearFillerTimer();
@@ -908,7 +946,8 @@ mediaWss.on('connection', (ws, req) => {
   function scheduleUtteranceFlush() {
     if (utteranceTimer) clearTimeout(utteranceTimer);
     // Fallback if Soniox endpoint marker is delayed/missing (tuned near max_endpoint_delay).
-    utteranceTimer = setTimeout(() => flushUtterance(), 900);
+    const flushMs = Number(process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 1200);
+    utteranceTimer = setTimeout(() => flushUtterance(), flushMs);
   }
 
   function onSttEvent(evt) {
@@ -1214,7 +1253,7 @@ async function maybeSendWhatsAppNotification(callSid) {
   }
 }
 
-const CONTEXT_WINDOW = 10;
+const CONTEXT_WINDOW = 16;
 
 wss.on('connection', (ws) => {
   let callSid = null;
@@ -1340,11 +1379,12 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
         contents,
         config: {
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          temperature: 0.7,
-          maxOutputTokens: 300,
-          // gemini-3.6-flash rejects thinkingBudget:0; MINIMAL keeps latency low.
+          // Slightly lower temp → more conclusive, less rambling phone replies.
+          temperature: 0.55,
+          maxOutputTokens: 280,
+          // LOW > MINIMAL for coherent bilingual turns; still voice-latency friendly.
           thinkingConfig: {
-            thinkingLevel: 'MINIMAL',
+            thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'LOW',
           },
         },
       });
