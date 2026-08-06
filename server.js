@@ -954,7 +954,7 @@ mediaWss.on('connection', (ws, req) => {
     utteranceParts = [];
     if (!text) return;
     if (turnBusy) {
-      pendingUtterance = text;
+      pendingUtterance = pendingUtterance ? `${pendingUtterance} ${text}` : text;
       return;
     }
     runCallerTurn(text).catch((err) => {
