@@ -1,6 +1,7 @@
 // server.js
 // Phase 1 telephony layer: receives forwarded missed calls, hands the call
 // to Twilio ConversationRelay, and runs the conversation loop through Gemini.
+// Persistence: Supabase (calls, transcripts, call-recordings Storage).
 
 require('dotenv').config();
 const express = require('express');
@@ -8,7 +9,6 @@ const { WebSocketServer } = require('ws');
 const http = require('http');
 const { GoogleGenAI } = require('@google/genai');
 const twilio = require('twilio');
-const db = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
@@ -18,12 +18,16 @@ const requiredEnvironmentVariables = [
   'GEMINI_API_KEY',
   'TWILIO_ACCOUNT_SID',
   'TWILIO_AUTH_TOKEN',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
 ];
 const missingEnvironmentVariables = requiredEnvironmentVariables.filter((name) => !process.env[name]);
 if (missingEnvironmentVariables.length > 0) {
   console.error(`ERROR: Missing required environment variables: ${missingEnvironmentVariables.join(', ')}`);
   process.exit(1);
 }
+
+const db = require('./src/db');
 
 // Twilio-approved WhatsApp sender number (E.164, no "whatsapp:" prefix —
 // that prefix gets added at call time). For testing, this can be Twilio's
@@ -35,6 +39,13 @@ const BUSINESS_OWNER_WHATSAPP_NUMBER = process.env.BUSINESS_OWNER_WHATSAPP_NUMBE
 
 const geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+function twilioBasicAuthHeader() {
+  const token = Buffer.from(
+    `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`
+  ).toString('base64');
+  return `Basic ${token}`;
+}
 
 const app = express();
 app.use(express.urlencoded({ extended: false })); // Twilio posts form-encoded
@@ -62,6 +73,10 @@ function validateTwilioWebhook(req, res, next) {
   next();
 }
 
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 // ---------------------------------------------------------------------------
 // 1. Inbound call webhook — Twilio hits this the moment the forwarded call
 //    reaches your number. Returns TwiML that:
@@ -69,11 +84,11 @@ function validateTwilioWebhook(req, res, next) {
 //      (b) connects the call to ConversationRelay, which streams transcribed
 //          speech to our WebSocket and plays back whatever text we send.
 // ---------------------------------------------------------------------------
-app.post('/voice/incoming', validateTwilioWebhook, (req, res) => {
+app.post('/voice/incoming', validateTwilioWebhook, async (req, res) => {
   try {
     const { CallSid, From, To } = req.body;
 
-    db.upsertCall({ callSid: CallSid, fromNumber: From, toNumber: To });
+    await db.upsertCall({ callSid: CallSid, fromNumber: From, toNumber: To, provider: 'twilio' });
 
     const wsUrl = `${PUBLIC_BASE_URL.replace(/^https/, 'wss')}/ws/relay`;
     const recordingCallback = `${PUBLIC_BASE_URL}/voice/recording-status`;
@@ -105,21 +120,24 @@ app.post('/voice/incoming', validateTwilioWebhook, (req, res) => {
 
 // ---------------------------------------------------------------------------
 // 2. Recording status callback — fires once Twilio finishes processing the
-//    recording. Attach the URL/SID to the right call row.
+//    recording. Download → upload to Supabase Storage → attach URL to call.
 // ---------------------------------------------------------------------------
-app.post('/voice/recording-status', validateTwilioWebhook, (req, res) => {
+app.post('/voice/recording-status', validateTwilioWebhook, async (req, res) => {
   try {
     const { CallSid, RecordingUrl, RecordingSid, RecordingStatus } = req.body;
 
     if (RecordingStatus === 'completed') {
-      db.attachRecording({
+      const twilioRecordingUrl = `${RecordingUrl}.mp3`;
+      await db.attachRecording({
         callSid: CallSid,
-        recordingUrl: `${RecordingUrl}.mp3`, // Twilio's base URL needs an extension appended
         recordingSid: RecordingSid,
+        sourceUrl: twilioRecordingUrl,
+        recordingUrl: twilioRecordingUrl,
+        authHeader: twilioBasicAuthHeader(),
       });
       // Recording may finish before or after the caller-info save happens —
       // check conditions again here in case this is the piece that completes them.
-      maybeSendWhatsAppNotification(CallSid);
+      await maybeSendWhatsAppNotification(CallSid);
     }
 
     res.sendStatus(200);
@@ -156,7 +174,7 @@ async function maybeSendWhatsAppNotification(callSid) {
     return;
   }
 
-  const call = db.getCall(callSid);
+  const call = await db.getCall(callSid);
   if (!call) return;
 
   const hasCallerInfo = Boolean(call.name && call.reason);
@@ -181,13 +199,11 @@ async function maybeSendWhatsAppNotification(callSid) {
       from: `whatsapp:${TWILIO_WHATSAPP_FROM}`,
       to: `whatsapp:${BUSINESS_OWNER_WHATSAPP_NUMBER}`,
       body,
-      // Works because the recording belongs to the same Twilio account that's
-      // sending this message. If you ever need to share a recording outside
-      // this account, generate a signed/public URL instead of using the raw
-      // Twilio recording URL directly.
+      // Prefer Supabase signed URL when Storage upload succeeded; otherwise
+      // Twilio URL works when media stays on the same Twilio account.
       mediaUrl: [call.recording_url],
     });
-    db.markWhatsappSent(callSid);
+    await db.markWhatsappSent(callSid);
   } catch (err) {
     console.error(`[${callSid}] WhatsApp notification failed:`, err);
     // Don't rethrow — a failed notification should never take down the server
@@ -241,7 +257,12 @@ wss.on('connection', (ws) => {
 
       if (data.type === 'setup') {
         callSid = data.callSid;
-        db.upsertCall({ callSid, fromNumber: data.from, toNumber: data.to });
+        await db.upsertCall({
+          callSid,
+          fromNumber: data.from,
+          toNumber: data.to,
+          provider: 'twilio',
+        });
         console.log(`[${callSid}] WebSocket connected: ${data.from} → ${data.to}`);
         return; // welcomeGreeting in the TwiML already handles the opening line
       }
@@ -261,7 +282,7 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'text', token: reply.spokenText, last: true }));
         }
 
-        db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
+        await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
 
         if (reply.shouldEndCall) {
           // Give the TTS a moment to finish playing before tearing down.
@@ -286,7 +307,9 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log(`[${callSid || 'unknown'}] WebSocket closed`);
     if (callSid) {
-      db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
+      db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') }).catch((err) => {
+        console.error(`[${callSid}] Failed to flush transcript on close:`, err?.message || err);
+      });
     }
   });
 });
@@ -347,7 +370,7 @@ async function runGeminiTurn(messages, callSid) {
   const shouldEndCall = parsed.shouldEndCall;
 
   if (parsed.name && parsed.reason) {
-    db.saveCallerInfo({ callSid, name: parsed.name, reason: parsed.reason });
+    await db.saveCallerInfo({ callSid, name: parsed.name, reason: parsed.reason });
     maybeSendWhatsAppNotification(callSid);
   }
 
@@ -389,5 +412,5 @@ server.listen(PORT, () => {
   console.log(`📡 Relay WebSocket: ${PUBLIC_BASE_URL.replace(/^https/, 'wss')}/ws/relay`);
   console.log(`✓ Gemini SDK initialized`);
   console.log(`✓ Twilio SDK initialized`);
-  console.log(`✓ SQLite database initialized`);
+  console.log(`✓ Supabase database initialized`);
 });

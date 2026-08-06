@@ -2,11 +2,14 @@
 
 This tree is the **intended** production layout from
 [`ARCHITECTURE_MIGRATION_BLUEPRINT.md`](./ARCHITECTURE_MIGRATION_BLUEPRINT.md).
-Modules are introduced incrementally behind provider flags; do not delete
-Twilio/`server.js` paths until Phase 5 cutover.
+
+**Phase 1 done:** `src/lib/supabaseClient.js` + `src/db.js` replace SQLite.
 
 ```
 src/
+  lib/
+    supabaseClient.js       # Phase 1 ✓
+  db.js                     # Phase 1 ✓ — calls / transcripts / recordings
   config.js
   telephony/
     sautikitWebhook.js      # POST /voice/incoming → Stream XML
@@ -15,7 +18,7 @@ src/
   speech/
     sonioxStt.js
     sonioxTts.js
-    fillers.js              # EN / SW / Sheng instant replies
+    fillers.js
   intelligence/
     llm.js
     prompts.js
@@ -23,30 +26,25 @@ src/
   orchestrator/
     turnManager.js
     callSession.js
-  db/
-    supabase.js             # same exports as root db.js
   notify/
     whatsapp.js
 ```
 
 ## Provider flags (planned)
 
-| Flag | Values | Default during migration |
+| Flag | Values | Notes |
 | --- | --- | --- |
-| `TELEPHONY_PROVIDER` | `twilio` \| `sautikit` | `twilio` until Phase 4 proven |
-| `DB_BACKEND` | `sqlite` \| `supabase` | `sqlite` until Phase 1 verified |
-| `WHATSAPP_PROVIDER` | `twilio` \| `sautikit` | `twilio` until messaging cutover |
-| `LLM_PROVIDER` | `gemini` \| `openai` | `gemini` |
+| `TELEPHONY_PROVIDER` | `twilio` \| `sautikit` | Default `twilio` until Phase 4–5 |
+| `WHATSAPP_PROVIDER` | `twilio` \| `sautikit` | Twilio until messaging cutover |
+| `LLM_PROVIDER` | `gemini` \| `openai` | Default `gemini` |
 
-## Stable DB surface (do not break)
+## Stable DB surface
 
 ```js
-upsertCall({ callSid, fromNumber, toNumber })
-saveCallerInfo({ callSid, name, reason })
-appendTranscript({ callSid, transcript })
-attachRecording({ callSid, recordingUrl, recordingSid })
-getCall(callSid)
-markWhatsappSent(callSid)
+await upsertCall({ callSid, fromNumber, toNumber })
+await saveCallerInfo({ callSid, name, reason })
+await appendTranscript({ callSid, transcript })
+await attachRecording({ callSid, recordingUrl, recordingSid, sourceUrl, authHeader })
+await getCall(callSid)
+await markWhatsappSent(callSid)
 ```
-
-Any Supabase adapter must implement these so orchestrator code stays unchanged.

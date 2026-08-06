@@ -18,9 +18,11 @@ An automated, sub-second latency AI receptionist platform built specifically for
 | Orchestration | Twilio-managed STT/TTS + our WS text loop | Custom Node.js media orchestrator |
 | Speech | Twilio / Google TTS via ConversationRelay | Soniox realtime STT + TTS |
 | Intelligence | Gemini (`gemini-3.6-flash`) | Gemini / GPT-4o-mini (fillers + RAG) |
-| Persistence | Local SQLite (`db/calls.db`) | Supabase PostgreSQL + Storage |
+| Persistence | Local SQLite (`db/calls.db`) → **Supabase** | Supabase PostgreSQL + Storage |
 | Notifications | Twilio WhatsApp | SautiKit WhatsApp (or Twilio bridge during cutover) |
 | Hosting | Single Express process | Voice engine (Railway/Render/DO) + Next.js dashboard (Vercel) |
+
+> **Phase 1 status:** SQLite removed. App persists via `src/db.js` + `src/lib/supabaseClient.js` to `tenants` / `calls` / `transcripts` and uploads recordings to the `call-recordings` bucket.
 
 ---
 
@@ -300,11 +302,12 @@ TWILIO_WHATSAPP_FROM=
 - Document architecture, API corrections, schema, module map
 - No production cutover
 
-### Phase 1 — Persistence swap (low risk)
+### Phase 1 — Persistence swap *(implemented)*
 
-- Implement `src/db/supabase.js` with identical exports to `db.js`
-- Feature flag `DB_BACKEND=sqlite|supabase`
-- Dual-write optional; verify dashboard queries
+- `src/lib/supabaseClient.js` + `src/db.js` (async Supabase adapter)
+- Tables: `tenants`, `calls`, `transcripts`; Storage: `call-recordings`
+- SQLite / `better-sqlite3` removed
+- Smoke: `npm run smoke:db`
 
 ### Phase 2 — SautiKit voice webhook (no AI yet)
 
