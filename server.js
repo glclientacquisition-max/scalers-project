@@ -13,6 +13,7 @@ const {
   createSonioxTtsSession,
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
+const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -384,11 +385,33 @@ mediaWss.on('connection', (ws, req) => {
   let fillerTimer = null;
   let bargedIn = false;
   let pendingUtterance = null;
-  let messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  let systemPrompt = buildSystemPrompt();
+  let greetingLine = buildGreeting();
+  let messages = [{ role: 'system', content: systemPrompt }];
   const transcriptLog = [];
   let greetingStarted = false;
+  let profileLoaded = false;
 
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
+
+  async function ensureTenantPrompt() {
+    if (profileLoaded) return;
+    profileLoaded = true;
+    try {
+      const profile = await db.getTenantProfile({ callSid: sessionCallSid });
+      systemPrompt = buildSystemPrompt(profile);
+      greetingLine = buildGreeting(profile.businessName);
+      messages = [{ role: 'system', content: systemPrompt }];
+      console.log(
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${profile.businessName || 'unknown'} customPrompt=${Boolean(profile.llmSystemPrompt)}`
+      );
+    } catch (err) {
+      console.warn(
+        `[ws/media][${sidLabel()}] tenant prompt load failed, using defaults:`,
+        err?.message || err
+      );
+    }
+  }
 
   function clearFillerTimer() {
     if (fillerTimer) {
@@ -464,7 +487,7 @@ mediaWss.on('connection', (ws, req) => {
 
     try {
       const geminiPromise = process.env.GEMINI_API_KEY
-        ? runGeminiTurn(messages, sidLabel())
+        ? runGeminiTurn(messages, sidLabel(), systemPrompt)
         : Promise.resolve({
             spokenText: "Thanks — someone from the business will call you back shortly.",
             shouldEndCall: true,
@@ -585,6 +608,11 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
+  // Warm tenant prompt early when callSid is already on the WS URL.
+  if (sessionCallSid) {
+    ensureTenantPrompt().catch(() => {});
+  }
+
   if (isSonioxConfigured()) {
     try {
       stt = createSonioxSttSession({
@@ -625,15 +653,16 @@ mediaWss.on('connection', (ws, req) => {
     console.warn('[ws/media] SONIOX_VOICE missing — skipping TTS for this call');
   }
 
-  // Greet once media + TTS are ready (STT can still warm up in parallel).
+  // Greet once media + TTS + tenant prompt are ready.
   (async () => {
     if (greetingStarted) return;
     greetingStarted = true;
     try {
+      await ensureTenantPrompt();
       if (tts) await tts.ready;
-      await speakText(GREETING_LINE);
-      transcriptLog.push(`Agent: ${GREETING_LINE}`);
-      messages.push({ role: 'assistant', content: GREETING_LINE });
+      await speakText(greetingLine);
+      transcriptLog.push(`Agent: ${greetingLine}`);
+      messages.push({ role: 'assistant', content: greetingLine });
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
     }
@@ -665,6 +694,7 @@ mediaWss.on('connection', (ws, req) => {
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
+              ensureTenantPrompt().catch(() => {});
             }
           } catch (parseErr) {
             console.log(
@@ -800,39 +830,12 @@ async function maybeSendWhatsAppNotification(callSid) {
   }
 }
 
-const GREETING_LINE =
-  process.env.VOICE_GREETING ||
-  "Habari, you've reached the business. How can I help you today?";
-
-const SYSTEM_PROMPT = `You are a friendly phone receptionist answering a
-missed call on behalf of a small business in Kenya. Your only job this call:
-1. Get the caller's name.
-2. Get a short reason for their call.
-3. Briefly confirm both back to them in one sentence.
-4. Tell them the business will get back to them soon, then say goodbye.
-
-Speak in warm, natural conversational English or Kiswahili — match the
-caller's language. Sound like a real receptionist, not stiff or robotic.
-
-Keep every reply to 1-2 short sentences — this is a live phone call, not
-chat. When you have both the caller's name and reason, respond with one
-natural confirmation sentence and also append a structured marker block
-using this exact format:
-
-###TOOL###
-{"save_caller_info":{"name":"<name>","reason":"<reason>"}}
-###ENDTOOL###
-
-If the call should end after your goodbye, also append the marker:
-###ENDCALL###
-
-Do not include any other JSON or markup in your spoken response.`;
-
-const CONTEXT_WINDOW = 6;
+const CONTEXT_WINDOW = 10;
 
 wss.on('connection', (ws) => {
   let callSid = null;
-  let messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  let systemPrompt = buildSystemPrompt();
+  let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
 
   ws.on('message', async (raw) => {
@@ -853,6 +856,13 @@ wss.on('connection', (ws) => {
           toNumber: data.to,
           provider: 'sautikit',
         });
+        try {
+          const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
+          systemPrompt = buildSystemPrompt(profile);
+          messages = [{ role: 'system', content: systemPrompt }];
+        } catch (err) {
+          console.warn(`[${callSid}] tenant prompt load failed:`, err?.message || err);
+        }
         console.log(`[${callSid}] WebSocket connected: ${data.from} → ${data.to}`);
         return; // welcomeGreeting in the TwiML already handles the opening line
       }
@@ -866,7 +876,7 @@ wss.on('connection', (ws) => {
         transcriptLog.push(`Caller: ${data.voicePrompt}`);
         messages.push({ role: 'user', content: data.voicePrompt });
 
-        const reply = await runGeminiTurn(messages, callSid);
+        const reply = await runGeminiTurn(messages, callSid, systemPrompt);
         if (reply.spokenText) {
           transcriptLog.push(`Agent: ${reply.spokenText}`);
           ws.send(JSON.stringify({ type: 'text', token: reply.spokenText, last: true }));
@@ -921,7 +931,7 @@ function isRetryableGeminiError(err) {
 // Runs one turn of the conversation through Gemini, preserving the chat
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
-async function runGeminiTurn(messages, callSid) {
+async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt()) {
   const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   const maxAttempts = Math.max(1, Number(process.env.GEMINI_MAX_RETRIES || 3));
   let response;
@@ -945,7 +955,7 @@ async function runGeminiTurn(messages, callSid) {
         model,
         contents,
         config: {
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          systemInstruction: { parts: [{ text: systemPrompt }] },
           temperature: 0.7,
           maxOutputTokens: 300,
           // gemini-3.6-flash rejects thinkingBudget:0; MINIMAL keeps latency low.
