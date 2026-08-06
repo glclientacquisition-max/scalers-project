@@ -1,27 +1,36 @@
--- Voice languages for onboarding (English, Kiswahili, Sheng, Kenyan locals)
+-- Automatic voice languages: English, Kiswahili, Sheng
 -- Run in the Supabase SQL editor after multi_tenant_onboarding.sql.
 --
+-- No onboarding picker — every business gets en/sw/sheng automatically.
+-- Local Kenyan languages are deferred to a future release.
+--
 -- Adds:
---   tenants.voice_languages text[]
---   tenants.voice_language_other text
--- Updates Auth trigger to read languages from signup metadata.
+--   tenants.voice_languages text[]  default {en,sw,sheng}
+--   tenants.voice_language_other text  (reserved for future)
 
 alter table public.tenants
-  add column if not exists voice_languages text[] not null default array['en', 'sw']::text[];
+  add column if not exists voice_languages text[] not null default array['en', 'sw', 'sheng']::text[];
 
 alter table public.tenants
   add column if not exists voice_language_other text;
 
+-- Existing rows that still have the old {en,sw} default → include Sheng.
+update public.tenants
+set voice_languages = array['en', 'sw', 'sheng']::text[]
+where voice_languages is null
+   or voice_languages = array['en', 'sw']::text[]
+   or cardinality(voice_languages) = 0;
+
 comment on column public.tenants.voice_languages is
-  'Receptionist languages chosen at onboarding: en, sw, sheng, kikuyu, luo, kamba, kalenjin, luhya, kisii, meru, somali, other';
+  'Automatic receptionist languages: en, sw, sheng (no user picker; locals later)';
 
 comment on column public.tenants.voice_language_other is
-  'Free-text label when voice_languages includes other';
+  'Reserved for future local-language support';
 
--- Default prompt can mention languages (business name still primary arg).
+-- Default prompt mentions automatic EN/SW/Sheng.
 create or replace function public.default_tenant_llm_prompt(
   p_business_name text,
-  p_languages text[] default array['en', 'sw']::text[]
+  p_languages text[] default array['en', 'sw', 'sheng']::text[]
 )
 returns text
 language plpgsql
@@ -29,36 +38,8 @@ immutable
 as $$
 declare
   v_name text := coalesce(nullif(trim(p_business_name), ''), 'the business');
-  v_langs text;
 begin
-  select string_agg(label, ', ' order by ord)
-  into v_langs
-  from (
-    select
-      case code
-        when 'en' then 'English'
-        when 'sw' then 'Kiswahili'
-        when 'sheng' then 'Sheng'
-        when 'kikuyu' then 'Kikuyu'
-        when 'luo' then 'Luo'
-        when 'kamba' then 'Kamba'
-        when 'kalenjin' then 'Kalenjin'
-        when 'luhya' then 'Luhya'
-        when 'kisii' then 'Kisii'
-        when 'meru' then 'Meru'
-        when 'somali' then 'Somali'
-        when 'other' then 'other Kenyan languages'
-        else code
-      end as label,
-      ord
-    from unnest(coalesce(nullif(p_languages, '{}'::text[]), array['en', 'sw']::text[]))
-      with ordinality as t(code, ord)
-  ) x;
-
-  if v_langs is null or length(trim(v_langs)) = 0 then
-    v_langs := 'English, Kiswahili';
-  end if;
-
+  -- p_languages kept for signature compatibility; always describe the auto trio.
   return format(
     E'You are the live phone receptionist for %s in Kenya.\n\n'
     E'BUSINESS KNOWLEDGE (update this in Sauti Desk → Business settings):\n'
@@ -68,7 +49,7 @@ begin
     E'- Service area: cities / neighborhoods you cover\n'
     E'- Pricing: quote after understanding the job — do not invent exact prices\n'
     E'- Payment: e.g. M-Pesa and cash\n'
-    E'- Languages: %s\n\n'
+    E'- Languages: English, Kiswahili, and Sheng (automatic — match the caller)\n\n'
     E'Your job on this call:\n'
     E'1. Answer using ONLY the business knowledge above. If unknown, say the team will follow up.\n'
     E'2. Get the caller''s name.\n'
@@ -77,13 +58,10 @@ begin
     E'Conversation rules (live phone — be conclusive and intelligent):\n'
     E'- Answer the caller''s actual question first — do not stall with holding phrases.\n'
     E'- Ask at most ONE clarifying question per turn.\n'
-    E'- Mirror the caller''s language within the enabled set (%s). If they switch, switch with them.\n'
-    E'- Sheng (if enabled): natural Kenyan street mix — warm, not forced.\n'
+    E'- Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.\n'
     E'- Keep every spoken reply to 1–2 short sentences.',
     v_name,
-    v_name,
-    v_langs,
-    v_langs
+    v_name
   );
 end;
 $$;
@@ -98,8 +76,7 @@ declare
   v_business_name text;
   v_notify_phone text;
   v_tenant_id uuid;
-  v_langs text[];
-  v_other text;
+  v_langs text[] := array['en', 'sw', 'sheng']::text[];
 begin
   v_business_name := nullif(trim(coalesce(NEW.raw_user_meta_data->>'business_name', '')), '');
   v_notify_phone := nullif(trim(coalesce(
@@ -107,22 +84,6 @@ begin
     NEW.raw_user_meta_data->>'notification_phone',
     ''
   )), '');
-  v_other := nullif(trim(coalesce(NEW.raw_user_meta_data->>'voice_language_other', '')), '');
-
-  -- voice_languages may be a JSON array in auth metadata.
-  if jsonb_typeof(NEW.raw_user_meta_data->'voice_languages') = 'array' then
-    select coalesce(array_agg(value order by ordinality), array['en', 'sw']::text[])
-    into v_langs
-    from jsonb_array_elements_text(NEW.raw_user_meta_data->'voice_languages')
-      with ordinality as t(value, ordinality);
-  elsif nullif(trim(coalesce(NEW.raw_user_meta_data->>'voice_languages', '')), '') is not null then
-    select coalesce(array_agg(trim(both from x)), array['en', 'sw']::text[])
-    into v_langs
-    from unnest(string_to_array(NEW.raw_user_meta_data->>'voice_languages', ',')) as x
-    where length(trim(both from x)) > 0;
-  else
-    v_langs := array['en', 'sw']::text[];
-  end if;
 
   if v_business_name is null then
     return NEW;
@@ -149,7 +110,7 @@ begin
     v_notify_phone,
     public.default_tenant_llm_prompt(v_business_name, v_langs),
     v_langs,
-    v_other,
+    null,
     true,
     NEW.id,
     0,

@@ -699,8 +699,6 @@ mediaWss.on('connection', (ws, req) => {
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
   let callLanguage = 'unknown';
   let fillerUsedThisCall = false;
-  let voiceLanguages = ['en', 'sw'];
-  let voiceLanguageOther = null;
 
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
 
@@ -709,15 +707,11 @@ mediaWss.on('connection', (ws, req) => {
     profileLoaded = true;
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
-      voiceLanguages = Array.isArray(profile.voiceLanguages)
-        ? profile.voiceLanguages
-        : ['en', 'sw'];
-      voiceLanguageOther = profile.voiceLanguageOther || null;
       systemPrompt = buildSystemPrompt(profile);
-      greetingLine = buildGreeting(profile.businessName, voiceLanguages);
+      greetingLine = buildGreeting(profile.businessName);
       messages = [{ role: 'system', content: systemPrompt }];
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${profile.businessName || 'unknown'} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=${voiceLanguages.join(',')}`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${profile.businessName || 'unknown'} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
       );
     } catch (err) {
       console.warn(
@@ -837,7 +831,7 @@ mediaWss.on('connection', (ws, req) => {
     transcriptLog.push(`Caller: ${clean}`);
     messages.push({ role: 'user', content: clean });
 
-    const turnSystemPrompt = `${systemPrompt}\n\n${languageDirective(callLanguage, voiceLanguages)}`;
+    const turnSystemPrompt = `${systemPrompt}\n\n${languageDirective(callLanguage)}`;
 
     try {
       const geminiPromise = process.env.GEMINI_API_KEY

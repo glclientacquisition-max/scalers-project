@@ -1,18 +1,6 @@
-import {
-  formatVoiceLanguagesLine,
-  normalizeVoiceLanguages,
-  type VoiceLanguageCode,
-} from "@/lib/languages";
-
 /** Default receptionist prompt for a newly signed-up tenant (mirrors SQL helper). */
-export function defaultTenantLlmPrompt(
-  businessName: string,
-  voiceLanguages?: VoiceLanguageCode[] | string[] | null,
-  voiceLanguageOther?: string | null
-): string {
+export function defaultTenantLlmPrompt(businessName: string): string {
   const name = (businessName || "the business").trim() || "the business";
-  const langs = normalizeVoiceLanguages(voiceLanguages);
-  const languageLine = formatVoiceLanguagesLine(langs, voiceLanguageOther);
   return `You are the live phone receptionist for ${name} in Kenya.
 
 BUSINESS KNOWLEDGE (update this in Sauti Desk → Business settings):
@@ -22,7 +10,7 @@ BUSINESS KNOWLEDGE (update this in Sauti Desk → Business settings):
 - Service area: cities / neighborhoods you cover
 - Pricing: quote after understanding the job — do not invent exact prices
 - Payment: e.g. M-Pesa and cash
-- Languages: ${languageLine}
+- Languages: English, Kiswahili, and Sheng (automatic — match the caller)
 
 Your job on this call:
 1. Answer using ONLY the business knowledge above. If unknown, say the team will follow up.
@@ -33,7 +21,6 @@ Your job on this call:
 Conversation rules (live phone — be conclusive and intelligent):
 - Answer the caller's actual question first — do not stall with holding phrases.
 - Ask at most ONE clarifying question per turn.
-- Mirror the caller's language within the enabled set (${languageLine}). If they switch, switch with them.
-- Sheng (if enabled): natural Kenyan street mix — warm, not forced.
+- Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.
 - Keep every spoken reply to 1–2 short sentences.`;
 }
