@@ -1,23 +1,37 @@
 // server.js
-// Phase 1 telephony layer: receives forwarded missed calls, hands the call
-// to Twilio ConversationRelay, and runs the conversation loop through Gemini.
+// Phase 2: SautiKit voice webhook + media WebSocket stub.
 // Persistence: Supabase (calls, transcripts, call-recordings Storage).
+// Twilio has been removed from the telephony path.
 
 require('dotenv').config();
 const express = require('express');
-const { WebSocketServer } = require('ws');
+const { WebSocketServer, WebSocket } = require('ws');
 const http = require('http');
 const { GoogleGenAI } = require('@google/genai');
-const twilio = require('twilio');
+const { createSonioxSttSession, isSonioxConfigured } = require('./src/speech/sonioxStt');
+const {
+  createSonioxTtsSession,
+  isSonioxTtsConfigured,
+} = require('./src/speech/sonioxTts');
+const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
+const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
+const {
+  isWhatsAppConfigured,
+  buildLeadText,
+  sendOwnerWhatsApp,
+} = require('./src/notifications/whatsapp');
+const {
+  isTelegramConfigured,
+  sendOwnerTelegram,
+} = require('./src/notifications/telegram');
 
 const PORT = process.env.PORT || 3000;
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
 
+// Phase 2 boot requirements: Supabase only.
+// PUBLIC_BASE_URL is optional — Stream URLs use req.headers.host (Localtunnel).
+// GEMINI_API_KEY is optional at boot (lazy-loaded if /ws/relay LLM path is used).
 const requiredEnvironmentVariables = [
-  'PUBLIC_BASE_URL',
-  'GEMINI_API_KEY',
-  'TWILIO_ACCOUNT_SID',
-  'TWILIO_AUTH_TOKEN',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
 ];
@@ -29,115 +43,229 @@ if (missingEnvironmentVariables.length > 0) {
 
 const db = require('./src/db');
 
-// Twilio-approved WhatsApp sender number (E.164, no "whatsapp:" prefix —
-// that prefix gets added at call time). For testing, this can be Twilio's
-// WhatsApp sandbox number; for production it must be a number provisioned
-// for WhatsApp Business through Twilio.
-const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM;
-// Business owner's WhatsApp-reachable number (E.164, no prefix).
-const BUSINESS_OWNER_WHATSAPP_NUMBER = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER;
-
-const geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-
-function twilioBasicAuthHeader() {
-  const token = Buffer.from(
-    `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`
-  ).toString('base64');
-  return `Basic ${token}`;
+let geminiClient = null;
+function getGeminiClient() {
+  if (geminiClient) return geminiClient;
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+  geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return geminiClient;
 }
 
 const app = express();
-app.use(express.urlencoded({ extended: false })); // Twilio posts form-encoded
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+app.use(
+  express.urlencoded({
+    extended: true,
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
-function validateTwilioWebhook(req, res, next) {
-  if (process.env.TWILIO_VALIDATE_WEBHOOKS === 'false') {
-    return next();
-  }
-
-  const signature = req.header('X-Twilio-Signature');
-  const webhookUrl = `${PUBLIC_BASE_URL}${req.originalUrl}`;
-  const isValid = signature && twilio.validateRequest(
-    process.env.TWILIO_AUTH_TOKEN,
-    signature,
-    webhookUrl,
-    req.body
-  );
-
-  if (!isValid) {
-    console.warn(`Rejected invalid Twilio webhook signature for ${req.originalUrl}`);
-    return res.sendStatus(403);
-  }
-
+// Diagnostic middleware — log every inbound HTTP request (Localtunnel / SautiKit debug).
+app.use((req, res, next) => {
+  console.log(`\n[${new Date().toISOString()}] INCOMING REQUEST: ${req.method} ${req.url}`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
   next();
-}
+});
 
 app.get('/healthz', (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
+/**
+ * Build the media WebSocket URL from the inbound request host so Localtunnel /
+ * ngrok / production reverse proxies work without hard-coding PUBLIC_BASE_URL.
+ */
+function buildMediaStreamUrl(req) {
+  const host = req.headers.host;
+  if (!host) {
+    throw new Error('Missing Host header — cannot build Stream WebSocket URL');
+  }
+  const forwarded = String(req.headers['x-forwarded-proto'] || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  const wsProto = forwarded === 'http' ? 'ws' : 'wss';
+  return `${wsProto}://${host}/ws/media`;
+}
+
+/** Normalize SautiKit voice webhook fields (live payload shape). */
+function extractInboundCallFields(body = {}) {
+  const nested = body.call || body.payload || body.data || {};
+  const callSid =
+    body.sessionId ||
+    body.SessionId ||
+    body.streamSid ||
+    body.CallSid ||
+    body.callSid ||
+    body.call_sid ||
+    body.call_id ||
+    body.CallId ||
+    nested.id ||
+    nested.sessionId ||
+    nested.call_id ||
+    null;
+  const fromNumber =
+    body.callerNumber ||
+    body.From ||
+    body.from ||
+    body.caller_number ||
+    nested.callerNumber ||
+    nested.from ||
+    null;
+  // Prefer the number the client actually dialed when present (outbound WebRTC tests).
+  const toNumber =
+    body.clientDialedNumber ||
+    body.destinationNumber ||
+    body.To ||
+    body.to ||
+    body.destination_number ||
+    nested.to ||
+    null;
+  const callSessionState = String(
+    body.callSessionState ||
+      body.CallSessionState ||
+      body.streamEvent ||
+      body.streamStatus ||
+      body.status ||
+      ''
+  );
+  return {
+    callSid,
+    fromNumber,
+    toNumber,
+    callSessionState,
+    streamSid: body.streamSid || null,
+    streamEvent: body.streamEvent || null,
+  };
+}
+
+function shouldSkipMediaStream(callSessionState, body = {}) {
+  const state = String(callSessionState || '').toLowerCase();
+  const streamEvent = String(body.streamEvent || '').toLowerCase();
+  if (!state && !streamEvent) return false;
+
+  // Stream already running / finished — never re-issue <Stream/>.
+  const skipTokens = [
+    'streamstarted',
+    'stream-started',
+    'streamstopped',
+    'stream-stopped',
+    'streamerror',
+    'stream-error',
+    'completed',
+    'hangup',
+    'failed',
+    'busy',
+    'no-answer',
+  ];
+  return skipTokens.some((t) => state.includes(t) || streamEvent.includes(t));
+}
+
 // ---------------------------------------------------------------------------
-// 1. Inbound call webhook — Twilio hits this the moment the forwarded call
-//    reaches your number. Returns TwiML that:
-//      (a) starts a background recording of the whole call
-//      (b) connects the call to ConversationRelay, which streams transcribed
-//          speech to our WebSocket and plays back whatever text we send.
+// 1. Inbound voice webhook — SautiKit POSTs here (voice_callback_url).
+//    Mounted on BOTH `/` and `/voice/incoming` because some number routing
+//    configs point at the tunnel root (logs showed POST / → 404 before).
 // ---------------------------------------------------------------------------
-app.post('/voice/incoming', validateTwilioWebhook, async (req, res) => {
+async function handleVoiceIncoming(req, res) {
   try {
-    const { CallSid, From, To } = req.body;
+    const extracted = extractInboundCallFields(req.body);
+    const fromNumber = extracted.fromNumber;
+    const toNumber = extracted.toNumber;
+    const callSessionState = extracted.callSessionState;
+    // Always have a durable id for Supabase even if SautiKit omits CallSid.
+    const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
 
-    await db.upsertCall({ callSid: CallSid, fromNumber: From, toNumber: To, provider: 'twilio' });
+    console.log('[voice/incoming]', {
+      path: req.path || req.url,
+      callSid,
+      callSidSource: extracted.callSid ? 'payload' : 'fallback',
+      fromNumber,
+      toNumber,
+      callSessionState: callSessionState || '(initial)',
+      host: req.headers.host,
+      bodyKeys: Object.keys(req.body || {}),
+    });
+    console.log('[voice/incoming] RAW BODY:', JSON.stringify(req.body, null, 2));
 
-    const wsUrl = `${PUBLIC_BASE_URL.replace(/^https/, 'wss')}/ws/relay`;
-    const recordingCallback = `${PUBLIC_BASE_URL}/voice/recording-status`;
+    // SautiKit re-invokes the voice URL on StreamStarted / Completed / etc.
+    // Returning another Stream document re-forks and errors — send empty XML.
+    if (shouldSkipMediaStream(callSessionState, req.body)) {
+      console.log('[voice/incoming] lifecycle edge — empty <Response/> (no re-Stream)');
+      return res
+        .type('text/xml')
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
 
-    const twiml = `
-      <?xml version="1.0" encoding="UTF-8"?>
-      <Response>
-        <Start>
-          <Recording recordingStatusCallback="${recordingCallback}" recordingStatusCallbackEvent="completed" />
-        </Start>
-        <Connect>
-          <ConversationRelay
-            url="${wsUrl}"
-            welcomeGreeting="Hi! Sorry we missed your call. Can you tell me your name and the reason you're calling?"
-            ttsProvider="Google"
-            voice="en-US-Chirp3-HD-Aoede"
-            language="en-US"
-          />
-        </Connect>
-      </Response>
-    `.trim();
+    try {
+      await db.upsertCall({
+        callSid,
+        fromNumber: fromNumber || 'unknown',
+        toNumber,
+        provider: 'sautikit',
+      });
+    } catch (dbErr) {
+      // Do not fail the webhook / Stream setup if DB is briefly unavailable.
+      console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
+    }
+
+    const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
+    // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s.
+    // Pass callSid on the WS URL so /ws/media can bind the session without
+    // waiting for the first metadata frame.
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Stream url="${streamUrl}" name="ai-receptionist" track="inbound_track" connect="true" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />
+</Response>`;
 
     res.type('text/xml').send(twiml);
   } catch (err) {
     console.error('[voice/incoming] Webhook handling failed:', err);
     res.sendStatus(500);
   }
-});
+}
+
+app.post('/', sautikitWebhookGuard, handleVoiceIncoming);
+app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
+app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
 
 // ---------------------------------------------------------------------------
-// 2. Recording status callback — fires once Twilio finishes processing the
-//    recording. Download → upload to Supabase Storage → attach URL to call.
+// 2. Recording attach helper (provider-agnostic). Used when a recording URL
+//    is available from SautiKit events (Phase 2+) or manual hooks.
 // ---------------------------------------------------------------------------
-app.post('/voice/recording-status', validateTwilioWebhook, async (req, res) => {
+app.post('/voice/recording-status', sautikitWebhookGuard, async (req, res) => {
   try {
-    const { CallSid, RecordingUrl, RecordingSid, RecordingStatus } = req.body;
+    const callSid =
+      req.body.CallSid || req.body.callSid || req.body.call_sid || req.body.call_id;
+    const recordingUrl =
+      req.body.RecordingUrl || req.body.recording_url || req.body.recordingUrl;
+    const recordingSid =
+      req.body.RecordingSid || req.body.recording_sid || req.body.recordingSid;
+    const recordingStatus =
+      req.body.RecordingStatus || req.body.recording_status || req.body.status || 'completed';
 
-    if (RecordingStatus === 'completed') {
-      const twilioRecordingUrl = `${RecordingUrl}.mp3`;
+    if (!callSid) {
+      return res.status(400).json({ error: 'call_sid required' });
+    }
+
+    if (recordingStatus === 'completed' && recordingUrl) {
+      const url = recordingUrl.endsWith('.mp3') ? recordingUrl : recordingUrl;
       await db.attachRecording({
-        callSid: CallSid,
-        recordingSid: RecordingSid,
-        sourceUrl: twilioRecordingUrl,
-        recordingUrl: twilioRecordingUrl,
-        authHeader: twilioBasicAuthHeader(),
+        callSid,
+        recordingSid,
+        sourceUrl: url,
+        recordingUrl: url,
       });
-      // Recording may finish before or after the caller-info save happens —
-      // check conditions again here in case this is the piece that completes them.
-      await maybeSendWhatsAppNotification(CallSid);
+      await maybeSendWhatsAppNotification(callSid);
     }
 
     res.sendStatus(200);
@@ -148,101 +276,696 @@ app.post('/voice/recording-status', validateTwilioWebhook, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. ConversationRelay WebSocket — one connection per active call.
-//    Message shapes (from Twilio docs):
-//      inbound:  { type: "setup", callSid, from, to }
-//                { type: "prompt", voicePrompt: "<transcribed caller speech>" }
-//                { type: "interrupt", ... }
-//      outbound: { type: "text", token: "<text to speak>", last: true }
-//                { type: "end", handoffData: "..." }  // ends the call
+// 2b. SautiKit workspace events — call.completed / recording.ready
+// ---------------------------------------------------------------------------
+app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
+  try {
+    const kind =
+      req.headers['x-sautikit-event-kind'] ||
+      req.body?.kind ||
+      req.body?.event_type ||
+      req.body?.type ||
+      '';
+    const body = req.body || {};
+    const callSid =
+      body.call_sid ||
+      body.callSid ||
+      body.sessionId ||
+      body.data?.call_sid ||
+      body.data?.sessionId ||
+      body.payload?.call_sid ||
+      null;
+
+    console.log('[voice/events]', {
+      kind: String(kind),
+      callSid,
+      eventId: req.headers['x-sautikit-event-id'] || null,
+      bodyKeys: Object.keys(body),
+    });
+
+    const kindStr = String(kind).toLowerCase();
+
+    if (kindStr.includes('recording') && callSid) {
+      const recordingUrl =
+        body.recording_url ||
+        body.url ||
+        body.data?.recording_url ||
+        body.data?.url ||
+        body.payload?.recording_url ||
+        null;
+      const recordingSid = body.recording_sid || body.data?.recording_sid || null;
+      if (recordingUrl) {
+        await db.attachRecording({
+          callSid,
+          recordingSid,
+          sourceUrl: recordingUrl,
+          recordingUrl,
+        });
+        await maybeSendWhatsAppNotification(callSid);
+      }
+    }
+
+    if (kindStr.includes('completed') && callSid) {
+      const duration =
+        body.duration_seconds ??
+        body.durationInSeconds ??
+        body.data?.duration_seconds ??
+        null;
+      if (duration != null) {
+        try {
+          const call = await db.getCall(callSid);
+          if (call?._raw?.id) {
+            // Duration lives on calls; best-effort via summary if no direct updater.
+            console.log(`[voice/events] call ${callSid} completed duration=${duration}`);
+          }
+        } catch (err) {
+          console.warn('[voice/events] duration log failed:', err?.message || err);
+        }
+      }
+      await maybeSendWhatsAppNotification(callSid);
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('[voice/events] Webhook handling failed:', err);
+    res.sendStatus(500);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 3. Media WebSocket (/ws/media) — SautiKit audio.drachtio.org fork
+//    Use noServer + manual upgrade so we never fight another WSS on :3000
+//    (dual path-based WSS on one HTTP server is a common cause of bare 1006).
 // ---------------------------------------------------------------------------
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws/relay' });
 
-// ---------------------------------------------------------------------------
-// WhatsApp notification to the business owner. Fires from two different
-// places (save_caller_info tool use, and the recording-status webhook)
-// because either one might complete last — this function is the single
-// gate that only actually sends once both name+reason AND the recording
-// are present, and only once ever per call.
-// ---------------------------------------------------------------------------
-const whatsappSendInProgress = new Set();
+const mediaWss = new WebSocketServer({
+  noServer: true,
+  perMessageDeflate: false,
+  handleProtocols: (protocols) => {
+    try {
+      const list = Array.from(protocols || []);
+      if (list.includes('audio.drachtio.org')) return 'audio.drachtio.org';
+      return list[0] || 'audio.drachtio.org';
+    } catch {
+      return 'audio.drachtio.org';
+    }
+  },
+});
 
-async function maybeSendWhatsAppNotification(callSid) {
-  if (!TWILIO_WHATSAPP_FROM || !BUSINESS_OWNER_WHATSAPP_NUMBER) {
-    console.warn(`[${callSid}] WhatsApp notification skipped: TWILIO_WHATSAPP_FROM or BUSINESS_OWNER_WHATSAPP_NUMBER not configured.`);
-    return;
+// Legacy ConversationRelay path (unused in Phase 2 SautiKit flow).
+const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
+
+function toNodeBuffer(data) {
+  if (Buffer.isBuffer(data)) return data;
+  if (Array.isArray(data)) return Buffer.concat(data.map((part) => toNodeBuffer(part)));
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof data === 'string') return Buffer.from(data, 'utf8');
+  return Buffer.from(String(data));
+}
+
+function looksLikeJsonText(text) {
+  const trimmed = text.trim();
+  return trimmed.startsWith('{') || trimmed.startsWith('[');
+}
+
+server.on('upgrade', (req, socket, head) => {
+  try {
+    const pathname = new URL(req.url || '', 'http://localhost').pathname;
+    console.log(`[upgrade] pathname=${pathname} proto=${req.headers['sec-websocket-protocol'] || ''}`);
+
+    if (pathname === '/ws/media') {
+      mediaWss.handleUpgrade(req, socket, head, (ws) => {
+        mediaWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    if (pathname === '/ws/relay') {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    console.warn(`[upgrade] rejecting unknown path ${pathname}`);
+    socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+    socket.destroy();
+  } catch (err) {
+    console.error('[upgrade] error:', err?.message || err);
+    try {
+      socket.destroy();
+    } catch {
+      /* ignore */
+    }
+  }
+});
+
+/** ~20 ms of mono pcm_s16le @ 16 kHz — matches typical SautiKit inbound frames. */
+const OUTBOUND_PCM_FRAME_BYTES = 640;
+
+function sendPcmToMedia(ws, pcm) {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
+  // Prefer small frames for smoother playback on the telephony side.
+  for (let offset = 0; offset < pcm.length; offset += OUTBOUND_PCM_FRAME_BYTES) {
+    const slice = pcm.subarray(offset, offset + OUTBOUND_PCM_FRAME_BYTES);
+    try {
+      ws.send(slice, { binary: true });
+    } catch (err) {
+      console.warn('[ws/media] outbound PCM send failed:', err?.message || err);
+      break;
+    }
+  }
+}
+
+mediaWss.on('connection', (ws, req) => {
+  const connectedAt = Date.now();
+  let sessionCallSid = null;
+  try {
+    const q = new URL(req.url || '', 'http://localhost').searchParams;
+    sessionCallSid = q.get('callSid') || q.get('sessionId') || null;
+  } catch {
+    /* ignore */
   }
 
+  console.log(
+    `[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'} url=${req.url} callSid=${sessionCallSid || 'unknown'}`
+  );
+  console.log('[ws/media] upgrade headers:', JSON.stringify(req.headers, null, 2));
+
+  try {
+    if (req.socket) {
+      req.socket.setKeepAlive(true, 10000);
+      req.socket.setNoDelay(true);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
+
+  let textFrames = 0;
+  let binaryFrames = 0;
+  let stt = null;
+  let tts = null;
+  let speaking = false;
+  let speakStartedAt = 0;
+  let lastAgentText = '';
+  let turnBusy = false;
+  let utteranceParts = [];
+  let utteranceTimer = null;
+  let fillerTimer = null;
+  let bargedIn = false;
+  let pendingUtterance = null;
+  let systemPrompt = buildSystemPrompt();
+  let greetingLine = buildGreeting();
+  let messages = [{ role: 'system', content: systemPrompt }];
+  const transcriptLog = [];
+  let greetingStarted = false;
+  let profileLoaded = false;
+
+  const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
+
+  async function ensureTenantPrompt() {
+    if (profileLoaded) return;
+    profileLoaded = true;
+    try {
+      const profile = await db.getTenantProfile({ callSid: sessionCallSid });
+      systemPrompt = buildSystemPrompt(profile);
+      greetingLine = buildGreeting(profile.businessName);
+      messages = [{ role: 'system', content: systemPrompt }];
+      console.log(
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${profile.businessName || 'unknown'} customPrompt=${Boolean(profile.llmSystemPrompt)}`
+      );
+    } catch (err) {
+      console.warn(
+        `[ws/media][${sidLabel()}] tenant prompt load failed, using defaults:`,
+        err?.message || err
+      );
+    }
+  }
+
+  function clearFillerTimer() {
+    if (fillerTimer) {
+      clearTimeout(fillerTimer);
+      fillerTimer = null;
+    }
+  }
+
+  async function speakText(text) {
+    if (!tts || !text) return;
+    speaking = true;
+    bargedIn = false;
+    speakStartedAt = Date.now();
+    lastAgentText = String(text);
+    try {
+      await tts.speak(text);
+    } catch (err) {
+      console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
+    } finally {
+      speaking = false;
+    }
+  }
+
+  function cancelSpeech(reason) {
+    clearFillerTimer();
+    if (!tts) return;
+    bargedIn = true;
+    console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
+    try {
+      tts.cancel();
+    } catch {
+      /* ignore */
+    }
+    speaking = false;
+  }
+
+  function looksLikeEcho(text) {
+    const a = String(text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const b = String(lastAgentText || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!a || !b) return false;
+    if (b.includes(a) || a.includes(b.slice(0, Math.min(40, b.length)))) return true;
+    return false;
+  }
+
+  function kickPendingTurn() {
+    if (turnBusy || !pendingUtterance) return;
+    const text = pendingUtterance;
+    pendingUtterance = null;
+    runCallerTurn(text).catch((err) => {
+      console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
+    });
+  }
+
+  async function runCallerTurn(userText) {
+    const clean = String(userText || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    if (turnBusy) {
+      pendingUtterance = clean;
+      return;
+    }
+    turnBusy = true;
+    console.log(`[ws/media][${sidLabel()}] caller turn: ${clean}`);
+    transcriptLog.push(`Caller: ${clean}`);
+    messages.push({ role: 'user', content: clean });
+
+    try {
+      const geminiPromise = process.env.GEMINI_API_KEY
+        ? runGeminiTurn(messages, sidLabel(), systemPrompt)
+        : Promise.resolve({
+            spokenText: "Thanks — someone from the business will call you back shortly.",
+            shouldEndCall: true,
+          });
+
+      // Delayed filler: only if Gemini is still thinking after FILLER_DELAY_MS.
+      const useFiller = Boolean(tts) && process.env.VOICE_FILLER !== 'off';
+      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 450);
+      const fillerText = process.env.VOICE_FILLER || 'Sawa, nakucheckia…';
+      let fillerPromise = Promise.resolve();
+      let fillerStarted = false;
+
+      if (useFiller) {
+        fillerPromise = new Promise((resolve) => {
+          fillerTimer = setTimeout(() => {
+            fillerTimer = null;
+            // Reply may already be ready — skip filler.
+            if (turnBusy && !speaking) {
+              fillerStarted = true;
+              speakText(fillerText).then(resolve, resolve);
+            } else {
+              resolve();
+            }
+          }, fillerDelayMs);
+        });
+      }
+
+      const result = await geminiPromise;
+      clearFillerTimer();
+      if (fillerStarted && tts) {
+        try {
+          tts.cancel();
+        } catch {
+          /* ignore */
+        }
+        await fillerPromise.catch(() => {});
+      }
+
+      const reply = result?.spokenText || AI_FALLBACK_LINE;
+      transcriptLog.push(`Agent: ${reply}`);
+      await speakText(reply);
+
+      if (result?.shouldEndCall && !bargedIn) {
+        console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
+        setTimeout(() => {
+          try {
+            ws.close(1000, 'end_call');
+          } catch {
+            /* ignore */
+          }
+        }, 800);
+      }
+    } catch (err) {
+      console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
+      await speakText(AI_FALLBACK_LINE);
+    } finally {
+      clearFillerTimer();
+      turnBusy = false;
+      kickPendingTurn();
+    }
+  }
+
+  function flushUtterance() {
+    if (utteranceTimer) {
+      clearTimeout(utteranceTimer);
+      utteranceTimer = null;
+    }
+    if (!utteranceParts.length) return;
+    const text = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    utteranceParts = [];
+    if (!text) return;
+    if (turnBusy) {
+      pendingUtterance = text;
+      return;
+    }
+    runCallerTurn(text).catch((err) => {
+      console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
+    });
+  }
+
+  function scheduleUtteranceFlush() {
+    if (utteranceTimer) clearTimeout(utteranceTimer);
+    // Fallback if Soniox endpoint marker is delayed/missing.
+    utteranceTimer = setTimeout(() => flushUtterance(), 900);
+  }
+
+  function onSttEvent(evt) {
+    if (evt.type === 'transcript' && evt.text) {
+      const text = String(evt.text).trim();
+      if (!text) return;
+
+      // Barge-in while agent audio is playing (including during an in-flight turn).
+      if (speaking) {
+        const spokenForMs = Date.now() - speakStartedAt;
+        if (spokenForMs >= 400 && text.length >= 10 && !looksLikeEcho(text)) {
+          cancelSpeech('caller speech');
+          if (evt.isFinal) {
+            utteranceParts.push(text);
+            scheduleUtteranceFlush();
+          }
+        }
+        return;
+      }
+
+      // Ignore STT while Gemini is thinking / filler pending (no agent audio yet).
+      if (turnBusy) return;
+
+      if (evt.isFinal) {
+        utteranceParts.push(text);
+        scheduleUtteranceFlush();
+      }
+      return;
+    }
+    if (evt.type === 'endpoint') {
+      if (speaking) return;
+      if (turnBusy) return;
+      flushUtterance();
+    }
+  }
+
+  // Warm tenant prompt early when callSid is already on the WS URL.
+  if (sessionCallSid) {
+    ensureTenantPrompt().catch(() => {});
+  }
+
+  if (isSonioxConfigured()) {
+    try {
+      stt = createSonioxSttSession({
+        callSid: sidLabel(),
+        onEvent: onSttEvent,
+      });
+      stt.ready.catch((err) => {
+        console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
+        stt = null;
+      });
+    } catch (err) {
+      console.error(`[ws/media] Soniox STT init error:`, err?.message || err);
+      stt = null;
+    }
+  } else {
+    console.warn('[ws/media] SONIOX_API_KEY missing — skipping STT for this call');
+  }
+
+  if (isSonioxTtsConfigured()) {
+    try {
+      tts = createSonioxTtsSession({
+        callSid: sidLabel(),
+        onAudio: (pcm) => {
+          // Drop outbound audio after barge-in cancel.
+          if (!speaking) return;
+          if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+        },
+      });
+      tts.ready.catch((err) => {
+        console.error(`[ws/media] Soniox TTS failed to start:`, err?.message || err);
+        tts = null;
+      });
+    } catch (err) {
+      console.error(`[ws/media] Soniox TTS init error:`, err?.message || err);
+      tts = null;
+    }
+  } else {
+    console.warn('[ws/media] SONIOX_VOICE missing — skipping TTS for this call');
+  }
+
+  // Greet once media + TTS + tenant prompt are ready.
+  (async () => {
+    if (greetingStarted) return;
+    greetingStarted = true;
+    try {
+      await ensureTenantPrompt();
+      if (tts) await tts.ready;
+      await speakText(greetingLine);
+      transcriptLog.push(`Agent: ${greetingLine}`);
+      messages.push({ role: 'assistant', content: greetingLine });
+    } catch (err) {
+      console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
+    }
+  })();
+
+  ws.on('message', (data, isBinary) => {
+    try {
+      const buf = toNodeBuffer(data);
+      const asText = buf.toString('utf8');
+
+      // Trust the WebSocket binary bit — PCM can coincidentally start with '{'/'['.
+      if (!isBinary) {
+        textFrames += 1;
+        if (looksLikeJsonText(asText)) {
+          try {
+            const parsed = JSON.parse(asText);
+            console.log('[WS INCOMING PAYLOAD]', JSON.stringify(parsed, null, 2));
+
+            const meta = parsed.metadata || parsed;
+            const maybeSid =
+              meta.callSid ||
+              meta.sessionId ||
+              meta.call_sid ||
+              meta.call_id ||
+              meta.streamSid ||
+              parsed.sessionId ||
+              parsed.streamSid ||
+              null;
+            if (maybeSid && !sessionCallSid) {
+              sessionCallSid = String(maybeSid);
+              console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
+              ensureTenantPrompt().catch(() => {});
+            }
+          } catch (parseErr) {
+            console.log(
+              '[ws/media] text frame (non-JSON):',
+              asText.slice(0, 200),
+              '| parseError=',
+              parseErr?.message || parseErr
+            );
+          }
+        } else {
+          console.log('[ws/media] text frame:', asText.slice(0, 500));
+        }
+        return;
+      }
+
+      binaryFrames += 1;
+      if (binaryFrames <= 5 || binaryFrames % 50 === 0) {
+        console.log(
+          `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
+        );
+      }
+      // Keep feeding STT during TTS so barge-in can fire; echo is filtered in onSttEvent.
+      if (stt) stt.sendAudio(buf);
+    } catch (err) {
+      console.error(
+        '[ws/media] message handler error (socket kept open):',
+        err?.message || err,
+        err?.stack
+      );
+    }
+  });
+
+  ws.on('close', (code, reason) => {
+    const ms = Date.now() - connectedAt;
+    console.log(
+      `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
+    );
+    clearFillerTimer();
+    if (utteranceTimer) {
+      clearTimeout(utteranceTimer);
+      utteranceTimer = null;
+    }
+    if (stt) {
+      try {
+        stt.close();
+      } catch {
+        /* ignore */
+      }
+      stt = null;
+    }
+    if (tts) {
+      try {
+        tts.close();
+      } catch {
+        /* ignore */
+      }
+      tts = null;
+    }
+    if (sessionCallSid && transcriptLog.length) {
+      db.appendTranscript({ callSid: sessionCallSid, transcript: transcriptLog.join('\n') }).catch(
+        (err) => {
+          console.error(`[ws/media] transcript flush failed:`, err?.message || err);
+        }
+      );
+    }
+  });
+
+  ws.on('error', (err) => {
+    console.error('[ws/media] error:', err?.message || err);
+  });
+});
+
+const mediaKeepalive = setInterval(() => {
+  for (const ws of mediaWss.clients) {
+    if (ws.isAlive === false) {
+      console.warn('[ws/media] keepalive missed — terminating stale socket');
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    try {
+      ws.ping();
+    } catch (err) {
+      console.warn('[ws/media] ping failed:', err?.message || err);
+    }
+  }
+}, 15000);
+
+mediaWss.on('close', () => clearInterval(mediaKeepalive));
+
+// ---------------------------------------------------------------------------
+// Owner lead notification (Telegram interim; WhatsApp when Business is linked).
+// Fires from save_caller_info and recording/events webhooks. Sends once per call.
+// ---------------------------------------------------------------------------
+const ownerNotifyInProgress = new Set();
+
+async function maybeSendWhatsAppNotification(callSid) {
+  // Kept name for call-sites; routes Telegram first, then WhatsApp.
   const call = await db.getCall(callSid);
   if (!call) return;
 
   const hasCallerInfo = Boolean(call.name && call.reason);
-  const hasRecording = Boolean(call.recording_url);
-  if (!hasCallerInfo || !hasRecording) return; // not ready yet — the other trigger will re-check later
+  if (!hasCallerInfo) return;
 
-  if (whatsappSendInProgress.has(callSid)) return;
+  if (ownerNotifyInProgress.has(callSid)) return;
   if (call.whatsapp_sent) return;
-  whatsappSendInProgress.add(callSid);
-
-  const body = [
-    'New missed-call lead',
-    `Name: ${call.name}`,
-    `Phone: ${call.from_number}`,
-    `Reason: ${call.reason}`,
-    `Time: ${call.created_at}`,
-    `Recording: ${call.recording_url}`,
-  ].join('\n');
+  ownerNotifyInProgress.add(callSid);
 
   try {
-    await twilioClient.messages.create({
-      from: `whatsapp:${TWILIO_WHATSAPP_FROM}`,
-      to: `whatsapp:${BUSINESS_OWNER_WHATSAPP_NUMBER}`,
-      body,
-      // Prefer Supabase signed URL when Storage upload succeeded; otherwise
-      // Twilio URL works when media stays on the same Twilio account.
-      mediaUrl: [call.recording_url],
-    });
+    let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+    let businessName = process.env.BUSINESS_NAME || null;
+    try {
+      const profile = await db.getTenantProfile({ callSid });
+      ownerNumber = profile.whatsappNumber || ownerNumber;
+      businessName = profile.businessName || businessName;
+    } catch (err) {
+      console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
+    }
+
+    const lead = {
+      businessName,
+      name: call.name,
+      reason: call.reason,
+      callerNumber: call.from_number,
+      recordingUrl: call.recording_url,
+    };
+
+    // Prefer Telegram until WhatsApp Business is registered on the DID.
+    if (isTelegramConfigured()) {
+      const result = await sendOwnerTelegram({ lead });
+      await db.markWhatsappSent(callSid);
+      console.log(`[${callSid}] Telegram lead notify accepted:`, result?.result?.message_id || result);
+      return;
+    }
+
+    if (!ownerNumber) {
+      console.warn(
+        `[${callSid}] Owner notify skipped: set TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID (interim) or WhatsApp owner number`
+      );
+      return;
+    }
+
+    if (!isWhatsAppConfigured()) {
+      console.warn(
+        `[${callSid}] Owner notify skipped (no Telegram / WhatsApp sender). Lead ready:`,
+        {
+          name: call.name,
+          phone: call.from_number,
+          reason: call.reason,
+          recording: call.recording_url,
+          ownerNumber,
+        }
+      );
+      return;
+    }
+
+    const body = buildLeadText(lead);
+    const result = await sendOwnerWhatsApp({ to: ownerNumber, body, lead });
     await db.markWhatsappSent(callSid);
+    console.log(`[${callSid}] WhatsApp lead notify accepted:`, result);
   } catch (err) {
-    console.error(`[${callSid}] WhatsApp notification failed:`, err);
-    // Don't rethrow — a failed notification should never take down the server
-    // or affect the call itself. The state remains unsent so a later trigger
-    // can retry.
+    console.error(`[${callSid}] Owner notification failed:`, err?.message || err);
   } finally {
-    whatsappSendInProgress.delete(callSid);
+    ownerNotifyInProgress.delete(callSid);
   }
 }
 
-const SYSTEM_PROMPT = `You are a friendly phone receptionist answering a
-missed call on behalf of a small business in Kenya. Your only job this call:
-1. Get the caller's name.
-2. Get a short reason for their call.
-3. Briefly confirm both back to them in one sentence.
-4. Tell them the business will get back to them soon, then say goodbye.
-
-Speak in warm, natural, conversational English — plain and friendly, the
-way a real receptionist would talk on the phone, not stiff or robotic.
-
-Keep every reply to 1-2 short sentences — this is a live phone call, not
-chat. When you have both the caller's name and reason, respond with one
-natural confirmation sentence and also append a structured marker block
-using this exact format:
-
-###TOOL###
-{"save_caller_info":{"name":"<name>","reason":"<reason>"}}
-###ENDTOOL###
-
-If the call should end after your goodbye, also append the marker:
-###ENDCALL###
-
-Do not include any other JSON or markup in your spoken response.`;
-
-const CONTEXT_WINDOW = 6;
+const CONTEXT_WINDOW = 10;
 
 wss.on('connection', (ws) => {
   let callSid = null;
-  let messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  let systemPrompt = buildSystemPrompt();
+  let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
 
   ws.on('message', async (raw) => {
@@ -261,8 +984,15 @@ wss.on('connection', (ws) => {
           callSid,
           fromNumber: data.from,
           toNumber: data.to,
-          provider: 'twilio',
+          provider: 'sautikit',
         });
+        try {
+          const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
+          systemPrompt = buildSystemPrompt(profile);
+          messages = [{ role: 'system', content: systemPrompt }];
+        } catch (err) {
+          console.warn(`[${callSid}] tenant prompt load failed:`, err?.message || err);
+        }
         console.log(`[${callSid}] WebSocket connected: ${data.from} → ${data.to}`);
         return; // welcomeGreeting in the TwiML already handles the opening line
       }
@@ -276,7 +1006,7 @@ wss.on('connection', (ws) => {
         transcriptLog.push(`Caller: ${data.voicePrompt}`);
         messages.push({ role: 'user', content: data.voicePrompt });
 
-        const reply = await runGeminiTurn(messages, callSid);
+        const reply = await runGeminiTurn(messages, callSid, systemPrompt);
         if (reply.spokenText) {
           transcriptLog.push(`Agent: ${reply.spokenText}`);
           ws.send(JSON.stringify({ type: 'text', token: reply.spokenText, last: true }));
@@ -317,42 +1047,75 @@ wss.on('connection', (ws) => {
 const AI_FALLBACK_LINE =
   "Sorry, we're having a technical issue on our end — the business will call you back shortly. Thanks for your patience.";
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableGeminiError(err) {
+  const status = Number(err?.status || err?.code || 0);
+  if (status === 429 || status === 503 || status === 500) return true;
+  const msg = String(err?.message || err || '').toLowerCase();
+  return msg.includes('503') || msg.includes('429') || msg.includes('unavailable') || msg.includes('overloaded');
+}
+
 // Runs one turn of the conversation through Gemini, preserving the chat
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
-async function runGeminiTurn(messages, callSid) {
+async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt()) {
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const maxAttempts = Math.max(1, Number(process.env.GEMINI_MAX_RETRIES || 3));
   let response;
-  try {
-    console.log(`[${callSid}] Calling Gemini API (model: gemini-3.6-flash, messages: ${messages.length})`);
+  let lastErr = null;
 
-    const recentMessages = messages.slice(-CONTEXT_WINDOW);
-    const contents = recentMessages
-      .filter((message) => message.role !== 'system')
-      .map((message) => ({
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: message.content }],
-      }));
+  const recentMessages = messages.slice(-CONTEXT_WINDOW);
+  const contents = recentMessages
+    .filter((message) => message.role !== 'system')
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: message.content }],
+    }));
 
-    response = await geminiClient.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents,
-      config: {
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        temperature: 0.7,
-        maxOutputTokens: 300,
-        thinkingConfig: {
-          thinkingBudget: 0,
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      console.log(
+        `[${callSid}] Calling Gemini API (model: ${model}, messages: ${messages.length}, attempt: ${attempt}/${maxAttempts})`
+      );
+
+      response = await getGeminiClient().models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          temperature: 0.7,
+          maxOutputTokens: 300,
+          // gemini-3.6-flash rejects thinkingBudget:0; MINIMAL keeps latency low.
+          thinkingConfig: {
+            thinkingLevel: 'MINIMAL',
+          },
         },
-      },
-    });
-    console.log(`[${callSid}] Gemini response received`);
-  } catch (err) {
-    console.error(
-      `[${callSid}] Gemini API call failed:`,
-      `status=${err?.status || 'N/A'}`,
-      `message=${err?.message || err}`
-    );
-    return { spokenText: AI_FALLBACK_LINE, shouldEndCall: true };
+      });
+      console.log(`[${callSid}] Gemini response received`);
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      const retryable = isRetryableGeminiError(err);
+      console.error(
+        `[${callSid}] Gemini API call failed:`,
+        `status=${err?.status || 'N/A'}`,
+        `attempt=${attempt}/${maxAttempts}`,
+        `retryable=${retryable}`,
+        `message=${err?.message || err}`
+      );
+      if (!retryable || attempt >= maxAttempts) break;
+      const backoffMs = Math.min(2000, 250 * 2 ** (attempt - 1));
+      await sleep(backoffMs);
+    }
+  }
+
+  if (lastErr || !response) {
+    // Keep the call open so the caller can try again after a transient outage.
+    return { spokenText: AI_FALLBACK_LINE, shouldEndCall: false };
   }
 
   let outputText = '';
@@ -408,9 +1171,44 @@ function parseGeminiResponse(responseText) {
 
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
-  console.log(`📞 Voice webhook: ${PUBLIC_BASE_URL}/voice/incoming`);
-  console.log(`📡 Relay WebSocket: ${PUBLIC_BASE_URL.replace(/^https/, 'wss')}/ws/relay`);
-  console.log(`✓ Gemini SDK initialized`);
-  console.log(`✓ Twilio SDK initialized`);
+  console.log(`📞 Voice webhook: POST /voice/incoming (SautiKit XML Stream → /ws/media)`);
+  console.log(`📡 Media WebSocket: /ws/media (Host-based wss URL for Localtunnel)`);
+  if (PUBLIC_BASE_URL) {
+    console.log(`🌐 PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}`);
+  } else {
+    console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
+  }
   console.log(`✓ Supabase database initialized`);
+  if (process.env.GEMINI_API_KEY) {
+    console.log(`✓ GEMINI_API_KEY present (lazy-loaded on LLM use)`);
+  } else {
+    console.log(`ℹ GEMINI_API_KEY not set (optional for Phase 2 webhook tests)`);
+  }
+  if (isSonioxConfigured()) {
+    console.log(
+      `✓ SONIOX_API_KEY present (STT on /ws/media)${process.env.SONIOX_VOICE ? ` voice=${process.env.SONIOX_VOICE}` : ''}`
+    );
+    if (isSonioxTtsConfigured()) {
+      console.log(`✓ SONIOX_VOICE present (TTS replies enabled)`);
+    } else {
+      console.log(`ℹ SONIOX_VOICE not set — STT only, no spoken replies`);
+    }
+  } else {
+    console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
+  }
+  if (process.env.SAUTIKIT_API_KEY) {
+    console.log(
+      `✓ SAUTIKIT_API_KEY present${isWhatsAppConfigured() ? ' (WhatsApp notify ready)' : ' (WhatsApp number id not set yet)'}`
+    );
+  } else {
+    console.log(`ℹ SAUTIKIT_API_KEY not set — WhatsApp lead notify disabled`);
+  }
+  if (isTelegramConfigured()) {
+    console.log(`✓ Telegram owner alerts enabled (chat ${process.env.TELEGRAM_CHAT_ID})`);
+  } else {
+    console.log(`ℹ Telegram owner alerts not set (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID)`);
+  }
+  if (String(process.env.SAUTIKIT_VALIDATE_WEBHOOKS || '').toLowerCase() === 'true') {
+    console.log(`✓ SautiKit webhook signature validation ON`);
+  }
 });

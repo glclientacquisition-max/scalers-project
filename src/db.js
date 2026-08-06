@@ -89,7 +89,7 @@ async function resolveTenantId({ toNumber, tenantId }) {
   );
 }
 
-async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'twilio' }) {
+async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'sautikit' }) {
   const resolvedTenantId = await resolveTenantId({ toNumber, tenantId });
   const existing = await getCall(callSid);
   const meta = existing
@@ -312,6 +312,54 @@ async function attachRecording({
   return shapeCall(data);
 }
 
+async function getTenantById(tenantId) {
+  if (!tenantId) return null;
+  const { data, error } = await supabase
+    .from('tenants')
+    .select(
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'
+    )
+    .eq('id', tenantId)
+    .maybeSingle();
+  throwIfError('getTenantById', error);
+  return data || null;
+}
+
+/**
+ * Resolve tenant profile for a live call (by callSid → tenant_id, else DID / fallback).
+ */
+async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
+  let resolvedId = tenantId || DEFAULT_TENANT_ID || null;
+
+  if (!resolvedId && callSid) {
+    const call = await getCall(callSid);
+    if (call?.tenant_id) resolvedId = call.tenant_id;
+  }
+
+  if (!resolvedId) {
+    resolvedId = await resolveTenantId({ toNumber, tenantId });
+  }
+
+  const row = await getTenantById(resolvedId);
+  if (!row) {
+    return {
+      id: resolvedId,
+      businessName: process.env.BUSINESS_NAME || 'the business',
+      llmSystemPrompt: null,
+      knowledge: process.env.BUSINESS_KNOWLEDGE || null,
+    };
+  }
+
+  return {
+    id: row.id,
+    businessName: row.business_name,
+    llmSystemPrompt: row.llm_system_prompt || null,
+    knowledge: process.env.BUSINESS_KNOWLEDGE || null,
+    whatsappNumber: row.whatsapp_notification_number || null,
+    did: row.sautikit_virtual_number || null,
+  };
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -319,6 +367,8 @@ module.exports = {
   attachRecording,
   uploadRecordingBuffer,
   getCall,
+  getTenantById,
+  getTenantProfile,
   markWhatsappSent,
   RECORDINGS_BUCKET,
   shapeCall,

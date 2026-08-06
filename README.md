@@ -4,22 +4,25 @@ AI receptionist for East African B2B businesses: answers missed / busy / after-h
 
 ## Current stack
 
-- **Telephony:** Twilio ConversationRelay  
-- **LLM:** Google Gemini  
-- **DB / Storage:** Supabase PostgreSQL (`tenants`, `calls`, `transcripts`) + `call-recordings` bucket  
+- **Telephony:** SautiKit (Stream XML + PCM WebSocket)
+- **Speech:** Soniox realtime STT + TTS
+- **LLM:** Google Gemini
+- **DB / Storage:** Supabase PostgreSQL (`tenants`, `calls`, `transcripts`) + `call-recordings` bucket
 - **Entry:** `npm start` → `server.js`
 
-## Setup
+## Setup (local)
 
-1. Copy `.env.example` → `.env` and fill Twilio, Gemini, and Supabase keys.
-2. Ensure schema matches [`docs/supabase/schema.sql`](docs/supabase/schema.sql) (or your live equivalent).
+1. Copy `.env.example` → `.env` and fill keys (see comments).
+2. Ensure schema matches [`docs/supabase/schema.sql`](docs/supabase/schema.sql).
 3. `npm install && npm start`
-4. Optional DB smoke test: `npm run smoke:db`
+4. Optional DB smoke: `npm run smoke:db`
+5. Local tunnel for SautiKit: [`docs/WEBHOOK_TUNNEL.md`](docs/WEBHOOK_TUNNEL.md)  
+   Prefer `npm run tunnel:cloudflared`.
 
-## Production direction
+## Production cutover (Phase 5)
 
-See the architecture and phased cutover plan:
+See **[`docs/PRODUCTION_CUTOVER.md`](docs/PRODUCTION_CUTOVER.md)** — Railway/Render deploy, point SautiKit voice + events URLs, WhatsApp lead notify.
+
+## Architecture
 
 **[docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md](docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md)**
-
-Target stack: **SautiKit** (telephony) + **Soniox** (STT/TTS) + **Gemini / GPT-4o-mini** + **Supabase**, with a custom Node.js media orchestrator and a Next.js admin dashboard.
