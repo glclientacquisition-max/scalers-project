@@ -8,6 +8,7 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 const http = require('http');
 const { GoogleGenAI } = require('@google/genai');
+const { createSonioxSttSession, isSonioxConfigured } = require('./src/speech/sonioxStt');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -351,6 +352,30 @@ mediaWss.on('connection', (ws, req) => {
 
   let textFrames = 0;
   let binaryFrames = 0;
+  let stt = null;
+  const transcriptFinals = [];
+
+  if (isSonioxConfigured()) {
+    try {
+      stt = createSonioxSttSession({
+        callSid: sessionCallSid || `media_${Date.now()}`,
+        onEvent: (evt) => {
+          if (evt.type === 'transcript' && evt.isFinal && evt.text) {
+            transcriptFinals.push(evt.text);
+          }
+        },
+      });
+      stt.ready.catch((err) => {
+        console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
+        stt = null;
+      });
+    } catch (err) {
+      console.error(`[ws/media] Soniox STT init error:`, err?.message || err);
+      stt = null;
+    }
+  } else {
+    console.warn('[ws/media] SONIOX_API_KEY missing — skipping STT for this call');
+  }
 
   ws.on('message', (data, isBinary) => {
     try {
@@ -399,6 +424,7 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media] binary audio frame #${binaryFrames} (${buf.length} bytes) callSid=${sessionCallSid || 'unknown'}`
         );
       }
+      if (stt) stt.sendAudio(buf);
     } catch (err) {
       console.error(
         '[ws/media] message handler error (socket kept open):',
@@ -413,6 +439,22 @@ mediaWss.on('connection', (ws, req) => {
     console.log(
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
+    if (stt) {
+      try {
+        stt.close();
+      } catch {
+        /* ignore */
+      }
+      stt = null;
+    }
+    if (sessionCallSid && transcriptFinals.length) {
+      const transcript = transcriptFinals
+        .map((t) => (t.startsWith('Caller:') ? t : `Caller: ${t}`))
+        .join('\n');
+      db.appendTranscript({ callSid: sessionCallSid, transcript }).catch((err) => {
+        console.error(`[ws/media] transcript flush failed:`, err?.message || err);
+      });
+    }
   });
 
   ws.on('error', (err) => {
@@ -689,5 +731,12 @@ server.listen(PORT, () => {
     console.log(`✓ GEMINI_API_KEY present (lazy-loaded on LLM use)`);
   } else {
     console.log(`ℹ GEMINI_API_KEY not set (optional for Phase 2 webhook tests)`);
+  }
+  if (isSonioxConfigured()) {
+    console.log(
+      `✓ SONIOX_API_KEY present (STT on /ws/media)${process.env.SONIOX_VOICE ? ` voice=${process.env.SONIOX_VOICE}` : ''}`
+    );
+  } else {
+    console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
   }
 });
