@@ -17,11 +17,14 @@ const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
 const {
   detectCallerLanguage,
   resolveCallLanguage,
-  pickFillerText,
   ttsLanguageFor,
   isBackchannel,
   languageDirective,
 } = require('./src/conversation/language');
+const {
+  generateDynamicGreeting,
+  pickContextualAck,
+} = require('./src/conversation/dynamicSpeech');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
   isWhatsAppConfigured,
@@ -692,6 +695,7 @@ mediaWss.on('connection', (ws, req) => {
   let pendingUtterance = null;
   let systemPrompt = buildSystemPrompt();
   let greetingLine = buildGreeting();
+  let businessName = process.env.BUSINESS_NAME || 'the business';
   let messages = [{ role: 'system', content: systemPrompt }];
   const transcriptLog = [];
   let greetingStarted = false;
@@ -707,11 +711,12 @@ mediaWss.on('connection', (ws, req) => {
     profileLoaded = true;
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
+      businessName = profile.businessName || businessName;
       systemPrompt = buildSystemPrompt(profile);
-      greetingLine = buildGreeting(profile.businessName);
+      greetingLine = buildGreeting(businessName);
       messages = [{ role: 'system', content: systemPrompt }];
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${profile.businessName || 'unknown'} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
       );
     } catch (err) {
       console.warn(
@@ -844,29 +849,33 @@ mediaWss.on('connection', (ws, req) => {
             shouldEndCall: true,
           });
 
-      // Delayed filler: only if Gemini is still slow. Default delay is high so
-      // fast replies never say "Sawa, nakucheckia…" on every turn. Language-matched.
-      const fillerMode = process.env.VOICE_FILLER || 'auto';
+      // Default: silence while Gemini thinks (feels human, not scripted).
+      // VOICE_FILLER=ack → one tiny contextual backchannel ("Sawa." / "Alright.").
+      // VOICE_FILLER=auto|custom → legacy hold phrase (discouraged).
+      const fillerMode = (process.env.VOICE_FILLER || 'off').toLowerCase();
       const useFiller =
         Boolean(tts) &&
         fillerMode !== 'off' &&
-        // At most one hold phrase per call — avoids the every-turn annoyance.
         !fillerUsedThisCall;
-      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 1200);
-      const fillerText = pickFillerText(callLanguage);
+      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 1500);
+      const fillerText =
+        fillerMode === 'ack'
+          ? pickContextualAck(clean, callLanguage)
+          : fillerMode === 'auto'
+            ? pickContextualAck(clean, callLanguage)
+            : process.env.VOICE_FILLER;
       let fillerPromise = Promise.resolve();
       let fillerStarted = false;
 
-      if (useFiller) {
+      if (useFiller && fillerText) {
         fillerPromise = new Promise((resolve) => {
           fillerTimer = setTimeout(() => {
             fillerTimer = null;
-            // Reply may already be ready — skip filler.
             if (turnBusy && !speaking && !bargeInActive) {
               fillerStarted = true;
               fillerUsedThisCall = true;
               console.log(
-                `[ws/media][${sidLabel()}] slow-reply filler lang=${callLanguage}: ${fillerText}`
+                `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
               );
               speakText(fillerText, { language: ttsLanguageFor(callLanguage) }).then(
                 resolve,
@@ -1035,17 +1044,33 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   // Greet once media + TTS + tenant prompt are ready.
+  // Greeting is generated fresh by Gemini (dynamic) with a fast time-of-day fallback.
   (async () => {
     if (greetingStarted) return;
     greetingStarted = true;
     try {
       await ensureTenantPrompt();
       if (tts) await tts.ready;
+
+      greetingLine = await generateDynamicGreeting({
+        businessName,
+        callSid: sidLabel(),
+        generateText: generateGeminiText,
+      });
+      console.log(`[ws/media][${sidLabel()}] dynamic greeting: ${greetingLine}`);
+
       await speakText(greetingLine);
       transcriptLog.push(`Agent: ${greetingLine}`);
       messages.push({ role: 'assistant', content: greetingLine });
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
+      try {
+        const fallback = buildGreeting(businessName);
+        await speakText(fallback);
+        messages.push({ role: 'assistant', content: fallback });
+      } catch {
+        /* ignore */
+      }
     }
   })();
 
@@ -1351,6 +1376,44 @@ function isRetryableGeminiError(err) {
   return msg.includes('503') || msg.includes('429') || msg.includes('unavailable') || msg.includes('overloaded');
 }
 
+function extractGeminiText(response) {
+  if (typeof response?.text === 'string') return response.text;
+  if (Array.isArray(response?.candidates?.[0]?.content?.parts)) {
+    return response.candidates[0].content.parts
+      .filter((part) => part && !part.thought && typeof part.text === 'string')
+      .map((part) => part.text)
+      .join('');
+  }
+  return '';
+}
+
+/**
+ * Lightweight one-shot Gemini text (greetings / helpers). No chat history.
+ */
+async function generateGeminiText({
+  callSid,
+  systemInstruction,
+  userText,
+  temperature = 0.7,
+  maxOutputTokens = 80,
+  thinkingLevel = 'MINIMAL',
+}) {
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const response = await getGeminiClient().models.generateContent({
+    model,
+    contents: [{ role: 'user', parts: [{ text: String(userText || 'Go.') }] }],
+    config: {
+      systemInstruction: { parts: [{ text: String(systemInstruction || '') }] },
+      temperature,
+      maxOutputTokens,
+      thinkingConfig: { thinkingLevel },
+    },
+  });
+  const text = extractGeminiText(response).trim();
+  console.log(`[${callSid}] Gemini one-shot text chars=${text.length}`);
+  return text;
+}
+
 // Runs one turn of the conversation through Gemini, preserving the chat
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
@@ -1412,16 +1475,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
     return { spokenText: AI_FALLBACK_LINE, shouldEndCall: false };
   }
 
-  let outputText = '';
-  if (typeof response?.text === 'string') {
-    outputText = response.text;
-  } else if (Array.isArray(response?.candidates?.[0]?.content?.parts)) {
-    outputText = response.candidates[0].content.parts
-      .filter((part) => part && !part.thought && typeof part.text === 'string')
-      .map((part) => part.text)
-      .join('');
-  }
-
+  const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
   const spokenText = parsed.spokenText || AI_FALLBACK_LINE;
   const shouldEndCall = parsed.shouldEndCall;
