@@ -357,7 +357,8 @@ mediaWss.on('connection', (ws, req) => {
       const buf = toNodeBuffer(data);
       const asText = buf.toString('utf8');
 
-      if (!isBinary || looksLikeJsonText(asText)) {
+      // Trust the WebSocket binary bit — PCM can coincidentally start with '{'/'['.
+      if (!isBinary) {
         textFrames += 1;
         if (looksLikeJsonText(asText)) {
           try {
@@ -381,7 +382,7 @@ mediaWss.on('connection', (ws, req) => {
           } catch (parseErr) {
             console.log(
               '[ws/media] text frame (non-JSON):',
-              asText.slice(0, 500),
+              asText.slice(0, 200),
               '| parseError=',
               parseErr?.message || parseErr
             );
