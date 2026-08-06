@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f3efe6;
+  --bg-deep: #e7e0d2;
+  --ink: #1c2421;
+  --ink-soft: #4a5752;
+  --line: #cfc5b4;
+  --card: #fffaf2;
+  --accent: #0f6b5c;
+  --accent-deep: #0a4f44;
+  --warn: #9a4a1c;
+  --ok: #2f6b3a;
+}
+
+body {
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #d7ebe4 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #f0e2c8 0%, transparent 50%),
+    var(--bg);
+  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: Georgia, "Times New Roman", serif;
+}
