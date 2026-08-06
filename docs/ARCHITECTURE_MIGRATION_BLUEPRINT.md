@@ -300,6 +300,7 @@ TWILIO_WHATSAPP_FROM=
 
 - Document architecture, API corrections, schema, module map
 - Document full product/technical requirements ([`REQUIREMENTS.md`](./REQUIREMENTS.md))
+- Document phase-by-phase implementation checklist ([`REQUIREMENTS_BY_PHASE.md`](./REQUIREMENTS_BY_PHASE.md))
 - No production cutover
 
 ### Phase 1 — Persistence swap (low risk)
