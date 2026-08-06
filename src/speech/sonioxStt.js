@@ -41,11 +41,17 @@ function createSonioxSttSession({ callSid, onEvent = () => {} }) {
         sample_rate: SAMPLE_RATE,
         num_channels: 1,
         language_hints: ['en', 'sw'],
+        // Faster turn-taking (stt-rt-v5 endpoint detection tuning).
         enable_endpoint_detection: true,
+        endpoint_latency_adjustment_level: 2,
+        max_endpoint_delay_ms: 800,
+        endpoint_sensitivity: 0.5,
       };
       ws.send(JSON.stringify(config));
       opened = true;
-      console.log(`[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE}`);
+      console.log(
+        `[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE} endpoint={latencyAdj:2,maxDelayMs:800,sensitivity:0.5}`
+      );
       while (pending.length) {
         const chunk = pending.shift();
         try {
