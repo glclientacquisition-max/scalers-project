@@ -11,10 +11,12 @@ AI receptionist for East African B2B businesses: answers missed / busy / after-h
 
 ## Setup
 
-1. Copy `.env.example` → `.env` and fill Twilio, Gemini, and Supabase keys.
+1. Copy `.env.example` → `.env` and fill Supabase keys (Twilio not required for Phase 2).
 2. Ensure schema matches [`docs/supabase/schema.sql`](docs/supabase/schema.sql) (or your live equivalent).
 3. `npm install && npm start`
 4. Optional DB smoke test: `npm run smoke:db`
+5. **Public webhook tunnel (SautiKit):** see [`docs/WEBHOOK_TUNNEL.md`](docs/WEBHOOK_TUNNEL.md)  
+   Prefer `npm run tunnel:cloudflared` — Localtunnel’s splash page blocks automated webhooks.
 
 ## Production direction
 
