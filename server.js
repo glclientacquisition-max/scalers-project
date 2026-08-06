@@ -40,8 +40,15 @@ function getGeminiClient() {
 }
 
 const app = express();
-app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Diagnostic middleware — log every inbound HTTP request (Localtunnel / SautiKit debug).
+app.use((req, res, next) => {
+  console.log(`\n[${new Date().toISOString()}] INCOMING REQUEST: ${req.method} ${req.url}`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  next();
+});
 
 app.get('/healthz', (_req, res) => {
   res.status(200).json({ ok: true });
