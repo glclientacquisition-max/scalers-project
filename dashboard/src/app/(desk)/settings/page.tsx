@@ -1,31 +1,33 @@
-import { getSupabaseAdmin, type TenantRow } from "@/lib/supabase";
+import { getCurrentTenant } from "@/lib/tenant";
 import { TenantForm } from "@/components/TenantForm";
 
 export default async function SettingsPage() {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("tenants")
-    .select(
-      "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active"
-    )
-    .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
+  let tenant;
+  try {
+    tenant = await getCurrentTenant();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return (
       <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
-        Could not load business: {error.message}
+        Could not load business: {message}
       </div>
     );
   }
 
-  if (!data) {
-    return <p className="text-[var(--ink-soft)]">No active tenant found in Supabase.</p>;
+  if (!tenant) {
+    return (
+      <div className="max-w-xl">
+        <h1 className="font-display text-4xl tracking-tight">Business</h1>
+        <p className="mt-3 text-[var(--ink-soft)]">
+          No workspace is linked to this account yet. Sign up again or apply{" "}
+          <code className="text-sm">docs/supabase/multi_tenant_onboarding.sql</code> and
+          contact support.
+        </p>
+      </div>
+    );
   }
 
-  const tenant = data as TenantRow;
+  const pendingDid = String(tenant.sautikit_virtual_number || "").startsWith("pending:");
 
   return (
     <div className="max-w-3xl">
@@ -37,8 +39,16 @@ export default async function SettingsPage() {
       <div className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <p className="text-sm text-[var(--ink-soft)]">
           DID{" "}
-          <span className="font-medium text-[var(--ink)]">{tenant.sautikit_virtual_number}</span>
+          <span className="font-medium text-[var(--ink)]">
+            {pendingDid ? "Pending assignment" : tenant.sautikit_virtual_number}
+          </span>
         </p>
+        {pendingDid ? (
+          <p className="mt-2 text-xs text-[var(--ink-soft)]">
+            Your voice number will appear here once a SautiKit DID is assigned from the number
+            pool (Phase C).
+          </p>
+        ) : null}
         <div className="mt-6">
           <TenantForm tenant={tenant} />
         </div>

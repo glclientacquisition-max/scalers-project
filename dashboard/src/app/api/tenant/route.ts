@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { isAuthenticated } from "@/lib/auth";
+import { getCurrentTenant } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   if (!(await isAuthenticated())) {
@@ -10,6 +11,11 @@ export async function POST(request: Request) {
   const body = await request.json();
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const tenant = await getCurrentTenant();
+  if (!tenant || tenant.id !== id) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const patch: Record<string, unknown> = {};
   if (typeof body.business_name === "string") patch.business_name = body.business_name.trim();

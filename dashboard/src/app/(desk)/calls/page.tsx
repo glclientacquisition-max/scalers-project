@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSupabaseAdmin, parseSummary, type CallRow } from "@/lib/supabase";
+import { getCurrentTenant } from "@/lib/tenant";
 
 function formatWhen(iso: string) {
   try {
@@ -14,12 +15,26 @@ function formatWhen(iso: string) {
 }
 
 export default async function CallsPage() {
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return (
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 text-[var(--ink-soft)]">
+        No workspace linked to this account yet.{" "}
+        <Link href="/signup" className="text-[var(--accent)]">
+          Create one
+        </Link>
+        .
+      </div>
+    );
+  }
+
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("calls")
     .select(
       "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment"
     )
+    .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false })
     .limit(50);
 

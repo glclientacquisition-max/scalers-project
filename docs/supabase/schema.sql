@@ -5,12 +5,21 @@
 --   id uuid PK
 --   created_at timestamptz
 --   business_name text NOT NULL
---   sautikit_virtual_number text NOT NULL
+--   sautikit_virtual_number text NOT NULL  (pending:<auth_user_id> until DID pool assign)
 --   whatsapp_notification_number text NOT NULL
 --   llm_system_prompt text
 --   telecom_wallet_balance_kes numeric
 --   ai_wallet_balance_usd numeric
 --   is_active boolean
+--   owner_user_id uuid → auth.users.id  (added in multi_tenant_onboarding.sql)
+--
+-- tenant_members  (user ↔ tenant mapping; see multi_tenant_onboarding.sql)
+--   id uuid PK
+--   created_at timestamptz
+--   user_id uuid → auth.users.id
+--   tenant_id uuid → tenants.id
+--   role text ('owner' | 'admin' | 'member')
+--   unique (user_id, tenant_id)
 
 -- calls
 --   id uuid PK
