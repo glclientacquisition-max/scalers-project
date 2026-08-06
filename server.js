@@ -136,10 +136,10 @@ function shouldSkipMediaStream(callSessionState) {
 
 // ---------------------------------------------------------------------------
 // 1. Inbound voice webhook — SautiKit POSTs here (voice_callback_url).
-//    Respond with TwiML/XML <Connect><Stream/></Connect> (JSON Stream is still
-//    on SautiKit's roadmap). WebSocket URL is derived from Host (Localtunnel).
+//    Mounted on BOTH `/` and `/voice/incoming` because some number routing
+//    configs point at the tunnel root (logs showed POST / → 404 before).
 // ---------------------------------------------------------------------------
-app.post('/voice/incoming', async (req, res) => {
+async function handleVoiceIncoming(req, res) {
   try {
     const extracted = extractInboundCallFields(req.body);
     const fromNumber = extracted.fromNumber;
@@ -149,6 +149,7 @@ app.post('/voice/incoming', async (req, res) => {
     const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
 
     console.log('[voice/incoming]', {
+      path: req.path || req.url,
       callSid,
       callSidSource: extracted.callSid ? 'payload' : 'fallback',
       fromNumber,
@@ -193,7 +194,11 @@ app.post('/voice/incoming', async (req, res) => {
     console.error('[voice/incoming] Webhook handling failed:', err);
     res.sendStatus(500);
   }
-});
+}
+
+app.post('/', handleVoiceIncoming);
+app.post('/voice/incoming', handleVoiceIncoming);
+app.post('/voice', handleVoiceIncoming);
 
 // ---------------------------------------------------------------------------
 // 2. Recording attach helper (provider-agnostic). Used when a recording URL
