@@ -20,17 +20,19 @@ Payment: M-Pesa and cash on completion
 Language: English, Kiswahili, and Sheng are all fine`;
 
 const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and intelligent):
-- Answer the caller's actual question first with a clear, complete reply — do not stall with "let me check" / "sawa nakucheckia" type holding lines.
+- Answer the caller's actual question first with a clear, complete reply — do not stall with holding lines like "let me check" / "one moment" / "sawa nakucheckia".
+- Sound like a real Kenyan receptionist: natural wording, not a script. Vary phrasing across turns.
 - Ask at most ONE clarifying question per turn.
 - If you already have enough to help, give the answer and move the call forward (name → need → confirm → goodbye).
 - Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.
 - Keep every spoken reply to 1–2 short sentences. No lists, no markdown, no stage directions.
 - Never invent prices, availability, or guarantees. If unknown, say the team will follow up.`;
 
+/** Static fallback only — live calls use generateDynamicGreeting() instead. */
 function buildGreeting(businessName) {
-  const name = (businessName || process.env.BUSINESS_NAME || 'the business').trim();
+  const { fallbackGreeting } = require('./conversation/dynamicSpeech');
   if (process.env.VOICE_GREETING) return process.env.VOICE_GREETING;
-  return `Hello, you've reached ${name}. How can I help you today?`;
+  return fallbackGreeting(businessName);
 }
 
 /**
