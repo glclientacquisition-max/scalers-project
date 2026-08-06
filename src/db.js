@@ -89,7 +89,7 @@ async function resolveTenantId({ toNumber, tenantId }) {
   );
 }
 
-async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'twilio' }) {
+async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'sautikit' }) {
   const resolvedTenantId = await resolveTenantId({ toNumber, tenantId });
   const existing = await getCall(callSid);
   const meta = existing

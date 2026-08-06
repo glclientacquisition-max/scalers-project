@@ -14,6 +14,12 @@ const {
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
+const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
+const {
+  isWhatsAppConfigured,
+  buildLeadText,
+  sendOwnerWhatsApp,
+} = require('./src/notifications/whatsapp');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -33,8 +39,6 @@ if (missingEnvironmentVariables.length > 0) {
 
 const db = require('./src/db');
 
-const BUSINESS_OWNER_WHATSAPP_NUMBER = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER;
-
 let geminiClient = null;
 function getGeminiClient() {
   if (geminiClient) return geminiClient;
@@ -46,8 +50,21 @@ function getGeminiClient() {
 }
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+app.use(
+  express.urlencoded({
+    extended: true,
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 // Diagnostic middleware — log every inbound HTTP request (Localtunnel / SautiKit debug).
 app.use((req, res, next) => {
@@ -213,15 +230,15 @@ async function handleVoiceIncoming(req, res) {
   }
 }
 
-app.post('/', handleVoiceIncoming);
-app.post('/voice/incoming', handleVoiceIncoming);
-app.post('/voice', handleVoiceIncoming);
+app.post('/', sautikitWebhookGuard, handleVoiceIncoming);
+app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
+app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
 
 // ---------------------------------------------------------------------------
 // 2. Recording attach helper (provider-agnostic). Used when a recording URL
 //    is available from SautiKit events (Phase 2+) or manual hooks.
 // ---------------------------------------------------------------------------
-app.post('/voice/recording-status', async (req, res) => {
+app.post('/voice/recording-status', sautikitWebhookGuard, async (req, res) => {
   try {
     const callSid =
       req.body.CallSid || req.body.callSid || req.body.call_sid || req.body.call_id;
@@ -250,6 +267,83 @@ app.post('/voice/recording-status', async (req, res) => {
     res.sendStatus(200);
   } catch (err) {
     console.error('[voice/recording-status] Webhook handling failed:', err);
+    res.sendStatus(500);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 2b. SautiKit workspace events — call.completed / recording.ready
+// ---------------------------------------------------------------------------
+app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
+  try {
+    const kind =
+      req.headers['x-sautikit-event-kind'] ||
+      req.body?.kind ||
+      req.body?.event_type ||
+      req.body?.type ||
+      '';
+    const body = req.body || {};
+    const callSid =
+      body.call_sid ||
+      body.callSid ||
+      body.sessionId ||
+      body.data?.call_sid ||
+      body.data?.sessionId ||
+      body.payload?.call_sid ||
+      null;
+
+    console.log('[voice/events]', {
+      kind: String(kind),
+      callSid,
+      eventId: req.headers['x-sautikit-event-id'] || null,
+      bodyKeys: Object.keys(body),
+    });
+
+    const kindStr = String(kind).toLowerCase();
+
+    if (kindStr.includes('recording') && callSid) {
+      const recordingUrl =
+        body.recording_url ||
+        body.url ||
+        body.data?.recording_url ||
+        body.data?.url ||
+        body.payload?.recording_url ||
+        null;
+      const recordingSid = body.recording_sid || body.data?.recording_sid || null;
+      if (recordingUrl) {
+        await db.attachRecording({
+          callSid,
+          recordingSid,
+          sourceUrl: recordingUrl,
+          recordingUrl,
+        });
+        await maybeSendWhatsAppNotification(callSid);
+      }
+    }
+
+    if (kindStr.includes('completed') && callSid) {
+      const duration =
+        body.duration_seconds ??
+        body.durationInSeconds ??
+        body.data?.duration_seconds ??
+        null;
+      if (duration != null) {
+        try {
+          const call = await db.getCall(callSid);
+          if (call?._raw?.id) {
+            // Duration lives on calls; best-effort via summary if no direct updater.
+            console.log(`[voice/events] call ${callSid} completed duration=${duration}`);
+          }
+        } catch (err) {
+          console.warn('[voice/events] duration log failed:', err?.message || err);
+        }
+      }
+      await maybeSendWhatsAppNotification(callSid);
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('[voice/events] Webhook handling failed:', err);
     res.sendStatus(500);
   }
 });
@@ -795,36 +889,63 @@ mediaWss.on('close', () => clearInterval(mediaKeepalive));
 const whatsappSendInProgress = new Set();
 
 async function maybeSendWhatsAppNotification(callSid) {
-  // Twilio WhatsApp removed from Phase 2. SautiKit WhatsApp lands in a later cutover.
-  if (!BUSINESS_OWNER_WHATSAPP_NUMBER) {
-    console.warn(`[${callSid}] WhatsApp notification skipped: BUSINESS_OWNER_WHATSAPP_NUMBER not configured.`);
-    return;
-  }
-
   const call = await db.getCall(callSid);
   if (!call) return;
 
   const hasCallerInfo = Boolean(call.name && call.reason);
-  const hasRecording = Boolean(call.recording_url);
-  if (!hasCallerInfo || !hasRecording) return;
+  // Prefer sending once we have name+reason; recording is a nice-to-have.
+  if (!hasCallerInfo) return;
 
   if (whatsappSendInProgress.has(callSid)) return;
   if (call.whatsapp_sent) return;
   whatsappSendInProgress.add(callSid);
 
   try {
-    console.warn(
-      `[${callSid}] WhatsApp provider not wired yet (Twilio removed). Lead ready:`,
-      {
-        name: call.name,
-        phone: call.from_number,
-        reason: call.reason,
-        recording: call.recording_url,
-      }
-    );
-    // Mark sent only when a real provider is configured in a later phase.
+    let ownerNumber =
+      process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+    let businessName = process.env.BUSINESS_NAME || null;
+    try {
+      const profile = await db.getTenantProfile({ callSid });
+      ownerNumber = profile.whatsappNumber || ownerNumber;
+      businessName = profile.businessName || businessName;
+    } catch (err) {
+      console.warn(`[${callSid}] tenant lookup for WhatsApp failed:`, err?.message || err);
+    }
+
+    if (!ownerNumber) {
+      console.warn(
+        `[${callSid}] WhatsApp notification skipped: no owner number (tenants.whatsapp_notification_number or BUSINESS_OWNER_WHATSAPP_NUMBER)`
+      );
+      return;
+    }
+
+    if (!isWhatsAppConfigured()) {
+      console.warn(
+        `[${callSid}] WhatsApp provider not configured (need SAUTIKIT_API_KEY + SAUTIKIT_WHATSAPP_NUMBER_ID). Lead ready:`,
+        {
+          name: call.name,
+          phone: call.from_number,
+          reason: call.reason,
+          recording: call.recording_url,
+          ownerNumber,
+        }
+      );
+      return;
+    }
+
+    const lead = {
+      businessName,
+      name: call.name,
+      reason: call.reason,
+      callerNumber: call.from_number,
+      recordingUrl: call.recording_url,
+    };
+    const body = buildLeadText(lead);
+    const result = await sendOwnerWhatsApp({ to: ownerNumber, body, lead });
+    await db.markWhatsappSent(callSid);
+    console.log(`[${callSid}] WhatsApp lead notify accepted:`, result);
   } catch (err) {
-    console.error(`[${callSid}] WhatsApp notification failed:`, err);
+    console.error(`[${callSid}] WhatsApp notification failed:`, err?.message || err);
   } finally {
     whatsappSendInProgress.delete(callSid);
   }
@@ -1049,6 +1170,11 @@ server.listen(PORT, () => {
     console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
   }
   console.log(`✓ Supabase database initialized`);
+  if (process.env.PUBLIC_BASE_URL) {
+    console.log(`🌐 PUBLIC_BASE_URL: ${process.env.PUBLIC_BASE_URL}`);
+  } else {
+    console.log(`🌐 PUBLIC_BASE_URL not set — Stream URLs use request Host header`);
+  }
   if (process.env.GEMINI_API_KEY) {
     console.log(`✓ GEMINI_API_KEY present (lazy-loaded on LLM use)`);
   } else {
@@ -1065,5 +1191,15 @@ server.listen(PORT, () => {
     }
   } else {
     console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
+  }
+  if (process.env.SAUTIKIT_API_KEY) {
+    console.log(
+      `✓ SAUTIKIT_API_KEY present${isWhatsAppConfigured() ? ' (WhatsApp notify ready)' : ' (WhatsApp number id not set yet)'}`
+    );
+  } else {
+    console.log(`ℹ SAUTIKIT_API_KEY not set — WhatsApp lead notify disabled`);
+  }
+  if (String(process.env.SAUTIKIT_VALIDATE_WEBHOOKS || '').toLowerCase() === 'true') {
+    console.log(`✓ SautiKit webhook signature validation ON`);
   }
 });
