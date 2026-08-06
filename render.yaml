@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: missed-call-voice
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Set the rest in the Render dashboard (do not commit secrets):
+      # SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY,
+      # SONIOX_API_KEY, SONIOX_VOICE, SAUTIKIT_API_KEY, PUBLIC_BASE_URL, …
