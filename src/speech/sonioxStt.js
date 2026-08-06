@@ -80,8 +80,19 @@ function createSonioxSttSession({ callSid, onEvent = () => {} }) {
       if (Array.isArray(msg.tokens) && msg.tokens.length) {
         let interim = '';
         let finals = '';
+        let sawEndpoint = false;
         for (const token of msg.tokens) {
           if (!token || typeof token.text !== 'string') continue;
+          // Soniox endpoint marker when enable_endpoint_detection is on.
+          if (token.text.includes('<end>')) {
+            sawEndpoint = true;
+            const cleaned = token.text.replace(/<\/?end>/g, '').replace(/\?/g, '').trim();
+            if (cleaned) {
+              if (token.is_final) finals += cleaned;
+              else interim += cleaned;
+            }
+            continue;
+          }
           if (token.is_final) finals += token.text;
           else interim += token.text;
         }
@@ -91,6 +102,10 @@ function createSonioxSttSession({ callSid, onEvent = () => {} }) {
         } else if (interim) {
           console.log(`[soniox-stt][${callSid}] interim: ${interim}`);
           onEvent({ type: 'transcript', text: interim, isFinal: false, raw: msg });
+        }
+        if (sawEndpoint) {
+          console.log(`[soniox-stt][${callSid}] endpoint`);
+          onEvent({ type: 'endpoint', raw: msg });
         }
       }
 
