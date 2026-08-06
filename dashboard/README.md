@@ -13,6 +13,15 @@ Next.js app for reviewing missed-call leads and editing business receptionist kn
 
 The Auth trigger provisions a `tenants` row + `tenant_members` mapping. The signup Server Action also calls a service-role fallback if the trigger has not been applied yet.
 
+### Phase C — DID pool
+
+1. Apply `docs/supabase/did_number_pool.sql` in Supabase.
+2. Point spare SautiKit DIDs’ webhooks at Railway.
+3. Login as ops (`admin@sauti.local` + `DASHBOARD_PASSWORD`) → **DID pool** → add available numbers.
+4. New signups auto-claim the next DID; pending tenants can be assigned from the same page.
+
+See `docs/PRODUCTION_DID_POOL.md`.
+
 ## Local
 
 ```bash

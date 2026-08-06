@@ -45,8 +45,8 @@ export default async function SettingsPage() {
         </p>
         {pendingDid ? (
           <p className="mt-2 text-xs text-[var(--ink-soft)]">
-            Your voice number will appear here once a SautiKit DID is assigned from the number
-            pool (Phase C).
+            Waiting for a SautiKit DID from the number pool. Ops can assign one under{" "}
+            <span className="font-medium">DID pool</span> (legacy admin login).
           </p>
         ) : null}
         <div className="mt-6">

@@ -103,6 +103,15 @@ async function resolveTenantId({ toNumber, fromNumber, tenantId }) {
   );
 }
 
+function isAssignableDid(value) {
+  const s = String(value || '').trim();
+  if (!s) return false;
+  if (s.toLowerCase().startsWith('pending:')) return false;
+  // Require a plausible E.164-ish phone (digits after optional +).
+  const digits = s.replace(/\D/g, '');
+  return digits.length >= 9;
+}
+
 async function listActiveTenantDids() {
   const { data, error } = await supabase
     .from('tenants')
@@ -110,7 +119,8 @@ async function listActiveTenantDids() {
     .eq('is_active', true);
   throwIfError('listActiveTenantDids', error);
   const fromEnv = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
-  return [...new Set([...(data || []).map((r) => r.sautikit_virtual_number).filter(Boolean), ...fromEnv])];
+  const fromDb = (data || []).map((r) => r.sautikit_virtual_number).filter(isAssignableDid);
+  return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
 }
 
 async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'sautikit' }) {

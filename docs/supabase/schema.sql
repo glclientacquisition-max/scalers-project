@@ -20,6 +20,14 @@
 --   tenant_id uuid → tenants.id
 --   role text ('owner' | 'admin' | 'member')
 --   unique (user_id, tenant_id)
+--
+-- sautikit_did_pool  (Phase C; see did_number_pool.sql)
+--   id uuid PK
+--   e164 text unique
+--   status text ('available' | 'assigned' | 'reserved' | 'disabled')
+--   tenant_id uuid → tenants.id
+--   assigned_at timestamptz
+--   notes text
 
 -- calls
 --   id uuid PK

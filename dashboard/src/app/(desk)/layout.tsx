@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   if (!(await isAuthenticated())) {
     redirect("/login");
   }
+
+  const showOpsNav = await isLegacyAuthenticated();
 
   return (
     <div className="min-h-screen">
@@ -24,6 +26,11 @@ export default async function AppShell({ children }: { children: React.ReactNode
             <Link href="/settings" className="text-[var(--ink)] hover:text-[var(--accent)]">
               Business
             </Link>
+            {showOpsNav ? (
+              <Link href="/numbers" className="text-[var(--ink)] hover:text-[var(--accent)]">
+                DID pool
+              </Link>
+            ) : null}
             <form action="/api/logout" method="post">
               <button type="submit" className="text-[var(--ink-soft)] hover:text-[var(--warn)]">
                 Sign out
