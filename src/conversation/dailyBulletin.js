@@ -130,7 +130,9 @@ SPEAKING RULES FOR BULLETIN:
 - When the caller asks about these topics (or if a bulletin says you are closed today), tell them the Fact text in natural words.
 - Speak the owner's Fact text. Do NOT invent or speak the expiry/clear time unless the caller asks how long this lasts.
 - Do not say the word "bulletin". Do not say "until tonight" / clock times from the internal expiry.
-- Do not offer something a bulletin says is unavailable.`;
+- Do not offer something a bulletin says is unavailable.
+- After stating a closure / interruption fact, NEVER go silent. In the SAME turn, say you can still help (or take a message) and ask one short next question (what they need, or their name).
+- Example shape: "<fact in natural words>. Even so, I can still help — what do you need?"`;
 }
 
 module.exports = {
