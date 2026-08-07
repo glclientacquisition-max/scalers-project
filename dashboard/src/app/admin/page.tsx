@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAdminOverview } from "@/lib/admin";
+import { SautikitTelecomPanel } from "@/components/SautikitTelecomPanel";
 
 function Kpi({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
@@ -59,6 +60,8 @@ export default async function AdminOverviewPage() {
           View businesses
         </Link>
       </section>
+
+      <SautikitTelecomPanel />
 
       <section className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <h2 className="font-display text-2xl tracking-tight">Needs attention</h2>

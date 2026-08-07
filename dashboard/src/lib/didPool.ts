@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { listSautikitNumbers } from "@/lib/sautikit";
 
 export type DidPoolRow = {
   id: string;
@@ -49,6 +50,58 @@ export async function listPendingTenants(): Promise<PendingTenant[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data || []) as PendingTenant[];
+}
+
+export type SyncResult = {
+  added: string[];
+  linked: string[];
+  skipped: string[];
+};
+
+/**
+ * Pull the numbers this SautiKit account owns into the DID pool.
+ * New voice-capable numbers become 'available'; existing rows get their
+ * sautikit_number_id backfilled. Never touches assignment state.
+ */
+export async function syncPoolFromSautikit(): Promise<SyncResult> {
+  const admin = getSupabaseAdmin();
+  const [numbers, pool] = await Promise.all([listSautikitNumbers(), listDidPool()]);
+  const byE164 = new Map(pool.map((row) => [row.e164, row]));
+
+  const result: SyncResult = { added: [], linked: [], skipped: [] };
+
+  for (const num of numbers) {
+    if (num.status !== "active" || !num.capabilities?.includes("voice")) {
+      result.skipped.push(num.e164);
+      continue;
+    }
+
+    const existing = byE164.get(num.e164);
+    if (existing) {
+      if (!existing.sautikit_number_id) {
+        const { error } = await admin
+          .from("sautikit_did_pool")
+          .update({ sautikit_number_id: num.id })
+          .eq("id", existing.id);
+        if (error) throw error;
+        result.linked.push(num.e164);
+      } else {
+        result.skipped.push(num.e164);
+      }
+      continue;
+    }
+
+    const { error } = await admin.from("sautikit_did_pool").insert({
+      e164: num.e164,
+      sautikit_number_id: num.id,
+      status: "available",
+      notes: "Synced from SautiKit",
+    });
+    if (error) throw error;
+    result.added.push(num.e164);
+  }
+
+  return result;
 }
 
 export async function addDidToPool(opts: {
