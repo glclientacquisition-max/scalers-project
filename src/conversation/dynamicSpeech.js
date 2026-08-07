@@ -1,4 +1,4 @@
-// Dynamic spoken lines — greeting from Gemini; no canned "one moment" scripts.
+// Dynamic spoken lines — instant varied greeting; optional Gemini rewrite.
 
 /**
  * Nairobi/EAT time-of-day bucket for natural openers.
@@ -12,8 +12,8 @@ function eatTimeOfDay(date = new Date()) {
 }
 
 /**
- * Fast fallback if Gemini greeting is slow/unavailable.
- * Still varies by time of day — not one frozen script.
+ * Instant greeting — correct business name, varies by time of day.
+ * Prefer this for first-audio latency (no Gemini wait on the critical path).
  */
 function fallbackGreeting(businessName) {
   const name = (businessName || process.env.BUSINESS_NAME || 'the business').trim();
@@ -44,62 +44,81 @@ function cleanSpokenLine(text) {
     .trim();
 }
 
+function greetingLooksValid(line, businessName) {
+  const text = cleanSpokenLine(line);
+  if (!text || text.length > 160) return false;
+  const name = String(businessName || '').trim();
+  if (!name || /^the business$/i.test(name)) return true;
+  // Reject Gemini slips like "Good evening, the business here…"
+  if (/\bthe business\b/i.test(text) && !/\bthe business\b/i.test(name)) return false;
+  // Prefer greetings that actually say the business name.
+  const nameToken = name.split(/\s+/)[0];
+  if (nameToken && nameToken.length >= 3) {
+    return text.toLowerCase().includes(nameToken.toLowerCase());
+  }
+  return true;
+}
+
 /**
- * Ask Gemini for a fresh one-line phone greeting.
- * Races a timeout so the caller is never left in silence too long.
- *
- * @param {object} opts
- * @param {string} opts.businessName
- * @param {string} [opts.callSid]
- * @param {(args: object) => Promise<string>} opts.generateText  thin Gemini wrapper
- * @param {number} [opts.timeoutMs]
+ * Generate call opener.
+ * Default mode=instant: local varied line with the real business name (fast).
+ * mode=gemini: ask Gemini, fall back if slow/invalid.
  */
 async function generateDynamicGreeting(opts) {
   const businessName = (opts.businessName || 'the business').trim();
-  const timeoutMs = Math.max(300, Number(opts.timeoutMs || process.env.VOICE_GREETING_TIMEOUT_MS || 900));
-  const tod = eatTimeOfDay();
+  const mode = String(
+    opts.mode || process.env.VOICE_GREETING_MODE || 'instant'
+  ).toLowerCase();
 
   if (process.env.VOICE_GREETING) {
     return String(process.env.VOICE_GREETING).trim();
   }
 
+  const instant = fallbackGreeting(businessName);
+  if (mode !== 'gemini') return instant;
+
+  const timeoutMs = Math.max(
+    300,
+    Number(opts.timeoutMs || process.env.VOICE_GREETING_TIMEOUT_MS || 700)
+  );
+  const tod = eatTimeOfDay();
+
   if (typeof opts.generateText !== 'function' || !process.env.GEMINI_API_KEY) {
-    return fallbackGreeting(businessName);
+    return instant;
   }
 
   const instruction = `You are the live phone receptionist for ${businessName} in Kenya.
-Write ONE short spoken greeting to open the call (max 18 words).
-It is ${tod} in Nairobi. Sound warm and natural — vary the wording, do not sound like a script.
+Write ONE short spoken greeting to open the call (max 16 words).
+You MUST include the exact business name "${businessName}" in the greeting.
+It is ${tod} in Nairobi. Sound warm and natural — vary the wording.
 English or light Kiswahili mix is fine. Invite them to say how you can help.
-No quotes, no markdown, no name-asking yet, no company slogan dump.`;
+No quotes, no markdown, never say "the business" as a placeholder.`;
 
   const task = opts
     .generateText({
       callSid: opts.callSid || 'greeting',
       systemInstruction: instruction,
-      userText: 'Open the call now.',
-      temperature: 0.9,
-      maxOutputTokens: 60,
+      userText: `Greet the caller for ${businessName}.`,
+      temperature: 0.85,
+      maxOutputTokens: 50,
       thinkingLevel: 'MINIMAL',
     })
     .then((raw) => {
       const line = cleanSpokenLine(raw);
-      if (!line || line.length > 160) return fallbackGreeting(businessName);
+      if (!greetingLooksValid(line, businessName)) return instant;
       return line;
     })
-    .catch(() => fallbackGreeting(businessName));
+    .catch(() => instant);
 
   const timeout = new Promise((resolve) => {
-    setTimeout(() => resolve(fallbackGreeting(businessName)), timeoutMs);
+    setTimeout(() => resolve(instant), timeoutMs);
   });
 
   return Promise.race([task, timeout]);
 }
 
 /**
- * Optional tiny ack while Gemini thinks. Not a "checking" script —
- * just a natural human backchannel based on the caller's last line.
- * Default product behavior is silence (VOICE_FILLER=off).
+ * Optional tiny ack while Gemini thinks.
  */
 function pickContextualAck(userText, lang) {
   const t = String(userText || '').toLowerCase();
@@ -109,10 +128,47 @@ function pickContextualAck(userText, lang) {
   return asked ? 'Alright.' : 'Mm-hmm.';
 }
 
+/** Caller lines that should not burn a full Gemini turn. */
+function isNonSubstantiveTurn(text) {
+  const t = String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s'?-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return true;
+  if (t.length <= 2) return true;
+  const noise = new Set([
+    'ok',
+    'okay',
+    'yeah',
+    'yep',
+    'uh yeah',
+    'uh huh',
+    'hello',
+    'hello?',
+    'hi',
+    'hey',
+    'sawa',
+    'mm',
+    'hmm',
+    'ah',
+    'oh',
+    'gemini',
+    'yes',
+    'no',
+  ]);
+  if (noise.has(t)) return true;
+  // Pure filler like "Uh, yeah."
+  if (/^(uh|um|ah|oh)\s*(yeah|yes|ok|okay)?$/.test(t)) return true;
+  return false;
+}
+
 module.exports = {
   eatTimeOfDay,
   fallbackGreeting,
   generateDynamicGreeting,
   pickContextualAck,
   cleanSpokenLine,
+  greetingLooksValid,
+  isNonSubstantiveTurn,
 };

@@ -106,6 +106,8 @@ const BACKCHANNELS = new Set([
   'mhm',
   'uh huh',
   'uh-huh',
+  'uh yeah',
+  'um yeah',
   'aha',
   'ah',
   'oh',
@@ -123,6 +125,7 @@ const BACKCHANNELS = new Set([
   'eh',
   'eeh',
   'poa',
+  'gemini',
 ]);
 
 /**

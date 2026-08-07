@@ -25,7 +25,8 @@ const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and
 - Ask at most ONE clarifying question per turn.
 - If you already have enough to help, give the answer and move the call forward (name → need → confirm → goodbye).
 - Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.
-- Keep every spoken reply to 1–2 short sentences. No lists, no markdown, no stage directions.
+- Keep every spoken reply under 25 words (1 short sentence preferred, 2 max). No lists, no URLs spelled out, no markdown.
+- Prefer simple everyday words that are easy to pronounce on a phone.
 - Never invent prices, availability, or guarantees. If unknown, say the team will follow up.`;
 
 /** Static fallback only — live calls use generateDynamicGreeting() instead. */
