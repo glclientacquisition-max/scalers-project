@@ -53,6 +53,17 @@ export type TranscriptRow = {
   latency_ms: number | null;
 };
 
+export type TeamDirectoryEntry = {
+  name: string;
+  role: string;
+  phone: string;
+};
+
+export type FaqEntry = {
+  question: string;
+  answer: string;
+};
+
 export type TenantRow = {
   id: string;
   business_name: string;
@@ -61,7 +72,10 @@ export type TenantRow = {
   llm_system_prompt: string | null;
   services_offered?: string | null;
   business_hours?: string | null;
+  agent_name?: string | null;
   agent_tone?: string | null;
+  team_directory?: TeamDirectoryEntry[] | null;
+  faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
   telecom_wallet_balance_kes?: number | null;
   ai_wallet_balance_usd?: number | null;

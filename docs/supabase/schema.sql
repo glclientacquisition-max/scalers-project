@@ -10,7 +10,10 @@
 --   llm_system_prompt text  (compiled for voice engine — not edited raw in Desk)
 --   business_hours text     (owner-facing; see tenant_business_profile.sql)
 --   services_offered text   (owner-facing)
---   agent_tone text         (professional | friendly | localized)
+--   agent_name text         (receptionist intro name; default Receptionist)
+--   agent_tone text         (professional | friendly | empathetic | localized)
+--   team_directory jsonb    ([{name, role, phone}]; knowledge_acquisition_phase1.sql)
+--   faqs jsonb              ([{question, answer}]; knowledge_acquisition_phase1.sql)
 --   voice_languages text[]  (auto: en, sw, sheng — see voice_languages.sql; locals later)
 --   voice_language_other text  (reserved)
 --   telecom_wallet_balance_kes numeric

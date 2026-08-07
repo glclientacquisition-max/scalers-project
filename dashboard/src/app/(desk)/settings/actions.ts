@@ -1,7 +1,12 @@
 "use server";
 
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
-import { parseAgentTone, compileReceptionistPrompt } from "@/lib/promptCompiler";
+import {
+  parseAgentTone,
+  compileReceptionistPrompt,
+  parseTeamDirectoryField,
+  parseFaqsField,
+} from "@/lib/promptCompiler";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export type SettingsCompileState = {
@@ -34,13 +39,20 @@ export async function saveAndCompileSettings(
   ).trim();
   const servicesOffered = String(formData.get("services_offered") || "").trim();
   const businessHours = String(formData.get("business_hours") || "").trim();
+  const agentName =
+    String(formData.get("agent_name") || "").trim() || "Receptionist";
   const agentTone = parseAgentTone(String(formData.get("agent_tone") || ""));
   const unknownAnswerFallback = String(
     formData.get("unknown_answer_fallback") || ""
   ).trim();
+  const teamDirectory = parseTeamDirectoryField(formData.get("team_directory"));
+  const faqs = parseFaqsField(formData.get("faqs"));
 
   if (!businessName) {
     return { error: "Business name is required." };
+  }
+  if (agentName.length > 40) {
+    return { error: "Agent name should be under 40 characters." };
   }
   if (servicesOffered.length < 12) {
     return { error: "Describe your services and pricing (a few sentences)." };
@@ -51,12 +63,21 @@ export async function saveAndCompileSettings(
   if (!agentTone) {
     return { error: "Pick a tone of voice." };
   }
+  if (teamDirectory.length > 20) {
+    return { error: "Team directory is limited to 20 people." };
+  }
+  if (faqs.length > 25) {
+    return { error: "Golden FAQs are limited to 25 pairs." };
+  }
 
   const { prompt, source } = await compileReceptionistPrompt({
     businessName,
     servicesOffered,
     businessHours,
     agentTone,
+    agentName,
+    teamDirectory,
+    faqs,
     unknownAnswerFallback,
   });
 
@@ -70,7 +91,10 @@ export async function saveAndCompileSettings(
     whatsapp_notification_number: notificationPhone || tenant.whatsapp_notification_number,
     services_offered: servicesOffered,
     business_hours: businessHours,
+    agent_name: agentName,
     agent_tone: agentTone,
+    team_directory: teamDirectory,
+    faqs,
     unknown_answer_fallback: unknownAnswerFallback || null,
     llm_system_prompt: prompt,
   };
@@ -81,6 +105,11 @@ export async function saveAndCompileSettings(
     if (/unknown_answer_fallback/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/employee_training.sql in Supabase.`,
+      };
+    }
+    if (/agent_name|team_directory|faqs/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/knowledge_acquisition_phase1.sql in Supabase.`,
       };
     }
     const missingCol = /business_hours|services_offered|agent_tone|column/i.test(

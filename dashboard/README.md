@@ -58,8 +58,9 @@ Without a Gemini key, a local template is saved instead.
 ### AI Prompt Compiler (settings)
 
 1. Apply `docs/supabase/tenant_business_profile.sql` (adds `business_hours`, `services_offered`, `agent_tone`).
-2. `/settings` edits those structured fields only — no raw prompt textarea.
-3. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
+2. Apply `docs/supabase/knowledge_acquisition_phase1.sql` (adds `agent_name`, `team_directory`, `faqs`).
+3. `/settings` edits structured fields only (persona, services, team directory, golden FAQs) — no raw prompt textarea.
+4. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
 
 ### Employee Training center (settings)
 

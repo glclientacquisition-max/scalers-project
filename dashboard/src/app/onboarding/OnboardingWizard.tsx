@@ -13,15 +13,19 @@ const STEPS = ["Services & pricing", "Hours & location", "Tone of voice"] as con
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
     id: "professional",
-    blurb: "Calm, clear, and polished — best for clinics, offices, and formal brands.",
+    blurb: "Calm, clear, and polished. Best for clinics, offices, and formal brands.",
   },
   {
     id: "friendly",
-    blurb: "Warm and helpful — like a receptionist people enjoy talking to.",
+    blurb: "Warm and helpful, like a receptionist people enjoy talking to.",
+  },
+  {
+    id: "empathetic",
+    blurb: "Steady and caring. Acknowledges frustration before solving.",
   },
   {
     id: "localized",
-    blurb: "Natural Kenyan voice — light Sheng when the caller uses it.",
+    blurb: "Natural Kenyan voice with light Sheng when the caller uses it.",
   },
 ];
 
