@@ -23,7 +23,7 @@ export function BrandMark({
   className = "",
   priority = false,
 }: BrandMarkProps) {
-  const [src, setSrc] = useState(brandAssets.icon);
+  const [useFallback, setUseFallback] = useState(false);
 
   const content = (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
@@ -33,15 +33,26 @@ export function BrandMark({
           invert ? "rounded-md bg-white/5" : "",
         ].join(" ")}
       >
-        <Image
-          src={src}
-          alt=""
-          width={32}
-          height={32}
-          priority={priority}
-          className="h-8 w-8 object-contain"
-          onError={() => setSrc(brandAssets.iconFallback)}
-        />
+        {useFallback ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={brandAssets.iconFallback}
+            alt=""
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain"
+          />
+        ) : (
+          <Image
+            src={brandAssets.icon}
+            alt=""
+            width={32}
+            height={32}
+            priority={priority}
+            className="h-8 w-8 object-contain"
+            onError={() => setUseFallback(true)}
+          />
+        )}
       </span>
       <span
         className={[
