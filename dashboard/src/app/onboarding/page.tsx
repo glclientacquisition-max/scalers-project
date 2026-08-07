@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
     return (
       <main className="min-h-screen flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-lg">
-          <BrandWordmark href="/onboarding" context="Workspace" priority />
+          <BrandWordmark href="/onboarding" context="Workspace" variant="lockup" priority />
           <p className="mt-6 text-ink-soft leading-relaxed">
             No workspace linked to this account. Sign up again or contact support.
           </p>
@@ -36,7 +36,7 @@ export default async function OnboardingPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-xl">
-        <BrandWordmark href="/onboarding" context="Setup" priority />
+        <BrandWordmark href="/onboarding" context="Setup" variant="lockup" priority />
         <h1 className="mt-8 font-display text-2xl text-ink">
           Set up {tenant.business_name}
         </h1>
