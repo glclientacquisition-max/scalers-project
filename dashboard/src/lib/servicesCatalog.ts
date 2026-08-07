@@ -63,11 +63,69 @@ export function extractServicesNotes(servicesOffered: string): string {
   return text;
 }
 
+function parseBulkServiceLine(line: string): ServiceItem | null {
+  const cleaned = line.replace(/^[-*•]\s*/, "").trim();
+  if (!cleaned) return null;
+
+  // Spreadsheet / advanced: name | price | notes | out of scope (unchanged)
+  if (cleaned.includes("|")) {
+    const parts = cleaned.split("|").map((p) => p.trim());
+    const [name = "", price = "", notes = "", out = ""] = parts;
+    if (!name) return null;
+    return {
+      name,
+      price_range: price,
+      notes,
+      out_of_scope: out,
+    };
+  }
+
+  // Tab-separated (Excel / Sheets paste)
+  if (cleaned.includes("\t")) {
+    const parts = cleaned.split("\t").map((p) => p.trim());
+    const [name = "", price = "", notes = "", out = ""] = parts;
+    if (!name) return null;
+    return {
+      name,
+      price_range: price,
+      notes,
+      out_of_scope: out,
+    };
+  }
+
+  // Simple menu list: "Home cleaning - from 2,500 KES"
+  const dash = cleaned.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if (dash) {
+    const name = dash[1].trim();
+    const price = dash[2].trim();
+    if (!name) return null;
+    return {
+      name,
+      price_range: price,
+      notes: "",
+      out_of_scope: "",
+    };
+  }
+
+  // Name only
+  return {
+    name: cleaned,
+    price_range: "",
+    notes: "",
+    out_of_scope: "",
+  };
+}
+
 /**
  * Parse a bulk paste block into service rows.
- * One service per line. Columns separated by | or tab:
+ *
+ * Simple (preferred):
+ *   Home cleaning - from 2,500 KES
+ *   Plumbing
+ *
+ * Advanced (unchanged):
  *   name | price | notes | out of scope
- * Name-only lines are fine.
+ * Also accepts tab-separated columns.
  */
 export function parseBulkServices(raw: string): ServiceItem[] {
   const text = String(raw || "").replace(/\r\n/g, "\n").trim();
@@ -77,22 +135,6 @@ export function parseBulkServices(raw: string): ServiceItem[] {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line && !/^services?\s*:?$/i.test(line))
-    .map((line) => {
-      const cleaned = line.replace(/^[-*•]\s*/, "");
-      const parts = cleaned.includes("|")
-        ? cleaned.split("|")
-        : cleaned.includes("\t")
-          ? cleaned.split("\t")
-          : [cleaned];
-      const [name = "", price = "", notes = "", out = ""] = parts.map((p) =>
-        p.trim()
-      );
-      return {
-        name,
-        price_range: price,
-        notes,
-        out_of_scope: out,
-      };
-    })
-    .filter((row) => row.name);
+    .map(parseBulkServiceLine)
+    .filter((row): row is ServiceItem => Boolean(row?.name));
 }
