@@ -46,9 +46,11 @@ export const TONE_LABELS: Record<OnboardingTone, string> = {
 /** Deterministic fallback if Gemini is unavailable. */
 export function compilePromptLocally(
   businessName: string,
-  answers: OnboardingAnswers
+  answers: OnboardingAnswers,
+  unknownAnswerFallback?: string
 ): string {
   const name = businessName.trim() || "the business";
+  const unknownLine = (unknownAnswerFallback || "").trim();
   const toneLine =
     answers.tone === "professional"
       ? "Tone: calm, clear, and professional — warm but concise."
@@ -68,7 +70,11 @@ ${answers.hoursLocation.trim()}
 - ${toneLine}
 
 Your job on this call:
-1. Answer using ONLY the business knowledge above. If unknown, say the team will follow up.
+1. Answer using ONLY the business knowledge above.${
+    unknownLine
+      ? ` If a caller asks for something we do not offer, say: "${unknownLine}" (adapt to the caller's language).`
+      : " If unknown, say the team will follow up."
+  }
 2. Get the caller's name.
 3. Get a short reason for their call.
 4. Confirm name + reason, say the business will get back to them soon, then goodbye.

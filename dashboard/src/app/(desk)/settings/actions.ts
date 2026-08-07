@@ -35,6 +35,9 @@ export async function saveAndCompileSettings(
   const servicesOffered = String(formData.get("services_offered") || "").trim();
   const businessHours = String(formData.get("business_hours") || "").trim();
   const agentTone = parseAgentTone(String(formData.get("agent_tone") || ""));
+  const unknownAnswerFallback = String(
+    formData.get("unknown_answer_fallback") || ""
+  ).trim();
 
   if (!businessName) {
     return { error: "Business name is required." };
@@ -54,6 +57,7 @@ export async function saveAndCompileSettings(
     servicesOffered,
     businessHours,
     agentTone,
+    unknownAnswerFallback,
   });
 
   const workspace = await createWorkspaceDataClient();
@@ -67,12 +71,18 @@ export async function saveAndCompileSettings(
     services_offered: servicesOffered,
     business_hours: businessHours,
     agent_tone: agentTone,
+    unknown_answer_fallback: unknownAnswerFallback || null,
     llm_system_prompt: prompt,
   };
 
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
 
   if (error) {
+    if (/unknown_answer_fallback/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/employee_training.sql in Supabase.`,
+      };
+    }
     const missingCol = /business_hours|services_offered|agent_tone|column/i.test(
       error.message
     );
