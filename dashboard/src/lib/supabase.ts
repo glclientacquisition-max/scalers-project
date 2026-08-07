@@ -24,6 +24,8 @@ export function getSupabaseAdmin(): SupabaseClient {
   return client;
 }
 
+export type LeadStatus = "new" | "contacted" | "resolved";
+
 export type CallRow = {
   id: string;
   created_at: string;
@@ -35,7 +37,12 @@ export type CallRow = {
   recording_url: string | null;
   summary: string | null;
   sentiment: string | null;
+  lead_status?: LeadStatus | null;
 };
+
+export function parseLeadStatus(raw: unknown): LeadStatus {
+  return raw === "contacted" || raw === "resolved" ? raw : "new";
+}
 
 export type TranscriptRow = {
   id: string;
@@ -55,6 +62,8 @@ export type TenantRow = {
   services_offered?: string | null;
   business_hours?: string | null;
   agent_tone?: string | null;
+  telecom_wallet_balance_kes?: number | null;
+  ai_wallet_balance_usd?: number | null;
   is_active: boolean | null;
 };
 

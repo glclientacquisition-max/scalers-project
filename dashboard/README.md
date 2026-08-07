@@ -48,6 +48,13 @@ New owners with a blank/default `llm_system_prompt` are redirected to `/onboardi
 with Gemini (`GEMINI_API_KEY`) into `tenants.llm_system_prompt`, then opens `/calls`.
 Without a Gemini key, a local template is saved instead.
 
+### Triage inbox (CRM)
+
+1. Apply `docs/supabase/lead_status.sql` (adds `calls.lead_status`, owner update policy).
+2. `/calls` shows a KPI strip (today's missed calls, leads captured, wallet) and
+   New → Contacted → Resolved toggles per lead.
+3. Call detail gets an AI summary box and a sticky recording player (1x / 1.5x / 2x).
+
 ### AI Prompt Compiler (settings)
 
 1. Apply `docs/supabase/tenant_business_profile.sql` (adds `business_hours`, `services_offered`, `agent_tone`).

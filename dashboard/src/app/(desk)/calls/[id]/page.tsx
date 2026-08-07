@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { parseSummary, type CallRow, type TranscriptRow } from "@/lib/supabase";
+import {
+  parseLeadStatus,
+  parseSummary,
+  type CallRow,
+  type TranscriptRow,
+} from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { CallAudioPlayer } from "@/components/CallAudioPlayer";
+import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 
 function formatWhen(iso: string) {
@@ -56,6 +63,25 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
   );
 }
 
+function buildSummarySentence(opts: {
+  name: string | null;
+  reason: string | null;
+  callerNumber: string;
+  urgent: boolean;
+}): string {
+  const who = opts.name || `The caller (${opts.callerNumber})`;
+  if (!opts.reason) {
+    return `${who} called, but no reason was captured yet. Skim the conversation below.`;
+  }
+  const reason = opts.reason.replace(/\.$/, "");
+  return `${who} called about: ${reason}.${opts.urgent ? " This sounded urgent." : ""}`;
+}
+
+const CALL_SELECT =
+  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
+const CALL_SELECT_LEGACY =
+  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
+
 export default async function CallDetailPage({
   params,
 }: {
@@ -68,18 +94,34 @@ export default async function CallDetailPage({
   const workspace = await createWorkspaceDataClient();
   if (!workspace) notFound();
 
-  const { data: call, error } = await workspace.client
+  let leadStatusReady = true;
+  const first = await workspace.client
     .from("calls")
-    .select(
-      "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment"
-    )
+    .select(CALL_SELECT)
     .eq("id", id)
     .eq("tenant_id", tenant.id)
     .maybeSingle();
+  let call = first.data as CallRow | null;
+  let error = first.error;
+
+  if (error && /lead_status|column/i.test(error.message)) {
+    leadStatusReady = false;
+    const retry = await workspace.client
+      .from("calls")
+      .select(CALL_SELECT_LEGACY)
+      .eq("id", id)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    call = retry.data as CallRow | null;
+    error = retry.error;
+  }
 
   if (error || !call) notFound();
-  const row = call as CallRow;
+  const row = call;
   const meta = parseSummary(row.summary);
+  const name = typeof meta.name === "string" ? meta.name : null;
+  const reason = typeof meta.reason === "string" ? meta.reason : null;
+  const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
 
   const { data: transcripts } = await workspace.client
     .from("transcripts")
@@ -98,7 +140,35 @@ export default async function CallDetailPage({
       <h1 className="mt-4 font-display text-4xl tracking-tight">Call detail</h1>
       <p className="mt-2 text-[var(--ink-soft)]">{formatWhen(row.created_at)}</p>
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2">
+      {/* AI summary box — the 3-second read */}
+      <section
+        className={[
+          "mt-6 rounded-2xl border p-5",
+          urgent
+            ? "border-[var(--warn)]/50 bg-[#fdf3ec]"
+            : "border-[var(--accent)]/30 bg-[#e8f4f1]",
+        ].join(" ")}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
+              What this call was about
+            </h2>
+            <p className="mt-2 text-base leading-relaxed text-[var(--ink)]">
+              {buildSummarySentence({ name, reason, callerNumber: row.caller_number, urgent })}
+            </p>
+          </div>
+          {leadStatusReady ? (
+            <LeadStatusToggle
+              callId={row.id}
+              initial={parseLeadStatus(row.lead_status)}
+              size="md"
+            />
+          ) : null}
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
           <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Caller</h2>
           <div className="mt-2 text-lg">
@@ -109,38 +179,15 @@ export default async function CallDetailPage({
           </p>
         </div>
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
-          <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Lead</h2>
-          <p className="mt-2 text-lg font-medium">
-            {typeof meta.name === "string" ? meta.name : "—"}
-          </p>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            {typeof meta.reason === "string" ? meta.reason : "No reason saved"}
-          </p>
+          <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Call</h2>
+          <div className="mt-2 flex flex-wrap gap-3 text-sm">
+            <span>Duration: {row.duration_seconds ?? "—"}s</span>
+            <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
+          </div>
+          {!row.recording_url ? (
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">No recording attached yet.</p>
+          ) : null}
         </div>
-      </section>
-
-      <section className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
-        <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Status</h2>
-        <div className="mt-2 flex flex-wrap gap-3 text-sm">
-          <span>Status: {row.status || "—"}</span>
-          <span>Duration: {row.duration_seconds ?? "—"}s</span>
-          <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
-        </div>
-        {row.recording_url ? (
-          <p className="mt-3 text-sm">
-            Recording:{" "}
-            <a
-              className="text-[var(--accent)] underline break-all"
-              href={row.recording_url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              open link
-            </a>
-          </p>
-        ) : (
-          <p className="mt-3 text-sm text-[var(--ink-soft)]">No recording attached yet.</p>
-        )}
       </section>
 
       <section className="mt-8">
@@ -159,6 +206,8 @@ export default async function CallDetailPage({
           )}
         </div>
       </section>
+
+      {row.recording_url ? <CallAudioPlayer src={row.recording_url} /> : null}
     </div>
   );
 }

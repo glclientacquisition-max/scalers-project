@@ -5,7 +5,7 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TENANT_SELECT =
-  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, services_offered, business_hours, agent_tone, is_active";
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, services_offered, business_hours, agent_tone, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
 const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
