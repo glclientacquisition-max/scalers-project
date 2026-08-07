@@ -12,7 +12,17 @@ export type OnboardingAnswers = {
 export function tenantNeedsOnboarding(tenant: {
   business_name: string;
   llm_system_prompt: string | null | undefined;
+  services_offered?: string | null;
+  business_hours?: string | null;
+  agent_tone?: string | null;
 }): boolean {
+  // Structured profile from onboarding/settings means setup is done.
+  const hasProfile =
+    Boolean(String(tenant.services_offered || "").trim()) &&
+    Boolean(String(tenant.business_hours || "").trim()) &&
+    Boolean(String(tenant.agent_tone || "").trim());
+  if (hasProfile) return false;
+
   const prompt = String(tenant.llm_system_prompt || "").trim();
   if (!prompt) return true;
 
@@ -23,6 +33,7 @@ export function tenantNeedsOnboarding(tenant: {
   const businessName = String(tenant.business_name || "").trim();
   if (businessName && prompt === defaultTenantLlmPrompt(businessName)) return true;
 
+  // Already has a compiled/custom prompt (e.g. pre-profile tenants) — skip wizard.
   return false;
 }
 
