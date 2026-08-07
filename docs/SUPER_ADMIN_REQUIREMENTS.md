@@ -1,4 +1,4 @@
-# Sauti Desk — Super Admin Requirements
+# Scalers — Super Admin Requirements
 
 ## Goal
 
