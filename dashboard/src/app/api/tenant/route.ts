@@ -43,7 +43,9 @@ export async function POST(request: Request) {
     .from("tenants")
     .update(patch)
     .eq("id", id)
-    .select("id, business_name, whatsapp_notification_number, llm_system_prompt")
+    .select(
+      "id, business_name, whatsapp_notification_number, services_offered, business_hours, agent_tone"
+    )
     .single();
 
   if (error) {
