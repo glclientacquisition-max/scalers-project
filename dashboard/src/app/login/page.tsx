@@ -9,7 +9,7 @@ export default function LoginPage({
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href="/login" context="Sign in" priority />
+        <BrandWordmark href="/login" context="Sign in" variant="lockup" priority />
         <h1 className="sr-only">Sign in to Scalers</h1>
 
         <form

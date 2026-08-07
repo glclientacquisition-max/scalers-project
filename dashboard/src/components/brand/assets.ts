@@ -1,13 +1,15 @@
 /** Canonical Scalers brand asset paths (`public/brand/`). */
 export const brandAssets = {
-  /** Full mark + wordmark, transparent (auth / marketing). */
-  logoFull: "/brand/logo-full.png",
+  /** Cropped full mark for light auth surfaces. */
+  logoFull: "/brand/logo-full-mark.png",
   logoFullWhiteBg: "/brand/logo-full-white-bg.png",
   /**
-   * Transparent ribbon icon — preferred on headers and colored chrome
-   * so the mark overlays cleanly without a white plate.
+   * Square transparent ribbon mark for chrome overlays.
+   * Derived from the official icon (tight crop, no white plate).
    */
-  iconTransparent: "/brand/icon.png",
+  iconTransparent: "/brand/icon-mark.png",
+  /** Original uploads kept for reference / OG / favicon. */
+  iconSource: "/brand/icon.png",
   iconWhiteBg: "/brand/icon-white-bg.png",
   iconFallback: "/brand/icon.svg",
   favicon: "/brand/favicon.png",
