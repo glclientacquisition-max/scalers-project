@@ -46,7 +46,7 @@ begin
   return format(
     $prompt$You are the live phone receptionist for %s in Kenya.
 
-BUSINESS KNOWLEDGE (update this in Sauti Desk Business settings):
+BUSINESS KNOWLEDGE (update this in Scalers Business settings):
 - Business name: %s
 - Services: describe what you offer
 - Hours: e.g. Mon-Sat 8:00am-6:00pm EAT

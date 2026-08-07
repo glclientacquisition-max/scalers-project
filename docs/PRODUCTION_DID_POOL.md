@@ -2,7 +2,7 @@
 
 ## Goal
 
-New Sauti Desk signups get a real `+254…` DID from a pre-bought pool instead of staying on `pending:<user_id>`.
+New Scalers signups get a real `+254…` DID from a pre-bought pool instead of staying on `pending:<user_id>`.
 
 ## One-time setup
 
@@ -16,7 +16,7 @@ New Sauti Desk signups get a real `+254…` DID from a pre-bought pool instead o
    - Same Stream / media settings as the smoke DID
 
 3. **Seed the pool** (pick one):
-   - Desk: login as `admin@sauti.local` + `DASHBOARD_PASSWORD` → **Admin → Numbers**  
+   - Desk: login as `admin@scalers.local` + `DASHBOARD_PASSWORD` → **Admin → Numbers**  
    - Or SQL:
 
 ```sql

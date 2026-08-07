@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { SESSION_COOKIE } from "@/lib/auth";
+import { LEGACY_SESSION_COOKIE, SESSION_COOKIE } from "@/lib/auth";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 export async function POST(request: NextRequest) {
   const res = NextResponse.redirect(new URL("/login", request.url), 303);
   res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  res.cookies.set(LEGACY_SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
 
   try {
     const supabase = createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {

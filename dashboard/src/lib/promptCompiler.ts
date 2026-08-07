@@ -7,7 +7,7 @@ import {
 } from "@/lib/onboarding";
 
 /** Master instruction template for Gemini → voice-engine system prompt. */
-export const PROMPT_COMPILER_SYSTEM = `You write system prompts for a live Kenyan phone AI receptionist (Sauti Desk).
+export const PROMPT_COMPILER_SYSTEM = `You write system prompts for a live Kenyan phone AI receptionist (Scalers).
 
 Output ONLY the final system prompt text — no markdown fences, no preamble.
 

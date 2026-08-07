@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   if (
     legacyPassword &&
     password === legacyPassword &&
-    (!email || email === "admin@sauti.local")
+    (!email || email === "admin@scalers.local" || email === "admin@sauti.local")
   ) {
     // Platform operators go straight to the Super Admin console.
     const res = NextResponse.redirect(new URL("/admin", request.url), 303);

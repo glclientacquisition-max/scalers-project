@@ -28,7 +28,12 @@ export function tenantNeedsOnboarding(tenant: {
 
   // Signup / SQL default template markers.
   if (prompt.includes("describe what you offer")) return true;
-  if (prompt.includes("update this in Sauti Desk")) return true;
+  if (
+    prompt.includes("update this in Sauti Desk") ||
+    prompt.includes("update this in Scalers")
+  ) {
+    return true;
+  }
 
   const businessName = String(tenant.business_name || "").trim();
   if (businessName && prompt === defaultTenantLlmPrompt(businessName)) return true;

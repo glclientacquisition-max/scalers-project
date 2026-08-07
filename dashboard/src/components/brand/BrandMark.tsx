@@ -5,109 +5,204 @@ import Link from "next/link";
 import { useState } from "react";
 import { brandAssets } from "@/components/brand/assets";
 
-type BrandMarkProps = {
-  href?: string;
-  label?: string;
-  invert?: boolean;
+type Size = "sm" | "md" | "lg";
+
+const SIZE: Record<
+  Size,
+  { box: string; img: string; type: string; gap: string; width: number; height: number; context: string }
+> = {
+  sm: {
+    box: "h-7 w-7",
+    img: "h-7 w-7",
+    type: "text-lg leading-none",
+    gap: "gap-2",
+    width: 28,
+    height: 28,
+    context: "text-[10px]",
+  },
+  md: {
+    box: "h-9 w-9",
+    img: "h-9 w-9",
+    type: "text-xl leading-none sm:text-2xl",
+    gap: "gap-2.5",
+    width: 36,
+    height: 36,
+    context: "text-[11px]",
+  },
+  lg: {
+    box: "h-11 w-11",
+    img: "h-11 w-11",
+    type: "text-2xl leading-none sm:text-3xl",
+    gap: "gap-3",
+    width: 44,
+    height: 44,
+    context: "text-xs",
+  },
+};
+
+type BrandLockupProps = {
+  href?: string | null;
+  name?: string;
+  /** Line under the product name (business name, Super Admin, etc.). */
+  context?: string;
+  onDark?: boolean;
+  size?: Size;
   className?: string;
   priority?: boolean;
 };
 
 /**
- * Scalers mark for chrome. Uses PNG icon when available, SVG fallback otherwise.
+ * Official Scalers lockup: transparent icon + product name.
+ * Prefer on headers and colored surfaces so the mark overlays without a white plate.
  */
-export function BrandMark({
+export function BrandLockup({
   href = "/",
-  label = "Sauti Desk",
-  invert = false,
+  name = "Scalers",
+  context,
+  onDark = false,
+  size = "md",
   className = "",
   priority = false,
-}: BrandMarkProps) {
+}: BrandLockupProps) {
   const [useFallback, setUseFallback] = useState(false);
+  const s = SIZE[size];
 
-  const content = (
-    <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <span
-        className={[
-          "relative inline-flex h-8 w-8 shrink-0 overflow-hidden",
-          invert ? "rounded-md bg-white/5" : "",
-        ].join(" ")}
-      >
+  const mark = (
+    <span className={`inline-flex items-center ${s.gap} min-w-0 ${className}`}>
+      <span className={`relative inline-flex shrink-0 items-center justify-center ${s.box}`}>
         {useFallback ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={brandAssets.iconFallback}
             alt=""
-            width={32}
-            height={32}
-            className="h-8 w-8 object-contain"
+            width={s.width}
+            height={s.height}
+            className={`${s.img} object-contain`}
           />
         ) : (
           <Image
-            src={brandAssets.icon}
+            src={brandAssets.iconTransparent}
             alt=""
-            width={32}
-            height={32}
+            width={s.width}
+            height={s.height}
             priority={priority}
-            className="h-8 w-8 object-contain"
+            className={`${s.img} object-contain object-center`}
             onError={() => setUseFallback(true)}
           />
         )}
       </span>
-      <span
-        className={[
-          "font-display text-xl tracking-tight sm:text-2xl",
-          invert ? "text-white" : "text-brand-900",
-        ].join(" ")}
-      >
-        {label}
+      <span className="min-w-0 flex flex-col justify-center">
+        <span
+          className={[
+            "font-display tracking-tight",
+            s.type,
+            onDark ? "text-white" : "text-brand-900",
+          ].join(" ")}
+        >
+          {name}
+        </span>
+        {context ? (
+          <span
+            className={[
+              "mt-0.5 truncate font-medium uppercase tracking-[0.14em]",
+              s.context,
+              onDark ? "text-brand-200/75" : "text-ink-soft",
+            ].join(" ")}
+          >
+            {context}
+          </span>
+        ) : null}
       </span>
     </span>
   );
 
-  if (!href) return content;
+  if (!href) return mark;
   return (
     <Link
       href={href}
-      className="inline-flex items-center rounded-md focus-visible:outline-none focus-visible:shadow-focus"
+      className="inline-flex min-w-0 rounded-md focus-visible:outline-none focus-visible:shadow-focus"
+      aria-label={context ? `${name} · ${context}` : name}
     >
-      {content}
+      {mark}
     </Link>
   );
 }
 
+/** Alias for older imports. */
+export function BrandMark(props: {
+  href?: string;
+  label?: string;
+  invert?: boolean;
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <BrandLockup
+      href={props.href}
+      name={props.label ?? "Scalers"}
+      onDark={props.invert}
+      className={props.className}
+      priority={props.priority}
+    />
+  );
+}
+
+/**
+ * Auth / marketing hero: full logo file when available, else transparent lockup.
+ */
 export function BrandWordmark({
   href = "/",
   className = "",
   priority = false,
+  context,
 }: {
   href?: string;
   className?: string;
   priority?: boolean;
+  context?: string;
 }) {
   const [failed, setFailed] = useState(false);
 
-  const inner = failed ? (
-    <BrandMark href={undefined} label="Sauti Desk" className={className} priority={priority} />
-  ) : (
-    <Image
-      src={brandAssets.logoFull}
-      alt="Scalers"
-      width={320}
-      height={320}
-      priority={priority}
-      className={`h-10 w-auto object-contain sm:h-12 ${className}`}
-      onError={() => setFailed(true)}
-    />
+  if (failed) {
+    return (
+      <BrandLockup
+        href={href}
+        name="Scalers"
+        context={context}
+        size="lg"
+        className={className}
+        priority={priority}
+      />
+    );
+  }
+
+  const img = (
+    <span className={`inline-flex flex-col ${className}`}>
+      <Image
+        src={brandAssets.logoFull}
+        alt="Scalers"
+        width={360}
+        height={140}
+        priority={priority}
+        className="h-12 w-auto max-w-[220px] object-contain object-left sm:h-14 sm:max-w-[260px]"
+        onError={() => setFailed(true)}
+      />
+      {context ? (
+        <span className="mt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-ink-soft">
+          {context}
+        </span>
+      ) : null}
+    </span>
   );
 
-  if (!href) return inner;
+  if (!href) return img;
   return (
     <Link
       href={href}
       className="inline-block rounded-md focus-visible:outline-none focus-visible:shadow-focus"
+      aria-label={context ? `Scalers · ${context}` : "Scalers"}
     >
-      {inner}
+      {img}
     </Link>
   );
 }

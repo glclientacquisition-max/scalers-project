@@ -1,7 +1,7 @@
 -- Structured business profile for the AI Prompt Compiler.
 -- Run in the Supabase SQL editor after multi_tenant_onboarding.sql.
 --
--- Owners edit these fields in Sauti Desk; Gemini compiles them into
+-- Owners edit these fields in Scalers; Gemini compiles them into
 -- tenants.llm_system_prompt for the voice engine.
 -- ASCII-only (safe for Supabase SQL Editor).
 

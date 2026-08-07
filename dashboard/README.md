@@ -1,4 +1,4 @@
-# Sauti Desk (admin dashboard)
+# Scalers (owner desk + Super Admin)
 
 Next.js app for reviewing missed-call leads and editing business receptionist knowledge.
 
@@ -81,7 +81,7 @@ Without a Gemini key, a local template is saved instead.
 1. Apply `docs/supabase/did_number_pool.sql` in Supabase.
 2. Point spare SautiKit DIDs’ webhooks at Railway.
 3. Apply `docs/supabase/super_admin_ops.sql` (release/remove business helpers + optional Jirani teardown).
-4. Login as ops (`admin@sauti.local` + `DASHBOARD_PASSWORD`) → **Admin**.
+4. Login as ops (`admin@scalers.local` + `DASHBOARD_PASSWORD`) → **Admin**.
 5. Use **Numbers** to seed DIDs; **Businesses** to assign / release / remove.
 
 See `docs/PRODUCTION_DID_POOL.md` and `docs/SUPER_ADMIN_REQUIREMENTS.md`.
