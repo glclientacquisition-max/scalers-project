@@ -213,11 +213,23 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     );
   }
 
+  const bulkPreview = useMemo(
+    () => parseBulkServices(bulkServicesText),
+    [bulkServicesText]
+  );
+
+  function addBlankServiceRows(count: number) {
+    setServices((prev) => [
+      ...prev,
+      ...Array.from({ length: count }, () => emptyService()),
+    ]);
+  }
+
   function applyBulkServices() {
     const parsed = parseBulkServices(bulkServicesText);
     if (!parsed.length) {
       setBulkServicesError(
-        "Paste at least one line. Format: name | price | notes | out of scope"
+        "Add at least one service name. Example: Home cleaning - from 2,500 KES"
       );
       return;
     }
@@ -364,7 +376,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             <div>
               <h3 className="text-sm font-medium text-[var(--ink)]">Services catalog</h3>
               <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                Loaded live on every call as ground truth. Prefer clear prices and out-of-scope notes.
+                Your menu for the receptionist. Add a few blank rows, or paste a list like you would on WhatsApp.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -373,7 +385,14 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 onClick={() => setServices((prev) => [...prev, emptyService()])}
                 className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
               >
-                Add service
+                Add 1
+              </button>
+              <button
+                type="button"
+                onClick={() => addBlankServiceRows(3)}
+                className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
+              >
+                Add 3 blank
               </button>
               <button
                 type="button"
@@ -383,20 +402,18 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 }}
                 className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:border-[#0096FF]/50"
               >
-                {showBulkServices ? "Hide bulk add" : "Add many"}
+                {showBulkServices ? "Hide paste" : "Paste list"}
               </button>
             </div>
           </div>
 
           {showBulkServices ? (
-            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
+            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-4">
               <label className="block text-sm font-medium" htmlFor="bulk_services">
-                Paste multiple services
+                Paste your service list
               </label>
               <p className="text-xs text-[var(--ink-soft)]">
-                One service per line. Optional columns separated by{" "}
-                <span className="font-medium text-[var(--ink)]">|</span>: name | price | notes |
-                out of scope
+                One service per line. Optional price after a dash.
               </p>
               <textarea
                 id="bulk_services"
@@ -407,10 +424,43 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 }}
                 rows={6}
                 placeholder={
-                  "Home cleaning | from 2,500 KES | Nairobi only | No offices\nPlumbing | quote after visit\nElectrical | from 1,500 KES"
+                  "Home cleaning - from 2,500 KES\nPlumbing\nElectrical - quote after visit"
                 }
-                className={`${fieldClass} font-mono text-sm leading-relaxed`}
+                className={`${fieldClass} text-sm leading-relaxed`}
               />
+              <details className="text-xs text-[var(--ink-soft)]">
+                <summary className="cursor-pointer font-medium text-[var(--ink)]">
+                  Spreadsheet format still works
+                </summary>
+                <p className="mt-2 leading-relaxed">
+                  Paste columns as{" "}
+                  <span className="font-medium text-[var(--ink)]">
+                    name | price | notes | out of scope
+                  </span>
+                  , or copy rows from Excel / Sheets.
+                </p>
+              </details>
+
+              {bulkPreview.length > 0 ? (
+                <div className="rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                  <p className="text-xs font-medium text-[var(--ink)]">
+                    Ready to add {bulkPreview.length} service
+                    {bulkPreview.length === 1 ? "" : "s"}
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-[var(--ink-soft)]">
+                    {bulkPreview.slice(0, 8).map((row, i) => (
+                      <li key={`${row.name}-${i}`}>
+                        <span className="font-medium text-[var(--ink)]">{row.name}</span>
+                        {row.price_range ? ` · ${row.price_range}` : ""}
+                      </li>
+                    ))}
+                    {bulkPreview.length > 8 ? (
+                      <li>+{bulkPreview.length - 8} more</li>
+                    ) : null}
+                  </ul>
+                </div>
+              ) : null}
+
               {bulkServicesError ? (
                 <p className="text-sm text-[var(--warn)]" role="alert">
                   {bulkServicesError}
@@ -419,16 +469,20 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               <button
                 type="button"
                 onClick={applyBulkServices}
-                className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+                disabled={!bulkPreview.length}
+                className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
               >
-                Add pasted services
+                Add to catalog
               </button>
             </div>
           ) : null}
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             {services.map((service, index) => (
-              <div key={`service-${index}`} className="space-y-3 border-b border-[var(--line)] pb-5 last:border-b-0 last:pb-0">
+              <div
+                key={`service-${index}`}
+                className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                     Service {index + 1}
@@ -472,29 +526,31 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-notes-${index}`}>
-                    Notes / requirements
-                  </label>
-                  <input
-                    id={`svc-notes-${index}`}
-                    value={service.notes}
-                    onChange={(e) => updateService(index, "notes", e.target.value)}
-                    placeholder="2-bedroom homes, Nairobi only"
-                    className={fieldClass}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-oos-${index}`}>
-                    Out of scope
-                  </label>
-                  <input
-                    id={`svc-oos-${index}`}
-                    value={service.out_of_scope}
-                    onChange={(e) => updateService(index, "out_of_scope", e.target.value)}
-                    placeholder="No commercial offices"
-                    className={fieldClass}
-                  />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-notes-${index}`}>
+                      Notes / requirements
+                    </label>
+                    <input
+                      id={`svc-notes-${index}`}
+                      value={service.notes}
+                      onChange={(e) => updateService(index, "notes", e.target.value)}
+                      placeholder="2-bedroom homes, Nairobi only"
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-oos-${index}`}>
+                      Out of scope
+                    </label>
+                    <input
+                      id={`svc-oos-${index}`}
+                      value={service.out_of_scope}
+                      onChange={(e) => updateService(index, "out_of_scope", e.target.value)}
+                      placeholder="No commercial offices"
+                      className={fieldClass}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
