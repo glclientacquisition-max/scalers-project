@@ -93,10 +93,10 @@ export function BrandWordmark({
     <Image
       src={brandAssets.logoFull}
       alt="Scalers"
-      width={180}
-      height={40}
+      width={320}
+      height={320}
       priority={priority}
-      className={`h-9 w-auto object-contain sm:h-10 ${className}`}
+      className={`h-10 w-auto object-contain sm:h-12 ${className}`}
       onError={() => setFailed(true)}
     />
   );

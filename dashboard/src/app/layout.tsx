@@ -25,23 +25,15 @@ export const metadata: Metadata = {
   },
   description: "Missed-call leads and receptionist controls for East African businesses.",
   applicationName: "Sauti Desk",
-  icons: {
-    icon: [
-      { url: "/brand/favicon.png", type: "image/png" },
-      { url: "/brand/icon.svg", type: "image/svg+xml" },
-    ],
-    apple: [{ url: "/brand/favicon.png" }],
-    shortcut: ["/brand/favicon.png"],
-  },
   openGraph: {
     title: "Sauti Desk",
     description: "Triage missed calls. Follow hot leads.",
     siteName: "Sauti Desk",
     images: [
       {
-        url: "/brand/icon-white-bg.png",
-        width: 1200,
-        height: 630,
+        url: "/og.png",
+        width: 1254,
+        height: 1254,
         alt: "Scalers",
       },
     ],
@@ -50,7 +42,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Sauti Desk",
     description: "Triage missed calls. Follow hot leads.",
-    images: ["/brand/icon-white-bg.png"],
+    images: ["/og.png"],
   },
 };
 
