@@ -109,6 +109,8 @@ Open http://localhost:3000 (or the port Next prints).
 | `GEMINI_API_KEY` | Optional: onboarding prompt compile (local template fallback if unset) |
 | `GEMINI_MODEL` | Optional: defaults to `gemini-2.0-flash` |
 | `SAUTIKIT_API_KEY` | Optional: Super Admin telecom panel + “Sync from SautiKit” (server-only) |
+| `SAUTIKIT_ADMIN_OPS_KEY` | Optional Key B: Buy number (`numbers.claim`) — Vercel only |
+| `VOICE_PUBLIC_BASE_URL` | Optional: Railway voice base for webhook routing after buy |
 | `SAUTIKIT_API_BASE` | Optional: defaults to `https://api.sautikit.com` |
 | `DASHBOARD_PASSWORD` | Optional legacy shared-password desk |
 | `DASHBOARD_OPEN=true` | Dev only: skip login if no password |
