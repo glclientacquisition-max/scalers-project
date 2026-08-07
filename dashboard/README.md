@@ -27,6 +27,13 @@ The Auth trigger provisions a `tenants` row + `tenant_members` mapping. The sign
 
 Never put the service role key in `NEXT_PUBLIC_*` or browser bundles.
 
+### Sprint 2 — Onboarding wizard
+
+New owners with a blank/default `llm_system_prompt` are redirected to `/onboarding`
+(services & pricing → hours & location → tone). A server action compiles the answers
+with Gemini (`GEMINI_API_KEY`) into `tenants.llm_system_prompt`, then opens `/calls`.
+Without a Gemini key, a local template is saved instead.
+
 ### Phase C — DID pool
 
 1. Apply `docs/supabase/did_number_pool.sql` in Supabase.
@@ -57,6 +64,8 @@ Open http://localhost:3000 (or the port Next prints).
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key for Auth sessions |
 | `SUPABASE_URL` | Same URL (server admin client) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only: Super Admin, DID pool, signup provisioner (never browser) |
+| `GEMINI_API_KEY` | Optional: onboarding prompt compile (local template fallback if unset) |
+| `GEMINI_MODEL` | Optional: defaults to `gemini-2.0-flash` |
 | `DASHBOARD_PASSWORD` | Optional legacy shared-password desk |
 | `DASHBOARD_OPEN=true` | Dev only: skip login if no password |
 
