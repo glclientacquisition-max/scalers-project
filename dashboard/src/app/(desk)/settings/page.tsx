@@ -1,6 +1,9 @@
 import { getCurrentTenant } from "@/lib/tenant";
 import { TenantForm } from "@/components/TenantForm";
 
+/** Allow Gemini compile + Supabase write without premature platform cutoffs. */
+export const maxDuration = 30;
+
 export default async function SettingsPage() {
   let tenant;
   try {

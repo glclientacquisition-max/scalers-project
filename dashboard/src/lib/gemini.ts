@@ -3,6 +3,9 @@
  * Uses the Generative Language REST API (no extra npm client required).
  */
 
+/** Keep desk training snappy; fall back to the local template on timeout. */
+const GEMINI_TIMEOUT_MS = 12_000;
+
 function extractText(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
   const root = payload as {
@@ -31,30 +34,47 @@ export async function generateGeminiText(opts: {
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  // gemini-2.0-flash was shut down; match current Flash-Lite for fast compile.
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: opts.systemInstruction }],
-      },
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: opts.userText }],
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), GEMINI_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: ac.signal,
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: opts.systemInstruction }],
         },
-      ],
-      generationConfig: {
-        temperature: opts.temperature ?? 0.35,
-        maxOutputTokens: opts.maxOutputTokens ?? 2048,
-      },
-    }),
-  });
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: opts.userText }],
+          },
+        ],
+        generationConfig: {
+          temperature: opts.temperature ?? 0.35,
+          maxOutputTokens: opts.maxOutputTokens ?? 2048,
+        },
+      }),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `Gemini timed out after ${GEMINI_TIMEOUT_MS / 1000}s (model ${model})`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   const json = (await res.json().catch(() => null)) as unknown;
   if (!res.ok) {
