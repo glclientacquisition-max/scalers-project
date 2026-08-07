@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { listSautikitNumbers } from "@/lib/sautikit";
+import { claimSautikitNumber, listSautikitNumbers } from "@/lib/sautikit";
 
 export type DidPoolRow = {
   id: string;
@@ -102,6 +102,57 @@ export async function syncPoolFromSautikit(): Promise<SyncResult> {
   }
 
   return result;
+}
+
+/**
+ * Claim a SautiKit inventory number, point webhooks at Railway, insert into pool.
+ */
+export async function buyNumberIntoPool(inventoryId: string): Promise<DidPoolRow> {
+  if (!inventoryId) throw new Error("inventory_id required");
+
+  const claimed = await claimSautikitNumber(inventoryId);
+  const e164 = claimed.e164;
+  if (!e164) throw new Error("Claimed number has no E.164");
+
+  const admin = getSupabaseAdmin();
+  const { data: existing } = await admin
+    .from("sautikit_did_pool")
+    .select(
+      "id, created_at, e164, sautikit_number_id, status, tenant_id, assigned_at, notes"
+    )
+    .eq("e164", e164)
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await admin
+      .from("sautikit_did_pool")
+      .update({
+        sautikit_number_id: claimed.id,
+        notes: existing.notes || "Bought from SautiKit",
+      })
+      .eq("id", existing.id)
+      .select(
+        "id, created_at, e164, sautikit_number_id, status, tenant_id, assigned_at, notes"
+      )
+      .single();
+    if (error) throw error;
+    return data as DidPoolRow;
+  }
+
+  const { data, error } = await admin
+    .from("sautikit_did_pool")
+    .insert({
+      e164,
+      sautikit_number_id: claimed.id,
+      status: "available",
+      notes: "Bought from SautiKit",
+    })
+    .select(
+      "id, created_at, e164, sautikit_number_id, status, tenant_id, assigned_at, notes"
+    )
+    .single();
+  if (error) throw error;
+  return data as DidPoolRow;
 }
 
 export async function addDidToPool(opts: {

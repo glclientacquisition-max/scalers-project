@@ -80,8 +80,38 @@ export function getSautikitApiKey(): string {
   return normalizeSautikitApiKey(process.env.SAUTIKIT_API_KEY);
 }
 
+/** Key B — numbers.claim (+ routing). Falls back to Key A if it has the scope. */
+export function getSautikitAdminOpsKey(): string {
+  return (
+    normalizeSautikitApiKey(process.env.SAUTIKIT_ADMIN_OPS_KEY) || getSautikitApiKey()
+  );
+}
+
 export function isSautikitConfigured(): boolean {
   return Boolean(getSautikitApiKey());
+}
+
+export function isSautikitBuyConfigured(): boolean {
+  return Boolean(getSautikitAdminOpsKey());
+}
+
+export type SautikitAvailableNumber = {
+  inventory_id: string;
+  e164: string;
+  country: string;
+  capabilities: string[];
+  monthly_price_minor: number;
+  currency: string;
+  inbound_per_min_minor: number;
+  outbound_per_min_minor: number;
+};
+
+export function getVoicePublicBase(): string {
+  const raw =
+    process.env.VOICE_PUBLIC_BASE_URL ||
+    process.env.PUBLIC_BASE_URL ||
+    "https://scalers-project-production.up.railway.app";
+  return String(raw).replace(/\/+$/, "");
 }
 
 export function getSautikitKeyDiagnostics(): SautikitKeyDiagnostics {
@@ -144,17 +174,20 @@ export function getSautikitKeyDiagnostics(): SautikitKeyDiagnostics {
   };
 }
 
-async function sautikitGet<T>(path: string): Promise<T> {
-  const apiKey = getSautikitApiKey();
-  if (!apiKey) throw new Error("SAUTIKIT_API_KEY is not configured");
+async function sautikitRequest<T>(
+  path: string,
+  opts: { method?: string; body?: unknown; apiKey: string }
+): Promise<T> {
+  if (!opts.apiKey) throw new Error("SautiKit API key is not configured");
 
   const res = await fetch(`${BASE}${path}`, {
+    method: opts.method || "GET",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${opts.apiKey}`,
       Accept: "application/json",
+      ...(opts.body ? { "Content-Type": "application/json" } : {}),
     },
-    // Never cache auth'd SautiKit responses — a revoked-key 401 must not stick
-    // after the env var is rotated on Vercel.
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
     cache: "no-store",
   });
 
@@ -176,9 +209,60 @@ async function sautikitGet<T>(path: string): Promise<T> {
   return json as T;
 }
 
+async function sautikitGet<T>(path: string): Promise<T> {
+  const apiKey = getSautikitApiKey();
+  if (!apiKey) throw new Error("SAUTIKIT_API_KEY is not configured");
+  return sautikitRequest<T>(path, { apiKey });
+}
+
 export async function listSautikitNumbers(): Promise<SautikitNumber[]> {
   const json = await sautikitGet<{ numbers: SautikitNumber[] }>("/v1/numbers");
   return json.numbers || [];
+}
+
+/** Inventory for sale (Key A numbers.read is enough). */
+export async function listAvailableSautikitNumbers(): Promise<SautikitAvailableNumber[]> {
+  const json = await sautikitGet<{ available: SautikitAvailableNumber[] }>(
+    "/v1/numbers/available"
+  );
+  return (json.available || []).filter((n) => n.capabilities?.includes("voice"));
+}
+
+/**
+ * Claim a number from inventory and point voice/events at Railway.
+ * Requires Key B (`SAUTIKIT_ADMIN_OPS_KEY`) with `numbers.claim`.
+ */
+export async function claimSautikitNumber(inventoryId: string): Promise<SautikitNumber> {
+  const opsKey = getSautikitAdminOpsKey();
+  if (!opsKey) throw new Error("SAUTIKIT_ADMIN_OPS_KEY (or SAUTIKIT_API_KEY) is not configured");
+
+  const claimed = await sautikitRequest<{ number?: SautikitNumber } & SautikitNumber>(
+    "/v1/numbers/available/claim",
+    {
+      method: "POST",
+      apiKey: opsKey,
+      body: { inventory_id: inventoryId },
+    }
+  );
+
+  const number: SautikitNumber = (claimed.number || claimed) as SautikitNumber;
+  if (!number?.id) {
+    throw new Error("SautiKit claim returned no number id");
+  }
+
+  const voiceBase = getVoicePublicBase();
+  await sautikitRequest(`/v1/numbers/${number.id}/routing`, {
+    method: "PUT",
+    apiKey: opsKey,
+    body: {
+      voice_callback_url: `${voiceBase}/`,
+      events_url: `${voiceBase}/voice/events`,
+    },
+  });
+
+  // Re-fetch owned list for canonical row (callback urls filled).
+  const owned = await listSautikitNumbers();
+  return owned.find((n) => n.id === number.id) || number;
 }
 
 /**

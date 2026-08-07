@@ -1,4 +1,5 @@
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
+import { BuyNumberPanel } from "@/components/BuyNumberPanel";
 import { DidPoolManager } from "@/components/DidPoolManager";
 import { SautikitSyncButton } from "@/components/SautikitSyncButton";
 
@@ -29,7 +30,8 @@ export default async function AdminNumbersPage() {
         Spare SautiKit numbers waiting to be given to businesses. A number is either available or
         assigned to exactly one business — never both.
       </p>
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
+        <BuyNumberPanel />
         <DidPoolManager pool={pool} pendingBusinesses={pendingBusinesses} />
       </div>
     </div>
