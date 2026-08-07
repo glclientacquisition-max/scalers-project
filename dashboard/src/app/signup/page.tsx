@@ -1,17 +1,13 @@
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/BrandMark";
 import { SignupForm } from "./SignupForm";
 
 export default function SignupPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <p className="font-display text-4xl text-[var(--accent-deep)] tracking-tight">
-          Sauti Desk
-        </p>
-        <p className="mt-3 text-[var(--ink-soft)] text-base leading-relaxed">
-          Create your AI receptionist workspace. It automatically handles English, Kiswahili,
-          and Sheng with your callers.
-        </p>
+        <BrandWordmark href="/signup" priority />
+        <h1 className="mt-8 font-display text-2xl tracking-tight text-ink">Create workspace</h1>
 
         <SignupForm />
 

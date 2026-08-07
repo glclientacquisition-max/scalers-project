@@ -69,7 +69,7 @@ export default async function AdminOverviewPage() {
           Businesses waiting for a phone number or marked inactive.
         </p>
         {overview.attention.length === 0 ? (
-          <p className="mt-6 text-sm text-[var(--ink-soft)]">Nothing waiting — pool and businesses look healthy.</p>
+          <p className="mt-6 text-sm text-[var(--ink-soft)]">Nothing waiting. Pool and businesses look healthy.</p>
         ) : (
           <ul className="mt-5 divide-y divide-[var(--line)]/70">
             {overview.attention.map((b) => (

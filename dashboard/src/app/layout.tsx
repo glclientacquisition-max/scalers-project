@@ -26,7 +26,10 @@ export const metadata: Metadata = {
   description: "Missed-call leads and receptionist controls for East African businesses.",
   applicationName: "Sauti Desk",
   icons: {
-    icon: [{ url: "/brand/favicon.png", type: "image/png" }],
+    icon: [
+      { url: "/brand/favicon.png", type: "image/png" },
+      { url: "/brand/icon.svg", type: "image/svg+xml" },
+    ],
     apple: [{ url: "/brand/favicon.png" }],
     shortcut: ["/brand/favicon.png"],
   },

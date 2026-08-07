@@ -67,12 +67,9 @@ export default async function WalletPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-4xl tracking-tight">Wallet</h1>
-          <p className="mt-2 text-[var(--ink-soft)]">
-            Prepaid balances and this month&apos;s receptionist usage.
-          </p>
         </div>
         <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-medium text-[var(--accent-deep)]">
-          Free beta — no charges yet
+          Free beta. No charges yet.
         </span>
       </div>
 

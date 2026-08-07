@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Scalers">
+  <defs>
+    <linearGradient id="s-face" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2AA8FF"/>
+      <stop offset="1" stop-color="#0096FF"/>
+    </linearGradient>
+    <linearGradient id="s-fold" x1="20" y1="16" x2="44" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#005CCC"/>
+      <stop offset="1" stop-color="#0047AB"/>
+    </linearGradient>
+  </defs>
+  <!-- Top ribbon bar -->
+  <path d="M12 14c0-3.3 2.7-6 6-6h28c2.2 0 4 1.8 4 4v6c0 2.2-1.8 4-4 4H28l-8 8H18c-3.3 0-6-2.7-6-6V14z" fill="url(#s-face)"/>
+  <!-- Diagonal fold -->
+  <path d="M28 22l8 8-16 16-8-8 16-16z" fill="url(#s-fold)"/>
+  <!-- Bottom ribbon bar -->
+  <path d="M52 50c0 3.3-2.7 6-6 6H18c-2.2 0-4-1.8-4-4v-6c0-2.2 1.8-4 4-4h18l8-8h2c3.3 0 6 2.7 6 6v10z" fill="url(#s-face)"/>
+</svg>

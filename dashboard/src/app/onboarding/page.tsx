@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { BrandWordmark } from "@/components/brand/BrandMark";
 import { getAuthUser, isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -19,11 +20,9 @@ export default async function OnboardingPage() {
     return (
       <main className="min-h-screen flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-lg">
-          <p className="font-display text-4xl text-[var(--accent-deep)] tracking-tight">
-            Sauti Desk
-          </p>
-          <p className="mt-4 text-[var(--ink-soft)] leading-relaxed">
-            No workspace is linked to this account yet. Sign up again or contact support.
+          <BrandWordmark href="/onboarding" priority />
+          <p className="mt-6 text-ink-soft leading-relaxed">
+            No workspace linked to this account. Sign up again or contact support.
           </p>
         </div>
       </main>
@@ -37,15 +36,10 @@ export default async function OnboardingPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-xl">
-        <p className="font-display text-4xl sm:text-5xl text-[var(--accent-deep)] tracking-tight">
-          Sauti Desk
-        </p>
-        <h1 className="mt-4 font-display text-2xl text-[var(--ink)]">
+        <BrandWordmark href="/onboarding" priority />
+        <h1 className="mt-8 font-display text-2xl text-ink">
           Set up {tenant.business_name}
         </h1>
-        <p className="mt-2 text-[var(--ink-soft)] leading-relaxed">
-          Three quick steps and we write your AI receptionist&apos;s knowledge for live calls.
-        </p>
         <OnboardingWizard businessName={tenant.business_name} />
       </div>
     </main>

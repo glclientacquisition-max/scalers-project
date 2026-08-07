@@ -59,7 +59,7 @@ export function BuyNumberPanel() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Buy failed");
-      setStatus(`Bought ${e164} — added to pool as available.`);
+      setStatus(`Bought ${e164}. Added to pool as available.`);
       startTransition(() => router.refresh());
       await load();
     } catch (err) {
