@@ -66,8 +66,9 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           Today&apos;s updates
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Temporary notes for the receptionist. These override your normal menu until they
-          expire. No retraining needed.
+          Temporary notes for the receptionist. Callers hear your wording (e.g. &quot;Out of
+          chicken today&quot;). The expiry only controls when the note stops applying. No
+          retraining needed.
         </p>
       </div>
 

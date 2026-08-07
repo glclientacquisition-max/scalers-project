@@ -11,7 +11,10 @@ const {
   formatScheduleSummary,
 } = require('./conversation/businessHours');
 const { buildLiveGroundTruth } = require('./conversation/liveKnowledge');
-const { formatBulletinForPrompt } = require('./conversation/dailyBulletin');
+const {
+  formatBulletinForPrompt,
+  bulletinImpliesClosed,
+} = require('./conversation/dailyBulletin');
 
 const DEFAULT_KNOWLEDGE = `Business: Jirani Home Services (Nairobi & environs)
 What we do: home repairs and maintenance for homes and small offices.
@@ -56,15 +59,23 @@ function buildContextHeader(profile = {}) {
     ? 'message'
     : 'serve';
 
+  const closedByBulletin = bulletinImpliesClosed(profile.dailyBulletin);
+  const effectiveStatus =
+    closedByBulletin && status === 'open' ? 'closed' : status;
+
   let statusBlock;
-  if (status === 'open') {
+  if (closedByBulletin) {
+    statusBlock = `BUSINESS STATUS: CLOSED today per Today's update (overrides normal hours).
+Tell callers you are closed using the bulletin fact in natural words. Still capture name + reason when helpful.
+Do not claim you are open.`;
+  } else if (effectiveStatus === 'open') {
     statusBlock = `BUSINESS STATUS: OPEN now.
 If asked whether you are open, say yes. Help normally.`;
-  } else if (status === 'closed' && afterHoursMode === 'message') {
+  } else if (effectiveStatus === 'closed' && afterHoursMode === 'message') {
     statusBlock = `BUSINESS STATUS: CLOSED now (after-hours mode: MESSAGE ONLY).
 Tell the caller you are closed. Take their name and request for callback when open.
 Keep answers brief. Do not deep-dive into quotes or availability. Do not promise same-day service.`;
-  } else if (status === 'closed') {
+  } else if (effectiveStatus === 'closed') {
     statusBlock = `BUSINESS STATUS: CLOSED now (after-hours mode: KEEP SERVING).
 Be honest that the business is closed for walk-in / same-day fulfillment right now.
 You MUST still help: answer FAQs, services, pricing, and location from knowledge; capture name + reason; explain when the team will follow up.

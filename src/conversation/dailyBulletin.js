@@ -90,19 +90,47 @@ function formatEndLabel(endsAt, now = new Date()) {
 }
 
 /**
+ * True when an active bulletin means the business is closed / not operating today.
+ */
+function bulletinImpliesClosed(raw, now = new Date()) {
+  const items = activeBulletinItems(raw, now);
+  return items.some((item) =>
+    /\b(closed|close early|closing early|not open|shut|maandamano|no operations|off today)\b/i.test(
+      item.text
+    )
+  );
+}
+
+/** First active closure-style bulletin text, if any. */
+function bulletinClosureNotice(raw, now = new Date()) {
+  const items = activeBulletinItems(raw, now);
+  const hit = items.find((item) =>
+    /\b(closed|close early|closing early|not open|shut|maandamano|no operations|off today)\b/i.test(
+      item.text
+    )
+  );
+  return hit ? hit.text : null;
+}
+
+/**
  * Prompt block for CONTEXT HEADER. Empty string if nothing active.
  */
 function formatBulletinForPrompt(raw, now = new Date()) {
   const items = activeBulletinItems(raw, now);
   if (!items.length) return '';
 
-  const lines = items.map(
-    (item) => `- ${item.text} (${formatEndLabel(item.ends_at, now)})`
-  );
+  const lines = items.map((item) => {
+    const until = formatEndLabel(item.ends_at, now);
+    return `- Fact to tell callers: "${item.text}" [internal expiry: ${until} — do not read this expiry aloud]`;
+  });
 
   return `DAILY BULLETIN (highest priority facts for this call — override menu/FAQs if they conflict):
 ${lines.join('\n')}
-INSTRUCTION: If a caller asks about these topics, lead with the bulletin fact. Do not offer something the bulletin says is unavailable. Do not say the word "bulletin".`;
+SPEAKING RULES FOR BULLETIN:
+- When the caller asks about these topics (or if a bulletin says you are closed today), tell them the Fact text in natural words.
+- Speak the owner's Fact text. Do NOT invent or speak the expiry/clear time unless the caller asks how long this lasts.
+- Do not say the word "bulletin". Do not say "until tonight" / clock times from the internal expiry.
+- Do not offer something a bulletin says is unavailable.`;
 }
 
 module.exports = {
@@ -110,4 +138,6 @@ module.exports = {
   activeBulletinItems,
   formatBulletinForPrompt,
   formatEndLabel,
+  bulletinImpliesClosed,
+  bulletinClosureNotice,
 };
