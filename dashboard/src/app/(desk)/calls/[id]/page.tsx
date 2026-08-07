@@ -1,12 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  getSupabaseAdmin,
-  parseSummary,
-  type CallRow,
-  type TranscriptRow,
-} from "@/lib/supabase";
-import { getCurrentTenant } from "@/lib/tenant";
+import { parseSummary, type CallRow, type TranscriptRow } from "@/lib/supabase";
+import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 function formatWhen(iso: string) {
   try {
@@ -29,9 +24,10 @@ export default async function CallDetailPage({
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
 
-  const supabase = getSupabaseAdmin();
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) notFound();
 
-  const { data: call, error } = await supabase
+  const { data: call, error } = await workspace.client
     .from("calls")
     .select(
       "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment"
@@ -44,7 +40,7 @@ export default async function CallDetailPage({
   const row = call as CallRow;
   const meta = parseSummary(row.summary);
 
-  const { data: transcripts } = await supabase
+  const { data: transcripts } = await workspace.client
     .from("transcripts")
     .select("id, created_at, call_id, speaker, text_content, latency_ms")
     .eq("call_id", id)

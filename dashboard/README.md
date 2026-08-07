@@ -7,13 +7,25 @@ Next.js app for reviewing missed-call leads and editing business receptionist kn
 1. Apply SQL in the Supabase SQL editor:  
    `docs/supabase/multi_tenant_onboarding.sql`  
    (creates `tenant_members`, default prompt helper, Auth → tenant trigger)
-2. Apply `docs/supabase/voice_languages.sql`  
+2. Apply `docs/supabase/owner_rls.sql`  
+   (RLS on tenants / calls / transcripts / tenant_members — owners isolated by membership)
+3. Apply `docs/supabase/voice_languages.sql`  
    (automatic English / Kiswahili / Sheng — no user picker; locals later)
-3. In Supabase Auth settings, enable **Email** provider. For local demos you can disable “Confirm email”.
-4. Set dashboard env vars (anon + service role).
-5. Open `/signup` to create a workspace (email, password, business name, notification phone).
+4. In Supabase Auth settings, enable **Email** provider. For local demos you can disable “Confirm email”.
+5. Set dashboard env vars (anon + service role).
+6. Open `/signup` to create a workspace (email, password, business name, notification phone).
 
 The Auth trigger provisions a `tenants` row + `tenant_members` mapping. The signup Server Action also calls a service-role fallback if the trigger has not been applied yet.
+
+### Sprint 1 — RLS & clients
+
+| Surface | Client | Key |
+|---|---|---|
+| `/calls`, `/settings` (owner) | `@supabase/ssr` Auth session | Anon + JWT; RLS enforced |
+| `/admin/*`, DID pool, signup provisioner | Service role (server-only) | `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS) |
+| Railway voice engine | Service role | Same — writes calls/transcripts |
+
+Never put the service role key in `NEXT_PUBLIC_*` or browser bundles.
 
 ### Phase C — DID pool
 
@@ -44,7 +56,7 @@ Open http://localhost:3000 (or the port Next prints).
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (browser + server Auth) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key for Auth sessions |
 | `SUPABASE_URL` | Same URL (server admin client) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only reads/writes + tenant fallback |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only: Super Admin, DID pool, signup provisioner (never browser) |
 | `DASHBOARD_PASSWORD` | Optional legacy shared-password desk |
 | `DASHBOARD_OPEN=true` | Dev only: skip login if no password |
 
