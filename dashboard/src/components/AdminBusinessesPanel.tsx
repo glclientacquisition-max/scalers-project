@@ -23,6 +23,7 @@ export function AdminBusinessesPanel({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState("");
@@ -30,6 +31,8 @@ export function AdminBusinessesPanel({
   const [telecomDelta, setTelecomDelta] = useState("1000");
   const [aiDelta, setAiDelta] = useState("0");
   const [adjustNote, setAdjustNote] = useState("Beta seed");
+
+  const PAGE_SIZE = 25;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -41,6 +44,68 @@ export function AdminBusinessesPanel({
         b.whatsapp_notification_number.toLowerCase().includes(q)
     );
   }, [businesses, query]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function setQueryAndReset(next: string) {
+    setQuery(next);
+    setPage(1);
+  }
+
+  function Actions({ b }: { b: AdminBusiness }) {
+    const waiting = b.status === "waiting";
+    const hasRealDid = !waiting && b.status === "active";
+    return (
+      <div className="flex flex-wrap gap-x-3 gap-y-2">
+        {waiting ? (
+          <button
+            type="button"
+            disabled={pending || availableDidCount === 0}
+            onClick={() => void run({ action: "assign_next", business_id: b.id })}
+            className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)] disabled:opacity-50"
+          >
+            Assign next number
+          </button>
+        ) : null}
+        {hasRealDid ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => void run({ action: "release_did", business_id: b.id })}
+            className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]"
+          >
+            Release number
+          </button>
+        ) : null}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setAdjustId(b.id);
+            setTelecomDelta("1000");
+            setAiDelta("5");
+            setAdjustNote("Beta seed");
+          }}
+          className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)]"
+        >
+          Adjust wallet
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setConfirmRemoveId(b.id);
+            setConfirmText("");
+          }}
+          className="text-sm text-[var(--warn)] hover:underline"
+        >
+          Remove
+        </button>
+      </div>
+    );
+  }
 
   async function run(body: Record<string, unknown>) {
     setError(null);
@@ -68,7 +133,7 @@ export function AdminBusinessesPanel({
           <span className="font-medium">Search businesses</span>
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQueryAndReset(e.target.value)}
             className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
             placeholder="Name or phone number"
           />
@@ -80,7 +145,47 @@ export function AdminBusinessesPanel({
 
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)]">
+      {/* Mobile / tablet cards */}
+      <ul className="space-y-3 lg:hidden">
+        {pageRows.length === 0 ? (
+          <li className="rounded-2xl border border-[var(--line)] bg-[var(--card)] px-4 py-10 text-center text-[var(--ink-soft)]">
+            No businesses match.
+          </li>
+        ) : (
+          pageRows.map((b) => {
+            const waiting = b.status === "waiting";
+            const kes = Number(b.telecom_wallet_balance_kes ?? 0);
+            const usd = Number(b.ai_wallet_balance_usd ?? 0);
+            return (
+              <li
+                key={b.id}
+                className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-[var(--ink)]">{b.business_name}</p>
+                    <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
+                      {waiting ? "Not assigned" : b.sautikit_virtual_number}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                      KES {kes.toLocaleString("en-KE")} · ${usd.toFixed(2)} AI
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs">
+                    {statusLabel(b.status)}
+                  </span>
+                </div>
+                <div className="mt-3 border-t border-[var(--line)]/60 pt-3">
+                  <Actions b={b} />
+                </div>
+              </li>
+            );
+          })
+        )}
+      </ul>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)] lg:block">
         <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="bg-[var(--bg-deep)]/70 text-[var(--ink-soft)]">
             <tr>
@@ -92,16 +197,15 @@ export function AdminBusinessesPanel({
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {pageRows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-[var(--ink-soft)]">
                   No businesses match.
                 </td>
               </tr>
             ) : (
-              filtered.map((b) => {
+              pageRows.map((b) => {
                 const waiting = b.status === "waiting";
-                const hasRealDid = !waiting && b.status === "active";
                 const kes = Number(b.telecom_wallet_balance_kes ?? 0);
                 const usd = Number(b.ai_wallet_balance_usd ?? 0);
                 return (
@@ -129,56 +233,7 @@ export function AdminBusinessesPanel({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-2 items-start">
-                        {waiting ? (
-                          <button
-                            type="button"
-                            disabled={pending || availableDidCount === 0}
-                            onClick={() =>
-                              void run({ action: "assign_next", business_id: b.id })
-                            }
-                            className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)] disabled:opacity-50"
-                          >
-                            Assign next number
-                          </button>
-                        ) : null}
-                        {hasRealDid ? (
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() =>
-                              void run({ action: "release_did", business_id: b.id })
-                            }
-                            className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]"
-                          >
-                            Release number
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          disabled={pending}
-                          onClick={() => {
-                            setAdjustId(b.id);
-                            setTelecomDelta("1000");
-                            setAiDelta("5");
-                            setAdjustNote("Beta seed");
-                          }}
-                          className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)]"
-                        >
-                          Adjust wallet
-                        </button>
-                        <button
-                          type="button"
-                          disabled={pending}
-                          onClick={() => {
-                            setConfirmRemoveId(b.id);
-                            setConfirmText("");
-                          }}
-                          className="text-sm text-[var(--warn)] hover:underline"
-                        >
-                          Remove business
-                        </button>
-                      </div>
+                      <Actions b={b} />
                     </td>
                   </tr>
                 );
@@ -188,11 +243,38 @@ export function AdminBusinessesPanel({
         </table>
       </div>
 
+      {filtered.length > PAGE_SIZE ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-[var(--ink-soft)]">
+            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of{" "}
+            {filtered.length}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={safePage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {adjustId ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
           <p className="font-medium">Adjust wallet balances</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Beta only — manually credit/debit. Positive adds, negative subtracts. No M-Pesa yet.
+            Beta only. Manually credit or debit. Positive adds, negative subtracts. No M-Pesa yet.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <label className="text-sm">
