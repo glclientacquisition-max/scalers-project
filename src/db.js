@@ -342,6 +342,9 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
       // Always accept a positive duration; fill zeros from later webhooks.
       if (!existing.duration_seconds || nextDuration >= Number(existing.duration_seconds || 0)) {
         patch.duration_seconds = nextDuration;
+        // Beta metering: AI minutes ≈ talk time. Used for wallet burn-rate estimates.
+        // Round up to the next 0.1 minute so short calls still count.
+        patch.ai_processing_minutes = Math.round((nextDuration / 60) * 10) / 10;
       }
     }
   }

@@ -26,6 +26,10 @@ export function AdminBusinessesPanel({
   const [error, setError] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState("");
+  const [adjustId, setAdjustId] = useState<string | null>(null);
+  const [telecomDelta, setTelecomDelta] = useState("1000");
+  const [aiDelta, setAiDelta] = useState("0");
+  const [adjustNote, setAdjustNote] = useState("Beta seed");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -48,11 +52,13 @@ export function AdminBusinessesPanel({
     const json = await res.json();
     if (!res.ok) {
       setError(json.error || "Request failed");
-      return;
+      return false;
     }
     setConfirmRemoveId(null);
     setConfirmText("");
+    setAdjustId(null);
     startTransition(() => router.refresh());
+    return true;
   }
 
   return (
@@ -75,12 +81,12 @@ export function AdminBusinessesPanel({
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
 
       <div className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)]">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="bg-[var(--bg-deep)]/70 text-[var(--ink-soft)]">
             <tr>
               <th className="px-4 py-3 font-medium">Business</th>
               <th className="px-4 py-3 font-medium">Phone number</th>
-              <th className="px-4 py-3 font-medium">Alerts</th>
+              <th className="px-4 py-3 font-medium">Wallets</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
@@ -96,6 +102,8 @@ export function AdminBusinessesPanel({
               filtered.map((b) => {
                 const waiting = b.status === "waiting";
                 const hasRealDid = !waiting && b.status === "active";
+                const kes = Number(b.telecom_wallet_balance_kes ?? 0);
+                const usd = Number(b.ai_wallet_balance_usd ?? 0);
                 return (
                   <tr key={b.id} className="border-t border-[var(--line)]/70 align-top">
                     <td className="px-4 py-3">
@@ -111,7 +119,10 @@ export function AdminBusinessesPanel({
                         b.sautikit_virtual_number
                       )}
                     </td>
-                    <td className="px-4 py-3">{b.whatsapp_notification_number || "—"}</td>
+                    <td className="px-4 py-3 text-xs leading-relaxed">
+                      <p>KES {kes.toLocaleString("en-KE")}</p>
+                      <p className="text-[var(--ink-soft)]">${usd.toFixed(2)} AI</p>
+                    </td>
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs">
                         {statusLabel(b.status)}
@@ -147,6 +158,19 @@ export function AdminBusinessesPanel({
                           type="button"
                           disabled={pending}
                           onClick={() => {
+                            setAdjustId(b.id);
+                            setTelecomDelta("1000");
+                            setAiDelta("5");
+                            setAdjustNote("Beta seed");
+                          }}
+                          className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)]"
+                        >
+                          Adjust wallet
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
                             setConfirmRemoveId(b.id);
                             setConfirmText("");
                           }}
@@ -163,6 +187,66 @@ export function AdminBusinessesPanel({
           </tbody>
         </table>
       </div>
+
+      {adjustId ? (
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
+          <p className="font-medium">Adjust wallet balances</p>
+          <p className="mt-1 text-sm text-[var(--ink-soft)]">
+            Beta only — manually credit/debit. Positive adds, negative subtracts. No M-Pesa yet.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label className="text-sm">
+              Telecom Δ (KES)
+              <input
+                value={telecomDelta}
+                onChange={(e) => setTelecomDelta(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="text-sm">
+              AI Δ (USD)
+              <input
+                value={aiDelta}
+                onChange={(e) => setAiDelta(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="text-sm">
+              Note
+              <input
+                value={adjustNote}
+                onChange={(e) => setAdjustNote(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+              />
+            </label>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                void run({
+                  action: "adjust_wallet",
+                  business_id: adjustId,
+                  telecom_delta_kes: Number(telecomDelta) || 0,
+                  ai_delta_usd: Number(aiDelta) || 0,
+                  note: adjustNote,
+                }).then(() => setAdjustId(null))
+              }
+              className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdjustId(null)}
+              className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {confirmRemoveId ? (
         <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-5">

@@ -69,6 +69,13 @@ Without a Gemini key, a local template is saved instead.
 3. Save button shows "Training your receptionist…"; a Test Drive card shows the DID to call
    (tap-to-dial) once assigned.
 
+### Wallet & metering (beta)
+
+1. Apply `docs/supabase/wallet_metering.sql`.
+2. Owners open **Wallet** for dual balances + this month's minutes (Free beta badge — no charges).
+3. Voice engine writes `calls.ai_processing_minutes` from duration on call completion.
+4. Super Admin → Businesses → **Adjust wallet** seeds balances manually (no M-Pesa yet).
+
 ### Phase C — DID pool
 
 1. Apply `docs/supabase/did_number_pool.sql` in Supabase.

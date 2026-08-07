@@ -42,8 +42,8 @@
 --   sautikit_call_sid text  (unique; also stores Twilio CallSid during Phase 1)
 --   status text
 --   duration_seconds int
---   ai_processing_minutes numeric
---   recording_url text
+--   ai_processing_minutes numeric  (set by voice engine from duration; wallet metering)
+--   lead_status text  (new | contacted | resolved — see lead_status.sql)
 --   sentiment text
 --   summary text  (JSON blob for name/reason/whatsapp_sent/to_number/provider/…)
 

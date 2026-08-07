@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { removeBusinessAndReleaseDid, releaseDidFromBusiness } from "@/lib/admin";
+import {
+  adjustTenantWallet,
+  removeBusinessAndReleaseDid,
+  releaseDidFromBusiness,
+} from "@/lib/admin";
 
 export async function POST(request: Request) {
   if (!(await isLegacyAuthenticated())) {
@@ -39,9 +43,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, e164 });
     }
 
+    if (action === "adjust_wallet") {
+      const telecomDeltaKes = Number(body.telecom_delta_kes || 0);
+      const aiDeltaUsd = Number(body.ai_delta_usd || 0);
+      if (!Number.isFinite(telecomDeltaKes) || !Number.isFinite(aiDeltaUsd)) {
+        return NextResponse.json({ error: "Invalid wallet deltas" }, { status: 400 });
+      }
+      if (telecomDeltaKes === 0 && aiDeltaUsd === 0) {
+        return NextResponse.json({ error: "Enter a non-zero amount" }, { status: 400 });
+      }
+      const wallets = await adjustTenantWallet({
+        businessId,
+        telecomDeltaKes,
+        aiDeltaUsd,
+        note: String(body.note || "").trim() || undefined,
+      });
+      return NextResponse.json({ ok: true, ...wallets });
+    }
+
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const hint = /adjust_tenant_wallet|function/i.test(message)
+      ? " Apply docs/supabase/wallet_metering.sql in Supabase."
+      : "";
+    return NextResponse.json({ error: `${message}${hint}` }, { status: 500 });
   }
 }
