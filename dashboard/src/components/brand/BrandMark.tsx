@@ -7,35 +7,36 @@ import { brandAssets } from "@/components/brand/assets";
 
 type Size = "sm" | "md" | "lg";
 
+/** Average, readable chrome sizes — icon stays legible beside the name. */
 const SIZE: Record<
   Size,
   { box: string; img: string; type: string; gap: string; width: number; height: number; context: string }
 > = {
   sm: {
-    box: "h-7 w-7",
-    img: "h-7 w-7",
+    box: "h-8 w-8",
+    img: "h-8 w-8",
     type: "text-lg leading-none",
     gap: "gap-2",
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     context: "text-[10px]",
   },
   md: {
-    box: "h-9 w-9",
-    img: "h-9 w-9",
-    type: "text-xl leading-none sm:text-2xl",
-    gap: "gap-2.5",
-    width: 36,
-    height: 36,
+    box: "h-10 w-10",
+    img: "h-10 w-10",
+    type: "text-2xl leading-none",
+    gap: "gap-3",
+    width: 40,
+    height: 40,
     context: "text-[11px]",
   },
   lg: {
-    box: "h-11 w-11",
-    img: "h-11 w-11",
-    type: "text-2xl leading-none sm:text-3xl",
-    gap: "gap-3",
-    width: 44,
-    height: 44,
+    box: "h-12 w-12",
+    img: "h-12 w-12",
+    type: "text-3xl leading-none",
+    gap: "gap-3.5",
+    width: 48,
+    height: 48,
     context: "text-xs",
   },
 };
@@ -43,7 +44,6 @@ const SIZE: Record<
 type BrandLockupProps = {
   href?: string | null;
   name?: string;
-  /** Line under the product name (business name, Super Admin, etc.). */
   context?: string;
   onDark?: boolean;
   size?: Size;
@@ -52,8 +52,8 @@ type BrandLockupProps = {
 };
 
 /**
- * Official Scalers lockup: transparent icon + product name.
- * Prefer on headers and colored surfaces so the mark overlays without a white plate.
+ * Scalers lockup: transparent icon + product name.
+ * Use in headers / colored chrome so the mark overlays without a white plate.
  */
 export function BrandLockup({
   href = "/",
@@ -69,7 +69,10 @@ export function BrandLockup({
 
   const mark = (
     <span className={`inline-flex items-center ${s.gap} min-w-0 ${className}`}>
-      <span className={`relative inline-flex shrink-0 items-center justify-center ${s.box}`}>
+      <span
+        className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden ${s.box}`}
+        aria-hidden
+      >
         {useFallback ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -91,7 +94,7 @@ export function BrandLockup({
           />
         )}
       </span>
-      <span className="min-w-0 flex flex-col justify-center">
+      <span className="min-w-0 flex flex-col justify-center gap-0.5">
         <span
           className={[
             "font-display tracking-tight",
@@ -104,9 +107,9 @@ export function BrandLockup({
         {context ? (
           <span
             className={[
-              "mt-0.5 truncate font-medium uppercase tracking-[0.14em]",
+              "truncate font-medium uppercase tracking-[0.14em]",
               s.context,
-              onDark ? "text-brand-200/75" : "text-ink-soft",
+              onDark ? "text-sky-200/80" : "text-ink-soft",
             ].join(" ")}
           >
             {context}
@@ -128,7 +131,6 @@ export function BrandLockup({
   );
 }
 
-/** Alias for older imports. */
 export function BrandMark(props: {
   href?: string;
   label?: string;
@@ -148,22 +150,25 @@ export function BrandMark(props: {
 }
 
 /**
- * Auth / marketing hero: full logo file when available, else transparent lockup.
+ * Auth / entry surfaces: large lockup (transparent mark + Scalers).
+ * Falls back cleanly; optional full logo file when `variant="full"`.
  */
 export function BrandWordmark({
   href = "/",
   className = "",
   priority = false,
   context,
+  variant = "lockup",
 }: {
   href?: string;
   className?: string;
   priority?: boolean;
   context?: string;
+  variant?: "lockup" | "full";
 }) {
   const [failed, setFailed] = useState(false);
 
-  if (failed) {
+  if (variant === "lockup" || failed) {
     return (
       <BrandLockup
         href={href}
@@ -181,14 +186,14 @@ export function BrandWordmark({
       <Image
         src={brandAssets.logoFull}
         alt="Scalers"
-        width={360}
-        height={140}
+        width={320}
+        height={128}
         priority={priority}
-        className="h-12 w-auto max-w-[220px] object-contain object-left sm:h-14 sm:max-w-[260px]"
+        className="h-14 w-auto max-w-[280px] object-contain object-left sm:h-16"
         onError={() => setFailed(true)}
       />
       {context ? (
-        <span className="mt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-ink-soft">
+        <span className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-ink-soft">
           {context}
         </span>
       ) : null}

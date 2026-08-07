@@ -7,7 +7,6 @@ import { getCurrentTenant } from "@/lib/tenant";
 
 /**
  * Workspace shell for authenticated business owners.
- * Super Admin sessions route to /admin.
  */
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const authUser = await getAuthUser();
@@ -28,8 +27,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line/80 bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-desk items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4">
+      <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex max-w-desk items-center justify-between gap-4 px-4 py-3.5 sm:px-6 sm:py-4">
           <BrandLockup
             href="/calls"
             name="Scalers"
