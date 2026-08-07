@@ -32,10 +32,6 @@ export default async function SettingsPage() {
   return (
     <div className="max-w-3xl">
       <h1 className="font-display text-4xl tracking-tight">Business</h1>
-      <p className="mt-2 text-[var(--ink-soft)]">
-        Teach your receptionist what your business offers — it uses this knowledge on every
-        call.
-      </p>
 
       <div className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <p className="text-sm text-[var(--ink-soft)]">
@@ -61,8 +57,7 @@ export default async function SettingsPage() {
         </h2>
         {pendingDid ? (
           <p className="mt-3 text-sm leading-relaxed text-[var(--ink-soft)]">
-            Your number is being assigned — you&apos;ll be able to test as soon as it&apos;s
-            live.
+            Number pending. You can test as soon as it is live.
           </p>
         ) : (
           <>

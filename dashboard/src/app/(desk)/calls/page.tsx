@@ -112,7 +112,7 @@ function KpiStrip({ tenant, leads }: { tenant: TenantRow; leads: Lead[] }) {
       <Kpi
         label="Wallet"
         value={`KES ${kes.toLocaleString("en-KE")}`}
-        hint={lowWallet ? "Low balance — top up soon" : `AI usage: $${usd.toFixed(2)}`}
+        hint={lowWallet ? "Low balance. Top up soon." : `AI usage: $${usd.toFixed(2)}`}
         warn={lowWallet}
       />
     </section>

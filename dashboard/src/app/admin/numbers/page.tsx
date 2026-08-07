@@ -27,8 +27,7 @@ export default async function AdminNumbersPage() {
         <SautikitSyncButton />
       </div>
       <p className="mt-1 text-sm text-[var(--ink-soft)] max-w-2xl">
-        Spare SautiKit numbers waiting to be given to businesses. A number is either available or
-        assigned to exactly one business — never both.
+        Spare SautiKit numbers for businesses. Available or assigned to one business. Never both.
       </p>
       <div className="mt-6 space-y-6">
         <BuyNumberPanel />

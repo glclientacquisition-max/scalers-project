@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/BrandMark";
 
 export default function LoginPage({
   searchParams,
@@ -8,17 +9,13 @@ export default function LoginPage({
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <p className="font-display text-4xl text-[var(--accent-deep)] tracking-tight">
-          Sauti Desk
-        </p>
-        <p className="mt-3 text-[var(--ink-soft)] text-base leading-relaxed">
-          Sign in to review missed-call leads and tune your receptionist.
-        </p>
+        <BrandWordmark href="/login" priority />
+        <h1 className="mt-8 font-display text-2xl tracking-tight text-ink">Sign in</h1>
 
         <form
           action="/api/login"
           method="post"
-          className="mt-10 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 shadow-[0_20px_50px_-35px_rgba(28,36,33,0.45)] space-y-4"
+          className="mt-6 rounded-panel border border-line bg-surface p-6 shadow-lift space-y-4"
         >
           <div>
             <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="email">
