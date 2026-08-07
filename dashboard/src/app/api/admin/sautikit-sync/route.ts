@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import { syncPoolFromSautikit } from "@/lib/didPool";
-import { isSautikitConfigured } from "@/lib/sautikit";
+import {
+  getSautikitKeyDiagnostics,
+  isSautikitConfigured,
+} from "@/lib/sautikit";
 
 export async function POST() {
   if (!(await isLegacyAuthenticated())) {
@@ -9,7 +12,10 @@ export async function POST() {
   }
   if (!isSautikitConfigured()) {
     return NextResponse.json(
-      { error: "SAUTIKIT_API_KEY is not set on the dashboard server." },
+      {
+        error: "SAUTIKIT_API_KEY is not set on the dashboard server.",
+        diagnostics: getSautikitKeyDiagnostics(),
+      },
       { status: 500 }
     );
   }
@@ -19,6 +25,14 @@ export async function POST() {
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const code = (err as { code?: string }).code;
+    return NextResponse.json(
+      {
+        error: message,
+        code: code || null,
+        diagnostics: getSautikitKeyDiagnostics(),
+      },
+      { status: 500 }
+    );
   }
 }
