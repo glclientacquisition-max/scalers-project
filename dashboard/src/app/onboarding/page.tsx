@@ -11,7 +11,7 @@ export default async function OnboardingPage() {
 
   // Super Admin / legacy desk skips the owner wizard.
   if ((await isLegacyAuthenticated()) && !(await getAuthUser())) {
-    redirect("/calls");
+    redirect("/admin");
   }
 
   const tenant = await getCurrentTenant();

@@ -1,24 +1,29 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getAuthUser, isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
+import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
 
+/**
+ * Workspace desk shell — strictly for authenticated business owners.
+ * Super Admin (legacy cookie) sessions are routed to /admin instead.
+ */
 export default async function AppShell({ children }: { children: React.ReactNode }) {
-  if (!(await isAuthenticated())) {
+  const authUser = await getAuthUser();
+
+  if (!authUser) {
+    // Platform operators have their own root layout at /admin.
+    if (await isLegacyAuthenticated()) {
+      redirect("/admin");
+    }
     redirect("/login");
   }
 
   // Owners with a blank/default prompt finish guided setup before the desk.
-  const authUser = await getAuthUser();
-  if (authUser) {
-    const tenant = await getCurrentTenant();
-    if (tenant && tenantNeedsOnboarding(tenant)) {
-      redirect("/onboarding");
-    }
+  const tenant = await getCurrentTenant();
+  if (tenant && tenantNeedsOnboarding(tenant)) {
+    redirect("/onboarding");
   }
-
-  const showOpsNav = await isLegacyAuthenticated();
 
   return (
     <div className="min-h-screen">
@@ -35,13 +40,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
               Calls
             </Link>
             <Link href="/settings" className="text-[var(--ink)] hover:text-[var(--accent)]">
-              Business
+              Business Settings
             </Link>
-            {showOpsNav ? (
-              <Link href="/admin" className="text-[var(--ink)] hover:text-[var(--accent)]">
-                Admin
-              </Link>
-            ) : null}
             <form action="/api/logout" method="post">
               <button type="submit" className="text-[var(--ink-soft)] hover:text-[var(--warn)]">
                 Sign out

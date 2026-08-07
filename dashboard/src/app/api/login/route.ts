@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     password === legacyPassword &&
     (!email || email === "admin@sauti.local")
   ) {
-    const res = NextResponse.redirect(new URL("/calls", request.url), 303);
+    // Platform operators go straight to the Super Admin console.
+    const res = NextResponse.redirect(new URL("/admin", request.url), 303);
     res.cookies.set(SESSION_COOKIE, sessionCookieValue(), {
       httpOnly: true,
       sameSite: "lax",
