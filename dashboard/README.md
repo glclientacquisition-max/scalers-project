@@ -29,6 +29,18 @@ The Auth trigger provisions a `tenants` row + `tenant_members` mapping. The sign
 
 Never put the service role key in `NEXT_PUBLIC_*` or browser bundles.
 
+### Strict view separation (owner vs Super Admin)
+
+Two completely separate shells — roles never share navigation:
+
+| Role | Layout | Nav | Landing after login |
+|---|---|---|---|
+| Workspace owner (Auth session) | `src/app/(desk)/layout.tsx` header | Calls, Business Settings, Sign out | `/calls` |
+| Super Admin (legacy cookie) | `src/app/admin/layout.tsx` sidebar | Overview, Businesses, Numbers, Sign out | `/admin` |
+
+Legacy-cookie sessions visiting `/calls` or `/settings` are redirected to `/admin`;
+Auth owners visiting `/admin/*` are redirected to `/calls`.
+
 ### Sprint 2 — Onboarding wizard
 
 New owners with a blank/default `llm_system_prompt` are redirected to `/onboarding`
