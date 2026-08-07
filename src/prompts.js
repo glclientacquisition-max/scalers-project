@@ -37,7 +37,12 @@ const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and
 - Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.
 - Keep every spoken reply under 25 words (1 short sentence preferred, 2 max). No lists, no URLs spelled out, no markdown.
 - Prefer simple everyday words that are easy to pronounce on a phone.
-- Never invent prices, availability, or guarantees. If unknown, say the team will follow up.`;
+- Never invent prices, availability, or guarantees. If unknown, say the team will follow up.
+- Never end a turn on a status fact alone (closed, delays, bulletin). Always add what you can still do and one next question.
+NAME ACCURACY (critical — names go to owner notifications):
+- If the name is muffled, unusual, partially heard, or you are unsure, ask once: "Sorry — was that [best guess]?" or ask them to spell it. Do not guess silently.
+- Accept yes/no confirmations and spelling. Prefer one short confirm over a wrong name.
+- If the caller corrects their name or reason, immediately switch to the corrected value for the rest of the call and re-append save_caller_info with the latest values.`;
 
 /**
  * Live per-call header — highest priority over the compiled prompt.
@@ -64,10 +69,15 @@ function buildContextHeader(profile = {}) {
     closedByBulletin && status === 'open' ? 'closed' : status;
 
   let statusBlock;
-  if (closedByBulletin) {
-    statusBlock = `BUSINESS STATUS: CLOSED today per Today's update (overrides normal hours).
-Tell callers you are closed using the bulletin fact in natural words. Still capture name + reason when helpful.
-Do not claim you are open.`;
+  if (closedByBulletin && afterHoursMode === 'message') {
+    statusBlock = `BUSINESS STATUS: CLOSED today per Today's update (overrides normal hours; mode: MESSAGE ONLY).
+Tell callers the bulletin fact in natural words. Then take their name and request for callback.
+Do not go silent after the fact. Do not claim you are open. Do not deep-dive into same-day fulfillment.`;
+  } else if (closedByBulletin) {
+    statusBlock = `BUSINESS STATUS: CLOSED today per Today's update (overrides normal hours; mode: KEEP SERVING).
+Tell callers the bulletin fact in natural words, then immediately say you can still help and ask what they need.
+You MUST still answer FAQs, services, pricing, and location from knowledge; capture name + reason; explain when the team will follow up.
+Do not go silent after stating the update. Do not claim walk-in / same-day operations are open.`;
   } else if (effectiveStatus === 'open') {
     statusBlock = `BUSINESS STATUS: OPEN now.
 If asked whether you are open, say yes. Help normally.`;
@@ -144,9 +154,9 @@ ${CONVERSATION_RULES}
 
 ${languagePolicy}
 
-When you have both the caller's name and reason, also append:
+Whenever you first capture OR later correct the caller's name and/or reason, append (use the latest values; omit a field only if still unknown):
 ###TOOL###
-{"save_caller_info":{"name":"<name>","reason":"<reason>"}}
+{"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
 If the call should end after goodbye, also append: ###ENDCALL###
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
@@ -167,7 +177,7 @@ Languages (automatic): ${languageLine}
 Your job on this call:
 1. Answer the caller's questions using ONLY the live ground truth and business knowledge above.
    If something is unknown (exact price, availability, custom request), say you'll note it and the team will follow up — never invent prices or guarantees.
-2. Get the caller's name.
+2. Get the caller's name. If unsure you heard it, confirm once before saving.
 3. Get a short reason for their call / what they need.
 4. Briefly confirm name + reason, say the business will get back to them soon, then goodbye.
 
@@ -175,9 +185,9 @@ ${CONVERSATION_RULES}
 
 ${languagePolicy}
 
-When you have both name and reason, respond with one natural confirmation sentence and append:
+Whenever you first capture OR later correct name and/or reason, respond naturally and append the latest values:
 ###TOOL###
-{"save_caller_info":{"name":"<name>","reason":"<reason>"}}
+{"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
 
 If the call should end after your goodbye, also append:

@@ -28,24 +28,29 @@ function fallbackGreeting(businessName, opts = {}) {
       : 'serve';
   const closureNotice = String(opts.closureNotice || '').trim();
 
-  // Today's update says closed — greet with that fact (not the expiry clock).
+  // Today's update says closed — state the fact, then keep the call moving.
   if (closureNotice) {
-    const short =
+    let short =
       closureNotice.length > 90
         ? `${closureNotice.slice(0, 87).trim()}...`
         : closureNotice;
+    if (!/[.!?…]$/.test(short)) short = `${short}.`;
+    const follow =
+      afterHoursMode === 'message'
+        ? 'I can still take a message. May I have your name?'
+        : 'Even so, I can still help. How can I assist?';
     const options = {
       morning: [
-        `Good morning, you've reached ${name}, this is ${agent}. ${short}`,
-        `Habari ya asubuhi, ${name}, ${agent} speaking. ${short}`,
+        `Good morning, you've reached ${name}, this is ${agent}. ${short} ${follow}`,
+        `Habari ya asubuhi, ${name}, ${agent} speaking. ${short} ${follow}`,
       ],
       afternoon: [
-        `Hello, you've reached ${name}, this is ${agent}. ${short}`,
-        `Habari, ${name}, ${agent} speaking. ${short}`,
+        `Hello, you've reached ${name}, this is ${agent}. ${short} ${follow}`,
+        `Habari, ${name}, ${agent} speaking. ${short} ${follow}`,
       ],
       evening: [
-        `Good evening, you've reached ${name}, this is ${agent}. ${short}`,
-        `Habari ya jioni, ${name}, ${agent} speaking. ${short}`,
+        `Good evening, you've reached ${name}, this is ${agent}. ${short} ${follow}`,
+        `Habari ya jioni, ${name}, ${agent} speaking. ${short} ${follow}`,
       ],
     };
     const list = options[tod] || options.afternoon;
@@ -119,7 +124,7 @@ function cleanSpokenLine(text) {
 
 function greetingLooksValid(line, businessName, agentName) {
   const text = cleanSpokenLine(line);
-  if (!text || text.length > 180) return false;
+  if (!text || text.length > 240) return false;
   const name = String(businessName || '').trim();
   if (!name || /^the business$/i.test(name)) return true;
   if (/\bthe business\b/i.test(text) && !/\bthe business\b/i.test(name)) return false;
@@ -174,8 +179,11 @@ async function generateDynamicGreeting(opts) {
     return instant;
   }
 
-  const openLine =
-    isOpen === false && afterHoursMode === 'message'
+  const openLine = closureNotice
+    ? afterHoursMode === 'message'
+      ? `Today's update: "${closureNotice}". Mention that fact in natural words, then say you can take a message and ask for their name. Do not end on the fact alone.`
+      : `Today's update: "${closureNotice}". Mention that fact in natural words, then say you can still help and ask how you can assist. Do not end on the fact alone.`
+    : isOpen === false && afterHoursMode === 'message'
       ? 'The business is CLOSED now. Say you can take a message for the team.'
       : isOpen === false
         ? 'The business is CLOSED now, but you still help. Say you are closed yet can still assist.'
@@ -183,8 +191,9 @@ async function generateDynamicGreeting(opts) {
           ? 'The business is OPEN now.'
           : 'Open/closed status is unknown; do not claim the shop is closed.';
 
+  const maxWords = closureNotice ? 36 : 20;
   const instruction = `You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
-Write ONE short spoken greeting to open the call (max 20 words).
+Write ONE short spoken greeting to open the call (max ${maxWords} words).
 You MUST include the exact business name "${businessName}".
 You MUST introduce yourself as ${agentName} (e.g. "this is ${agentName} speaking").
 It is ${tod} in Nairobi. ${openLine}
@@ -225,37 +234,102 @@ function pickContextualAck(userText, lang) {
   return asked ? 'Alright.' : 'Mm-hmm.';
 }
 
-/** Caller lines that should not burn a full Gemini turn. */
-function isNonSubstantiveTurn(text) {
-  const t = String(text || '')
+const PURE_NOISE = new Set([
+  'ok',
+  'okay',
+  'yeah',
+  'yep',
+  'uh yeah',
+  'uh huh',
+  'hello',
+  'hello?',
+  'hi',
+  'hey',
+  'sawa',
+  'mm',
+  'hmm',
+  'ah',
+  'oh',
+  'gemini',
+]);
+
+const CONFIRM_ANSWERS = new Set([
+  'yes',
+  'no',
+  'yeah',
+  'yep',
+  'yup',
+  'nope',
+  'ndiyo',
+  'hapana',
+  'correct',
+  'right',
+  'sawa',
+  'exactly',
+]);
+
+function normalizeCallerText(text) {
+  return String(text || '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s'?-]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Caller lines that should not burn a full Gemini turn. */
+function isNonSubstantiveTurn(text) {
+  const t = normalizeCallerText(text);
   if (!t) return true;
   if (t.length <= 2) return true;
-  const noise = new Set([
-    'ok',
-    'okay',
-    'yeah',
-    'yep',
-    'uh yeah',
-    'uh huh',
-    'hello',
-    'hello?',
-    'hi',
-    'hey',
-    'sawa',
-    'mm',
-    'hmm',
-    'ah',
-    'oh',
-    'gemini',
-    'yes',
-    'no',
-  ]);
-  if (noise.has(t)) return true;
+  if (PURE_NOISE.has(t)) return true;
+  if (CONFIRM_ANSWERS.has(t)) return true;
   if (/^(uh|um|ah|oh)\s*(yeah|yes|ok|okay)?$/.test(t)) return true;
+  return false;
+}
+
+/** True when the last agent line is waiting on a yes/no or name reply. */
+function looksLikeAwaitingCallerReply(agentText) {
+  const t = String(agentText || '').toLowerCase();
+  if (!t) return false;
+  if (t.includes('?')) return true;
+  return /\b(was that|did i hear|did you say|your name|may i (have|get)|spell|correct|right|confirm|who (am i|is this) speaking)\b/.test(
+    t
+  );
+}
+
+function looksLikeNamePrompt(agentText) {
+  const t = String(agentText || '').toLowerCase();
+  return /\b(your name|may i (have|get) your name|who (am i|is this) speaking|was that|did i hear|spell)\b/.test(
+    t
+  );
+}
+
+/**
+ * Decide whether to skip a caller utterance before Gemini.
+ * Keeps barge-in filters separate — short names and yes/no must reach the model
+ * when the agent just asked for a name or confirmation.
+ */
+function shouldSkipCallerTurn(text, opts = {}) {
+  const t = normalizeCallerText(text);
+  if (!t) return true;
+
+  const lastAgent = String(opts.lastAgentText || '');
+  const awaiting = looksLikeAwaitingCallerReply(lastAgent);
+
+  // Corrections must always reach the model.
+  if (/^(no|nope|actually|it's|it is|not |correction|wait)\b/.test(t)) {
+    return false;
+  }
+
+  if (awaiting && CONFIRM_ANSWERS.has(t)) return false;
+
+  // Short names like "John" / "Ann" / "Ali" — do not treat as noise after a name ask.
+  if (awaiting && looksLikeNamePrompt(lastAgent)) {
+    const words = t.split(' ').filter(Boolean);
+    if (words.length <= 3 && t.length <= 40 && !PURE_NOISE.has(t)) return false;
+  }
+
+  if (isNonSubstantiveTurn(t)) return true;
   return false;
 }
 
@@ -267,4 +341,7 @@ module.exports = {
   cleanSpokenLine,
   greetingLooksValid,
   isNonSubstantiveTurn,
+  shouldSkipCallerTurn,
+  looksLikeAwaitingCallerReply,
+  looksLikeNamePrompt,
 };

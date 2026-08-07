@@ -26,7 +26,7 @@ const {
 const {
   generateDynamicGreeting,
   pickContextualAck,
-  isNonSubstantiveTurn,
+  shouldSkipCallerTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { pickTtsLanguage } = require('./src/speech/ttsNormalize');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
@@ -850,8 +850,8 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
 
-    // Skip "Okay." / "Hello?" / "Uh, yeah" — do not spend Gemini latency on noise.
-    if (isBackchannel(clean) || isNonSubstantiveTurn(clean)) {
+    // Skip pure noise, but keep yes/no and short names when the agent just asked.
+    if (shouldSkipCallerTurn(clean, { lastAgentText })) {
       console.log(`[ws/media][${sidLabel()}] skip non-substantive turn: ${clean}`);
       return;
     }
@@ -1525,9 +1525,16 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   const spokenText = parsed.spokenText || AI_FALLBACK_LINE;
   const shouldEndCall = parsed.shouldEndCall;
 
-  if (parsed.name && parsed.reason) {
-    await db.saveCallerInfo({ callSid, name: parsed.name, reason: parsed.reason });
-    maybeSendWhatsAppNotification(callSid);
+  if (parsed.name || parsed.reason) {
+    // Partial updates allowed so a name correction can overwrite without re-sending reason.
+    const saved = await db.saveCallerInfo({
+      callSid,
+      name: parsed.name || undefined,
+      reason: parsed.reason || undefined,
+    });
+    if (saved?.name && saved?.reason) {
+      maybeSendWhatsAppNotification(callSid);
+    }
   }
 
   messages.push({ role: 'assistant', content: spokenText });

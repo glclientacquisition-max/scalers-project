@@ -158,8 +158,13 @@ async function saveCallerInfo({ callSid, name, reason }) {
   }
 
   const meta = parseSummary(existing.summary);
-  meta.name = name;
-  meta.reason = reason;
+  // Merge partial updates so a corrected name can overwrite without clearing reason.
+  if (name != null && String(name).trim()) {
+    meta.name = String(name).trim();
+  }
+  if (reason != null && String(reason).trim()) {
+    meta.reason = String(reason).trim();
+  }
 
   const { data, error } = await supabase
     .from('calls')
