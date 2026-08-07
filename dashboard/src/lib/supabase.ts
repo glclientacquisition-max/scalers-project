@@ -64,6 +64,15 @@ export type FaqEntry = {
   answer: string;
 };
 
+export type HoursScheduleRow = {
+  timezone?: string;
+  location?: string;
+  days?: Record<
+    string,
+    { open: string; close: string } | null | undefined
+  >;
+};
+
 export type TenantRow = {
   id: string;
   business_name: string;
@@ -72,6 +81,7 @@ export type TenantRow = {
   llm_system_prompt: string | null;
   services_offered?: string | null;
   business_hours?: string | null;
+  hours_schedule?: HoursScheduleRow | null;
   agent_name?: string | null;
   agent_tone?: string | null;
   team_directory?: TeamDirectoryEntry[] | null;

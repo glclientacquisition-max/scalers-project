@@ -5,6 +5,11 @@ const {
   tenantLanguagePolicy,
   formatVoiceLanguagesLine,
 } = require('./conversation/languageOptions');
+const {
+  formatEatNowLabel,
+  openClosedStatus,
+  formatScheduleSummary,
+} = require('./conversation/businessHours');
 
 const DEFAULT_KNOWLEDGE = `Business: Jirani Home Services (Nairobi & environs)
 What we do: home repairs and maintenance for homes and small offices.
@@ -29,18 +34,64 @@ const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and
 - Prefer simple everyday words that are easy to pronounce on a phone.
 - Never invent prices, availability, or guarantees. If unknown, say the team will follow up.`;
 
+/**
+ * Live per-call header — highest priority over the compiled prompt.
+ * Injects clock, identity, open/closed, and mood adaptation.
+ */
+function buildContextHeader(profile = {}) {
+  const agentName =
+    String(profile.agentName || process.env.AGENT_NAME || 'Receptionist').trim() ||
+    'Receptionist';
+  const businessName =
+    profile.businessName || process.env.BUSINESS_NAME || 'the business';
+  const nowLabel = formatEatNowLabel(new Date());
+  const status = openClosedStatus(profile.hoursSchedule);
+  const scheduleSummary = formatScheduleSummary(profile.hoursSchedule);
+
+  let statusBlock;
+  if (status === 'open') {
+    statusBlock = `BUSINESS STATUS: OPEN now.
+If asked whether you are open, say yes. Help normally.`;
+  } else if (status === 'closed') {
+    statusBlock = `BUSINESS STATUS: CLOSED now.
+Tell the caller you are closed, offer to take a message / note their request for callback, and still capture name + reason.
+Do not promise same-day service unless the business knowledge explicitly allows after-hours emergencies.`;
+  } else {
+    statusBlock = `BUSINESS STATUS: unknown (no structured weekly hours on file).
+Follow hours from BUSINESS KNOWLEDGE if present; do not invent open/closed times.`;
+  }
+
+  const hoursLine = scheduleSummary
+    ? `STRUCTURED HOURS: ${scheduleSummary}`
+    : profile.businessHours
+      ? `HOURS NOTES: ${String(profile.businessHours).trim()}`
+      : 'STRUCTURED HOURS: not set';
+
+  return `CONTEXT HEADER (live — highest priority on this call):
+CURRENT TIME IN KENYA: ${nowLabel}
+YOUR NAME: ${agentName}
+BUSINESS: ${businessName}
+${hoursLine}
+${statusBlock}
+IDENTITY: You are ${agentName}. On the first turn (if not already greeted), introduce yourself naturally as ${agentName}.
+MOOD: Listen to the caller's tone. If they are frustrated or angry, be empathetic and concise. Do not use cheerful filler words if the user is angry.`;
+}
+
 /** Static fallback only — live calls use generateDynamicGreeting() instead. */
-function buildGreeting(businessName) {
+function buildGreeting(businessName, opts = {}) {
   const { fallbackGreeting } = require('./conversation/dynamicSpeech');
   if (process.env.VOICE_GREETING) return process.env.VOICE_GREETING;
-  return fallbackGreeting(businessName);
+  return fallbackGreeting(businessName, opts);
 }
 
 /**
  * @param {object} [profile]
  * @param {string} [profile.businessName]
+ * @param {string} [profile.agentName]
  * @param {string} [profile.llmSystemPrompt]  full override from tenants.llm_system_prompt
  * @param {string} [profile.knowledge]       facts block (env or default)
+ * @param {object} [profile.hoursSchedule]
+ * @param {string} [profile.businessHours]
  */
 function buildSystemPrompt(profile = {}) {
   const businessName =
@@ -51,10 +102,13 @@ function buildSystemPrompt(profile = {}) {
     DEFAULT_KNOWLEDGE;
   const languagePolicy = tenantLanguagePolicy();
   const languageLine = formatVoiceLanguagesLine();
+  const header = buildContextHeader(profile);
 
-  // Tenant-provided full prompt wins, but we still append the tool/end markers contract.
+  // Tenant-provided full prompt wins, but we still prepend live context + append tools.
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
-    return `${String(profile.llmSystemPrompt).trim()}
+    return `${header}
+
+${String(profile.llmSystemPrompt).trim()}
 
 ${CONVERSATION_RULES}
 
@@ -68,7 +122,12 @@ If the call should end after goodbye, also append: ###ENDCALL###
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
   }
 
-  return `You are the live phone receptionist for ${businessName} in Kenya.
+  const agentName =
+    String(profile.agentName || 'Receptionist').trim() || 'Receptionist';
+
+  return `${header}
+
+You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
 
 BUSINESS KNOWLEDGE (use this — do not invent facts outside it):
 ${knowledge}
@@ -100,6 +159,7 @@ Do not include any other JSON or markup in your spoken response. Never read the 
 module.exports = {
   buildSystemPrompt,
   buildGreeting,
+  buildContextHeader,
   DEFAULT_KNOWLEDGE,
   CONVERSATION_RULES,
 };

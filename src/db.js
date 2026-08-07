@@ -428,13 +428,25 @@ async function attachRecording({
 
 async function getTenantById(tenantId) {
   if (!tenantId) return null;
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
+
+  // Older DBs may lack KA columns — retry a narrower select.
+  if (error && /hours_schedule|agent_name|agent_tone|business_hours|column/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
+
   throwIfError('getTenantById', error);
   return data || null;
 }
@@ -459,18 +471,26 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     return {
       id: resolvedId,
       businessName: process.env.BUSINESS_NAME || 'the business',
+      agentName: process.env.AGENT_NAME || 'Receptionist',
       llmSystemPrompt: null,
       knowledge: process.env.BUSINESS_KNOWLEDGE || null,
+      hoursSchedule: null,
+      businessHours: null,
+      agentTone: null,
     };
   }
 
   return {
     id: row.id,
     businessName: row.business_name,
+    agentName: row.agent_name || 'Receptionist',
+    agentTone: row.agent_tone || null,
     llmSystemPrompt: row.llm_system_prompt || null,
     knowledge: process.env.BUSINESS_KNOWLEDGE || null,
     whatsappNumber: row.whatsapp_notification_number || null,
     did: row.sautikit_virtual_number || null,
+    hoursSchedule: row.hours_schedule || null,
+    businessHours: row.business_hours || null,
   };
 }
 

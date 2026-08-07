@@ -14,6 +14,7 @@ const {
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
+const { openClosedStatus } = require('./src/conversation/businessHours');
 const {
   detectCallerLanguage,
   resolveCallLanguage,
@@ -696,12 +697,16 @@ mediaWss.on('connection', (ws, req) => {
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
   let systemPrompt = buildSystemPrompt();
-  let greetingLine = buildGreeting();
+  let greetingLine = buildGreeting(process.env.BUSINESS_NAME || 'the business');
   let businessName = process.env.BUSINESS_NAME || 'the business';
+  let agentName = process.env.AGENT_NAME || 'Receptionist';
+  let hoursSchedule = null;
+  let openStatus = 'unknown';
   let messages = [{ role: 'system', content: systemPrompt }];
   const transcriptLog = [];
   let greetingStarted = false;
   let profileLoaded = false;
+  let profileCallSid = null;
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
   let callLanguage = 'unknown';
   let fillerUsedThisCall = false;
@@ -709,18 +714,27 @@ mediaWss.on('connection', (ws, req) => {
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
 
   async function ensureTenantPrompt() {
-    if (profileLoaded) return;
-    profileLoaded = true;
+    if (profileLoaded && profileCallSid === sessionCallSid) return;
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
       businessName = profile.businessName || businessName;
+      agentName = profile.agentName || agentName;
+      hoursSchedule = profile.hoursSchedule || null;
+      openStatus = openClosedStatus(hoursSchedule);
       systemPrompt = buildSystemPrompt(profile);
-      greetingLine = buildGreeting(businessName);
+      greetingLine = buildGreeting(businessName, {
+        agentName,
+        isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
+      });
       messages = [{ role: 'system', content: systemPrompt }];
+      profileLoaded = true;
+      profileCallSid = sessionCallSid;
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
       );
     } catch (err) {
+      profileLoaded = true;
+      profileCallSid = sessionCallSid;
       console.warn(
         `[ws/media][${sidLabel()}] tenant prompt load failed, using defaults:`,
         err?.message || err
@@ -1066,12 +1080,14 @@ mediaWss.on('connection', (ws, req) => {
       // Set VOICE_GREETING_MODE=gemini only if you want an LLM-written opener.
       greetingLine = await generateDynamicGreeting({
         businessName,
+        agentName,
+        isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         callSid: sidLabel(),
         generateText: generateGeminiText,
         mode: process.env.VOICE_GREETING_MODE || 'instant',
       });
       console.log(
-        `[ws/media][${sidLabel()}] greeting mode=${process.env.VOICE_GREETING_MODE || 'instant'}: ${greetingLine}`
+        `[ws/media][${sidLabel()}] greeting mode=${process.env.VOICE_GREETING_MODE || 'instant'} agent=${agentName} open=${openStatus}: ${greetingLine}`
       );
 
       await speakText(greetingLine);
@@ -1080,7 +1096,10 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
       try {
-        const fallback = buildGreeting(businessName);
+        const fallback = buildGreeting(businessName, {
+          agentName,
+          isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
+        });
         await speakText(fallback);
         messages.push({ role: 'assistant', content: fallback });
       } catch {
