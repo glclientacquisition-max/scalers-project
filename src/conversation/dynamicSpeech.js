@@ -26,6 +26,31 @@ function fallbackGreeting(businessName, opts = {}) {
     String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
       ? 'message'
       : 'serve';
+  const closureNotice = String(opts.closureNotice || '').trim();
+
+  // Today's update says closed — greet with that fact (not the expiry clock).
+  if (closureNotice) {
+    const short =
+      closureNotice.length > 90
+        ? `${closureNotice.slice(0, 87).trim()}...`
+        : closureNotice;
+    const options = {
+      morning: [
+        `Good morning, you've reached ${name}, this is ${agent}. ${short}`,
+        `Habari ya asubuhi, ${name}, ${agent} speaking. ${short}`,
+      ],
+      afternoon: [
+        `Hello, you've reached ${name}, this is ${agent}. ${short}`,
+        `Habari, ${name}, ${agent} speaking. ${short}`,
+      ],
+      evening: [
+        `Good evening, you've reached ${name}, this is ${agent}. ${short}`,
+        `Habari ya jioni, ${name}, ${agent} speaking. ${short}`,
+      ],
+    };
+    const list = options[tod] || options.afternoon;
+    return list[Math.floor(Math.random() * list.length)];
+  }
 
   if (closed && afterHoursMode === 'message') {
     const closedOptions = {
@@ -130,10 +155,12 @@ async function generateDynamicGreeting(opts) {
     String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
       ? 'message'
       : 'serve';
+  const closureNotice = String(opts.closureNotice || '').trim();
   const instant = fallbackGreeting(businessName, {
     agentName,
     isOpen,
     afterHoursMode,
+    closureNotice,
   });
   if (mode !== 'gemini') return instant;
 
