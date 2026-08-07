@@ -18,6 +18,13 @@ import {
   type AfterHoursMode,
 } from "@/lib/afterHours";
 import {
+  emptyService,
+  extractServicesNotes,
+  formatServicesForCompiler,
+  normalizeServicesCatalog,
+  type ServiceItem,
+} from "@/lib/servicesCatalog";
+import {
   saveAndCompileSettings,
   type SettingsCompileState,
 } from "@/app/(desk)/settings/actions";
@@ -101,7 +108,13 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
     tenant.whatsapp_notification_number || ""
   );
-  const [servicesOffered, setServicesOffered] = useState(tenant.services_offered || "");
+  const [servicesNotes, setServicesNotes] = useState(() =>
+    extractServicesNotes(tenant.services_offered || "")
+  );
+  const [services, setServices] = useState<ServiceItem[]>(() => {
+    const rows = normalizeServicesCatalog(tenant.services_catalog);
+    return rows.length ? rows : [emptyService()];
+  });
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
@@ -143,6 +156,14 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       ),
     [faqs]
   );
+  const servicesJson = useMemo(
+    () => JSON.stringify(services.filter((s) => s.name.trim())),
+    [services]
+  );
+  const servicesOfferedSummary = useMemo(
+    () => formatServicesForCompiler(services, servicesNotes),
+    [services, servicesNotes]
+  );
   const hoursScheduleJson = useMemo(
     () =>
       JSON.stringify({
@@ -182,6 +203,12 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     );
   }
 
+  function updateService(index: number, key: keyof ServiceItem, value: string) {
+    setServices((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+    );
+  }
+
   function setDayOpen(day: DayKey, open: boolean) {
     setHoursSchedule((prev) => ({
       ...prev,
@@ -210,7 +237,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
-      <input type="hidden" name="services_offered" value={servicesOffered} />
+      <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
+      <input type="hidden" name="services_catalog" value={servicesJson} />
+      <input type="hidden" name="services_notes" value={servicesNotes} />
       <input type="hidden" name="business_hours" value={businessHoursSummary} />
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
       <input type="hidden" name="location_notes" value={locationNotes} />
@@ -309,18 +338,110 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium" htmlFor="services_offered">
-            Services &amp; pricing
-          </label>
-          <textarea
-            id="services_offered"
-            value={servicesOffered}
-            onChange={(e) => setServicesOffered(e.target.value)}
-            rows={6}
-            placeholder="What you offer and how pricing works…"
-            className={`${fieldClass} leading-relaxed`}
-          />
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ink)]">Services catalog</h3>
+              <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                Loaded live on every call as ground truth. Prefer clear prices and out-of-scope notes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setServices((prev) => [...prev, emptyService()])}
+              className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
+            >
+              Add service
+            </button>
+          </div>
+
+          <div className="space-y-5">
+            {services.map((service, index) => (
+              <div key={`service-${index}`} className="space-y-3 border-b border-[var(--line)] pb-5 last:border-b-0 last:pb-0">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                    Service {index + 1}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setServices((prev) =>
+                        prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
+                      )
+                    }
+                    className="text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                    aria-label={`Remove service ${index + 1}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-name-${index}`}>
+                      Service name
+                    </label>
+                    <input
+                      id={`svc-name-${index}`}
+                      value={service.name}
+                      onChange={(e) => updateService(index, "name", e.target.value)}
+                      placeholder="Home cleaning"
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-price-${index}`}>
+                      Price range
+                    </label>
+                    <input
+                      id={`svc-price-${index}`}
+                      value={service.price_range}
+                      onChange={(e) => updateService(index, "price_range", e.target.value)}
+                      placeholder="from 2,500 KES"
+                      className={fieldClass}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-notes-${index}`}>
+                    Notes / requirements
+                  </label>
+                  <input
+                    id={`svc-notes-${index}`}
+                    value={service.notes}
+                    onChange={(e) => updateService(index, "notes", e.target.value)}
+                    placeholder="2-bedroom homes, Nairobi only"
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-oos-${index}`}>
+                    Out of scope
+                  </label>
+                  <input
+                    id={`svc-oos-${index}`}
+                    value={service.out_of_scope}
+                    onChange={(e) => updateService(index, "out_of_scope", e.target.value)}
+                    placeholder="No commercial offices"
+                    className={fieldClass}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium" htmlFor="services_notes">
+              Additional service notes (optional)
+            </label>
+            <textarea
+              id="services_notes"
+              value={servicesNotes}
+              onChange={(e) => setServicesNotes(e.target.value)}
+              rows={3}
+              placeholder="Payment, deposits, or other details that do not fit a single service row…"
+              className={`${fieldClass} leading-relaxed`}
+            />
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -536,7 +657,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               Golden FAQs
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              Short answers the receptionist should treat as ground truth.
+              Loaded live on every call. The receptionist must answer these exactly when asked.
             </p>
           </div>
           <button

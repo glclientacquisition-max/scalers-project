@@ -64,6 +64,13 @@ export type FaqEntry = {
   answer: string;
 };
 
+export type ServiceCatalogEntry = {
+  name: string;
+  price_range: string;
+  notes: string;
+  out_of_scope: string;
+};
+
 export type HoursScheduleRow = {
   timezone?: string;
   location?: string;
@@ -80,6 +87,7 @@ export type TenantRow = {
   whatsapp_notification_number: string;
   llm_system_prompt: string | null;
   services_offered?: string | null;
+  services_catalog?: ServiceCatalogEntry[] | null;
   business_hours?: string | null;
   hours_schedule?: HoursScheduleRow | null;
   after_hours_mode?: "serve" | "message" | null;

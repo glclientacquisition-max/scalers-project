@@ -10,6 +10,7 @@ const {
   openClosedStatus,
   formatScheduleSummary,
 } = require('./conversation/businessHours');
+const { buildLiveGroundTruth } = require('./conversation/liveKnowledge');
 
 const DEFAULT_KNOWLEDGE = `Business: Jirani Home Services (Nairobi & environs)
 What we do: home repairs and maintenance for homes and small offices.
@@ -115,11 +116,13 @@ function buildSystemPrompt(profile = {}) {
   const languagePolicy = tenantLanguagePolicy();
   const languageLine = formatVoiceLanguagesLine();
   const header = buildContextHeader(profile);
+  const liveTruth = buildLiveGroundTruth(profile);
+  const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
 
-  // Tenant-provided full prompt wins, but we still prepend live context + append tools.
+  // Tenant-provided full prompt wins, but we still prepend live context + ground truth.
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
     return `${header}
-
+${liveBlock}
 ${String(profile.llmSystemPrompt).trim()}
 
 ${CONVERSATION_RULES}
@@ -138,7 +141,7 @@ Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
     String(profile.agentName || 'Receptionist').trim() || 'Receptionist';
 
   return `${header}
-
+${liveBlock}
 You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
 
 BUSINESS KNOWLEDGE (use this — do not invent facts outside it):
@@ -147,7 +150,7 @@ ${knowledge}
 Languages (automatic): ${languageLine}
 
 Your job on this call:
-1. Answer the caller's questions using ONLY the business knowledge above.
+1. Answer the caller's questions using ONLY the live ground truth and business knowledge above.
    If something is unknown (exact price, availability, custom request), say you'll note it and the team will follow up — never invent prices or guarantees.
 2. Get the caller's name.
 3. Get a short reason for their call / what they need.
