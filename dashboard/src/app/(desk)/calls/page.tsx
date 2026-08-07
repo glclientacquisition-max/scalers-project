@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getSupabaseAdmin, parseSummary, type CallRow } from "@/lib/supabase";
-import { getCurrentTenant } from "@/lib/tenant";
+import { parseSummary, type CallRow } from "@/lib/supabase";
+import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 function formatWhen(iso: string) {
   try {
@@ -28,8 +28,17 @@ export default async function CallsPage() {
     );
   }
 
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return (
+      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
+        Not signed in.
+      </div>
+    );
+  }
+
+  // Owner: JWT + RLS. Legacy Super Admin desk: service role (bypasses RLS).
+  const { data, error } = await workspace.client
     .from("calls")
     .select(
       "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment"
@@ -42,6 +51,11 @@ export default async function CallsPage() {
     return (
       <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
         Could not load calls: {error.message}
+        {/row-level security|permission denied|rls/i.test(error.message) ? (
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            Apply docs/supabase/owner_rls.sql in Supabase if you have not yet.
+          </p>
+        ) : null}
       </div>
     );
   }

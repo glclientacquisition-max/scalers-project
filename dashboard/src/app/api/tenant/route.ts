@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase";
-import { isAuthenticated } from "@/lib/auth";
-import { getCurrentTenant } from "@/lib/tenant";
+import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
+import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   if (!(await isAuthenticated())) {
@@ -26,8 +25,13 @@ export async function POST(request: Request) {
     patch.llm_system_prompt = body.llm_system_prompt;
   }
 
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  // Owners update via JWT + RLS. Legacy Super Admin desk keeps service role.
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const { data, error } = await workspace.client
     .from("tenants")
     .update(patch)
     .eq("id", id)
@@ -35,7 +39,12 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const hint =
+      /row-level security|permission denied|rls/i.test(error.message) &&
+      !(await isLegacyAuthenticated())
+        ? " Apply docs/supabase/owner_rls.sql in Supabase."
+        : "";
+    return NextResponse.json({ error: `${error.message}${hint}` }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, tenant: data });
+  return NextResponse.json({ ok: true, tenant: data, mode: workspace.mode });
 }

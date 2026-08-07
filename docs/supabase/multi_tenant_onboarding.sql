@@ -140,7 +140,7 @@ create trigger on_auth_user_created_provision_tenant
   execute function public.handle_new_user_tenant();
 
 -- ---------------------------------------------------------------------------
--- 4. RLS helpers (Phase B foundation — enable when ready to drop service-role reads)
+-- 4. RLS helpers (foundation — full Sprint 1 policies: docs/supabase/owner_rls.sql)
 -- ---------------------------------------------------------------------------
 alter table public.tenant_members enable row level security;
 
@@ -163,13 +163,5 @@ create policy tenant_members_select_own
   to authenticated
   using (user_id = auth.uid());
 
--- Example tenant isolation (uncomment when dashboard uses the anon key + user JWT):
--- alter table public.tenants enable row level security;
--- create policy tenants_select_member on public.tenants
---   for select to authenticated
---   using (id in (select public.current_user_tenant_ids()));
---
--- alter table public.calls enable row level security;
--- create policy calls_select_member on public.calls
---   for select to authenticated
---   using (tenant_id in (select public.current_user_tenant_ids()));
+-- Apply docs/supabase/owner_rls.sql for tenants / calls / transcripts policies.
+-- Owners use Auth JWT + anon key; voice engine + Super Admin keep service_role.

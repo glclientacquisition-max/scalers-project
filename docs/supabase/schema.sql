@@ -54,6 +54,11 @@
 
 -- Storage bucket: call-recordings (private)
 
+-- Owner RLS (Sprint 1) — apply docs/supabase/owner_rls.sql
+--   Enables RLS on tenant_members, tenants, calls, transcripts.
+--   Owners SELECT/UPDATE via auth.uid() membership in tenant_members.
+--   service_role (voice engine + Super Admin + signup provisioner) bypasses RLS.
+
 -- Optional seed for single-tenant / smoke tests:
 -- insert into public.tenants (
 --   business_name, sautikit_virtual_number, whatsapp_notification_number, is_active
