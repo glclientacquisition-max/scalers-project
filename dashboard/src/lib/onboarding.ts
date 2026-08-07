@@ -1,11 +1,26 @@
 import { defaultTenantLlmPrompt } from "@/lib/prompts";
 
-export type OnboardingTone = "professional" | "friendly" | "localized";
+export type OnboardingTone =
+  | "professional"
+  | "friendly"
+  | "empathetic"
+  | "localized";
 
 export type OnboardingAnswers = {
   servicesPricing: string;
   hoursLocation: string;
   tone: OnboardingTone;
+};
+
+export type TeamMember = {
+  name: string;
+  role: string;
+  phone: string;
+};
+
+export type FaqItem = {
+  question: string;
+  answer: string;
 };
 
 /** True when the tenant still has a blank or signup-default receptionist prompt. */
@@ -45,25 +60,81 @@ export function tenantNeedsOnboarding(tenant: {
 export const TONE_LABELS: Record<OnboardingTone, string> = {
   professional: "Professional",
   friendly: "Friendly",
+  empathetic: "Empathetic",
   localized: "Localized / Sheng",
+};
+
+function toneGuidance(tone: OnboardingTone): string {
+  switch (tone) {
+    case "professional":
+      return "Tone: calm, clear, and professional. Warm but concise.";
+    case "friendly":
+      return "Tone: warm and approachable, like a helpful Kenyan receptionist.";
+    case "empathetic":
+      return "Tone: empathetic and steady. Acknowledge frustration first, then help. Skip cheerful filler when the caller is upset.";
+    case "localized":
+      return "Tone: natural Kenyan receptionist. Light Sheng is fine when the caller uses it; stay clear and respectful.";
+  }
+}
+
+function formatTeamDirectory(members: TeamMember[]): string {
+  const rows = members
+    .map((m) => {
+      const name = m.name.trim();
+      const role = m.role.trim();
+      const phone = m.phone.trim();
+      if (!name && !role && !phone) return "";
+      return `- ${name || "Team member"}${role ? ` (${role})` : ""}${
+        phone ? `; phone ${phone}` : ""
+      }`;
+    })
+    .filter(Boolean);
+  return rows.length ? rows.join("\n") : "(none listed)";
+}
+
+function formatFaqs(faqs: FaqItem[]): string {
+  const rows = faqs
+    .map((f) => {
+      const q = f.question.trim();
+      const a = f.answer.trim();
+      if (!q || !a) return "";
+      return `Q: ${q}\nA: ${a}`;
+    })
+    .filter(Boolean);
+  return rows.length ? rows.join("\n\n") : "(none listed)";
+}
+
+export type CompileExtras = {
+  agentName?: string;
+  teamDirectory?: TeamMember[];
+  faqs?: FaqItem[];
+  unknownAnswerFallback?: string;
 };
 
 /** Deterministic fallback if Gemini is unavailable. */
 export function compilePromptLocally(
   businessName: string,
   answers: OnboardingAnswers,
-  unknownAnswerFallback?: string
+  extras: CompileExtras | string = {}
 ): string {
-  const name = businessName.trim() || "the business";
-  const unknownLine = (unknownAnswerFallback || "").trim();
-  const toneLine =
-    answers.tone === "professional"
-      ? "Tone: calm, clear, and professional — warm but concise."
-      : answers.tone === "friendly"
-        ? "Tone: warm and approachable, like a helpful Kenyan receptionist."
-        : "Tone: natural Kenyan receptionist — light Sheng is fine when the caller uses it; stay clear and respectful.";
+  // Back-compat: older callers passed unknown fallback as a third string.
+  const opts: CompileExtras =
+    typeof extras === "string" ? { unknownAnswerFallback: extras } : extras;
 
-  return `You are the live phone receptionist for ${name} in Kenya.
+  const name = businessName.trim() || "the business";
+  const agentName = (opts.agentName || "Receptionist").trim() || "Receptionist";
+  const unknownLine = (opts.unknownAnswerFallback || "").trim();
+  const team = opts.teamDirectory || [];
+  const faqs = opts.faqs || [];
+  const teamBlock = formatTeamDirectory(team);
+  const faqBlock = formatFaqs(faqs);
+
+  return `You are ${agentName}, the live phone receptionist for ${name} in Kenya.
+
+IDENTITY:
+- Your name is ${agentName}. Introduce yourself naturally on the first turn (e.g. "Hello, you've reached ${name}, this is ${agentName} speaking.").
+- ${toneGuidance(answers.tone)}
+- Listen to the caller's mood. If they sound frustrated or angry, drop cheerful filler immediately and stay empathetic and concise.
 
 BUSINESS KNOWLEDGE:
 - Business name: ${name}
@@ -72,10 +143,16 @@ ${answers.servicesPricing.trim()}
 - Hours & location:
 ${answers.hoursLocation.trim()}
 - Languages: English, Kiswahili, and Sheng (automatic — match the caller)
-- ${toneLine}
+
+GOLDEN FAQs (authoritative — answer these exactly when asked):
+${faqBlock}
+
+TEAM DIRECTORY (escalation — you are the receptionist, not the expert):
+${teamBlock}
+- If a caller is angry, asks for a refund, billing help, or a named role above, acknowledge the issue, say the right teammate will follow up (WhatsApp/call), and capture name + reason. Do not invent transfers you cannot perform.
 
 Your job on this call:
-1. Answer using ONLY the business knowledge above.${
+1. Answer using ONLY the business knowledge and golden FAQs above.${
     unknownLine
       ? ` If a caller asks for something we do not offer, say: "${unknownLine}" (adapt to the caller's language).`
       : " If unknown, say the team will follow up."
@@ -89,5 +166,5 @@ Conversation rules (live phone — be conclusive and intelligent):
 - Ask at most ONE clarifying question per turn.
 - Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.
 - Keep every spoken reply to 1–2 short sentences.
-- Never invent prices, availability, or guarantees outside the knowledge above.`;
+- Never invent prices, availability, team members, or guarantees outside the knowledge above.`;
 }

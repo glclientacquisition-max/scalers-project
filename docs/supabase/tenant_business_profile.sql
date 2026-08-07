@@ -19,4 +19,4 @@ comment on column public.tenants.business_hours is
 comment on column public.tenants.services_offered is
   'Owner-facing services and pricing; compiled into llm_system_prompt';
 comment on column public.tenants.agent_tone is
-  'Owner tone preference: professional | friendly | localized';
+  'Owner tone preference: professional | friendly | empathetic | localized';
