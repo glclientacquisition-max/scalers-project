@@ -5,7 +5,14 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TENANT_SELECT =
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, services_offered, business_hours, agent_tone, is_active";
+
+const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
+
+function isMissingProfileColumnError(message: string): boolean {
+  return /business_hours|services_offered|agent_tone|column/i.test(message);
+}
 
 /**
  * Workspace data client:
@@ -44,11 +51,19 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
     if (memErr) throw memErr;
     if (!membership?.tenant_id) return null;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("tenants")
       .select(TENANT_SELECT)
       .eq("id", membership.tenant_id)
       .maybeSingle();
+
+    if (error && isMissingProfileColumnError(error.message)) {
+      ({ data, error } = await supabase
+        .from("tenants")
+        .select(TENANT_SELECT_LEGACY)
+        .eq("id", membership.tenant_id)
+        .maybeSingle());
+    }
 
     if (error) throw error;
     return (data as TenantRow) || null;
@@ -57,13 +72,24 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
   // Legacy shared-password desk: first active tenant (ops/demo). Service role.
   if (await isLegacyAuthenticated()) {
     const admin = getSupabaseAdmin();
-    const { data, error } = await admin
+    let { data, error } = await admin
       .from("tenants")
       .select(TENANT_SELECT)
       .eq("is_active", true)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
+
+    if (error && isMissingProfileColumnError(error.message)) {
+      ({ data, error } = await admin
+        .from("tenants")
+        .select(TENANT_SELECT_LEGACY)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle());
+    }
+
     if (error) throw error;
     return (data as TenantRow) || null;
   }

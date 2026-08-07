@@ -52,6 +52,9 @@ export type TenantRow = {
   sautikit_virtual_number: string;
   whatsapp_notification_number: string;
   llm_system_prompt: string | null;
+  services_offered?: string | null;
+  business_hours?: string | null;
+  agent_tone?: string | null;
   is_active: boolean | null;
 };
 

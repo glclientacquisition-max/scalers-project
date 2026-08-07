@@ -33,7 +33,7 @@ export default async function SettingsPage() {
     <div className="max-w-3xl">
       <h1 className="font-display text-4xl tracking-tight">Business</h1>
       <p className="mt-2 text-[var(--ink-soft)]">
-        Update how the phone receptionist introduces itself and what it knows.
+        Edit what callers hear about — we compile it into the live AI receptionist prompt.
       </p>
 
       <div className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">

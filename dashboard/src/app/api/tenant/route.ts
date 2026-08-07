@@ -16,13 +16,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  // Raw llm_system_prompt edits are disabled — use saveAndCompileSettings /
+  // onboarding so Gemini compiles structured fields into the voice prompt.
   const patch: Record<string, unknown> = {};
   if (typeof body.business_name === "string") patch.business_name = body.business_name.trim();
   if (typeof body.whatsapp_notification_number === "string") {
     patch.whatsapp_notification_number = body.whatsapp_notification_number.trim();
   }
-  if (typeof body.llm_system_prompt === "string") {
-    patch.llm_system_prompt = body.llm_system_prompt;
+  if (typeof body.services_offered === "string") {
+    patch.services_offered = body.services_offered.trim();
+  }
+  if (typeof body.business_hours === "string") {
+    patch.business_hours = body.business_hours.trim();
+  }
+  if (typeof body.agent_tone === "string") {
+    patch.agent_tone = body.agent_tone.trim();
   }
 
   // Owners update via JWT + RLS. Legacy Super Admin desk keeps service role.

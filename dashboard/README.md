@@ -9,11 +9,13 @@ Next.js app for reviewing missed-call leads and editing business receptionist kn
    (creates `tenant_members`, default prompt helper, Auth → tenant trigger)
 2. Apply `docs/supabase/owner_rls.sql`  
    (RLS on tenants / calls / transcripts / tenant_members — owners isolated by membership)
-3. Apply `docs/supabase/voice_languages.sql`  
+3. Apply `docs/supabase/tenant_business_profile.sql`  
+   (structured hours / services / tone for the AI Prompt Compiler)
+4. Apply `docs/supabase/voice_languages.sql`  
    (automatic English / Kiswahili / Sheng — no user picker; locals later)
-4. In Supabase Auth settings, enable **Email** provider. For local demos you can disable “Confirm email”.
-5. Set dashboard env vars (anon + service role).
-6. Open `/signup` to create a workspace (email, password, business name, notification phone).
+5. In Supabase Auth settings, enable **Email** provider. For local demos you can disable “Confirm email”.
+6. Set dashboard env vars (anon + service role + optional `GEMINI_API_KEY`).
+7. Open `/signup` to create a workspace (email, password, business name, notification phone).
 
 The Auth trigger provisions a `tenants` row + `tenant_members` mapping. The signup Server Action also calls a service-role fallback if the trigger has not been applied yet.
 
@@ -33,6 +35,12 @@ New owners with a blank/default `llm_system_prompt` are redirected to `/onboardi
 (services & pricing → hours & location → tone). A server action compiles the answers
 with Gemini (`GEMINI_API_KEY`) into `tenants.llm_system_prompt`, then opens `/calls`.
 Without a Gemini key, a local template is saved instead.
+
+### AI Prompt Compiler (settings)
+
+1. Apply `docs/supabase/tenant_business_profile.sql` (adds `business_hours`, `services_offered`, `agent_tone`).
+2. `/settings` edits those structured fields only — no raw prompt textarea.
+3. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
 
 ### Phase C — DID pool
 

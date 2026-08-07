@@ -7,7 +7,10 @@
 --   business_name text NOT NULL
 --   sautikit_virtual_number text NOT NULL  (pending:<auth_user_id> until DID pool assign)
 --   whatsapp_notification_number text NOT NULL
---   llm_system_prompt text
+--   llm_system_prompt text  (compiled for voice engine — not edited raw in Desk)
+--   business_hours text     (owner-facing; see tenant_business_profile.sql)
+--   services_offered text   (owner-facing)
+--   agent_tone text         (professional | friendly | localized)
 --   voice_languages text[]  (auto: en, sw, sheng — see voice_languages.sql; locals later)
 --   voice_language_other text  (reserved)
 --   telecom_wallet_balance_kes numeric
