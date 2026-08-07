@@ -22,6 +22,7 @@ import {
   extractServicesNotes,
   formatServicesForCompiler,
   normalizeServicesCatalog,
+  parseBulkServices,
   type ServiceItem,
 } from "@/lib/servicesCatalog";
 import {
@@ -115,6 +116,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     const rows = normalizeServicesCatalog(tenant.services_catalog);
     return rows.length ? rows : [emptyService()];
   });
+  const [showBulkServices, setShowBulkServices] = useState(false);
+  const [bulkServicesText, setBulkServicesText] = useState("");
+  const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
@@ -207,6 +211,23 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     setServices((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
     );
+  }
+
+  function applyBulkServices() {
+    const parsed = parseBulkServices(bulkServicesText);
+    if (!parsed.length) {
+      setBulkServicesError(
+        "Paste at least one line. Format: name | price | notes | out of scope"
+      );
+      return;
+    }
+    setServices((prev) => {
+      const existing = prev.filter((s) => s.name.trim());
+      return [...existing, ...parsed];
+    });
+    setBulkServicesText("");
+    setBulkServicesError(null);
+    setShowBulkServices(false);
   }
 
   function setDayOpen(day: DayKey, open: boolean) {
@@ -346,14 +367,64 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 Loaded live on every call as ground truth. Prefer clear prices and out-of-scope notes.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setServices((prev) => [...prev, emptyService()])}
-              className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
-            >
-              Add service
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setServices((prev) => [...prev, emptyService()])}
+                className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
+              >
+                Add service
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkServices((v) => !v);
+                  setBulkServicesError(null);
+                }}
+                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:border-[#0096FF]/50"
+              >
+                {showBulkServices ? "Hide bulk add" : "Add many"}
+              </button>
+            </div>
           </div>
+
+          {showBulkServices ? (
+            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
+              <label className="block text-sm font-medium" htmlFor="bulk_services">
+                Paste multiple services
+              </label>
+              <p className="text-xs text-[var(--ink-soft)]">
+                One service per line. Optional columns separated by{" "}
+                <span className="font-medium text-[var(--ink)]">|</span>: name | price | notes |
+                out of scope
+              </p>
+              <textarea
+                id="bulk_services"
+                value={bulkServicesText}
+                onChange={(e) => {
+                  setBulkServicesText(e.target.value);
+                  if (bulkServicesError) setBulkServicesError(null);
+                }}
+                rows={6}
+                placeholder={
+                  "Home cleaning | from 2,500 KES | Nairobi only | No offices\nPlumbing | quote after visit\nElectrical | from 1,500 KES"
+                }
+                className={`${fieldClass} font-mono text-sm leading-relaxed`}
+              />
+              {bulkServicesError ? (
+                <p className="text-sm text-[var(--warn)]" role="alert">
+                  {bulkServicesError}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={applyBulkServices}
+                className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+              >
+                Add pasted services
+              </button>
+            </div>
+          ) : null}
 
           <div className="space-y-5">
             {services.map((service, index) => (
