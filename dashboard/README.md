@@ -101,6 +101,8 @@ Open http://localhost:3000 (or the port Next prints).
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only: Super Admin, DID pool, signup provisioner (never browser) |
 | `GEMINI_API_KEY` | Optional: onboarding prompt compile (local template fallback if unset) |
 | `GEMINI_MODEL` | Optional: defaults to `gemini-2.0-flash` |
+| `SAUTIKIT_API_KEY` | Optional: Super Admin telecom panel + “Sync from SautiKit” (server-only) |
+| `SAUTIKIT_API_BASE` | Optional: defaults to `https://api.sautikit.com` |
 | `DASHBOARD_PASSWORD` | Optional legacy shared-password desk |
 | `DASHBOARD_OPEN=true` | Dev only: skip login if no password |
 

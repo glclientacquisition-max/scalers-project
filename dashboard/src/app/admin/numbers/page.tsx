@@ -1,5 +1,6 @@
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
 import { DidPoolManager } from "@/components/DidPoolManager";
+import { SautikitSyncButton } from "@/components/SautikitSyncButton";
 
 export default async function AdminNumbersPage() {
   let pool;
@@ -20,7 +21,10 @@ export default async function AdminNumbersPage() {
 
   return (
     <div>
-      <h2 className="font-display text-2xl tracking-tight">Number pool</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-2xl tracking-tight">Number pool</h2>
+        <SautikitSyncButton />
+      </div>
       <p className="mt-1 text-sm text-[var(--ink-soft)] max-w-2xl">
         Spare SautiKit numbers waiting to be given to businesses. A number is either available or
         assigned to exactly one business — never both.
