@@ -431,12 +431,30 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
   // Older DBs may lack newer KA columns — peel them off gradually.
+  if (error && /services_catalog/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, faqs, team_directory, unknown_answer_fallback, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
+  if (error && /faqs|team_directory|services_offered|unknown_answer_fallback/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error && /after_hours_mode/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
@@ -487,6 +505,11 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessHours: null,
       agentTone: null,
       afterHoursMode: 'serve',
+      servicesCatalog: [],
+      servicesOffered: null,
+      faqs: [],
+      teamDirectory: [],
+      unknownAnswerFallback: null,
     };
   }
 
@@ -507,6 +530,11 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     hoursSchedule: row.hours_schedule || null,
     businessHours: row.business_hours || null,
     afterHoursMode,
+    servicesCatalog: row.services_catalog || [],
+    servicesOffered: row.services_offered || null,
+    faqs: row.faqs || [],
+    teamDirectory: row.team_directory || [],
+    unknownAnswerFallback: row.unknown_answer_fallback || null,
   };
 }
 

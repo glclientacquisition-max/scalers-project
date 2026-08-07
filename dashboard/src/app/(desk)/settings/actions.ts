@@ -12,6 +12,10 @@ import {
   parseHoursSchedule,
 } from "@/lib/hoursSchedule";
 import { parseAfterHoursMode } from "@/lib/afterHours";
+import {
+  formatServicesForCompiler,
+  parseServicesCatalogField,
+} from "@/lib/servicesCatalog";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export type SettingsCompileState = {
@@ -42,7 +46,11 @@ export async function saveAndCompileSettings(
   const notificationPhone = String(
     formData.get("whatsapp_notification_number") || ""
   ).trim();
-  const servicesOffered = String(formData.get("services_offered") || "").trim();
+  const servicesNotes = String(formData.get("services_notes") || "").trim();
+  const servicesCatalog = parseServicesCatalogField(formData.get("services_catalog"));
+  const servicesOffered =
+    formatServicesForCompiler(servicesCatalog, servicesNotes) ||
+    String(formData.get("services_offered") || "").trim();
   const agentName =
     String(formData.get("agent_name") || "").trim() || "Receptionist";
   const agentTone = parseAgentTone(String(formData.get("agent_tone") || ""));
@@ -68,8 +76,11 @@ export async function saveAndCompileSettings(
   if (agentName.length > 40) {
     return { error: "Agent name should be under 40 characters." };
   }
-  if (servicesOffered.length < 12) {
-    return { error: "Describe your services and pricing (a few sentences)." };
+  if (!servicesCatalog.length && servicesOffered.length < 12) {
+    return { error: "Add at least one service with a name, or extra service notes." };
+  }
+  if (servicesCatalog.length > 40) {
+    return { error: "Services catalog is limited to 40 items." };
   }
   if (!scheduleForSave) {
     return { error: "Set at least one open day in weekly hours." };
@@ -107,6 +118,7 @@ export async function saveAndCompileSettings(
     business_name: businessName,
     whatsapp_notification_number: notificationPhone || tenant.whatsapp_notification_number,
     services_offered: servicesOffered,
+    services_catalog: servicesCatalog,
     business_hours: businessHours,
     hours_schedule: scheduleForSave,
     after_hours_mode: afterHoursMode,
@@ -124,6 +136,11 @@ export async function saveAndCompileSettings(
     if (/unknown_answer_fallback/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/employee_training.sql in Supabase.`,
+      };
+    }
+    if (/services_catalog/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/services_catalog.sql in Supabase.`,
       };
     }
     if (/hours_schedule/i.test(error.message)) {
