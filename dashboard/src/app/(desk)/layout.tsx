@@ -42,6 +42,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
             <Link href="/settings" className="text-[var(--ink)] hover:text-[var(--accent)]">
               Business Settings
             </Link>
+            <Link href="/wallet" className="text-[var(--ink)] hover:text-[var(--accent)]">
+              Wallet
+            </Link>
             <form action="/api/logout" method="post">
               <button type="submit" className="text-[var(--ink-soft)] hover:text-[var(--warn)]">
                 Sign out

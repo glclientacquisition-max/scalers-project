@@ -8,6 +8,8 @@ export type AdminBusiness = {
   sautikit_virtual_number: string;
   whatsapp_notification_number: string;
   is_active: boolean | null;
+  telecom_wallet_balance_kes: number | null;
+  ai_wallet_balance_usd: number | null;
   status: "active" | "waiting" | "archived";
 };
 
@@ -38,7 +40,7 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
   const { data, error } = await admin
     .from("tenants")
     .select(
-      "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active"
+      "id, created_at, business_name, sautikit_virtual_number, whatsapp_notification_number, is_active, telecom_wallet_balance_kes, ai_wallet_balance_usd"
     )
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -46,6 +48,27 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
     ...row,
     status: businessStatus(row),
   })) as AdminBusiness[];
+}
+
+export async function adjustTenantWallet(opts: {
+  businessId: string;
+  telecomDeltaKes?: number;
+  aiDeltaUsd?: number;
+  note?: string;
+}): Promise<{ telecom_wallet_balance_kes: number; ai_wallet_balance_usd: number }> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("adjust_tenant_wallet", {
+    p_tenant_id: opts.businessId,
+    p_telecom_delta_kes: opts.telecomDeltaKes ?? 0,
+    p_ai_delta_usd: opts.aiDeltaUsd ?? 0,
+    p_note: opts.note || null,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    telecom_wallet_balance_kes: Number(row?.telecom_wallet_balance_kes ?? 0),
+    ai_wallet_balance_usd: Number(row?.ai_wallet_balance_usd ?? 0),
+  };
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {
