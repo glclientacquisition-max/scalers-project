@@ -62,3 +62,37 @@ export function extractServicesNotes(servicesOffered: string): string {
   if (/^Services:\n/i.test(text)) return "";
   return text;
 }
+
+/**
+ * Parse a bulk paste block into service rows.
+ * One service per line. Columns separated by | or tab:
+ *   name | price | notes | out of scope
+ * Name-only lines are fine.
+ */
+export function parseBulkServices(raw: string): ServiceItem[] {
+  const text = String(raw || "").replace(/\r\n/g, "\n").trim();
+  if (!text) return [];
+
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !/^services?\s*:?$/i.test(line))
+    .map((line) => {
+      const cleaned = line.replace(/^[-*•]\s*/, "");
+      const parts = cleaned.includes("|")
+        ? cleaned.split("|")
+        : cleaned.includes("\t")
+          ? cleaned.split("\t")
+          : [cleaned];
+      const [name = "", price = "", notes = "", out = ""] = parts.map((p) =>
+        p.trim()
+      );
+      return {
+        name,
+        price_range: price,
+        notes,
+        out_of_scope: out,
+      };
+    })
+    .filter((row) => row.name);
+}
