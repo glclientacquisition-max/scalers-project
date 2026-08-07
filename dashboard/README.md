@@ -60,9 +60,10 @@ Without a Gemini key, a local template is saved instead.
 1. Apply `docs/supabase/tenant_business_profile.sql` (adds `business_hours`, `services_offered`, `agent_tone`).
 2. Apply `docs/supabase/knowledge_acquisition_phase1.sql` (adds `agent_name`, `team_directory`, `faqs`).
 3. Apply `docs/supabase/hours_schedule.sql` (adds `hours_schedule` for live open/closed).
-4. `/settings` edits structured fields only (persona, weekly hours, services, team directory, golden FAQs) — no raw prompt textarea.
-5. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
-6. Voice injects a live CONTEXT HEADER (EAT time, agent name, open/closed) on every call and greets with the agent name.
+4. Apply `docs/supabase/after_hours_mode.sql` (`serve` vs `message` when closed).
+5. `/settings` edits structured fields only (persona, weekly hours, after-hours mode, services, team directory, golden FAQs) — no raw prompt textarea.
+6. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
+7. Voice injects a live CONTEXT HEADER (EAT time, agent name, open/closed, after-hours mode) on every call and greets with the agent name.
 
 ### Employee Training center (settings)
 

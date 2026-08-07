@@ -13,6 +13,11 @@ import {
   type HoursSchedule,
 } from "@/lib/hoursSchedule";
 import {
+  AFTER_HOURS_OPTIONS,
+  parseAfterHoursMode,
+  type AfterHoursMode,
+} from "@/lib/afterHours";
+import {
   saveAndCompileSettings,
   type SettingsCompileState,
 } from "@/app/(desk)/settings/actions";
@@ -110,6 +115,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       scheduleForForm(tenant.hours_schedule, "").location ||
       extractLocationFallback(tenant.business_hours || "")
   );
+  const [afterHoursMode, setAfterHoursMode] = useState<AfterHoursMode>(() =>
+    parseAfterHoursMode(tenant.after_hours_mode)
+  );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
     return rows.length ? rows : [emptyMember()];
@@ -206,6 +214,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="business_hours" value={businessHoursSummary} />
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
       <input type="hidden" name="location_notes" value={locationNotes} />
+      <input type="hidden" name="after_hours_mode" value={afterHoursMode} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
@@ -390,6 +399,36 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               placeholder="e.g. Westlands, Nairobi. We cover Kiambu and Ruiru."
               className={`${fieldClass} leading-relaxed`}
             />
+          </div>
+
+          <div>
+            <p className="block text-sm font-medium">When you are closed</p>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
+              Controls how the receptionist handles after-hours callers.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {AFTER_HOURS_OPTIONS.map((opt) => {
+                const selected = afterHoursMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setAfterHoursMode(opt.id)}
+                    className={[
+                      "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
+                      selected
+                        ? "border-[#0096FF] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_#0096FF]"
+                        : "border-[var(--line)] bg-white hover:border-[#0096FF]/50",
+                    ].join(" ")}
+                  >
+                    <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                    <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                      {opt.blurb}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

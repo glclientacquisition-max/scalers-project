@@ -431,12 +431,21 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
-  // Older DBs may lack KA columns — retry a narrower select.
+  // Older DBs may lack newer KA columns — peel them off gradually.
+  if (error && /after_hours_mode/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error && /hours_schedule|agent_name|agent_tone|business_hours|column/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
@@ -477,8 +486,14 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       hoursSchedule: null,
       businessHours: null,
       agentTone: null,
+      afterHoursMode: 'serve',
     };
   }
+
+  const afterHoursMode =
+    String(row.after_hours_mode || 'serve').trim().toLowerCase() === 'message'
+      ? 'message'
+      : 'serve';
 
   return {
     id: row.id,
@@ -491,6 +506,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     did: row.sautikit_virtual_number || null,
     hoursSchedule: row.hours_schedule || null,
     businessHours: row.business_hours || null,
+    afterHoursMode,
   };
 }
 
