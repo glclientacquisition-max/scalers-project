@@ -1,0 +1,73 @@
+/**
+ * WhatsApp Bridge — 1-click follow-up while automated Meta messaging is pending.
+ * Renders the caller number with a green WhatsApp deep link (https://wa.me/<digits>).
+ */
+
+export function waMeHref(rawNumber: string): string | null {
+  const digits = String(rawNumber || "").replace(/\D/g, "");
+  if (digits.length < 9) return null;
+  return `https://wa.me/${digits}`;
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className || "h-4 w-4"}
+    >
+      <path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.33 4.95L2 22l5.3-1.39a9.87 9.87 0 0 0 4.73 1.2h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.65-1.03-5.14-2.9-7.01A9.83 9.83 0 0 0 12.04 2Zm0 18.13h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.11.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.37c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.22-8.24 8.22Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.13-1.05-.39-2-1.23-.73-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.51.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.13.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.29Z" />
+    </svg>
+  );
+}
+
+export function WhatsAppLink({
+  number,
+  label,
+  compact = false,
+}: {
+  number: string;
+  /** Optional visible text; defaults to the number itself. */
+  label?: string;
+  /** Icon-only pill (for tight table cells). */
+  compact?: boolean;
+}) {
+  const href = waMeHref(number);
+  const text = label ?? number;
+
+  if (!href) {
+    return <span className="font-medium">{text}</span>;
+  }
+
+  if (compact) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        title={`Chat with ${number} on WhatsApp`}
+        aria-label={`Chat with ${number} on WhatsApp`}
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white hover:bg-[#1ebe5b] transition"
+      >
+        <WhatsAppIcon className="h-4 w-4" />
+      </a>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="font-medium">{text}</span>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        title={`Chat with ${number} on WhatsApp`}
+        aria-label={`Chat with ${number} on WhatsApp`}
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white hover:bg-[#1ebe5b] transition"
+      >
+        <WhatsAppIcon className="h-3.5 w-3.5" />
+      </a>
+    </span>
+  );
+}

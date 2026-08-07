@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { parseSummary, type CallRow, type TranscriptRow } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
 
 function formatWhen(iso: string) {
   try {
@@ -13,6 +14,46 @@ function formatWhen(iso: string) {
   } catch {
     return iso;
   }
+}
+
+/** WhatsApp-style transcript bubble. Caller = green/left, receptionist = grey/right. */
+function ChatBubble({ turn }: { turn: TranscriptRow }) {
+  const speaker = String(turn.speaker || "").toLowerCase();
+  const isCaller = speaker === "caller";
+  const isSystem = speaker === "system";
+
+  if (isSystem) {
+    return (
+      <div className="flex justify-center px-2">
+        <p className="max-w-[85%] rounded-full bg-[var(--bg-deep)]/80 px-4 py-1.5 text-center text-xs text-[var(--ink-soft)]">
+          {turn.text_content}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={["flex px-1", isCaller ? "justify-start" : "justify-end"].join(" ")}>
+      <div
+        className={[
+          "max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[75%]",
+          isCaller
+            ? "rounded-bl-md bg-[#d9f4e2] text-[var(--ink)]"
+            : "rounded-br-md bg-[var(--bg-deep)]/90 text-[var(--ink)]",
+        ].join(" ")}
+      >
+        <p
+          className={[
+            "text-[11px] font-medium uppercase tracking-wide",
+            isCaller ? "text-[#2f6b3a]" : "text-[var(--ink-soft)]",
+          ].join(" ")}
+        >
+          {isCaller ? "Caller" : "Receptionist"}
+        </p>
+        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.text_content}</p>
+      </div>
+    </div>
+  );
 }
 
 export default async function CallDetailPage({
@@ -60,7 +101,9 @@ export default async function CallDetailPage({
       <section className="mt-8 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
           <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Caller</h2>
-          <p className="mt-2 text-lg font-medium">{row.caller_number}</p>
+          <div className="mt-2 text-lg">
+            <WhatsAppLink number={row.caller_number} />
+          </div>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             SID {row.sautikit_call_sid || "—"}
           </p>
@@ -101,22 +144,18 @@ export default async function CallDetailPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="font-display text-2xl">Transcript</h2>
-        <div className="mt-4 space-y-3">
+        <h2 className="font-display text-2xl">Conversation</h2>
+        <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--card)] px-2 py-4 sm:px-4">
           {turns.length === 0 ? (
-            <p className="text-[var(--ink-soft)] text-sm">No transcript rows for this call.</p>
+            <p className="px-3 py-6 text-center text-sm text-[var(--ink-soft)]">
+              No transcript rows for this call.
+            </p>
           ) : (
-            turns.map((t) => (
-              <div
-                key={t.id}
-                className="rounded-xl border border-[var(--line)] bg-white/70 px-4 py-3"
-              >
-                <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
-                  {t.speaker}
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{t.text_content}</p>
-              </div>
-            ))
+            <div className="space-y-2.5">
+              {turns.map((t) => (
+                <ChatBubble key={t.id} turn={t} />
+              ))}
+            </div>
           )}
         </div>
       </section>
