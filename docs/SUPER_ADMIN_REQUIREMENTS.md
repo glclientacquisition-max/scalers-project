@@ -12,7 +12,7 @@ Replace the narrow “DID pool” ops page with a **Super Admin** control center
 
 | Role | Who | Access |
 | --- | --- | --- |
-| Super Admin (ops) | Legacy login `admin@sauti.local` + `DASHBOARD_PASSWORD` | `/admin/*` |
+| Super Admin (ops) | Legacy login `admin@scalers.local` + `DASHBOARD_PASSWORD` | `/admin/*` |
 | Business owner | Supabase Auth signup/login | Own `/calls` + `/settings` only |
 
 Requirements:
@@ -81,7 +81,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Use **Business** everywhere in labels, filters, and empty states.
 - Dense but scannable tables; status as quiet pills (not loud badges).
 - Destructive actions: warn color + confirm; never one-click delete.
-- Prefer the existing Sauti Desk visual system (cream surface, deep green accent, display serif for titles) for consistency with the owner desk — improve hierarchy/spacing, don’t invent a second brand.
+- Prefer the Scalers visual system (cool surfaces, ribbon blue accent, Sora/DM Sans) for consistency with the owner desk. Improve hierarchy/spacing; don’t invent a second brand.
 - Mobile: tables may scroll horizontally; forms stack cleanly.
 
 ---
