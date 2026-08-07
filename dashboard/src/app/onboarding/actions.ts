@@ -22,7 +22,7 @@ export async function completeOnboardingAction(
   const user = await getAuthUser();
   if (!user) {
     if (await isLegacyAuthenticated()) {
-      redirect("/calls");
+      redirect("/admin");
     }
     return { error: "Sign in to finish setup." };
   }
