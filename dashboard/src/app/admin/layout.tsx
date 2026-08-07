@@ -23,7 +23,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="flex items-center justify-between gap-4 px-5 py-5 lg:block">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-brand-200/80">Super Admin</p>
-            <BrandMark href="/admin" label="Sauti" invert className="mt-2" priority />
+            <BrandMark href="/admin" label="Scalers" invert className="mt-2" priority />
           </div>
           <form action="/api/logout" method="post" className="lg:hidden">
             <button type="submit" className="text-sm text-brand-200 hover:text-white">

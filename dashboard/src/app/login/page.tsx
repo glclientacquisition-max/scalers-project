@@ -51,7 +51,7 @@ export default function LoginPage({
             type="submit"
             className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition"
           >
-            Enter desk
+            Sign in
           </button>
         </form>
 

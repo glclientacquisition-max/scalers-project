@@ -20,15 +20,15 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Sauti Desk",
-    template: "%s · Sauti Desk",
+    default: "Scalers",
+    template: "%s · Scalers",
   },
   description: "Missed-call leads and receptionist controls for East African businesses.",
-  applicationName: "Sauti Desk",
+  applicationName: "Scalers",
   openGraph: {
-    title: "Sauti Desk",
+    title: "Scalers",
     description: "Triage missed calls. Follow hot leads.",
-    siteName: "Sauti Desk",
+    siteName: "Scalers",
     images: [
       {
         url: "/og.png",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Sauti Desk",
+    title: "Scalers",
     description: "Triage missed calls. Follow hot leads.",
     images: ["/og.png"],
   },

@@ -14,7 +14,7 @@ export function SignupForm() {
       <div className="mt-10 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <p className="font-medium text-[var(--ink)]">Check your email</p>
         <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-          We sent a confirmation link. After you confirm, sign in to open your Sauti Desk
+          We sent a confirmation link. After you confirm, sign in to open Scalers
           workspace.
         </p>
         <Link
@@ -105,7 +105,7 @@ export function SignupForm() {
         disabled={pending}
         className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-60"
       >
-        {pending ? "Creating workspace…" : "Create Sauti Desk"}
+        {pending ? "Creating workspace…" : "Create Scalers workspace"}
       </button>
     </form>
   );

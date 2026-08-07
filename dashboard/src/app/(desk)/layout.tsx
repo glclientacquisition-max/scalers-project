@@ -28,7 +28,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
     <div className="min-h-screen">
       <header className="border-b border-line/80 bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-desk items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4">
-          <BrandMark href="/calls" label="Sauti Desk" priority />
+          <BrandMark href="/calls" label="Scalers" priority />
           <nav className="flex items-center gap-3 text-sm sm:gap-5">
             <Link href="/calls" className="text-ink hover:text-accent">
               Calls

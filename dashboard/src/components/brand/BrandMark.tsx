@@ -18,7 +18,7 @@ type BrandMarkProps = {
  */
 export function BrandMark({
   href = "/",
-  label = "Sauti Desk",
+  label = "Scalers",
   invert = false,
   className = "",
   priority = false,
@@ -88,7 +88,7 @@ export function BrandWordmark({
   const [failed, setFailed] = useState(false);
 
   const inner = failed ? (
-    <BrandMark href={undefined} label="Sauti Desk" className={className} priority={priority} />
+    <BrandMark href={undefined} label="Scalers" className={className} priority={priority} />
   ) : (
     <Image
       src={brandAssets.logoFull}
