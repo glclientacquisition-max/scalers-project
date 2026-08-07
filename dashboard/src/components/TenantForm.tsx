@@ -39,6 +39,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   );
   const [servicesOffered, setServicesOffered] = useState(tenant.services_offered || "");
   const [businessHours, setBusinessHours] = useState(tenant.business_hours || "");
+  const [unknownFallback, setUnknownFallback] = useState(
+    tenant.unknown_answer_fallback || ""
+  );
   const [tone, setTone] = useState<OnboardingTone | "">(initialTone(tenant));
   const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
   const [flash, setFlash] = useState<string | null>(null);
@@ -47,8 +50,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     if (state.ok) {
       setFlash(
         state.source === "gemini"
-          ? "Saved. Your receptionist knowledge was rewritten for new calls."
-          : "Saved with a local template (Gemini unavailable). New calls will use this knowledge."
+          ? "Training complete. Your receptionist will use this on the next call."
+          : "Training saved (basic mode). Your receptionist will use this on the next call."
       );
     }
   }, [state]);
@@ -61,6 +64,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="services_offered" value={servicesOffered} />
       <input type="hidden" name="business_hours" value={businessHours} />
       <input type="hidden" name="agent_tone" value={tone} />
+      <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
 
       <div>
         <label className="block text-sm font-medium" htmlFor="business_name">
@@ -115,6 +119,24 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       </div>
 
       <div>
+        <label className="block text-sm font-medium" htmlFor="unknown_answer_fallback">
+          If a customer asks for something you don&apos;t offer, what should the receptionist
+          say?
+        </label>
+        <textarea
+          id="unknown_answer_fallback"
+          value={unknownFallback}
+          onChange={(e) => setUnknownFallback(e.target.value)}
+          rows={2}
+          placeholder={'e.g. "Let me note that down — the boss will call you back today to confirm."'}
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[var(--accent)] leading-relaxed"
+        />
+        <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
+          Optional. Without it, the receptionist says the team will follow up.
+        </p>
+      </div>
+
+      <div>
         <p className="block text-sm font-medium">Tone of voice</p>
         <p className="mt-1 text-xs text-[var(--ink-soft)]">
           We rewrite the live call prompt from these fields — you never edit the raw AI prompt.
@@ -145,9 +167,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <button
         type="submit"
         disabled={pending || !tone}
-        className="rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] disabled:opacity-60"
+        className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] disabled:opacity-60"
       >
-        {pending ? "Saving & compiling…" : "Save & update receptionist"}
+        {pending ? (
+          <>
+            <span
+              aria-hidden="true"
+              className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+            />
+            Training your receptionist…
+          </>
+        ) : (
+          "Save & train receptionist"
+        )}
       </button>
 
       {state.error ? (

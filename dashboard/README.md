@@ -61,6 +61,14 @@ Without a Gemini key, a local template is saved instead.
 2. `/settings` edits those structured fields only — no raw prompt textarea.
 3. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
 
+### Employee Training center (settings)
+
+1. Apply `docs/supabase/employee_training.sql` (adds `tenants.unknown_answer_fallback`).
+2. Owners write the exact line for requests outside their knowledge ("I don't know" fallback);
+   the compiler bakes it into the receptionist prompt.
+3. Save button shows "Training your receptionist…"; a Test Drive card shows the DID to call
+   (tap-to-dial) once assigned.
+
 ### Phase C — DID pool
 
 1. Apply `docs/supabase/did_number_pool.sql` in Supabase.

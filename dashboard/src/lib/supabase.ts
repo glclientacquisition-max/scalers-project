@@ -62,6 +62,7 @@ export type TenantRow = {
   services_offered?: string | null;
   business_hours?: string | null;
   agent_tone?: string | null;
+  unknown_answer_fallback?: string | null;
   telecom_wallet_balance_kes?: number | null;
   ai_wallet_balance_usd?: number | null;
   is_active: boolean | null;

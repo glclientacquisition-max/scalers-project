@@ -16,6 +16,7 @@ Requirements for the prompt you write:
 - Include a BUSINESS KNOWLEDGE section with: business name, services & pricing (as given), hours & location (as given), languages (English, Kiswahili, Sheng — match the caller), and tone guidance matching the chosen tone.
 - Include a short "Your job on this call" checklist: answer from knowledge only, get name, get reason, confirm, goodbye.
 - Include live-phone conversation rules: answer first (no stalling), at most one clarifying question per turn, match EN/SW/Sheng, 1–2 short spoken sentences, never invent prices/availability outside knowledge.
+- If an "unknown request line" is provided, add a rule: when a caller asks for something outside the business knowledge, respond with that exact line (adapted to the caller's language) instead of a generic deflection.
 - Keep it tight and phone-ready. Do not invent services, prices, hours, or locations that were not provided.
 - Do not include tool markers or ###ENDCALL### — the voice engine appends those.`;
 
@@ -43,16 +44,19 @@ export async function compileReceptionistPrompt(opts: {
   servicesOffered: string;
   businessHours: string;
   agentTone: OnboardingTone;
+  /** Owner-written line for requests outside the business knowledge. */
+  unknownAnswerFallback?: string;
 }): Promise<{ prompt: string; source: "gemini" | "local" }> {
   const answers: OnboardingAnswers = {
     servicesPricing: opts.servicesOffered.trim(),
     hoursLocation: opts.businessHours.trim(),
     tone: opts.agentTone,
   };
+  const unknownLine = (opts.unknownAnswerFallback || "").trim();
 
   if (!process.env.GEMINI_API_KEY) {
     return {
-      prompt: compilePromptLocally(opts.businessName, answers),
+      prompt: compilePromptLocally(opts.businessName, answers, unknownLine),
       source: "local",
     };
   }
@@ -67,6 +71,9 @@ export async function compileReceptionistPrompt(opts: {
       "",
       "Business hours & location:",
       answers.hoursLocation,
+      ...(unknownLine
+        ? ["", "Unknown request line (say this when asked for something we do not offer):", unknownLine]
+        : []),
       "",
       "Write the optimized llm_system_prompt now.",
     ].join("\n");
@@ -80,7 +87,7 @@ export async function compileReceptionistPrompt(opts: {
     const prompt = stripFences(raw);
     if (prompt.length < 80) {
       return {
-        prompt: compilePromptLocally(opts.businessName, answers),
+        prompt: compilePromptLocally(opts.businessName, answers, unknownLine),
         source: "local",
       };
     }
@@ -91,7 +98,7 @@ export async function compileReceptionistPrompt(opts: {
       err instanceof Error ? err.message : err
     );
     return {
-      prompt: compilePromptLocally(opts.businessName, answers),
+      prompt: compilePromptLocally(opts.businessName, answers, unknownLine),
       source: "local",
     };
   }
