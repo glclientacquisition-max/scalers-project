@@ -62,9 +62,10 @@ Without a Gemini key, a local template is saved instead.
 3. Apply `docs/supabase/hours_schedule.sql` (adds `hours_schedule` for live open/closed).
 4. Apply `docs/supabase/after_hours_mode.sql` (`serve` vs `message` when closed).
 5. Apply `docs/supabase/services_catalog.sql` (structured services table).
-6. `/settings` edits structured fields only (persona, weekly hours, services catalog, FAQs, team) — no raw prompt textarea.
-7. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
-8. Voice injects a live CONTEXT HEADER plus LIVE GROUND TRUTH (services, FAQs, team) on every call.
+6. Apply `docs/supabase/daily_bulletin.sql` (Today's updates / temporary overrides).
+7. `/settings` edits structured fields (persona, weekly hours, services, FAQs, team) plus immediate Today's updates.
+8. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
+9. Voice injects a live CONTEXT HEADER (including daily bulletin) plus LIVE GROUND TRUTH on every call.
 
 ### Employee Training center (settings)
 
