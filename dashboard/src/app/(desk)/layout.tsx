@@ -1,10 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
+import { getAuthUser, isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
+import { tenantNeedsOnboarding } from "@/lib/onboarding";
+import { getCurrentTenant } from "@/lib/tenant";
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   if (!(await isAuthenticated())) {
     redirect("/login");
+  }
+
+  // Owners with a blank/default prompt finish guided setup before the desk.
+  const authUser = await getAuthUser();
+  if (authUser) {
+    const tenant = await getCurrentTenant();
+    if (tenant && tenantNeedsOnboarding(tenant)) {
+      redirect("/onboarding");
+    }
   }
 
   const showOpsNav = await isLegacyAuthenticated();

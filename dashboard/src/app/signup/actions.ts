@@ -94,5 +94,5 @@ export async function signupAction(
     return { checkEmail: true };
   }
 
-  redirect("/calls");
+  redirect("/onboarding");
 }
