@@ -9,13 +9,13 @@ export default function LoginPage({
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href="/login" priority />
-        <h1 className="mt-8 font-display text-2xl tracking-tight text-ink">Sign in</h1>
+        <BrandWordmark href="/login" context="Sign in" priority />
+        <h1 className="sr-only">Sign in to Scalers</h1>
 
         <form
           action="/api/login"
           method="post"
-          className="mt-6 rounded-panel border border-line bg-surface p-6 shadow-lift space-y-4"
+          className="mt-8 rounded-panel border border-line bg-surface p-6 shadow-lift space-y-4"
         >
           <div>
             <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="email">

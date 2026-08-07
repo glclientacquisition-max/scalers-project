@@ -6,10 +6,12 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href="/signup" priority />
-        <h1 className="mt-8 font-display text-2xl tracking-tight text-ink">Create workspace</h1>
+        <BrandWordmark href="/signup" context="New workspace" priority />
+        <h1 className="sr-only">Create a Scalers workspace</h1>
 
-        <SignupForm />
+        <div className="mt-8">
+          <SignupForm />
+        </div>
 
         <p className="mt-6 text-sm text-[var(--ink-soft)]">
           Already have an account?{" "}
