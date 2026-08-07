@@ -1,9 +1,41 @@
 import {
   formatMinor,
+  getSautikitKeyDiagnostics,
   getSautikitWallet,
   isSautikitConfigured,
   listSautikitNumbers,
 } from "@/lib/sautikit";
+
+function DiagnosticsBlock() {
+  const d = getSautikitKeyDiagnostics();
+  return (
+    <div className="mt-3 rounded-xl border border-[var(--line)] bg-white/70 px-4 py-3 text-xs text-[var(--ink-soft)] space-y-1">
+      <p className="font-medium text-[var(--ink)]">Key loaded on this server (safe diagnostics)</p>
+      <p>
+        Configured: {d.configured ? "yes" : "no"}
+        {d.fingerprint ? ` · fingerprint ${d.fingerprint}` : ""}
+        {d.length ? ` · length ${d.length}` : ""}
+      </p>
+      <p>
+        Starts with eyJ: {d.startsWithEyJ ? "yes" : "no"}
+        {d.label ? ` · label “${d.label}”` : ""}
+      </p>
+      <p>Scopes: {d.scopes.length ? d.scopes.join(", ") : "—"}</p>
+      <p>Workspace: {d.workspaceId || "—"}</p>
+      {d.issues.length ? (
+        <ul className="mt-2 list-disc pl-4 text-[var(--warn)]">
+          {d.issues.map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
+      ) : null}
+      <p className="mt-2">
+        Expected: label like Key A / sauti-platform-read, scopes include wallet.read +
+        numbers.read, length ~454, starts with eyJ.
+      </p>
+    </div>
+  );
+}
 
 /** Server component: platform telecom costs straight from the SautiKit API. */
 export async function SautikitTelecomPanel() {
@@ -12,9 +44,10 @@ export async function SautikitTelecomPanel() {
       <section className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <h2 className="font-display text-2xl tracking-tight">Telecom (SautiKit)</h2>
         <p className="mt-2 text-sm text-[var(--ink-soft)]">
-          Set <code>SAUTIKIT_API_KEY</code> on the dashboard server to see your numbers,
-          line costs, and wallet here.
+          Set <code>SAUTIKIT_API_KEY</code> on the dashboard server (Vercel Production) to see
+          your numbers, line costs, and wallet here.
         </p>
+        <DiagnosticsBlock />
       </section>
     );
   }
@@ -25,10 +58,26 @@ export async function SautikitTelecomPanel() {
     [numbers, wallet] = await Promise.all([listSautikitNumbers(), getSautikitWallet()]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: string }).code;
     return (
       <section className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6">
         <h2 className="font-display text-2xl tracking-tight">Telecom (SautiKit)</h2>
         <p className="mt-2 text-sm text-[var(--warn)]">Could not reach SautiKit: {message}</p>
+        {code === "api_key.revoked" || /revoked/i.test(message) ? (
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            Vercel is still sending a <strong>revoked</strong> key. In Vercel → Settings →
+            Environment Variables, open <code>SAUTIKIT_API_KEY</code> for{" "}
+            <strong>Production</strong>, paste only the JWT (starts with <code>eyJ</code>),
+            save, then Redeploy the Production deployment.
+          </p>
+        ) : null}
+        {code === "api_key.invalid" || /invalid|malformed/i.test(message) ? (
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            The value looks malformed (often pasted as <code>SAUTIKIT_API_KEY=eyJ…</code> or
+            with quotes). Value must be the bare JWT only.
+          </p>
+        ) : null}
+        <DiagnosticsBlock />
       </section>
     );
   }
