@@ -14,6 +14,7 @@
 --   agent_tone text         (professional | friendly | empathetic | localized)
 --   team_directory jsonb    ([{name, role, phone}]; knowledge_acquisition_phase1.sql)
 --   faqs jsonb              ([{question, answer}]; knowledge_acquisition_phase1.sql)
+--   hours_schedule jsonb    (weekly open hours; hours_schedule.sql — used live for open/closed)
 --   voice_languages text[]  (auto: en, sw, sheng — see voice_languages.sql; locals later)
 --   voice_language_other text  (reserved)
 --   telecom_wallet_balance_kes numeric

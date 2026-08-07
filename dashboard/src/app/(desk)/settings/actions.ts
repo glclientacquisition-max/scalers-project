@@ -7,6 +7,10 @@ import {
   parseTeamDirectoryField,
   parseFaqsField,
 } from "@/lib/promptCompiler";
+import {
+  formatHoursForCompiler,
+  parseHoursSchedule,
+} from "@/lib/hoursSchedule";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export type SettingsCompileState = {
@@ -38,7 +42,6 @@ export async function saveAndCompileSettings(
     formData.get("whatsapp_notification_number") || ""
   ).trim();
   const servicesOffered = String(formData.get("services_offered") || "").trim();
-  const businessHours = String(formData.get("business_hours") || "").trim();
   const agentName =
     String(formData.get("agent_name") || "").trim() || "Receptionist";
   const agentTone = parseAgentTone(String(formData.get("agent_tone") || ""));
@@ -48,6 +51,15 @@ export async function saveAndCompileSettings(
   const teamDirectory = parseTeamDirectoryField(formData.get("team_directory"));
   const faqs = parseFaqsField(formData.get("faqs"));
 
+  const hoursSchedule = parseHoursSchedule(formData.get("hours_schedule"));
+  const locationNotes = String(formData.get("location_notes") || "").trim();
+  const scheduleForSave = hoursSchedule
+    ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
+    : null;
+  const businessHours =
+    formatHoursForCompiler(scheduleForSave) ||
+    String(formData.get("business_hours") || "").trim();
+
   if (!businessName) {
     return { error: "Business name is required." };
   }
@@ -56,6 +68,9 @@ export async function saveAndCompileSettings(
   }
   if (servicesOffered.length < 12) {
     return { error: "Describe your services and pricing (a few sentences)." };
+  }
+  if (!scheduleForSave) {
+    return { error: "Set at least one open day in weekly hours." };
   }
   if (businessHours.length < 8) {
     return { error: "Add business hours and where you operate." };
@@ -91,6 +106,7 @@ export async function saveAndCompileSettings(
     whatsapp_notification_number: notificationPhone || tenant.whatsapp_notification_number,
     services_offered: servicesOffered,
     business_hours: businessHours,
+    hours_schedule: scheduleForSave,
     agent_name: agentName,
     agent_tone: agentTone,
     team_directory: teamDirectory,
@@ -105,6 +121,11 @@ export async function saveAndCompileSettings(
     if (/unknown_answer_fallback/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/employee_training.sql in Supabase.`,
+      };
+    }
+    if (/hours_schedule/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/hours_schedule.sql in Supabase.`,
       };
     }
     if (/agent_name|team_directory|faqs/i.test(error.message)) {
@@ -128,7 +149,6 @@ export async function saveAndCompileSettings(
     return { error: error.message };
   }
 
-  // Touch auth path so layout revalidation sees fresh tenant on next nav.
   await getAuthUser();
 
   return { ok: true, source };

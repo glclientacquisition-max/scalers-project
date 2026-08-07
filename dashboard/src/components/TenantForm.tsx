@@ -5,6 +5,14 @@ import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import type { OnboardingTone } from "@/lib/onboarding";
 import { TONE_LABELS } from "@/lib/onboarding";
 import {
+  DAY_LABELS,
+  DAY_ORDER,
+  formatHoursForCompiler,
+  scheduleForForm,
+  type DayKey,
+  type HoursSchedule,
+} from "@/lib/hoursSchedule";
+import {
   saveAndCompileSettings,
   type SettingsCompileState,
 } from "@/app/(desk)/settings/actions";
@@ -65,6 +73,19 @@ function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
 const emptyMember = (): TeamDirectoryEntry => ({ name: "", role: "", phone: "" });
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
+/** Pull location prose from legacy free-text hours when schedule.location is empty. */
+function extractLocationFallback(businessHours: string): string {
+  const text = String(businessHours || "").trim();
+  if (!text) return "";
+  const loc = text.match(/location\s*[/:]?\s*(.+)$/i);
+  if (loc?.[1]) return loc[1].trim();
+  // If it looks like a schedule summary only, skip.
+  if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i.test(text) && text.length < 180) {
+    return "";
+  }
+  return text;
+}
+
 const initial: SettingsCompileState = {};
 
 const fieldClass =
@@ -76,12 +97,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     tenant.whatsapp_notification_number || ""
   );
   const [servicesOffered, setServicesOffered] = useState(tenant.services_offered || "");
-  const [businessHours, setBusinessHours] = useState(tenant.business_hours || "");
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
   const [agentName, setAgentName] = useState(tenant.agent_name || "Receptionist");
   const [tone, setTone] = useState<OnboardingTone | "">(initialTone(tenant));
+  const [hoursSchedule, setHoursSchedule] = useState<HoursSchedule>(() =>
+    scheduleForForm(tenant.hours_schedule, tenant.business_hours || "")
+  );
+  const [locationNotes, setLocationNotes] = useState(
+    () =>
+      scheduleForForm(tenant.hours_schedule, "").location ||
+      extractLocationFallback(tenant.business_hours || "")
+  );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
     return rows.length ? rows : [emptyMember()];
@@ -107,6 +135,22 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       ),
     [faqs]
   );
+  const hoursScheduleJson = useMemo(
+    () =>
+      JSON.stringify({
+        ...hoursSchedule,
+        location: locationNotes.trim(),
+      }),
+    [hoursSchedule, locationNotes]
+  );
+  const businessHoursSummary = useMemo(
+    () =>
+      formatHoursForCompiler({
+        ...hoursSchedule,
+        location: locationNotes.trim(),
+      }),
+    [hoursSchedule, locationNotes]
+  );
 
   useEffect(() => {
     if (state.ok) {
@@ -130,13 +174,38 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     );
   }
 
+  function setDayOpen(day: DayKey, open: boolean) {
+    setHoursSchedule((prev) => ({
+      ...prev,
+      days: {
+        ...prev.days,
+        [day]: open ? { open: "08:00", close: "18:00" } : null,
+      },
+    }));
+  }
+
+  function setDayTime(day: DayKey, key: "open" | "close", value: string) {
+    setHoursSchedule((prev) => {
+      const current = prev.days[day] || { open: "08:00", close: "18:00" };
+      return {
+        ...prev,
+        days: {
+          ...prev.days,
+          [day]: { ...current, [key]: value },
+        },
+      };
+    });
+  }
+
   return (
     <form action={formAction} className="space-y-10">
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
       <input type="hidden" name="services_offered" value={servicesOffered} />
-      <input type="hidden" name="business_hours" value={businessHours} />
+      <input type="hidden" name="business_hours" value={businessHoursSummary} />
+      <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
+      <input type="hidden" name="location_notes" value={locationNotes} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
@@ -167,7 +236,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               className={fieldClass}
             />
             <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-              Used in the greeting: &quot;this is {agentName.trim() || "Receptionist"} speaking&quot;.
+              Live on every call: &quot;you&apos;ve reached {businessName.trim() || "your business"}, this is{" "}
+              {agentName.trim() || "Receptionist"} speaking&quot;.
             </p>
           </div>
 
@@ -244,18 +314,83 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium" htmlFor="business_hours">
-            Business hours &amp; location
-          </label>
-          <textarea
-            id="business_hours"
-            value={businessHours}
-            onChange={(e) => setBusinessHours(e.target.value)}
-            rows={5}
-            placeholder="Open hours and areas you cover…"
-            className={`${fieldClass} leading-relaxed`}
-          />
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-[var(--ink)]">Weekly hours (EAT)</h3>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
+              Used live on every call so the receptionist knows if you are open or closed.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {DAY_ORDER.map((day) => {
+              const slot = hoursSchedule.days[day];
+              const open = Boolean(slot);
+              return (
+                <div
+                  key={day}
+                  className="grid grid-cols-[7rem_auto_1fr] items-center gap-3 sm:grid-cols-[8.5rem_auto_1fr_1fr]"
+                >
+                  <span className="text-sm font-medium text-[var(--ink)]">
+                    {DAY_LABELS[day]}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDayOpen(day, !open)}
+                    className={[
+                      "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                      open
+                        ? "border-[#0096FF] bg-[var(--accent-soft)] text-[#0096FF]"
+                        : "border-[var(--line)] text-[var(--ink-soft)]",
+                    ].join(" ")}
+                  >
+                    {open ? "Open" : "Closed"}
+                  </button>
+                  {open && slot ? (
+                    <div className="col-span-1 flex flex-wrap items-center gap-2 sm:col-span-2">
+                      <label className="sr-only" htmlFor={`open-${day}`}>
+                        Opens
+                      </label>
+                      <input
+                        id={`open-${day}`}
+                        type="time"
+                        value={slot.open}
+                        onChange={(e) => setDayTime(day, "open", e.target.value)}
+                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF]"
+                      />
+                      <span className="text-xs text-[var(--ink-soft)]">to</span>
+                      <label className="sr-only" htmlFor={`close-${day}`}>
+                        Closes
+                      </label>
+                      <input
+                        id={`close-${day}`}
+                        type="time"
+                        value={slot.close}
+                        onChange={(e) => setDayTime(day, "close", e.target.value)}
+                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF]"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-xs text-[var(--ink-soft)] sm:col-span-2">
+                      Closed all day
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div>
+            <label className="block text-sm font-medium" htmlFor="location_notes">
+              Location &amp; coverage
+            </label>
+            <textarea
+              id="location_notes"
+              value={locationNotes}
+              onChange={(e) => setLocationNotes(e.target.value)}
+              rows={2}
+              placeholder="e.g. Westlands, Nairobi. We cover Kiambu and Ruiru."
+              className={`${fieldClass} leading-relaxed`}
+            />
+          </div>
         </div>
 
         <div>
