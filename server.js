@@ -702,6 +702,7 @@ mediaWss.on('connection', (ws, req) => {
   let agentName = process.env.AGENT_NAME || 'Receptionist';
   let hoursSchedule = null;
   let openStatus = 'unknown';
+  let afterHoursMode = 'serve';
   let messages = [{ role: 'system', content: systemPrompt }];
   const transcriptLog = [];
   let greetingStarted = false;
@@ -720,17 +721,19 @@ mediaWss.on('connection', (ws, req) => {
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
       hoursSchedule = profile.hoursSchedule || null;
+      afterHoursMode = profile.afterHoursMode || 'serve';
       openStatus = openClosedStatus(hoursSchedule);
       systemPrompt = buildSystemPrompt(profile);
       greetingLine = buildGreeting(businessName, {
         agentName,
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
+        afterHoursMode,
       });
       messages = [{ role: 'system', content: systemPrompt }];
       profileLoaded = true;
       profileCallSid = sessionCallSid;
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
       );
     } catch (err) {
       profileLoaded = true;
@@ -1082,12 +1085,13 @@ mediaWss.on('connection', (ws, req) => {
         businessName,
         agentName,
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
+        afterHoursMode,
         callSid: sidLabel(),
         generateText: generateGeminiText,
         mode: process.env.VOICE_GREETING_MODE || 'instant',
       });
       console.log(
-        `[ws/media][${sidLabel()}] greeting mode=${process.env.VOICE_GREETING_MODE || 'instant'} agent=${agentName} open=${openStatus}: ${greetingLine}`
+        `[ws/media][${sidLabel()}] greeting mode=${process.env.VOICE_GREETING_MODE || 'instant'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode}: ${greetingLine}`
       );
 
       await speakText(greetingLine);
@@ -1099,6 +1103,7 @@ mediaWss.on('connection', (ws, req) => {
         const fallback = buildGreeting(businessName, {
           agentName,
           isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
+          afterHoursMode,
         });
         await speakText(fallback);
         messages.push({ role: 'assistant', content: fallback });

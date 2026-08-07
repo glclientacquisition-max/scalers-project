@@ -48,17 +48,29 @@ function buildContextHeader(profile = {}) {
   const status = openClosedStatus(profile.hoursSchedule);
   const scheduleSummary = formatScheduleSummary(profile.hoursSchedule);
 
+  const afterHoursMode = String(profile.afterHoursMode || 'serve')
+    .trim()
+    .toLowerCase() === 'message'
+    ? 'message'
+    : 'serve';
+
   let statusBlock;
   if (status === 'open') {
     statusBlock = `BUSINESS STATUS: OPEN now.
 If asked whether you are open, say yes. Help normally.`;
+  } else if (status === 'closed' && afterHoursMode === 'message') {
+    statusBlock = `BUSINESS STATUS: CLOSED now (after-hours mode: MESSAGE ONLY).
+Tell the caller you are closed. Take their name and request for callback when open.
+Keep answers brief. Do not deep-dive into quotes or availability. Do not promise same-day service.`;
   } else if (status === 'closed') {
-    statusBlock = `BUSINESS STATUS: CLOSED now.
-Tell the caller you are closed, offer to take a message / note their request for callback, and still capture name + reason.
-Do not promise same-day service unless the business knowledge explicitly allows after-hours emergencies.`;
+    statusBlock = `BUSINESS STATUS: CLOSED now (after-hours mode: KEEP SERVING).
+Be honest that the business is closed for walk-in / same-day fulfillment right now.
+You MUST still help: answer FAQs, services, pricing, and location from knowledge; capture name + reason; explain when the team will follow up.
+Do not refuse to help just because it is after hours. Do not invent that staff are on site.`;
   } else {
     statusBlock = `BUSINESS STATUS: unknown (no structured weekly hours on file).
-Follow hours from BUSINESS KNOWLEDGE if present; do not invent open/closed times.`;
+Follow hours from BUSINESS KNOWLEDGE if present; do not invent open/closed times.
+Still help the caller from knowledge and capture their details.`;
   }
 
   const hoursLine = scheduleSummary

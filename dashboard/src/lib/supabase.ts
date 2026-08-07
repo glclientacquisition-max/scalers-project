@@ -82,6 +82,7 @@ export type TenantRow = {
   services_offered?: string | null;
   business_hours?: string | null;
   hours_schedule?: HoursScheduleRow | null;
+  after_hours_mode?: "serve" | "message" | null;
   agent_name?: string | null;
   agent_tone?: string | null;
   team_directory?: TeamDirectoryEntry[] | null;

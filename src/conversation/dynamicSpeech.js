@@ -22,8 +22,12 @@ function fallbackGreeting(businessName, opts = {}) {
   const agent = String(opts.agentName || 'Receptionist').trim() || 'Receptionist';
   const tod = eatTimeOfDay();
   const closed = opts.isOpen === false;
+  const afterHoursMode =
+    String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
+      ? 'message'
+      : 'serve';
 
-  if (closed) {
+  if (closed && afterHoursMode === 'message') {
     const closedOptions = {
       morning: [
         `Good morning, you've reached ${name}, this is ${agent}. We're closed right now, but I can take a message.`,
@@ -39,6 +43,26 @@ function fallbackGreeting(businessName, opts = {}) {
       ],
     };
     const list = closedOptions[tod] || closedOptions.afternoon;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  if (closed) {
+    // Default: still serve after hours — be honest about closed status, then help.
+    const serveClosed = {
+      morning: [
+        `Good morning, you've reached ${name}, this is ${agent}. We're closed now, but I can still help. How can I assist?`,
+        `Habari ya asubuhi, ${name}, ${agent} speaking. We're closed, but I can still help you.`,
+      ],
+      afternoon: [
+        `Hello, you've reached ${name}, this is ${agent}. We're closed right now, but I can still help. What do you need?`,
+        `Habari, ${name}, ${agent} speaking. We're closed, but I can still answer you.`,
+      ],
+      evening: [
+        `Good evening, you've reached ${name}, this is ${agent}. We're closed now, but I can still help. How can I assist?`,
+        `Habari ya jioni, ${name}, ${agent} speaking. We're closed, but I can still help you.`,
+      ],
+    };
+    const list = serveClosed[tod] || serveClosed.afternoon;
     return list[Math.floor(Math.random() * list.length)];
   }
 
@@ -102,7 +126,15 @@ async function generateDynamicGreeting(opts) {
     return String(process.env.VOICE_GREETING).trim();
   }
 
-  const instant = fallbackGreeting(businessName, { agentName, isOpen });
+  const afterHoursMode =
+    String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
+      ? 'message'
+      : 'serve';
+  const instant = fallbackGreeting(businessName, {
+    agentName,
+    isOpen,
+    afterHoursMode,
+  });
   if (mode !== 'gemini') return instant;
 
   const timeoutMs = Math.max(
@@ -116,11 +148,13 @@ async function generateDynamicGreeting(opts) {
   }
 
   const openLine =
-    isOpen === false
+    isOpen === false && afterHoursMode === 'message'
       ? 'The business is CLOSED now. Say you can take a message for the team.'
-      : isOpen === true
-        ? 'The business is OPEN now.'
-        : 'Open/closed status is unknown; do not claim the shop is closed.';
+      : isOpen === false
+        ? 'The business is CLOSED now, but you still help. Say you are closed yet can still assist.'
+        : isOpen === true
+          ? 'The business is OPEN now.'
+          : 'Open/closed status is unknown; do not claim the shop is closed.';
 
   const instruction = `You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
 Write ONE short spoken greeting to open the call (max 20 words).

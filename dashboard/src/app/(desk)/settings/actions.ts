@@ -11,6 +11,7 @@ import {
   formatHoursForCompiler,
   parseHoursSchedule,
 } from "@/lib/hoursSchedule";
+import { parseAfterHoursMode } from "@/lib/afterHours";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export type SettingsCompileState = {
@@ -53,6 +54,7 @@ export async function saveAndCompileSettings(
 
   const hoursSchedule = parseHoursSchedule(formData.get("hours_schedule"));
   const locationNotes = String(formData.get("location_notes") || "").trim();
+  const afterHoursMode = parseAfterHoursMode(formData.get("after_hours_mode"));
   const scheduleForSave = hoursSchedule
     ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
     : null;
@@ -107,6 +109,7 @@ export async function saveAndCompileSettings(
     services_offered: servicesOffered,
     business_hours: businessHours,
     hours_schedule: scheduleForSave,
+    after_hours_mode: afterHoursMode,
     agent_name: agentName,
     agent_tone: agentTone,
     team_directory: teamDirectory,
@@ -126,6 +129,11 @@ export async function saveAndCompileSettings(
     if (/hours_schedule/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/hours_schedule.sql in Supabase.`,
+      };
+    }
+    if (/after_hours_mode/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/after_hours_mode.sql in Supabase.`,
       };
     }
     if (/agent_name|team_directory|faqs/i.test(error.message)) {
