@@ -131,7 +131,7 @@ export async function compileReceptionistPrompt(opts: {
       systemInstruction: PROMPT_COMPILER_SYSTEM,
       userText,
       temperature: 0.35,
-      maxOutputTokens: 3072,
+      maxOutputTokens: 2048,
     });
     const prompt = stripFences(raw);
     if (prompt.length < 80) {

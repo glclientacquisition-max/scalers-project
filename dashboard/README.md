@@ -108,7 +108,7 @@ Open http://localhost:3000 (or the port Next prints).
 | `SUPABASE_URL` | Same URL (server admin client) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only: Super Admin, DID pool, signup provisioner (never browser) |
 | `GEMINI_API_KEY` | Optional: onboarding prompt compile (local template fallback if unset) |
-| `GEMINI_MODEL` | Optional: defaults to `gemini-2.0-flash` |
+| `GEMINI_MODEL` | Optional: defaults to `gemini-3.5-flash-lite` (desk compile; 12s timeout then local fallback) |
 | `SAUTIKIT_API_KEY` | Optional: Super Admin telecom panel + “Sync from SautiKit” (server-only) |
 | `SAUTIKIT_ADMIN_OPS_KEY` | Optional Key B: Buy number (`numbers.claim`) — Vercel only |
 | `VOICE_PUBLIC_BASE_URL` | Optional: Railway voice base for webhook routing after buy |
