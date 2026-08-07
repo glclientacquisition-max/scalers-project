@@ -122,7 +122,39 @@ export function DidPoolManager({
 
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)]">
+      <ul className="space-y-3 lg:hidden">
+        {pool.length === 0 ? (
+          <li className="rounded-2xl border border-[var(--line)] bg-[var(--card)] px-4 py-8 text-center text-sm text-[var(--ink-soft)]">
+            Pool empty. Add a pre-bought SautiKit number above.
+          </li>
+        ) : (
+          pool.slice(0, 50).map((row) => (
+            <li
+              key={row.id}
+              className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-medium">{row.e164}</p>
+                <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs capitalize">
+                  {row.status}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                {row.tenants?.business_name ||
+                  (row.tenant_id ? "Linked business" : "Unassigned")}
+              </p>
+              {row.notes ? (
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">{row.notes}</p>
+              ) : null}
+            </li>
+          ))
+        )}
+      </ul>
+      {pool.length > 50 ? (
+        <p className="text-xs text-[var(--ink-soft)] lg:hidden">Showing first 50 of {pool.length}</p>
+      ) : null}
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)] lg:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-[var(--bg-deep)]/70 text-[var(--ink-soft)]">
             <tr>

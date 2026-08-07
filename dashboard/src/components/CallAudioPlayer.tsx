@@ -18,19 +18,19 @@ export function CallAudioPlayer({ src }: { src: string }) {
   }
 
   return (
-    <div className="sticky bottom-0 z-20 -mx-6 mt-8 border-t border-[var(--line)] bg-[var(--card)]/95 px-6 py-3 backdrop-blur sm:rounded-t-2xl">
-      <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3">
+    <div className="sticky bottom-0 z-20 -mx-4 mt-8 border-t border-[var(--line)] bg-[var(--card)]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:rounded-t-2xl sm:px-6">
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <audio
           ref={audioRef}
           src={src}
           controls
           preload="none"
-          className="h-10 min-w-0 flex-1"
+          className="h-10 w-full min-w-0 flex-1"
           onPlay={() => {
             if (audioRef.current) audioRef.current.playbackRate = speed;
           }}
         />
-        <div className="flex items-center gap-1" role="group" aria-label="Playback speed">
+        <div className="flex items-center gap-1 self-end sm:self-auto" role="group" aria-label="Playback speed">
           {SPEEDS.map((s) => (
             <button
               key={s}

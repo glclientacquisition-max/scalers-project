@@ -9,6 +9,7 @@ import {
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 
 function formatWhen(iso: string) {
   try {
@@ -22,16 +23,15 @@ function formatWhen(iso: string) {
   }
 }
 
-function isTodayNairobi(iso: string): boolean {
-  try {
-    const fmt = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Africa/Nairobi",
-      dateStyle: "short",
-    });
-    return fmt.format(new Date(iso)) === fmt.format(new Date());
-  } catch {
-    return false;
-  }
+function nairobiDayStartIso(): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Nairobi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const day = fmt.format(new Date()); // YYYY-MM-DD
+  return new Date(`${day}T00:00:00+03:00`).toISOString();
 }
 
 type Lead = {
@@ -91,24 +91,30 @@ function Kpi({
   );
 }
 
-function KpiStrip({ tenant, leads }: { tenant: TenantRow; leads: Lead[] }) {
-  const missedToday = leads.filter((l) => isTodayNairobi(l.call.created_at)).length;
-  const captured = leads.filter((l) => l.name || l.reason).length;
-  const needFollowUp = leads.filter((l) => l.leadStatus === "new").length;
-
+function KpiStrip({
+  tenant,
+  todayCount,
+  newCount,
+  capturedOnPage,
+}: {
+  tenant: TenantRow;
+  todayCount: number;
+  newCount: number;
+  capturedOnPage: number;
+}) {
   const kes = Number(tenant.telecom_wallet_balance_kes ?? 0);
   const usd = Number(tenant.ai_wallet_balance_usd ?? 0);
   const lowWallet = kes < 200 || usd < 1;
 
   return (
-    <section className="mt-8 grid gap-3 sm:grid-cols-3">
+    <section className="mt-6 grid gap-3 sm:grid-cols-3">
       <Kpi
-        label="Today's missed calls"
-        value={missedToday}
-        hint={needFollowUp > 0 ? `${needFollowUp} waiting for follow-up` : "All followed up"}
-        warn={needFollowUp > 0}
+        label="Today's calls"
+        value={todayCount}
+        hint={newCount > 0 ? `${newCount} waiting for follow-up` : "All followed up"}
+        warn={newCount > 0}
       />
-      <Kpi label="Leads captured" value={captured} hint="Callers with a name or reason" />
+      <Kpi label="Leads on page" value={capturedOnPage} hint="Name or reason captured" />
       <Kpi
         label="Wallet"
         value={`KES ${kes.toLocaleString("en-KE")}`}
@@ -137,7 +143,18 @@ const CALL_SELECT =
 const CALL_SELECT_LEGACY =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
 
-export default async function CallsPage() {
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
+
+export default async function CallsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const sp = await searchParams;
+  const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
@@ -160,28 +177,32 @@ export default async function CallsPage() {
     );
   }
 
-  // Owner: JWT + RLS. Legacy Super Admin desk: service role (bypasses RLS).
   let leadStatusReady = true;
-  const first = await workspace.client
+  const dayStart = nairobiDayStartIso();
+  const client = workspace.client;
+
+  let first = await client
     .from("calls")
-    .select(CALL_SELECT)
+    .select(CALL_SELECT, { count: "exact" })
     .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .range(from, to);
+
   let data = first.data as CallRow[] | null;
   let error = first.error;
+  let total = first.count ?? 0;
 
   if (error && /lead_status|column/i.test(error.message)) {
-    // lead_status.sql not applied yet — degrade gracefully without toggles.
     leadStatusReady = false;
-    const retry = await workspace.client
+    const retry = await client
       .from("calls")
-      .select(CALL_SELECT_LEGACY)
+      .select(CALL_SELECT_LEGACY, { count: "exact" })
       .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .range(from, to);
     data = retry.data as CallRow[] | null;
     error = retry.error;
+    total = retry.count ?? 0;
   }
 
   if (error) {
@@ -197,37 +218,63 @@ export default async function CallsPage() {
     );
   }
 
+  const [todayRes, newRes] = await Promise.all([
+    client
+      .from("calls")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .gte("created_at", dayStart),
+    leadStatusReady
+      ? client
+          .from("calls")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenant.id)
+          .eq("lead_status", "new")
+      : Promise.resolve({ count: 0, error: null }),
+  ]);
+
   const leads = (data || []).map(toLead);
+  const capturedOnPage = leads.filter((l) => l.name || l.reason).length;
+  const todayCount = todayRes.count ?? 0;
+  const newCount = newRes.count ?? 0;
 
   return (
     <div>
-      <div className="flex items-end justify-between gap-4 flex-wrap">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-4xl tracking-tight text-[var(--ink)]">Calls</h1>
-          <p className="mt-2 text-[var(--ink-soft)]">
-            Triage missed-call leads and follow up while they are hot.
+          <h1 className="font-display text-3xl tracking-tight text-[var(--ink)] sm:text-4xl">
+            Calls
+          </h1>
+          <p className="mt-1 text-sm text-[var(--ink-soft)] sm:text-base">
+            Triage leads and follow up while they are hot.
           </p>
         </div>
-        <p className="text-sm text-[var(--ink-soft)]">{leads.length} shown</p>
       </div>
 
-      <KpiStrip tenant={tenant} leads={leads} />
+      <KpiStrip
+        tenant={tenant}
+        todayCount={todayCount}
+        newCount={newCount}
+        capturedOnPage={capturedOnPage}
+      />
 
       {!leadStatusReady ? (
         <p className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-xs text-[var(--ink-soft)]">
-          Lead statuses (New / Contacted / Resolved) need a one-time database update — apply{" "}
+          Lead statuses need a one-time database update. Apply{" "}
           <code>docs/supabase/lead_status.sql</code> in Supabase.
         </p>
       ) : null}
 
       {leads.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--card)] px-4 py-10 text-center text-[var(--ink-soft)]">
-          No calls yet. Place a test call to the SautiKit DID.
+          {total === 0
+            ? "No calls yet. Place a test call to your receptionist number."
+            : "No calls on this page."}
         </div>
       ) : (
         <>
-          {/* Mobile (< md): stacked Lead Cards */}
-          <ul className="mt-6 space-y-3 md:hidden">
+          {/* Mobile + tablet: cards. Desktop lg+: table */}
+          <ul className="mt-6 space-y-3 lg:hidden">
             {leads.map((lead) => (
               <li
                 key={lead.call.id}
@@ -271,9 +318,8 @@ export default async function CallsPage() {
             ))}
           </ul>
 
-          {/* Desktop (md+): classic table */}
-          <div className="mt-6 hidden overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--card)] md:block">
-            <table className="w-full text-left text-sm">
+          <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)] lg:block">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="bg-[var(--bg-deep)]/70 text-[var(--ink-soft)]">
                 <tr>
                   <th className="px-4 py-3 font-medium">When</th>
@@ -319,7 +365,7 @@ export default async function CallsPage() {
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/calls/${lead.call.id}`}
-                        className="text-[var(--accent)] hover:text-[var(--accent-deep)] font-medium"
+                        className="font-medium text-[var(--accent)] hover:text-[var(--accent-deep)]"
                       >
                         Open
                       </Link>
@@ -329,6 +375,8 @@ export default async function CallsPage() {
               </tbody>
             </table>
           </div>
+
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} href="/calls" />
         </>
       )}
     </div>

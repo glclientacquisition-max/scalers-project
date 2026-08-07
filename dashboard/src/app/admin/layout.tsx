@@ -1,16 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
+import { AdminNav } from "@/components/AdminNav";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 
-const NAV = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/businesses", label: "Businesses" },
-  { href: "/admin/numbers", label: "Numbers" },
-];
-
 /**
- * Super Admin shell — Scalers brand on navy chrome.
+ * Super Admin shell.
+ * Mobile: top brand + horizontal nav. Desktop: navy sidebar + content.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!(await isLegacyAuthenticated())) {
@@ -19,8 +14,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen lg:flex">
-      <aside className="flex flex-col border-b border-white/10 bg-brand-900 text-white lg:min-h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r lg:border-white/10">
-        <div className="flex items-center justify-between gap-4 px-5 py-5">
+      <aside className="sticky top-0 z-40 flex flex-col border-b border-white/10 bg-brand-900 text-white lg:min-h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r lg:border-white/10">
+        <div className="flex items-center justify-between gap-4 px-5 py-4 lg:py-5">
           <BrandLockup
             href="/admin"
             name="Scalers"
@@ -36,17 +31,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </form>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-4 lg:mt-2 lg:flex-1 lg:flex-col lg:px-3 lg:pb-0">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-lg px-3 py-2.5 text-sm font-medium text-sky-100/85 transition hover:bg-white/10 hover:text-white whitespace-nowrap"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="px-3 pb-3 lg:flex-1 lg:pb-0">
+          <AdminNav onDark />
+        </div>
 
         <div className="mt-auto hidden border-t border-white/10 px-5 py-5 lg:block">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-sky-200/55">
@@ -61,12 +48,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </aside>
 
       <main className="flex-1 px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
-        <div className="mx-auto max-w-5xl">
-          <div className="mb-8 border-b border-line/80 pb-4 lg:hidden">
-            <BrandLockup href="/admin" name="Scalers" context="Super Admin" size="md" />
-          </div>
-          {children}
-        </div>
+        <div className="mx-auto max-w-5xl">{children}</div>
       </main>
     </div>
   );

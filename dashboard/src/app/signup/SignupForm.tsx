@@ -30,7 +30,7 @@ export function SignupForm() {
   return (
     <form
       action={formAction}
-      className="mt-10 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 shadow-[0_20px_50px_-35px_rgba(28,36,33,0.45)] space-y-4"
+      className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 shadow-lift space-y-4"
     >
       <div>
         <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="business_name">
