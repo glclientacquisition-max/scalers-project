@@ -11,6 +11,7 @@ const {
   formatScheduleSummary,
 } = require('./conversation/businessHours');
 const { buildLiveGroundTruth } = require('./conversation/liveKnowledge');
+const { formatBulletinForPrompt } = require('./conversation/dailyBulletin');
 
 const DEFAULT_KNOWLEDGE = `Business: Jirani Home Services (Nairobi & environs)
 What we do: home repairs and maintenance for homes and small offices.
@@ -80,13 +81,16 @@ Still help the caller from knowledge and capture their details.`;
       ? `HOURS NOTES: ${String(profile.businessHours).trim()}`
       : 'STRUCTURED HOURS: not set';
 
+  const bulletinBlock = formatBulletinForPrompt(profile.dailyBulletin);
+  const bulletinSection = bulletinBlock ? `\n${bulletinBlock}\n` : '\n';
+
   return `CONTEXT HEADER (live — highest priority on this call):
 CURRENT TIME IN KENYA: ${nowLabel}
 YOUR NAME: ${agentName}
 BUSINESS: ${businessName}
 ${hoursLine}
 ${statusBlock}
-IDENTITY: You are ${agentName}. On the first turn (if not already greeted), introduce yourself naturally as ${agentName}.
+${bulletinSection}IDENTITY: You are ${agentName}. On the first turn (if not already greeted), introduce yourself naturally as ${agentName}.
 MOOD: Listen to the caller's tone. If they are frustrated or angry, be empathetic and concise. Do not use cheerful filler words if the user is angry.`;
 }
 

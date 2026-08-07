@@ -431,12 +431,21 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
   // Older DBs may lack newer KA columns — peel them off gradually.
+  if (error && /daily_bulletin/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error && /services_catalog/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
@@ -510,6 +519,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       faqs: [],
       teamDirectory: [],
       unknownAnswerFallback: null,
+      dailyBulletin: [],
     };
   }
 
@@ -535,6 +545,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     faqs: row.faqs || [],
     teamDirectory: row.team_directory || [],
     unknownAnswerFallback: row.unknown_answer_fallback || null,
+    dailyBulletin: row.daily_bulletin || [],
   };
 }
 

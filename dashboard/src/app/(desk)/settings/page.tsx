@@ -1,5 +1,6 @@
 import { getCurrentTenant } from "@/lib/tenant";
 import { TenantForm } from "@/components/TenantForm";
+import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 
 /** Allow Gemini compile + Supabase write without premature platform cutoffs. */
 export const maxDuration = 30;
@@ -49,7 +50,12 @@ export default async function SettingsPage() {
             <span className="font-medium">Admin → Businesses</span>.
           </p>
         ) : null}
-        <div className="mt-6">
+
+        <div className="mt-8 border-t border-[var(--line)] pt-8">
+          <DailyBulletinPanel tenant={tenant} />
+        </div>
+
+        <div className="mt-8 border-t border-[var(--line)] pt-8">
           <TenantForm tenant={tenant} />
         </div>
       </div>

@@ -80,6 +80,15 @@ export type HoursScheduleRow = {
   >;
 };
 
+export type DailyBulletinEntry = {
+  id: string;
+  text: string;
+  active?: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  created_at?: string | null;
+};
+
 export type TenantRow = {
   id: string;
   business_name: string;
@@ -96,6 +105,7 @@ export type TenantRow = {
   team_directory?: TeamDirectoryEntry[] | null;
   faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
+  daily_bulletin?: DailyBulletinEntry[] | null;
   telecom_wallet_balance_kes?: number | null;
   ai_wallet_balance_usd?: number | null;
   is_active: boolean | null;
