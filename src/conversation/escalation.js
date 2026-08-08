@@ -10,6 +10,39 @@ function normalizeQuery(raw) {
     .trim();
 }
 
+/** Strip filler words so "the sales guy" → "sales". */
+function roleSeekTokens(query) {
+  const stop = new Set([
+    'the',
+    'a',
+    'an',
+    'guy',
+    'girl',
+    'person',
+    'people',
+    'team',
+    'department',
+    'dept',
+    'someone',
+    'anybody',
+    'please',
+    'for',
+    'to',
+    'speak',
+    'talk',
+    'with',
+    'want',
+    'need',
+    'looking',
+    'kwa',
+    'na',
+    'ya',
+  ]);
+  return normalizeQuery(query)
+    .split(' ')
+    .filter((t) => t.length >= 2 && !stop.has(t));
+}
+
 /**
  * Pick the best teammate for an escalate query (name or role).
  * @param {unknown} teamDirectory
@@ -17,32 +50,60 @@ function normalizeQuery(raw) {
  * @returns {{ name: string, role: string, phone: string } | null}
  */
 function resolveTeammate(teamDirectory, query) {
-  const team = normalizeTeam(teamDirectory);
-  if (!team.length) return null;
+  return resolveEscalation(teamDirectory, query).teammate;
+}
 
-  const q = normalizeQuery(query);
-  if (!q) return team[0];
+/**
+ * Full escalation resolution with match quality.
+ * Use when the caller asks for a role that may not exist (e.g. "sales"
+ * but directory only has CEO) — still route to a real person, never invent one.
+ *
+ * @returns {{
+ *   teammate: { name: string, role: string, phone: string } | null,
+ *   match: 'exact_name'|'exact_role'|'partial'|'fallback'|null,
+ *   requested: string,
+ * }}
+ */
+function resolveEscalation(teamDirectory, query) {
+  const team = normalizeTeam(teamDirectory);
+  const requested = String(query || '').trim();
+  if (!team.length) {
+    return { teammate: null, match: null, requested };
+  }
+
+  const q = normalizeQuery(requested);
+  if (!q) {
+    return { teammate: team[0], match: 'fallback', requested };
+  }
 
   const exactName = team.find((m) => normalizeQuery(m.name) === q);
-  if (exactName) return exactName;
+  if (exactName) {
+    return { teammate: exactName, match: 'exact_name', requested };
+  }
 
   const exactRole = team.find((m) => normalizeQuery(m.role) === q);
-  if (exactRole) return exactRole;
+  if (exactRole) {
+    return { teammate: exactRole, match: 'exact_role', requested };
+  }
 
-  const nameIncludes = team.find(
-    (m) => normalizeQuery(m.name).includes(q) || q.includes(normalizeQuery(m.name))
-  );
-  if (nameIncludes) return nameIncludes;
+  const nameIncludes = team.find((m) => {
+    const n = normalizeQuery(m.name);
+    return n && (n.includes(q) || q.includes(n));
+  });
+  if (nameIncludes) {
+    return { teammate: nameIncludes, match: 'partial', requested };
+  }
 
-  const roleIncludes = team.find(
-    (m) =>
-      m.role &&
-      (normalizeQuery(m.role).includes(q) || q.includes(normalizeQuery(m.role)))
-  );
-  if (roleIncludes) return roleIncludes;
+  const roleIncludes = team.find((m) => {
+    const r = normalizeQuery(m.role);
+    return r && (r.includes(q) || q.includes(r));
+  });
+  if (roleIncludes) {
+    return { teammate: roleIncludes, match: 'partial', requested };
+  }
 
-  // Keyword overlap (billing, refunds, manager, etc.)
-  const tokens = q.split(' ').filter((t) => t.length >= 3);
+  // Keyword overlap (billing, refunds, manager, sales, etc.)
+  const tokens = roleSeekTokens(requested);
   if (tokens.length) {
     let best = null;
     let bestScore = 0;
@@ -57,10 +118,14 @@ function resolveTeammate(teamDirectory, query) {
         best = m;
       }
     }
-    if (best && bestScore > 0) return best;
+    if (best && bestScore > 0) {
+      return { teammate: best, match: 'partial', requested };
+    }
   }
 
-  return team[0];
+  // No sales / billing / etc. on the list — fall back to first listed person
+  // (often owner/CEO). Caller must be told honestly; notify includes requested role.
+  return { teammate: team[0], match: 'fallback', requested };
 }
 
 function teammateLabel(teammate) {
@@ -79,15 +144,26 @@ function buildEscalationText({
   reason,
   callerNumber,
   recordingUrl,
+  requested,
+  match,
 } = {}) {
   const who = teammateLabel(teammate);
+  const isFallback = match === 'fallback' && requested;
   const lines = [
-    `Escalation for ${who}${businessName ? ` — ${businessName}` : ''}`,
+    isFallback
+      ? `Escalation for ${who}${businessName ? ` — ${businessName}` : ''} (fallback)`
+      : `Escalation for ${who}${businessName ? ` — ${businessName}` : ''}`,
     ``,
     `Caller: ${callerName || '—'}`,
     `Phone: ${callerNumber || '—'}`,
     `Reason: ${reason || '—'}`,
   ];
+  if (isFallback) {
+    lines.push(`Caller asked for: ${requested}`);
+    lines.push(`Note: no exact match in team directory — routed to ${who}`);
+  } else if (requested && match && match !== 'exact_name') {
+    lines.push(`Matched on: ${requested}`);
+  }
   if (teammate?.phone) {
     lines.push(`Teammate phone: ${teammate.phone}`);
   }
@@ -97,7 +173,9 @@ function buildEscalationText({
 
 module.exports = {
   resolveTeammate,
+  resolveEscalation,
   buildEscalationText,
   teammateLabel,
   normalizeQuery,
+  roleSeekTokens,
 };

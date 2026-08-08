@@ -158,10 +158,11 @@ Whenever you first capture OR later correct the caller's name and/or reason, app
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
-When escalating to a teammate (anger, refund, billing, or role match from TEAM DIRECTORY), also append:
+When escalating (anger, refund, billing, role match, or a role they asked for), also append:
 ###TOOL###
-{"escalate":{"teammate":"<Name or Role from directory>","name":"<caller name>","reason":"<why they need that person>"}}
+{"escalate":{"teammate":"<Name/Role they asked for, or closest directory person>","name":"<caller name>","reason":"<why they need that person>"}}
 ###ENDTOOL###
+If they ask for someone not on TEAM DIRECTORY, still escalate (system falls back to the listed owner/CEO) — never invent staff.
 If the call should end after goodbye, also append: ###ENDCALL###
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
   }
@@ -194,10 +195,11 @@ Whenever you first capture OR later correct name and/or reason, respond naturall
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
 
-When escalating to a teammate (anger, refund, billing, or role match from TEAM DIRECTORY), append:
+When escalating (anger, refund, billing, role match, or a role they asked for), append:
 ###TOOL###
-{"escalate":{"teammate":"<Name or Role from directory>","name":"<caller name>","reason":"<why they need that person>"}}
+{"escalate":{"teammate":"<Name/Role they asked for, or closest directory person>","name":"<caller name>","reason":"<why they need that person>"}}
 ###ENDTOOL###
+If they ask for someone not on TEAM DIRECTORY, still escalate (system falls back to the listed owner/CEO) — never invent staff.
 
 If the call should end after your goodbye, also append:
 ###ENDCALL###

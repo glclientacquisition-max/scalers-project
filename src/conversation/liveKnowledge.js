@@ -110,8 +110,11 @@ function buildLiveGroundTruth(profile = {}) {
     'TEAM DIRECTORY (escalation — you are the receptionist, not the expert):',
     formatTeamBlock(team),
     team.length
-      ? 'If a caller is angry, asks for a refund/billing, or matches a role above: acknowledge, say that teammate will follow up shortly, capture name + reason, and append the escalate tool with that teammate name or role. Do not invent live transfers or claim you already WhatsApped them.'
-      : ''
+      ? `ESCALATION RULES:
+- If a caller is angry, asks for a refund/billing, or matches a role above: acknowledge, say that teammate will follow up shortly, capture name + reason, and append the escalate tool with that teammate name or role.
+- If they ask for a role or person NOT on this list (e.g. "sales guy" but only CEO is listed): do NOT invent a sales person. Say you do not have that role on file, offer the closest listed person (usually owner/CEO) to follow up, then escalate to that real person. In the escalate tool, set teammate to who they asked for (e.g. "sales") so the system can fall back and tag the notify.
+- Do not invent live transfers or claim you already WhatsApped them.`
+      : 'ESCALATION: No team directory on file. Do not invent staff. Capture name + reason and say the business will follow up.'
   );
 
   if (unknown) {

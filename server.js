@@ -40,7 +40,7 @@ const {
   sendOwnerTelegram,
 } = require('./src/notifications/telegram');
 const {
-  resolveTeammate,
+  resolveEscalation,
   buildEscalationText,
   teammateLabel,
 } = require('./src/conversation/escalation');
@@ -1286,10 +1286,16 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
     }
 
-    const teammate = resolveTeammate(teamDirectory, escalate.teammate);
+    const resolved = resolveEscalation(teamDirectory, escalate.teammate);
+    const teammate = resolved.teammate;
     const callerName = String(escalate.name || call.name || '').trim() || null;
-    const reason =
+    let reason =
       String(escalate.reason || call.reason || call.escalate_reason || '').trim() || null;
+    // Keep the caller's asked-for role visible when we fall back (sales → CEO).
+    if (resolved.match === 'fallback' && resolved.requested) {
+      const asked = `Asked for ${resolved.requested}`;
+      reason = reason ? `${reason} (${asked})` : asked;
+    }
 
     if (callerName || reason) {
       await db.saveCallerInfo({
@@ -1311,6 +1317,8 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     const body = buildEscalationText({
       ...lead,
       teammate,
+      requested: resolved.requested,
+      match: resolved.match,
     });
 
     let ownerNotified = false;
