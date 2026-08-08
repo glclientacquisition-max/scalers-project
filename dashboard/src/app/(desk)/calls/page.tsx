@@ -70,7 +70,7 @@ function Kpi({
     <div
       className={[
         "rounded-2xl border px-5 py-4",
-        warn ? "border-[var(--warn)]/50 bg-[#fdf3ec]" : "border-[var(--line)] bg-[var(--card)]",
+        warn ? "border-warn/50 bg-warn-soft" : "border-line bg-surface",
       ].join(" ")}
     >
       <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">{label}</p>
@@ -117,14 +117,74 @@ function KpiStrip({
         hint={newCount > 0 ? `${newCount} waiting for follow-up` : "All followed up"}
         warn={newCount > 0}
       />
-      <Kpi label="Leads on page" value={capturedOnPage} hint="Name or reason captured" />
-      <Kpi
-        label="Wallet"
-        value={`KES ${kes.toLocaleString("en-KE")}`}
-        hint={lowWallet ? "Low balance. Top up soon." : "Prepaid KES balance"}
-        warn={lowWallet}
-      />
+      <Kpi label="Leads shown" value={capturedOnPage} hint="Name or reason on this page" />
+      <Link href="/wallet" className="block rounded-2xl focus-visible:outline-none focus-visible:shadow-focus">
+        <Kpi
+          label="Wallet"
+          value={`KES ${kes.toLocaleString("en-KE")}`}
+          hint={lowWallet ? "Low balance. Top up soon." : "Prepaid KES balance"}
+          warn={lowWallet}
+        />
+      </Link>
     </section>
+  );
+}
+
+function EmptyCalls({
+  total,
+  pendingDid,
+  did,
+}: {
+  total: number;
+  pendingDid: boolean;
+  did: string;
+}) {
+  if (total > 0) {
+    return (
+      <div className="mt-6 rounded-2xl border border-line bg-surface px-4 py-10 text-center text-ink-soft">
+        No calls on this page.
+      </div>
+    );
+  }
+
+  if (pendingDid) {
+    return (
+      <div className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-10 text-center">
+        <p className="font-display text-xl tracking-tight text-ink">Number being assigned</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+          Your receptionist line is almost ready. Train the business profile now — once the
+          number is live, place a test call and leads will show up here.
+        </p>
+        <Link
+          href="/settings#train"
+          className="mt-5 inline-flex rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-deep focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          Train receptionist
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-line bg-surface px-4 py-10 text-center text-ink-soft">
+      <p className="font-display text-xl tracking-tight text-ink">No calls yet</p>
+      <p className="mx-auto mt-2 max-w-md text-sm">
+        Place a test call to{" "}
+        <a
+          href={`tel:${did}`}
+          className="font-medium text-accent-deep underline focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          {did}
+        </a>{" "}
+        from another phone. Captured leads will land here for triage.
+      </p>
+      <Link
+        href="/settings#test"
+        className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-accent-deep transition hover:border-accent focus-visible:outline-none focus-visible:shadow-focus"
+      >
+        How to test
+      </Link>
+    </div>
   );
 }
 
@@ -269,11 +329,11 @@ export default async function CallsPage({
       ) : null}
 
       {leads.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--card)] px-4 py-10 text-center text-[var(--ink-soft)]">
-          {total === 0
-            ? "No calls yet. Place a test call to your receptionist number."
-            : "No calls on this page."}
-        </div>
+        <EmptyCalls
+          total={total}
+          pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
+          did={tenant.sautikit_virtual_number}
+        />
       ) : (
         <>
           {/* Mobile + tablet: cards. Desktop lg+: table */}
@@ -283,7 +343,7 @@ export default async function CallsPage({
                 key={lead.call.id}
                 className={[
                   "rounded-2xl border bg-[var(--card)] p-4",
-                  lead.urgent ? "border-[var(--warn)]/50 bg-[#fdf3ec]" : "border-[var(--line)]",
+                  lead.urgent ? "border-warn/50 bg-warn-soft" : "border-line",
                 ].join(" ")}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -338,7 +398,7 @@ export default async function CallsPage({
                     key={lead.call.id}
                     className={[
                       "border-t border-[var(--line)]/70",
-                      lead.urgent ? "bg-[#fdf3ec]" : "",
+                      lead.urgent ? "bg-warn-soft" : "",
                     ].join(" ")}
                   >
                     <td className="px-4 py-3 whitespace-nowrap">

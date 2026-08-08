@@ -9,7 +9,7 @@ export default function LoginPage({
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href="/login" context="Sign in" variant="lockup" priority />
+        <BrandWordmark href="/" context="Sign in" variant="lockup" priority />
         <h1 className="sr-only">Sign in to Scalers</h1>
 
         <form
@@ -28,12 +28,12 @@ export default function LoginPage({
               required
               autoFocus
               autoComplete="email"
-              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[var(--accent)]"
+              className="mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus"
               placeholder="you@business.co.ke"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="password">
+            <label className="block text-sm font-medium text-ink" htmlFor="password">
               Password
             </label>
             <input
@@ -42,14 +42,14 @@ export default function LoginPage({
               type="password"
               required
               autoComplete="current-password"
-              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[var(--accent)]"
+              className="mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus"
               placeholder="••••••••"
             />
           </div>
           <LoginError searchParams={searchParams} />
           <button
             type="submit"
-            className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition"
+            className="w-full rounded-xl bg-accent px-4 py-3 font-medium text-white transition hover:bg-accent-deep focus-visible:outline-none focus-visible:shadow-focus"
           >
             Sign in
           </button>
@@ -77,5 +77,9 @@ async function LoginError({
     sp.error === "1"
       ? "Invalid email or password."
       : decodeURIComponent(sp.error);
-  return <p className="mt-1 text-sm text-[var(--warn)]">{message}</p>;
+  return (
+    <p className="mt-1 text-sm text-warn" role="alert">
+      {message}
+    </p>
+  );
 }

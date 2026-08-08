@@ -44,8 +44,16 @@ export default {
           deep: "var(--accent-deep)",
           soft: "var(--accent-soft)",
         },
-        warn: "var(--warn)",
-        ok: "var(--ok)",
+        warn: {
+          DEFAULT: "var(--warn)",
+          soft: "var(--warn-soft)",
+        },
+        ok: {
+          DEFAULT: "var(--ok)",
+          soft: "var(--ok-soft)",
+        },
+        lead: "var(--lead)",
+        whatsapp: "var(--whatsapp)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "sans-serif"],

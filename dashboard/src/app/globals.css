@@ -18,7 +18,11 @@
   --accent-deep: #005ccc;
   --accent-soft: #eaf6ff;
   --warn: #c2410c;
+  --warn-soft: #fdf3ec;
   --ok: #15803d;
+  --ok-soft: #eaf6f0;
+  --lead: #b98a1f;
+  --whatsapp: #25d366;
 
   --background: var(--bg);
   --foreground: var(--ink);
@@ -45,4 +49,56 @@ h3,
 ::selection {
   background: color-mix(in srgb, var(--brand) 28%, white);
   color: var(--brand-ink);
+}
+
+/* Landing hero motion — presence, not noise */
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-2%, 1.5%, 0) scale(1.04);
+  }
+}
+
+.landing-rise {
+  animation: landing-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-rise-delay-1 {
+  animation-delay: 0.08s;
+}
+
+.landing-rise-delay-2 {
+  animation-delay: 0.16s;
+}
+
+.landing-rise-delay-3 {
+  animation-delay: 0.24s;
+}
+
+.landing-rise-delay-4 {
+  animation-delay: 0.32s;
+}
+
+.landing-drift {
+  animation: landing-drift 18s ease-in-out alternate infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise,
+  .landing-drift {
+    animation: none;
+  }
 }

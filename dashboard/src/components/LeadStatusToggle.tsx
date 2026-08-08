@@ -16,8 +16,8 @@ const STYLES: Record<LeadStatus, { active: string; idle: string }> = {
     idle: "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--warn)]/60",
   },
   contacted: {
-    active: "bg-[#b98a1f] text-white border-[#b98a1f]",
-    idle: "border-[var(--line)] text-[var(--ink-soft)] hover:border-[#b98a1f]/60",
+    active: "bg-lead text-white border-lead",
+    idle: "border-line text-ink-soft hover:border-lead/60",
   },
   resolved: {
     active: "bg-[var(--ok)] text-white border-[var(--ok)]",

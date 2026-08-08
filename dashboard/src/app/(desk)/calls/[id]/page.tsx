@@ -155,8 +155,8 @@ export default async function CallDetailPage({
         className={[
           "mt-6 rounded-2xl border p-5",
           urgent
-            ? "border-[var(--warn)]/50 bg-[#fdf3ec]"
-            : "border-[var(--accent)]/30 bg-[#e8f4f1]",
+            ? "border-warn/50 bg-warn-soft"
+            : "border-accent/30 bg-accent-soft",
         ].join(" ")}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
