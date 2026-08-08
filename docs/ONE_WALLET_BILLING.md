@@ -11,7 +11,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 |---|---|
 | Existing dual balances in production | One-time backfill: `wallet_balance_kes = telecom_kes + round(ai_usd × 130)` |
 | Kenyan SMB payment rails | Wallet is KES-only; M-Pesa/Paystack top-up slots into `topup` ledger kind later |
-| Free-beta tenants at balance 0 | Default `billing_enforcement = soft`: debit (may go negative), **do not block calls** |
+| Free-beta tenants | Default `billing_enforcement = off` (whitelist): meter only, **no charges**. See `BETA_WALLET_PROGRAM.md` |
 | Hangup webhooks fire more than once | `charge_call_to_wallet` is idempotent per `call_id` |
 | Duration can arrive after first terminal event | First non-zero charge wins for v1; later duration upgrades do not double-bill |
 | Monthly line fee with no cron yet | Lazy `apply_line_rental` when Wallet page loads (unique per `YYYY-MM`) |

@@ -37,7 +37,7 @@ function kindLabel(kind: string): string {
   if (kind === "line_rental") return "Line fee";
   if (kind === "admin_adjustment") return "Adjustment";
   if (kind === "topup") return "Top-up";
-  if (kind === "trial_credit") return "Trial";
+  if (kind === "trial_credit") return "Trial / beta credit";
   return kind;
 }
 
@@ -70,6 +70,7 @@ export default async function WalletPage() {
       walletKes: tenant.wallet_balance_kes,
       telecomKes: tenant.telecom_wallet_balance_kes,
       aiUsd: tenant.ai_wallet_balance_usd,
+      billingEnforcement: tenant.billing_enforcement,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -92,7 +93,7 @@ export default async function WalletPage() {
           </p>
         </div>
         <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-medium text-[var(--accent-deep)]">
-          Prepaid · KES
+          {usage.isBeta ? "Free beta — not charged" : "Prepaid · KES"}
         </span>
       </div>
 
@@ -101,16 +102,22 @@ export default async function WalletPage() {
           label="Wallet balance"
           value={`KES ${usage.walletBalanceKes.toLocaleString("en-KE")}`}
           hint={
-            usage.lowBalance
-              ? "Low balance — ask ops to top up (M-Pesa coming soon)."
-              : "Covers line fee + call minutes"
+            usage.isBeta
+              ? "Beta workspace — usage is tracked, nothing is deducted."
+              : usage.lowBalance
+                ? "Low balance — ask Scalers to top up (M-Pesa coming soon)."
+                : "Covers line fee + call minutes"
           }
-          warn={usage.lowBalance}
+          warn={!usage.isBeta && usage.lowBalance}
         />
         <Kpi
-          label="Billed this month"
-          value={`KES ${billedThisMonth.toLocaleString("en-KE")}`}
-          hint={`Calls KES ${usage.callChargesKes.toLocaleString("en-KE")} · Line KES ${usage.lineFeeKes.toLocaleString("en-KE")}`}
+          label={usage.isBeta ? "Would cost this month" : "Billed this month"}
+          value={`KES ${(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString("en-KE")}`}
+          hint={
+            usage.isBeta
+              ? `Illustrative at KES ${WALLET_RATE_KES_PER_MINUTE}/min (not charged)`
+              : `Calls KES ${usage.callChargesKes.toLocaleString("en-KE")} · Line KES ${usage.lineFeeKes.toLocaleString("en-KE")}`
+          }
         />
       </section>
 
@@ -134,28 +141,20 @@ export default async function WalletPage() {
         </dl>
         <p className="mt-4 text-xs text-[var(--ink-soft)] leading-relaxed">
           Rate card: KES {WALLET_RATE_KES_PER_MINUTE}/min (AI included) + KES{" "}
-          {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo line fee when a number is
-          assigned. Soft billing: usage is deducted; calls are not blocked at zero yet.
+          {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo line fee
+          {usage.isBeta
+            ? ". You are on the beta whitelist — metered only."
+            : ". Soft billing: usage is deducted; calls are not blocked at zero yet."}
         </p>
-        {usage.daysRemainingAtPace != null ? (
-          <p className="mt-2 text-sm text-[var(--ink)]">
-            At your current call volume, KES {usage.walletBalanceKes.toLocaleString("en-KE")} would
-            last about <strong>{usage.daysRemainingAtPace} days</strong>.
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Add balance via platform ops to see how long it would last at your pace.
-          </p>
-        )}
       </section>
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <h2 className="font-display text-2xl tracking-tight">Recent activity</h2>
         {usage.recentLedger.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--ink-soft)]">
-            No ledger entries yet. Apply{" "}
-            <code className="text-xs">docs/supabase/one_wallet_billing.sql</code> and seed a
-            balance to start.
+            {usage.isBeta
+              ? "No charges while on free beta. Usage still appears above."
+              : "No ledger entries yet."}
           </p>
         ) : (
           <ul className="mt-4 divide-y divide-[var(--line)]">

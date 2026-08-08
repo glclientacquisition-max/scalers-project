@@ -54,6 +54,12 @@ export default async function AdminOverviewPage() {
           Add / manage numbers
         </Link>
         <Link
+          href="/admin/wallets"
+          className="rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)]"
+        >
+          Manage wallets
+        </Link>
+        <Link
           href="/admin/businesses"
           className="rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)]"
         >

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 /** Retail rate card (KES). AI usage is bundled into the per-minute rate. */
 export const WALLET_RATE_KES_PER_MINUTE = Number(
@@ -37,6 +38,8 @@ export type TenantUsageSummary = {
   daysRemainingAtPace: number | null;
   walletBalanceKes: number;
   lowBalance: boolean;
+  billingEnforcement: string;
+  isBeta: boolean;
   recentLedger: WalletLedgerRow[];
 };
 
@@ -66,21 +69,23 @@ export function resolveWalletBalanceKes(wallets: {
 }
 
 /**
- * Lazy-apply monthly line rental (idempotent). Safe if RPC missing (pre-migration).
+ * Lazy-apply monthly line rental via service role only (owners cannot choose amount).
+ * No-op when workspace is on beta (`billing_enforcement = off`).
  */
 export async function ensureLineRentalApplied(
-  client: SupabaseClient,
   tenantId: string,
   amountKes: number = WALLET_LINE_FEE_KES_PER_MONTH
 ): Promise<number | null> {
-  const { data, error } = await client.rpc("apply_line_rental", {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("apply_line_rental", {
     p_tenant_id: tenantId,
     p_period: currentPeriodUtc(),
     p_amount_kes: amountKes,
   });
   if (error) {
-    // Pre-migration or enforcement off — ignore.
-    if (/function|does not exist|schema cache/i.test(error.message)) return null;
+    if (/function|does not exist|schema cache|permission|not authorized/i.test(error.message)) {
+      return null;
+    }
     throw error;
   }
   const row = Array.isArray(data) ? data[0] : data;
@@ -90,15 +95,25 @@ export async function ensureLineRentalApplied(
 export async function getTenantUsageSummary(
   client: SupabaseClient,
   tenantId: string,
-  wallets: { walletKes?: number | null; telecomKes?: number | null; aiUsd?: number | null }
+  wallets: {
+    walletKes?: number | null;
+    telecomKes?: number | null;
+    aiUsd?: number | null;
+    billingEnforcement?: string | null;
+  }
 ): Promise<TenantUsageSummary> {
   let walletBalanceKes = resolveWalletBalanceKes(wallets);
+  const billingEnforcement = wallets.billingEnforcement || "off";
+  const isBeta = billingEnforcement === "off";
 
-  try {
-    const applied = await ensureLineRentalApplied(client, tenantId);
-    if (applied != null) walletBalanceKes = applied;
-  } catch {
-    // Non-fatal: usage still loads.
+  // Only charge line fee for prepaid workspaces.
+  if (billingEnforcement !== "off") {
+    try {
+      const applied = await ensureLineRentalApplied(tenantId);
+      if (applied != null) walletBalanceKes = applied;
+    } catch {
+      // Non-fatal: usage still loads.
+    }
   }
 
   const since = startOfMonthUtcIso();
@@ -184,7 +199,9 @@ export async function getTenantUsageSummary(
     lineFeeKes,
     daysRemainingAtPace,
     walletBalanceKes,
-    lowBalance: walletBalanceKes < WALLET_LOW_BALANCE_KES,
+    lowBalance: !isBeta && walletBalanceKes < WALLET_LOW_BALANCE_KES,
+    billingEnforcement,
+    isBeta,
     recentLedger,
   };
 }

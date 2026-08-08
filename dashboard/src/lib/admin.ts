@@ -99,14 +99,18 @@ export async function adjustTenantWallet(opts: {
   businessId: string;
   deltaKes: number;
   note?: string;
+  actor?: string;
+  idempotencyKey?: string;
 }): Promise<{ wallet_balance_kes: number }> {
   const admin = getSupabaseAdmin();
+  const note = (opts.note || "Wallet adjustment").trim();
 
-  // Prefer one-arg KES RPC; fall back to legacy dual-delta signature.
   const primary = await admin.rpc("adjust_tenant_wallet", {
     p_tenant_id: opts.businessId,
     p_delta_kes: opts.deltaKes,
-    p_note: opts.note || null,
+    p_note: note,
+    p_actor: opts.actor || "ops",
+    p_idempotency_key: opts.idempotencyKey || null,
   });
 
   if (!primary.error) {
@@ -118,7 +122,7 @@ export async function adjustTenantWallet(opts: {
     p_tenant_id: opts.businessId,
     p_telecom_delta_kes: opts.deltaKes,
     p_ai_delta_usd: 0,
-    p_note: opts.note || null,
+    p_note: note,
   });
   if (legacy.error) throw primary.error || legacy.error;
   const row = Array.isArray(legacy.data) ? legacy.data[0] : legacy.data;

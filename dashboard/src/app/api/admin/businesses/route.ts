@@ -58,10 +58,19 @@ export async function POST(request: Request) {
       if (combined === 0) {
         return NextResponse.json({ error: "Enter a non-zero amount" }, { status: 400 });
       }
+      const note = String(body.note || "").trim();
+      if (note.length < 3) {
+        return NextResponse.json(
+          { error: "Note required (min 3 chars) for wallet adjusts" },
+          { status: 400 }
+        );
+      }
       const wallets = await adjustTenantWallet({
         businessId,
         deltaKes: combined,
-        note: String(body.note || "").trim() || undefined,
+        note,
+        actor: String(body.actor || "ops").trim() || "ops",
+        idempotencyKey: String(body.idempotency_key || "").trim() || undefined,
       });
       return NextResponse.json({
         ok: true,
