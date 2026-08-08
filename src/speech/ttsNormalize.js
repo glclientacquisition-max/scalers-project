@@ -1,6 +1,12 @@
 // Prepare spoken text for clearer Soniox TTS pronunciation on phone calls.
 
-const { applyLexicon } = require('./pronunciationLexicon');
+const {
+  applyLexicon,
+  envLexiconOverrides,
+  parseLexiconOverrides,
+} = require('./pronunciationLexicon');
+const { expandPhones, expandSpokenForms } = require('./spokenForms');
+const { shouldRewriteSheng, rewriteShengForTts } = require('./shengRewrite');
 
 const SW_UTTERANCE_MARKERS =
   /\b(habari|sawa|asante|karibu|tafadhali|nina|nataka|ningependa|ndiyo|hapana|kwaheri|jina|msaada|kidogo|naweza|unaweza|ninaomba|naomba|pole|samahani|bei|huduma|nitakupigia|nakucheckia|shida|kesho|leo)\b/gi;
@@ -14,17 +20,6 @@ function stripMarkup(text) {
     .replace(/[*_`#]+/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-/**
- * Expand phone-ish digit runs so TTS reads digit-by-digit.
- * @param {string} text
- */
-function expandPhones(text) {
-  return String(text || '').replace(/\+(\d[\d\s-]{7,}\d)/g, (_, digits) => {
-    const d = String(digits).replace(/\D/g, '');
-    return d.split('').join(' ');
-  });
 }
 
 /**
@@ -51,7 +46,6 @@ function detectUtteranceTtsLang(text) {
   const swHits = (raw.match(SW_UTTERANCE_MARKERS) || []).length;
   if (swHits >= 2) return 'sw';
   if (swHits >= 1 && /^[\p{L}\s,'’\-?!.,]+$/u.test(raw.trim())) {
-    // Single clear SW token on an otherwise simple line (e.g. "Sawa.", "Asante sana.")
     const enCue =
       /\b(hello|hi|please|thanks|thank you|okay|call|name|need|want|service|price|how much|i will|i'll|we can|can you)\b/i.test(
         raw
@@ -79,7 +73,6 @@ function resolveTtsLanguage(text, callLanguage, forcedLanguage) {
   if (utterance) return utterance;
 
   if (callLanguage === 'sw') {
-    // Sticky SW, but if the line is clearly English-only, stay on EN for clarity.
     const raw = String(text || '').toLowerCase();
     const swHits = (raw.match(SW_UTTERANCE_MARKERS) || []).length;
     const enHeavy =
@@ -95,11 +88,23 @@ function resolveTtsLanguage(text, callLanguage, forcedLanguage) {
 }
 
 /**
+ * Merge env + tenant/session lexicon overrides (tenant wins on same match).
+ * @param {unknown} [extra]
+ */
+function mergeExtraLexicon(extra) {
+  const fromEnv = envLexiconOverrides();
+  const fromOpts = parseLexiconOverrides(extra);
+  if (!fromEnv.length) return fromOpts;
+  if (!fromOpts.length) return fromEnv;
+  return [...fromOpts, ...fromEnv];
+}
+
+/**
  * Full TTS prep pipeline:
- * strip markup → lexicon → phone expand → punctuation polish.
+ * strip markup → Sheng rewrite → lexicon → money/time/days → phones → punctuation.
  *
  * @param {string} text
- * @param {{ callLanguage?: string, language?: string }} [opts]
+ * @param {{ callLanguage?: string, language?: string, extraLexicon?: unknown }} [opts]
  * @returns {{ original: string, text: string, language: 'en'|'sw' }}
  */
 function prepareForTts(text, opts = {}) {
@@ -109,9 +114,14 @@ function prepareForTts(text, opts = {}) {
   }
 
   const language = resolveTtsLanguage(original, opts.callLanguage, opts.language);
+  const extras = mergeExtraLexicon(opts.extraLexicon);
 
   let spoken = stripMarkup(original);
-  spoken = applyLexicon(spoken, language);
+  if (shouldRewriteSheng(spoken, opts.callLanguage)) {
+    spoken = rewriteShengForTts(spoken);
+  }
+  spoken = applyLexicon(spoken, language, extras);
+  spoken = expandSpokenForms(spoken, language);
   spoken = expandPhones(spoken);
   spoken = polishPunctuation(spoken);
 
@@ -142,4 +152,5 @@ module.exports = {
   prepareForTts,
   normalizeForTts,
   pickTtsLanguage,
+  mergeExtraLexicon,
 };
