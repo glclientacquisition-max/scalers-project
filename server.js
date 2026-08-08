@@ -32,6 +32,11 @@ const {
   shouldSkipCallerTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
+const {
+  adaptiveFlushMs,
+  evaluateBargeIn,
+  looksLikeEcho: turnLooksLikeEcho,
+} = require('./src/speech/turnTaking');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
@@ -827,38 +832,39 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
+  let lastBargeSkipLogAt = 0;
   function maybeBargeIn(text, source) {
-    const agentBusy = speaking || turnBusy;
-    if (!agentBusy) return false;
-    if (text.length <= 2) return false;
-    // Ignore short backchannels ("Okay.", "Sawa", "Hello?") so they don't
-    // cancel a real answer mid-sentence.
-    if (isBackchannel(text)) return false;
-    // Echo filter only matters while TTS audio is in the caller's ear.
-    if (speaking && looksLikeEcho(text)) return false;
-    if (speaking) {
-      const spokenForMs = Date.now() - speakStartedAt;
-      // Tiny grace so the first TTS phonemes do not self-trigger barge-in.
-      if (spokenForMs < 120) return false;
+    const decision = evaluateBargeIn({
+      text,
+      speaking,
+      turnBusy,
+      speakStartedAt,
+      lastAgentText,
+      isBackchannel,
+    });
+    if (!decision.barge) {
+      // Rate-limited diagnostics (interim STT is chatty).
+      const now = Date.now();
+      const sample = String(text || '').trim();
+      if (
+        (speaking || turnBusy) &&
+        sample.length >= 5 &&
+        now - lastBargeSkipLogAt > 900 &&
+        decision.reason !== 'idle'
+      ) {
+        lastBargeSkipLogAt = now;
+        console.log(
+          `[ws/media][${sidLabel()}] barge skipped (${decision.reason}) src=${source}: ${sample.slice(0, 80)}`
+        );
+      }
+      return false;
     }
-    cancelSpeech(source);
+    cancelSpeech(`${source}/${decision.reason}`);
     return true;
   }
 
   function looksLikeEcho(text) {
-    const a = String(text || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const b = String(lastAgentText || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!a || !b) return false;
-    if (b.includes(a) || a.includes(b.slice(0, Math.min(40, b.length)))) return true;
-    return false;
+    return turnLooksLikeEcho(text, lastAgentText);
   }
 
   function kickPendingTurn() {
@@ -1014,8 +1020,15 @@ mediaWss.on('connection', (ws, req) => {
 
   function scheduleUtteranceFlush() {
     if (utteranceTimer) clearTimeout(utteranceTimer);
-    // Fallback if Soniox endpoint marker is delayed/missing (tuned near max_endpoint_delay).
-    const flushMs = Number(process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 1200);
+    // Adaptive fallback if Soniox endpoint marker is delayed/missing.
+    const pendingText = utteranceParts.join('').replace(/\s+/g, ' ').trim();
+    const flushMs = adaptiveFlushMs({
+      text: pendingText,
+      lastAgentText,
+    });
+    console.log(
+      `[ws/media][${sidLabel()}] schedule flush in ${flushMs}ms chars=${pendingText.length}`
+    );
     utteranceTimer = setTimeout(() => flushUtterance(), flushMs);
   }
 

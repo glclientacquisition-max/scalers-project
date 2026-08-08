@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "test:tts": "node tests/ttsNormalize.test.js",
+    "test:turns": "node tests/turnTaking.test.js",
+    "test:voice": "npm run test:tts && npm run test:turns",
     "smoke:db": "node scripts/smoke-db.js",
     "tunnel": "node scripts/tunnel.js",
     "tunnel:localtunnel": "node scripts/tunnel.js",
