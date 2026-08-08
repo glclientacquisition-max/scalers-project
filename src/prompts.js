@@ -143,14 +143,11 @@ function buildSystemPrompt(profile = {}) {
   const header = buildContextHeader(profile);
   const liveTruth = buildLiveGroundTruth(profile);
   const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
-  const escalationEnabled = profile.escalationEnabled !== false;
-  const escalateTools = escalationEnabled
-    ? `When escalating (anger, refund, billing, role match, or a role they asked for), also append:
+  const escalateTools = `When escalating (anger, refund, billing, role match, or a role they asked for), also append:
 ###TOOL###
 {"escalate":{"teammate":"<Name/Role they asked for, or closest directory person>","name":"<caller name>","reason":"<why they need that person>"}}
 ###ENDTOOL###
-If they ask for someone not on TEAM DIRECTORY, still escalate (system falls back to General queries / owner/CEO) — never invent staff.`
-    : `Escalation alerts are OFF for this business — do not append the escalate tool. Still capture name + reason normally.`;
+If they ask for someone not on TEAM DIRECTORY, still escalate (system falls back to General queries / owner/CEO) — never invent staff.`;
 
   // Tenant-provided full prompt wins, but we still prepend live context + ground truth.
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {

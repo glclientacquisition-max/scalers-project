@@ -1,10 +1,8 @@
--- Per-business toggle: escalate / notify teammates from Team Directory.
--- Default ON. When off, the receptionist still helps callers but does not
--- fire escalation notifications (Telegram / later WhatsApp).
--- ASCII-only (safe for Supabase SQL Editor).
+-- LEGACY / unused by the app.
+-- Column may still exist on older DBs from an interim Telegram alerts toggle.
+-- Scalers does not expose or read this setting anymore; scale path is
+-- per-tenant WhatsApp owner/teammate numbers, not a global Telegram switch.
+-- Safe to leave the column in place; do not re-wire product UI to it.
 
-alter table public.tenants
-  add column if not exists escalation_enabled boolean not null default true;
-
-comment on column public.tenants.escalation_enabled is
-  'When true, send Telegram/WhatsApp call alerts (leads + team escalation). When false, save calls to Inbox only — no alert messages.';
+-- alter table public.tenants
+--   add column if not exists escalation_enabled boolean not null default true;

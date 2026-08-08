@@ -5,13 +5,13 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TENANT_SELECT =
-  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, services_offered, services_catalog, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, escalation_enabled, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, llm_system_prompt, services_offered, services_catalog, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
 const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
 
 function isMissingProfileColumnError(message: string): boolean {
-  return /business_hours|hours_schedule|after_hours_mode|services_offered|services_catalog|agent_name|agent_tone|team_directory|faqs|unknown_answer_fallback|daily_bulletin|escalation_enabled|column/i.test(
+  return /business_hours|hours_schedule|after_hours_mode|services_offered|services_catalog|agent_name|agent_tone|team_directory|faqs|unknown_answer_fallback|daily_bulletin|alert_email|column/i.test(
     message
   );
 }

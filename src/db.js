@@ -491,13 +491,13 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, escalation_enabled, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
   // Older DBs may lack newer KA columns — peel them off gradually.
-  if (error && /escalation_enabled/i.test(error.message)) {
+  if (error && /alert_email/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
       .select(
@@ -583,13 +583,13 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessHours: null,
       agentTone: null,
       afterHoursMode: 'serve',
-      escalationEnabled: true,
       servicesCatalog: [],
       servicesOffered: null,
       faqs: [],
       teamDirectory: [],
       unknownAnswerFallback: null,
       dailyBulletin: [],
+      alertEmail: null,
     };
   }
 
@@ -606,11 +606,11 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     llmSystemPrompt: row.llm_system_prompt || null,
     knowledge: process.env.BUSINESS_KNOWLEDGE || null,
     whatsappNumber: row.whatsapp_notification_number || null,
+    alertEmail: row.alert_email || null,
     did: row.sautikit_virtual_number || null,
     hoursSchedule: row.hours_schedule || null,
     businessHours: row.business_hours || null,
     afterHoursMode,
-    escalationEnabled: row.escalation_enabled !== false,
     servicesCatalog: row.services_catalog || [],
     servicesOffered: row.services_offered || null,
     faqs: row.faqs || [],
