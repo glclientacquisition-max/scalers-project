@@ -89,7 +89,7 @@ function buildEscalationText({
     `Reason: ${reason || '—'}`,
   ];
   if (teammate?.phone) {
-    lines.push(`Teammate WhatsApp: ${teammate.phone}`);
+    lines.push(`Teammate phone: ${teammate.phone}`);
   }
   if (recordingUrl) lines.push(`Recording: ${recordingUrl}`);
   return lines.join('\n');

@@ -1260,9 +1260,11 @@ const escalationNotifyInProgress = new Set();
 
 /**
  * Real escalation notify from TEAM DIRECTORY (not prompt-only).
- * - Telegram owner chat tagged with teammate name (when configured)
- * - WhatsApp teammate phone when present + SautiKit WhatsApp configured
- * - Else WhatsApp owner alert number with escalation copy
+ *
+ * Live path today: Telegram owner chat, tagged with teammate name/role.
+ * WhatsApp (teammate or owner) is only attempted when Telegram is NOT
+ * configured — same interim policy as owner leads, until WA Business works.
+ * Set ESCALATION_WHATSAPP=1 to also try teammate WhatsApp after Telegram.
  */
 async function maybeSendEscalationNotification(callSid, escalate = {}) {
   const call = await db.getCall(callSid);
@@ -1313,8 +1315,11 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     let ownerNotified = false;
     let teammateNotified = false;
+    const telegramReady = isTelegramConfigured();
+    const forceWhatsApp = String(process.env.ESCALATION_WHATSAPP || '').trim() === '1';
 
-    if (isTelegramConfigured()) {
+    // Primary live channel: Telegram (interim until WhatsApp Business is ready).
+    if (telegramReady) {
       const result = await sendOwnerTelegram({ text: body, lead });
       ownerNotified = true;
       console.log(
@@ -1323,7 +1328,9 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       );
     }
 
-    if (isWhatsAppConfigured()) {
+    // WhatsApp only when Telegram is unavailable, or explicitly opted in.
+    const tryWhatsApp = isWhatsAppConfigured() && (!telegramReady || forceWhatsApp);
+    if (tryWhatsApp) {
       const teammatePhone = teammate?.phone ? String(teammate.phone).trim() : '';
       if (teammatePhone) {
         try {
@@ -1335,7 +1342,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
           );
         } catch (err) {
           console.warn(
-            `[${callSid}] WhatsApp to teammate failed, will try owner:`,
+            `[${callSid}] WhatsApp to teammate failed:`,
             err?.message || err
           );
         }
@@ -1347,29 +1354,19 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
             `[${callSid}] Escalation WhatsApp skipped: no teammate phone or owner number`
           );
         } else {
-          const result = await sendOwnerWhatsApp({ to: ownerNumber, body, lead });
-          ownerNotified = true;
-          console.log(`[${callSid}] WhatsApp escalation to owner:`, result);
-        }
-      } else if (!ownerNotified && ownerNumber && teammateNotified) {
-        // Teammate got the ping; also mirror to owner alert number when distinct.
-        const { normalizeWhatsAppTo } = require('./src/notifications/whatsapp');
-        const tNorm = normalizeWhatsAppTo(teammatePhone);
-        const oNorm = normalizeWhatsAppTo(ownerNumber);
-        if (tNorm && oNorm && tNorm !== oNorm) {
           try {
-            await sendOwnerWhatsApp({ to: ownerNumber, body, lead });
+            const result = await sendOwnerWhatsApp({ to: ownerNumber, body, lead });
             ownerNotified = true;
-            console.log(`[${callSid}] WhatsApp escalation mirrored to owner`);
+            console.log(`[${callSid}] WhatsApp escalation to owner:`, result);
           } catch (err) {
-            console.warn(`[${callSid}] Owner mirror WhatsApp failed:`, err?.message || err);
+            console.warn(`[${callSid}] WhatsApp escalation to owner failed:`, err?.message || err);
           }
         }
       }
     }
 
     if (!ownerNotified && !teammateNotified) {
-      console.warn(`[${callSid}] Escalation notify skipped (no Telegram / WhatsApp). Ready:`, {
+      console.warn(`[${callSid}] Escalation notify skipped (no working channel). Ready:`, {
         teammate: teammateLabel(teammate),
         name: lead.name,
         phone: lead.callerNumber,

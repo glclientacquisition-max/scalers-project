@@ -706,8 +706,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               Team Directory
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              People the AI can escalate to. Add a Phone / WhatsApp so that person
-              actually gets alerted when the AI routes a call to them.
+              People the AI can escalate to. Alerts go to your owner Telegram now,
+              tagged with that person&apos;s name. Phone is stored for WhatsApp
+              later once Business messaging is live.
             </p>
           </div>
           <button
