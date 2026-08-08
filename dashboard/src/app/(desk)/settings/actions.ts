@@ -63,14 +63,6 @@ export async function saveAndCompileSettings(
   const hoursSchedule = parseHoursSchedule(formData.get("hours_schedule"));
   const locationNotes = String(formData.get("location_notes") || "").trim();
   const afterHoursMode = parseAfterHoursMode(formData.get("after_hours_mode"));
-  const escalationEnabledRaw = String(formData.get("escalation_enabled") || "")
-    .trim()
-    .toLowerCase();
-  const escalationEnabled =
-    escalationEnabledRaw === "1" ||
-    escalationEnabledRaw === "true" ||
-    escalationEnabledRaw === "on" ||
-    escalationEnabledRaw === "yes";
   const scheduleForSave = hoursSchedule
     ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
     : null;
@@ -130,7 +122,6 @@ export async function saveAndCompileSettings(
     business_hours: businessHours,
     hours_schedule: scheduleForSave,
     after_hours_mode: afterHoursMode,
-    escalation_enabled: escalationEnabled,
     agent_name: agentName,
     agent_tone: agentTone,
     team_directory: teamDirectory,
@@ -142,11 +133,6 @@ export async function saveAndCompileSettings(
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
 
   if (error) {
-    if (/escalation_enabled/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/escalation_enabled.sql in Supabase.`,
-      };
-    }
     if (/unknown_answer_fallback/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/employee_training.sql in Supabase.`,

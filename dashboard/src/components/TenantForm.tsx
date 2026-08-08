@@ -135,9 +135,6 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [afterHoursMode, setAfterHoursMode] = useState<AfterHoursMode>(() =>
     parseAfterHoursMode(tenant.after_hours_mode)
   );
-  const [escalationEnabled, setEscalationEnabled] = useState(
-    () => tenant.escalation_enabled !== false
-  );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
     return rows.length ? rows : [emptyMember()];
@@ -280,11 +277,6 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
       <input type="hidden" name="location_notes" value={locationNotes} />
       <input type="hidden" name="after_hours_mode" value={afterHoursMode} />
-      <input
-        type="hidden"
-        name="escalation_enabled"
-        value={escalationEnabled ? "true" : "false"}
-      />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
@@ -714,9 +706,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               Team Directory
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              People the AI can escalate to. Alerts go to your owner Telegram now,
-              tagged with that person&apos;s name. Phone is stored for WhatsApp
-              later once Business messaging is live.
+              People the AI can escalate to. Add Phone / WhatsApp on each person for
+              when Business messaging is live. Tip: use role{" "}
+              <span className="font-medium text-[var(--ink)]">General queries</span> as
+              the catch-all when someone asks for a role you have not listed.
             </p>
           </div>
           <button
@@ -726,40 +719,6 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           >
             Add teammate
           </button>
-        </div>
-
-        <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-[var(--ink)]">Call alerts (Telegram)</p>
-              <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-                When on: teammate escalation + lead alerts go to Telegram.
-                When off: calls still save in Inbox, but no alert messages are sent.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={escalationEnabled}
-              onClick={() => setEscalationEnabled((v) => !v)}
-              className={[
-                "relative h-8 w-14 shrink-0 rounded-full transition duration-200",
-                escalationEnabled ? "bg-[#0096FF]" : "bg-[var(--line)]",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "absolute top-1 left-1 h-6 w-6 rounded-full bg-white shadow transition duration-200",
-                  escalationEnabled ? "translate-x-6" : "translate-x-0",
-                ].join(" ")}
-              />
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-[var(--ink-soft)]">
-            Save &amp; train after changing this. Tip: add a teammate with role{" "}
-            <span className="font-medium text-[var(--ink)]">General queries</span> as
-            the catch-all when someone asks for a role you have not listed (like sales).
-          </p>
         </div>
 
         <div className="space-y-4">

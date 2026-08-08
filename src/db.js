@@ -491,21 +491,12 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, escalation_enabled, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
   // Older DBs may lack newer KA columns — peel them off gradually.
-  if (error && /escalation_enabled/i.test(error.message)) {
-    ({ data, error } = await supabase
-      .from('tenants')
-      .select(
-        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
-      )
-      .eq('id', tenantId)
-      .maybeSingle());
-  }
   if (error && /daily_bulletin/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
@@ -583,7 +574,6 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessHours: null,
       agentTone: null,
       afterHoursMode: 'serve',
-      escalationEnabled: true,
       servicesCatalog: [],
       servicesOffered: null,
       faqs: [],
@@ -610,7 +600,6 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     hoursSchedule: row.hours_schedule || null,
     businessHours: row.business_hours || null,
     afterHoursMode,
-    escalationEnabled: row.escalation_enabled !== false,
     servicesCatalog: row.services_catalog || [],
     servicesOffered: row.services_offered || null,
     faqs: row.faqs || [],

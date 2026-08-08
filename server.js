@@ -1277,20 +1277,13 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
     let businessName = process.env.BUSINESS_NAME || null;
     let teamDirectory = [];
-    let escalationEnabled = true;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       businessName = profile.businessName || businessName;
       teamDirectory = profile.teamDirectory || [];
-      escalationEnabled = profile.escalationEnabled !== false;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
-    }
-
-    if (!escalationEnabled) {
-      console.log(`[${callSid}] Escalation notify skipped (call alerts off in settings)`);
-      return;
     }
 
     const resolved = resolveEscalation(teamDirectory, escalate.teammate);
@@ -1424,11 +1417,6 @@ async function maybeSendWhatsAppNotification(callSid) {
     let businessName = process.env.BUSINESS_NAME || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
-      // Same Settings toggle as escalation: when off, no Telegram/WhatsApp pings.
-      if (profile.escalationEnabled === false) {
-        console.log(`[${callSid}] Owner alert skipped (call alerts off in settings)`);
-        return;
-      }
       ownerNumber = profile.whatsappNumber || ownerNumber;
       businessName = profile.businessName || businessName;
     } catch (err) {
