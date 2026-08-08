@@ -146,6 +146,7 @@ export async function ensureTenantForUser(opts: {
     llm_system_prompt: defaultTenantLlmPrompt(businessName),
     is_active: true,
     wallet_balance_kes: 0,
+    billing_enforcement: "off",
     telecom_wallet_balance_kes: 0,
     ai_wallet_balance_usd: 0,
   };
