@@ -361,14 +361,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <section className="space-y-5 border-t border-[var(--line)] pt-8">
         <div>
           <label className="block text-sm font-medium" htmlFor="owner">
-            Owner alert number (WhatsApp later / reference)
+            Owner alert WhatsApp number
           </label>
           <input
             id="owner"
             value={ownerWhatsapp}
             onChange={(e) => setOwnerWhatsapp(e.target.value)}
+            placeholder="+2547…"
             className={fieldClass}
           />
+          <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
+            Used for lead alerts once WhatsApp Business messaging is connected.
+            Add teammate phones in Team Directory for escalation routing.
+          </p>
         </div>
 
         <div className="space-y-4">
@@ -706,8 +711,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               Team Directory
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              People the AI can escalate to. Add Phone / WhatsApp on each person for
-              when Business messaging is live. Tip: use role{" "}
+              People the AI can escalate to. Their Phone / WhatsApp is the plug-and-play
+              destination when Business messaging is connected. Tip: use role{" "}
               <span className="font-medium text-[var(--ink)]">General queries</span> as
               the catch-all when someone asks for a role you have not listed.
             </p>
