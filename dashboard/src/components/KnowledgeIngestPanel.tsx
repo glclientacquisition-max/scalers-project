@@ -187,8 +187,19 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               disabled={extractPending}
               className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
             >
-              {extractPending ? "Scanning…" : "Scan and suggest"}
+              {extractPending
+                ? mode === "url"
+                  ? "Opening page…"
+                  : "Finding services…"
+                : "Scan and suggest"}
             </button>
+            {extractPending ? (
+              <p className="text-xs text-[var(--ink-soft)]">
+                {mode === "url"
+                  ? "Usually under 10 seconds. If the site hides its menu in the browser, we’ll ask you to paste instead."
+                  : "Usually a few seconds."}
+              </p>
+            ) : null}
           </form>
         </div>
       ) : (
