@@ -1289,7 +1289,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     }
 
     if (!escalationEnabled) {
-      console.log(`[${callSid}] Escalation notify skipped (disabled in settings)`);
+      console.log(`[${callSid}] Escalation notify skipped (call alerts off in settings)`);
       return;
     }
 
@@ -1424,6 +1424,11 @@ async function maybeSendWhatsAppNotification(callSid) {
     let businessName = process.env.BUSINESS_NAME || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
+      // Same Settings toggle as escalation: when off, no Telegram/WhatsApp pings.
+      if (profile.escalationEnabled === false) {
+        console.log(`[${callSid}] Owner alert skipped (call alerts off in settings)`);
+        return;
+      }
       ownerNumber = profile.whatsappNumber || ownerNumber;
       businessName = profile.businessName || businessName;
     } catch (err) {

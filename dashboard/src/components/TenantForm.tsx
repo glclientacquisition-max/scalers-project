@@ -731,10 +731,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-[var(--ink)]">Escalation alerts</p>
+              <p className="text-sm font-medium text-[var(--ink)]">Call alerts (Telegram)</p>
               <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-                When on, the AI can route callers to teammates and notify Telegram.
-                Turn off if you only want normal lead capture.
+                When on: teammate escalation + lead alerts go to Telegram.
+                When off: calls still save in Inbox, but no alert messages are sent.
               </p>
             </div>
             <button
@@ -756,7 +756,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             </button>
           </div>
           <p className="mt-3 text-xs text-[var(--ink-soft)]">
-            Tip: add a teammate with role <span className="font-medium text-[var(--ink)]">General queries</span> as
+            Save &amp; train after changing this. Tip: add a teammate with role{" "}
+            <span className="font-medium text-[var(--ink)]">General queries</span> as
             the catch-all when someone asks for a role you have not listed (like sales).
           </p>
         </div>
