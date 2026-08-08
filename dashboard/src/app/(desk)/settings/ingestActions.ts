@@ -23,6 +23,7 @@ import {
   type IngestDraft,
 } from "@/lib/ingest/extract";
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
+import { parseAgentTools } from "@/lib/agentTools";
 
 export type IngestExtractState = {
   error?: string;
@@ -248,6 +249,7 @@ export async function applyIngestAction(
   const servicesOffered = formatServicesForCompiler(merged.services, "");
   const agentName = String(tenant.agent_name || "Receptionist").trim() || "Receptionist";
 
+  const agentTools = parseAgentTools(tenant.agent_tools);
   const { prompt, source } = await compileReceptionistPrompt({
     businessName: tenant.business_name,
     servicesOffered,
@@ -257,6 +259,7 @@ export async function applyIngestAction(
     teamDirectory: merged.team,
     faqs: merged.faqs,
     unknownAnswerFallback: merged.unknownAnswerFallback,
+    escalateEnabled: agentTools.escalate,
   });
 
   const workspace = await createWorkspaceDataClient();

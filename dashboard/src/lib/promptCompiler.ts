@@ -18,7 +18,8 @@ Requirements for the prompt you write:
 - Include an IDENTITY section with: agent name, how to introduce on the first turn ("Hello, you've reached <Business>, this is <Agent> speaking."), tone guidance matching the chosen tone, and a mood rule (if the caller is frustrated or angry, drop cheerful filler and stay empathetic and concise).
 - Include a BUSINESS KNOWLEDGE section with: business name, services & pricing (as given), hours & location (as given), languages (English, Kiswahili, Sheng — match the caller).
 - If golden FAQs are provided, include a GOLDEN FAQs section. Treat each Q/A as authoritative. The receptionist must answer those questions from the given answers and must not invent alternatives.
-- If a team directory is provided, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Rule: the AI is the receptionist, not the expert. For anger, refunds, billing, or a matching role, acknowledge, say that teammate will follow up, capture name + reason, and use the escalate tool. If the caller asks for a role not on the list (e.g. sales when only CEO is listed), do not invent staff — offer the closest listed person (usually owner/CEO) and still escalate. Do not invent live transfers.
+- If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Rule: the AI is the receptionist, not the expert. For anger, refunds, billing, or a matching role, acknowledge, say that teammate will follow up, capture name + reason, and use the escalate tool. If the caller asks for a role not on the list (e.g. sales when only CEO is listed), do not invent staff — offer the closest listed person (usually owner/CEO) and still escalate. Do not invent live transfers.
+- If escalation is disabled, still list the team for awareness but instruct: do not escalate; capture name + reason and say the business will follow up.
 - Include a short "Your job on this call" checklist: answer from knowledge and FAQs only, get name (confirm once if unsure of pronunciation/spelling), get reason, confirm, goodbye. If the caller corrects their name, use the corrected name going forward.
 - Include live-phone conversation rules: answer first (no stalling), never end a turn on a closed/status fact alone (always say how you can still help and ask one next question), at most one clarifying question per turn, match EN/SW/Sheng, 1–2 short spoken sentences, never invent prices/availability/people outside knowledge.
 - If an "unknown request line" is provided, add a rule: when a caller asks for something outside the business knowledge and FAQs, respond with that exact line (adapted to the caller's language) instead of a generic deflection.
@@ -82,6 +83,8 @@ export async function compileReceptionistPrompt(opts: {
   faqs?: FaqItem[];
   /** Owner-written line for requests outside the business knowledge. */
   unknownAnswerFallback?: string;
+  /** Default true. When false, prompt must not instruct escalate tool use. */
+  escalateEnabled?: boolean;
 }): Promise<{ prompt: string; source: "gemini" | "local" }> {
   const answers: OnboardingAnswers = {
     servicesPricing: opts.servicesOffered.trim(),
@@ -92,7 +95,14 @@ export async function compileReceptionistPrompt(opts: {
   const unknownLine = (opts.unknownAnswerFallback || "").trim();
   const teamDirectory = opts.teamDirectory || [];
   const faqs = opts.faqs || [];
-  const extras = { agentName, teamDirectory, faqs, unknownAnswerFallback: unknownLine };
+  const escalateEnabled = opts.escalateEnabled !== false;
+  const extras = {
+    agentName,
+    teamDirectory,
+    faqs,
+    unknownAnswerFallback: unknownLine,
+    escalateEnabled,
+  };
 
   if (!process.env.GEMINI_API_KEY) {
     return {
@@ -115,6 +125,7 @@ export async function compileReceptionistPrompt(opts: {
       "",
       "Team directory (Name | Role | Phone):",
       formatTeamForCompiler(teamDirectory),
+      `Escalation tool: ${escalateEnabled ? "ENABLED" : "DISABLED — do not instruct escalate"}`,
       "",
       "Golden FAQs:",
       formatFaqsForCompiler(faqs),

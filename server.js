@@ -16,6 +16,10 @@ const {
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
 const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
+const { parseAgentTools } = require('./src/conversation/agentTools');
+
+/** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
+const callAgentTools = new Map();
 const {
   detectCallerLanguage,
   resolveCallLanguage,
@@ -730,6 +734,9 @@ mediaWss.on('connection', (ws, req) => {
       openStatus = openClosedStatus(hoursSchedule);
       closureNotice = bulletinClosureNotice(profile.dailyBulletin);
       systemPrompt = buildSystemPrompt(profile);
+      if (sessionCallSid) {
+        callAgentTools.set(sessionCallSid, parseAgentTools(profile.agentTools));
+      }
       greetingLine = buildGreeting(businessName, {
         agentName,
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
@@ -739,8 +746,9 @@ mediaWss.on('connection', (ws, req) => {
       messages = [{ role: 'system', content: systemPrompt }];
       profileLoaded = true;
       profileCallSid = sessionCallSid;
+      const tools = parseAgentTools(profile.agentTools);
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} langs=en,sw,sheng(auto)`
       );
     } catch (err) {
       profileLoaded = true;
@@ -1453,6 +1461,7 @@ wss.on('connection', (ws) => {
         try {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
           systemPrompt = buildSystemPrompt(profile);
+          callAgentTools.set(callSid, parseAgentTools(profile.agentTools));
           messages = [{ role: 'system', content: systemPrompt }];
         } catch (err) {
           console.warn(`[${callSid}] tenant prompt load failed:`, err?.message || err);
@@ -1623,8 +1632,11 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
+  const tools = callAgentTools.get(callSid) || parseAgentTools(null);
   const spokenText = parsed.spokenText || AI_FALLBACK_LINE;
-  const shouldEndCall = parsed.shouldEndCall;
+  // Honor owner tool toggles even if the model still emitted markers.
+  if (!tools.escalate) parsed.escalate = null;
+  const shouldEndCall = Boolean(parsed.shouldEndCall && tools.end_call);
 
   if (parsed.name || parsed.reason) {
     // Partial updates allowed so a name correction can overwrite without re-sending reason.

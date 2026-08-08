@@ -108,6 +108,8 @@ export type TenantRow = {
   faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
   daily_bulletin?: DailyBulletinEntry[] | null;
+  /** Receptionist tool toggles: escalate, end_call. */
+  agent_tools?: { escalate?: boolean; end_call?: boolean } | null;
   wallet_balance_kes?: number | null;
   wallet_low_balance_kes?: number | null;
   billing_enforcement?: "soft" | "hard" | "off" | null;

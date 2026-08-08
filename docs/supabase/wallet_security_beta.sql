@@ -506,7 +506,8 @@ grant update (
   daily_bulletin,
   voice_languages,
   voice_language_other,
-  escalation_enabled
+  escalation_enabled,
+  agent_tools
 ) on public.tenants to authenticated;
 
 -- ---------------------------------------------------------------------------
