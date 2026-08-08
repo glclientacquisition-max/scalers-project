@@ -353,7 +353,9 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           ) : null}
 
           <div className="space-y-2">
-            <p className="text-sm font-medium text-[var(--ink)]">How should we add these?</p>
+            <p className="text-sm font-medium text-[var(--ink)]">
+              Keep your current list, or start fresh?
+            </p>
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
@@ -365,9 +367,10 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                     : "border-[var(--line)] bg-white",
                 ].join(" ")}
               >
-                <span className="font-medium">Add to what I already have</span>
+                <span className="font-medium">Keep my current list</span>
                 <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
-                  Recommended. Skips duplicates.
+                  Safe choice. We add the new ones you tick — nothing already
+                  saved gets deleted.
                 </span>
               </button>
               <button
@@ -380,9 +383,10 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                     : "border-[var(--line)] bg-white",
                 ].join(" ")}
               >
-                <span className="font-medium">Replace services &amp; FAQs</span>
+                <span className="font-medium">Start fresh</span>
                 <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
-                  Only the items you tick stay.
+                  Clears your old services &amp; FAQs. Only what you tick now
+                  stays.
                 </span>
               </button>
             </div>
