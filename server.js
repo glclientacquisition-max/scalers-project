@@ -905,48 +905,32 @@ mediaWss.on('connection', (ws, req) => {
     const turnSystemPrompt = `${systemPrompt}\n\n${languageDirective(callLanguage)}`;
 
     try {
-      const geminiPromise = process.env.GEMINI_API_KEY
-        ? runGeminiTurn(messages, sidLabel(), turnSystemPrompt)
-        : Promise.resolve({
-            spokenText:
-              callLanguage === 'sw'
-                ? 'Asante — mtu kutoka kwa biashara atakupigia simu hivi karibuni.'
-                : 'Thanks — someone from the business will call you back shortly.',
-            shouldEndCall: true,
-          });
-
-      // Default: silence while Gemini thinks (feels human, not scripted).
-      // VOICE_FILLER=ack → one tiny contextual backchannel ("Sawa." / "Alright.").
-      // VOICE_FILLER=auto|custom → legacy hold phrase (discouraged).
-      const fillerMode = (process.env.VOICE_FILLER || 'off').toLowerCase();
+      // VOICE_FILLER=auto (default): adaptive ack only if first spoken audio is slow.
+      // ack → always schedule a tiny backchannel; off → silence; custom → fixed phrase.
+      const fillerMode = (process.env.VOICE_FILLER || 'auto').toLowerCase();
       const useFiller =
-        Boolean(tts) &&
-        fillerMode !== 'off' &&
-        !fillerUsedThisCall;
-      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 1500);
+        Boolean(tts) && fillerMode !== 'off' && !fillerUsedThisCall;
+      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 550);
       const fillerText =
-        fillerMode === 'ack'
+        fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, callLanguage)
-          : fillerMode === 'auto'
-            ? pickContextualAck(clean, callLanguage)
-            : process.env.VOICE_FILLER;
+          : process.env.VOICE_FILLER;
       let fillerPromise = Promise.resolve();
       let fillerStarted = false;
+      let firstSpokenChunk = false;
 
       if (useFiller && fillerText) {
         fillerPromise = new Promise((resolve) => {
           fillerTimer = setTimeout(() => {
             fillerTimer = null;
-            if (turnBusy && !speaking && !bargeInActive) {
+            // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
+            if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
               fillerStarted = true;
               fillerUsedThisCall = true;
               console.log(
                 `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
               );
-              speakText(fillerText).then(
-                resolve,
-                resolve
-              );
+              speakText(fillerText).then(resolve, resolve);
             } else {
               resolve();
             }
@@ -954,29 +938,131 @@ mediaWss.on('connection', (ws, req) => {
         });
       }
 
-      const result = await geminiPromise;
-      clearFillerTimer();
-      if (fillerStarted && tts) {
-        try {
-          tts.cancel();
-        } catch {
-          /* ignore */
+      const streamOn =
+        Boolean(process.env.GEMINI_API_KEY) &&
+        Boolean(tts) &&
+        (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
+
+      let speakSession = null;
+      let streamPlaybackGen = 0;
+      const spokenChunks = [];
+
+      async function stopFillerForReply() {
+        clearFillerTimer();
+        if (fillerStarted && tts) {
+          try {
+            tts.cancel();
+          } catch {
+            /* ignore */
+          }
+          fillerStarted = false;
+          await fillerPromise.catch(() => {});
         }
-        await fillerPromise.catch(() => {});
       }
 
-      const reply = result?.spokenText || AI_FALLBACK_LINE;
+      async function onSpokenChunk(chunk) {
+        const text = String(chunk || '').trim();
+        if (!text || !tts) return;
+        firstSpokenChunk = true;
+        await stopFillerForReply();
+        if (bargeInActive) return;
 
-      // Caller interrupted while Gemini was generating — drop the unspoken reply.
-      if (bargeInActive) {
-        console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
-        discardUnspokenAssistant(reply);
-        bargeInActive = false;
-        return;
+        if (!speakSession) {
+          speaking = true;
+          speakStartedAt = Date.now();
+          activePlaybackGeneration = ++playbackGeneration;
+          streamPlaybackGen = activePlaybackGeneration;
+          speakSession = await tts.beginSpeak({
+            callLanguage,
+            extraLexicon: ttsLexiconOverrides,
+          });
+          console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
+        }
+        if (bargeInActive) {
+          try {
+            speakSession.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+          return;
+        }
+        speakSession.pushText(text);
+        spokenChunks.push(text);
+        lastAgentText = spokenChunks.join(' ');
       }
 
-      transcriptLog.push(`Agent: ${reply}`);
-      await speakText(reply);
+      let result;
+      if (!process.env.GEMINI_API_KEY) {
+        result = {
+          spokenText:
+            callLanguage === 'sw'
+              ? 'Asante — mtu kutoka kwa biashara atakupigia simu hivi karibuni.'
+              : 'Thanks — someone from the business will call you back shortly.',
+          shouldEndCall: true,
+        };
+        await stopFillerForReply();
+        if (!bargeInActive) {
+          transcriptLog.push(`Agent: ${result.spokenText}`);
+          await speakText(result.spokenText);
+        }
+      } else if (streamOn) {
+        result = await runGeminiTurnStreaming(messages, sidLabel(), turnSystemPrompt, {
+          onSpokenChunk,
+          shouldAbort: () => bargeInActive,
+        });
+        await stopFillerForReply();
+
+        if (speakSession) {
+          if (bargeInActive) {
+            try {
+              speakSession.cancel();
+            } catch {
+              /* ignore */
+            }
+            console.log(`[ws/media][${sidLabel()}] discarding streamed reply after barge-in`);
+            discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
+            bargeInActive = false;
+            speakSession = null;
+            if (activePlaybackGeneration === streamPlaybackGen) speaking = false;
+            return;
+          }
+          try {
+            await speakSession.end();
+          } catch (err) {
+            console.error(
+              `[ws/media][${sidLabel()}] TTS stream end failed:`,
+              err?.message || err
+            );
+          } finally {
+            if (activePlaybackGeneration === streamPlaybackGen) speaking = false;
+            speakSession = null;
+          }
+          const reply = result?.spokenText || spokenChunks.join(' ') || AI_FALLBACK_LINE;
+          transcriptLog.push(`Agent: ${reply}`);
+        } else if (!bargeInActive) {
+          // Stream produced no flushable chunks (or TTS never opened) — speak full reply.
+          const reply = result?.spokenText || AI_FALLBACK_LINE;
+          transcriptLog.push(`Agent: ${reply}`);
+          await speakText(reply);
+        } else {
+          discardUnspokenAssistant(result?.spokenText || '');
+          bargeInActive = false;
+          return;
+        }
+      } else {
+        result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt);
+        await stopFillerForReply();
+        const reply = result?.spokenText || AI_FALLBACK_LINE;
+        if (bargeInActive) {
+          console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
+          discardUnspokenAssistant(reply);
+          bargeInActive = false;
+          return;
+        }
+        transcriptLog.push(`Agent: ${reply}`);
+        await speakText(reply);
+      }
 
       if (result?.shouldEndCall && !bargeInActive) {
         console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
@@ -1600,6 +1686,134 @@ async function generateGeminiText({
   return text;
 }
 
+function buildGeminiContents(messages) {
+  const recentMessages = messages.slice(-CONTEXT_WINDOW);
+  return recentMessages
+    .filter((message) => message.role !== 'system')
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: message.content }],
+    }));
+}
+
+function geminiVoiceConfig(systemPrompt) {
+  return {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    // Lower temp + short output → faster, clearer phone replies.
+    temperature: 0.45,
+    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 160),
+    // MINIMAL keeps voice latency down; set GEMINI_THINKING_LEVEL=LOW if needed.
+    thinkingConfig: {
+      thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
+    },
+  };
+}
+
+/**
+ * Apply parsed tool markers (save_caller_info / escalate) for a call turn.
+ */
+async function applyGeminiTools(callSid, parsed) {
+  const tools = callAgentTools.get(callSid) || parseAgentTools(null);
+  if (!tools.escalate) parsed.escalate = null;
+  const shouldEndCall = Boolean(parsed.shouldEndCall && tools.end_call);
+
+  if (parsed.name || parsed.reason) {
+    const saved = await db.saveCallerInfo({
+      callSid,
+      name: parsed.name || undefined,
+      reason: parsed.reason || undefined,
+    });
+    if (saved?.name && saved?.reason && !parsed.escalate) {
+      maybeSendWhatsAppNotification(callSid);
+    }
+  }
+
+  if (parsed.escalate) {
+    maybeSendEscalationNotification(callSid, parsed.escalate).catch((err) => {
+      console.error(`[${callSid}] escalate notify error:`, err?.message || err);
+    });
+  }
+
+  return shouldEndCall;
+}
+
+/**
+ * Stream Gemini tokens → onSpokenChunk (sentence/clause flushes) → TTS.
+ * Falls back to non-streaming generateContent on stream failure.
+ */
+async function runGeminiTurnStreaming(
+  messages,
+  callSid,
+  systemPrompt = buildSystemPrompt(),
+  { onSpokenChunk, shouldAbort } = {}
+) {
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const contents = buildGeminiContents(messages);
+  const buffer = createSpokenStreamBuffer();
+  let fullText = '';
+  let streamFailed = false;
+
+  try {
+    console.log(
+      `[${callSid}] Calling Gemini stream (model: ${model}, messages: ${messages.length})`
+    );
+    const stream = await getGeminiClient().models.generateContentStream({
+      model,
+      contents,
+      config: geminiVoiceConfig(systemPrompt),
+    });
+
+    for await (const chunk of stream) {
+      if (shouldAbort?.()) {
+        console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
+        break;
+      }
+      const delta = extractGeminiText(chunk);
+      if (!delta) continue;
+      fullText += delta;
+      const pieces = buffer.push(delta);
+      for (const piece of pieces) {
+        if (shouldAbort?.()) break;
+        if (typeof onSpokenChunk === 'function') {
+          await onSpokenChunk(piece);
+        }
+      }
+    }
+    console.log(
+      `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
+    );
+  } catch (err) {
+    streamFailed = true;
+    console.error(
+      `[${callSid}] Gemini stream failed, falling back to generateContent:`,
+      err?.message || err
+    );
+  }
+
+  if (streamFailed && !fullText) {
+    return runGeminiTurn(messages, callSid, systemPrompt);
+  }
+
+  if (!shouldAbort?.()) {
+    for (const piece of buffer.finish()) {
+      if (typeof onSpokenChunk === 'function') {
+        await onSpokenChunk(piece);
+      }
+    }
+  } else {
+    // Finalize buffer state without speaking remainder.
+    buffer.finish();
+  }
+
+  const parsed = parseGeminiResponse(fullText || buffer.getRaw());
+  const spokenText =
+    buffer.getSpokenEmitted() || parsed.spokenText || AI_FALLBACK_LINE;
+  const shouldEndCall = await applyGeminiTools(callSid, parsed);
+
+  messages.push({ role: 'assistant', content: spokenText });
+  return { spokenText, shouldEndCall, streamed: !streamFailed };
+}
+
 // Runs one turn of the conversation through Gemini, preserving the chat
 // history and executing the caller-info / end-call signals via structured
 // markers returned in the model output.
@@ -1608,14 +1822,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   const maxAttempts = Math.max(1, Number(process.env.GEMINI_MAX_RETRIES || 3));
   let response;
   let lastErr = null;
-
-  const recentMessages = messages.slice(-CONTEXT_WINDOW);
-  const contents = recentMessages
-    .filter((message) => message.role !== 'system')
-    .map((message) => ({
-      role: message.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: message.content }],
-    }));
+  const contents = buildGeminiContents(messages);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -1626,16 +1833,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
       response = await getGeminiClient().models.generateContent({
         model,
         contents,
-        config: {
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          // Lower temp + short output → faster, clearer phone replies.
-          temperature: 0.45,
-          maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 160),
-          // MINIMAL keeps voice latency down; set GEMINI_THINKING_LEVEL=LOW if needed.
-          thinkingConfig: {
-            thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
-          },
-        },
+        config: geminiVoiceConfig(systemPrompt),
       });
       console.log(`[${callSid}] Gemini response received`);
       lastErr = null;
@@ -1663,30 +1861,8 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
-  const tools = callAgentTools.get(callSid) || parseAgentTools(null);
   const spokenText = parsed.spokenText || AI_FALLBACK_LINE;
-  // Honor owner tool toggles even if the model still emitted markers.
-  if (!tools.escalate) parsed.escalate = null;
-  const shouldEndCall = Boolean(parsed.shouldEndCall && tools.end_call);
-
-  if (parsed.name || parsed.reason) {
-    // Partial updates allowed so a name correction can overwrite without re-sending reason.
-    const saved = await db.saveCallerInfo({
-      callSid,
-      name: parsed.name || undefined,
-      reason: parsed.reason || undefined,
-    });
-    // If this turn also escalates, the escalation path notifies (richer message).
-    if (saved?.name && saved?.reason && !parsed.escalate) {
-      maybeSendWhatsAppNotification(callSid);
-    }
-  }
-
-  if (parsed.escalate) {
-    maybeSendEscalationNotification(callSid, parsed.escalate).catch((err) => {
-      console.error(`[${callSid}] escalate notify error:`, err?.message || err);
-    });
-  }
+  const shouldEndCall = await applyGeminiTools(callSid, parsed);
 
   messages.push({ role: 'assistant', content: spokenText });
 

@@ -148,65 +148,147 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
   }
 
   /**
-   * Speak full text (non-streaming LLM for now). Returns when stream terminates.
-   * Runs prepareForTts unless opts.alreadyPrepared is set.
-   * @param {string} text
-   * @param {{ language?: string, callLanguage?: string, alreadyPrepared?: boolean, speed?: number }} [opts]
+   * Open a Soniox TTS stream that accepts incremental text chunks (LLM→TTS).
+   * @param {{ language?: string, callLanguage?: string, speed?: number, alreadyPrepared?: boolean, extraLexicon?: unknown }} [opts]
    */
-  async function speak(text, opts = {}) {
-    const prepared = opts.alreadyPrepared
-      ? {
-          original: String(text || ''),
-          text: String(text || '').trim(),
-          language:
-            opts.language === 'sw' || opts.language === 'en'
-              ? opts.language
-              : process.env.SONIOX_TTS_LANGUAGE || 'en',
-        }
-      : prepareForTts(text, {
-          callLanguage: opts.callLanguage,
-          language: opts.language,
-        });
-
-    const clean = prepared.text;
-    if (!clean) return { cancelled: false };
+  async function beginSpeak(opts = {}) {
     if (closed) throw new Error('TTS session closed');
-
     await ensureConnected();
 
     const streamId = `tts-${randomUUID()}`;
-    const language = prepared.language;
-    const speed =
-      opts.speed != null ? clampSpeed(opts.speed) : speedForLanguage(language);
+    // Language may be refined on first push via prepareForTts.
+    let language =
+      opts.language === 'sw' || opts.language === 'en'
+        ? opts.language
+        : null;
+    const speedHint = opts.speed != null ? clampSpeed(opts.speed) : null;
+    let speed = speedHint;
+    let configured = false;
+    let ended = false;
 
     const done = new Promise((resolve, reject) => {
       active.set(streamId, { resolve, reject, cancelled: false });
     });
 
-    sendJson({
-      api_key: apiKey,
-      model: SONIOX_TTS_MODEL,
-      language,
-      voice,
-      speed,
-      audio_format: 'pcm_s16le',
-      sample_rate: SAMPLE_RATE,
-      stream_id: streamId,
-    });
-    sendJson({ text: clean, text_end: false, stream_id: streamId });
-    sendJson({ text: '', text_end: true, stream_id: streamId });
+    function ensureConfigured(resolvedLang) {
+      if (configured) return;
+      language = resolvedLang === 'sw' ? 'sw' : 'en';
+      speed = speedHint != null ? speedHint : speedForLanguage(language);
+      sendJson({
+        api_key: apiKey,
+        model: SONIOX_TTS_MODEL,
+        language,
+        voice,
+        speed,
+        audio_format: 'pcm_s16le',
+        sample_rate: SAMPLE_RATE,
+        stream_id: streamId,
+      });
+      configured = true;
+      console.log(
+        `[soniox-tts][${callSid}] begin stream=${streamId} lang=${language} speed=${speed}`
+      );
+    }
 
-    const changed = prepared.original !== clean;
-    console.log(
-      `[soniox-tts][${callSid}] speak stream=${streamId} lang=${language} speed=${speed} chars=${clean.length}` +
-        (changed ? ` normalized=1` : '') +
-        ` original=${JSON.stringify(prepared.original)} spoken=${JSON.stringify(clean)}`
-    );
+    /**
+     * Push one text chunk into the open stream.
+     * @param {string} text
+     */
+    function pushText(text) {
+      if (ended || closed) return { pushed: false };
+      const prepared = opts.alreadyPrepared
+        ? {
+            original: String(text || ''),
+            text: String(text || '').trim(),
+            language: language || opts.language || process.env.SONIOX_TTS_LANGUAGE || 'en',
+          }
+        : prepareForTts(text, {
+            callLanguage: opts.callLanguage,
+            language: opts.language || language || undefined,
+            extraLexicon: opts.extraLexicon,
+          });
+      const clean = prepared.text;
+      if (!clean) return { pushed: false, language: prepared.language };
 
-    return done;
+      ensureConfigured(prepared.language);
+      sendJson({ text: clean, text_end: false, stream_id: streamId });
+      console.log(
+        `[soniox-tts][${callSid}] chunk stream=${streamId} chars=${clean.length}` +
+          ` original=${JSON.stringify(prepared.original)} spoken=${JSON.stringify(clean)}`
+      );
+      return { pushed: true, language: prepared.language, text: clean };
+    }
+
+    /**
+     * Signal text_end and wait for Soniox terminated.
+     */
+    async function end() {
+      if (ended) return done.catch(() => ({ cancelled: true }));
+      ended = true;
+      if (!configured) {
+        // Nothing spoken — resolve without opening a Soniox stream.
+        const waiter = active.get(streamId);
+        if (waiter) {
+          active.delete(streamId);
+          waiter.resolve({ cancelled: false, empty: true });
+        }
+        return { cancelled: false, empty: true };
+      }
+      try {
+        sendJson({ text: '', text_end: true, stream_id: streamId });
+      } catch (err) {
+        const waiter = active.get(streamId);
+        if (waiter) {
+          active.delete(streamId);
+          waiter.reject(err);
+        }
+        throw err;
+      }
+      return done;
+    }
+
+    function cancel() {
+      ended = true;
+      if (!configured) {
+        const waiter = active.get(streamId);
+        if (waiter) {
+          active.delete(streamId);
+          waiter.resolve({ cancelled: true, empty: true });
+        }
+        return;
+      }
+      cancelStream(streamId);
+    }
+
+    return {
+      streamId,
+      pushText,
+      end,
+      cancel,
+      done,
+      get language() {
+        return language;
+      },
+    };
   }
 
-  function cancel(streamId) {
+  /**
+   * Speak full text. Returns when stream terminates.
+   * Runs prepareForTts unless opts.alreadyPrepared is set.
+   * @param {string} text
+   * @param {{ language?: string, callLanguage?: string, alreadyPrepared?: boolean, speed?: number, extraLexicon?: unknown }} [opts]
+   */
+  async function speak(text, opts = {}) {
+    const session = await beginSpeak(opts);
+    const pushed = session.pushText(text);
+    if (!pushed.pushed) {
+      session.cancel();
+      return { cancelled: false, empty: true };
+    }
+    return session.end();
+  }
+
+  function cancelStream(streamId) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const targets = streamId ? [streamId] : [...active.keys()];
     for (const id of targets) {
@@ -218,6 +300,10 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
         console.warn(`[soniox-tts][${callSid}] cancel failed:`, err?.message || err);
       }
     }
+  }
+
+  function cancel(streamId) {
+    cancelStream(streamId);
   }
 
   function close() {
@@ -235,6 +321,7 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
 
   return {
     ready: ensureConnected(),
+    beginSpeak,
     speak,
     cancel,
     close,
