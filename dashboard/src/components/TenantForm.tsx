@@ -966,7 +966,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3">
             <p className="text-sm text-[var(--ink)]">Start with a common question</p>
             <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Tap one to fill the first blank — edit it to match your business.
+              Tap one to fill the first blank, then edit it to match your business.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {FAQ_STARTERS.map((starter) => (
@@ -1031,7 +1031,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 />
                 {faqDupIndexes.has(index) ? (
                   <p id={`faq-dup-${index}`} className="mt-1 text-xs text-[var(--warn)]" role="status">
-                    Same as another FAQ — keep one clear wording.
+                    Same as another FAQ. Keep one clear wording.
                   </p>
                 ) : null}
               </div>

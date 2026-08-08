@@ -22,16 +22,16 @@ export const AGENT_TOOL_OPTIONS: {
     label: "Alert a teammate",
     blurb:
       "When a caller is angry, asks for a refund, or wants a specific person, notify that teammate (WhatsApp or email).",
-    onLabel: "On — send alerts",
-    offLabel: "Off — just take a note",
+    onLabel: "On: send alerts",
+    offLabel: "Off: just take a note",
   },
   {
     id: "end_call",
     label: "Hang up after goodbye",
     blurb:
       "Let the receptionist end the call after a clear goodbye. Turn off if you prefer the line to stay open.",
-    onLabel: "On — can hang up",
-    offLabel: "Off — stay on the line",
+    onLabel: "On: can hang up",
+    offLabel: "Off: stay on the line",
   },
 ];
 

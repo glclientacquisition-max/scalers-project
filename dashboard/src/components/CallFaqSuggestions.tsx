@@ -122,7 +122,7 @@ export function CallFaqSuggestions({
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]" id="call-faq-help">
           If the caller asked something useful, we&apos;ll suggest a Golden FAQ. You
-          edit and approve — nothing goes live on its own.
+          edit and approve. Nothing goes live on its own.
         </p>
       </div>
 

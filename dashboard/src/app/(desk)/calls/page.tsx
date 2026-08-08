@@ -152,8 +152,7 @@ function EmptyCalls({
       <div className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-10 text-center">
         <p className="font-display text-xl tracking-tight text-ink">Number being assigned</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-          Your receptionist line is almost ready. Train the business profile now — once the
-          number is live, place a test call and leads will show up here.
+          Your assistant line is almost ready. Train the business profile now. Once the number is live, place a test call and leads will show up here.
         </p>
         <Link
           href="/settings#train"

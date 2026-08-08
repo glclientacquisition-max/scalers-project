@@ -237,7 +237,7 @@ export function AdminWalletsPanel({
 
       {creditTarget ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
-          <p className="font-medium">Credit / debit — {creditTarget.business_name}</p>
+          <p className="font-medium">Credit / debit: {creditTarget.business_name}</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Current balance KES {creditTarget.wallet_balance_kes.toLocaleString("en-KE")}. Positive
             credits, negative debits. Requires a reason. Logged to ops audit.
@@ -309,7 +309,7 @@ export function AdminWalletsPanel({
 
       {modeTarget ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
-          <p className="font-medium">Billing plan — {modeTarget.business_name}</p>
+          <p className="font-medium">Billing plan: {modeTarget.business_name}</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Current:{" "}
             <strong>
@@ -330,9 +330,9 @@ export function AdminWalletsPanel({
                 onChange={(e) => setMode(e.target.value as BillingMode)}
                 className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
               >
-                <option value="off">Beta — free (off)</option>
-                <option value="soft">Prepaid — soft</option>
-                <option value="hard">Prepaid — hard</option>
+                <option value="off">Beta (free)</option>
+                <option value="soft">Prepaid (soft)</option>
+                <option value="hard">Prepaid (hard)</option>
               </select>
             </label>
             <label className="text-sm">
@@ -388,7 +388,7 @@ export function AdminWalletsPanel({
       {ledgerTarget ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="font-medium">Ledger — {ledgerTarget.business_name}</p>
+            <p className="font-medium">Ledger: {ledgerTarget.business_name}</p>
             <button
               type="button"
               className="text-sm text-[var(--ink-soft)]"

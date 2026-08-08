@@ -199,7 +199,7 @@ export default async function CallDetailPage({
             <p className="mt-2 text-sm text-[var(--ink)]">
               Escalated to {escalatedTo.name}
               {escalatedTo.role ? ` (${escalatedTo.role})` : ""}
-              {escalateReason ? ` — ${escalateReason}` : ""}
+              {escalateReason ? `: ${escalateReason}` : ""}
             </p>
           ) : null}
           {!row.recording_url ? (

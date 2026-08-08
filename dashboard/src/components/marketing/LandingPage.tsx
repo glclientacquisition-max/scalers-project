@@ -3,7 +3,7 @@ import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
 
 /**
- * Logged-out marketing home — one hero composition:
+ * Logged-out marketing home: one hero composition.
  * brand → value → single CTA group. Authenticated users never see this.
  */
 export function LandingPage() {
@@ -57,12 +57,12 @@ export function LandingPage() {
             </div>
 
             <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem]">
-              Your receptionist answers every missed call.
+              The autonomous business assistant for Kenyan SMEs.
             </h1>
 
             <p className="landing-rise landing-rise-delay-3 mt-4 max-w-md text-base leading-relaxed text-sky-100/90 sm:text-lg">
-              Capture the caller&apos;s name and reason, then get the lead on WhatsApp — busy,
-              after hours, or mid-job.
+              Answers when you&apos;re busy, after hours, or on-site. Captures the
+              caller&apos;s name and reason, then sends the lead to WhatsApp.
             </p>
 
             <div className="landing-rise landing-rise-delay-4 mt-10 flex flex-wrap items-center gap-3">
@@ -83,7 +83,7 @@ export function LandingPage() {
         </section>
 
         <p className="landing-rise landing-rise-delay-4 text-xs text-sky-100/55 sm:text-sm">
-          Built for East African businesses that can&apos;t afford a missed lead.
+          Built for local businesses in Kenya that can&apos;t afford a missed lead.
         </p>
       </div>
     </main>

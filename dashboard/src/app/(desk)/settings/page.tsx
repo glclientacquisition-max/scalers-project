@@ -56,8 +56,8 @@ export default async function SettingsPage() {
       </p>
       {pendingDid ? (
         <p className="mt-2 text-xs text-ink-soft">
-          We&apos;re assigning your number. You can keep training now — testing goes live as
-          soon as the line is ready.
+          We&apos;re assigning your number. Keep training now; testing goes live as soon as
+          the line is ready.
         </p>
       ) : null}
 
@@ -110,8 +110,7 @@ export default async function SettingsPage() {
         </h2>
         {pendingDid ? (
           <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-            Number pending. Keep training above — you can place a test call as soon as your
-            line is assigned.
+            Number pending. Keep training above. You can place a test call as soon as your line is assigned.
           </p>
         ) : (
           <>

@@ -95,7 +95,7 @@ export async function SautikitTelecomPanel() {
         <div>
           <h2 className="font-display text-2xl tracking-tight">Telecom (SautiKit)</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Live from your SautiKit account — this is what the platform pays.
+            Live from your SautiKit account. This is what the platform pays.
           </p>
         </div>
         <div className="text-right">
@@ -176,7 +176,7 @@ export async function SautikitTelecomPanel() {
           </span>
         ) : (
           <span>
-            Wallet balance hidden — mint an API key with the <code>wallet.read</code> scope to
+            Wallet balance hidden. Mint an API key with the <code>wallet.read</code> scope to
             show it here.
           </span>
         )}

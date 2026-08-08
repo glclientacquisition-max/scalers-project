@@ -8,7 +8,7 @@ export const FAQ_ANSWER_MAX = 400;
 export const FAQ_STARTERS: FaqEntry[] = [
   {
     question: "Do you have parking?",
-    answer: "Yes — free parking is available for customers.",
+    answer: "Yes, free parking is available for customers.",
   },
   {
     question: "Do you accept M-Pesa?",
@@ -132,7 +132,7 @@ export function formatFaqMergeMessage(result: FaqMergeResult): string {
     if (result.skippedCap) {
       return `Your Golden FAQs are full (max ${FAQ_MAX}). Remove one in Business settings, then try again.`;
     }
-    return "Those FAQs are already on file — nothing new to add.";
+    return "Those FAQs are already on file. Nothing new to add.";
   }
   let msg = `${parts.join(" and ")}. Live on the next call.`;
   if (result.skippedCap) {

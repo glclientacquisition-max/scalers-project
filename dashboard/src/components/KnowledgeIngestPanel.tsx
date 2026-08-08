@@ -108,12 +108,11 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           Import knowledge
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Paste a menu or drop a website link. We&apos;ll suggest services and FAQs —
-          you tick what looks right before anything goes live.
+          Paste a menu or drop a website link. We&apos;ll suggest services and FAQs.
+          Tick what looks right before anything goes live.
         </p>
         <p className="mt-2 text-xs text-[var(--ink-soft)]">
-          Tip: set your weekly hours and tone of voice below once first — imports use
-          those to retrain the receptionist.
+          Tip: set your weekly hours and tone of voice below once first. Imports use those to retrain the assistant.
         </p>
       </div>
 
@@ -422,7 +421,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               >
                 <span className="font-medium">Keep my current list</span>
                 <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
-                  Safe choice. We add the new ones you tick — nothing already
+                  Safe choice. We add the new ones you tick; nothing already
                   saved gets deleted.
                 </span>
               </button>

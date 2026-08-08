@@ -89,11 +89,11 @@ export default async function WalletPage() {
         <div>
           <h1 className="font-display text-4xl tracking-tight">Wallet</h1>
           <p className="mt-2 text-[var(--ink-soft)]">
-            One prepaid KES balance for line rental and receptionist minutes.
+            One prepaid KES balance for line rental and assistant minutes.
           </p>
         </div>
         <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-medium text-[var(--accent-deep)]">
-          {usage.isBeta ? "Free beta — not charged" : "Prepaid · KES"}
+          {usage.isBeta ? "Free beta (not charged)" : "Prepaid · KES"}
         </span>
       </div>
 
@@ -103,9 +103,9 @@ export default async function WalletPage() {
           value={`KES ${usage.walletBalanceKes.toLocaleString("en-KE")}`}
           hint={
             usage.isBeta
-              ? "Beta workspace — usage is tracked, nothing is deducted."
+              ? "Beta workspace: usage is tracked, nothing is deducted."
               : usage.lowBalance
-                ? "Low balance — ask Scalers to top up (M-Pesa coming soon)."
+                ? "Low balance. Ask Scalers to top up (M-Pesa coming soon)."
                 : "Covers line fee + call minutes"
           }
           warn={!usage.isBeta && usage.lowBalance}
@@ -143,7 +143,7 @@ export default async function WalletPage() {
           Rate card: KES {WALLET_RATE_KES_PER_MINUTE}/min (AI included) + KES{" "}
           {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo line fee
           {usage.isBeta
-            ? ". You are on the beta whitelist — metered only."
+            ? ". You are on the beta whitelist (metered only)."
             : ". Soft billing: usage is deducted; calls are not blocked at zero yet."}
         </p>
       </section>
