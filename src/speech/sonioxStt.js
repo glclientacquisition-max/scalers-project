@@ -2,11 +2,19 @@
 // Soniox realtime STT over WebSocket. Feeds pcm_s16le @ 16 kHz from SautiKit.
 
 const WebSocket = require('ws');
+const { sttLanguageHints } = require('../conversation/languageOptions');
 
 const SONIOX_WS_URL =
   process.env.SONIOX_STT_URL || 'wss://stt-rt.soniox.com/transcribe-websocket';
 const SONIOX_MODEL = process.env.SONIOX_STT_MODEL || 'stt-rt-v5';
 const SAMPLE_RATE = Number(process.env.SONIOX_SAMPLE_RATE || 16000);
+/** Default ceiling for Soniox endpoint detection (local flush adapts under this). */
+const MAX_ENDPOINT_DELAY_MS = Number(process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 900);
+const ENDPOINT_SENSITIVITY = Math.min(
+  1,
+  Math.max(0, Number(process.env.SONIOX_ENDPOINT_SENSITIVITY || 0.5))
+);
+const ENDPOINT_LATENCY_ADJ = Number(process.env.SONIOX_ENDPOINT_LATENCY_ADJ || 2);
 
 /**
  * Open a Soniox realtime transcription session.
@@ -34,23 +42,26 @@ function createSonioxSttSession({ callSid, onEvent = () => {} }) {
 
     ws.once('open', () => {
       clearTimeout(timer);
+      const hints = sttLanguageHints();
       const config = {
         api_key: apiKey,
         model: SONIOX_MODEL,
         audio_format: 'pcm_s16le',
         sample_rate: SAMPLE_RATE,
         num_channels: 1,
-        language_hints: ['en', 'sw'],
-        // Endpoint tuning: give callers time to finish a thought before Gemini runs.
+        language_hints: hints,
+        // Endpoint tuning: snappier defaults; incomplete thoughts rely on adaptive local flush.
         enable_endpoint_detection: true,
-        endpoint_latency_adjustment_level: 2,
-        max_endpoint_delay_ms: Number(process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 1200),
-        endpoint_sensitivity: 0.45,
+        endpoint_latency_adjustment_level: ENDPOINT_LATENCY_ADJ,
+        max_endpoint_delay_ms: MAX_ENDPOINT_DELAY_MS,
+        endpoint_sensitivity: ENDPOINT_SENSITIVITY,
       };
       ws.send(JSON.stringify(config));
       opened = true;
       console.log(
-        `[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE} endpoint={latencyAdj:2,maxDelayMs:${config.max_endpoint_delay_ms},sensitivity:0.45}`
+        `[soniox-stt][${callSid}] session open model=${SONIOX_MODEL} rate=${SAMPLE_RATE}` +
+          ` hints=${hints.join('+')}` +
+          ` endpoint={latencyAdj:${ENDPOINT_LATENCY_ADJ},maxDelayMs:${config.max_endpoint_delay_ms},sensitivity:${ENDPOINT_SENSITIVITY}}`
       );
       while (pending.length) {
         const chunk = pending.shift();
