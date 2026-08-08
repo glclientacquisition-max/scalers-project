@@ -37,6 +37,9 @@ const {
   evaluateBargeIn,
   looksLikeEcho: turnLooksLikeEcho,
 } = require('./src/speech/turnTaking');
+const {
+  createSpokenStreamBuffer,
+} = require('./src/speech/spokenStreamBuffer');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
@@ -1077,6 +1080,9 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
       if (!bargeInActive) {
+        // Persist exactly what the caller hears so dashboard transcripts expose
+        // failures instead of ending after the caller's last line.
+        transcriptLog.push(`Agent: ${AI_FALLBACK_LINE}`);
         await speakText(AI_FALLBACK_LINE);
       }
     } finally {
