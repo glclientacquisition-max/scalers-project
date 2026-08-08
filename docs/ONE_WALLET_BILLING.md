@@ -41,7 +41,11 @@ WALLET_RATE_KES_PER_MINUTE=15
 WALLET_LINE_FEE_KES_PER_MONTH=1000
 ```
 
-## Later (not in this PR)
+## Apply after one_wallet_billing
+
+Also apply `docs/supabase/wallet_security_beta.sql` (RPC locks, column protection, ops audit, beta defaults).
+
+## Later
 
 - M-Pesa / Paystack STK top-up → `topup` ledger rows
 - Hard enforcement on inbound when balance ≤ 0
