@@ -203,8 +203,8 @@ export function parseTeamDirectoryField(
 
 export function parseFaqsField(raw: FormDataEntryValue | null): FaqItem[] {
   return parseJsonArrayField(raw, (row) => {
-    const question = String(row.question ?? "").trim();
-    const answer = String(row.answer ?? "").trim();
+    const question = String(row.question ?? "").trim().slice(0, 200);
+    const answer = String(row.answer ?? "").trim().slice(0, 400);
     if (!question || !answer) return null;
     return { question, answer };
   });

@@ -1,4 +1,5 @@
 import { generateGeminiText } from "@/lib/gemini";
+import { FAQ_MAX, normalizeFaqKey } from "@/lib/faqs";
 import { parseBulkServices, type ServiceItem } from "@/lib/servicesCatalog";
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
 
@@ -198,7 +199,7 @@ function keyService(s: ServiceItem): string {
   return s.name.trim().toLowerCase();
 }
 function keyFaq(f: FaqEntry): string {
-  return f.question.trim().toLowerCase();
+  return normalizeFaqKey(f.question);
 }
 function keyTeam(t: TeamDirectoryEntry): string {
   return `${t.name.trim().toLowerCase()}|${t.role.trim().toLowerCase()}`;
@@ -221,6 +222,7 @@ export function mergeIngestDraft(opts: {
   team: TeamDirectoryEntry[];
   unknownAnswerFallback: string;
   added: { services: number; faqs: number; team: number };
+  skippedFaqCap?: number;
 } {
   const pickedServices = opts.selectedServiceIndexes
     .map((i) => opts.draft.services[i])
@@ -234,10 +236,12 @@ export function mergeIngestDraft(opts: {
 
   let services: ServiceItem[];
   let faqs: FaqEntry[];
+  let skippedFaqCap = 0;
 
   if (opts.mode === "replace_services_faqs") {
     services = pickedServices.slice(0, 40);
-    faqs = pickedFaqs.slice(0, 25);
+    faqs = pickedFaqs.slice(0, FAQ_MAX);
+    skippedFaqCap = Math.max(0, pickedFaqs.length - faqs.length);
   } else {
     const serviceMap = new Map<string, ServiceItem>();
     for (const s of opts.existingServices) {
@@ -260,12 +264,15 @@ export function mergeIngestDraft(opts: {
     let addedFaqs = 0;
     for (const f of pickedFaqs) {
       const k = keyFaq(f);
-      if (!faqMap.has(k)) {
-        faqMap.set(k, f);
-        addedFaqs += 1;
+      if (faqMap.has(k)) continue;
+      if (faqMap.size >= FAQ_MAX) {
+        skippedFaqCap += 1;
+        continue;
       }
+      faqMap.set(k, f);
+      addedFaqs += 1;
     }
-    faqs = [...faqMap.values()].slice(0, 25);
+    faqs = [...faqMap.values()];
 
     const teamMap = new Map<string, TeamDirectoryEntry>();
     for (const t of opts.existingTeam) {
@@ -295,6 +302,7 @@ export function mergeIngestDraft(opts: {
         faqs: addedFaqs,
         team: addedTeam,
       },
+      skippedFaqCap,
     };
   }
 
@@ -325,5 +333,6 @@ export function mergeIngestDraft(opts: {
       faqs: faqs.length,
       team: addedTeam,
     },
+    skippedFaqCap,
   };
 }
