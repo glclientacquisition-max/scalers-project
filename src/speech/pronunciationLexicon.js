@@ -68,37 +68,101 @@ const KENYA_LEXICON = [
   { match: '\\bapprox\\.?\\b', say: 'approximately', priority: 60 },
 ];
 
-/** Compiled once: highest priority first, then longer patterns. */
-const COMPILED = KENYA_LEXICON.map((entry, index) => {
-  const source = entry.match.startsWith('\\b') || entry.match.includes('\\b')
-    ? entry.match
-    : `\\b(?:${entry.match})\\b`;
-  return {
-    ...entry,
-    langs: entry.langs || ['en', 'sw', 'sheng'],
-    priority: entry.priority ?? 50,
-    index,
-    re: new RegExp(source, 'gi'),
-  };
-}).sort((a, b) => {
+/**
+ * @param {LexiconEntry[]} entries
+ */
+function compileEntries(entries) {
+  return entries.map((entry, index) => {
+    const source =
+      entry.match.startsWith('\\b') || entry.match.includes('\\b')
+        ? entry.match
+        : `\\b(?:${entry.match})\\b`;
+    return {
+      ...entry,
+      langs: entry.langs || ['en', 'sw', 'sheng'],
+      priority: entry.priority ?? 50,
+      index,
+      re: new RegExp(source, 'gi'),
+    };
+  });
+}
+
+function sortCompiled(a, b) {
   if (b.priority !== a.priority) return b.priority - a.priority;
   return b.match.length - a.match.length || a.index - b.index;
-});
+}
+
+/** Compiled once: highest priority first, then longer patterns. */
+const COMPILED = compileEntries(KENYA_LEXICON).sort(sortCompiled);
+
+/**
+ * Parse tenant/env lexicon overrides.
+ * Accepts JSON string or array of { match, say, langs?, priority? }.
+ * @param {unknown} raw
+ * @returns {LexiconEntry[]}
+ */
+function parseLexiconOverrides(raw) {
+  if (raw == null || raw === '') return [];
+  let list = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      list = JSON.parse(trimmed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+
+  /** @type {LexiconEntry[]} */
+  const out = [];
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const match = String(item.match || item.from || '').trim();
+    const say = String(item.say || item.to || '').trim();
+    if (!match || !say) continue;
+    // Reject unsafe regex bombs / empty patterns.
+    if (match.length > 80) continue;
+    try {
+      // Validate compile early.
+      new RegExp(match.startsWith('\\b') ? match : `\\b(?:${match})\\b`, 'gi');
+    } catch {
+      continue;
+    }
+    out.push({
+      match,
+      say,
+      langs: Array.isArray(item.langs) ? item.langs : ['en', 'sw', 'sheng'],
+      priority: Number(item.priority) >= 0 ? Number(item.priority) : 200,
+    });
+  }
+  return out;
+}
+
+function envLexiconOverrides() {
+  return parseLexiconOverrides(process.env.TTS_LEXICON_OVERRIDES);
+}
 
 /**
  * Apply lexicon rewrites for the active TTS language.
  * @param {string} text
  * @param {'en'|'sw'|string} [lang]
+ * @param {LexiconEntry[]} [extraEntries]
  */
-function applyLexicon(text, lang = 'en') {
+function applyLexicon(text, lang = 'en', extraEntries = []) {
   let out = String(text || '');
   if (!out) return out;
 
   const ttsLang = lang === 'sw' ? 'sw' : 'en';
-  // Sheng rides English TTS — include sheng-tagged entries with en.
   const allowSheng = ttsLang === 'en';
+  const extras = Array.isArray(extraEntries) ? extraEntries : [];
+  const compiled =
+    extras.length > 0
+      ? [...compileEntries(extras), ...COMPILED].sort(sortCompiled)
+      : COMPILED;
 
-  for (const entry of COMPILED) {
+  for (const entry of compiled) {
     const ok =
       entry.langs.includes(ttsLang) ||
       (allowSheng && entry.langs.includes('sheng'));
@@ -122,4 +186,6 @@ module.exports = {
   KENYA_LEXICON,
   applyLexicon,
   listLexiconEntries,
+  parseLexiconOverrides,
+  envLexiconOverrides,
 };

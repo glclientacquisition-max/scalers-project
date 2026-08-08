@@ -719,6 +719,8 @@ mediaWss.on('connection', (ws, req) => {
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
   let callLanguage = 'unknown';
   let fillerUsedThisCall = false;
+  /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
+  let ttsLexiconOverrides = [];
 
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
 
@@ -733,6 +735,9 @@ mediaWss.on('connection', (ws, req) => {
       openStatus = openClosedStatus(hoursSchedule);
       closureNotice = bulletinClosureNotice(profile.dailyBulletin);
       systemPrompt = buildSystemPrompt(profile);
+      ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
+        ? profile.ttsLexicon
+        : [];
       if (sessionCallSid) {
         callAgentTools.set(sessionCallSid, parseAgentTools(profile.agentTools));
       }
@@ -747,7 +752,7 @@ mediaWss.on('connection', (ws, req) => {
       profileCallSid = sessionCallSid;
       const tools = parseAgentTools(profile.agentTools);
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} ttsLexicon=${ttsLexiconOverrides.length} langs=en,sw,sheng(auto)`
       );
     } catch (err) {
       profileLoaded = true;
@@ -779,6 +784,7 @@ mediaWss.on('connection', (ws, req) => {
     const prepared = prepareForTts(text, {
       callLanguage,
       language: opts.language,
+      extraLexicon: ttsLexiconOverrides,
     });
     console.log(
       `[ws/media][${sidLabel()}] tts prep lang=${prepared.language}` +

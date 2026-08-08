@@ -1,0 +1,90 @@
+{
+  "description": "Golden pronunciation phrases for EN / SW / Sheng listen + unit checks",
+  "cases": [
+    {
+      "id": "brand-mpesa-en",
+      "text": "You can pay by mpesa.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["M-Pesa"]
+    },
+    {
+      "id": "place-ruiru-thika",
+      "text": "We cover Ruiru and Thika near the CBD.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["Roo-ee-roo", "Thee-kah", "C B D"]
+    },
+    {
+      "id": "money-kes-en",
+      "text": "It is about KES 5,000.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["five thousand shillings"]
+    },
+    {
+      "id": "money-ksh-sw",
+      "text": "Bei ni Ksh 2000. Asante sana.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectIncludes": ["shilingi", "elfu"]
+    },
+    {
+      "id": "time-en",
+      "text": "We open at 8am and close at 6pm.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["8 A M", "6 P M"]
+    },
+    {
+      "id": "time-sw",
+      "text": "Tunafungua saa 8am. Sawa asante.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectIncludes": ["saa 8 asubuhi"]
+    },
+    {
+      "id": "days-en",
+      "text": "Hours are Mon-Sat.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["Monday to Saturday"]
+    },
+    {
+      "id": "phone-plus",
+      "text": "Call +254712345678 please.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["2 5 4 7 1 2 3 4 5 6 7 8"]
+    },
+    {
+      "id": "sheng-niaje",
+      "text": "Niaje msee, niko poa.",
+      "callLanguage": "sheng",
+      "expectLanguage": "en",
+      "expectIncludes": ["nee-ah-jay", "mseh", "poh-ah"]
+    },
+    {
+      "id": "sw-utterance-lang",
+      "text": "Sawa asante. Tutakupigia.",
+      "callLanguage": "en",
+      "expectLanguage": "sw",
+      "expectIncludes": ["Sawa", "asante"]
+    },
+    {
+      "id": "service-geyser",
+      "text": "We can fix the geyser.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["geezer"]
+    },
+    {
+      "id": "tenant-override",
+      "text": "Ask for Wanjiku at the desk.",
+      "callLanguage": "en",
+      "extraLexicon": [{ "match": "wanjiku", "say": "Wan-jee-koo" }],
+      "expectLanguage": "en",
+      "expectIncludes": ["Wan-jee-koo"]
+    }
+  ]
+}
