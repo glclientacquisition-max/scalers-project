@@ -110,7 +110,7 @@ function buildLiveGroundTruth(profile = {}) {
     'TEAM DIRECTORY (escalation — you are the receptionist, not the expert):',
     formatTeamBlock(team),
     team.length
-      ? 'If a caller is angry, asks for a refund/billing, or matches a role above: acknowledge, say that teammate will follow up (WhatsApp/call), capture name + reason, and append the escalate tool with that teammate name or role. Do not invent live transfers.'
+      ? 'If a caller is angry, asks for a refund/billing, or matches a role above: acknowledge, say that teammate will follow up shortly, capture name + reason, and append the escalate tool with that teammate name or role. Do not invent live transfers or claim you already WhatsApped them.'
       : ''
   );
 
