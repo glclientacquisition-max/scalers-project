@@ -28,6 +28,8 @@ export async function generateGeminiText(opts: {
   userText: string;
   temperature?: number;
   maxOutputTokens?: number;
+  /** Override default desk timeout (ms). */
+  timeoutMs?: number;
 }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -40,8 +42,9 @@ export async function generateGeminiText(opts: {
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+  const timeoutMs = opts.timeoutMs ?? GEMINI_TIMEOUT_MS;
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), GEMINI_TIMEOUT_MS);
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
 
   let res: Response;
   try {
@@ -68,7 +71,7 @@ export async function generateGeminiText(opts: {
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error(
-        `Gemini timed out after ${GEMINI_TIMEOUT_MS / 1000}s (model ${model})`
+        `Gemini timed out after ${timeoutMs / 1000}s (model ${model})`
       );
     }
     throw err;
