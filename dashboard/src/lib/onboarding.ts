@@ -114,6 +114,8 @@ export type CompileExtras = {
   teamDirectory?: TeamMember[];
   faqs?: FaqItem[];
   unknownAnswerFallback?: string;
+  /** When false, compiled prompt must not instruct the escalate tool. */
+  escalateEnabled?: boolean;
 };
 
 /** Deterministic fallback if Gemini is unavailable. */
@@ -131,8 +133,16 @@ export function compilePromptLocally(
   const unknownLine = (opts.unknownAnswerFallback || "").trim();
   const team = opts.teamDirectory || [];
   const faqs = opts.faqs || [];
+  const escalateEnabled = opts.escalateEnabled !== false;
   const teamBlock = formatTeamDirectory(team);
   const faqBlock = formatFaqs(faqs);
+  const teamSection = escalateEnabled
+    ? `TEAM DIRECTORY (escalation — you are the receptionist, not the expert):
+${teamBlock}
+- If a caller is angry, asks for a refund, billing help, or a named role above, acknowledge the issue, say the right teammate will follow up (WhatsApp/call), capture name + reason, and escalate to that teammate. Do not invent transfers you cannot perform.`
+    : `TEAM DIRECTORY (escalate tool is OFF — awareness only):
+${teamBlock}
+- Do not escalate. If a caller is angry or asks for someone, acknowledge, capture name + reason, and say the business will follow up.`;
 
   return `You are ${agentName}, the live phone receptionist for ${name} in Kenya.
 
@@ -152,9 +162,7 @@ ${answers.hoursLocation.trim()}
 GOLDEN FAQs (authoritative — answer these exactly when asked):
 ${faqBlock}
 
-TEAM DIRECTORY (escalation — you are the receptionist, not the expert):
-${teamBlock}
-- If a caller is angry, asks for a refund, billing help, or a named role above, acknowledge the issue, say the right teammate will follow up (WhatsApp/call), capture name + reason, and escalate to that teammate. Do not invent transfers you cannot perform.
+${teamSection}
 
 Your job on this call:
 1. Answer using ONLY the business knowledge and golden FAQs above.${

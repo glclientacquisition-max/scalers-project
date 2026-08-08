@@ -15,6 +15,7 @@ const {
   formatBulletinForPrompt,
   bulletinImpliesClosed,
 } = require('./conversation/dailyBulletin');
+const { parseAgentTools } = require('./conversation/agentTools');
 
 const DEFAULT_KNOWLEDGE = `Business: Jirani Home Services (Nairobi & environs)
 What we do: home repairs and maintenance for homes and small offices.
@@ -143,11 +144,19 @@ function buildSystemPrompt(profile = {}) {
   const header = buildContextHeader(profile);
   const liveTruth = buildLiveGroundTruth(profile);
   const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
-  const escalateTools = `When escalating (anger, refund, billing, role match, or a role they asked for), also append:
+  const tools = parseAgentTools(profile.agentTools);
+  const escalateTools = tools.escalate
+    ? `When escalating (anger, refund, billing, role match, or a role they asked for), also append:
 ###TOOL###
 {"escalate":{"teammate":"<Name/Role they asked for, or closest directory person>","name":"<caller name>","reason":"<why they need that person>"}}
 ###ENDTOOL###
-If they ask for someone not on TEAM DIRECTORY, still escalate (system falls back to General queries / owner/CEO) — never invent staff.`;
+If they ask for someone not on TEAM DIRECTORY, still escalate (system falls back to General queries / owner/CEO) — never invent staff.`
+    : `ESCALATION TOOL: disabled for this business. Do NOT append an escalate tool marker.
+If a caller is angry or asks for a person/refund: acknowledge, capture name + reason with save_caller_info, and say the business will follow up. Do not invent transfers.`;
+
+  const endCallTools = tools.end_call
+    ? `If the call should end after goodbye, also append: ###ENDCALL###`
+    : `END CALL TOOL: disabled for this business. Do NOT append ###ENDCALL###. After goodbye, wait for the caller or the line to close.`;
 
   // Tenant-provided full prompt wins, but we still prepend live context + ground truth.
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
@@ -164,7 +173,7 @@ Whenever you first capture OR later correct the caller's name and/or reason, app
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
 ${escalateTools}
-If the call should end after goodbye, also append: ###ENDCALL###
+${endCallTools}
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
   }
 
@@ -198,8 +207,7 @@ Whenever you first capture OR later correct name and/or reason, respond naturall
 
 ${escalateTools}
 
-If the call should end after your goodbye, also append:
-###ENDCALL###
+${endCallTools}
 
 Do not include any other JSON or markup in your spoken response. Never read the markers aloud.`;
 }

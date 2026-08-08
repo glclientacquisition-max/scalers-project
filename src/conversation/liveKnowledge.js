@@ -78,11 +78,13 @@ function formatTeamBlock(team) {
  * Prefer these over older compiled prose if there is a conflict.
  */
 function buildLiveGroundTruth(profile = {}) {
+  const { parseAgentTools } = require('./agentTools');
   const services = normalizeServices(profile.servicesCatalog);
   const faqs = normalizeFaqs(profile.faqs);
   const team = normalizeTeam(profile.teamDirectory);
   const unknown = String(profile.unknownAnswerFallback || '').trim();
   const extras = String(profile.servicesNotes || profile.servicesOffered || '').trim();
+  const tools = parseAgentTools(profile.agentTools);
 
   const hasAny = services.length || faqs.length || team.length || unknown || extras;
   if (!hasAny) return '';
@@ -105,18 +107,33 @@ function buildLiveGroundTruth(profile = {}) {
   }
 
   parts.push('', 'GOLDEN FAQs (answer these exactly when asked):', formatFaqsBlock(faqs));
-  parts.push(
-    '',
-    'TEAM DIRECTORY (escalation — you are the receptionist, not the expert):',
-    formatTeamBlock(team),
-    !team.length
-      ? 'ESCALATION: No team directory on file. Do not invent staff. Capture name + reason and say the business will follow up.'
-      : `ESCALATION RULES:
+
+  if (tools.escalate) {
+    parts.push(
+      '',
+      'TEAM DIRECTORY (escalation — you are the receptionist, not the expert):',
+      formatTeamBlock(team),
+      !team.length
+        ? 'ESCALATION: No team directory on file. Do not invent staff. Capture name + reason and say the business will follow up.'
+        : `ESCALATION RULES:
 - Prefer matching the caller's ask to a Name or Role above. A role like "General queries" is the catch-all for unmatched asks.
 - If a caller is angry, asks for a refund/billing, or matches a role above: acknowledge, say that teammate will follow up shortly, capture name + reason, and append the escalate tool with that teammate name or role.
 - If they ask for a role or person NOT on this list (e.g. "sales guy" but only CEO / General queries is listed): do NOT invent staff. Say you do not have that specialist on file, offer General queries or the owner/CEO to follow up, then escalate. In the escalate tool, set teammate to who they asked for (e.g. "sales") so the system can fall back and tag the notify.
 - Do not invent live transfers or claim you already WhatsApped them.`
-  );
+    );
+  } else if (team.length) {
+    parts.push(
+      '',
+      'TEAM DIRECTORY (for your awareness — escalate tool is OFF for this business):',
+      formatTeamBlock(team),
+      'Do NOT append the escalate tool. If a caller is angry or asks for someone: acknowledge, capture name + reason, and say the business will follow up.'
+    );
+  } else {
+    parts.push(
+      '',
+      'ESCALATION: escalate tool is OFF. Capture name + reason and say the business will follow up. Do not invent staff.'
+    );
+  }
 
   if (unknown) {
     parts.push(

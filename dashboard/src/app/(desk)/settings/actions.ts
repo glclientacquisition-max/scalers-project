@@ -17,6 +17,7 @@ import {
   parseServicesCatalogField,
 } from "@/lib/servicesCatalog";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { parseAgentTools } from "@/lib/agentTools";
 
 export type SettingsCompileState = {
   error?: string;
@@ -62,6 +63,10 @@ export async function saveAndCompileSettings(
   ).trim();
   const teamDirectory = parseTeamDirectoryField(formData.get("team_directory"));
   const faqs = parseFaqsField(formData.get("faqs"));
+  const agentTools = parseAgentTools({
+    escalate: String(formData.get("tool_escalate") || "") !== "0",
+    end_call: String(formData.get("tool_end_call") || "") !== "0",
+  });
 
   const hoursSchedule = parseHoursSchedule(formData.get("hours_schedule"));
   const locationNotes = String(formData.get("location_notes") || "").trim();
@@ -113,6 +118,7 @@ export async function saveAndCompileSettings(
     teamDirectory,
     faqs,
     unknownAnswerFallback,
+    escalateEnabled: agentTools.escalate,
   });
 
   const workspace = await createWorkspaceDataClient();
@@ -134,6 +140,7 @@ export async function saveAndCompileSettings(
     team_directory: teamDirectory,
     faqs,
     unknown_answer_fallback: unknownAnswerFallback || null,
+    agent_tools: agentTools,
     llm_system_prompt: prompt,
   };
 
@@ -163,6 +170,11 @@ export async function saveAndCompileSettings(
     if (/after_hours_mode/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/after_hours_mode.sql in Supabase.`,
+      };
+    }
+    if (/agent_tools/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/agent_tools.sql in Supabase.`,
       };
     }
     if (/agent_name|team_directory|faqs/i.test(error.message)) {

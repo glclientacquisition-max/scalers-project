@@ -17,6 +17,7 @@ import {
   type FaqSuggestion,
 } from "@/lib/faqFromTranscript";
 import type { FaqEntry, TeamDirectoryEntry, TranscriptRow } from "@/lib/supabase";
+import { parseAgentTools } from "@/lib/agentTools";
 
 export type FaqSuggestState = {
   error?: string;
@@ -224,6 +225,7 @@ export async function applyFaqSuggestionsAction(
   const agentName = String(tenant.agent_name || "Receptionist").trim() || "Receptionist";
   const unknownAnswerFallback = String(tenant.unknown_answer_fallback || "").trim();
 
+  const agentTools = parseAgentTools(tenant.agent_tools);
   const { prompt, source } = await compileReceptionistPrompt({
     businessName: tenant.business_name,
     servicesOffered,
@@ -233,6 +235,7 @@ export async function applyFaqSuggestionsAction(
     teamDirectory: team,
     faqs: merged.faqs,
     unknownAnswerFallback,
+    escalateEnabled: agentTools.escalate,
   });
 
   const workspace = await createWorkspaceDataClient();

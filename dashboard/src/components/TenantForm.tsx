@@ -18,6 +18,11 @@ import {
   type AfterHoursMode,
 } from "@/lib/afterHours";
 import {
+  AGENT_TOOL_OPTIONS,
+  parseAgentTools,
+  type AgentTools,
+} from "@/lib/agentTools";
+import {
   emptyService,
   extractServicesNotes,
   formatServicesForCompiler,
@@ -141,6 +146,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   );
   const [afterHoursMode, setAfterHoursMode] = useState<AfterHoursMode>(() =>
     parseAfterHoursMode(tenant.after_hours_mode)
+  );
+  const [agentTools, setAgentTools] = useState<AgentTools>(() =>
+    parseAgentTools(tenant.agent_tools)
   );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
@@ -290,6 +298,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
       <input type="hidden" name="team_directory" value={teamJson} />
       <input type="hidden" name="faqs" value={faqsJson} />
+      <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
+      <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
 
       <section className="space-y-5">
         <div>
@@ -726,6 +736,75 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
             Optional. Without it, the receptionist says the team will follow up.
           </p>
+        </div>
+      </section>
+
+      <section
+        className="space-y-4 border-t border-[var(--line)] pt-8"
+        aria-labelledby="receptionist-tools-heading"
+      >
+        <div>
+          <h2
+            id="receptionist-tools-heading"
+            className="font-display text-2xl tracking-tight text-[var(--ink)]"
+          >
+            Receptionist tools
+          </h2>
+          <p className="mt-1 text-sm text-[var(--ink-soft)]">
+            Turn capabilities on or off. Saving a caller&apos;s name and reason always
+            stays on so you never miss a lead.
+          </p>
+        </div>
+        <div className="space-y-4">
+          {AGENT_TOOL_OPTIONS.map((opt) => {
+            const on = agentTools[opt.id];
+            return (
+              <div key={opt.id} className="space-y-2">
+                <div>
+                  <p className="text-sm font-medium text-[var(--ink)]">{opt.label}</p>
+                  <p className="mt-0.5 text-xs text-[var(--ink-soft)]">{opt.blurb}</p>
+                </div>
+                <div
+                  className="grid gap-2 sm:grid-cols-2"
+                  role="radiogroup"
+                  aria-label={opt.label}
+                >
+                  {(
+                    [
+                      { value: true, label: opt.onLabel },
+                      { value: false, label: opt.offLabel },
+                    ] as const
+                  ).map((choice) => {
+                    const selected = on === choice.value;
+                    return (
+                      <button
+                        key={`${opt.id}-${choice.value ? "on" : "off"}`}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() =>
+                          setAgentTools((prev) => ({
+                            ...prev,
+                            [opt.id]: choice.value,
+                          }))
+                        }
+                        className={[
+                          "w-full rounded-xl border px-4 py-3 text-left text-sm transition",
+                          selected
+                            ? "border-[#0096FF] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_#0096FF]"
+                            : "border-[var(--line)] bg-white hover:border-[#0096FF]/50",
+                        ].join(" ")}
+                      >
+                        <span className="font-medium text-[var(--ink)]">
+                          {choice.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
