@@ -1,9 +1,10 @@
 import { getCurrentTenant } from "@/lib/tenant";
 import { TenantForm } from "@/components/TenantForm";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
+import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 
-/** Allow Gemini compile + Supabase write without premature platform cutoffs. */
-export const maxDuration = 30;
+/** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
+export const maxDuration = 60;
 
 export default async function SettingsPage() {
   let tenant;
@@ -53,6 +54,10 @@ export default async function SettingsPage() {
 
         <div className="mt-8 border-t border-[var(--line)] pt-8">
           <DailyBulletinPanel tenant={tenant} />
+        </div>
+
+        <div className="mt-8 border-t border-[var(--line)] pt-8">
+          <KnowledgeIngestPanel tenant={tenant} />
         </div>
 
         <div className="mt-8 border-t border-[var(--line)] pt-8">

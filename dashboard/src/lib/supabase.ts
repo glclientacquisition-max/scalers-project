@@ -57,6 +57,7 @@ export type TeamDirectoryEntry = {
   name: string;
   role: string;
   phone: string;
+  email?: string;
 };
 
 export type FaqEntry = {

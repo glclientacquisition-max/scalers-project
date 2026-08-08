@@ -69,8 +69,9 @@ function normalizeTeam(raw: TenantRow["team_directory"]): TeamDirectoryEntry[] {
       name: String(row?.name || "").trim(),
       role: String(row?.role || "").trim(),
       phone: String(row?.phone || "").trim(),
+      email: String(row?.email || "").trim().toLowerCase(),
     }))
-    .filter((row) => row.name || row.role || row.phone);
+    .filter((row) => row.name || row.role || row.phone || row.email);
 }
 
 function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
@@ -83,7 +84,12 @@ function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
     .filter((row) => row.question || row.answer);
 }
 
-const emptyMember = (): TeamDirectoryEntry => ({ name: "", role: "", phone: "" });
+const emptyMember = (): TeamDirectoryEntry => ({
+  name: "",
+  role: "",
+  phone: "",
+  email: "",
+});
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
@@ -747,10 +753,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
 
         <div className="space-y-4">
           {team.map((member, index) => (
-            <div
-              key={`team-${index}`}
-              className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
-            >
+            <div key={`team-${index}`} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
               <div>
                 <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-name-${index}`}>
                   Name
@@ -784,6 +787,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                   value={member.phone}
                   onChange={(e) => updateTeam(index, "phone", e.target.value)}
                   placeholder="+2547…"
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-email-${index}`}>
+                  Email
+                </label>
+                <input
+                  id={`team-email-${index}`}
+                  type="email"
+                  value={member.email || ""}
+                  onChange={(e) => updateTeam(index, "email", e.target.value)}
+                  placeholder="jane@…"
                   className={fieldClass}
                 />
               </div>
