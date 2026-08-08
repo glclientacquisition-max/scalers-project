@@ -207,13 +207,13 @@ export function AdminWalletsPanel({
                         className="text-sm text-[var(--accent)]"
                         onClick={() => {
                           setModeId(r.id);
-                          setMode(r.billing_enforcement === "off" ? "soft" : "off");
+                          setMode(r.billing_enforcement);
                           setModeNote(
                             r.billing_enforcement === "off"
-                              ? "Graduate to prepaid"
-                              : "Beta program whitelist"
+                              ? r.beta_notes || "Beta program whitelist"
+                              : `Prepaid (${r.billing_enforcement})`
                           );
-                          setWaiveNegative(true);
+                          setWaiveNegative(r.billing_enforcement !== "off");
                         }}
                       >
                         Plan
@@ -311,6 +311,13 @@ export function AdminWalletsPanel({
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
           <p className="font-medium">Billing plan — {modeTarget.business_name}</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
+            Current:{" "}
+            <strong>
+              {modeTarget.billing_enforcement === "off"
+                ? "Beta (free)"
+                : `Prepaid (${modeTarget.billing_enforcement})`}
+            </strong>
+            . Change the mode below only if you want to update it.{" "}
             <strong>Beta (off)</strong> = whitelist, meter only, no charges.{" "}
             <strong>Soft</strong> = prepaid debit, calls still work. <strong>Hard</strong> = prepaid
             (block later).
