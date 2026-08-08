@@ -157,20 +157,36 @@ export async function extractKnowledgeFromText(opts: {
       .filter(Boolean)
       .join("\n");
 
-    const raw = await generateGeminiText({
+    // Keep scans snappy: race a short Gemini call against local heuristics.
+    const local = extractLocally(text, opts.sourceLabel);
+    const geminiPromise = generateGeminiText({
       systemInstruction: EXTRACT_SYSTEM,
-      userText,
+      userText: userText.slice(0, 12_000),
       temperature: 0.2,
-      maxOutputTokens: 4096,
-      timeoutMs: 25_000,
-    });
-    const draft = normalizeDraft(extractJsonObject(raw), opts.sourceLabel);
-    if (!draft.services.length && !draft.faqs.length && !draft.team.length) {
-      // Fall back to local heuristics if Gemini returned empty
-      const local = extractLocally(text, opts.sourceLabel);
-      if (local.services.length || local.faqs.length) {
-        return { draft: local, source: "local" };
-      }
+      maxOutputTokens: 2048,
+      timeoutMs: 8_000,
+    }).then((raw) => normalizeDraft(extractJsonObject(raw), opts.sourceLabel));
+
+    let draft: IngestDraft;
+    try {
+      draft = await geminiPromise;
+    } catch {
+      return { draft: local, source: "local" };
+    }
+
+    const geminiScore =
+      draft.services.length + draft.faqs.length + draft.team.length;
+    const localScore =
+      local.services.length + local.faqs.length + local.team.length;
+    if (geminiScore === 0 && localScore > 0) {
+      return { draft: local, source: "local" };
+    }
+    if (geminiScore === 0 && localScore === 0) {
+      return { draft, source: "gemini" };
+    }
+    // Prefer Gemini when it found at least as much; otherwise keep local wins.
+    if (localScore > geminiScore) {
+      return { draft: local, source: "local" };
     }
     return { draft, source: "gemini" };
   } catch {

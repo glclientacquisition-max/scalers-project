@@ -12,7 +12,11 @@ import {
 } from "@/lib/servicesCatalog";
 import { formatHoursForCompiler, scheduleForForm } from "@/lib/hoursSchedule";
 import { fetchPublicUrlSafe } from "@/lib/ingest/ssrfFetch";
-import { htmlToPlainText, normalizePasteText } from "@/lib/ingest/sanitize";
+import {
+  htmlToPlainText,
+  looksLikeClientRenderedShell,
+  normalizePasteText,
+} from "@/lib/ingest/sanitize";
 import {
   extractKnowledgeFromText,
   mergeIngestDraft,
@@ -102,8 +106,18 @@ export async function extractKnowledgeAction(
     if (mode === "url") {
       const url = String(formData.get("url") || "").trim();
       const fetched = await fetchPublicUrlSafe(url);
+      const shell = looksLikeClientRenderedShell(fetched.text);
       sourceText = htmlToPlainText(fetched.text);
       sourceLabel = fetched.finalUrl;
+
+      // Client-rendered sites (empty #root/#app) rarely expose a menu in HTML.
+      // Fail fast instead of waiting on AI over a page summary.
+      if (shell) {
+        return {
+          error:
+            "This website builds its menu in the browser, so the link alone isn’t enough. Switch to Paste text and drop in your services or FAQs — that usually finishes in a few seconds.",
+        };
+      }
       if (sourceText.length < 40) {
         return {
           error:
