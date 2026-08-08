@@ -4,6 +4,9 @@
 --
 -- See docs/ONE_WALLET_BILLING.md for constraints and apply order.
 
+-- Drop legacy adjust RPC first — return type gains wallet_balance_kes.
+drop function if exists public.adjust_tenant_wallet(uuid, numeric, numeric, text);
+
 -- ---------------------------------------------------------------------------
 -- 1) Single wallet columns on tenants
 -- ---------------------------------------------------------------------------
