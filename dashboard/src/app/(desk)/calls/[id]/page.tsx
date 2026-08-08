@@ -124,7 +124,12 @@ export default async function CallDetailPage({
   const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
   const escalatedTo =
     meta.escalated_to && typeof meta.escalated_to === "object"
-      ? (meta.escalated_to as { name?: string; role?: string; phone?: string })
+      ? (meta.escalated_to as {
+          name?: string;
+          role?: string;
+          phone?: string;
+          email?: string;
+        })
       : null;
   const escalateReason =
     typeof meta.escalate_reason === "string" ? meta.escalate_reason : null;
@@ -195,6 +200,7 @@ export default async function CallDetailPage({
             <p className="mt-2 text-sm text-[var(--ink)]">
               Escalated to {escalatedTo.name}
               {escalatedTo.role ? ` (${escalatedTo.role})` : ""}
+              {escalatedTo.email ? ` · ${escalatedTo.email}` : ""}
               {escalateReason ? ` — ${escalateReason}` : ""}
             </p>
           ) : null}
