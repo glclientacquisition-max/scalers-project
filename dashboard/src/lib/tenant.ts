@@ -5,13 +5,13 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TENANT_SELECT =
-  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, llm_system_prompt, services_offered, services_catalog, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, llm_system_prompt, services_offered, services_catalog, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
 const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
 
 function isMissingProfileColumnError(message: string): boolean {
-  return /business_hours|hours_schedule|after_hours_mode|services_offered|services_catalog|agent_name|agent_tone|team_directory|faqs|unknown_answer_fallback|daily_bulletin|alert_email|column/i.test(
+  return /business_hours|hours_schedule|after_hours_mode|services_offered|services_catalog|agent_name|agent_tone|team_directory|faqs|unknown_answer_fallback|daily_bulletin|alert_email|wallet_balance_kes|wallet_low_balance_kes|billing_enforcement|column/i.test(
     message
   );
 }
@@ -145,6 +145,7 @@ export async function ensureTenantForUser(opts: {
     whatsapp_notification_number: phone,
     llm_system_prompt: defaultTenantLlmPrompt(businessName),
     is_active: true,
+    wallet_balance_kes: 0,
     telecom_wallet_balance_kes: 0,
     ai_wallet_balance_usd: 0,
   };
@@ -179,6 +180,23 @@ export async function ensureTenantForUser(opts: {
       ({ data: tenant, error: tenantErr } = await admin
         .from("tenants")
         .insert(row)
+        .select("id")
+        .single());
+    }
+  }
+
+  if (tenantErr && /wallet_balance_kes/i.test(tenantErr.message)) {
+    const { wallet_balance_kes: _drop, ...rowWithoutOneWallet } = row;
+    void _drop;
+    ({ data: tenant, error: tenantErr } = await admin
+      .from("tenants")
+      .insert({ ...rowWithoutOneWallet, owner_user_id: opts.userId })
+      .select("id")
+      .single());
+    if (tenantErr?.message?.toLowerCase().includes("owner_user_id")) {
+      ({ data: tenant, error: tenantErr } = await admin
+        .from("tenants")
+        .insert(rowWithoutOneWallet)
         .select("id")
         .single());
     }

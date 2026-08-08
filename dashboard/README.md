@@ -75,12 +75,14 @@ Without a Gemini key, a local template is saved instead.
 3. Save button shows "Training your receptionist…"; a Test Drive card shows the DID to call
    (tap-to-dial) once assigned.
 
-### Wallet & metering (beta)
+### Wallet & billing (one KES prepaid wallet)
 
-1. Apply `docs/supabase/wallet_metering.sql`.
-2. Owners open **Wallet** for dual balances + this month's minutes (Free beta badge — no charges).
-3. Voice engine writes `calls.ai_processing_minutes` from duration on call completion.
-4. Super Admin → Businesses → **Adjust wallet** seeds balances manually (no M-Pesa yet).
+1. Apply `docs/supabase/wallet_metering.sql` (if not already), then `docs/supabase/one_wallet_billing.sql`.
+2. Owners open **Wallet** for a single KES balance, this month's minutes, and ledger activity.
+3. Voice engine writes `calls.ai_processing_minutes` and calls `charge_call_to_wallet` on hangup.
+4. Monthly line fee applies lazily when Wallet loads (`apply_line_rental`).
+5. Super Admin → Businesses → **Adjust wallet** credits/debits KES (ledger `admin_adjustment`). M-Pesa next.
+6. See `docs/ONE_WALLET_BILLING.md` for constraints and rate-card notes.
 
 ### Phase C — DID pool
 

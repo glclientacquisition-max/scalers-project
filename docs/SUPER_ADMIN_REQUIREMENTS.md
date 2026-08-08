@@ -89,7 +89,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 ## Out of scope (later)
 
 - Full RLS for owner JWT reads (Phase B).
-- Billing wallets UI / Paystack.
+- M-Pesa / Paystack wallet top-up (one KES wallet + ledger already shipped).
 - Prompt wizard / onboarding questionnaire.
 - Dynamic SautiKit DID purchase API.
 - Multi-user roles inside a business (admin/member invites).

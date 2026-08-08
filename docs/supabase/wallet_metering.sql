@@ -1,5 +1,6 @@
--- Wallet metering foundation (beta — display + metering only, no auto-charging).
+-- Wallet metering foundation (dual-wallet columns + legacy adjust RPC).
 -- Run in the Supabase SQL editor after owner_rls.sql / tenant_business_profile.sql.
+-- Then apply one_wallet_billing.sql (single KES wallet + ledger + call charges).
 -- ASCII-only (safe for Supabase SQL Editor).
 
 -- ---------------------------------------------------------------------------

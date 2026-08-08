@@ -102,9 +102,12 @@ function KpiStrip({
   newCount: number;
   capturedOnPage: number;
 }) {
-  const kes = Number(tenant.telecom_wallet_balance_kes ?? 0);
-  const usd = Number(tenant.ai_wallet_balance_usd ?? 0);
-  const lowWallet = kes < 200 || usd < 1;
+  const kes = Number(
+    tenant.wallet_balance_kes ??
+      (Number(tenant.telecom_wallet_balance_kes ?? 0) +
+        Math.round(Number(tenant.ai_wallet_balance_usd ?? 0) * 130))
+  );
+  const lowWallet = kes < 200;
 
   return (
     <section className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -118,7 +121,7 @@ function KpiStrip({
       <Kpi
         label="Wallet"
         value={`KES ${kes.toLocaleString("en-KE")}`}
-        hint={lowWallet ? "Low balance. Top up soon." : `AI usage: $${usd.toFixed(2)}`}
+        hint={lowWallet ? "Low balance. Top up soon." : "Prepaid KES balance"}
         warn={lowWallet}
       />
     </section>

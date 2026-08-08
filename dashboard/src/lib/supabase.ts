@@ -108,7 +108,12 @@ export type TenantRow = {
   faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
   daily_bulletin?: DailyBulletinEntry[] | null;
+  wallet_balance_kes?: number | null;
+  wallet_low_balance_kes?: number | null;
+  billing_enforcement?: "soft" | "hard" | "off" | null;
+  /** @deprecated Prefer wallet_balance_kes */
   telecom_wallet_balance_kes?: number | null;
+  /** @deprecated AI bundled into wallet_balance_kes */
   ai_wallet_balance_usd?: number | null;
   is_active: boolean | null;
 };
