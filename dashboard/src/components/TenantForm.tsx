@@ -29,6 +29,13 @@ import {
   saveAndCompileSettings,
   type SettingsCompileState,
 } from "@/app/(desk)/settings/actions";
+import {
+  FAQ_ANSWER_MAX,
+  FAQ_MAX,
+  FAQ_QUESTION_MAX,
+  FAQ_STARTERS,
+  normalizeFaqKey,
+} from "@/lib/faqs";
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
@@ -160,13 +167,38 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       ),
     [team]
   );
+  const filledFaqCount = useMemo(
+    () => faqs.filter((f) => f.question.trim() && f.answer.trim()).length,
+    [faqs]
+  );
   const faqsJson = useMemo(
     () =>
       JSON.stringify(
-        faqs.filter((f) => f.question.trim() && f.answer.trim())
+        faqs
+          .filter((f) => f.question.trim() && f.answer.trim())
+          .map((f) => ({
+            question: f.question.trim().slice(0, FAQ_QUESTION_MAX),
+            answer: f.answer.trim().slice(0, FAQ_ANSWER_MAX),
+          }))
       ),
     [faqs]
   );
+  const faqDupIndexes = useMemo(() => {
+    const seen = new Map<string, number>();
+    const dups = new Set<number>();
+    faqs.forEach((f, i) => {
+      const key = normalizeFaqKey(f.question);
+      if (!key) return;
+      const prev = seen.get(key);
+      if (prev != null) {
+        dups.add(prev);
+        dups.add(i);
+      } else {
+        seen.set(key, i);
+      }
+    });
+    return dups;
+  }, [faqs]);
   const servicesJson = useMemo(
     () => JSON.stringify(services.filter((s) => s.name.trim())),
     [services]
@@ -820,24 +852,67 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         </div>
       </section>
 
-      <section className="space-y-4 border-t border-[var(--line)] pt-8">
+      <section
+        id="golden-faqs"
+        className="space-y-4 border-t border-[var(--line)] pt-8"
+        aria-labelledby="golden-faqs-heading"
+      >
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
+            <h2
+              id="golden-faqs-heading"
+              className="font-display text-2xl tracking-tight text-[var(--ink)]"
+            >
               Golden FAQs
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              Loaded live on every call. The receptionist must answer these exactly when asked.
+              Short answers the receptionist must use when callers ask these. Tip: you
+              can also add ideas from a call under Calls.
+            </p>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]" aria-live="polite">
+              {filledFaqCount} of {FAQ_MAX} saved
             </p>
           </div>
           <button
             type="button"
             onClick={() => setFaqs((prev) => [...prev, emptyFaq()])}
-            className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
+            disabled={faqs.length >= FAQ_MAX}
+            className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
           >
             Add FAQ
           </button>
         </div>
+
+        {filledFaqCount === 0 ? (
+          <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3">
+            <p className="text-sm text-[var(--ink)]">Start with a common question</p>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
+              Tap one to fill the first blank — edit it to match your business.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {FAQ_STARTERS.map((starter) => (
+                <button
+                  key={starter.question}
+                  type="button"
+                  onClick={() =>
+                    setFaqs((prev) => {
+                      const next = [...prev];
+                      const blank = next.findIndex(
+                        (f) => !f.question.trim() && !f.answer.trim()
+                      );
+                      if (blank >= 0) next[blank] = { ...starter };
+                      else if (next.length < FAQ_MAX) next.push({ ...starter });
+                      return next;
+                    })
+                  }
+                  className="rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 text-left text-xs text-[var(--ink)] hover:border-[var(--accent)]"
+                >
+                  {starter.question}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="space-y-5">
           {faqs.map((faq, index) => (
@@ -866,10 +941,20 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 <input
                   id={`faq-q-${index}`}
                   value={faq.question}
+                  maxLength={FAQ_QUESTION_MAX}
                   onChange={(e) => updateFaq(index, "question", e.target.value)}
                   placeholder="Do you have parking?"
+                  aria-invalid={faqDupIndexes.has(index) || undefined}
+                  aria-describedby={
+                    faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
+                  }
                   className={fieldClass}
                 />
+                {faqDupIndexes.has(index) ? (
+                  <p id={`faq-dup-${index}`} className="mt-1 text-xs text-[var(--warn)]" role="status">
+                    Same as another FAQ — keep one clear wording.
+                  </p>
+                ) : null}
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`faq-a-${index}`}>
@@ -878,11 +963,15 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 <textarea
                   id={`faq-a-${index}`}
                   value={faq.answer}
+                  maxLength={FAQ_ANSWER_MAX}
                   onChange={(e) => updateFaq(index, "answer", e.target.value)}
                   rows={2}
                   placeholder="Yes, free parking behind the building."
                   className={`${fieldClass} leading-relaxed`}
                 />
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  {faq.answer.length}/{FAQ_ANSWER_MAX}
+                </p>
               </div>
             </div>
           ))}
@@ -914,7 +1003,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           </p>
         ) : null}
         {flash && !state.error ? (
-          <p className="mt-3 text-sm text-[var(--ok)]">{flash}</p>
+          <p className="mt-3 text-sm text-[var(--ok)]" role="status">
+            {flash}
+          </p>
         ) : null}
       </div>
     </form>

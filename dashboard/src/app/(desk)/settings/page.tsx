@@ -60,6 +60,14 @@ export default async function SettingsPage() {
           <KnowledgeIngestPanel tenant={tenant} />
         </div>
 
+        <p className="mt-4 text-xs text-[var(--ink-soft)]">
+          Jump to{" "}
+          <a href="#golden-faqs" className="font-medium text-[var(--accent-deep)] underline">
+            Golden FAQs
+          </a>{" "}
+          to edit answers by hand.
+        </p>
+
         <div className="mt-8 border-t border-[var(--line)] pt-8">
           <TenantForm tenant={tenant} />
         </div>

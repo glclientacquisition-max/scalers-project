@@ -12,7 +12,12 @@ import {
 } from "@/lib/servicesCatalog";
 import { formatHoursForCompiler, scheduleForForm } from "@/lib/hoursSchedule";
 import {
-  mergeFaqSuggestions,
+  FAQ_ANSWER_MAX,
+  FAQ_QUESTION_MAX,
+  formatFaqMergeMessage,
+  mergeFaqs,
+} from "@/lib/faqs";
+import {
   suggestFaqsFromTranscript,
   type FaqSuggestion,
 } from "@/lib/faqFromTranscript";
@@ -177,8 +182,10 @@ export async function applyFaqSuggestionsAction(
       .map((row) => {
         const r = (row || {}) as Record<string, unknown>;
         return {
-          question: String(r.question || "").trim().slice(0, 200),
-          answer: String(r.answer || "").trim().slice(0, 400),
+          question: String(r.question || "")
+            .trim()
+            .slice(0, FAQ_QUESTION_MAX),
+          answer: String(r.answer || "").trim().slice(0, FAQ_ANSWER_MAX),
         };
       })
       .filter((f) => f.question && f.answer);
@@ -208,11 +215,11 @@ export async function applyFaqSuggestionsAction(
   }
 
   const existingFaqs = normalizeFaqs(tenant.faqs);
-  const merged = mergeFaqSuggestions({ existing: existingFaqs, picked });
-  if (!merged.added) {
+  const merged = mergeFaqs({ existing: existingFaqs, picked, mode: "merge" });
+  if (!merged.added && !merged.updated) {
     return {
       ok: true,
-      message: "Those FAQs are already on file — nothing new to add.",
+      message: formatFaqMergeMessage(merged),
     };
   }
 
@@ -251,8 +258,6 @@ export async function applyFaqSuggestionsAction(
   return {
     ok: true,
     source,
-    message: `Added ${merged.added} FAQ${
-      merged.added === 1 ? "" : "s"
-    }. Live on the next call.`,
+    message: formatFaqMergeMessage(merged),
   };
 }

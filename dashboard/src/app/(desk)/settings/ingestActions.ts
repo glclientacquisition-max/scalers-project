@@ -295,6 +295,13 @@ export async function applyIngestAction(
     );
   }
 
+  const capNote =
+    merged.skippedFaqCap && merged.skippedFaqCap > 0
+      ? ` ${merged.skippedFaqCap} FAQ${
+          merged.skippedFaqCap === 1 ? "" : "s"
+        } could not fit (max 25).`
+      : "";
+
   if (mode === "replace_services_faqs") {
     const svc = merged.services.length;
     const faq = merged.faqs.length;
@@ -303,7 +310,7 @@ export async function applyIngestAction(
       source,
       message: `Replaced with ${svc} service${svc === 1 ? "" : "s"} and ${faq} FAQ${
         faq === 1 ? "" : "s"
-      }. Live on the next call — tweak anything below if needed.`,
+      }. Live on the next call — tweak anything below if needed.${capNote}`,
     };
   }
 
@@ -312,7 +319,9 @@ export async function applyIngestAction(
     source,
     message:
       parts.length > 0
-        ? `Added ${parts.join(" and ")}. Live on the next call — no need to retype them below.`
-        : "Nothing new to add (those items were already on file).",
+        ? `Added ${parts.join(" and ")}. Live on the next call — no need to retype them below.${capNote}`
+        : capNote
+          ? `Nothing new fit.${capNote}`
+          : "Nothing new to add (those items were already on file).",
   };
 }

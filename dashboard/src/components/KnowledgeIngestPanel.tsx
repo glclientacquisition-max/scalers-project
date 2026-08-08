@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import type { IngestDraft } from "@/lib/ingest/extract";
+import { FAQ_ANSWER_MAX, FAQ_QUESTION_MAX } from "@/lib/faqs";
 import {
   applyIngestAction,
   extractKnowledgeAction,
@@ -77,6 +78,20 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
     if (next.has(index)) next.delete(index);
     else next.add(index);
     setter(next);
+  }
+
+  function updateDraftFaq(
+    index: number,
+    key: "question" | "answer",
+    value: string
+  ) {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const faqs = prev.faqs.map((row, i) =>
+        i === index ? { ...row, [key]: value } : row
+      );
+      return { ...prev, faqs };
+    });
   }
 
   // While reviewing a draft, the extract tip already shows in the green box.
@@ -267,7 +282,12 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 <h3 className="text-sm font-medium text-[var(--ink)]">FAQs</h3>
                 <button
                   type="button"
-                  className="text-xs text-[#0096FF]"
+                  className="text-xs font-medium text-[var(--accent-deep)]"
+                  aria-label={
+                    selectedFaqs.size === draft.faqs.length
+                      ? `Clear all ${draft.faqs.length} FAQs`
+                      : `Select all ${draft.faqs.length} FAQs`
+                  }
                   onClick={() =>
                     setSelectedFaqs(
                       selectedFaqs.size === draft.faqs.length
@@ -290,11 +310,44 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                       className="mt-1"
                       checked={selectedFaqs.has(i)}
                       onChange={() => toggle(selectedFaqs, i, setSelectedFaqs)}
-                      aria-label={`Keep FAQ ${f.question}`}
+                      aria-label={`Keep FAQ ${f.question || i + 1}`}
                     />
-                    <div className="min-w-0">
-                      <p className="font-medium text-[var(--ink)]">{f.question}</p>
-                      <p className="text-sm text-[var(--ink-soft)]">{f.answer}</p>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div>
+                        <label
+                          className="block text-xs font-medium text-[var(--ink-soft)]"
+                          htmlFor={`ingest-faq-q-${i}`}
+                        >
+                          Question
+                        </label>
+                        <input
+                          id={`ingest-faq-q-${i}`}
+                          value={f.question}
+                          maxLength={FAQ_QUESTION_MAX}
+                          onChange={(e) =>
+                            updateDraftFaq(i, "question", e.target.value)
+                          }
+                          className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[#0096FF]"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className="block text-xs font-medium text-[var(--ink-soft)]"
+                          htmlFor={`ingest-faq-a-${i}`}
+                        >
+                          Answer
+                        </label>
+                        <textarea
+                          id={`ingest-faq-a-${i}`}
+                          value={f.answer}
+                          maxLength={FAQ_ANSWER_MAX}
+                          rows={2}
+                          onChange={(e) =>
+                            updateDraftFaq(i, "answer", e.target.value)
+                          }
+                          className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#0096FF]"
+                        />
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -435,7 +488,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             "text-sm",
             flashIsError ? "text-[var(--warn)]" : "text-[var(--accent-deep)]",
           ].join(" ")}
-          role="status"
+          role={flashIsError ? "alert" : "status"}
         >
           {flash}
         </p>

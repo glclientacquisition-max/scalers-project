@@ -1,4 +1,13 @@
 import { generateGeminiText } from "@/lib/gemini";
+import {
+  FAQ_ANSWER_MAX,
+  FAQ_MAX,
+  FAQ_QUESTION_MAX,
+  isNearDuplicateFaq,
+  mergeFaqs,
+  normalizeFaqKey,
+  type FaqMergeResult,
+} from "@/lib/faqs";
 import type { FaqEntry, TranscriptRow } from "@/lib/supabase";
 
 export type FaqSuggestion = {
@@ -9,6 +18,9 @@ export type FaqSuggestion = {
   /** True when the call never gave a solid answer — owner should fill it in. */
   needsOwnerAnswer: boolean;
 };
+
+export { normalizeFaqKey, mergeFaqs };
+export type { FaqMergeResult };
 
 const SUGGEST_SYSTEM = `You suggest Golden FAQs for a Kenyan phone receptionist (Scalers) from ONE call transcript.
 
@@ -30,10 +42,11 @@ Return ONLY valid JSON (no markdown fences):
 Rules:
 - Max 5 suggestions
 - Prefer questions the caller actually asked (or clearly meant)
+- Questions/answers may be English, Kiswahili, or Sheng — keep the caller's language when natural
 - If the receptionist gave a clear factual answer, use that as the answer
 - If the receptionist deferred, guessed, or said someone will call back WITHOUT answering, set needs_owner_answer=true and leave answer as a short draft or ""
 - Skip greetings, name capture, goodbye, and one-off personal chat
-- Skip anything already answered only with "I will check / someone will call"
+- Skip anything already answered only with "I will check / someone will call / nitarudi / nitakupigia"
 - Prefer reusable business knowledge (hours, delivery, pricing, location, booking, payment)
 - If nothing useful, return {"suggestions":[]}`;
 
@@ -75,28 +88,34 @@ export function formatTranscriptForSuggest(turns: TranscriptRow[]): string {
   return joined.length > 12_000 ? `${joined.slice(0, 12_000)}\n\n[truncated]` : joined;
 }
 
-export function normalizeFaqKey(question: string): string {
-  return String(question || "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function looksLikeQuestion(text: string): boolean {
+  const q = text.trim();
+  if (!q) return false;
+  if (q.endsWith("?")) return true;
+  // English
+  if (
+    /^(do|does|can|could|how|what|when|where|who|why|is|are|will|would|have|has)\b/i.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  // Kiswahili / common Sheng starters
+  if (
+    /^(je|una|mna|iko|kuna|ni|gharama|bei|saa|saa ngapi|wapi|delivery|m-?pesa|parking)\b/i.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
-function isDuplicate(question: string, existing: FaqEntry[]): boolean {
-  const key = normalizeFaqKey(question);
-  if (!key) return true;
-  return existing.some((f) => {
-    const other = normalizeFaqKey(f.question);
-    if (!other) return false;
-    if (other === key) return true;
-    if (other.includes(key) || key.includes(other)) {
-      // Only treat as dup when overlap is substantial
-      const shorter = Math.min(other.length, key.length);
-      return shorter >= 12;
-    }
-    return false;
-  });
+function isWeakAnswer(answer: string): boolean {
+  if (!answer.trim()) return true;
+  return /call you back|someone will|let me check|i('ll| will) check|not sure|nitakupigia|nitarudi|nikuangalie|sijui|let me confirm/i.test(
+    answer
+  );
 }
 
 function normalizeSuggestions(raw: unknown): FaqSuggestion[] {
@@ -104,8 +123,8 @@ function normalizeSuggestions(raw: unknown): FaqSuggestion[] {
   return asArray(obj.suggestions)
     .map((row) => {
       const r = (row || {}) as Record<string, unknown>;
-      const question = String(r.question || "").trim().slice(0, 200);
-      const answer = String(r.answer || "").trim().slice(0, 400);
+      const question = String(r.question || "").trim().slice(0, FAQ_QUESTION_MAX);
+      const answer = String(r.answer || "").trim().slice(0, FAQ_ANSWER_MAX);
       const reason = String(r.reason || "").trim().slice(0, 160);
       const needsOwnerAnswer =
         r.needs_owner_answer === true ||
@@ -114,7 +133,9 @@ function normalizeSuggestions(raw: unknown): FaqSuggestion[] {
       return {
         question,
         answer,
-        reason: reason || (needsOwnerAnswer ? "Caller asked — add your answer" : "From this call"),
+        reason:
+          reason ||
+          (needsOwnerAnswer ? "Caller asked — add your answer" : "From this call"),
         needsOwnerAnswer,
       };
     })
@@ -133,9 +154,7 @@ export function suggestFaqsLocally(transcriptText: string): FaqSuggestion[] {
     const line = lines[i];
     if (!/^Caller:\s*/i.test(line)) continue;
     const question = line.replace(/^Caller:\s*/i, "").trim();
-    if (!question.endsWith("?") && !/^(do|does|can|how|what|when|where|who|is|are)\b/i.test(question)) {
-      continue;
-    }
+    if (!looksLikeQuestion(question)) continue;
     let answer = "";
     for (let j = i + 1; j < Math.min(i + 4, lines.length); j += 1) {
       if (/^Receptionist:\s*/i.test(lines[j])) {
@@ -143,12 +162,10 @@ export function suggestFaqsLocally(transcriptText: string): FaqSuggestion[] {
         break;
       }
     }
-    const weak =
-      !answer ||
-      /call you back|someone will|let me check|i('ll| will) check|not sure/i.test(answer);
+    const weak = isWeakAnswer(answer);
     out.push({
-      question: question.slice(0, 200),
-      answer: weak ? "" : answer.slice(0, 400),
+      question: question.slice(0, FAQ_QUESTION_MAX),
+      answer: weak ? "" : answer.slice(0, FAQ_ANSWER_MAX),
       reason: weak ? "Caller asked — add your answer" : "From this call",
       needsOwnerAnswer: weak,
     });
@@ -168,14 +185,16 @@ export async function suggestFaqsFromTranscript(opts: {
   }
 
   const callerLines = (opts.turns || []).filter(
-    (t) => String(t.speaker || "").toLowerCase() === "caller" && String(t.text_content || "").trim()
+    (t) =>
+      String(t.speaker || "").toLowerCase() === "caller" &&
+      String(t.text_content || "").trim()
   );
   if (callerLines.length < 1) {
     throw new Error("No caller lines in this transcript yet.");
   }
 
   const filterExisting = (rows: FaqSuggestion[]) =>
-    rows.filter((s) => !isDuplicate(s.question, opts.existingFaqs));
+    rows.filter((s) => !isNearDuplicateFaq(s.question, opts.existingFaqs));
 
   if (!process.env.GEMINI_API_KEY) {
     return {
@@ -190,7 +209,7 @@ export async function suggestFaqsFromTranscript(opts: {
       "Existing FAQs (do not repeat):",
       opts.existingFaqs.length
         ? opts.existingFaqs
-            .slice(0, 25)
+            .slice(0, FAQ_MAX)
             .map((f, i) => `${i + 1}. Q: ${f.question}`)
             .join("\n")
         : "(none)",
@@ -224,29 +243,10 @@ export async function suggestFaqsFromTranscript(opts: {
   }
 }
 
+/** @deprecated Prefer mergeFaqs from @/lib/faqs — kept for call-site compatibility. */
 export function mergeFaqSuggestions(opts: {
   existing: FaqEntry[];
   picked: FaqEntry[];
-}): { faqs: FaqEntry[]; added: number } {
-  const map = new Map<string, FaqEntry>();
-  for (const f of opts.existing) {
-    if (f.question.trim() && f.answer.trim()) {
-      map.set(normalizeFaqKey(f.question), {
-        question: f.question.trim().slice(0, 200),
-        answer: f.answer.trim().slice(0, 400),
-      });
-    }
-  }
-  let added = 0;
-  for (const f of opts.picked) {
-    const q = f.question.trim().slice(0, 200);
-    const a = f.answer.trim().slice(0, 400);
-    if (!q || !a) continue;
-    const key = normalizeFaqKey(q);
-    if (!map.has(key)) {
-      map.set(key, { question: q, answer: a });
-      added += 1;
-    }
-  }
-  return { faqs: [...map.values()].slice(0, 25), added };
+}): FaqMergeResult {
+  return mergeFaqs({ existing: opts.existing, picked: opts.picked, mode: "merge" });
 }
