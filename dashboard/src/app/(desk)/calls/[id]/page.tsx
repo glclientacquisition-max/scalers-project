@@ -8,8 +8,12 @@ import {
 } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { CallAudioPlayer } from "@/components/CallAudioPlayer";
+import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+
+/** Allow Gemini FAQ suggest + compile without premature cutoffs. */
+export const maxDuration = 60;
 
 function formatWhen(iso: string) {
   try {
@@ -220,6 +224,12 @@ export default async function CallDetailPage({
           )}
         </div>
       </section>
+
+      <CallFaqSuggestions
+        tenantId={tenant.id}
+        callId={row.id}
+        hasTranscript={turns.length > 0}
+      />
 
       {row.recording_url ? <CallAudioPlayer src={row.recording_url} /> : null}
     </div>
