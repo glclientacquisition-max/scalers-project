@@ -69,8 +69,9 @@ function normalizeTeam(raw: TenantRow["team_directory"]): TeamDirectoryEntry[] {
       name: String(row?.name || "").trim(),
       role: String(row?.role || "").trim(),
       phone: String(row?.phone || "").trim(),
+      email: String(row?.email || "").trim().toLowerCase(),
     }))
-    .filter((row) => row.name || row.role || row.phone);
+    .filter((row) => row.name || row.role || row.phone || row.email);
 }
 
 function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
@@ -83,7 +84,12 @@ function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
     .filter((row) => row.question || row.answer);
 }
 
-const emptyMember = (): TeamDirectoryEntry => ({ name: "", role: "", phone: "" });
+const emptyMember = (): TeamDirectoryEntry => ({
+  name: "",
+  role: "",
+  phone: "",
+  email: "",
+});
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
@@ -150,7 +156,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const teamJson = useMemo(
     () =>
       JSON.stringify(
-        team.filter((m) => m.name.trim() || m.role.trim() || m.phone.trim())
+        team.filter(
+          (m) =>
+            m.name.trim() || m.role.trim() || m.phone.trim() || m.email.trim()
+        )
       ),
     [team]
   );
@@ -730,10 +739,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               Team Directory
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              People the AI can escalate to. Their Phone / WhatsApp is the plug-and-play
-              destination when Business messaging is connected. Tip: use role{" "}
-              <span className="font-medium text-[var(--ink)]">General queries</span> as
-              the catch-all when someone asks for a role you have not listed.
+              People the AI can escalate to. Add Phone / WhatsApp for messaging, and
+              Email so escalations can reach them when WhatsApp is not ready. Tip: use
+              role <span className="font-medium text-[var(--ink)]">General queries</span>{" "}
+              as the catch-all when someone asks for a role you have not listed.
             </p>
           </div>
           <button
@@ -749,7 +758,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           {team.map((member, index) => (
             <div
               key={`team-${index}`}
-              className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-end"
             >
               <div>
                 <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-name-${index}`}>
@@ -784,6 +793,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                   value={member.phone}
                   onChange={(e) => updateTeam(index, "phone", e.target.value)}
                   placeholder="+2547…"
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-email-${index}`}>
+                  Email
+                </label>
+                <input
+                  id={`team-email-${index}`}
+                  type="email"
+                  value={member.email}
+                  onChange={(e) => updateTeam(index, "email", e.target.value)}
+                  placeholder="jane@business.com"
                   className={fieldClass}
                 />
               </div>

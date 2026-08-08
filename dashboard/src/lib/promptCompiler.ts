@@ -54,7 +54,8 @@ function formatTeamForCompiler(members: TeamMember[]): string {
       const name = m.name.trim() || "Team member";
       const role = m.role.trim() || "General";
       const phone = m.phone.trim() || "n/a";
-      return `${i + 1}. Name: ${name} | Role: ${role} | Phone: ${phone}`;
+      const email = String(m.email || "").trim() || "n/a";
+      return `${i + 1}. Name: ${name} | Role: ${role} | Phone: ${phone} | Email: ${email}`;
     })
     .join("\n");
 }
@@ -181,9 +182,10 @@ export function parseTeamDirectoryField(
     const name = String(row.name ?? "").trim();
     const role = String(row.role ?? "").trim();
     const phone = String(row.phone ?? "").trim();
-    if (!name && !role && !phone) return null;
+    const email = String(row.email ?? "").trim().toLowerCase();
+    if (!name && !role && !phone && !email) return null;
     if (!name) return null;
-    return { name, role, phone };
+    return { name, role, phone, email };
   });
 }
 

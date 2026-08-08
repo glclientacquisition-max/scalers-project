@@ -40,6 +40,7 @@ function normalizeTeam(raw) {
       name: String(row?.name || '').trim(),
       role: String(row?.role || '').trim(),
       phone: String(row?.phone || '').trim(),
+      email: String(row?.email || '').trim().toLowerCase(),
     }))
     .filter((row) => row.name);
 }
@@ -68,7 +69,8 @@ function formatTeamBlock(team) {
     .map((m) => {
       const role = m.role ? ` (${m.role})` : '';
       const phone = m.phone ? `; phone ${m.phone}` : '';
-      return `- ${m.name}${role}${phone}`;
+      const email = m.email ? `; email ${m.email}` : '';
+      return `- ${m.name}${role}${phone}${email}`;
     })
     .join('\n');
 }

@@ -16,6 +16,7 @@ export type TeamMember = {
   name: string;
   role: string;
   phone: string;
+  email?: string;
 };
 
 export type FaqItem = {
@@ -83,10 +84,12 @@ function formatTeamDirectory(members: TeamMember[]): string {
       const name = m.name.trim();
       const role = m.role.trim();
       const phone = m.phone.trim();
-      if (!name && !role && !phone) return "";
-      return `- ${name || "Team member"}${role ? ` (${role})` : ""}${
-        phone ? `; phone ${phone}` : ""
-      }`;
+      const email = String(m.email || "").trim();
+      if (!name && !role && !phone && !email) return "";
+      const bits = [`- ${name || "Team member"}${role ? ` (${role})` : ""}`];
+      if (phone) bits.push(`phone ${phone}`);
+      if (email) bits.push(`email ${email}`);
+      return bits.length > 1 ? `${bits[0]}; ${bits.slice(1).join("; ")}` : bits[0];
     })
     .filter(Boolean);
   return rows.length ? rows.join("\n") : "(none listed)";

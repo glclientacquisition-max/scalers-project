@@ -1319,6 +1319,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     const sent = await dispatchEscalationAlert({
       teammatePhone: teammate?.phone || null,
+      teammateEmail: teammate?.email || null,
       ownerPhone: ownerNumber,
       ownerEmail,
       body,
@@ -1337,6 +1338,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         ownerNumber: ownerNumber || null,
         ownerEmail: ownerEmail || null,
         teammatePhone: teammate?.phone || null,
+        teammateEmail: teammate?.email || null,
       });
       const refreshed = await db.getCall(callSid);
       if (refreshed?.name && refreshed?.reason) {

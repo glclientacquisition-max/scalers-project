@@ -264,7 +264,7 @@ async function markWhatsappSent(callSid) {
 
 /**
  * Persist escalation target on the call summary (no schema migration).
- * @param {{ callSid: string, teammate?: { name?: string, role?: string, phone?: string } | null, reason?: string|null }} opts
+ * @param {{ callSid: string, teammate?: { name?: string, role?: string, phone?: string, email?: string } | null, reason?: string|null }} opts
  */
 async function saveEscalation({ callSid, teammate, reason }) {
   const existing = await getCall(callSid);
@@ -278,6 +278,7 @@ async function saveEscalation({ callSid, teammate, reason }) {
       name: String(teammate.name || '').trim() || null,
       role: String(teammate.role || '').trim() || null,
       phone: String(teammate.phone || '').trim() || null,
+      email: String(teammate.email || '').trim().toLowerCase() || null,
     };
   }
   if (reason != null && String(reason).trim()) {

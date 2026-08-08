@@ -197,6 +197,9 @@ function buildEscalationText({
   if (teammate?.phone) {
     lines.push(`Teammate phone: ${teammate.phone}`);
   }
+  if (teammate?.email) {
+    lines.push(`Teammate email: ${teammate.email}`);
+  }
   if (recordingUrl) lines.push(`Recording: ${recordingUrl}`);
   return lines.join('\n');
 }

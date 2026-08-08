@@ -85,6 +85,9 @@ Safaricom / Airtel call-forwarding should already divert missed/busy/after-hours
 1. Set `RESEND_API_KEY` + `ALERT_EMAIL_FROM`
 2. Optional env default: `OWNER_ALERT_EMAIL`
 3. Per business: Alert email in Settings (`tenants.alert_email`)
+4. Per teammate: Email on Team Directory (escalations go there first when WhatsApp is down)
+
+**No domain yet?** Use Resend test mode: `ALERT_EMAIL_FROM=Scalers Alerts <onboarding@resend.dev>` and set destination to the same email you used to sign up for Resend (only that inbox can receive until a domain is verified).
 
 Telegram is not used.
 

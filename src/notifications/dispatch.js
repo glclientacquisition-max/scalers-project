@@ -87,10 +87,11 @@ async function dispatchAlert({ to, email, body, lead = {}, subject } = {}) {
 }
 
 /**
- * Escalation: WhatsApp teammate, then owner WhatsApp, then owner email.
+ * Escalation: WhatsApp teammate → owner WhatsApp → teammate email → owner email.
  */
 async function dispatchEscalationAlert({
   teammatePhone,
+  teammateEmail,
   ownerPhone,
   ownerEmail,
   body,
@@ -99,6 +100,8 @@ async function dispatchEscalationAlert({
 } = {}) {
   const sent = [];
   const waReady = whatsAppSenderReady();
+  const subj =
+    subject || `Escalation${lead.businessName ? ` — ${lead.businessName}` : ''}`;
 
   if (waReady && teammatePhone) {
     try {
@@ -135,15 +138,58 @@ async function dispatchEscalationAlert({
     }
   }
 
+  // Email path when WhatsApp did not deliver (or is not configured).
   if (!sent.length) {
-    const mail = await sendEmailFallback({
-      to: ownerEmail,
+    const teammateMail = await sendEmailFallback({
+      to: teammateEmail,
       body,
       lead,
-      subject: subject || `Escalation${lead.businessName ? ` — ${lead.businessName}` : ''}`,
+      subject: subj,
     });
-    if (mail.channel) {
-      sent.push({ channel: 'email', role: 'owner', to: mail.to, result: mail.result });
+    if (teammateMail.channel) {
+      sent.push({
+        channel: 'email',
+        role: 'teammate',
+        to: teammateMail.to,
+        result: teammateMail.result,
+      });
+    }
+
+    const ownerMailAddr = normalizeEmail(ownerEmail);
+    const teammateMailAddr = normalizeEmail(teammateEmail);
+    const ownerMailDistinct =
+      ownerMailAddr && (!teammateMailAddr || ownerMailAddr !== teammateMailAddr);
+
+    if (ownerMailDistinct) {
+      const ownerMail = await sendEmailFallback({
+        to: ownerEmail,
+        body,
+        lead,
+        subject: subj,
+      });
+      if (ownerMail.channel) {
+        sent.push({
+          channel: 'email',
+          role: 'owner',
+          to: ownerMail.to,
+          result: ownerMail.result,
+        });
+      }
+    } else if (!sent.length) {
+      const ownerMail = await sendEmailFallback({
+        to: ownerEmail,
+        body,
+        lead,
+        subject: subj,
+      });
+      if (ownerMail.channel) {
+        sent.push({
+          channel: 'email',
+          role: 'owner',
+          to: ownerMail.to,
+          result: ownerMail.result,
+        });
+      }
     }
   }
 
