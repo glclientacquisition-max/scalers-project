@@ -554,12 +554,21 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
   // Older DBs may lack newer KA columns — peel them off gradually.
+  if (error && /tts_lexicon/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error && /agent_tools/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
@@ -663,10 +672,12 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       dailyBulletin: [],
       alertEmail: null,
       agentTools: { escalate: true, end_call: true },
+      ttsLexicon: [],
     };
   }
 
   const { parseAgentTools } = require('./conversation/agentTools');
+  const { parseLexiconOverrides } = require('./speech/pronunciationLexicon');
   const afterHoursMode =
     String(row.after_hours_mode || 'serve').trim().toLowerCase() === 'message'
       ? 'message'
@@ -692,6 +703,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     unknownAnswerFallback: row.unknown_answer_fallback || null,
     dailyBulletin: row.daily_bulletin || [],
     agentTools: parseAgentTools(row.agent_tools),
+    ttsLexicon: parseLexiconOverrides(row.tts_lexicon),
   };
 }
 

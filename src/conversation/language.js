@@ -232,18 +232,18 @@ function isBackchannel(text) {
  */
 function languageDirective(lang) {
   if (lang === 'en') {
-    return 'Language cue: caller is using English — reply in clear English.';
+    return 'Language cue: caller is using English — reply in clear Kenyan English that is easy to say on a phone.';
   }
   if (lang === 'sw') {
-    return 'Language cue: caller is using Kiswahili — reply in natural Kiswahili.';
+    return 'Language cue: caller is using Kiswahili — reply in natural Kiswahili with short, easy-to-pronounce sentences.';
   }
   if (lang === 'sheng') {
-    return 'Language cue: caller is using Sheng — reply in light natural Sheng, short and clear.';
+    return 'Language cue: caller is using Sheng — reply in light natural Sheng, short and clear; keep slang sparse so it stays easy to pronounce.';
   }
   if (lang === 'mixed') {
-    return 'Language cue: caller is mixing English/Kiswahili — mirror lightly; stay clear.';
+    return 'Language cue: caller is mixing English/Kiswahili — mirror lightly; stay clear and pronounceable.';
   }
-  return 'Language cue: match the caller in English, Kiswahili, or light Sheng.';
+  return 'Language cue: match the caller in English, Kiswahili, or light Sheng; keep every reply easy to say on a phone.';
 }
 
 module.exports = {
