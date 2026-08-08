@@ -31,11 +31,11 @@ const {
 const { pickTtsLanguage } = require('./src/speech/ttsNormalize');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
-const { isTelegramConfigured } = require('./src/notifications/telegram');
 const {
   dispatchAlert,
   dispatchEscalationAlert,
   whatsAppSenderReady,
+  emailFallbackReady,
 } = require('./src/notifications/dispatch');
 const {
   resolveEscalation,
@@ -1259,7 +1259,7 @@ const escalationNotifyInProgress = new Set();
 /**
  * Escalation notify from TEAM DIRECTORY.
  * Plug-and-play: WhatsApp to teammate/owner when SautiKit WA is configured;
- * Telegram only as interim fallback.
+ * email fallback when WhatsApp is unavailable.
  */
 async function maybeSendEscalationNotification(callSid, escalate = {}) {
   const call = await db.getCall(callSid);
@@ -1270,11 +1270,13 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
   try {
     let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+    let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
     let teamDirectory = [];
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
+      ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
       teamDirectory = profile.teamDirectory || [];
     } catch (err) {
@@ -1318,8 +1320,10 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     const sent = await dispatchEscalationAlert({
       teammatePhone: teammate?.phone || null,
       ownerPhone: ownerNumber,
+      ownerEmail,
       body,
       lead,
+      subject: `Escalation for ${teammateLabel(teammate)}${businessName ? ` — ${businessName}` : ''}`,
     });
 
     if (!sent.length) {
@@ -1329,7 +1333,9 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         phone: lead.callerNumber,
         reason: lead.reason,
         whatsappSender: whatsAppSenderReady(),
+        emailFallback: emailFallbackReady(),
         ownerNumber: ownerNumber || null,
+        ownerEmail: ownerEmail || null,
         teammatePhone: teammate?.phone || null,
       });
       const refreshed = await db.getCall(callSid);
@@ -1358,7 +1364,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 }
 
 async function maybeSendWhatsAppNotification(callSid) {
-  // Lead alert: WhatsApp owner number when sender is ready; Telegram interim otherwise.
+  // Lead alert: WhatsApp owner number when sender is ready; email fallback otherwise.
   const call = await db.getCall(callSid);
   if (!call) return;
 
@@ -1371,10 +1377,12 @@ async function maybeSendWhatsAppNotification(callSid) {
 
   try {
     let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+    let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
+      ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
@@ -1388,7 +1396,7 @@ async function maybeSendWhatsAppNotification(callSid) {
       recordingUrl: call.recording_url,
     };
 
-    const result = await dispatchAlert({ to: ownerNumber, lead });
+    const result = await dispatchAlert({ to: ownerNumber, email: ownerEmail, lead });
     if (!result.channel) {
       console.warn(`[${callSid}] Owner notify skipped (${result.reason || 'unknown'}). Lead ready:`, {
         name: call.name,
@@ -1396,7 +1404,9 @@ async function maybeSendWhatsAppNotification(callSid) {
         reason: call.reason,
         recording: call.recording_url,
         ownerNumber: ownerNumber || null,
+        ownerEmail: ownerEmail || null,
         whatsappSender: whatsAppSenderReady(),
+        emailFallback: emailFallbackReady(),
       });
       return;
     }
@@ -1716,14 +1726,12 @@ server.listen(PORT, () => {
   } else if (process.env.SAUTIKIT_API_KEY) {
     console.log(`ℹ SAUTIKIT_API_KEY present — set SAUTIKIT_WHATSAPP_NUMBER_ID (or CONNECTION_ID) to enable WhatsApp alerts`);
   } else {
-    console.log(`ℹ WhatsApp notify not configured — will use Telegram interim if set`);
+    console.log(`ℹ WhatsApp notify not configured — will use email fallback if set`);
   }
-  if (isTelegramConfigured()) {
-    console.log(
-      `✓ Telegram interim fallback enabled (chat ${process.env.TELEGRAM_CHAT_ID})`
-    );
+  if (emailFallbackReady()) {
+    console.log(`✓ Email alert fallback ready (from ${process.env.ALERT_EMAIL_FROM})`);
   } else {
-    console.log(`ℹ Telegram interim not set (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID)`);
+    console.log(`ℹ Email fallback not set (RESEND_API_KEY + ALERT_EMAIL_FROM)`);
   }
   if (String(process.env.SAUTIKIT_VALIDATE_WEBHOOKS || '').toLowerCase() === 'true') {
     console.log(`✓ SautiKit webhook signature validation ON`);

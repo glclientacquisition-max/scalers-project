@@ -94,6 +94,7 @@ export type TenantRow = {
   business_name: string;
   sautikit_virtual_number: string;
   whatsapp_notification_number: string;
+  alert_email?: string | null;
   llm_system_prompt: string | null;
   services_offered?: string | null;
   services_catalog?: ServiceCatalogEntry[] | null;

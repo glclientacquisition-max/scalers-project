@@ -7,6 +7,7 @@
 --   business_name text NOT NULL
 --   sautikit_virtual_number text NOT NULL  (pending:<auth_user_id> until DID pool assign)
 --   whatsapp_notification_number text NOT NULL
+--   alert_email text        (email fallback for leads/escalation; alert_email.sql)
 --   llm_system_prompt text  (compiled for voice engine — not edited raw in Desk)
 --   business_hours text     (owner-facing; see tenant_business_profile.sql)
 --   services_offered text   (owner-facing)

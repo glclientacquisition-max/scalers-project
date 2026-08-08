@@ -109,6 +109,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
     tenant.whatsapp_notification_number || ""
   );
+  const [alertEmail, setAlertEmail] = useState(tenant.alert_email || "");
   const [servicesNotes, setServicesNotes] = useState(() =>
     extractServicesNotes(tenant.services_offered || "")
   );
@@ -270,6 +271,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
+      <input type="hidden" name="alert_email" value={alertEmail} />
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />
       <input type="hidden" name="services_notes" value={servicesNotes} />
@@ -359,21 +361,38 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       </section>
 
       <section className="space-y-5 border-t border-[var(--line)] pt-8">
-        <div>
-          <label className="block text-sm font-medium" htmlFor="owner">
-            Owner alert WhatsApp number
-          </label>
-          <input
-            id="owner"
-            value={ownerWhatsapp}
-            onChange={(e) => setOwnerWhatsapp(e.target.value)}
-            placeholder="+2547…"
-            className={fieldClass}
-          />
-          <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-            Used for lead alerts once WhatsApp Business messaging is connected.
-            Add teammate phones in Team Directory for escalation routing.
-          </p>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium" htmlFor="owner">
+              Owner alert WhatsApp number
+            </label>
+            <input
+              id="owner"
+              value={ownerWhatsapp}
+              onChange={(e) => setOwnerWhatsapp(e.target.value)}
+              placeholder="+2547…"
+              className={fieldClass}
+            />
+            <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
+              Primary when WhatsApp Business messaging is connected.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium" htmlFor="alert_email">
+              Alert email (fallback)
+            </label>
+            <input
+              id="alert_email"
+              type="email"
+              value={alertEmail}
+              onChange={(e) => setAlertEmail(e.target.value)}
+              placeholder="owner@business.com"
+              className={fieldClass}
+            />
+            <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
+              Used if WhatsApp is not ready or a send fails.
+            </p>
+          </div>
         </div>
 
         <div className="space-y-4">
