@@ -21,9 +21,24 @@
 --   daily_bulletin jsonb    ([{id,text,active,starts_at,ends_at}]; daily_bulletin.sql)
 --   voice_languages text[]  (auto: en, sw, sheng — see voice_languages.sql; locals later)
 --   voice_language_other text  (reserved)
---   telecom_wallet_balance_kes numeric
---   ai_wallet_balance_usd numeric
+--   wallet_balance_kes numeric          (one prepaid KES wallet — see one_wallet_billing.sql)
+--   wallet_low_balance_kes numeric      (UI threshold; default 200)
+--   billing_enforcement text            (soft | hard | off)
+--   telecom_wallet_balance_kes numeric  (DEPRECATED — mirrored from wallet_balance_kes)
+--   ai_wallet_balance_usd numeric       (DEPRECATED — AI bundled into KES wallet)
 --   is_active boolean
+--
+-- wallet_ledger  (append-only; see one_wallet_billing.sql)
+--   id uuid PK
+--   created_at timestamptz
+--   tenant_id uuid → tenants.id
+--   kind text (topup | call_charge | line_rental | admin_adjustment | …)
+--   amount_kes numeric  (+ credit / − debit)
+--   balance_after_kes numeric
+--   reference_type text
+--   reference_id text   (idempotency key with kind+tenant)
+--   note text
+--   metadata jsonb
 --   owner_user_id uuid → auth.users.id  (added in multi_tenant_onboarding.sql)
 --
 -- tenant_members  (user ↔ tenant mapping; see multi_tenant_onboarding.sql)

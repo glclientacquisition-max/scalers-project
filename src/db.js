@@ -11,6 +11,8 @@ const { supabase } = require('./lib/supabaseClient');
 
 const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
+const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
+const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 15);
 
 function throwIfError(context, error) {
   if (error) {
@@ -56,6 +58,7 @@ function shapeCall(row) {
     escalated_to: meta.escalated_to || null,
     escalate_reason: meta.escalate_reason || null,
     duration_seconds: row.duration_seconds ?? null,
+    ai_processing_minutes: row.ai_processing_minutes ?? null,
     created_at: row.created_at,
     summary: row.summary,
     _raw: row,
@@ -402,14 +405,22 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
       // Always accept a positive duration; fill zeros from later webhooks.
       if (!existing.duration_seconds || nextDuration >= Number(existing.duration_seconds || 0)) {
         patch.duration_seconds = nextDuration;
-        // Beta metering: AI minutes ≈ talk time. Used for wallet burn-rate estimates.
-        // Round up to the next 0.1 minute so short calls still count.
+        // Billable minutes ≈ talk time (0.1 min resolution). Used by one-KES wallet charge.
         patch.ai_processing_minutes = Math.round((nextDuration / 60) * 10) / 10;
       }
     }
   }
 
   if (Object.keys(patch).length === 0) {
+    // Still attempt charge if we already have minutes (idempotent).
+    if (WALLET_CHARGING_ENABLED && existing.id && Number(existing.ai_processing_minutes) > 0) {
+      await chargeCallToWallet({
+        callId: existing.id,
+        minutes: Number(existing.ai_processing_minutes),
+      }).catch((err) => {
+        console.warn('[db] chargeCallToWallet:', err?.message || err);
+      });
+    }
     return existing;
   }
 
@@ -421,7 +432,59 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     .maybeSingle();
 
   throwIfError('updateCallStatus', error);
-  return shapeCall(data);
+  const shaped = shapeCall(data);
+
+  if (
+    WALLET_CHARGING_ENABLED &&
+    shaped?.id &&
+    Number(shaped.ai_processing_minutes || patch.ai_processing_minutes || 0) > 0
+  ) {
+    await chargeCallToWallet({
+      callId: shaped.id,
+      minutes: Number(shaped.ai_processing_minutes || patch.ai_processing_minutes),
+    }).catch((err) => {
+      console.warn('[db] chargeCallToWallet:', err?.message || err);
+    });
+  }
+
+  return shaped;
+}
+
+/**
+ * Debit tenant KES wallet for a completed call.
+ * Idempotent in Postgres (unique ledger reference = call id).
+ */
+async function chargeCallToWallet({ callId, minutes, rateKesPerMin } = {}) {
+  if (!callId) return null;
+  const mins = Number(minutes);
+  if (!Number.isFinite(mins) || mins <= 0) return null;
+
+  const rate = Number.isFinite(Number(rateKesPerMin))
+    ? Number(rateKesPerMin)
+    : WALLET_RATE_KES_PER_MINUTE;
+
+  const { data, error } = await supabase.rpc('charge_call_to_wallet', {
+    p_call_id: callId,
+    p_minutes: mins,
+    p_rate_kes_per_min: rate,
+  });
+
+  if (error) {
+    // Pre-migration: SQL not applied yet — do not fail the call path.
+    if (/function|does not exist|schema cache/i.test(error.message || '')) {
+      console.warn('[db] charge_call_to_wallet missing — apply docs/supabase/one_wallet_billing.sql');
+      return null;
+    }
+    throwIfError('chargeCallToWallet', error);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (row?.charged) {
+    console.log(
+      `[db] wallet charge call=${callId} amount_kes=${row.amount_kes} balance=${row.wallet_balance_kes}`
+    );
+  }
+  return row || null;
 }
 
 async function attachRecording({
@@ -627,6 +690,7 @@ module.exports = {
   appendTranscript,
   attachRecording,
   updateCallStatus,
+  chargeCallToWallet,
   uploadRecordingBuffer,
   getCall,
   getTenantById,

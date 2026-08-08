@@ -44,28 +44,38 @@ export async function POST(request: Request) {
     }
 
     if (action === "adjust_wallet") {
-      const telecomDeltaKes = Number(body.telecom_delta_kes || 0);
+      // One KES wallet. Legacy telecom/ai fields still accepted and folded server-side.
+      const deltaKesRaw = body.delta_kes ?? body.telecom_delta_kes;
+      const deltaKes = Number(deltaKesRaw || 0);
       const aiDeltaUsd = Number(body.ai_delta_usd || 0);
-      if (!Number.isFinite(telecomDeltaKes) || !Number.isFinite(aiDeltaUsd)) {
-        return NextResponse.json({ error: "Invalid wallet deltas" }, { status: 400 });
+      const combined =
+        Number.isFinite(deltaKes) && Number.isFinite(aiDeltaUsd)
+          ? deltaKes + Math.round(aiDeltaUsd * 130)
+          : NaN;
+      if (!Number.isFinite(combined)) {
+        return NextResponse.json({ error: "Invalid wallet delta" }, { status: 400 });
       }
-      if (telecomDeltaKes === 0 && aiDeltaUsd === 0) {
+      if (combined === 0) {
         return NextResponse.json({ error: "Enter a non-zero amount" }, { status: 400 });
       }
       const wallets = await adjustTenantWallet({
         businessId,
-        telecomDeltaKes,
-        aiDeltaUsd,
+        deltaKes: combined,
         note: String(body.note || "").trim() || undefined,
       });
-      return NextResponse.json({ ok: true, ...wallets });
+      return NextResponse.json({
+        ok: true,
+        wallet_balance_kes: wallets.wallet_balance_kes,
+        telecom_wallet_balance_kes: wallets.wallet_balance_kes,
+        ai_wallet_balance_usd: 0,
+      });
     }
 
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const hint = /adjust_tenant_wallet|function/i.test(message)
-      ? " Apply docs/supabase/wallet_metering.sql in Supabase."
+      ? " Apply docs/supabase/one_wallet_billing.sql in Supabase."
       : "";
     return NextResponse.json({ error: `${message}${hint}` }, { status: 500 });
   }

@@ -28,9 +28,8 @@ export function AdminBusinessesPanel({
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [adjustId, setAdjustId] = useState<string | null>(null);
-  const [telecomDelta, setTelecomDelta] = useState("1000");
-  const [aiDelta, setAiDelta] = useState("0");
-  const [adjustNote, setAdjustNote] = useState("Beta seed");
+  const [deltaKes, setDeltaKes] = useState("1000");
+  const [adjustNote, setAdjustNote] = useState("Wallet top-up");
 
   const PAGE_SIZE = 25;
 
@@ -84,9 +83,8 @@ export function AdminBusinessesPanel({
           disabled={pending}
           onClick={() => {
             setAdjustId(b.id);
-            setTelecomDelta("1000");
-            setAiDelta("5");
-            setAdjustNote("Beta seed");
+            setDeltaKes("1000");
+            setAdjustNote("Wallet top-up");
           }}
           className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)]"
         >
@@ -154,8 +152,7 @@ export function AdminBusinessesPanel({
         ) : (
           pageRows.map((b) => {
             const waiting = b.status === "waiting";
-            const kes = Number(b.telecom_wallet_balance_kes ?? 0);
-            const usd = Number(b.ai_wallet_balance_usd ?? 0);
+            const kes = Number(b.wallet_balance_kes ?? b.telecom_wallet_balance_kes ?? 0);
             return (
               <li
                 key={b.id}
@@ -168,7 +165,7 @@ export function AdminBusinessesPanel({
                       {waiting ? "Not assigned" : b.sautikit_virtual_number}
                     </p>
                     <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                      KES {kes.toLocaleString("en-KE")} · ${usd.toFixed(2)} AI
+                      Wallet KES {kes.toLocaleString("en-KE")}
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs">
@@ -191,7 +188,7 @@ export function AdminBusinessesPanel({
             <tr>
               <th className="px-4 py-3 font-medium">Business</th>
               <th className="px-4 py-3 font-medium">Phone number</th>
-              <th className="px-4 py-3 font-medium">Wallets</th>
+              <th className="px-4 py-3 font-medium">Wallet</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
@@ -206,8 +203,7 @@ export function AdminBusinessesPanel({
             ) : (
               pageRows.map((b) => {
                 const waiting = b.status === "waiting";
-                const kes = Number(b.telecom_wallet_balance_kes ?? 0);
-                const usd = Number(b.ai_wallet_balance_usd ?? 0);
+                const kes = Number(b.wallet_balance_kes ?? b.telecom_wallet_balance_kes ?? 0);
                 return (
                   <tr key={b.id} className="border-t border-[var(--line)]/70 align-top">
                     <td className="px-4 py-3">
@@ -225,7 +221,6 @@ export function AdminBusinessesPanel({
                     </td>
                     <td className="px-4 py-3 text-xs leading-relaxed">
                       <p>KES {kes.toLocaleString("en-KE")}</p>
-                      <p className="text-[var(--ink-soft)]">${usd.toFixed(2)} AI</p>
                     </td>
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs">
@@ -272,24 +267,17 @@ export function AdminBusinessesPanel({
 
       {adjustId ? (
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
-          <p className="font-medium">Adjust wallet balances</p>
+          <p className="font-medium">Adjust wallet</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Beta only. Manually credit or debit. Positive adds, negative subtracts. No M-Pesa yet.
+            Single KES prepaid wallet. Positive credits, negative debits. Writes a ledger entry.
+            M-Pesa top-up comes next.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              Telecom Δ (KES)
+              Amount Δ (KES)
               <input
-                value={telecomDelta}
-                onChange={(e) => setTelecomDelta(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
-              />
-            </label>
-            <label className="text-sm">
-              AI Δ (USD)
-              <input
-                value={aiDelta}
-                onChange={(e) => setAiDelta(e.target.value)}
+                value={deltaKes}
+                onChange={(e) => setDeltaKes(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
               />
             </label>
@@ -310,8 +298,7 @@ export function AdminBusinessesPanel({
                 void run({
                   action: "adjust_wallet",
                   business_id: adjustId,
-                  telecom_delta_kes: Number(telecomDelta) || 0,
-                  ai_delta_usd: Number(aiDelta) || 0,
+                  delta_kes: Number(deltaKes) || 0,
                   note: adjustNote,
                 }).then(() => setAdjustId(null))
               }
