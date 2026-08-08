@@ -1,57 +1,145 @@
 // Prepare spoken text for clearer Soniox TTS pronunciation on phone calls.
 
+const { applyLexicon } = require('./pronunciationLexicon');
+
+const SW_UTTERANCE_MARKERS =
+  /\b(habari|sawa|asante|karibu|tafadhali|nina|nataka|ningependa|ndiyo|hapana|kwaheri|jina|msaada|kidogo|naweza|unaweza|ninaomba|naomba|pole|samahani|bei|huduma|nitakupigia|nakucheckia|shida|kesho|leo)\b/gi;
+
 /**
- * Light cleanup so TTS reads more naturally (esp. Kenya phone + mixed EN/SW).
- * Does not invent content — only normalizes punctuation / symbols.
+ * Strip markup the model sometimes leaks + collapse whitespace.
+ * @param {string} text
  */
-function normalizeForTts(text) {
-  let t = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!t) return t;
+function stripMarkup(text) {
+  return String(text || '')
+    .replace(/[*_`#]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  // Strip markup the model sometimes leaks.
-  t = t.replace(/[*_`#]+/g, '');
-
-  // Phone-ish digit runs: read more clearly.
-  t = t.replace(/\+(\d[\d\s-]{7,}\d)/g, (_, digits) => {
+/**
+ * Expand phone-ish digit runs so TTS reads digit-by-digit.
+ * @param {string} text
+ */
+function expandPhones(text) {
+  return String(text || '').replace(/\+(\d[\d\s-]{7,}\d)/g, (_, digits) => {
     const d = String(digits).replace(/\D/g, '');
     return d.split('').join(' ');
   });
-
-  // Common abbreviations.
-  t = t
-    .replace(/\bwhatsapp\b/gi, 'WhatsApp')
-    .replace(/\bm-?pesa\b/gi, 'M-Pesa')
-    .replace(/\be\.g\./gi, 'for example')
-    .replace(/\bi\.e\./gi, 'that is')
-    .replace(/\bOK\b/g, 'okay');
-
-  // Avoid trailing ellipsis that TTS can stretch oddly.
-  t = t.replace(/\u2026/g, '.').replace(/\.\.\./g, '.');
-
-  // Keep sentences short-friendly: collapse double punctuation.
-  t = t.replace(/([!?.,])\1+/g, '$1');
-
-  return t.trim();
 }
 
 /**
- * Pick Soniox TTS language for a spoken line.
- * Prefer Swahili when the line itself is clearly SW-heavy.
+ * Punctuation polish for phone TTS (avoid stretched ellipsis, etc.).
+ * @param {string} text
  */
-function pickTtsLanguage(text, callLanguage) {
-  const raw = String(text || '').toLowerCase();
-  const swHits = (
-    raw.match(
-      /\b(habari|sawa|asante|karibu|tafadhali|nina|nataka|ningependa|ndiyo|hapana|kwaheri|jina|msaada|kidogo|naweza|unaweza)\b/g
-    ) || []
-  ).length;
+function polishPunctuation(text) {
+  let t = String(text || '');
+  t = t.replace(/\u2026/g, '.').replace(/\.\.\./g, '.');
+  t = t.replace(/([!?.,])\1+/g, '$1');
+  return t.replace(/\s+/g, ' ').trim();
+}
 
-  if (swHits >= 2 || (callLanguage === 'sw' && swHits >= 1)) return 'sw';
-  if (callLanguage === 'sw' && /^[a-z\s,'-]*$/.test(raw) && swHits >= 1) return 'sw';
+/**
+ * Detect whether this utterance should use Swahili TTS (`sw`) or English (`en`).
+ * Returns null when the line itself is inconclusive.
+ * @param {string} text
+ * @returns {'en'|'sw'|null}
+ */
+function detectUtteranceTtsLang(text) {
+  const raw = String(text || '').toLowerCase();
+  if (!raw.trim()) return null;
+
+  const swHits = (raw.match(SW_UTTERANCE_MARKERS) || []).length;
+  if (swHits >= 2) return 'sw';
+  if (swHits >= 1 && /^[\p{L}\s,'’\-?!.,]+$/u.test(raw.trim())) {
+    // Single clear SW token on an otherwise simple line (e.g. "Sawa.", "Asante sana.")
+    const enCue =
+      /\b(hello|hi|please|thanks|thank you|okay|call|name|need|want|service|price|how much|i will|i'll|we can|can you)\b/i.test(
+        raw
+      );
+    if (!enCue) return 'sw';
+  }
+  return null;
+}
+
+/**
+ * Single owner of Soniox TTS language selection.
+ * Prefer forced → per-utterance → sticky call language → env default.
+ * Sheng / mixed / unknown ride English TTS.
+ *
+ * @param {string} text
+ * @param {'en'|'sw'|'sheng'|'mixed'|'unknown'|null|undefined} [callLanguage]
+ * @param {string} [forcedLanguage] - optional override (`en` | `sw` only)
+ * @returns {'en'|'sw'}
+ */
+function resolveTtsLanguage(text, callLanguage, forcedLanguage) {
+  const forced = String(forcedLanguage || '').toLowerCase();
+  if (forced === 'en' || forced === 'sw') return forced;
+
+  const utterance = detectUtteranceTtsLang(text);
+  if (utterance) return utterance;
+
+  if (callLanguage === 'sw') {
+    // Sticky SW, but if the line is clearly English-only, stay on EN for clarity.
+    const raw = String(text || '').toLowerCase();
+    const swHits = (raw.match(SW_UTTERANCE_MARKERS) || []).length;
+    const enHeavy =
+      /\b(hello|thanks|thank you|please|i will|i'll|we can|call you|your name|how can|what can)\b/i.test(
+        raw
+      );
+    if (enHeavy && swHits === 0) return process.env.SONIOX_TTS_LANGUAGE || 'en';
+    return 'sw';
+  }
+
+  // sheng, en, mixed, unknown → English TTS voice/lang code
   return process.env.SONIOX_TTS_LANGUAGE || 'en';
 }
 
+/**
+ * Full TTS prep pipeline:
+ * strip markup → lexicon → phone expand → punctuation polish.
+ *
+ * @param {string} text
+ * @param {{ callLanguage?: string, language?: string }} [opts]
+ * @returns {{ original: string, text: string, language: 'en'|'sw' }}
+ */
+function prepareForTts(text, opts = {}) {
+  const original = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!original) {
+    return { original: '', text: '', language: 'en' };
+  }
+
+  const language = resolveTtsLanguage(original, opts.callLanguage, opts.language);
+
+  let spoken = stripMarkup(original);
+  spoken = applyLexicon(spoken, language);
+  spoken = expandPhones(spoken);
+  spoken = polishPunctuation(spoken);
+
+  return { original, text: spoken, language };
+}
+
+/**
+ * Legacy helper — returns prepared spoken text only.
+ * Prefer prepareForTts() for new call sites.
+ */
+function normalizeForTts(text, opts = {}) {
+  return prepareForTts(text, opts).text;
+}
+
+/**
+ * Legacy alias — prefer resolveTtsLanguage().
+ */
+function pickTtsLanguage(text, callLanguage) {
+  return resolveTtsLanguage(text, callLanguage);
+}
+
 module.exports = {
+  stripMarkup,
+  expandPhones,
+  polishPunctuation,
+  detectUtteranceTtsLang,
+  resolveTtsLanguage,
+  prepareForTts,
   normalizeForTts,
   pickTtsLanguage,
 };

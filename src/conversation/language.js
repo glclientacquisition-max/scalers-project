@@ -199,7 +199,10 @@ function pickFillerText(lang) {
   return 'One moment…';
 }
 
-/** Soniox TTS language code. */
+/**
+ * Sticky call-language → Soniox TTS code (no utterance inspection).
+ * Prefer src/speech/ttsNormalize.resolveTtsLanguage for speak paths.
+ */
 function ttsLanguageFor(lang) {
   if (lang === 'sw') return 'sw';
   // Sheng rides English TTS + prompt style.
