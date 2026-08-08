@@ -706,7 +706,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               Team Directory
             </h2>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              People the AI can promise a callback from when a caller needs a human.
+              People the AI can escalate to. Add a Phone / WhatsApp so that person
+              actually gets alerted when the AI routes a call to them.
             </p>
           </div>
           <button

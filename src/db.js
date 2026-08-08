@@ -52,6 +52,9 @@ function shapeCall(row) {
     recording_path: meta.recording_path || null,
     status: row.status || null,
     whatsapp_sent: Boolean(meta.whatsapp_sent),
+    escalation_sent: Boolean(meta.escalation_sent),
+    escalated_to: meta.escalated_to || null,
+    escalate_reason: meta.escalate_reason || null,
     duration_seconds: row.duration_seconds ?? null,
     created_at: row.created_at,
     summary: row.summary,
@@ -256,6 +259,58 @@ async function markWhatsappSent(callSid) {
     .maybeSingle();
 
   throwIfError('markWhatsappSent', error);
+  return Boolean(data);
+}
+
+/**
+ * Persist escalation target on the call summary (no schema migration).
+ * @param {{ callSid: string, teammate?: { name?: string, role?: string, phone?: string } | null, reason?: string|null }} opts
+ */
+async function saveEscalation({ callSid, teammate, reason }) {
+  const existing = await getCall(callSid);
+  if (!existing) {
+    throw new Error(`[db] saveEscalation: no call for ${callSid}`);
+  }
+
+  const meta = parseSummary(existing.summary);
+  if (teammate && (teammate.name || teammate.role)) {
+    meta.escalated_to = {
+      name: String(teammate.name || '').trim() || null,
+      role: String(teammate.role || '').trim() || null,
+      phone: String(teammate.phone || '').trim() || null,
+    };
+  }
+  if (reason != null && String(reason).trim()) {
+    meta.escalate_reason = String(reason).trim();
+  }
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('*')
+    .maybeSingle();
+
+  throwIfError('saveEscalation', error);
+  return shapeCall(data);
+}
+
+async function markEscalationSent(callSid) {
+  const existing = await getCall(callSid);
+  if (!existing) return false;
+  if (existing.escalation_sent) return false;
+
+  const meta = parseSummary(existing.summary);
+  meta.escalation_sent = true;
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('id')
+    .maybeSingle();
+
+  throwIfError('markEscalationSent', error);
   return Boolean(data);
 }
 
@@ -557,6 +612,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 module.exports = {
   upsertCall,
   saveCallerInfo,
+  saveEscalation,
   appendTranscript,
   attachRecording,
   updateCallStatus,
@@ -566,6 +622,7 @@ module.exports = {
   getTenantProfile,
   listActiveTenantDids,
   markWhatsappSent,
+  markEscalationSent,
   RECORDINGS_BUCKET,
   shapeCall,
 };

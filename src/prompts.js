@@ -158,6 +158,10 @@ Whenever you first capture OR later correct the caller's name and/or reason, app
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
+When escalating to a teammate (anger, refund, billing, or role match from TEAM DIRECTORY), also append:
+###TOOL###
+{"escalate":{"teammate":"<Name or Role from directory>","name":"<caller name>","reason":"<why they need that person>"}}
+###ENDTOOL###
 If the call should end after goodbye, also append: ###ENDCALL###
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
   }
@@ -188,6 +192,11 @@ ${languagePolicy}
 Whenever you first capture OR later correct name and/or reason, respond naturally and append the latest values:
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
+###ENDTOOL###
+
+When escalating to a teammate (anger, refund, billing, or role match from TEAM DIRECTORY), append:
+###TOOL###
+{"escalate":{"teammate":"<Name or Role from directory>","name":"<caller name>","reason":"<why they need that person>"}}
 ###ENDTOOL###
 
 If the call should end after your goodbye, also append:
