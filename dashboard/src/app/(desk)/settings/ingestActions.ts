@@ -116,7 +116,7 @@ export async function extractKnowledgeAction(
       if (shell) {
         return {
           error:
-            "This website builds its menu in the browser, so the link alone isn’t enough. Switch to Paste text and drop in your services or FAQs — that usually finishes in a few seconds.",
+            "This website builds its menu in the browser, so the link alone isn’t enough. Switch to Paste text and drop in your services or FAQs. That usually finishes in a few seconds.",
         };
       }
       if (sourceText.length < 40) {
@@ -313,7 +313,7 @@ export async function applyIngestAction(
       source,
       message: `Replaced with ${svc} service${svc === 1 ? "" : "s"} and ${faq} FAQ${
         faq === 1 ? "" : "s"
-      }. Live on the next call — tweak anything below if needed.${capNote}`,
+      }. Live on the next call. Tweak anything below if needed.${capNote}`,
     };
   }
 
@@ -322,7 +322,7 @@ export async function applyIngestAction(
     source,
     message:
       parts.length > 0
-        ? `Added ${parts.join(" and ")}. Live on the next call — no need to retype them below.${capNote}`
+        ? `Added ${parts.join(" and ")}. Live on the next call. No need to retype them below.${capNote}`
         : capNote
           ? `Nothing new fit.${capNote}`
           : "Nothing new to add (those items were already on file).",

@@ -60,7 +60,7 @@ export function SautikitSyncButton() {
       </span>
       {diagnostics ? (
         <p className="text-[11px] text-[var(--ink-soft)] text-right leading-relaxed">
-          Server key: label “{diagnostics.label || "—"}”, length {diagnostics.length ?? "—"},
+          Server key: label “{diagnostics.label || "-"}”, length {diagnostics.length ?? "-"},
           eyJ={diagnostics.startsWithEyJ ? "yes" : "no"}
           {diagnostics.fingerprint ? `, ${diagnostics.fingerprint}` : ""}
           {diagnostics.scopes?.length ? ` · ${diagnostics.scopes.join(", ")}` : ""}

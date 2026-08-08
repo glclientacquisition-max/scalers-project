@@ -85,7 +85,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           onChange={(e) => setText(e.target.value)}
           maxLength={160}
           placeholder="e.g. Out of chicken today"
-          className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[#0096FF]"
+          className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus"
         />
 
         <div className="flex flex-wrap gap-2">
@@ -99,8 +99,8 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 className={[
                   "rounded-lg border px-3 py-1.5 text-xs font-medium transition",
                   selected
-                    ? "border-[#0096FF] bg-[var(--accent-soft)] text-[#0096FF]"
-                    : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[#0096FF]/50",
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                    : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]/50",
                 ].join(" ")}
               >
                 {opt.label}
@@ -112,7 +112,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
         <button
           type="submit"
           disabled={postPending || !text.trim()}
-          className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
+          className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
         >
           {postPending ? "Posting…" : "Post update"}
         </button>
@@ -130,7 +130,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
               className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[var(--line)] bg-white px-4 py-3"
             >
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-[#0096FF]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--accent)]">
                   Live now
                 </p>
                 <p className="mt-1 text-sm font-medium text-[var(--ink)]">{item.text}</p>

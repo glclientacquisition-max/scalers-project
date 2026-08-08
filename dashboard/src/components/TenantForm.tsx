@@ -120,7 +120,7 @@ function extractLocationFallback(businessHours: string): string {
 const initial: SettingsCompileState = {};
 
 const fieldClass =
-  "mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[#0096FF]";
+  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus";
 
 export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
@@ -391,8 +391,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                   className={[
                     "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
                     selected
-                      ? "border-[#0096FF] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_#0096FF]"
-                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/50",
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
                   ].join(" ")}
                 >
                   <span className="font-medium text-[var(--ink)]">
@@ -455,14 +455,14 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               <button
                 type="button"
                 onClick={() => setServices((prev) => [...prev, emptyService()])}
-                className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
               >
                 Add 1
               </button>
               <button
                 type="button"
                 onClick={() => addBlankServiceRows(3)}
-                className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
               >
                 Add 3 blank
               </button>
@@ -472,7 +472,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                   setShowBulkServices((v) => !v);
                   setBulkServicesError(null);
                 }}
-                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:border-[#0096FF]/50"
+                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)]/50"
               >
                 {showBulkServices ? "Hide paste" : "Paste list"}
               </button>
@@ -542,7 +542,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 type="button"
                 onClick={applyBulkServices}
                 disabled={!bulkPreview.length}
-                className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
+                className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
               >
                 Add to catalog
               </button>
@@ -668,7 +668,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                     className={[
                       "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
                       open
-                        ? "border-[#0096FF] bg-[var(--accent-soft)] text-[#0096FF]"
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
                         : "border-[var(--line)] text-[var(--ink-soft)]",
                     ].join(" ")}
                   >
@@ -684,7 +684,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF]"
+                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--accent)]"
                       />
                       <span className="text-xs text-[var(--ink-soft)]">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
@@ -695,7 +695,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF]"
+                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--accent)]"
                       />
                     </div>
                   ) : (
@@ -737,8 +737,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                     className={[
                       "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
                       selected
-                        ? "border-[#0096FF] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_#0096FF]"
-                        : "border-[var(--line)] bg-white hover:border-[#0096FF]/50",
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
                     ].join(" ")}
                   >
                     <span className="font-medium text-[var(--ink)]">{opt.label}</span>
@@ -823,8 +823,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                         className={[
                           "w-full rounded-xl border px-4 py-3 text-left text-sm transition",
                           selected
-                            ? "border-[#0096FF] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_#0096FF]"
-                            : "border-[var(--line)] bg-white hover:border-[#0096FF]/50",
+                            ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                            : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
                         ].join(" ")}
                       >
                         <span className="font-medium text-[var(--ink)]">
@@ -856,7 +856,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           <button
             type="button"
             onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-            className="rounded-xl border border-[#0096FF]/40 px-3 py-2 text-sm font-medium text-[#0096FF] hover:bg-[var(--accent-soft)]"
+            className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
           >
             Add teammate
           </button>
@@ -966,7 +966,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3">
             <p className="text-sm text-[var(--ink)]">Start with a common question</p>
             <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Tap one to fill the first blank — edit it to match your business.
+              Tap one to fill the first blank, then edit it to match your business.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {FAQ_STARTERS.map((starter) => (
@@ -1031,7 +1031,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 />
                 {faqDupIndexes.has(index) ? (
                   <p id={`faq-dup-${index}`} className="mt-1 text-xs text-[var(--warn)]" role="status">
-                    Same as another FAQ — keep one clear wording.
+                    Same as another FAQ. Keep one clear wording.
                   </p>
                 ) : null}
               </div>
@@ -1057,11 +1057,11 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         </div>
       </section>
 
-      <div className="border-t border-[var(--line)] pt-6">
+      <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">
         <button
           type="submit"
           disabled={pending || !tone}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#0096FF] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-white font-medium transition hover:bg-accent-deep focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-60"
         >
           {pending ? (
             <>
@@ -1077,12 +1077,12 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         </button>
 
         {state.error ? (
-          <p className="mt-3 text-sm text-[var(--warn)]" role="alert">
+          <p className="mt-3 text-sm text-warn" role="alert">
             {state.error}
           </p>
         ) : null}
         {flash && !state.error ? (
-          <p className="mt-3 text-sm text-[var(--ok)]" role="status">
+          <p className="mt-3 text-sm text-ok" role="status">
             {flash}
           </p>
         ) : null}

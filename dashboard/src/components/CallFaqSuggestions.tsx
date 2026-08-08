@@ -12,7 +12,7 @@ import {
 } from "@/app/(desk)/calls/faqActions";
 
 const fieldClass =
-  "mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[#0096FF]";
+  "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
 
 const suggestInitial: FaqSuggestState = {};
 const applyInitial: FaqApplyState = {};
@@ -122,7 +122,7 @@ export function CallFaqSuggestions({
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]" id="call-faq-help">
           If the caller asked something useful, we&apos;ll suggest a Golden FAQ. You
-          edit and approve — nothing goes live on its own.
+          edit and approve. Nothing goes live on its own.
         </p>
       </div>
 
@@ -136,7 +136,7 @@ export function CallFaqSuggestions({
             aria-describedby={
               !hasTranscript ? "call-faq-no-transcript" : "call-faq-help"
             }
-            className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+            className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
           >
             {suggestPending ? "Looking through the call…" : "Find FAQ ideas"}
           </button>
@@ -184,7 +184,7 @@ export function CallFaqSuggestions({
           </h3>
           {suggestState.message ? (
             <p
-              className="rounded-xl border border-[var(--accent)]/30 bg-[#e8f4f1] px-4 py-3 text-sm text-[var(--ink)]"
+              className="rounded-xl border border-[var(--accent)]/30 bg-accent-soft px-4 py-3 text-sm text-[var(--ink)]"
               role="status"
             >
               {suggestState.message}
@@ -292,7 +292,7 @@ export function CallFaqSuggestions({
               type="submit"
               disabled={applyPending || selectedReady === 0}
               aria-describedby="call-faq-add-help"
-              className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
             >
               {applyPending
                 ? "Adding…"

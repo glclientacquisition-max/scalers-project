@@ -135,7 +135,7 @@ function normalizeSuggestions(raw: unknown): FaqSuggestion[] {
         answer,
         reason:
           reason ||
-          (needsOwnerAnswer ? "Caller asked — add your answer" : "From this call"),
+          (needsOwnerAnswer ? "Caller asked. Add your answer" : "From this call"),
         needsOwnerAnswer,
       };
     })
@@ -166,7 +166,7 @@ export function suggestFaqsLocally(transcriptText: string): FaqSuggestion[] {
     out.push({
       question: question.slice(0, FAQ_QUESTION_MAX),
       answer: weak ? "" : answer.slice(0, FAQ_ANSWER_MAX),
-      reason: weak ? "Caller asked — add your answer" : "From this call",
+      reason: weak ? "Caller asked. Add your answer" : "From this call",
       needsOwnerAnswer: weak,
     });
     if (out.length >= 5) break;

@@ -13,7 +13,7 @@ import {
 } from "@/app/(desk)/settings/ingestActions";
 
 const fieldClass =
-  "mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[#0096FF]";
+  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus";
 
 const extractInitial: IngestExtractState = {};
 const applyInitial: IngestApplyState = {};
@@ -108,12 +108,11 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           Import knowledge
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Paste a menu or drop a website link. We&apos;ll suggest services and FAQs —
-          you tick what looks right before anything goes live.
+          Paste a menu or drop a website link. We&apos;ll suggest services and FAQs.
+          Tick what looks right before anything goes live.
         </p>
         <p className="mt-2 text-xs text-[var(--ink-soft)]">
-          Tip: set your weekly hours and tone of voice below once first — imports use
-          those to retrain the receptionist.
+          Tip: set your weekly hours and tone of voice below once first. Imports use those to retrain the assistant.
         </p>
       </div>
 
@@ -143,8 +142,8 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   className={[
                     "w-full rounded-xl border px-4 py-3 text-left transition",
                     selected
-                      ? "border-[#0096FF] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_#0096FF]"
-                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/50",
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
                   ].join(" ")}
                 >
                   <span className="font-medium text-[var(--ink)]">{opt.label}</span>
@@ -200,7 +199,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             <button
               type="submit"
               disabled={extractPending}
-              className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
             >
               {extractPending
                 ? mode === "url"
@@ -219,7 +218,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-xl border border-[var(--accent)]/30 bg-[#e8f4f1] px-4 py-3 text-sm text-[var(--ink)]">
+          <div className="rounded-xl border border-[var(--accent)]/30 bg-accent-soft px-4 py-3 text-sm text-[var(--ink)]">
             From <span className="font-medium">{draft.sourceLabel}</span>
             {extractState.message ? (
               <span className="mt-1 block text-[var(--ink-soft)]">{extractState.message}</span>
@@ -232,7 +231,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
                 <button
                   type="button"
-                  className="text-xs text-[#0096FF]"
+                  className="text-xs text-[var(--accent)]"
                   onClick={() =>
                     setSelectedServices(
                       selectedServices.size === draft.services.length
@@ -327,7 +326,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                           onChange={(e) =>
                             updateDraftFaq(i, "question", e.target.value)
                           }
-                          className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[#0096FF]"
+                          className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
                         />
                       </div>
                       <div>
@@ -345,7 +344,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                           onChange={(e) =>
                             updateDraftFaq(i, "answer", e.target.value)
                           }
-                          className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#0096FF]"
+                          className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm leading-relaxed outline-none focus:border-[var(--accent)]"
                         />
                       </div>
                     </div>
@@ -416,13 +415,13 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 className={[
                   "rounded-xl border px-3 py-2.5 text-left text-sm",
                   mergeMode === "merge"
-                    ? "border-[#0096FF] bg-[var(--accent-soft)]"
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                     : "border-[var(--line)] bg-white",
                 ].join(" ")}
               >
                 <span className="font-medium">Keep my current list</span>
                 <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
-                  Safe choice. We add the new ones you tick — nothing already
+                  Safe choice. We add the new ones you tick; nothing already
                   saved gets deleted.
                 </span>
               </button>
@@ -432,7 +431,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 className={[
                   "rounded-xl border px-3 py-2.5 text-left text-sm",
                   mergeMode === "replace_services_faqs"
-                    ? "border-[#0096FF] bg-[var(--accent-soft)]"
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                     : "border-[var(--line)] bg-white",
                 ].join(" ")}
               >
@@ -466,7 +465,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   selectedTeam.size === 0 &&
                   !includeUnknown)
               }
-              className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
             >
               {applyPending ? "Adding…" : "Add to my receptionist"}
             </button>

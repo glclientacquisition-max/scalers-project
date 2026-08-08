@@ -48,7 +48,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white hover:bg-[#1ebe5b] transition"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white hover:brightness-95 transition"
       >
         <WhatsAppIcon className="h-4 w-4" />
       </a>
@@ -64,7 +64,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
-        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white hover:bg-[#1ebe5b] transition"
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white hover:brightness-95 transition"
       >
         <WhatsAppIcon className="h-3.5 w-3.5" />
       </a>

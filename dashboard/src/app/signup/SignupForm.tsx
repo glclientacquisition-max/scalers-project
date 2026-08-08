@@ -93,7 +93,7 @@ export function SignupForm() {
           placeholder="+2547…"
         />
         <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-          Where we send missed-call lead alerts (WhatsApp / Telegram later). The receptionist
+          Where we send lead alerts (WhatsApp / Telegram later). The assistant
           automatically speaks English, Kiswahili, and Sheng.
         </p>
       </div>

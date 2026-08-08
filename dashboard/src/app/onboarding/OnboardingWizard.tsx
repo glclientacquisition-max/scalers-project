@@ -167,7 +167,7 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
                     className={[
                       "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
                       selected
-                        ? "border-[var(--accent)] bg-[#e8f4f1] shadow-[inset_0_0_0_1px_var(--accent)]"
+                        ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
                         : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
                     ].join(" ")}
                   >

@@ -6,7 +6,7 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
-        <BrandWordmark href="/signup" context="New workspace" variant="lockup" priority />
+        <BrandWordmark href="/" context="New workspace" variant="lockup" priority />
         <h1 className="sr-only">Create a Scalers workspace</h1>
 
         <div className="mt-8">
