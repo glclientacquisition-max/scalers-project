@@ -123,9 +123,39 @@ function resolveEscalation(teamDirectory, query) {
     }
   }
 
-  // No sales / billing / etc. on the list — fall back to first listed person
-  // (often owner/CEO). Caller must be told honestly; notify includes requested role.
+  // No sales / billing / etc. — prefer an explicit "General queries" catch-all,
+  // then owner/CEO-ish roles, then the first listed person.
+  const general = findGeneralQueriesTeammate(team);
+  if (general) {
+    return { teammate: general, match: 'fallback', requested };
+  }
+
   return { teammate: team[0], match: 'fallback', requested };
+}
+
+/** Roles that mean "default inbox for unmatched asks". */
+function isGeneralQueriesRole(role) {
+  const r = normalizeQuery(role);
+  if (!r) return false;
+  if (/\bgeneral\b/.test(r) && /\b(quer|inquir|request|support|help|desk|reception)\b/.test(r)) {
+    return true;
+  }
+  if (r === 'general' || r === 'general queries' || r === 'general query') return true;
+  if (r === 'front desk' || r === 'reception' || r === 'receptionist') return true;
+  return false;
+}
+
+function isOwnerishRole(role) {
+  const r = normalizeQuery(role);
+  return /\b(ceo|owner|founder|director|md|managing director)\b/.test(r);
+}
+
+function findGeneralQueriesTeammate(team) {
+  const general = team.find((m) => isGeneralQueriesRole(m.role));
+  if (general) return general;
+  const ownerish = team.find((m) => isOwnerishRole(m.role));
+  if (ownerish) return ownerish;
+  return null;
 }
 
 function teammateLabel(teammate) {
@@ -178,4 +208,6 @@ module.exports = {
   teammateLabel,
   normalizeQuery,
   roleSeekTokens,
+  isGeneralQueriesRole,
+  findGeneralQueriesTeammate,
 };

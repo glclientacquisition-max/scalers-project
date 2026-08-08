@@ -83,6 +83,7 @@ function buildLiveGroundTruth(profile = {}) {
   const team = normalizeTeam(profile.teamDirectory);
   const unknown = String(profile.unknownAnswerFallback || '').trim();
   const extras = String(profile.servicesNotes || profile.servicesOffered || '').trim();
+  const escalationEnabled = profile.escalationEnabled !== false;
 
   const hasAny = services.length || faqs.length || team.length || unknown || extras;
   if (!hasAny) return '';
@@ -109,12 +110,15 @@ function buildLiveGroundTruth(profile = {}) {
     '',
     'TEAM DIRECTORY (escalation — you are the receptionist, not the expert):',
     formatTeamBlock(team),
-    team.length
-      ? `ESCALATION RULES:
+    !team.length
+      ? 'ESCALATION: No team directory on file. Do not invent staff. Capture name + reason and say the business will follow up.'
+      : !escalationEnabled
+        ? 'ESCALATION ALERTS: turned OFF in business settings. You may still mention the team directory for context, but do NOT promise a tagged teammate alert and do NOT append the escalate tool. Capture name + reason for a normal business follow-up.'
+        : `ESCALATION RULES (alerts ON):
+- Prefer matching the caller's ask to a Name or Role above. A role like "General queries" is the catch-all for unmatched asks.
 - If a caller is angry, asks for a refund/billing, or matches a role above: acknowledge, say that teammate will follow up shortly, capture name + reason, and append the escalate tool with that teammate name or role.
-- If they ask for a role or person NOT on this list (e.g. "sales guy" but only CEO is listed): do NOT invent a sales person. Say you do not have that role on file, offer the closest listed person (usually owner/CEO) to follow up, then escalate to that real person. In the escalate tool, set teammate to who they asked for (e.g. "sales") so the system can fall back and tag the notify.
+- If they ask for a role or person NOT on this list (e.g. "sales guy" but only CEO / General queries is listed): do NOT invent staff. Say you do not have that specialist on file, offer General queries or the owner/CEO to follow up, then escalate. In the escalate tool, set teammate to who they asked for (e.g. "sales") so the system can fall back and tag the notify.
 - Do not invent live transfers or claim you already WhatsApped them.`
-      : 'ESCALATION: No team directory on file. Do not invent staff. Capture name + reason and say the business will follow up.'
   );
 
   if (unknown) {

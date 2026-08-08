@@ -7,6 +7,10 @@ const {
 } = require('../src/conversation/escalation');
 
 const onlyCeo = [{ name: 'Wanjiku', role: 'CEO', phone: '0711000000' }];
+const ceoAndGeneral = [
+  { name: 'Wanjiku', role: 'CEO', phone: '0711000000' },
+  { name: 'Desk', role: 'General queries', phone: '0711333333' },
+];
 const fullTeam = [
   { name: 'Jane', role: 'Billing', phone: '0711111111' },
   { name: 'Peter', role: 'Sales', phone: '0711222222' },
@@ -21,6 +25,13 @@ const scenarios = [
     ask: 'the sales guy',
     expectMatch: 'fallback',
     expectName: 'Wanjiku',
+  },
+  {
+    name: 'Ask for sales guy — General queries catch-all preferred over CEO',
+    team: ceoAndGeneral,
+    ask: 'the sales guy',
+    expectMatch: 'fallback',
+    expectName: 'Desk',
   },
   {
     name: 'Ask for sales — sales exists',

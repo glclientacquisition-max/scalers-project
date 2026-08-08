@@ -1277,13 +1277,20 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
     let businessName = process.env.BUSINESS_NAME || null;
     let teamDirectory = [];
+    let escalationEnabled = true;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       businessName = profile.businessName || businessName;
       teamDirectory = profile.teamDirectory || [];
+      escalationEnabled = profile.escalationEnabled !== false;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
+    }
+
+    if (!escalationEnabled) {
+      console.log(`[${callSid}] Escalation notify skipped (disabled in settings)`);
+      return;
     }
 
     const resolved = resolveEscalation(teamDirectory, escalate.teammate);

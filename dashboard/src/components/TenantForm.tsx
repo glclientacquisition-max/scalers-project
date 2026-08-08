@@ -135,6 +135,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [afterHoursMode, setAfterHoursMode] = useState<AfterHoursMode>(() =>
     parseAfterHoursMode(tenant.after_hours_mode)
   );
+  const [escalationEnabled, setEscalationEnabled] = useState(
+    () => tenant.escalation_enabled !== false
+  );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
     return rows.length ? rows : [emptyMember()];
@@ -277,6 +280,11 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
       <input type="hidden" name="location_notes" value={locationNotes} />
       <input type="hidden" name="after_hours_mode" value={afterHoursMode} />
+      <input
+        type="hidden"
+        name="escalation_enabled"
+        value={escalationEnabled ? "true" : "false"}
+      />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
@@ -720,6 +728,39 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           </button>
         </div>
 
+        <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-[var(--ink)]">Escalation alerts</p>
+              <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+                When on, the AI can route callers to teammates and notify Telegram.
+                Turn off if you only want normal lead capture.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={escalationEnabled}
+              onClick={() => setEscalationEnabled((v) => !v)}
+              className={[
+                "relative h-8 w-14 shrink-0 rounded-full transition duration-200",
+                escalationEnabled ? "bg-[#0096FF]" : "bg-[var(--line)]",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "absolute top-1 left-1 h-6 w-6 rounded-full bg-white shadow transition duration-200",
+                  escalationEnabled ? "translate-x-6" : "translate-x-0",
+                ].join(" ")}
+              />
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-[var(--ink-soft)]">
+            Tip: add a teammate with role <span className="font-medium text-[var(--ink)]">General queries</span> as
+            the catch-all when someone asks for a role you have not listed (like sales).
+          </p>
+        </div>
+
         <div className="space-y-4">
           {team.map((member, index) => (
             <div
@@ -746,7 +787,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                   id={`team-role-${index}`}
                   value={member.role}
                   onChange={(e) => updateTeam(index, "role", e.target.value)}
-                  placeholder="Billing & Refunds"
+                  placeholder="General queries"
                   className={fieldClass}
                 />
               </div>
