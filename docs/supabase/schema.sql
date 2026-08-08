@@ -13,6 +13,7 @@
 --   agent_name text         (receptionist intro name; default Receptionist)
 --   agent_tone text         (professional | friendly | empathetic | localized)
 --   team_directory jsonb    ([{name, role, phone}]; knowledge_acquisition_phase1.sql)
+--   escalation_enabled bool (default true; escalation_enabled.sql)
 --   faqs jsonb              ([{question, answer}]; knowledge_acquisition_phase1.sql)
 --   hours_schedule jsonb    (weekly open hours; hours_schedule.sql — used live for open/closed)
 --   after_hours_mode text   (serve | message; after_hours_mode.sql)

@@ -39,6 +39,11 @@ const {
   isTelegramConfigured,
   sendOwnerTelegram,
 } = require('./src/notifications/telegram');
+const {
+  resolveEscalation,
+  buildEscalationText,
+  teammateLabel,
+} = require('./src/conversation/escalation');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -1251,6 +1256,156 @@ mediaWss.on('close', () => clearInterval(mediaKeepalive));
 // Fires from save_caller_info and recording/events webhooks. Sends once per call.
 // ---------------------------------------------------------------------------
 const ownerNotifyInProgress = new Set();
+const escalationNotifyInProgress = new Set();
+
+/**
+ * Real escalation notify from TEAM DIRECTORY (not prompt-only).
+ *
+ * Live path today: Telegram owner chat, tagged with teammate name/role.
+ * WhatsApp (teammate or owner) is only attempted when Telegram is NOT
+ * configured — same interim policy as owner leads, until WA Business works.
+ * Set ESCALATION_WHATSAPP=1 to also try teammate WhatsApp after Telegram.
+ */
+async function maybeSendEscalationNotification(callSid, escalate = {}) {
+  const call = await db.getCall(callSid);
+  if (!call) return;
+  if (call.escalation_sent) return;
+  if (escalationNotifyInProgress.has(callSid)) return;
+  escalationNotifyInProgress.add(callSid);
+
+  try {
+    let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+    let businessName = process.env.BUSINESS_NAME || null;
+    let teamDirectory = [];
+    let escalationEnabled = true;
+    try {
+      const profile = await db.getTenantProfile({ callSid });
+      ownerNumber = profile.whatsappNumber || ownerNumber;
+      businessName = profile.businessName || businessName;
+      teamDirectory = profile.teamDirectory || [];
+      escalationEnabled = profile.escalationEnabled !== false;
+    } catch (err) {
+      console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
+    }
+
+    if (!escalationEnabled) {
+      console.log(`[${callSid}] Escalation notify skipped (call alerts off in settings)`);
+      return;
+    }
+
+    const resolved = resolveEscalation(teamDirectory, escalate.teammate);
+    const teammate = resolved.teammate;
+    const callerName = String(escalate.name || call.name || '').trim() || null;
+    let reason =
+      String(escalate.reason || call.reason || call.escalate_reason || '').trim() || null;
+    // Keep the caller's asked-for role visible when we fall back (sales → CEO).
+    if (resolved.match === 'fallback' && resolved.requested) {
+      const asked = `Asked for ${resolved.requested}`;
+      reason = reason ? `${reason} (${asked})` : asked;
+    }
+
+    if (callerName || reason) {
+      await db.saveCallerInfo({
+        callSid,
+        name: callerName || undefined,
+        reason: reason || undefined,
+      });
+    }
+
+    await db.saveEscalation({ callSid, teammate, reason });
+
+    const lead = {
+      businessName,
+      name: callerName || call.name,
+      reason: reason || call.reason,
+      callerNumber: call.from_number,
+      recordingUrl: call.recording_url,
+    };
+    const body = buildEscalationText({
+      ...lead,
+      teammate,
+      requested: resolved.requested,
+      match: resolved.match,
+    });
+
+    let ownerNotified = false;
+    let teammateNotified = false;
+    const telegramReady = isTelegramConfigured();
+    const forceWhatsApp = String(process.env.ESCALATION_WHATSAPP || '').trim() === '1';
+
+    // Primary live channel: Telegram (interim until WhatsApp Business is ready).
+    if (telegramReady) {
+      const result = await sendOwnerTelegram({ text: body, lead });
+      ownerNotified = true;
+      console.log(
+        `[${callSid}] Telegram escalation for ${teammateLabel(teammate)}:`,
+        result?.result?.message_id || result
+      );
+    }
+
+    // WhatsApp only when Telegram is unavailable, or explicitly opted in.
+    const tryWhatsApp = isWhatsAppConfigured() && (!telegramReady || forceWhatsApp);
+    if (tryWhatsApp) {
+      const teammatePhone = teammate?.phone ? String(teammate.phone).trim() : '';
+      if (teammatePhone) {
+        try {
+          const result = await sendOwnerWhatsApp({ to: teammatePhone, body, lead });
+          teammateNotified = true;
+          console.log(
+            `[${callSid}] WhatsApp escalation to teammate ${teammateLabel(teammate)}:`,
+            result
+          );
+        } catch (err) {
+          console.warn(
+            `[${callSid}] WhatsApp to teammate failed:`,
+            err?.message || err
+          );
+        }
+      }
+
+      if (!ownerNotified && !teammateNotified) {
+        if (!ownerNumber) {
+          console.warn(
+            `[${callSid}] Escalation WhatsApp skipped: no teammate phone or owner number`
+          );
+        } else {
+          try {
+            const result = await sendOwnerWhatsApp({ to: ownerNumber, body, lead });
+            ownerNotified = true;
+            console.log(`[${callSid}] WhatsApp escalation to owner:`, result);
+          } catch (err) {
+            console.warn(`[${callSid}] WhatsApp escalation to owner failed:`, err?.message || err);
+          }
+        }
+      }
+    }
+
+    if (!ownerNotified && !teammateNotified) {
+      console.warn(`[${callSid}] Escalation notify skipped (no working channel). Ready:`, {
+        teammate: teammateLabel(teammate),
+        name: lead.name,
+        phone: lead.callerNumber,
+        reason: lead.reason,
+      });
+      // Still try the generic owner lead path so the call is not lost.
+      const refreshed = await db.getCall(callSid);
+      if (refreshed?.name && refreshed?.reason) {
+        await maybeSendWhatsAppNotification(callSid);
+      }
+      return;
+    }
+
+    await db.markEscalationSent(callSid);
+    // Owner channel already has the richer escalation — skip duplicate generic lead.
+    if (ownerNotified) {
+      await db.markWhatsappSent(callSid);
+    }
+  } catch (err) {
+    console.error(`[${callSid}] Escalation notification failed:`, err?.message || err);
+  } finally {
+    escalationNotifyInProgress.delete(callSid);
+  }
+}
 
 async function maybeSendWhatsAppNotification(callSid) {
   // Kept name for call-sites; routes Telegram first, then WhatsApp.
@@ -1269,6 +1424,11 @@ async function maybeSendWhatsAppNotification(callSid) {
     let businessName = process.env.BUSINESS_NAME || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
+      // Same Settings toggle as escalation: when off, no Telegram/WhatsApp pings.
+      if (profile.escalationEnabled === false) {
+        console.log(`[${callSid}] Owner alert skipped (call alerts off in settings)`);
+        return;
+      }
       ownerNumber = profile.whatsappNumber || ownerNumber;
       businessName = profile.businessName || businessName;
     } catch (err) {
@@ -1532,9 +1692,16 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
       name: parsed.name || undefined,
       reason: parsed.reason || undefined,
     });
-    if (saved?.name && saved?.reason) {
+    // If this turn also escalates, the escalation path notifies (richer message).
+    if (saved?.name && saved?.reason && !parsed.escalate) {
       maybeSendWhatsAppNotification(callSid);
     }
+  }
+
+  if (parsed.escalate) {
+    maybeSendEscalationNotification(callSid, parsed.escalate).catch((err) => {
+      console.error(`[${callSid}] escalate notify error:`, err?.message || err);
+    });
   }
 
   messages.push({ role: 'assistant', content: spokenText });
@@ -1544,23 +1711,40 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
 function parseGeminiResponse(responseText) {
   const output = { spokenText: responseText, shouldEndCall: false };
-  const toolMatch = /###TOOL###([\s\S]*?)###ENDTOOL###/i.exec(responseText);
-  const endCallMatch = /###ENDCALL###/i.exec(responseText);
+  let spoken = String(responseText || '');
+  const toolRe = /###TOOL###([\s\S]*?)###ENDTOOL###/gi;
+  const blocks = [...spoken.matchAll(toolRe)];
 
-  if (toolMatch) {
-    const toolJson = toolMatch[1].trim();
+  for (const match of blocks) {
+    const toolJson = match[1].trim();
     try {
       const parsed = JSON.parse(toolJson);
       if (parsed.save_caller_info) {
-        output.name = parsed.save_caller_info.name;
-        output.reason = parsed.save_caller_info.reason;
+        if (parsed.save_caller_info.name != null) {
+          output.name = parsed.save_caller_info.name;
+        }
+        if (parsed.save_caller_info.reason != null) {
+          output.reason = parsed.save_caller_info.reason;
+        }
+      }
+      if (parsed.escalate) {
+        output.escalate = {
+          teammate: String(
+            parsed.escalate.teammate || parsed.escalate.to || parsed.escalate.role || ''
+          ).trim(),
+          name: String(parsed.escalate.name || '').trim(),
+          reason: String(parsed.escalate.reason || '').trim(),
+        };
       }
     } catch (err) {
       console.warn('[parseGeminiResponse] Failed to parse tool JSON:', err?.message || err);
     }
-    output.spokenText = responseText.replace(toolMatch[0], '').trim();
+    spoken = spoken.replace(match[0], '');
   }
 
+  output.spokenText = spoken.trim();
+
+  const endCallMatch = /###ENDCALL###/i.exec(output.spokenText);
   if (endCallMatch) {
     output.shouldEndCall = true;
     output.spokenText = output.spokenText.replace(endCallMatch[0], '').trim();

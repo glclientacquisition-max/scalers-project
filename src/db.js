@@ -52,6 +52,9 @@ function shapeCall(row) {
     recording_path: meta.recording_path || null,
     status: row.status || null,
     whatsapp_sent: Boolean(meta.whatsapp_sent),
+    escalation_sent: Boolean(meta.escalation_sent),
+    escalated_to: meta.escalated_to || null,
+    escalate_reason: meta.escalate_reason || null,
     duration_seconds: row.duration_seconds ?? null,
     created_at: row.created_at,
     summary: row.summary,
@@ -259,6 +262,58 @@ async function markWhatsappSent(callSid) {
   return Boolean(data);
 }
 
+/**
+ * Persist escalation target on the call summary (no schema migration).
+ * @param {{ callSid: string, teammate?: { name?: string, role?: string, phone?: string } | null, reason?: string|null }} opts
+ */
+async function saveEscalation({ callSid, teammate, reason }) {
+  const existing = await getCall(callSid);
+  if (!existing) {
+    throw new Error(`[db] saveEscalation: no call for ${callSid}`);
+  }
+
+  const meta = parseSummary(existing.summary);
+  if (teammate && (teammate.name || teammate.role)) {
+    meta.escalated_to = {
+      name: String(teammate.name || '').trim() || null,
+      role: String(teammate.role || '').trim() || null,
+      phone: String(teammate.phone || '').trim() || null,
+    };
+  }
+  if (reason != null && String(reason).trim()) {
+    meta.escalate_reason = String(reason).trim();
+  }
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('*')
+    .maybeSingle();
+
+  throwIfError('saveEscalation', error);
+  return shapeCall(data);
+}
+
+async function markEscalationSent(callSid) {
+  const existing = await getCall(callSid);
+  if (!existing) return false;
+  if (existing.escalation_sent) return false;
+
+  const meta = parseSummary(existing.summary);
+  meta.escalation_sent = true;
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('id')
+    .maybeSingle();
+
+  throwIfError('markEscalationSent', error);
+  return Boolean(data);
+}
+
 async function uploadRecordingBuffer({
   callSid,
   recordingSid,
@@ -436,12 +491,21 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, escalation_enabled, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
   // Older DBs may lack newer KA columns — peel them off gradually.
+  if (error && /escalation_enabled/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, faqs, team_directory, unknown_answer_fallback, daily_bulletin, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
   if (error && /daily_bulletin/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
@@ -519,6 +583,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessHours: null,
       agentTone: null,
       afterHoursMode: 'serve',
+      escalationEnabled: true,
       servicesCatalog: [],
       servicesOffered: null,
       faqs: [],
@@ -545,6 +610,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     hoursSchedule: row.hours_schedule || null,
     businessHours: row.business_hours || null,
     afterHoursMode,
+    escalationEnabled: row.escalation_enabled !== false,
     servicesCatalog: row.services_catalog || [],
     servicesOffered: row.services_offered || null,
     faqs: row.faqs || [],
@@ -557,6 +623,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
 module.exports = {
   upsertCall,
   saveCallerInfo,
+  saveEscalation,
   appendTranscript,
   attachRecording,
   updateCallStatus,
@@ -566,6 +633,7 @@ module.exports = {
   getTenantProfile,
   listActiveTenantDids,
   markWhatsappSent,
+  markEscalationSent,
   RECORDINGS_BUCKET,
   shapeCall,
 };

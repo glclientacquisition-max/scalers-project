@@ -122,6 +122,12 @@ export default async function CallDetailPage({
   const name = typeof meta.name === "string" ? meta.name : null;
   const reason = typeof meta.reason === "string" ? meta.reason : null;
   const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
+  const escalatedTo =
+    meta.escalated_to && typeof meta.escalated_to === "object"
+      ? (meta.escalated_to as { name?: string; role?: string; phone?: string })
+      : null;
+  const escalateReason =
+    typeof meta.escalate_reason === "string" ? meta.escalate_reason : null;
 
   const { data: transcripts } = await workspace.client
     .from("transcripts")
@@ -183,7 +189,15 @@ export default async function CallDetailPage({
           <div className="mt-2 flex flex-wrap gap-3 text-sm">
             <span>Duration: {row.duration_seconds ?? "—"}s</span>
             <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
+            <span>Escalation: {meta.escalation_sent ? "sent" : "no"}</span>
           </div>
+          {escalatedTo?.name ? (
+            <p className="mt-2 text-sm text-[var(--ink)]">
+              Escalated to {escalatedTo.name}
+              {escalatedTo.role ? ` (${escalatedTo.role})` : ""}
+              {escalateReason ? ` — ${escalateReason}` : ""}
+            </p>
+          ) : null}
           {!row.recording_url ? (
             <p className="mt-2 text-sm text-[var(--ink-soft)]">No recording attached yet.</p>
           ) : null}

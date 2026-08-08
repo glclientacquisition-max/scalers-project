@@ -143,6 +143,14 @@ function buildSystemPrompt(profile = {}) {
   const header = buildContextHeader(profile);
   const liveTruth = buildLiveGroundTruth(profile);
   const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
+  const escalationEnabled = profile.escalationEnabled !== false;
+  const escalateTools = escalationEnabled
+    ? `When escalating (anger, refund, billing, role match, or a role they asked for), also append:
+###TOOL###
+{"escalate":{"teammate":"<Name/Role they asked for, or closest directory person>","name":"<caller name>","reason":"<why they need that person>"}}
+###ENDTOOL###
+If they ask for someone not on TEAM DIRECTORY, still escalate (system falls back to General queries / owner/CEO) — never invent staff.`
+    : `Escalation alerts are OFF for this business — do not append the escalate tool. Still capture name + reason normally.`;
 
   // Tenant-provided full prompt wins, but we still prepend live context + ground truth.
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
@@ -158,6 +166,7 @@ Whenever you first capture OR later correct the caller's name and/or reason, app
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
+${escalateTools}
 If the call should end after goodbye, also append: ###ENDCALL###
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
   }
@@ -189,6 +198,8 @@ Whenever you first capture OR later correct name and/or reason, respond naturall
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
+
+${escalateTools}
 
 If the call should end after your goodbye, also append:
 ###ENDCALL###

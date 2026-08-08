@@ -106,6 +106,7 @@ export type TenantRow = {
   faqs?: FaqEntry[] | null;
   unknown_answer_fallback?: string | null;
   daily_bulletin?: DailyBulletinEntry[] | null;
+  escalation_enabled?: boolean | null;
   telecom_wallet_balance_kes?: number | null;
   ai_wallet_balance_usd?: number | null;
   is_active: boolean | null;
