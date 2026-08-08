@@ -23,7 +23,6 @@ const callAgentTools = new Map();
 const {
   detectCallerLanguage,
   resolveCallLanguage,
-  ttsLanguageFor,
   isBackchannel,
   languageDirective,
 } = require('./src/conversation/language');
@@ -32,7 +31,7 @@ const {
   pickContextualAck,
   shouldSkipCallerTurn,
 } = require('./src/conversation/dynamicSpeech');
-const { pickTtsLanguage } = require('./src/speech/ttsNormalize');
+const { prepareForTts } = require('./src/speech/ttsNormalize');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
@@ -776,9 +775,22 @@ mediaWss.on('connection', (ws, req) => {
     lastAgentText = String(text);
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
-    const language = opts.language || pickTtsLanguage(text, callLanguage) || ttsLanguageFor(callLanguage);
+    // One owner for TTS language + pronunciation prep (per-utterance + sticky call lang).
+    const prepared = prepareForTts(text, {
+      callLanguage,
+      language: opts.language,
+    });
+    console.log(
+      `[ws/media][${sidLabel()}] tts prep lang=${prepared.language}` +
+        ` original=${JSON.stringify(prepared.original)}` +
+        ` spoken=${JSON.stringify(prepared.text)}`
+    );
     try {
-      await tts.speak(text, { language });
+      await tts.speak(prepared.text, {
+        language: prepared.language,
+        callLanguage,
+        alreadyPrepared: true,
+      });
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
     } finally {
@@ -919,7 +931,7 @@ mediaWss.on('connection', (ws, req) => {
               console.log(
                 `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
               );
-              speakText(fillerText, { language: ttsLanguageFor(callLanguage) }).then(
+              speakText(fillerText).then(
                 resolve,
                 resolve
               );
@@ -952,7 +964,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       transcriptLog.push(`Agent: ${reply}`);
-      await speakText(reply, { language: ttsLanguageFor(callLanguage) });
+      await speakText(reply);
 
       if (result?.shouldEndCall && !bargeInActive) {
         console.log(`[ws/media][${sidLabel()}] end-call marker — closing media shortly`);
@@ -967,7 +979,7 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
       if (!bargeInActive) {
-        await speakText(AI_FALLBACK_LINE, { language: ttsLanguageFor(callLanguage) });
+        await speakText(AI_FALLBACK_LINE);
       }
     } finally {
       clearFillerTimer();

@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "test:tts": "node tests/ttsNormalize.test.js",
     "smoke:db": "node scripts/smoke-db.js",
     "tunnel": "node scripts/tunnel.js",
     "tunnel:localtunnel": "node scripts/tunnel.js",

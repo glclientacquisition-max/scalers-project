@@ -4,7 +4,7 @@
 const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
 
-const { normalizeForTts } = require('./ttsNormalize');
+const { prepareForTts } = require('./ttsNormalize');
 
 const SONIOX_TTS_URL =
   process.env.SONIOX_TTS_URL || 'wss://tts-rt.soniox.com/tts-websocket';
@@ -137,18 +137,33 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
 
   /**
    * Speak full text (non-streaming LLM for now). Returns when stream terminates.
+   * Runs prepareForTts unless opts.alreadyPrepared is set.
    * @param {string} text
-   * @param {{ language?: string }} [opts]
+   * @param {{ language?: string, callLanguage?: string, alreadyPrepared?: boolean, speed?: number }} [opts]
    */
   async function speak(text, opts = {}) {
-    const clean = normalizeForTts(text);
+    const prepared = opts.alreadyPrepared
+      ? {
+          original: String(text || ''),
+          text: String(text || '').trim(),
+          language:
+            opts.language === 'sw' || opts.language === 'en'
+              ? opts.language
+              : process.env.SONIOX_TTS_LANGUAGE || 'en',
+        }
+      : prepareForTts(text, {
+          callLanguage: opts.callLanguage,
+          language: opts.language,
+        });
+
+    const clean = prepared.text;
     if (!clean) return { cancelled: false };
     if (closed) throw new Error('TTS session closed');
 
     await ensureConnected();
 
     const streamId = `tts-${randomUUID()}`;
-    const language = opts.language || process.env.SONIOX_TTS_LANGUAGE || 'en';
+    const language = prepared.language;
     const speed =
       opts.speed != null
         ? Math.min(1.3, Math.max(0.7, Number(opts.speed)))
@@ -171,8 +186,11 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
     sendJson({ text: clean, text_end: false, stream_id: streamId });
     sendJson({ text: '', text_end: true, stream_id: streamId });
 
+    const changed = prepared.original !== clean;
     console.log(
-      `[soniox-tts][${callSid}] speak stream=${streamId} lang=${language} speed=${speed} chars=${clean.length}`
+      `[soniox-tts][${callSid}] speak stream=${streamId} lang=${language} speed=${speed} chars=${clean.length}` +
+        (changed ? ` normalized=1` : '') +
+        ` original=${JSON.stringify(prepared.original)} spoken=${JSON.stringify(clean)}`
     );
 
     return done;
