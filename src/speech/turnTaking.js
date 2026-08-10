@@ -206,6 +206,19 @@ function evaluateBargeIn(opts) {
   return { barge: true, reason: 'interrupt_llm' };
 }
 
+/**
+ * Final STT while agent audio is still playing and barge did not fire.
+ * Drop clear echoes; keep real overlap for the next caller turn.
+ *
+ * @param {string} callerText
+ * @param {string} agentText
+ * @returns {'drop_echo' | 'queue'}
+ */
+function classifyFinalDuringAgentSpeech(callerText, agentText) {
+  if (looksLikeEcho(callerText, agentText)) return 'drop_echo';
+  return 'queue';
+}
+
 module.exports = {
   normalizeSpeech,
   looksLikeEcho,
@@ -214,4 +227,5 @@ module.exports = {
   hasBargeContent,
   adaptiveFlushMs,
   evaluateBargeIn,
+  classifyFinalDuringAgentSpeech,
 };

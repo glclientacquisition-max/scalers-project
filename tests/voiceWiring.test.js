@@ -20,4 +20,28 @@ assert.match(
   'spoken technical fallbacks must also be persisted in the transcript'
 );
 
+assert.match(
+  source,
+  /classifyFinalDuringAgentSpeech/,
+  'media path must classify finals heard during TTS (echo drop vs queue)'
+);
+
+assert.match(
+  source,
+  /filler cancelled for reply audio/,
+  'reply path must cancel thinking-ack without awaiting remote TTS terminated'
+);
+
+assert.match(
+  source,
+  /queue overlapping final while TTS/,
+  'non-echo finals during TTS must be queued for the next caller turn'
+);
+
+assert.match(
+  source,
+  /function releaseQueuedCallerSpeech/,
+  'playback end / barge-in must release queued caller speech'
+);
+
 console.log('Voice runtime wiring checks passed.');
