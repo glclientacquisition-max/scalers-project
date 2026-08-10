@@ -1,4 +1,5 @@
 -- Owner-facing receptionist tool toggles (per business).
+-- Run after tenants exist; prefer AFTER wallet_security_beta.sql so column grants stick.
 -- ASCII-only (safe for Supabase SQL Editor).
 --
 -- Shape (jsonb object):
