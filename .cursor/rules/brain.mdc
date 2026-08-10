@@ -1,0 +1,14 @@
+---
+description: Scalers Brain lane — prompts, conversation logic, tools, knowledge compile
+globs: src/prompts.js,src/conversation/**,dashboard/src/lib/promptCompiler.ts,dashboard/src/lib/prompts.ts,dashboard/src/lib/gemini.ts,dashboard/src/lib/faqs.ts,dashboard/src/lib/faqFromTranscript.ts,dashboard/src/lib/hoursSchedule.ts,dashboard/src/lib/afterHours.ts,dashboard/src/lib/dailyBulletin.ts,dashboard/src/lib/servicesCatalog.ts,dashboard/src/lib/agentTools.ts,dashboard/src/lib/ingest/**,dashboard/src/app/(desk)/settings/**,dashboard/src/app/(desk)/calls/faqActions.ts,dashboard/src/app/onboarding/actions.ts,docs/agents/BRAIN.md,scripts/smoke-escalation-scenarios.js
+alwaysApply: false
+---
+
+# Brain lane
+
+Full contract: `docs/agents/BRAIN.md`.
+
+- Own prompts, conversation modules, tools, and desk prompt compilation.
+- Avoid speech/media (`src/speech/**`), wallet/DID ops, and visual redesigns.
+- Keep spoken replies short; never invent prices/availability; en/sw/sheng auto-match.
+- Hand off schema/RPC changes to Platform.

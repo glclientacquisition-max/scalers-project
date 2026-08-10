@@ -34,4 +34,4 @@ Local: `cd dashboard && npm install && npm run dev` (see [`dashboard/README.md`]
 
 ## Agent lanes
 
-Specialized Cursor chats/agents: **[AGENTS.md](AGENTS.md)** (Voice contract: [`docs/agents/VOICE.md`](docs/agents/VOICE.md)).
+Specialized Cursor chats/agents: **[AGENTS.md](AGENTS.md)** · copy-paste prompts: [`docs/agents/PROMPTS.md`](docs/agents/PROMPTS.md).
