@@ -766,7 +766,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             className={`${fieldClass} leading-relaxed`}
           />
           <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-            Optional. Without it, the receptionist says the team will follow up.
+            Optional preferred phrasing. Without it, the receptionist admits they
+            don&apos;t have the detail, notes the request, and says the team will
+            follow up — still in the caller&apos;s language.
           </p>
         </div>
       </section>

@@ -74,6 +74,31 @@ function formatTeamBlock(team) {
 }
 
 /**
+ * Spoken policy when knowledge does not cover the ask.
+ * Custom owner line is preferred phrasing; default still admits unknown + captures lead.
+ * @param {string} [customLine]
+ */
+function formatUnknownAnswerPolicy(customLine = '') {
+  const line = String(customLine || '').trim();
+  const parts = [
+    'UNKNOWN ANSWER POLICY (when the ask is outside SERVICES / FAQs / TEAM above):',
+    '- Admit you do not have that fact. Do NOT invent prices, availability, guarantees, or services.',
+    '- Keep the spoken reply to 1 short sentence, then capture or confirm name + reason so the team can follow up.',
+    '- Match the caller language (English / Kiswahili / light Sheng).',
+  ];
+  if (line) {
+    parts.push(
+      `- Preferred line (adapt wording to the caller's language, keep the same meaning): "${line}"`
+    );
+  } else {
+    parts.push(
+      '- Default line ideas (pick one short variant, do not read this list aloud): "I don\'t have that detail — I\'ll note it and the team will follow up." / "Sina hiyo detail — nitaandika, team itakupigia." / "Sijui hiyo exact — nita-note, wataku-call."'
+    );
+  }
+  return parts.join('\n');
+}
+
+/**
  * Authoritative live facts injected on every call.
  * Prefer these over older compiled prose if there is a conflict.
  */
@@ -135,13 +160,7 @@ function buildLiveGroundTruth(profile = {}) {
     );
   }
 
-  if (unknown) {
-    parts.push(
-      '',
-      'UNKNOWN REQUEST LINE (say this when asked for something outside knowledge):',
-      `"${unknown}"`
-    );
-  }
+  parts.push('', formatUnknownAnswerPolicy(unknown));
 
   parts.push(
     '',
@@ -171,6 +190,7 @@ module.exports = {
   normalizeServices,
   normalizeFaqs,
   normalizeTeam,
+  formatUnknownAnswerPolicy,
   buildLiveGroundTruth,
   formatServicesForCompiler,
 };
