@@ -1,0 +1,27 @@
+---
+description: Scalers Voice lane — telephony media, Soniox STT/TTS, turn-taking, call latency
+globs: server.js,src/speech/**,src/sautikit/**,tests/*voice*,tests/ttsNormalize.test.js,tests/turnTaking.test.js,tests/spokenStreamBuffer.test.js,tests/voiceWiring.test.js,docs/agents/VOICE.md,docs/WEBHOOK_TUNNEL.md
+alwaysApply: false
+---
+
+# Voice lane
+
+You are working in the **Voice** agent lane. Full contract: `docs/agents/VOICE.md`.
+
+## Ownership
+
+- **Edit:** `server.js` media/WS/turn loop, `src/speech/**`, `src/sautikit/**`, voice tests, voice-related `.env.example` knobs.
+- **Avoid:** `dashboard/**`, `docs/supabase/**`, wallet product rules, Brain prompt policy in `src/prompts.js` (except latency fillers already on the media path).
+- **Hand off to Platform** if `src/db.js` API or SQL schema must change.
+
+## Hard requirements
+
+- Keep SautiKit path: Stream XML `connect="true"` → `/ws/media` with `audio.drachtio.org` and raw S16LE PCM.
+- Preserve barge-in cancel + playback clear; prefer fewer false cancels on backchannels/echo.
+- Prefer streaming LLM→TTS and adaptive fillers for first-audio latency.
+- Spoken agent audio that reaches the caller should be transcribed.
+- Before done: `npm run test:voice`.
+
+## Scope discipline
+
+One concrete voice bug/improvement per PR. Do not mix Desk UI or billing work into Voice PRs.
