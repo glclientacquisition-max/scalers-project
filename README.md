@@ -31,3 +31,7 @@ Local: `cd dashboard && npm install && npm run dev` (see [`dashboard/README.md`]
 ## Architecture
 
 **[docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md](docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md)**
+
+## Agent lanes
+
+Specialized Cursor chats/agents: **[AGENTS.md](AGENTS.md)** (Voice contract: [`docs/agents/VOICE.md`](docs/agents/VOICE.md)).
