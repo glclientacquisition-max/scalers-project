@@ -36,6 +36,7 @@ const {
   adaptiveFlushMs,
   evaluateBargeIn,
   looksLikeEcho: turnLooksLikeEcho,
+  classifyFinalDuringAgentSpeech,
 } = require('./src/speech/turnTaking');
 const {
   createSpokenStreamBuffer,
@@ -779,6 +780,14 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
+  function releaseQueuedCallerSpeech() {
+    if (utteranceParts.length) {
+      scheduleUtteranceFlush();
+      return;
+    }
+    kickPendingTurn();
+  }
+
   async function speakText(text, opts = {}) {
     if (!tts || !text) return;
     // Starting intentional playback clears a prior barge latch.
@@ -808,7 +817,10 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
     } finally {
-      if (activePlaybackGeneration === gen) speaking = false;
+      if (activePlaybackGeneration === gen) {
+        speaking = false;
+        releaseQueuedCallerSpeech();
+      }
     }
   }
 
@@ -826,6 +838,7 @@ mediaWss.on('connection', (ws, req) => {
       }
     }
     clearMediaPlayback(ws);
+    releaseQueuedCallerSpeech();
   }
 
   function discardUnspokenAssistant(reply) {
@@ -950,24 +963,30 @@ mediaWss.on('connection', (ws, req) => {
       let streamPlaybackGen = 0;
       const spokenChunks = [];
 
-      async function stopFillerForReply() {
+      function stopFillerForReply() {
         clearFillerTimer();
-        if (fillerStarted && tts) {
+        if (!fillerStarted) return;
+        fillerStarted = false;
+        // Drop any filler PCM already in flight and do not await speak() —
+        // waiting on remote TTS terminated was delaying first reply audio.
+        playbackGeneration += 1;
+        speaking = false;
+        if (tts) {
           try {
             tts.cancel();
           } catch {
             /* ignore */
           }
-          fillerStarted = false;
-          await fillerPromise.catch(() => {});
         }
+        clearMediaPlayback(ws);
+        console.log(`[ws/media][${sidLabel()}] filler cancelled for reply audio`);
       }
 
       async function onSpokenChunk(chunk) {
         const text = String(chunk || '').trim();
         if (!text || !tts) return;
         firstSpokenChunk = true;
-        await stopFillerForReply();
+        stopFillerForReply();
         if (bargeInActive) return;
 
         if (!speakSession) {
@@ -1027,7 +1046,10 @@ mediaWss.on('connection', (ws, req) => {
             discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
             bargeInActive = false;
             speakSession = null;
-            if (activePlaybackGeneration === streamPlaybackGen) speaking = false;
+            if (activePlaybackGeneration === streamPlaybackGen) {
+              speaking = false;
+              releaseQueuedCallerSpeech();
+            }
             return;
           }
           try {
@@ -1038,7 +1060,10 @@ mediaWss.on('connection', (ws, req) => {
               err?.message || err
             );
           } finally {
-            if (activePlaybackGeneration === streamPlaybackGen) speaking = false;
+            if (activePlaybackGeneration === streamPlaybackGen) {
+              speaking = false;
+              releaseQueuedCallerSpeech();
+            }
             speakSession = null;
           }
           const reply = result?.spokenText || spokenChunks.join(' ') || AI_FALLBACK_LINE;
@@ -1140,7 +1165,18 @@ mediaWss.on('connection', (ws, req) => {
       // Finals: barge if needed, then accumulate for the next customer turn.
       maybeBargeIn(text, 'final speech');
       if (speaking && !bargeInActive) {
-        // Still playing and not confident it was a barge — ignore finals (echo).
+        const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText);
+        if (overlap === 'drop_echo') {
+          console.log(
+            `[ws/media][${sidLabel()}] drop echo final while TTS: ${text.slice(0, 80)}`
+          );
+          return;
+        }
+        // Real overlap that wasn't strong enough to barge — keep for after playback.
+        utteranceParts.push(text);
+        console.log(
+          `[ws/media][${sidLabel()}] queue overlapping final while TTS: ${text.slice(0, 80)}`
+        );
         return;
       }
       utteranceParts.push(text);

@@ -9,6 +9,7 @@ const {
   evaluateBargeIn,
   hasBargeContent,
   agentAwaitingReply,
+  classifyFinalDuringAgentSpeech,
 } = require('../src/speech/turnTaking');
 
 let passed = 0;
@@ -164,6 +165,27 @@ test('hasBargeContent / agentAwaitingReply', () => {
   assert.strictEqual(hasBargeContent('mm'), false);
   assert.strictEqual(agentAwaitingReply('Was that John?'), true);
   assert.strictEqual(agentAwaitingReply('We are open today.'), false);
+});
+
+console.log('classifyFinalDuringAgentSpeech');
+test('drops echo finals during agent speech', () => {
+  assert.strictEqual(
+    classifyFinalDuringAgentSpeech(
+      'call you back shortly',
+      'Someone will call you back shortly.'
+    ),
+    'drop_echo'
+  );
+});
+test('queues real overlap finals during agent speech', () => {
+  assert.strictEqual(
+    classifyFinalDuringAgentSpeech('My name is Ann', 'How can I help you today?'),
+    'queue'
+  );
+  assert.strictEqual(
+    classifyFinalDuringAgentSpeech('yes', 'Was that John?'),
+    'queue'
+  );
 });
 
 if (process.exitCode) {
