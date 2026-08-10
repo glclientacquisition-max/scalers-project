@@ -1,0 +1,14 @@
+---
+description: Scalers Ops & Billing lane — wallet, DID pool, Super Admin telecom
+globs: docs/supabase/wallet*.sql,docs/supabase/one_wallet_billing.sql,docs/supabase/did_number_pool.sql,docs/supabase/super_admin_ops.sql,docs/ONE_WALLET_BILLING.md,docs/BETA_WALLET_PROGRAM.md,docs/PRODUCTION_DID_POOL.md,docs/SUPER_ADMIN_REQUIREMENTS.md,dashboard/src/app/admin/**,dashboard/src/app/api/admin/**,dashboard/src/app/api/did-pool/**,dashboard/src/app/(desk)/wallet/**,dashboard/src/lib/admin.ts,dashboard/src/lib/adminWallets.ts,dashboard/src/lib/didPool.ts,dashboard/src/lib/wallet.ts,dashboard/src/lib/sautikit.ts,dashboard/src/components/Admin*.tsx,dashboard/src/components/DidPoolManager.tsx,dashboard/src/components/BuyNumberPanel.tsx,dashboard/src/components/Sautikit*.tsx,docs/agents/OPS_BILLING.md
+alwaysApply: false
+---
+
+# Ops & Billing lane
+
+Full contract: `docs/agents/OPS_BILLING.md`.
+
+- Own one prepaid KES wallet, ledger, DID pool, Super Admin ops.
+- Keep call charges idempotent; beta `billing_enforcement=off` must not charge.
+- Avoid voice media redesign and marketing UI rewrites.
+- Coordinate Platform before new SQL/RPC shapes; service role stays server-only.

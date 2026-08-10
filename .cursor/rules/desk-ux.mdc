@@ -1,0 +1,15 @@
+---
+description: Scalers Desk UI/UX lane — owner desk, onboarding, marketing visuals
+globs: dashboard/src/app/**,dashboard/src/components/**,dashboard/src/app/globals.css,docs/agents/DESK_UX.md,dashboard/README.md
+alwaysApply: false
+---
+
+# Desk UI/UX lane
+
+Full contract: `docs/agents/DESK_UX.md`.
+
+- Own owner desk + marketing UX in `dashboard/`.
+- Preserve owner `(desk)` vs Super Admin `/admin` shell split.
+- Do not change voice engine, ledger/RPC rules, or Brain prompt semantics.
+- Prefer pure styling on Admin/DID/wallet panels; leave ops behavior to Ops lane.
+- Never expose service-role keys to the client. Run `cd dashboard && npm run lint` / `build`.
