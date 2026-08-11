@@ -4,7 +4,7 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 
 | Lane | Scope | Contract |
 | --- | --- | --- |
-| **Voice** | Telephony media, STT/TTS, turn-taking, call latency | [`docs/agents/VOICE.md`](docs/agents/VOICE.md) · speed plan: [`VOICE_SPEED_CONSISTENCY.md`](docs/agents/VOICE_SPEED_CONSISTENCY.md) · live findings: [`LIVE_CALL_FINDINGS.md`](docs/agents/LIVE_CALL_FINDINGS.md) · ChapterOne setup: [`CHAPTERONE_SETUP_REVIEW.md`](docs/agents/CHAPTERONE_SETUP_REVIEW.md) |
+| **Voice** | Telephony media, STT/TTS, turn-taking, call latency | [`docs/agents/VOICE.md`](docs/agents/VOICE.md) · speed plan: [`VOICE_SPEED_CONSISTENCY.md`](docs/agents/VOICE_SPEED_CONSISTENCY.md) · live findings: [`LIVE_CALL_FINDINGS.md`](docs/agents/LIVE_CALL_FINDINGS.md) · pronunciation: [`PRONUNCIATION.md`](docs/agents/PRONUNCIATION.md) · ChapterOne setup: [`CHAPTERONE_SETUP_REVIEW.md`](docs/agents/CHAPTERONE_SETUP_REVIEW.md) |
 | **Brain** | Prompts, conversation logic, tools, knowledge compile | [`docs/agents/BRAIN.md`](docs/agents/BRAIN.md) |
 | **Desk UI/UX** | Owner desk + marketing UI | [`docs/agents/DESK_UX.md`](docs/agents/DESK_UX.md) |
 | **Ops & Billing** | Wallet, DID pool, Super Admin | [`docs/agents/OPS_BILLING.md`](docs/agents/OPS_BILLING.md) |

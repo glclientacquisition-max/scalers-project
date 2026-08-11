@@ -247,7 +247,9 @@ export async function confirmPronunciationRecording(
   const clientLexicon = parseTtsLexicon(formData.get("current_lexicon"));
   const base = clientLexicon.length ? clientLexicon : existing;
   const merged = mergeLexiconEntries(base, derived.entries);
-  const stored = lexiconForStorage(merged);
+  // Always re-parse so blocked common-word matches cannot persist.
+  const sanitized = parseTtsLexicon(merged);
+  const stored = lexiconForStorage(sanitized);
 
   const { error } = await workspace.client
     .from("tenants")
@@ -272,9 +274,13 @@ export async function confirmPronunciationRecording(
   return {
     ok: true,
     source: derived.source,
-    entry: derived.entries[0],
-    entries: derived.entries,
-    lexicon: merged,
+    entry: sanitized[0] || derived.entries[0],
+    entries: sanitized.filter((e) =>
+      derived.entries.some(
+        (d) => d.match.toLowerCase() === e.match.toLowerCase()
+      )
+    ),
+    lexicon: sanitized,
     heard: derived.heard,
   };
 }
