@@ -195,6 +195,7 @@ function formatRetailPlaybookForPrompt(opts = {}) {
   const lines = [
     'RETAIL PLAYBOOK (follow for this business — finish the caller job):',
     'On each turn: identify the intent below, collect only missing required slots (ONE question max), then complete.',
+    'Use SERVICES for offerings (delivery, sourcing). Use PRODUCT CATALOGUE for individual items, prices, and stock. Share SOCIAL & WEB handles when asked.',
     `Handoff mode for human asks: ${handoff}.`,
     '',
   ];
