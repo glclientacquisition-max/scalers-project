@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import type { ProductItem } from "@/lib/productCatalog";
 import type { SocialHandles } from "@/lib/socialHandles";
+import { socialHandlesHaveContent } from "@/lib/socialHandles";
 import {
   applyCatalogImportAction,
   previewCatalogImportAction,
@@ -44,8 +45,11 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
       setSelected(new Set(previewState.products.map((_, i) => i)));
       if (previewState.social) {
         setSocial(previewState.social);
-        setIncludeSocial(
-          Object.values(previewState.social).some((v) => String(v || "").trim())
+      setIncludeSocial(
+          Boolean(
+            previewState.social &&
+              socialHandlesHaveContent(previewState.social)
+          )
         );
       }
     }
@@ -202,8 +206,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             ))}
           </ul>
 
-          {social &&
-          Object.values(social).some((v) => String(v || "").trim()) ? (
+          {social && socialHandlesHaveContent(social) ? (
             <label className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
               <input
                 type="checkbox"
@@ -212,11 +215,11 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                 onChange={(e) => setIncludeSocial(e.target.checked)}
               />
               <span>
-                <span className="font-medium">Also save social handles found</span>
+                <span className="font-medium">Also save phones / social found</span>
                 <span className="mt-1 block text-[var(--ink-soft)]">
-                  {Object.entries(social)
-                    .filter(([, v]) => String(v || "").trim())
-                    .map(([k, v]) => `${k}: ${v}`)
+                  {social.channels
+                    .filter((c) => c.value.trim())
+                    .map((c) => `${c.kind}${c.label ? ` (${c.label})` : ""}: ${c.value}`)
                     .join(" · ")}
                 </span>
               </span>

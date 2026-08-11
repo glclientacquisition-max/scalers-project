@@ -18,8 +18,8 @@ import {
   type ProductItem,
 } from "@/lib/productCatalog";
 import {
-  emptySocialHandles,
   normalizeSocialHandles,
+  socialHandlesHaveContent,
   type SocialHandles,
 } from "@/lib/socialHandles";
 import { generateGeminiText } from "@/lib/gemini";
@@ -55,13 +55,20 @@ async function extractProductsFromText(
   sourceText: string
 ): Promise<{ products: ProductItem[]; social: SocialHandles }> {
   const localProducts = parseBulkProducts(sourceText);
-  const social = emptySocialHandles();
+  const channels: SocialHandles["channels"] = [];
   const ig = sourceText.match(/@[a-z0-9._]{2,40}/i)?.[0];
-  if (ig) social.instagram = ig;
+  if (ig) channels.push({ kind: "instagram", label: "Instagram", value: ig });
   const web = sourceText.match(/https?:\/\/[^\s\]]+/i)?.[0];
-  if (web) social.website = web;
-  const phone = sourceText.match(/(?:\+?254|0)\s*\d{2,3}[\s-]?\d{3}[\s-]?\d{3,4}/)?.[0];
-  if (phone) social.whatsapp = phone.replace(/\s+/g, " ");
+  if (web) channels.push({ kind: "website", label: "Website", value: web });
+  const phones = sourceText.match(/(?:\+?254|0)\s*\d{2,3}[\s-]?\d{3}[\s-]?\d{3,4}/g) || [];
+  phones.slice(0, 4).forEach((phone, i) => {
+    channels.push({
+      kind: i === 0 ? "whatsapp" : "phone",
+      label: i === 0 ? "Main" : `Line ${i + 1}`,
+      value: phone.replace(/\s+/g, " "),
+    });
+  });
+  const social = normalizeSocialHandles({ channels });
 
   if (!process.env.GEMINI_API_KEY) {
     return { products: localProducts, social };
@@ -69,10 +76,10 @@ async function extractProductsFromText(
 
   try {
     const raw = await generateGeminiText({
-      systemInstruction: `Extract a product catalogue for a Kenyan shop phone receptionist.
+      systemInstruction: `Extract a product catalogue and public contact channels for a Kenyan shop phone receptionist.
 Return ONLY JSON:
-{"products":[{"name":"","price":"","category":"","in_stock":"yes|no|unknown|","sku":"","unit":"","notes":"","aliases":[]}],"social":{"website":"","instagram":"","facebook":"","tiktok":"","twitter":"","youtube":"","whatsapp":"","other":""}}
-Rules: products are individual sellable items (books, SKUs), NOT services like "delivery" or section headings. Max 80 products. Empty arrays/objects when unknown.`,
+{"products":[{"name":"","price":"","category":"","in_stock":"yes|no|unknown|","sku":"","unit":"","notes":"","aliases":[]}],"social":{"channels":[{"kind":"phone|whatsapp|website|instagram|facebook|tiktok|twitter|youtube|email|other","label":"Main","value":""}]}}
+Rules: products are individual sellable items (books, SKUs), NOT services like "delivery" or section headings. Include every distinct phone/WhatsApp found with a short label. Max ${PRODUCT_CATALOG_MAX} products. Empty arrays when unknown.`,
       userText: sourceText.slice(0, 18000),
       temperature: 0.2,
       maxOutputTokens: 4096,
@@ -81,18 +88,12 @@ Rules: products are individual sellable items (books, SKUs), NOT services like "
     const obj = extractJsonObject(raw) as Record<string, unknown>;
     const products = normalizeProductCatalog(obj.products).filter((p) => p.name);
     const gemSocial = normalizeSocialHandles(obj.social || {});
+    const mergedChannels = normalizeSocialHandles({
+      channels: [...social.channels, ...gemSocial.channels],
+    });
     return {
       products: products.length ? products : localProducts,
-      social: {
-        website: gemSocial.website || social.website,
-        instagram: gemSocial.instagram || social.instagram,
-        facebook: gemSocial.facebook || social.facebook,
-        tiktok: gemSocial.tiktok || social.tiktok,
-        twitter: gemSocial.twitter || social.twitter,
-        youtube: gemSocial.youtube || social.youtube,
-        whatsapp: gemSocial.whatsapp || social.whatsapp,
-        other: gemSocial.other || social.other,
-      },
+      social: mergedChannels,
     };
   } catch {
     return { products: localProducts, social };
@@ -130,10 +131,13 @@ export async function previewCatalogImportAction(
             "No product rows found. Use CSV headers like name,price,category,in_stock or one product per line.",
         };
       }
+      const capped = products.length > PRODUCT_CATALOG_MAX;
       return {
         ok: true,
         products: products.slice(0, PRODUCT_CATALOG_MAX),
-        message: `Found ${Math.min(products.length, PRODUCT_CATALOG_MAX)} products. Review below, then add.`,
+        message: capped
+          ? `Found ${products.length} products — keeping the first ${PRODUCT_CATALOG_MAX}. Review below, then add.`
+          : `Found ${products.length} products. Review below, then add.`,
       };
     }
 

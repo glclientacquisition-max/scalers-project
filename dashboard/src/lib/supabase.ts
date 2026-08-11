@@ -126,6 +126,12 @@ export type TenantRow = {
     aliases?: string[];
   }> | null;
   social_handles?: {
+    channels?: Array<{
+      kind?: string;
+      label?: string;
+      value?: string;
+    }>;
+    /** @deprecated flat legacy fields still normalized on read */
     website?: string;
     instagram?: string;
     facebook?: string;
@@ -133,6 +139,7 @@ export type TenantRow = {
     twitter?: string;
     youtube?: string;
     whatsapp?: string;
+    phone?: string;
     other?: string;
   } | null;
   business_hours?: string | null;

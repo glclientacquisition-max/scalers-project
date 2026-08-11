@@ -12,7 +12,7 @@ comment on column public.tenants.product_catalog is
   'Retail/product rows: [{name, sku, category, price, unit, in_stock, notes, aliases[]}]. Separate from services_catalog.';
 
 comment on column public.tenants.social_handles is
-  'Public social / web handles: {website, instagram, facebook, tiktok, twitter, youtube, whatsapp, other}.';
+  'Public contact channels: {channels:[{kind,label,value}]} — phones/WhatsApp/social/web. Legacy flat fields still accepted on read.';
 
 -- Owners already UPDATE tenants via existing RLS; jsonb columns inherit that.
 grant select, update (product_catalog, social_handles) on table public.tenants to authenticated;

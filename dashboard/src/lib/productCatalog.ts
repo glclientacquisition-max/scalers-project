@@ -12,9 +12,9 @@ export type ProductItem = {
   aliases: string[];
 };
 
-export const PRODUCT_CATALOG_MAX = 200;
+export const PRODUCT_CATALOG_MAX = 500;
 /** Soft cap injected into live prompts to protect latency. */
-export const PRODUCT_LIVE_INJECT_MAX = 80;
+export const PRODUCT_LIVE_INJECT_MAX = 100;
 
 export function emptyProduct(): ProductItem {
   return {

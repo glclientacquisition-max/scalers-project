@@ -30,7 +30,7 @@ function normalizeInStock(raw) {
   return '';
 }
 
-const LIVE_INJECT_MAX = 80;
+const LIVE_INJECT_MAX = 100;
 
 function normalizeProducts(raw) {
   return asArray(raw)

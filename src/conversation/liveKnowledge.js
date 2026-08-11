@@ -203,7 +203,7 @@ function buildLiveGroundTruth(profile = {}) {
   );
 
   if (socialHandlesHaveContent(social)) {
-    parts.push('', 'SOCIAL & WEB:', formatSocialHandlesBlock(social));
+    parts.push('', 'PHONES, SOCIAL & WEB:', formatSocialHandlesBlock(social));
   }
 
   parts.push('', 'POLICIES:', formatPoliciesBlock(policies));

@@ -39,8 +39,11 @@ import {
   type ProductItem,
 } from "@/lib/productCatalog";
 import {
+  emptySocialChannel,
   normalizeSocialHandles,
-  SOCIAL_FIELDS,
+  SOCIAL_CHANNEL_KINDS,
+  SOCIAL_CHANNELS_MAX,
+  type SocialChannel,
   type SocialHandles,
 } from "@/lib/socialHandles";
 import {
@@ -382,8 +385,37 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     );
   }
 
-  function updateSocial(key: keyof SocialHandles, value: string) {
-    setSocialHandles((prev) => ({ ...prev, [key]: value }));
+  function updateSocialChannel(
+    index: number,
+    key: keyof SocialChannel,
+    value: string
+  ) {
+    setSocialHandles((prev) => ({
+      channels: prev.channels.map((row, i) =>
+        i === index ? { ...row, [key]: value } : row
+      ),
+    }));
+  }
+
+  function addSocialChannel(kind = "phone") {
+    setSocialHandles((prev) => {
+      if (prev.channels.length >= SOCIAL_CHANNELS_MAX) return prev;
+      const label =
+        kind === "phone" || kind === "whatsapp"
+          ? prev.channels.some((c) => c.kind === "phone" || c.kind === "whatsapp")
+            ? "Sales"
+            : "Main"
+          : SOCIAL_CHANNEL_KINDS.find((k) => k.id === kind)?.label || "Other";
+      return {
+        channels: [...prev.channels, emptySocialChannel(kind, label)],
+      };
+    });
+  }
+
+  function removeSocialChannel(index: number) {
+    setSocialHandles((prev) => ({
+      channels: prev.channels.filter((_, i) => i !== index),
+    }));
   }
 
   function updateLocation(
@@ -1029,31 +1061,126 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         </div>
 
         <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-[var(--ink)]">Social &amp; web</h3>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Handles the receptionist can share when callers ask for Instagram, WhatsApp, or the website.
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ink)]">
+                Phones, social &amp; web
+              </h3>
+              <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                Add as many phone/WhatsApp numbers and social handles as you need.
+                Label each one (Main, Sales, Orders) so the receptionist shares the
+                right contact.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => addSocialChannel("phone")}
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add phone
+              </button>
+              <button
+                type="button"
+                onClick={() => addSocialChannel("whatsapp")}
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => addSocialChannel("instagram")}
+                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)]"
+              >
+                Add social
+              </button>
+            </div>
+          </div>
+
+          {socialHandles.channels.length === 0 ? (
+            <p className="text-sm text-[var(--ink-soft)]">
+              No public contacts yet. Add a Main phone/WhatsApp and Instagram if you
+              have them.
             </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {SOCIAL_FIELDS.map((field) => (
-              <div key={field.id}>
-                <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
-                  htmlFor={`social-${field.id}`}
+          ) : (
+            <div className="space-y-3">
+              {socialHandles.channels.map((channel, index) => (
+                <div
+                  key={`social-ch-${index}`}
+                  className="grid gap-3 rounded-xl border border-[var(--line)] bg-white p-4 sm:grid-cols-[8rem_7rem_1fr_auto]"
                 >
-                  {field.label}
-                </label>
-                <input
-                  id={`social-${field.id}`}
-                  value={socialHandles[field.id]}
-                  onChange={(e) => updateSocial(field.id, e.target.value)}
-                  placeholder={field.placeholder}
-                  className={fieldClass}
-                />
-              </div>
-            ))}
-          </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`social-kind-${index}`}
+                    >
+                      Type
+                    </label>
+                    <select
+                      id={`social-kind-${index}`}
+                      value={channel.kind}
+                      onChange={(e) =>
+                        updateSocialChannel(index, "kind", e.target.value)
+                      }
+                      className={fieldClass}
+                    >
+                      {SOCIAL_CHANNEL_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`social-label-${index}`}
+                    >
+                      Label
+                    </label>
+                    <input
+                      id={`social-label-${index}`}
+                      value={channel.label}
+                      onChange={(e) =>
+                        updateSocialChannel(index, "label", e.target.value)
+                      }
+                      placeholder="Main"
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`social-value-${index}`}
+                    >
+                      Number / handle / URL
+                    </label>
+                    <input
+                      id={`social-value-${index}`}
+                      value={channel.value}
+                      onChange={(e) =>
+                        updateSocialChannel(index, "value", e.target.value)
+                      }
+                      placeholder={
+                        SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
+                          ?.placeholder || ""
+                      }
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => removeSocialChannel(index)}
+                      className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
