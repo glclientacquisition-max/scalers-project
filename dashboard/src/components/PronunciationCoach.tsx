@@ -30,8 +30,11 @@ type CoachItem = PronunciationSuggestion & {
   status: "todo" | "done" | "skipped";
 };
 
+type StudioMode = "practice" | "library" | "fix";
+
 const confirmInitial: ConfirmPronunciationState = {};
 const mineInitial: MinePronunciationState = {};
+const LEXICON_PAGE_SIZE = 6;
 
 function blobToFile(blob: Blob, name: string): File {
   return new File([blob], name, { type: blob.type || "audio/webm" });
@@ -76,6 +79,9 @@ export function PronunciationCoach({
   const [extraItems, setExtraItems] = useState<PronunciationSuggestion[]>([]);
   const [skippedIds, setSkippedIds] = useState<Set<string>>(() => new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mode, setMode] = useState<StudioMode>("practice");
+  const [lexiconPage, setLexiconPage] = useState(0);
+  const [showFullQueue, setShowFullQueue] = useState(false);
 
   const [addPhrase, setAddPhrase] = useState("");
   const [addSay, setAddSay] = useState("");
@@ -141,6 +147,9 @@ export function PronunciationCoach({
         }
         return next;
       });
+      if ((mineState.suggestions || []).length > 0) {
+        setMode("practice");
+      }
     }
   }, [mineState]);
 
@@ -230,7 +239,6 @@ export function PronunciationCoach({
       });
       setMicError(null);
       setAddError(null);
-      // Drop completed custom/mine items from extra queue
       setExtraItems((prev) =>
         prev.filter((p) => !isPronunciationCovered(p, confirmState.lexicon || []))
       );
@@ -240,7 +248,7 @@ export function PronunciationCoach({
   useEffect(() => {
     if (confirmState.ok && confirmState.entries?.length) {
       const n = confirmState.entries.length;
-      setKeepNote(`Saved ${n} pronunciation${n === 1 ? "" : "s"}.`);
+      setKeepNote(`Saved ${n} pronunciation${n === 1 ? "" : "s"} — live on the next call.`);
     }
   }, [confirmState]);
 
@@ -251,6 +259,10 @@ export function PronunciationCoach({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setLexiconPage(0);
+  }, [lexicon.length]);
 
   function stopStream() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -375,8 +387,9 @@ export function PronunciationCoach({
     });
     if (!line) {
       setAddError(
-        `Couldn’t queue “${phrase}” for renew — try adding it under Heard something wrong?`
+        `Couldn’t queue “${phrase}” for renew — try adding it under Fix.`
       );
+      setMode("fix");
       return;
     }
     setExtraItems((prev) => {
@@ -391,6 +404,7 @@ export function PronunciationCoach({
     setActiveId(line.id);
     setAddError(null);
     clearTake();
+    setMode("practice");
   }
 
   function queueCustomPhrase(phrase: string) {
@@ -412,6 +426,7 @@ export function PronunciationCoach({
     setActiveId(line.id);
     setAddError(null);
     clearTake();
+    setMode("practice");
     return true;
   }
 
@@ -442,11 +457,11 @@ export function PronunciationCoach({
     mineAction(fd);
   }
 
-  function submitQuickAdd(mode: "record" | "save") {
+  function submitQuickAdd(modeAdd: "record" | "save") {
     const phrase = addPhrase.trim();
     if (!phrase) return;
     setAddError(null);
-    if (mode === "record") {
+    if (modeAdd === "record") {
       if (!queueCustomPhrase(phrase)) return;
       setAddPhrase("");
       setAddSay("");
@@ -454,7 +469,7 @@ export function PronunciationCoach({
     }
     if (!addSay.trim()) {
       setAddError(
-        "Add how it should sound, or use Queue to record instead."
+        "Add how it should sound, or use Record it instead."
       );
       return;
     }
@@ -470,6 +485,36 @@ export function PronunciationCoach({
   const totalFocus = items.filter((i) => i.status !== "skipped").length;
   const showMismatch = Boolean(confirmState.error && !confirmState.ok);
 
+  const lexiconPageCount = Math.max(1, Math.ceil(lexicon.length / LEXICON_PAGE_SIZE));
+  const safeLexiconPage = Math.min(lexiconPage, lexiconPageCount - 1);
+  const visibleLexicon = lexicon.slice(
+    safeLexiconPage * LEXICON_PAGE_SIZE,
+    (safeLexiconPage + 1) * LEXICON_PAGE_SIZE
+  );
+
+  const queueList = showFullQueue
+    ? items
+    : items.filter((i) => i.status === "todo").slice(0, 5);
+  const hiddenQueueCount = items.length - queueList.length;
+
+  const modes: Array<{ id: StudioMode; label: string; hint: string }> = [
+    {
+      id: "practice",
+      label: "Practice",
+      hint: todoItems.length ? `${todoItems.length} left` : "Caught up",
+    },
+    {
+      id: "library",
+      label: "Library",
+      hint: `${lexicon.length} saved`,
+    },
+    {
+      id: "fix",
+      label: "Fix",
+      hint: "Heard wrong",
+    },
+  ];
+
   return (
     <section
       id="pronunciation-coach"
@@ -478,68 +523,314 @@ export function PronunciationCoach({
     >
       <input type="hidden" name="tts_lexicon" value={lexiconJson} />
 
-      <div>
-        <h2
-          id="pronunciation-coach-heading"
-          className="font-display text-2xl tracking-tight text-[var(--ink)]"
-        >
-          Pronunciation studio
-        </h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          See what is trained, renew a name, add anything you heard wrong, or scan
-          recent calls for hard words.{" "}
-          <span className="font-medium text-[var(--ink)]">
-            Keep / Save word apply on the next call
-          </span>
-          .
-        </p>
-        {cleanNote ? (
-          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
-            {cleanNote}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2
+            id="pronunciation-coach-heading"
+            className="font-display text-2xl tracking-tight text-[var(--ink)]"
+          >
+            Pronunciation studio
+          </h2>
+          <p className="mt-1 text-sm text-[var(--ink-soft)]">
+            Teach how names and places should sound on the phone. Changes apply on
+            the next call.
+          </p>
+          {cleanNote ? (
+            <p className="mt-2 text-xs text-[var(--ok)]" role="status">
+              {cleanNote}
+            </p>
+          ) : null}
+        </div>
+        {greetingPreview ? (
+          <p className="max-w-sm text-right text-xs leading-relaxed text-[var(--ink-soft)]">
+            <span className="font-medium text-[var(--ink)]">Greeting preview</span>
+            <br />
+            {greetingPreview}
           </p>
         ) : null}
       </div>
 
-      {greetingPreview ? (
-        <div className="rounded-xl border border-[var(--line)] bg-white/80 px-4 py-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-            Phone preview (greeting)
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-[var(--ink)]">
-            {greetingPreview}
-          </p>
+      <div
+        className="flex flex-wrap gap-1 border-b border-[var(--line)] pb-px"
+        role="tablist"
+        aria-label="Pronunciation studio modes"
+      >
+        {modes.map((m) => {
+          const selected = mode === m.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setMode(m.id)}
+              className={[
+                "-mb-px border-b-2 px-3 py-2 text-sm transition",
+                selected
+                  ? "border-[var(--accent)] font-medium text-[var(--ink)]"
+                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]",
+              ].join(" ")}
+            >
+              {m.label}
+              <span className="ml-1.5 text-xs font-normal text-[var(--ink-soft)]">
+                {m.hint}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {mode === "practice" ? (
+        <div className="space-y-5">
+          {!todoItems.length && !active ? (
+            <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
+              <p className="text-sm font-medium text-[var(--ink)]">Nothing left to practice</p>
+              <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                Core names are covered. Fix something you heard wrong, or renew a
+                word in Library.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMode("fix")}
+                  className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+                >
+                  Fix a word
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("library")}
+                  className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)]"
+                >
+                  Open library
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {active ? (
+                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/35 to-white px-5 py-6 sm:px-7">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                      {active.label} · say this line
+                    </p>
+                    {totalFocus ? (
+                      <p className="text-xs text-[var(--ink-soft)]">
+                        {doneCount} of {totalFocus} done
+                      </p>
+                    ) : null}
+                  </div>
+                  <p
+                    className="mt-3 font-display text-2xl leading-snug tracking-tight text-[var(--ink)] sm:text-3xl"
+                    aria-live="polite"
+                  >
+                    {active.prompt}
+                  </p>
+                  <p className="mt-2 text-sm text-[var(--ink-soft)]">{active.reason}</p>
+                  {active.targets?.length ? (
+                    <p className="mt-3 text-xs text-[var(--ink-soft)]">
+                      Learns:{" "}
+                      <span className="font-medium text-[var(--ink)]">
+                        {active.targets.map((t) => t.label).join(" · ")}
+                      </span>
+                    </p>
+                  ) : null}
+
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    {!recording && !audioBlob ? (
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`h-2.5 w-2.5 rounded-full bg-white ${recording ? "animate-pulse" : ""}`}
+                        />
+                        Record line
+                      </button>
+                    ) : null}
+                    {recording ? (
+                      <button
+                        type="button"
+                        onClick={stopRecording}
+                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-white"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 animate-pulse rounded-full bg-white"
+                        />
+                        Stop
+                      </button>
+                    ) : null}
+                    {audioBlob && audioUrl && !recording ? (
+                      <>
+                        <audio
+                          src={audioUrl}
+                          controls
+                          className="h-10 max-w-full"
+                          preload="metadata"
+                        />
+                        <button
+                          type="button"
+                          onClick={startRecording}
+                          className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium"
+                        >
+                          Retry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={keepRecording}
+                          disabled={confirmPending}
+                          className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                          {confirmPending ? "Checking…" : "Use this take"}
+                        </button>
+                      </>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={skipActive}
+                      className="text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                    >
+                      Skip for now
+                    </button>
+                  </div>
+
+                  {micError ? (
+                    <p className="mt-3 text-sm text-[var(--warn)]" role="alert">
+                      {micError}
+                    </p>
+                  ) : null}
+                  {showMismatch ? (
+                    <div className="mt-3 rounded-xl border border-[var(--warn)]/30 bg-[var(--warn-soft)] px-3 py-2">
+                      <p className="text-sm text-[var(--warn)]" role="alert">
+                        {confirmState.error}
+                      </p>
+                      {confirmState.heard ? (
+                        <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                          We heard something like: “{confirmState.heard}”
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {keepNote ? (
+                    <p className="mt-3 text-sm text-[var(--ok)]" role="status">
+                      {keepNote}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {(todoItems.length > 1 || showFullQueue) && queueList.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                      Up next
+                    </p>
+                    {items.length > 5 || showFullQueue ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowFullQueue((v) => !v)}
+                        className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
+                      >
+                        {showFullQueue
+                          ? "Show remaining only"
+                          : hiddenQueueCount > 0
+                            ? `Show all (${items.length})`
+                            : "Hide finished"}
+                      </button>
+                    ) : null}
+                  </div>
+                  <ul className="space-y-1.5" aria-label="Training queue">
+                    {queueList.map((item) => {
+                      const selected = active?.id === item.id;
+                      return (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            disabled={item.status === "done"}
+                            onClick={() => {
+                              if (item.status === "skipped") {
+                                setSkippedIds((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(item.id);
+                                  return next;
+                                });
+                              }
+                              setActiveId(item.id);
+                              clearTake();
+                            }}
+                            className={[
+                              "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition",
+                              selected
+                                ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                                : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                              item.status === "done" ? "opacity-60" : "",
+                            ].join(" ")}
+                          >
+                            <span className="min-w-0">
+                              <span className="block text-xs text-[var(--ink-soft)]">
+                                {item.label}
+                              </span>
+                              <span className="mt-0.5 block truncate font-medium text-[var(--ink)]">
+                                {item.prompt}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-xs text-[var(--ink-soft)]">
+                              {item.status === "done"
+                                ? "Done"
+                                : item.status === "skipped"
+                                  ? "Skipped"
+                                  : "Todo"}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
 
-      {/* Trained library */}
-      <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-4">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h3 className="font-medium text-[var(--ink)]">
-              Trained pronunciations ({lexicon.length})
-            </h3>
-            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Live on the next call. Renew to re-record, edit the say-as, or remove.
-            </p>
-          </div>
-        </div>
-        {lexicon.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--ink-soft)]">
-            Nothing trained yet — use packs below or add a word you heard wrong.
+      {mode === "library" ? (
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--ink-soft)]">
+            Words already trained for the phone. Renew to re-record, edit the say-as, or remove.
           </p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {lexicon.map((entry) => {
-              const label = displayLexiconLabel(entry);
-              const isEditing = editingMatch === entry.match;
-              return (
-                <li
-                  key={entry.match}
-                  className="border-b border-[var(--line)] py-2 last:border-0"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+          {lexicon.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
+              <p className="text-sm font-medium text-[var(--ink)]">Nothing trained yet</p>
+              <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                Practice core packs, or fix a word you heard wrong.
+              </p>
+              <button
+                type="button"
+                onClick={() => setMode("practice")}
+                className="mt-3 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+              >
+                Start practicing
+              </button>
+            </div>
+          ) : (
+            <>
+              <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                {visibleLexicon.map((entry) => {
+                  const label = displayLexiconLabel(entry);
+                  const isEditing = editingMatch === entry.match;
+                  return (
+                  <li
+                    key={entry.match}
+                    className="py-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="min-w-0">
-                      <span className="block text-[var(--ink)]">{label}</span>
+                      <span className="block text-[var(--ink)]">
+                        {label}
+                      </span>
                       {!isEditing ? (
                         <span className="font-mono text-xs text-[var(--ink-soft)]">
                           phone says → {entry.say}
@@ -579,317 +870,194 @@ export function PronunciationCoach({
                         Remove
                       </button>
                     </span>
-                  </div>
-                  {isEditing ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <input
-                        value={editSay}
-                        onChange={(e) => setEditSay(e.target.value)}
-                        aria-label={`Say-as for ${label}`}
-                        className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-[var(--accent)]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => saveEditedSay(entry.match)}
-                        disabled={persistPending || !editSay.trim()}
-                        className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-                      >
-                        {persistPending ? "Saving…" : "Save"}
-                      </button>
                     </div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {persistState.error ? (
-          <p className="mt-2 text-xs text-[var(--warn)]">{persistState.error}</p>
-        ) : null}
-        {persistState.ok && !persistState.error ? (
-          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
-            Updated — next call will use it.
-          </p>
-        ) : null}
-      </div>
-
-      {/* Add heard wrong */}
-      <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-4">
-        <h3 className="font-medium text-[var(--ink)]">
-          Heard something wrong?
-        </h3>
-        <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-          Type the word or a short sentence, then record it — or save a typed “say
-          like” spelling for a quick fix.
-        </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor="pron-add-phrase">
-              Word or sentence
-            </label>
-            <input
-              id="pron-add-phrase"
-              value={addPhrase}
-              onChange={(e) => {
-                setAddPhrase(e.target.value);
-                setAddError(null);
-              }}
-              placeholder="Muindi Mbingu / White Paper Books"
-              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor="pron-add-say">
-              Say like (for typed save)
-            </label>
-            <input
-              id="pron-add-say"
-              value={addSay}
-              onChange={(e) => {
-                setAddSay(e.target.value);
-                setAddError(null);
-              }}
-              placeholder="Moo-in-dee Mbeen-goo"
-              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-            />
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => submitQuickAdd("record")}
-            disabled={!addPhrase.trim()}
-            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
-          >
-            Queue to record
-          </button>
-          <button
-            type="button"
-            onClick={() => submitQuickAdd("save")}
-            disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
-            className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
-          >
-            {quickPending ? "Saving…" : "Save typed spelling"}
-          </button>
-        </div>
-        {addError ? (
-          <p className="mt-2 text-xs text-[var(--warn)]" role="alert">
-            {addError}
-          </p>
-        ) : null}
-        {quickState.error ? (
-          <p className="mt-2 text-xs text-[var(--warn)]" role="alert">
-            {quickState.error}
-          </p>
-        ) : null}
-        {quickState.ok && !quickState.error ? (
-          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
-            Saved — next call will use it.
-          </p>
-        ) : null}
-      </div>
-
-      {/* Mine from calls */}
-      <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
-            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Finds hard names from recent agent transcripts (including lowercase
-              ASR) and your profile places — queue them to train.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={scanCalls}
-            disabled={minePending}
-            className="rounded-xl border border-[var(--accent)]/40 px-4 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
-          >
-            {minePending ? "Scanning…" : "Scan recent calls"}
-          </button>
-        </div>
-        {mineState.error ? (
-          <p className="mt-2 text-xs text-[var(--warn)]">{mineState.error}</p>
-        ) : null}
-        {mineState.ok ? (
-          <p className="mt-2 text-xs text-[var(--ink-soft)]" role="status">
-            Scanned {mineState.scannedLines ?? 0} agent lines
-            {mineState.suggestions?.length
-              ? ` · added ${mineState.suggestions.length} to the queue`
-              : " · nothing new to train"}
-            .
-          </p>
-        ) : null}
-      </div>
-
-      {/* Training queue */}
-      <div>
-        <h3 className="font-medium text-[var(--ink)]">Training queue</h3>
-        <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-          Core packs plus anything you added or mined
-          {totalFocus ? ` · ${doneCount} of ${totalFocus} done` : ""}.
-        </p>
-      </div>
-
-      {!todoItems.length && !active ? (
-        <p className="text-sm text-[var(--ink-soft)]">
-          Queue empty. Add a word you heard wrong, renew a trained name, or scan
-          calls.
-        </p>
-      ) : (
-        <div className="space-y-6">
-          {active ? (
-            <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/40 to-white px-5 py-6 sm:px-7">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                {active.label} · say this full line
-              </p>
-              <p
-                className="mt-3 font-display text-2xl leading-snug tracking-tight text-[var(--ink)] sm:text-3xl"
-                aria-live="polite"
-              >
-                {active.prompt}
-              </p>
-              <p className="mt-2 text-sm text-[var(--ink-soft)]">{active.reason}</p>
-              {active.targets?.length ? (
-                <p className="mt-3 text-xs text-[var(--ink-soft)]">
-                  Learns only:{" "}
-                  <span className="font-medium text-[var(--ink)]">
-                    {active.targets.map((t) => t.label).join(" · ")}
-                  </span>
-                </p>
-              ) : null}
-
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                {!recording && !audioBlob ? (
-                  <button
-                    type="button"
-                    onClick={startRecording}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 rounded-full bg-white"
-                    />
-                    Record line
-                  </button>
-                ) : null}
-                {recording ? (
-                  <button
-                    type="button"
-                    onClick={stopRecording}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-white"
-                  >
-                    Stop
-                  </button>
-                ) : null}
-                {audioBlob && audioUrl && !recording ? (
-                  <>
-                    <audio
-                      src={audioUrl}
-                      controls
-                      className="h-10 max-w-full"
-                      preload="metadata"
-                    />
-                    <button
-                      type="button"
-                      onClick={startRecording}
-                      className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium"
-                    >
-                      Retry
-                    </button>
-                    <button
-                      type="button"
-                      onClick={keepRecording}
-                      disabled={confirmPending}
-                      className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-                    >
-                      {confirmPending ? "Checking…" : "Keep"}
-                    </button>
-                  </>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={skipActive}
-                  className="text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
-                >
-                  Skip for now
-                </button>
-              </div>
-
-              {micError ? (
-                <p className="mt-3 text-sm text-[var(--warn)]" role="alert">
-                  {micError}
-                </p>
-              ) : null}
-              {showMismatch ? (
-                <div className="mt-3 rounded-xl border border-[var(--warn)]/30 bg-[var(--warn-soft)] px-3 py-2">
-                  <p className="text-sm text-[var(--warn)]" role="alert">
-                    {confirmState.error}
+                    {isEditing ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <input
+                          value={editSay}
+                          onChange={(e) => setEditSay(e.target.value)}
+                          aria-label={`Say-as for ${label}`}
+                          className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-[var(--accent)]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveEditedSay(entry.match)}
+                          disabled={persistPending || !editSay.trim()}
+                          className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                        >
+                          {persistPending ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                  );
+                })}
+              </ul>
+              {lexicon.length > LEXICON_PAGE_SIZE ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    {safeLexiconPage * LEXICON_PAGE_SIZE + 1}–
+                    {Math.min(lexicon.length, (safeLexiconPage + 1) * LEXICON_PAGE_SIZE)}{" "}
+                    of {lexicon.length}
                   </p>
-                  {confirmState.heard ? (
-                    <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                      We heard something like: “{confirmState.heard}”
-                    </p>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={safeLexiconPage <= 0}
+                      onClick={() => setLexiconPage((p) => Math.max(0, p - 1))}
+                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs text-[var(--ink-soft)]">
+                      {safeLexiconPage + 1} / {lexiconPageCount}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safeLexiconPage >= lexiconPageCount - 1}
+                      onClick={() =>
+                        setLexiconPage((p) => Math.min(lexiconPageCount - 1, p + 1))
+                      }
+                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               ) : null}
-              {keepNote ? (
-                <p className="mt-3 text-sm text-[var(--ok)]" role="status">
-                  {keepNote}
-                </p>
-              ) : null}
-            </div>
+            </>
+          )}
+          {persistState.error ? (
+            <p className="text-xs text-[var(--warn)]">{persistState.error}</p>
           ) : null}
-
-          <ul className="space-y-2" aria-label="Training queue">
-            {items.map((item) => {
-              const selected = active?.id === item.id;
-              return (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    disabled={item.status === "done"}
-                    onClick={() => {
-                      if (item.status === "skipped") {
-                        setSkippedIds((prev) => {
-                          const next = new Set(prev);
-                          next.delete(item.id);
-                          return next;
-                        });
-                      }
-                      setActiveId(item.id);
-                      clearTake();
-                    }}
-                    className={[
-                      "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition",
-                      selected
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                      item.status === "done" ? "opacity-70" : "",
-                    ].join(" ")}
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                        {item.label}
-                      </span>
-                      <span className="mt-0.5 block font-medium text-[var(--ink)]">
-                        {item.prompt}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                      {item.status === "done"
-                        ? "Done"
-                        : item.status === "skipped"
-                          ? "Skipped"
-                          : "Todo"}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          {persistState.ok && !persistState.error ? (
+            <p className="text-xs text-[var(--ok)]" role="status">
+              Updated — next call will use it.
+            </p>
+          ) : null}
+          {addError && mode === "library" ? (
+            <p className="text-xs text-[var(--warn)]" role="alert">
+              {addError}
+            </p>
+          ) : null}
         </div>
-      )}
+      ) : null}
+
+      {mode === "fix" ? (
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-medium text-[var(--ink)]">Heard something wrong?</h3>
+              <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
+                Type the word or a short sentence. Record it for the best fix, or
+                save a typed “say like” spelling for a quick patch.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor="pron-add-phrase"
+                >
+                  Word or sentence
+                </label>
+                <input
+                  id="pron-add-phrase"
+                  value={addPhrase}
+                  onChange={(e) => {
+                    setAddPhrase(e.target.value);
+                    setAddError(null);
+                  }}
+                  placeholder="Muindi Mbingu / White Paper Books"
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor="pron-add-say"
+                >
+                  Say like (for typed save)
+                </label>
+                <input
+                  id="pron-add-say"
+                  value={addSay}
+                  onChange={(e) => {
+                    setAddSay(e.target.value);
+                    setAddError(null);
+                  }}
+                  placeholder="Moo-in-dee Mbeen-goo"
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => submitQuickAdd("record")}
+                disabled={!addPhrase.trim()}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
+              >
+                Record it
+              </button>
+              <button
+                type="button"
+                onClick={() => submitQuickAdd("save")}
+                disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
+                className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+              >
+                {quickPending ? "Saving…" : "Save typed spelling"}
+              </button>
+            </div>
+            {addError ? (
+              <p className="text-xs text-[var(--warn)]" role="alert">
+                {addError}
+              </p>
+            ) : null}
+            {quickState.error ? (
+              <p className="text-xs text-[var(--warn)]" role="alert">
+                {quickState.error}
+              </p>
+            ) : null}
+            {quickState.ok && !quickState.error ? (
+              <p className="text-xs text-[var(--ok)]" role="status">
+                Saved — next call will use it.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-3 border-t border-[var(--line)] pt-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
+                <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
+                  Finds hard names from recent agent lines (including lowercase ASR) and your profile places — queues them for Practice.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={scanCalls}
+                disabled={minePending}
+                className="rounded-xl border border-[var(--accent)]/40 px-4 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+              >
+                {minePending ? "Scanning…" : "Scan recent calls"}
+              </button>
+            </div>
+            {mineState.error ? (
+              <p className="text-xs text-[var(--warn)]">{mineState.error}</p>
+            ) : null}
+            {mineState.ok ? (
+              <p className="text-xs text-[var(--ink-soft)]" role="status">
+                Scanned {mineState.scannedLines ?? 0} agent lines
+                {mineState.suggestions?.length
+                  ? ` · added ${mineState.suggestions.length} to Practice`
+                  : " · nothing new to train"}
+                .
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -164,7 +164,75 @@ const initial: SettingsCompileState = {};
 const fieldClass =
   "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus";
 
-export function TenantForm({ tenant }: { tenant: TenantRow }) {
+export type SettingsPanel =
+  | "catalog"
+  | "identity"
+  | "hours"
+  | "team"
+  | "faqs"
+  | "tools";
+
+const SERVICE_PAGE_SIZE = 5;
+const PRODUCT_PAGE_SIZE = 8;
+const FAQ_PAGE_SIZE = 5;
+
+function CatalogPager({
+  page,
+  pageSize,
+  total,
+  noun,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  noun: string;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (total <= 0) return null;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const from = page * pageSize + 1;
+  const to = Math.min(total, (page + 1) * pageSize);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 pt-3">
+      <p className="text-xs text-ink-soft">
+        {from}–{to} of {total} {noun}
+        {total === 1 ? "" : "s"}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={page <= 0}
+          onClick={onPrev}
+          className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
+        >
+          Previous
+        </button>
+        <span className="text-xs text-ink-soft">
+          {page + 1} / {pageCount}
+        </span>
+        <button
+          type="button"
+          disabled={page >= pageCount - 1}
+          onClick={onNext}
+          className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function TenantForm({
+  tenant,
+  panel = "identity",
+}: {
+  tenant: TenantRow;
+  panel?: SettingsPanel;
+}) {
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
     tenant.whatsapp_notification_number || ""
@@ -190,6 +258,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [showBulkProducts, setShowBulkProducts] = useState(false);
   const [bulkProductsText, setBulkProductsText] = useState("");
   const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
+  const [servicePage, setServicePage] = useState(0);
+  const [productPage, setProductPage] = useState(0);
+  const [faqPage, setFaqPage] = useState(0);
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
@@ -311,6 +382,24 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const productsJson = useMemo(
     () => JSON.stringify(products.filter((p) => p.name.trim())),
     [products]
+  );
+  const servicePageCount = Math.max(1, Math.ceil(services.length / SERVICE_PAGE_SIZE));
+  const productPageCount = Math.max(1, Math.ceil(products.length / PRODUCT_PAGE_SIZE));
+  const faqPageCount = Math.max(1, Math.ceil(faqs.length / FAQ_PAGE_SIZE));
+  const safeServicePage = Math.min(servicePage, servicePageCount - 1);
+  const safeProductPage = Math.min(productPage, productPageCount - 1);
+  const safeFaqPage = Math.min(faqPage, faqPageCount - 1);
+  const visibleServices = services.slice(
+    safeServicePage * SERVICE_PAGE_SIZE,
+    safeServicePage * SERVICE_PAGE_SIZE + SERVICE_PAGE_SIZE
+  );
+  const visibleProducts = products.slice(
+    safeProductPage * PRODUCT_PAGE_SIZE,
+    safeProductPage * PRODUCT_PAGE_SIZE + PRODUCT_PAGE_SIZE
+  );
+  const visibleFaqs = faqs.slice(
+    safeFaqPage * FAQ_PAGE_SIZE,
+    safeFaqPage * FAQ_PAGE_SIZE + FAQ_PAGE_SIZE
   );
   const socialJson = useMemo(
     () => JSON.stringify(socialHandles),
@@ -532,7 +621,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
       <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
 
-      <section className="space-y-5">
+      <section className={panel === "identity" ? "space-y-5" : "hidden"}>
         <div>
           <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
             Persona &amp; Identity
@@ -637,7 +726,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         </div>
       </section>
 
-      <section className="space-y-5 border-t border-[var(--line)] pt-8">
+      <section className={panel === "identity" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium" htmlFor="owner">
@@ -671,7 +760,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             </p>
           </div>
         </div>
+      </section>
 
+      <section className={panel === "catalog" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -684,7 +775,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setServices((prev) => [...prev, emptyService()])}
+                onClick={() => {
+                  setServices((prev) => [...prev, emptyService()]);
+                  setServicePage(Math.floor(services.length / SERVICE_PAGE_SIZE));
+                }}
                 className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
               >
                 Add 1
@@ -780,7 +874,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           ) : null}
 
           <div className="space-y-4">
-            {services.map((service, index) => (
+            {visibleServices.map((service, localIndex) => {
+              const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
+              return (
               <div
                 key={`service-${index}`}
                 className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4"
@@ -855,7 +951,16 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
+            <CatalogPager
+              page={safeServicePage}
+              pageSize={SERVICE_PAGE_SIZE}
+              total={services.length}
+              noun="service"
+              onPrev={() => setServicePage((p) => Math.max(0, p - 1))}
+              onNext={() => setServicePage((p) => Math.min(servicePageCount - 1, p + 1))}
+            />
           </div>
 
           <div>
@@ -885,7 +990,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setProducts((prev) => [...prev, emptyProduct()])}
+                onClick={() => {
+                  setProducts((prev) => [...prev, emptyProduct()]);
+                  setProductPage(Math.floor(products.length / PRODUCT_PAGE_SIZE));
+                }}
                 className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
               >
                 Add product
@@ -932,7 +1040,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 disabled={!bulkProductPreview.length}
                 className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
               >
-                Add to servicesue
+                Add to catalogue
               </button>
             </div>
           ) : null}
@@ -943,7 +1051,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             </p>
           ) : (
             <div className="space-y-4">
-              {products.map((product, index) => (
+              {visibleProducts.map((product, localIndex) => {
+                const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                return (
                 <div
                   key={`product-${index}`}
                   className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4"
@@ -1055,11 +1165,23 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
+              <CatalogPager
+                page={safeProductPage}
+                pageSize={PRODUCT_PAGE_SIZE}
+                total={products.length}
+                noun="product"
+                onPrev={() => setProductPage((p) => Math.max(0, p - 1))}
+                onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
+              />
             </div>
           )}
         </div>
 
+      </section>
+
+      <section className={panel === "identity" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -1183,6 +1305,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           )}
         </div>
 
+      </section>
+
+      <section className={panel === "hours" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-medium text-[var(--ink)]">Weekly hours (EAT)</h3>
@@ -1491,7 +1616,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       </section>
 
       <section
-        className="space-y-4 border-t border-[var(--line)] pt-8"
+        className={panel === "tools" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}
         aria-labelledby="receptionist-tools-heading"
       >
         <div>
@@ -1502,8 +1627,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             Receptionist tools
           </h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Turn capabilities on or off. Saving a caller&apos;s name and reason always
-            stays on so you never miss a lead.
+            Turn capabilities on or off, then train how names and places should sound
+            on the phone. Saving a caller&apos;s name and reason always stays on so you
+            never miss a lead.
           </p>
         </div>
         <div className="space-y-2">
@@ -1590,9 +1716,29 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             );
           })}
         </div>
+
+        <PronunciationCoach
+          tenantId={tenant.id}
+          businessName={businessName}
+          agentName={agentName}
+          locationNotes={locationNotes}
+          locations={locations}
+          team={team}
+          services={services}
+          faqs={faqs}
+          bulletinTexts={
+            Array.isArray(tenant.daily_bulletin)
+              ? tenant.daily_bulletin
+                  .map((b) => String(b?.text || "").trim())
+                  .filter(Boolean)
+              : []
+          }
+          initialLexicon={ttsLexicon}
+          onLexiconChange={setTtsLexicon}
+        />
       </section>
 
-      <section className="space-y-4 border-t border-[var(--line)] pt-8">
+      <section className={panel === "team" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
@@ -1685,7 +1831,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
 
       <section
         id="golden-faqs"
-        className="space-y-4 border-t border-[var(--line)] pt-8"
+        className={panel === "faqs" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}
         aria-labelledby="golden-faqs-heading"
       >
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1706,7 +1852,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           </div>
           <button
             type="button"
-            onClick={() => setFaqs((prev) => [...prev, emptyFaq()])}
+            onClick={() => {
+              setFaqs((prev) => [...prev, emptyFaq()]);
+              setFaqPage(Math.floor(faqs.length / FAQ_PAGE_SIZE));
+            }}
             disabled={faqs.length >= FAQ_MAX}
             className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
           >
@@ -1746,7 +1895,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         ) : null}
 
         <div className="space-y-5">
-          {faqs.map((faq, index) => (
+          {visibleFaqs.map((faq, localIndex) => {
+            const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
+            return (
             <div key={`faq-${index}`} className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
@@ -1805,29 +1956,18 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 </p>
               </div>
             </div>
-          ))}
+            );
+          })}
+          <CatalogPager
+            page={safeFaqPage}
+            pageSize={FAQ_PAGE_SIZE}
+            total={faqs.length}
+            noun="FAQ"
+            onPrev={() => setFaqPage((p) => Math.max(0, p - 1))}
+            onNext={() => setFaqPage((p) => Math.min(faqPageCount - 1, p + 1))}
+          />
         </div>
       </section>
-
-      <PronunciationCoach
-        tenantId={tenant.id}
-        businessName={businessName}
-        agentName={agentName}
-        locationNotes={locationNotes}
-        locations={locations}
-        team={team}
-        services={services}
-        faqs={faqs}
-        bulletinTexts={
-          Array.isArray(tenant.daily_bulletin)
-            ? tenant.daily_bulletin
-                .map((b) => String(b?.text || "").trim())
-                .filter(Boolean)
-            : []
-        }
-        initialLexicon={ttsLexicon}
-        onLexiconChange={setTtsLexicon}
-      />
 
       <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">
         <button
