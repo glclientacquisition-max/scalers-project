@@ -2,10 +2,11 @@ import Link from "next/link";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import {
   WALLET_LINE_FEE_KES_PER_MONTH,
+  WALLET_LOW_BALANCE_KES,
   WALLET_RATE_KES_PER_MINUTE,
   getTenantUsageSummary,
 } from "@/lib/wallet";
-import { SoftSpendLimitPanel } from "@/components/SoftSpendLimitPanel";
+import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 
 function Kpi({
   label,
@@ -85,12 +86,12 @@ export default async function WalletPage() {
   }
 
   const billedThisMonth = usage.callChargesKes + usage.lineFeeKes;
-  const softBanner =
-    usage.softSpendLimit.enabled && usage.softSpendLimit.thresholdReached >= 80
-      ? usage.softSpendLimit.thresholdReached >= 100
-        ? "Soft spend limit reached for this month. Calls still connect — raise or turn off your limit if you want."
-        : "You are approaching your soft spend limit this month."
-      : null;
+  const lowThreshold = Number(tenant.wallet_low_balance_kes ?? WALLET_LOW_BALANCE_KES);
+  const prepaidLow =
+    !usage.isBeta &&
+    usage.walletBalanceKes > 0 &&
+    usage.walletBalanceKes < lowThreshold;
+  const prepaidEmpty = !usage.isBeta && usage.walletBalanceKes <= 0;
 
   return (
     <div className="max-w-3xl">
@@ -106,9 +107,17 @@ export default async function WalletPage() {
         </span>
       </div>
 
-      {softBanner ? (
+      {prepaidEmpty ? (
         <p className="mt-4 rounded-xl border border-[var(--warn)]/40 bg-white px-4 py-3 text-sm text-[var(--warn)]">
-          {softBanner}
+          Prepaid is empty.
+          {tenant.on_demand_usage_enabled
+            ? " On-demand is on — calls can continue and bill beyond prepaid."
+            : " On-demand is off — further charges pause until you top up or enable on-demand."}
+        </p>
+      ) : prepaidLow ? (
+        <p className="mt-4 rounded-xl border border-[var(--warn)]/40 bg-white px-4 py-3 text-sm text-[var(--warn)]">
+          Prepaid is running low (under KES {lowThreshold.toLocaleString("en-KE")}). We also send a
+          live WhatsApp/email alert when this happens.
         </p>
       ) : null}
 
@@ -120,7 +129,7 @@ export default async function WalletPage() {
             usage.isBeta
               ? "Beta workspace: usage is tracked, nothing is deducted."
               : usage.lowBalance
-                ? "Low balance. Ask Scalers to top up (M-Pesa coming soon)."
+                ? "Low balance — top up soon. Live alert is sent automatically."
                 : "Covers line fee + call minutes"
           }
           warn={!usage.isBeta && usage.lowBalance}
@@ -133,18 +142,15 @@ export default async function WalletPage() {
               ? `Illustrative at KES ${WALLET_RATE_KES_PER_MINUTE}/min (not charged)`
               : `Calls KES ${usage.callChargesKes.toLocaleString("en-KE")} · Line KES ${usage.lineFeeKes.toLocaleString("en-KE")}`
           }
-          warn={usage.softSpendLimit.enabled && usage.softSpendLimit.thresholdReached >= 80}
         />
       </section>
 
-      <SoftSpendLimitPanel
+      <OnDemandUsagePanel
         tenantId={tenant.id}
-        enabled={Boolean(tenant.soft_spend_limit_enabled)}
-        limitKes={
-          tenant.soft_spend_limit_kes != null ? Number(tenant.soft_spend_limit_kes) : null
-        }
-        status={usage.softSpendLimit}
+        enabled={Boolean(tenant.on_demand_usage_enabled)}
+        walletBalanceKes={usage.walletBalanceKes}
         isBeta={usage.isBeta}
+        lowThresholdKes={lowThreshold}
       />
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
@@ -170,7 +176,7 @@ export default async function WalletPage() {
           {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo line fee
           {usage.isBeta
             ? ". You are on the beta whitelist (metered only)."
-            : ". Soft billing: usage is deducted; calls are not blocked at zero yet."}
+            : ". Prepaid is billed first; enable on-demand if you want usage after the balance hits zero."}
         </p>
       </section>
 
