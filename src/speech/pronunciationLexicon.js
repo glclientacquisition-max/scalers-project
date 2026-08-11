@@ -40,6 +40,7 @@ const KENYA_LEXICON = [
   { match: 'limuru', say: 'Lee-moo-roo', priority: 90 },
   { match: 'juja', say: 'Joo-jah', priority: 90 },
   { match: 'ngong', say: 'Ngong', priority: 85 },
+  { match: 'muindi\\s+mbingu|miundi\\s+mbingu', say: 'Moo-een-dee Mbeen-goo', priority: 95 },
   { match: 'kabete', say: 'Kah-beh-teh', priority: 90 },
   { match: 'kasarani', say: 'Kah-sah-rah-nee', priority: 90 },
   { match: 'embakasi', say: 'Em-bah-kah-see', priority: 90 },
@@ -59,6 +60,23 @@ const KENYA_LEXICON = [
   { match: '\\bwc\\b', say: 'W C', priority: 70 },
   { match: 'blocked\\s+drain', say: 'blocked drain', priority: 75 },
   { match: 'handyman', say: 'handy-man', priority: 75 },
+
+  // --- Retail / bookstore ---
+  { match: 'chapter\\s*one\\s+bookstore|chapterone\\s+bookstore', say: 'Chapter One Bookstore', priority: 96 },
+  { match: 'chapter\\s*one|chapterone', say: 'Chapter One', priority: 94 },
+  { match: 'manga', say: 'Man-gah', priority: 80 },
+  { match: 'best[- ]?seller', say: 'best seller', priority: 70 },
+  { match: 'e-?book|ebook', say: 'e-book', priority: 70 },
+
+  // --- Common Kenyan given names (receptionist clarity) ---
+  { match: 'aisha', say: 'Ah-ee-sha', priority: 90 },
+  { match: 'wanjiku', say: 'Wan-jee-koo', priority: 90 },
+  { match: 'wambui', say: 'Wahm-boo-ee', priority: 90 },
+  { match: 'njeri', say: 'Njeh-ree', priority: 90 },
+  { match: 'otieno', say: 'Oh-tee-eh-no', priority: 90 },
+  { match: 'ochieng|ochieng[\'’]?', say: 'Oh-chee-eng', priority: 90 },
+  { match: 'kamau', say: 'Kah-mau', priority: 90 },
+  { match: 'mwangi', say: 'Mwahn-gee', priority: 90 },
 
   // --- Common abbreviations (all langs) ---
   { match: 'e\\.g\\.', say: 'for example', priority: 60 },
