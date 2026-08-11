@@ -148,6 +148,9 @@ export type TenantRow = {
   wallet_balance_kes?: number | null;
   wallet_low_balance_kes?: number | null;
   billing_enforcement?: "soft" | "hard" | "off" | null;
+  /** Owner opt-in monthly soft spend budget (warn only). */
+  soft_spend_limit_enabled?: boolean | null;
+  soft_spend_limit_kes?: number | null;
   /** @deprecated Prefer wallet_balance_kes */
   telecom_wallet_balance_kes?: number | null;
   /** @deprecated AI bundled into wallet_balance_kes */

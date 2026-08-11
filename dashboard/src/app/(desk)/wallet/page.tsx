@@ -5,6 +5,7 @@ import {
   WALLET_RATE_KES_PER_MINUTE,
   getTenantUsageSummary,
 } from "@/lib/wallet";
+import { SoftSpendLimitPanel } from "@/components/SoftSpendLimitPanel";
 
 function Kpi({
   label,
@@ -71,6 +72,8 @@ export default async function WalletPage() {
       telecomKes: tenant.telecom_wallet_balance_kes,
       aiUsd: tenant.ai_wallet_balance_usd,
       billingEnforcement: tenant.billing_enforcement,
+      softSpendLimitEnabled: tenant.soft_spend_limit_enabled,
+      softSpendLimitKes: tenant.soft_spend_limit_kes,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -82,6 +85,12 @@ export default async function WalletPage() {
   }
 
   const billedThisMonth = usage.callChargesKes + usage.lineFeeKes;
+  const softBanner =
+    usage.softSpendLimit.enabled && usage.softSpendLimit.thresholdReached >= 80
+      ? usage.softSpendLimit.thresholdReached >= 100
+        ? "Soft spend limit reached for this month. Calls still connect — raise or turn off your limit if you want."
+        : "You are approaching your soft spend limit this month."
+      : null;
 
   return (
     <div className="max-w-3xl">
@@ -96,6 +105,12 @@ export default async function WalletPage() {
           {usage.isBeta ? "Free beta (not charged)" : "Prepaid · KES"}
         </span>
       </div>
+
+      {softBanner ? (
+        <p className="mt-4 rounded-xl border border-[var(--warn)]/40 bg-white px-4 py-3 text-sm text-[var(--warn)]">
+          {softBanner}
+        </p>
+      ) : null}
 
       <section className="mt-8 grid gap-3 sm:grid-cols-2">
         <Kpi
@@ -118,8 +133,19 @@ export default async function WalletPage() {
               ? `Illustrative at KES ${WALLET_RATE_KES_PER_MINUTE}/min (not charged)`
               : `Calls KES ${usage.callChargesKes.toLocaleString("en-KE")} · Line KES ${usage.lineFeeKes.toLocaleString("en-KE")}`
           }
+          warn={usage.softSpendLimit.enabled && usage.softSpendLimit.thresholdReached >= 80}
         />
       </section>
+
+      <SoftSpendLimitPanel
+        tenantId={tenant.id}
+        enabled={Boolean(tenant.soft_spend_limit_enabled)}
+        limitKes={
+          tenant.soft_spend_limit_kes != null ? Number(tenant.soft_spend_limit_kes) : null
+        }
+        status={usage.softSpendLimit}
+        isBeta={usage.isBeta}
+      />
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <h2 className="font-display text-2xl tracking-tight">This month</h2>

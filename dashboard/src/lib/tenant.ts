@@ -5,13 +5,20 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TENANT_SELECT =
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, llm_system_prompt, services_offered, services_catalog, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
+
+const TENANT_SELECT_NO_SOFT_LIMIT =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, llm_system_prompt, services_offered, services_catalog, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
 const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
 
+function isMissingSoftSpendLimitColumnError(message: string): boolean {
+  return /soft_spend_limit_enabled|soft_spend_limit_kes/i.test(message);
+}
+
 function isMissingProfileColumnError(message: string): boolean {
-  return /business_hours|hours_schedule|after_hours_mode|services_offered|services_catalog|agent_name|agent_tone|team_directory|faqs|unknown_answer_fallback|daily_bulletin|agent_tools|vertical|handoff_mode|business_locations|business_policies|alert_email|wallet_balance_kes|wallet_low_balance_kes|billing_enforcement|column/i.test(
+  return /business_hours|hours_schedule|after_hours_mode|services_offered|services_catalog|agent_name|agent_tone|team_directory|faqs|unknown_answer_fallback|daily_bulletin|agent_tools|vertical|handoff_mode|business_locations|business_policies|alert_email|wallet_balance_kes|wallet_low_balance_kes|billing_enforcement|soft_spend_limit_enabled|soft_spend_limit_kes|column/i.test(
     message
   );
 }
@@ -59,6 +66,14 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
       .eq("id", membership.tenant_id)
       .maybeSingle();
 
+    if (error && isMissingSoftSpendLimitColumnError(error.message)) {
+      ({ data, error } = await supabase
+        .from("tenants")
+        .select(TENANT_SELECT_NO_SOFT_LIMIT)
+        .eq("id", membership.tenant_id)
+        .maybeSingle());
+    }
+
     if (error && isMissingProfileColumnError(error.message)) {
       ({ data, error } = await supabase
         .from("tenants")
@@ -81,6 +96,16 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
+
+    if (error && isMissingSoftSpendLimitColumnError(error.message)) {
+      ({ data, error } = await admin
+        .from("tenants")
+        .select(TENANT_SELECT_NO_SOFT_LIMIT)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle());
+    }
 
     if (error && isMissingProfileColumnError(error.message)) {
       ({ data, error } = await admin

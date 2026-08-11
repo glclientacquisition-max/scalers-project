@@ -12,6 +12,13 @@ export const WALLET_LINE_FEE_KES_PER_MONTH = Number(
 );
 export const WALLET_LOW_BALANCE_KES = 200;
 
+/** Owner soft spend budget presets (KES / calendar month UTC). Opt-in only. */
+export const SOFT_SPEND_LIMIT_PRESETS_KES = [2000, 5000, 10000, 20000] as const;
+export const SOFT_SPEND_LIMIT_MIN_KES = 500;
+export const SOFT_SPEND_LIMIT_MAX_KES = 1_000_000;
+/** Soft warning thresholds (percent of monthly limit). Never blocks calls. */
+export const SOFT_SPEND_WARN_THRESHOLDS = [50, 80, 100] as const;
+
 /** @deprecated Use WALLET_RATE_KES_PER_MINUTE */
 export const BETA_RATE_KES_PER_MINUTE = WALLET_RATE_KES_PER_MINUTE;
 /** @deprecated Use WALLET_LINE_FEE_KES_PER_MONTH */
@@ -28,6 +35,16 @@ export type WalletLedgerRow = {
   reference_id: string | null;
 };
 
+export type SoftSpendLimitStatus = {
+  enabled: boolean;
+  limitKes: number | null;
+  /** Month-to-date spend counted against the soft budget. */
+  spentKes: number;
+  percent: number;
+  /** Highest crossed warn threshold (0 | 50 | 80 | 100). */
+  thresholdReached: 0 | 50 | 80 | 100;
+};
+
 export type TenantUsageSummary = {
   callsThisMonth: number;
   secondsThisMonth: number;
@@ -41,7 +58,63 @@ export type TenantUsageSummary = {
   billingEnforcement: string;
   isBeta: boolean;
   recentLedger: WalletLedgerRow[];
+  softSpendLimit: SoftSpendLimitStatus;
 };
+
+export function normalizeSoftSpendLimitKes(raw: unknown): number | null {
+  const n = typeof raw === "number" ? raw : Number(String(raw ?? "").replace(/,/g, "").trim());
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded < SOFT_SPEND_LIMIT_MIN_KES || rounded > SOFT_SPEND_LIMIT_MAX_KES) return null;
+  return rounded;
+}
+
+export function resolveSoftSpendLimitStatus(opts: {
+  enabled?: boolean | null;
+  limitKes?: number | null;
+  spentKes: number;
+}): SoftSpendLimitStatus {
+  const limit = opts.limitKes != null && Number.isFinite(Number(opts.limitKes))
+    ? Number(opts.limitKes)
+    : null;
+  const enabled = Boolean(opts.enabled) && limit != null && limit > 0;
+  const spent = Math.max(0, Number(opts.spentKes) || 0);
+  if (!enabled || !limit) {
+    return {
+      enabled: false,
+      limitKes: null,
+      spentKes: spent,
+      percent: 0,
+      thresholdReached: 0,
+    };
+  }
+  const percent = Math.min(999, (spent / limit) * 100);
+  let thresholdReached: SoftSpendLimitStatus["thresholdReached"] = 0;
+  for (const t of SOFT_SPEND_WARN_THRESHOLDS) {
+    if (percent >= t) thresholdReached = t;
+  }
+  return {
+    enabled: true,
+    limitKes: limit,
+    spentKes: spent,
+    percent,
+    thresholdReached,
+  };
+}
+
+export function softSpendLimitMessage(status: SoftSpendLimitStatus): string | null {
+  if (!status.enabled || !status.limitKes) return null;
+  if (status.thresholdReached >= 100) {
+    return `Soft limit reached (KES ${status.limitKes.toLocaleString("en-KE")} this month). Calls still work — raise or turn off the limit if you want.`;
+  }
+  if (status.thresholdReached >= 80) {
+    return `Approaching your soft limit (${Math.round(status.percent)}% of KES ${status.limitKes.toLocaleString("en-KE")}).`;
+  }
+  if (status.thresholdReached >= 50) {
+    return `Halfway through your soft monthly budget.`;
+  }
+  return null;
+}
 
 function startOfMonthUtcIso(): string {
   const now = new Date();
@@ -100,6 +173,8 @@ export async function getTenantUsageSummary(
     telecomKes?: number | null;
     aiUsd?: number | null;
     billingEnforcement?: string | null;
+    softSpendLimitEnabled?: boolean | null;
+    softSpendLimitKes?: number | null;
   }
 ): Promise<TenantUsageSummary> {
   let walletBalanceKes = resolveWalletBalanceKes(wallets);
@@ -190,6 +265,14 @@ export async function getTenantUsageSummary(
       }))
     : [];
 
+  // Soft budget counts prepaid ledger spend; beta uses illustrative rate-card cost.
+  const softSpentKes = isBeta ? estimatedCostKes : callChargesKes + lineFeeKes;
+  const softSpendLimit = resolveSoftSpendLimitStatus({
+    enabled: wallets.softSpendLimitEnabled,
+    limitKes: wallets.softSpendLimitKes,
+    spentKes: softSpentKes,
+  });
+
   return {
     callsThisMonth: rows.length,
     secondsThisMonth: seconds,
@@ -203,5 +286,6 @@ export async function getTenantUsageSummary(
     billingEnforcement,
     isBeta,
     recentLedger,
+    softSpendLimit,
   };
 }

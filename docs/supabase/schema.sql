@@ -29,6 +29,8 @@
 --   wallet_balance_kes numeric          (one prepaid KES wallet — see one_wallet_billing.sql)
 --   wallet_low_balance_kes numeric      (UI threshold; default 200)
 --   billing_enforcement text            (soft | hard | off)
+--   soft_spend_limit_enabled boolean    (owner opt-in; default false — wallet_soft_spend_limit.sql)
+--   soft_spend_limit_kes numeric        (monthly soft budget KES; warn only)
 --   telecom_wallet_balance_kes numeric  (DEPRECATED — mirrored from wallet_balance_kes)
 --   ai_wallet_balance_usd numeric       (DEPRECATED — AI bundled into KES wallet)
 --   is_active boolean
