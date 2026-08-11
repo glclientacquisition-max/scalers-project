@@ -3,14 +3,18 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
   confirmPronunciationRecording,
+  minePronunciationFromCallsAction,
   persistPronunciationLexicon,
+  quickAddPronunciationAction,
   type ConfirmPronunciationState,
+  type MinePronunciationState,
 } from "@/app/(desk)/settings/pronunciationActions";
 import {
   lexiconForStorage,
   parseTtsLexicon,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import { customTrainingLine } from "@/lib/pronunciationMine";
 import {
   buildPronunciationPacks,
   previewSpokenLine,
@@ -25,6 +29,7 @@ type CoachItem = PronunciationSuggestion & {
 };
 
 const confirmInitial: ConfirmPronunciationState = {};
+const mineInitial: MinePronunciationState = {};
 
 function blobToFile(blob: Blob, name: string): File {
   return new File([blob], name, { type: blob.type || "audio/webm" });
@@ -66,8 +71,12 @@ export function PronunciationCoach({
   const [cleanNote, setCleanNote] = useState<string | null>(null);
   const cleanedOnceRef = useRef(false);
 
+  const [extraItems, setExtraItems] = useState<PronunciationSuggestion[]>([]);
   const [skippedIds, setSkippedIds] = useState<Set<string>>(() => new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  const [addPhrase, setAddPhrase] = useState("");
+  const [addSay, setAddSay] = useState("");
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -85,13 +94,20 @@ export function PronunciationCoach({
     persistPronunciationLexicon,
     confirmInitial
   );
+  const [quickState, quickAction, quickPending] = useActionState(
+    quickAddPronunciationAction,
+    confirmInitial
+  );
+  const [mineState, mineAction, minePending] = useActionState(
+    minePronunciationFromCallsAction,
+    mineInitial
+  );
 
   const lexiconJson = useMemo(
     () => JSON.stringify(lexiconForStorage(lexicon)),
     [lexicon]
   );
 
-  // Auto-scrub polluted lexicon on open (common-word overrides).
   useEffect(() => {
     if (cleanedOnceRef.current) return;
     cleanedOnceRef.current = true;
@@ -109,6 +125,27 @@ export function PronunciationCoach({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (mineState.ok && Array.isArray(mineState.suggestions)) {
+      setExtraItems((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        const next = [...prev];
+        for (const s of mineState.suggestions || []) {
+          if (!ids.has(s.id)) next.push(s);
+        }
+        return next;
+      });
+    }
+  }, [mineState]);
+
+  useEffect(() => {
+    if (quickState.ok && quickState.lexicon) {
+      setLexicon(parseTtsLexicon(quickState.lexicon));
+      setAddPhrase("");
+      setAddSay("");
+    }
+  }, [quickState]);
+
   const packs = useMemo(
     () =>
       buildPronunciationPacks({
@@ -121,16 +158,25 @@ export function PronunciationCoach({
     [businessName, agentName, locations, team, lexicon]
   );
 
+  const queue = useMemo(() => {
+    const byId = new Map<string, PronunciationSuggestion>();
+    for (const p of [...packs, ...extraItems]) byId.set(p.id, p);
+    return [...byId.values()];
+  }, [packs, extraItems]);
+
   const items: CoachItem[] = useMemo(() => {
-    return packs.map((s) => ({
-      ...s,
-      status: skippedIds.has(s.id)
-        ? "skipped"
-        : isPronunciationCovered(s, lexicon)
-          ? "done"
-          : "todo",
-    }));
-  }, [packs, skippedIds, lexicon]);
+    return queue.map((s) => {
+      const isRenew = s.id.startsWith("renew:");
+      return {
+        ...s,
+        status: skippedIds.has(s.id)
+          ? "skipped"
+          : !isRenew && isPronunciationCovered(s, lexicon)
+            ? "done"
+            : "todo",
+      };
+    });
+  }, [queue, skippedIds, lexicon]);
 
   const todoItems = items.filter((i) => i.status === "todo");
   const active =
@@ -168,6 +214,10 @@ export function PronunciationCoach({
         return null;
       });
       setMicError(null);
+      // Drop completed custom/mine items from extra queue
+      setExtraItems((prev) =>
+        prev.filter((p) => !isPronunciationCovered(p, confirmState.lexicon || []))
+      );
     }
   }, [confirmState]);
 
@@ -269,6 +319,46 @@ export function PronunciationCoach({
     persistAction(fd);
   }
 
+  function renewEntry(entry: TtsLexiconEntry) {
+    const phrase = entry.label || entry.say || entry.match;
+    const line = customTrainingLine({
+      phrase,
+      idPrefix: "renew",
+      reason: `Renew “${entry.say}” — record a clearer take.`,
+    });
+    if (!line) return;
+    // Force re-train even if covered: temporarily remove from coverage by using renew id
+    setExtraItems((prev) => {
+      const without = prev.filter((p) => p.id !== line.id);
+      return [line, ...without];
+    });
+    setSkippedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(line.id);
+      return next;
+    });
+    setActiveId(line.id);
+    clearTake();
+  }
+
+  function queueCustomPhrase(phrase: string, asRecord: boolean) {
+    const line = customTrainingLine({
+      phrase,
+      idPrefix: "custom",
+      reason: "You flagged this as sounding wrong.",
+    });
+    if (!line) return false;
+    if (asRecord) {
+      setExtraItems((prev) => {
+        const without = prev.filter((p) => p.id !== line.id);
+        return [line, ...without];
+      });
+      setActiveId(line.id);
+      clearTake();
+    }
+    return true;
+  }
+
   function keepRecording() {
     if (!active || !audioBlob) return;
     const fd = new FormData();
@@ -287,6 +377,32 @@ export function PronunciationCoach({
       )
     );
     confirmAction(fd);
+  }
+
+  function scanCalls() {
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("current_lexicon", lexiconJson);
+    mineAction(fd);
+  }
+
+  function submitQuickAdd(mode: "record" | "save") {
+    const phrase = addPhrase.trim();
+    if (!phrase) return;
+    if (mode === "record") {
+      if (!queueCustomPhrase(phrase, true)) {
+        return;
+      }
+      setAddPhrase("");
+      setAddSay("");
+      return;
+    }
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("phrase", phrase);
+    fd.set("say", addSay.trim());
+    fd.set("current_lexicon", lexiconJson);
+    quickAction(fd);
   }
 
   const doneCount = items.filter((i) => i.status === "done").length;
@@ -309,22 +425,16 @@ export function PronunciationCoach({
           Pronunciation studio
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Up to three unique lines — Greeting, Location, Team — each said once, no
-          repeats.{" "}
+          See what is trained, renew a name, add anything you heard wrong, or scan
+          recent calls for hard words.{" "}
           <span className="font-medium text-[var(--ink)]">
-            Keep saves for the next call immediately
+            Keep / Save word apply on the next call
           </span>
-          . Save &amp; train below is for the receptionist prompt, not required for Keep.
+          .
         </p>
         {cleanNote ? (
           <p className="mt-2 text-xs text-[var(--ok)]" role="status">
             {cleanNote}
-          </p>
-        ) : null}
-        {items.length > 0 ? (
-          <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
-            {doneCount} of {totalFocus} packs trained
-            {skippedIds.size ? ` · ${skippedIds.size} skipped` : ""}
           </p>
         ) : null}
       </div>
@@ -340,18 +450,181 @@ export function PronunciationCoach({
         </div>
       ) : null}
 
-      {!items.length ? (
+      {/* Trained library */}
+      <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-4">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h3 className="font-medium text-[var(--ink)]">
+              Trained pronunciations ({lexicon.length})
+            </h3>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              Live on the next call. Renew to re-record, or remove.
+            </p>
+          </div>
+        </div>
+        {lexicon.length === 0 ? (
+          <p className="mt-3 text-sm text-[var(--ink-soft)]">
+            Nothing trained yet — use packs below or add a word you heard wrong.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {lexicon.map((entry) => (
+              <li
+                key={entry.match}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] py-2 last:border-0"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[var(--ink)]">
+                    {entry.label || entry.match}
+                  </span>
+                  <span className="font-mono text-xs text-[var(--ink-soft)]">
+                    phone says → {entry.say}
+                  </span>
+                </span>
+                <span className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => renewEntry(entry)}
+                    className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
+                  >
+                    Renew
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeEntry(entry.match)}
+                    disabled={persistPending}
+                    className="text-xs text-[var(--warn)] hover:underline disabled:opacity-60"
+                  >
+                    Remove
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {persistState.error ? (
+          <p className="mt-2 text-xs text-[var(--warn)]">{persistState.error}</p>
+        ) : null}
+      </div>
+
+      {/* Add heard wrong */}
+      <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-4">
+        <h3 className="font-medium text-[var(--ink)]">
+          Heard something wrong?
+        </h3>
+        <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+          Type the word or a short sentence, then record it — or save a typed “say
+          like” spelling for a quick fix.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor="pron-add-phrase">
+              Word or sentence
+            </label>
+            <input
+              id="pron-add-phrase"
+              value={addPhrase}
+              onChange={(e) => setAddPhrase(e.target.value)}
+              placeholder="Muindi Mbingu / White Paper Books"
+              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor="pron-add-say">
+              Say like (optional quick fix)
+            </label>
+            <input
+              id="pron-add-say"
+              value={addSay}
+              onChange={(e) => setAddSay(e.target.value)}
+              placeholder="Moo-in-dee Mbeen-goo"
+              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => submitQuickAdd("record")}
+            disabled={!addPhrase.trim()}
+            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
+          >
+            Queue to record
+          </button>
+          <button
+            type="button"
+            onClick={() => submitQuickAdd("save")}
+            disabled={!addPhrase.trim() || quickPending}
+            className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+          >
+            {quickPending ? "Saving…" : "Save typed spelling"}
+          </button>
+        </div>
+        {quickState.error ? (
+          <p className="mt-2 text-xs text-[var(--warn)]" role="alert">
+            {quickState.error}
+          </p>
+        ) : null}
+        {quickState.ok ? (
+          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
+            Saved — next call will use it.
+          </p>
+        ) : null}
+      </div>
+
+      {/* Mine from calls */}
+      <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              Finds complicated names the receptionist already said — queue them to
+              train.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={scanCalls}
+            disabled={minePending}
+            className="rounded-xl border border-[var(--accent)]/40 px-4 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+          >
+            {minePending ? "Scanning…" : "Scan recent calls"}
+          </button>
+        </div>
+        {mineState.error ? (
+          <p className="mt-2 text-xs text-[var(--warn)]">{mineState.error}</p>
+        ) : null}
+        {mineState.ok ? (
+          <p className="mt-2 text-xs text-[var(--ink-soft)]" role="status">
+            Scanned {mineState.scannedLines ?? 0} agent lines
+            {mineState.suggestions?.length
+              ? ` · added ${mineState.suggestions.length} to the queue`
+              : " · nothing new to train"}
+            .
+          </p>
+        ) : null}
+      </div>
+
+      {/* Training queue */}
+      <div>
+        <h3 className="font-medium text-[var(--ink)]">Training queue</h3>
+        <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+          Core packs plus anything you added or mined
+          {totalFocus ? ` · ${doneCount} of ${totalFocus} done` : ""}.
+        </p>
+      </div>
+
+      {!todoItems.length && !active ? (
         <p className="text-sm text-[var(--ink-soft)]">
-          {lexicon.length
-            ? "Core packs are trained. Refresh after you change business name, places, or team."
-            : "Add business name, agent name, and a location above — packs appear here."}
+          Queue empty. Add a word you heard wrong, renew a trained name, or scan
+          calls.
         </p>
       ) : (
         <div className="space-y-6">
           {active ? (
             <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/40 to-white px-5 py-6 sm:px-7">
               <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                {active.label} pack · say this full line
+                {active.label} · say this full line
               </p>
               <p
                 className="mt-3 font-display text-2xl leading-snug tracking-tight text-[var(--ink)] sm:text-3xl"
@@ -374,7 +647,7 @@ export function PronunciationCoach({
                   <button
                     type="button"
                     onClick={startRecording}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)] focus-visible:outline-none focus-visible:shadow-focus"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
                   >
                     <span
                       aria-hidden="true"
@@ -383,21 +656,15 @@ export function PronunciationCoach({
                     Record line
                   </button>
                 ) : null}
-
                 {recording ? (
                   <button
                     type="button"
                     onClick={stopRecording}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-white transition focus-visible:outline-none focus-visible:shadow-focus"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-white"
                   >
-                    <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 animate-pulse rounded-sm bg-white"
-                    />
                     Stop
                   </button>
                 ) : null}
-
                 {audioBlob && audioUrl && !recording ? (
                   <>
                     <audio
@@ -409,7 +676,7 @@ export function PronunciationCoach({
                     <button
                       type="button"
                       onClick={startRecording}
-                      className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)]"
+                      className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium"
                     >
                       Retry
                     </button>
@@ -417,17 +684,16 @@ export function PronunciationCoach({
                       type="button"
                       onClick={keepRecording}
                       disabled={confirmPending}
-                      className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white transition hover:brightness-95 disabled:opacity-60"
+                      className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
                     >
                       {confirmPending ? "Checking…" : "Keep"}
                     </button>
                   </>
                 ) : null}
-
                 <button
                   type="button"
                   onClick={skipActive}
-                  className="text-sm text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+                  className="text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
                 >
                   Skip for now
                 </button>
@@ -452,18 +718,14 @@ export function PronunciationCoach({
               ) : null}
               {confirmState.ok && confirmState.entries?.length ? (
                 <p className="mt-3 text-sm text-[var(--ok)]" role="status">
-                  Saved {confirmState.entries.length} name
-                  {confirmState.entries.length === 1 ? "" : "s"} from this pack.
+                  Saved {confirmState.entries.length} pronunciation
+                  {confirmState.entries.length === 1 ? "" : "s"}.
                 </p>
               ) : null}
             </div>
-          ) : (
-            <p className="text-sm text-[var(--ok)]" role="status">
-              Core packs done. Preview above shows how the greeting will read on the phone.
-            </p>
-          )}
+          ) : null}
 
-          <ul className="space-y-2" aria-label="Pronunciation packs">
+          <ul className="space-y-2" aria-label="Training queue">
             {items.map((item) => {
               const selected = active?.id === item.id;
               return (
@@ -497,9 +759,6 @@ export function PronunciationCoach({
                       <span className="mt-0.5 block font-medium text-[var(--ink)]">
                         {item.prompt}
                       </span>
-                      <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
-                        {(item.targets || []).map((t) => t.label).join(" · ")}
-                      </span>
                     </span>
                     <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                       {item.status === "done"
@@ -513,42 +772,6 @@ export function PronunciationCoach({
               );
             })}
           </ul>
-
-          {lexicon.length > 0 ? (
-            <details className="text-sm text-[var(--ink-soft)]" open>
-              <summary className="cursor-pointer font-medium text-[var(--ink)]">
-                Live pronunciations ({lexicon.length}) — next call
-              </summary>
-              <ul className="mt-3 space-y-2">
-                {lexicon.map((entry) => (
-                  <li
-                    key={entry.match}
-                    className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] py-2"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-[var(--ink)]">
-                        {entry.label || entry.match}
-                      </span>
-                      <span className="font-mono text-xs text-[var(--ink-soft)]">
-                        phone says → {entry.say}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeEntry(entry.match)}
-                      disabled={persistPending}
-                      className="text-xs text-[var(--warn)] hover:underline disabled:opacity-60"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {persistState.error ? (
-                <p className="mt-2 text-xs text-[var(--warn)]">{persistState.error}</p>
-              ) : null}
-            </details>
-          ) : null}
         </div>
       )}
     </section>

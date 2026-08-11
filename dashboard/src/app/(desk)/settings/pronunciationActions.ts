@@ -3,11 +3,17 @@
 import { isAuthenticated } from "@/lib/auth";
 import { deriveLexiconFromRecording } from "@/lib/pronunciationFromRecording";
 import {
+  isBlockedMatch,
   lexiconForStorage,
+  localSayFallback,
+  matchPatternFromPhrase,
   mergeLexiconEntries,
+  mergeLexiconEntry,
   parseTtsLexicon,
+  sanitizeSayForm,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import { mineSuggestionsFromAgentLines } from "@/lib/pronunciationMine";
 import { screenPronunciationSuggestions } from "@/lib/pronunciationScreen";
 import {
   parseSuggestionList,
@@ -330,6 +336,171 @@ export async function persistPronunciationLexicon(
   return {
     ok: true,
     lexicon: parseTtsLexicon(stored),
+    source: "local",
+  };
+}
+
+export type MinePronunciationState = {
+  error?: string;
+  ok?: boolean;
+  suggestions?: PronunciationSuggestion[];
+  scannedLines?: number;
+};
+
+/**
+ * Scan recent agent transcripts for hard names that may need pronunciation training.
+ */
+export async function minePronunciationFromCallsAction(
+  _prev: MinePronunciationState,
+  formData: FormData
+): Promise<MinePronunciationState> {
+  if (!(await isAuthenticated())) {
+    return { error: "Sign in to scan calls." };
+  }
+
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return { error: "No workspace linked to this account." };
+  }
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id || id !== tenant.id) {
+    return { error: "Forbidden." };
+  }
+
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return { error: "Not signed in." };
+  }
+
+  const { data: calls, error: callErr } = await workspace.client
+    .from("calls")
+    .select("id")
+    .eq("tenant_id", tenant.id)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (callErr) {
+    return { error: callErr.message };
+  }
+
+  const callIds = (calls || []).map((c) => c.id).filter(Boolean);
+  if (!callIds.length) {
+    return { ok: true, suggestions: [], scannedLines: 0 };
+  }
+
+  const { data: transcripts, error: txErr } = await workspace.client
+    .from("transcripts")
+    .select("text_content, speaker, call_id")
+    .in("call_id", callIds)
+    .eq("speaker", "agent")
+    .limit(200);
+
+  if (txErr) {
+    return { error: txErr.message };
+  }
+
+  const lines = (transcripts || [])
+    .map((t) => String(t.text_content || "").trim())
+    .filter(Boolean);
+
+  const existing = parseTtsLexicon(
+    formData.get("current_lexicon") ??
+      (tenant as { tts_lexicon?: unknown }).tts_lexicon
+  );
+
+  const { mineSuggestionsFromAgentLines: mine } = {
+    mineSuggestionsFromAgentLines,
+  };
+  const suggestions = mine({
+    lines,
+    existingLexicon: existing,
+    limit: 6,
+  });
+
+  return {
+    ok: true,
+    suggestions,
+    scannedLines: lines.length,
+  };
+}
+
+/**
+ * Quick-add a typed phrase into the lexicon (optional say-as) without recording.
+ * Prefer recording for quality; this is for fast fixes the owner heard wrong.
+ */
+export async function quickAddPronunciationAction(
+  _prev: ConfirmPronunciationState,
+  formData: FormData
+): Promise<ConfirmPronunciationState> {
+  if (!(await isAuthenticated())) {
+    return { error: "Sign in to add pronunciation." };
+  }
+
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return { error: "No workspace linked to this account." };
+  }
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id || id !== tenant.id) {
+    return { error: "Forbidden." };
+  }
+
+  const phrase = String(formData.get("phrase") || "").trim();
+  const sayRaw = String(formData.get("say") || "").trim();
+  if (!phrase || phrase.length > 80) {
+    return { error: "Enter a short word or name (under 80 characters)." };
+  }
+
+  const match = matchPatternFromPhrase(phrase);
+  if (!match || isBlockedMatch(match)) {
+    return {
+      error:
+        "That looks like a common English word. Train only hard names/places (or use a full phrase).",
+    };
+  }
+
+  const say = sanitizeSayForm(sayRaw || localSayFallback(phrase));
+  if (!say) {
+    return { error: "Could not build a spoken form for that phrase." };
+  }
+
+  const entry: TtsLexiconEntry = {
+    match,
+    say,
+    langs: ["en", "sw", "sheng"],
+    priority: 200,
+    label: phrase.slice(0, 120),
+  };
+
+  const existing = parseTtsLexicon(
+    (tenant as { tts_lexicon?: unknown }).tts_lexicon
+  );
+  const clientLexicon = parseTtsLexicon(formData.get("current_lexicon"));
+  const base = clientLexicon.length ? clientLexicon : existing;
+  const merged = parseTtsLexicon(mergeLexiconEntry(base, entry));
+  const stored = lexiconForStorage(merged);
+
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return { error: "Not signed in." };
+  }
+
+  const { error } = await workspace.client
+    .from("tenants")
+    .update({ tts_lexicon: stored })
+    .eq("id", tenant.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return {
+    ok: true,
+    entry: merged.find((e) => e.match === match) || entry,
+    entries: [entry],
+    lexicon: merged,
     source: "local",
   };
 }

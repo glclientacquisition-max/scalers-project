@@ -19,7 +19,6 @@ import {
 } from "@/lib/productCatalog";
 import {
   normalizeSocialHandles,
-  socialHandlesHaveContent,
   type SocialHandles,
 } from "@/lib/socialHandles";
 import { generateGeminiText } from "@/lib/gemini";
