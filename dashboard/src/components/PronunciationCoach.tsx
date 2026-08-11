@@ -309,7 +309,8 @@ export function PronunciationCoach({
           Pronunciation studio
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Train only the hard names — greeting, place, team — as full sentences.{" "}
+          Up to three unique lines — Greeting, Location, Team — each said once, no
+          repeats.{" "}
           <span className="font-medium text-[var(--ink)]">
             Keep saves for the next call immediately
           </span>

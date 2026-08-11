@@ -124,8 +124,13 @@ export function isBlockedMatch(match: string): boolean {
     .toLowerCase();
   if (!plain) return true;
   const parts = plain.split(" ").filter(Boolean);
+  // Only block single common words (city, where, book…).
+  // Multi-word place names like "City Market Fashion Mall" are allowed.
   if (parts.length === 1 && BLOCKED_MATCH_TOKENS.has(parts[0])) return true;
-  if (parts.every((p) => BLOCKED_MATCH_TOKENS.has(p))) return true;
+  // Two-word filler only (e.g. "the shop") — still block.
+  if (parts.length === 2 && parts.every((p) => BLOCKED_MATCH_TOKENS.has(p))) {
+    return true;
+  }
   return false;
 }
 

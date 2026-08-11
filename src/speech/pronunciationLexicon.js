@@ -215,7 +215,6 @@ const BLOCKED_MATCH_TOKENS = new Set(
 function isBlockedMatch(match) {
   const raw = String(match || '').trim();
   if (!raw) return true;
-  // Bare words / trivial alternates only (no multi-word place phrases).
   const plain = raw
     .replace(/\\s\+|\s\*|\\s/gi, ' ')
     .replace(/[\\^$|()?+*[\]{}]/g, ' ')
@@ -224,8 +223,11 @@ function isBlockedMatch(match) {
     .toLowerCase();
   if (!plain) return true;
   const parts = plain.split(' ').filter(Boolean);
+  // Single common words only — multi-word place names stay allowed.
   if (parts.length === 1 && BLOCKED_MATCH_TOKENS.has(parts[0])) return true;
-  if (parts.every((p) => BLOCKED_MATCH_TOKENS.has(p))) return true;
+  if (parts.length === 2 && parts.every((p) => BLOCKED_MATCH_TOKENS.has(p))) {
+    return true;
+  }
   return false;
 }
 

@@ -24,16 +24,15 @@ Open-ended “learn every word from my recording” produced entries like:
 
 ## Best product shape (Pronunciation studio)
 
-| Pack | Line | Targets only |
+| Pack | Line (example) | Targets only |
 | --- | --- | --- |
-| Greeting | “Hello, you've reached {biz}, this is {agent} speaking.” | business, agent |
-| Location | “We're on {place}, near {landmark}.” | hard place names |
-| Team | “I can have {name} follow up with you.” | team names |
+| Greeting | “Hello, you've reached ChapterOne Bookstore, this is Aisha speaking.” | business, agent |
+| Location | “We're on Muindi Mbingu Street, opposite City Market Fashion Mall.” | hard place names |
+| Team | “I can have Harrison Maina follow up with you.” | team names |
 
-- Record the **full line**; store **only target** say-forms.
-- Show a **phone preview** of the greeting after lexicon apply.
-- Auto-scrub polluted lexicons on studio open.
-- Match guardrail: audio must be the asked line (sugar ≠ water).
+**No repeats:** at most one of each pack; each hard name claimed once; duplicate prompts dropped.
+
+**Logical sense:** every prompt must contain its target labels; skip filler fragments (“Shop No”); no “just to confirm…” spam.
 
 ## Do / don’t for `say` forms
 
