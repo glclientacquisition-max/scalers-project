@@ -72,9 +72,12 @@ Ship the levers that raise *average* speed and reduce variance without live A/B 
 | --- | --- | --- |
 | True SautiKit media clear (`killAudio`) on barge-in | Stop talk-over after interrupt | Done |
 | Accumulate interim STT for barge decisions | Fewer missed “wait/stop” interrupts | Done |
+| Don’t flush mid-thought (`…and.`) / skip interrupt-only Gemini turns | Live DID `HD_0cdf315f02e9` | Done |
 | Cached micro-ack PCM per locale (optional) | Instant ack when LLM is actually slow | Next |
 | Greeting always instant + tenant warm before first PCM | No default-name greeting flash | Next |
 | Extract media session from `server.js` | Safer iteration on turn loop | Next |
+
+Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md).
 
 ### Phase 3 — Operate like a product
 

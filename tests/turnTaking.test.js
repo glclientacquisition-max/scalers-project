@@ -5,6 +5,7 @@ const assert = require('assert');
 const {
   looksLikeEcho,
   utteranceLooksIncomplete,
+  isInterruptOnlyUtterance,
   adaptiveFlushMs,
   evaluateBargeIn,
   hasBargeContent,
@@ -55,9 +56,28 @@ test('flags trailing conjunctions', () => {
   assert.strictEqual(utteranceLooksIncomplete('I need help with'), true);
   assert.strictEqual(utteranceLooksIncomplete('Nina shida na'), true);
 });
+test('flags STT period stuck on trailing and', () => {
+  assert.strictEqual(
+    utteranceLooksIncomplete('I\'d like to make a booking of an executive room,and.'),
+    true
+  );
+  assert.strictEqual(utteranceLooksIncomplete('I need a room, and.'), true);
+});
 test('complete sentences are complete', () => {
   assert.strictEqual(utteranceLooksIncomplete('I need a plumber.'), false);
   assert.strictEqual(utteranceLooksIncomplete('My name is John'), false);
+});
+
+console.log('isInterruptOnlyUtterance');
+test('detects wait/stop only turns', () => {
+  assert.strictEqual(isInterruptOnlyUtterance('Wait.'), true);
+  assert.strictEqual(isInterruptOnlyUtterance('Stop, stop, stop.'), true);
+  assert.strictEqual(isInterruptOnlyUtterance('No wait'), true);
+  assert.strictEqual(isInterruptOnlyUtterance('Wait.Wait.'), true);
+});
+test('does not treat real requests as interrupt-only', () => {
+  assert.strictEqual(isInterruptOnlyUtterance('Wait, my name is Ann'), false);
+  assert.strictEqual(isInterruptOnlyUtterance('I need an executive room'), false);
 });
 
 console.log('adaptiveFlushMs');
