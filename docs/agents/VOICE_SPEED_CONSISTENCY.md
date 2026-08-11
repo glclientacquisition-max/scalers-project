@@ -68,13 +68,13 @@ Ship the levers that raise *average* speed and reduce variance without live A/B 
 
 ### Phase 2 — Consistency hardening
 
-| Change | Why |
-| --- | --- |
-| True SautiKit media clear / short silence on barge-in | Stop talk-over after interrupt |
-| Accumulate interim STT for barge decisions | Fewer missed “wait/stop” interrupts |
-| Cached micro-ack PCM per locale (optional) | Instant ack when LLM is actually slow |
-| Greeting always instant + tenant warm before first PCM | No default-name greeting flash |
-| Extract media session from `server.js` | Safer iteration on turn loop |
+| Change | Why | Status |
+| --- | --- | --- |
+| True SautiKit media clear (`killAudio`) on barge-in | Stop talk-over after interrupt | Done |
+| Accumulate interim STT for barge decisions | Fewer missed “wait/stop” interrupts | Done |
+| Cached micro-ack PCM per locale (optional) | Instant ack when LLM is actually slow | Next |
+| Greeting always instant + tenant warm before first PCM | No default-name greeting flash | Next |
+| Extract media session from `server.js` | Safer iteration on turn loop | Next |
 
 ### Phase 3 — Operate like a product
 
