@@ -511,7 +511,8 @@ grant update (
   vertical,
   handoff_mode,
   business_locations,
-  business_policies
+  business_policies,
+  tts_lexicon
 ) on public.tenants to authenticated;
 
 -- ---------------------------------------------------------------------------
