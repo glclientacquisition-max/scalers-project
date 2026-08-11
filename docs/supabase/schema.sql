@@ -1,4 +1,5 @@
 -- Live Supabase schema (introspected 2026-08-06) for MISSED-CALL-PROJECT.
+-- REFERENCE ONLY — not an apply migration. See docs/supabase/README.md for apply order.
 -- App code in src/db.js maps to these tables. Do not invent alternate names.
 
 -- tenants

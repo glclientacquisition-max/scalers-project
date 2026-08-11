@@ -30,6 +30,8 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 
 ## Apply order
 
+Full project order: [`docs/supabase/README.md`](./supabase/README.md) (wallet section steps 16–18).
+
 1. Apply `docs/supabase/wallet_metering.sql` if not already applied (adds dual columns + old RPC).
 2. Apply `docs/supabase/one_wallet_billing.sql`.
 3. Deploy dashboard + voice engine.
