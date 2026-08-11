@@ -175,6 +175,9 @@ export function CallsCommandCenter({
         <Link href="/settings#test" className="font-medium text-accent-deep hover:underline">
           How to test
         </Link>
+        <Link href="/requests" className="font-medium text-accent-deep hover:underline">
+          Requests
+        </Link>
         <Link href="/settings#today" className="font-medium text-accent-deep hover:underline">
           Today&apos;s update
         </Link>

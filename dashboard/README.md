@@ -56,7 +56,7 @@ That page is the command center:
 1. **Briefing** — Nairobi greeting + one headline that answers “what needs me now?”
    (pending DID → train; live empty → test call; new leads → follow up; else caught up).
 2. **Glance metrics** — today / waiting / line status / wallet (no card clutter).
-3. **Quick actions** — Test · Today’s update · Train · Wallet.
+3. **Quick actions** — Test · Requests · Today’s update · Train · Wallet.
 4. **Needs you now** — top New (urgent first) with WhatsApp draft, **Done**, Open.
 5. **Inbox** — search + All/New/Contacted/Resolved filters + list/detail.
 
