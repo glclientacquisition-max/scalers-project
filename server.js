@@ -42,6 +42,7 @@ const {
   createSpokenStreamBuffer,
 } = require('./src/speech/spokenStreamBuffer');
 const { createVoiceTurnTiming } = require('./src/speech/voiceTiming');
+const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
@@ -657,14 +658,27 @@ function sendPcmToMedia(ws, pcm) {
   }
 }
 
-/** Best-effort stop of already-queued outbound audio on the media bridge. */
+/**
+ * Stop already-queued outbound audio on the media bridge (barge-in).
+ * SautiKit/drachtio mod_audio_fork understands `{ type: "killAudio" }`.
+ */
 function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  try {
-    // Twilio-style clear; raw PCM forks (audio.drachtio.org) may ignore this.
-    ws.send(JSON.stringify({ event: 'clear' }));
-  } catch (err) {
-    console.warn('[ws/media] clear event send failed:', err?.message || err);
+  const payloads = [
+    { type: 'killAudio' },
+    // Compatibility fallbacks seen across forks / Twilio-style bridges.
+    { event: 'clear' },
+    { type: 'clear' },
+  ];
+  for (const payload of payloads) {
+    try {
+      ws.send(JSON.stringify(payload));
+    } catch (err) {
+      console.warn(
+        `[ws/media] clear/killAudio send failed (${payload.type || payload.event}):`,
+        err?.message || err
+      );
+    }
   }
 }
 
@@ -731,6 +745,8 @@ mediaWss.on('connection', (ws, req) => {
   let fillerUsedThisCall = false;
   /** @type {ReturnType<typeof createVoiceTurnTiming>|null} */
   let activeTurnTiming = null;
+  /** Rolling interim hypothesis while agent is busy (for barge-in). */
+  let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
   let ttsLexiconOverrides = [];
 
@@ -832,6 +848,7 @@ mediaWss.on('connection', (ws, req) => {
     bargeInActive = true;
     playbackGeneration += 1;
     speaking = false;
+    interimBargeText = '';
     console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
     if (tts) {
       try {
@@ -1236,13 +1253,19 @@ mediaWss.on('connection', (ws, req) => {
 
       const isInterim = !evt.isFinal;
 
-      // Instant barge-in on interim tokens while TTS plays or Gemini is generating.
+      // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
-        maybeBargeIn(text, 'interim speech');
+        if (speaking || turnBusy) {
+          interimBargeText = mergeInterimHypothesis(interimBargeText, text);
+          maybeBargeIn(interimBargeText, 'interim speech');
+        } else {
+          interimBargeText = '';
+        }
         return;
       }
 
-      // Finals: barge if needed, then accumulate for the next customer turn.
+      // Finals replace the interim hypothesis.
+      interimBargeText = '';
       maybeBargeIn(text, 'final speech');
       if (speaking && !bargeInActive) {
         const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText);
@@ -1265,6 +1288,7 @@ mediaWss.on('connection', (ws, req) => {
     }
 
     if (evt.type === 'endpoint' || evt.type === 'finished') {
+      interimBargeText = '';
       // Do not clear bargeInActive while a Gemini turn is still in flight — that flag
       // must survive until runCallerTurn discards the unspoken reply.
       if (!turnBusy) {

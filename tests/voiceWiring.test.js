@@ -62,4 +62,16 @@ assert.match(
   'filler stop must not cancel the prefetched reply TTS stream'
 );
 
+assert.match(
+  source,
+  /mergeInterimHypothesis/,
+  'barge-in must accumulate interim STT hypotheses'
+);
+
+assert.match(
+  source,
+  /type:\s*['"]killAudio['"]/,
+  'media clear must send drachtio killAudio on barge-in'
+);
+
 console.log('Voice runtime wiring checks passed.');
