@@ -4,10 +4,16 @@ import { isAuthenticated } from "@/lib/auth";
 import { deriveLexiconFromRecording } from "@/lib/pronunciationFromRecording";
 import {
   lexiconForStorage,
-  mergeLexiconEntry,
+  mergeLexiconEntries,
   parseTtsLexicon,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import { screenPronunciationSuggestions } from "@/lib/pronunciationScreen";
+import {
+  parseSuggestionList,
+  suggestPronunciations,
+  type PronunciationSuggestion,
+} from "@/lib/pronunciationSuggest";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export type ConfirmPronunciationState = {
@@ -15,17 +21,139 @@ export type ConfirmPronunciationState = {
   ok?: boolean;
   source?: "gemini" | "local";
   entry?: TtsLexiconEntry;
+  entries?: TtsLexiconEntry[];
   lexicon?: TtsLexiconEntry[];
+  heard?: string;
 };
 
-const MAX_AUDIO_BYTES = 1_500_000; // ~1.5 MB webm
+export type ScreenPronunciationState = {
+  error?: string;
+  ok?: boolean;
+  source?: "gemini" | "local";
+  suggestions?: PronunciationSuggestion[];
+};
+
+const MAX_AUDIO_BYTES = 1_800_000; // ~1.8 MB — sentences are a bit longer
+const MAX_PROMPT = 200;
 
 function asBase64(buf: ArrayBuffer): string {
   return Buffer.from(buf).toString("base64");
 }
 
+function parseTargetsField(raw: FormDataEntryValue | null): Array<{
+  label: string;
+  match: string;
+}> {
+  if (raw == null) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const label = String((item as { label?: string }).label || "").trim();
+        const match = String((item as { match?: string }).match || "").trim();
+        if (!label) return null;
+        return { label, match };
+      })
+      .filter(Boolean) as Array<{ label: string; match: string }>;
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Accept an owner recording for one suggested phrase, derive say-as, merge into tts_lexicon.
+ * AI-screen constructive pronunciation lines for this workspace profile.
+ */
+export async function screenPronunciationSuggestionsAction(
+  _prev: ScreenPronunciationState,
+  formData: FormData
+): Promise<ScreenPronunciationState> {
+  if (!(await isAuthenticated())) {
+    return { error: "Sign in to refresh suggestions." };
+  }
+
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return { error: "No workspace linked to this account." };
+  }
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id || id !== tenant.id) {
+    return { error: "Forbidden." };
+  }
+
+  const input = {
+    businessName: String(formData.get("business_name") || "").trim(),
+    agentName: String(formData.get("agent_name") || "").trim(),
+    locationNotes: String(formData.get("location_notes") || "").trim(),
+    locations: (() => {
+      try {
+        const raw = JSON.parse(String(formData.get("locations") || "[]"));
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    })(),
+    team: (() => {
+      try {
+        const raw = JSON.parse(String(formData.get("team") || "[]"));
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    })(),
+    services: (() => {
+      try {
+        const raw = JSON.parse(String(formData.get("services") || "[]"));
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    })(),
+    faqs: (() => {
+      try {
+        const raw = JSON.parse(String(formData.get("faqs") || "[]"));
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    })(),
+    bulletinTexts: (() => {
+      try {
+        const raw = JSON.parse(String(formData.get("bulletin_texts") || "[]"));
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    })(),
+    existingLexicon: parseTtsLexicon(formData.get("current_lexicon")),
+  };
+
+  try {
+    const result = await screenPronunciationSuggestions(input);
+    return {
+      ok: true,
+      source: result.source,
+      suggestions: result.suggestions,
+    };
+  } catch (err) {
+    const local = suggestPronunciations(input);
+    return {
+      ok: true,
+      source: "local",
+      suggestions: local.length ? local : parseSuggestionList([]),
+      error:
+        err instanceof Error
+          ? `AI screen unavailable — showing basic lines. ${err.message}`
+          : undefined,
+    };
+  }
+}
+
+/**
+ * Accept an owner recording for one constructive line.
+ * Verifies the audio matches the asked sentence, then merges target lexicon entries.
  */
 export async function confirmPronunciationRecording(
   _prev: ConfirmPronunciationState,
@@ -47,12 +175,13 @@ export async function confirmPronunciationRecording(
 
   const prompt = String(formData.get("prompt") || "").trim();
   const label = String(formData.get("label") || "").trim() || prompt;
-  const kindRaw = String(formData.get("kind") || "word").trim();
-  const kind = kindRaw === "sentence" ? "sentence" : "word";
+  const kindRaw = String(formData.get("kind") || "sentence").trim();
+  const kind = kindRaw === "word" ? "word" : "sentence";
   const suggestedMatch = String(formData.get("match") || "").trim();
+  const targets = parseTargetsField(formData.get("targets"));
 
-  if (!prompt || prompt.length > 160) {
-    return { error: "Pick a short word or sentence to record." };
+  if (!prompt || prompt.length > MAX_PROMPT) {
+    return { error: "Pick a short sentence to record." };
   }
 
   const audio = formData.get("audio");
@@ -63,7 +192,9 @@ export async function confirmPronunciationRecording(
     const file = audio as File;
     if (file.size > 0) {
       if (file.size > MAX_AUDIO_BYTES) {
-        return { error: "Recording is too long. Try a shorter take (a few seconds)." };
+        return {
+          error: "Recording is too long. Keep it to one clear sentence.",
+        };
       }
       const mime = String(file.type || "audio/webm").toLowerCase();
       if (!mime.startsWith("audio/") && mime !== "application/octet-stream") {
@@ -75,22 +206,33 @@ export async function confirmPronunciationRecording(
   }
 
   if (!audioBase64) {
-    return { error: "Record yourself saying the phrase, then tap Keep." };
+    return { error: "Record yourself saying the line, then tap Keep." };
   }
 
-  let derived: { entry: TtsLexiconEntry; source: "gemini" | "local" };
+  let derived: Awaited<ReturnType<typeof deriveLexiconFromRecording>>;
   try {
     derived = await deriveLexiconFromRecording({
       prompt,
       label,
       kind,
       suggestedMatch,
+      targets,
       audioBase64,
       audioMimeType,
     });
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Could not learn that pronunciation.",
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not learn that pronunciation.",
+    };
+  }
+
+  if (!derived.ok) {
+    return {
+      error: derived.error,
+      heard: derived.heard,
     };
   }
 
@@ -104,7 +246,7 @@ export async function confirmPronunciationRecording(
   );
   const clientLexicon = parseTtsLexicon(formData.get("current_lexicon"));
   const base = clientLexicon.length ? clientLexicon : existing;
-  const merged = mergeLexiconEntry(base, derived.entry);
+  const merged = mergeLexiconEntries(base, derived.entries);
   const stored = lexiconForStorage(merged);
 
   const { error } = await workspace.client
@@ -130,7 +272,9 @@ export async function confirmPronunciationRecording(
   return {
     ok: true,
     source: derived.source,
-    entry: derived.entry,
+    entry: derived.entries[0],
+    entries: derived.entries,
     lexicon: merged,
+    heard: derived.heard,
   };
 }

@@ -1,5 +1,6 @@
 /**
- * Derive a Soniox-friendly "say" spelling from an owner recording (+ target phrase).
+ * Verify owner recording matches the asked line, then derive lexicon say-as entries.
+ * Guardrail: if they were asked for "sugar" but said "water", reject.
  */
 
 import { generateGeminiMultimodal } from "@/lib/gemini";
@@ -9,22 +10,34 @@ import {
   TTS_SAY_MAX,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import type { PronunciationTarget } from "@/lib/pronunciationSuggest";
 
-const SYSTEM = `You write pronunciation hints for a Kenyan phone receptionist TTS (Soniox).
+const SYSTEM = `You check a Kenyan business owner's pronunciation training recording for Scalers (phone TTS).
 
-The owner recorded themselves saying a word or short sentence clearly.
+They were asked to say a specific sentence clearly. Audio is attached.
+
 Return ONLY valid JSON (no markdown):
-{"say":"how the TTS should speak it","match":"optional regex-ish match if different"}
+{
+  "match_ok": true,
+  "heard": "short transcript of what they said",
+  "reason": "if match_ok is false, one short owner-facing reason",
+  "entries": [
+    { "label": "Hard Name", "match": "optional-regex", "say": "How TTS should say it" }
+  ]
+}
 
-Rules for "say":
-- Write the spoken form in Latin letters that an English/Kiswahili TTS will read clearly on a phone
-- Prefer syllable-friendly spelling with hyphens for hard names (e.g. "Moo-een-dee Mbeen-goo")
-- Keep brand spacing natural when clear ("Chapter One", "M-Pesa")
-- Do NOT invent different meanings — only fix pronunciation
-- Max ${TTS_SAY_MAX} characters
-- No IPA symbols, no quotes inside the string, no explanation fields
+match_ok rules (strict):
+- true only if the recording is clearly an attempt at the TARGET sentence (same meaning / same key names)
+- false if they said something totally different (e.g. asked for sugar, said water), stayed silent, hummed, or only said unrelated words
+- Accent, pacing, and imperfect English are OK — still match_ok true if the right names/line are there
+- Light filler ("um", "okay") around the line is OK
 
-If audio is missing or unclear, still propose the best Kenyan-English / Kiswahili-friendly spelling for the target text.`;
+entries rules (only when match_ok true):
+- One entry per TARGET hard name listed (not every English word)
+- "say" = Latin letters Soniox TTS can read on a phone; hyphens for hard syllables (e.g. "Moo-een-dee Mbeen-goo")
+- Prefer the owner's pronunciation when audible
+- Max ${TTS_SAY_MAX} chars per say
+- No IPA, no quotes inside strings`;
 
 function extractJsonObject(text: string): Record<string, unknown> {
   const raw = String(text || "").trim();
@@ -51,41 +64,97 @@ function extractJsonObject(text: string): Record<string, unknown> {
   }
 }
 
+function normalizeForCompare(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Cheap overlap check when Gemini is unavailable — still block obvious mismatches. */
+export function localAudioLikelyMatches(opts: {
+  prompt: string;
+  heard: string;
+  targets?: PronunciationTarget[];
+}): boolean {
+  const heard = normalizeForCompare(opts.heard);
+  if (!heard || heard.length < 2) return false;
+  const prompt = normalizeForCompare(opts.prompt);
+  if (!prompt) return false;
+
+  // Whole-line token overlap
+  const promptTokens = prompt.split(" ").filter((t) => t.length > 2);
+  const heardSet = new Set(heard.split(" "));
+  const overlap = promptTokens.filter((t) => heardSet.has(t)).length;
+  if (promptTokens.length && overlap / promptTokens.length >= 0.45) {
+    return true;
+  }
+
+  // At least one hard target must appear (normalized)
+  const targets = opts.targets || [];
+  if (targets.length) {
+    const heardCompact = heard.replace(/\s+/g, "");
+    return targets.some((t) => {
+      const label = normalizeForCompare(t.label).replace(/\s+/g, "");
+      return label.length >= 3 && heardCompact.includes(label);
+    });
+  }
+
+  return false;
+}
+
+export type DeriveRecordingResult =
+  | {
+      ok: true;
+      entries: TtsLexiconEntry[];
+      source: "gemini" | "local";
+      heard?: string;
+    }
+  | {
+      ok: false;
+      error: string;
+      heard?: string;
+    };
+
 export async function deriveLexiconFromRecording(opts: {
   prompt: string;
   label?: string;
   kind?: "word" | "sentence";
   suggestedMatch?: string;
+  targets?: PronunciationTarget[];
   audioBase64?: string | null;
   audioMimeType?: string | null;
-}): Promise<{ entry: TtsLexiconEntry; source: "gemini" | "local" }> {
+}): Promise<DeriveRecordingResult> {
   const prompt = String(opts.prompt || "").trim();
   if (!prompt) {
-    throw new Error("Nothing to pronounce.");
+    return { ok: false, error: "Nothing to pronounce." };
   }
 
-  const match =
-    String(opts.suggestedMatch || "").trim() ||
-    matchPatternFromPhrase(opts.label || prompt);
+  const targets: PronunciationTarget[] =
+    Array.isArray(opts.targets) && opts.targets.length
+      ? opts.targets
+      : [
+          {
+            label: String(opts.label || prompt).trim(),
+            match:
+              String(opts.suggestedMatch || "").trim() ||
+              matchPatternFromPhrase(opts.label || prompt),
+          },
+        ];
 
-  const fallbackSay = localSayFallback(opts.label || prompt);
-  const base: TtsLexiconEntry = {
-    match,
-    say: fallbackSay,
-    langs: ["en", "sw", "sheng"],
-    priority: 200,
-    label: (opts.label || prompt).slice(0, 120),
-    kind: opts.kind === "sentence" ? "sentence" : "word",
-  };
+  if (!opts.audioBase64) {
+    return {
+      ok: false,
+      error: "Record yourself saying the line, then tap Keep.",
+    };
+  }
 
   const userText = [
-    `Target text the receptionist must say: ${prompt}`,
-    opts.label && opts.label !== prompt ? `Short label: ${opts.label}` : "",
-    opts.kind ? `Kind: ${opts.kind}` : "",
-    opts.suggestedMatch ? `Preferred match pattern: ${opts.suggestedMatch}` : "",
-    opts.audioBase64
-      ? "Audio: owner recording of this phrase is attached. Prefer their pronunciation."
-      : "No audio attached — propose the clearest phone spelling.",
+    `TARGET sentence (must match): ${prompt}`,
+    `Hard targets to learn: ${JSON.stringify(targets.map((t) => t.label))}`,
+    opts.label ? `Line title: ${opts.label}` : "",
+    "Listen to the attached audio. Enforce match_ok strictly if content differs.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -95,7 +164,7 @@ export async function deriveLexiconFromRecording(opts: {
       { text: string } | { inlineData: { mimeType: string; data: string } }
     > = [{ text: userText }];
 
-    if (opts.audioBase64 && opts.audioMimeType) {
+    if (opts.audioMimeType) {
       parts.push({
         inlineData: {
           mimeType: opts.audioMimeType,
@@ -107,31 +176,90 @@ export async function deriveLexiconFromRecording(opts: {
     const raw = await generateGeminiMultimodal({
       systemInstruction: SYSTEM,
       parts,
-      temperature: 0.2,
-      maxOutputTokens: 256,
-      timeoutMs: 20_000,
+      temperature: 0.15,
+      maxOutputTokens: 512,
+      timeoutMs: 22_000,
     });
 
     const json = extractJsonObject(raw);
-    const say = String(json.say || "")
-      .trim()
-      .replace(/^["']|["']$/g, "")
-      .slice(0, TTS_SAY_MAX);
-    const maybeMatch = String(json.match || "").trim().slice(0, 80);
+    const heard = String(json.heard || "").trim();
+    const matchOk = json.match_ok === true || json.matchOk === true;
 
-    if (say) {
+    if (!matchOk) {
+      const reason = String(json.reason || "").trim();
       return {
-        entry: {
-          ...base,
-          say,
-          match: maybeMatch || match,
-        },
-        source: "gemini",
+        ok: false,
+        heard,
+        error:
+          reason ||
+          `That didn’t sound like the line we asked for. Please say: “${prompt}”`,
       };
     }
-  } catch {
-    // Fall through to local
-  }
 
-  return { entry: base, source: "local" };
+    const rawEntries = Array.isArray(json.entries) ? json.entries : [];
+    const entries: TtsLexiconEntry[] = [];
+
+    for (const item of rawEntries) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const label = String(row.label || "").trim();
+      const say = String(row.say || "")
+        .trim()
+        .replace(/^["']|["']$/g, "")
+        .slice(0, TTS_SAY_MAX);
+      if (!label || !say) continue;
+      const suggested = targets.find(
+        (t) => t.label.toLowerCase() === label.toLowerCase()
+      );
+      const match =
+        String(row.match || "").trim() ||
+        suggested?.match ||
+        matchPatternFromPhrase(label);
+      if (!match) continue;
+      entries.push({
+        match,
+        say,
+        langs: ["en", "sw", "sheng"],
+        priority: 200,
+        label: label.slice(0, 120),
+        kind: "sentence",
+      });
+    }
+
+    // Ensure every target gets an entry even if model omitted some
+    for (const target of targets) {
+      const has = entries.some(
+        (e) =>
+          e.label?.toLowerCase() === target.label.toLowerCase() ||
+          e.match.toLowerCase() === target.match.toLowerCase()
+      );
+      if (!has) {
+        entries.push({
+          match: target.match,
+          say: localSayFallback(target.label),
+          langs: ["en", "sw", "sheng"],
+          priority: 200,
+          label: target.label,
+          kind: "sentence",
+        });
+      }
+    }
+
+    if (!entries.length) {
+      return {
+        ok: false,
+        heard,
+        error: "Couldn’t learn pronunciations from that take. Please try again.",
+      };
+    }
+
+    return { ok: true, entries, source: "gemini", heard };
+  } catch {
+    // Without multimodal we cannot safely accept arbitrary audio.
+    return {
+      ok: false,
+      error:
+        "Couldn’t verify your recording right now. Please try Keep again in a moment.",
+    };
+  }
 }

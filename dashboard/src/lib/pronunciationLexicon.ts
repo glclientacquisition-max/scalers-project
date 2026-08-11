@@ -114,6 +114,18 @@ export function mergeLexiconEntry(
   return parseTtsLexicon([...filtered, next]);
 }
 
+/** Merge many entries (sentence coach may train several targets at once). */
+export function mergeLexiconEntries(
+  existing: TtsLexiconEntry[],
+  next: TtsLexiconEntry[]
+): TtsLexiconEntry[] {
+  let out = existing;
+  for (const entry of next) {
+    out = mergeLexiconEntry(out, entry);
+  }
+  return out;
+}
+
 /** Drop coach-only fields before persisting to tenants.tts_lexicon. */
 export function lexiconForStorage(entries: TtsLexiconEntry[]): Array<{
   match: string;
