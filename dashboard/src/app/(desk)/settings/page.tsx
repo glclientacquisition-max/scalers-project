@@ -98,7 +98,19 @@ export default async function SettingsPage() {
       </div>
 
       <div id="train" className="mt-10 scroll-mt-28 border-t border-line pt-10">
-        <TenantForm tenant={tenant} />
+        <TenantForm
+          key={[
+            tenant.id,
+            Array.isArray(tenant.services_catalog)
+              ? tenant.services_catalog.length
+              : 0,
+            Array.isArray(tenant.faqs) ? tenant.faqs.length : 0,
+            Array.isArray(tenant.team_directory) ? tenant.team_directory.length : 0,
+            String(tenant.llm_system_prompt || "").length,
+            tenant.vertical || "",
+          ].join(":")}
+          tenant={tenant}
+        />
       </div>
 
       <section
