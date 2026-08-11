@@ -71,7 +71,7 @@ export function SoftSpendLimitPanel({
               KES {status.spentKes.toLocaleString("en-KE")}
               <span className="font-normal text-[var(--ink-soft)]">
                 {" "}
-                of {status.limitKes.toLocaleString("en-KE")} this month
+                of {(status.limitKes ?? 0).toLocaleString("en-KE")} this month
               </span>
             </p>
             <p className={warn ? "text-[var(--warn)]" : "text-[var(--ink-soft)]"}>{pct}%</p>
