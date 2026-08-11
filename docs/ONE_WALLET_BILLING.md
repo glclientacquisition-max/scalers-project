@@ -47,9 +47,24 @@ WALLET_LINE_FEE_KES_PER_MONTH=1000
 
 Also apply `docs/supabase/wallet_security_beta.sql` (RPC locks, column protection, ops audit, beta defaults).
 
+Then apply `docs/supabase/wallet_soft_spend_limit.sql` (owner opt-in soft monthly budget).
+
+## Soft spend limit (owner opt-in)
+
+Cursor-style monthly budget on the owner Wallet page:
+
+| Setting | Behavior |
+|---|---|
+| Off (default) | No budget tracking |
+| On + owner-chosen KES amount | Warn at 50% / 80% / 100% of month-to-date spend |
+| Soft vs hard | Soft **never blocks calls**; hard inbound gate is separate |
+
+Owners opt in by will only and set their own limit (presets or custom, min KES 500). Prepaid counts ledger `call_charge` + `line_rental`; beta shows illustrative rate-card cost against the budget.
+
 ## Later
 
 - M-Pesa / Paystack STK top-up → `topup` ledger rows
 - Hard enforcement on inbound when balance ≤ 0
+- Email spend alerts at soft thresholds
 - Nairobi-TZ month boundaries
 - COGS-based rate tuning (Soniox + Gemini)
