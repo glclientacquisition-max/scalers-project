@@ -10,8 +10,10 @@ import {
   type MinePronunciationState,
 } from "@/app/(desk)/settings/pronunciationActions";
 import {
+  displayLexiconLabel,
   lexiconForStorage,
   parseTtsLexicon,
+  sanitizeSayForm,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
 import { customTrainingLine } from "@/lib/pronunciationMine";
@@ -77,6 +79,10 @@ export function PronunciationCoach({
 
   const [addPhrase, setAddPhrase] = useState("");
   const [addSay, setAddSay] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [editingMatch, setEditingMatch] = useState<string | null>(null);
+  const [editSay, setEditSay] = useState("");
+  const [keepNote, setKeepNote] = useState<string | null>(null);
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -143,8 +149,17 @@ export function PronunciationCoach({
       setLexicon(parseTtsLexicon(quickState.lexicon));
       setAddPhrase("");
       setAddSay("");
+      setAddError(null);
     }
   }, [quickState]);
+
+  useEffect(() => {
+    if (persistState.ok && persistState.lexicon) {
+      setLexicon(parseTtsLexicon(persistState.lexicon));
+      setEditingMatch(null);
+      setEditSay("");
+    }
+  }, [persistState]);
 
   const packs = useMemo(
     () =>
@@ -214,10 +229,18 @@ export function PronunciationCoach({
         return null;
       });
       setMicError(null);
+      setAddError(null);
       // Drop completed custom/mine items from extra queue
       setExtraItems((prev) =>
         prev.filter((p) => !isPronunciationCovered(p, confirmState.lexicon || []))
       );
+    }
+  }, [confirmState]);
+
+  useEffect(() => {
+    if (confirmState.ok && confirmState.entries?.length) {
+      const n = confirmState.entries.length;
+      setKeepNote(`Saved ${n} pronunciation${n === 1 ? "" : "s"}.`);
     }
   }, [confirmState]);
 
@@ -248,6 +271,7 @@ export function PronunciationCoach({
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setMicError(null);
+    setKeepNote(null);
   }
 
   async function startRecording() {
@@ -313,6 +337,28 @@ export function PronunciationCoach({
   function removeEntry(match: string) {
     const next = lexicon.filter((e) => e.match !== match);
     setLexicon(next);
+    if (editingMatch === match) {
+      setEditingMatch(null);
+      setEditSay("");
+    }
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(next)));
+    persistAction(fd);
+  }
+
+  function saveEditedSay(match: string) {
+    const say = sanitizeSayForm(editSay);
+    if (!say) {
+      setAddError("Enter how the phone should say it.");
+      return;
+    }
+    const next = lexicon.map((e) =>
+      e.match === match
+        ? { ...e, say, label: displayLexiconLabel(e) }
+        : e
+    );
+    setLexicon(next);
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(next)));
@@ -320,14 +366,19 @@ export function PronunciationCoach({
   }
 
   function renewEntry(entry: TtsLexiconEntry) {
-    const phrase = entry.label || entry.say || entry.match;
+    // Never use phonetic `say` as the phrase — that would train the wrong match.
+    const phrase = displayLexiconLabel(entry);
     const line = customTrainingLine({
       phrase,
       idPrefix: "renew",
       reason: `Renew “${entry.say}” — record a clearer take.`,
     });
-    if (!line) return;
-    // Force re-train even if covered: temporarily remove from coverage by using renew id
+    if (!line) {
+      setAddError(
+        `Couldn’t queue “${phrase}” for renew — try adding it under Heard something wrong?`
+      );
+      return;
+    }
     setExtraItems((prev) => {
       const without = prev.filter((p) => p.id !== line.id);
       return [line, ...without];
@@ -338,24 +389,29 @@ export function PronunciationCoach({
       return next;
     });
     setActiveId(line.id);
+    setAddError(null);
     clearTake();
   }
 
-  function queueCustomPhrase(phrase: string, asRecord: boolean) {
+  function queueCustomPhrase(phrase: string) {
     const line = customTrainingLine({
       phrase,
       idPrefix: "custom",
       reason: "You flagged this as sounding wrong.",
     });
-    if (!line) return false;
-    if (asRecord) {
-      setExtraItems((prev) => {
-        const without = prev.filter((p) => p.id !== line.id);
-        return [line, ...without];
-      });
-      setActiveId(line.id);
-      clearTake();
+    if (!line) {
+      setAddError(
+        "That looks like a common English word. Use a hard name/place, or a short sentence with it."
+      );
+      return false;
     }
+    setExtraItems((prev) => {
+      const without = prev.filter((p) => p.id !== line.id);
+      return [line, ...without];
+    });
+    setActiveId(line.id);
+    setAddError(null);
+    clearTake();
     return true;
   }
 
@@ -389,12 +445,17 @@ export function PronunciationCoach({
   function submitQuickAdd(mode: "record" | "save") {
     const phrase = addPhrase.trim();
     if (!phrase) return;
+    setAddError(null);
     if (mode === "record") {
-      if (!queueCustomPhrase(phrase, true)) {
-        return;
-      }
+      if (!queueCustomPhrase(phrase)) return;
       setAddPhrase("");
       setAddSay("");
+      return;
+    }
+    if (!addSay.trim()) {
+      setAddError(
+        "Add how it should sound, or use Queue to record instead."
+      );
       return;
     }
     const fd = new FormData();
@@ -458,7 +519,7 @@ export function PronunciationCoach({
               Trained pronunciations ({lexicon.length})
             </h3>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Live on the next call. Renew to re-record, or remove.
+              Live on the next call. Renew to re-record, edit the say-as, or remove.
             </p>
           </div>
         </div>
@@ -468,42 +529,87 @@ export function PronunciationCoach({
           </p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {lexicon.map((entry) => (
-              <li
-                key={entry.match}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] py-2 last:border-0"
-              >
-                <span className="min-w-0">
-                  <span className="block text-[var(--ink)]">
-                    {entry.label || entry.match}
-                  </span>
-                  <span className="font-mono text-xs text-[var(--ink-soft)]">
-                    phone says → {entry.say}
-                  </span>
-                </span>
-                <span className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => renewEntry(entry)}
-                    className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
-                  >
-                    Renew
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeEntry(entry.match)}
-                    disabled={persistPending}
-                    className="text-xs text-[var(--warn)] hover:underline disabled:opacity-60"
-                  >
-                    Remove
-                  </button>
-                </span>
-              </li>
-            ))}
+            {lexicon.map((entry) => {
+              const label = displayLexiconLabel(entry);
+              const isEditing = editingMatch === entry.match;
+              return (
+                <li
+                  key={entry.match}
+                  className="border-b border-[var(--line)] py-2 last:border-0"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="block text-[var(--ink)]">{label}</span>
+                      {!isEditing ? (
+                        <span className="font-mono text-xs text-[var(--ink-soft)]">
+                          phone says → {entry.say}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => renewEntry(entry)}
+                        className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
+                      >
+                        Renew
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isEditing) {
+                            setEditingMatch(null);
+                            setEditSay("");
+                          } else {
+                            setEditingMatch(entry.match);
+                            setEditSay(entry.say);
+                            setAddError(null);
+                          }
+                        }}
+                        className="text-xs font-medium text-[var(--ink-soft)] hover:underline"
+                      >
+                        {isEditing ? "Cancel" : "Edit say"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeEntry(entry.match)}
+                        disabled={persistPending}
+                        className="text-xs text-[var(--warn)] hover:underline disabled:opacity-60"
+                      >
+                        Remove
+                      </button>
+                    </span>
+                  </div>
+                  {isEditing ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        value={editSay}
+                        onChange={(e) => setEditSay(e.target.value)}
+                        aria-label={`Say-as for ${label}`}
+                        className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-[var(--accent)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => saveEditedSay(entry.match)}
+                        disabled={persistPending || !editSay.trim()}
+                        className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                      >
+                        {persistPending ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
         {persistState.error ? (
           <p className="mt-2 text-xs text-[var(--warn)]">{persistState.error}</p>
+        ) : null}
+        {persistState.ok && !persistState.error ? (
+          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
+            Updated — next call will use it.
+          </p>
         ) : null}
       </div>
 
@@ -524,19 +630,25 @@ export function PronunciationCoach({
             <input
               id="pron-add-phrase"
               value={addPhrase}
-              onChange={(e) => setAddPhrase(e.target.value)}
+              onChange={(e) => {
+                setAddPhrase(e.target.value);
+                setAddError(null);
+              }}
               placeholder="Muindi Mbingu / White Paper Books"
               className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor="pron-add-say">
-              Say like (optional quick fix)
+              Say like (for typed save)
             </label>
             <input
               id="pron-add-say"
               value={addSay}
-              onChange={(e) => setAddSay(e.target.value)}
+              onChange={(e) => {
+                setAddSay(e.target.value);
+                setAddError(null);
+              }}
               placeholder="Moo-in-dee Mbeen-goo"
               className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
             />
@@ -554,18 +666,23 @@ export function PronunciationCoach({
           <button
             type="button"
             onClick={() => submitQuickAdd("save")}
-            disabled={!addPhrase.trim() || quickPending}
+            disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
             className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
           >
             {quickPending ? "Saving…" : "Save typed spelling"}
           </button>
         </div>
+        {addError ? (
+          <p className="mt-2 text-xs text-[var(--warn)]" role="alert">
+            {addError}
+          </p>
+        ) : null}
         {quickState.error ? (
           <p className="mt-2 text-xs text-[var(--warn)]" role="alert">
             {quickState.error}
           </p>
         ) : null}
-        {quickState.ok ? (
+        {quickState.ok && !quickState.error ? (
           <p className="mt-2 text-xs text-[var(--ok)]" role="status">
             Saved — next call will use it.
           </p>
@@ -578,8 +695,8 @@ export function PronunciationCoach({
           <div>
             <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Finds complicated names the receptionist already said — queue them to
-              train.
+              Finds hard names from recent agent transcripts (including lowercase
+              ASR) and your profile places — queue them to train.
             </p>
           </div>
           <button
@@ -716,10 +833,9 @@ export function PronunciationCoach({
                   ) : null}
                 </div>
               ) : null}
-              {confirmState.ok && confirmState.entries?.length ? (
+              {keepNote ? (
                 <p className="mt-3 text-sm text-[var(--ok)]" role="status">
-                  Saved {confirmState.entries.length} pronunciation
-                  {confirmState.entries.length === 1 ? "" : "s"}.
+                  {keepNote}
                 </p>
               ) : null}
             </div>
