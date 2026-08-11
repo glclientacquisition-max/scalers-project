@@ -30,9 +30,12 @@ Open-ended “learn every word from my recording” produced entries like:
 | Location | “We're on Muindi Mbingu Street, opposite City Market Fashion Mall.” | hard place names |
 | Team | “I can have Harrison Maina follow up with you.” | team names |
 
-**No repeats:** at most one of each pack; each hard name claimed once; duplicate prompts dropped.
+## Owner workflow (studio)
 
-**Logical sense:** every prompt must contain its target labels; skip filler fragments (“Shop No”); no “just to confirm…” spam.
+1. **Trained pronunciations** — see every live `say` form; **Renew** (re-record) or **Remove**.
+2. **Heard something wrong?** — type the word/sentence → **Queue to record** or **Save typed spelling**.
+3. **From recent calls** — **Scan recent calls** mines hard names from agent transcripts into the queue.
+4. **Training queue** — Greeting / Location / Team packs plus custom / mined / renew items.
 
 ## Do / don’t for `say` forms
 
