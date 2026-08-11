@@ -8,7 +8,11 @@ const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
 const http = require('http');
 const { GoogleGenAI } = require('@google/genai');
-const { createSonioxSttSession, isSonioxConfigured } = require('./src/speech/sonioxStt');
+const {
+  createSonioxSttSession,
+  isSonioxConfigured,
+  buildSttContext,
+} = require('./src/speech/sonioxStt');
 const {
   createSonioxTtsSession,
   isSonioxTtsConfigured,
@@ -750,11 +754,32 @@ mediaWss.on('connection', (ws, req) => {
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
   let ttsLexiconOverrides = [];
+  /** Latest tenant fields used to build Soniox STT context (hearing path). */
+  let sttTenantSnapshot = null;
 
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
 
+  function publishSttContext(profile) {
+    if (!profile) {
+      sttTenantSnapshot = null;
+      return null;
+    }
+    sttTenantSnapshot = {
+      businessName: profile.businessName || businessName,
+      agentName: profile.agentName || agentName,
+      vertical: profile.vertical || 'general',
+      servicesCatalog: profile.servicesCatalog || [],
+      businessLocations: profile.businessLocations || [],
+      teamDirectory: profile.teamDirectory || [],
+      ttsLexicon: Array.isArray(profile.ttsLexicon) ? profile.ttsLexicon : [],
+    };
+    return buildSttContext(sttTenantSnapshot);
+  }
+
   async function ensureTenantPrompt() {
-    if (profileLoaded && profileCallSid === sessionCallSid) return;
+    if (profileLoaded && profileCallSid === sessionCallSid) {
+      return buildSttContext(sttTenantSnapshot);
+    }
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
       businessName = profile.businessName || businessName;
@@ -780,16 +805,20 @@ mediaWss.on('connection', (ws, req) => {
       profileLoaded = true;
       profileCallSid = sessionCallSid;
       const tools = parseAgentTools(profile.agentTools);
+      const sttCtx = publishSttContext(profile);
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} ttsLexicon=${ttsLexiconOverrides.length} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} ttsLexicon=${ttsLexiconOverrides.length} sttTerms=${sttCtx?.terms?.length || 0} langs=en,sw,sheng(auto)`
       );
+      return sttCtx;
     } catch (err) {
       profileLoaded = true;
       profileCallSid = sessionCallSid;
+      publishSttContext(null);
       console.warn(
         `[ws/media][${sidLabel()}] tenant prompt load failed, using defaults:`,
         err?.message || err
       );
+      return null;
     }
   }
 
@@ -1304,15 +1333,18 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   // Warm tenant prompt early when callSid is already on the WS URL.
-  if (sessionCallSid) {
-    ensureTenantPrompt().catch(() => {});
-  }
+  const tenantWarm =
+    sessionCallSid
+      ? ensureTenantPrompt().catch(() => null)
+      : Promise.resolve(null);
 
   if (isSonioxConfigured()) {
     try {
       stt = createSonioxSttSession({
         callSid: sidLabel(),
         onEvent: onSttEvent,
+        // Prefer awaited profile; fall back quickly if load is slow (audio still buffers).
+        contextPromise: tenantWarm.then((ctx) => ctx || buildSttContext(sttTenantSnapshot)),
       });
       stt.ready.catch((err) => {
         console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);

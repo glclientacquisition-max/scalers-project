@@ -9,7 +9,7 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | Path | Role |
 | --- | --- |
 | `server.js` | Media WS (`/ws/media`), inbound Stream XML wiring, speak/barge/filler/stream turn loop |
-| `src/speech/**` | Soniox STT/TTS, turn-taking, spoken buffer, TTS normalize, lexicon, Sheng rewrite |
+| `src/speech/**` | Soniox STT/TTS, STT context, turn-taking, spoken buffer, TTS normalize, lexicon, Sheng rewrite |
 | `src/sautikit/**` | Webhook signature / guards used by voice HTTP |
 | `tests/ttsNormalize.test.js` | TTS prep unit tests |
 | `tests/turnTaking.test.js` | Endpoint / barge-in unit tests |
@@ -57,6 +57,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 See `.env.example` — key ones:
 
 - `SONIOX_API_KEY`, `SONIOX_VOICE`, `SONIOX_SAMPLE_RATE`
+- `SONIOX_STT_CONTEXT` (per-tenant vocabulary; default on), `SONIOX_STT_CONTEXT_MAX_TERMS`
 - `VOICE_GREETING_MODE`, `VOICE_FILLER`, `VOICE_FILLER_DELAY_MS`
 - `VOICE_LLM_STREAM`, `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
