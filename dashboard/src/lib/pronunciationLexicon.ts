@@ -14,12 +14,145 @@ export type TtsLexiconEntry = {
   kind?: "word" | "sentence";
 };
 
-export const TTS_LEXICON_MAX = 40;
+export const TTS_LEXICON_MAX = 24;
 export const TTS_MATCH_MAX = 80;
 export const TTS_SAY_MAX = 120;
 
+/** Never train these as match keys — they wreck whole phone sentences. */
+export const BLOCKED_MATCH_TOKENS = new Set(
+  [
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "of",
+    "to",
+    "in",
+    "on",
+    "at",
+    "for",
+    "from",
+    "with",
+    "is",
+    "are",
+    "was",
+    "be",
+    "this",
+    "that",
+    "how",
+    "what",
+    "where",
+    "when",
+    "who",
+    "why",
+    "can",
+    "you",
+    "we",
+    "i",
+    "me",
+    "my",
+    "your",
+    "our",
+    "please",
+    "thanks",
+    "thank",
+    "hello",
+    "hi",
+    "yes",
+    "no",
+    "ok",
+    "okay",
+    "shop",
+    "store",
+    "street",
+    "road",
+    "avenue",
+    "city",
+    "market",
+    "mall",
+    "fashion",
+    "opposite",
+    "located",
+    "location",
+    "book",
+    "books",
+    "bookstore",
+    "paper",
+    "white",
+    "customers",
+    "customer",
+    "notify",
+    "kenya",
+    "nairobi",
+    "sundays",
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "same-day",
+    "sameday",
+    "in-store",
+    "instore",
+    "delivery",
+    "shipping",
+    "welcome",
+    "speaking",
+    "help",
+    "today",
+    "call",
+    "calling",
+    "reached",
+  ].map((t) => t.toLowerCase())
+);
+
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function isBlockedMatch(match: string): boolean {
+  const raw = String(match || "").trim();
+  if (!raw) return true;
+  const plain = raw
+    .replace(/\\s\+|\\s\*|\\s/gi, " ")
+    .replace(/[\\^$|()?+*[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!plain) return true;
+  const parts = plain.split(" ").filter(Boolean);
+  if (parts.length === 1 && BLOCKED_MATCH_TOKENS.has(parts[0])) return true;
+  if (parts.every((p) => BLOCKED_MATCH_TOKENS.has(p))) return true;
+  return false;
+}
+
+export function sanitizeSayForm(say: string): string {
+  let s = String(say || "").trim();
+  if (!s) return "";
+  s = s.replace(/-+/g, "-").replace(/\s*-\s*/g, "-").replace(/\s+/g, " ").trim();
+  s = s
+    .split(" ")
+    .map((token) => {
+      const hyphens = (token.match(/-/g) || []).length;
+      const letters = token.replace(/[^a-zA-Z]/g, "");
+      if (hyphens >= 2 && letters.length <= 8) {
+        const joined = token.replace(/-/g, "");
+        if (BLOCKED_MATCH_TOKENS.has(joined.toLowerCase())) {
+          return joined.charAt(0).toUpperCase() + joined.slice(1).toLowerCase();
+        }
+      }
+      // Cap extreme hyphenation on proper names (keep at most 2 hyphens per token)
+      if (hyphens > 2) {
+        const bits = token.split("-");
+        return `${bits[0]}-${bits.slice(1).join("")}`;
+      }
+      return token;
+    })
+    .join(" ");
+  return s.slice(0, TTS_SAY_MAX);
 }
 
 /** Build a case-insensitive word-boundary match pattern from a display phrase. */
@@ -35,7 +168,6 @@ export function matchPatternFromPhrase(phrase: string): string {
 
   if (words.length === 1) {
     const word = words[0];
-    // Camel / glued brands: ChapterOne → chapter\s*one|chapterone
     const camelParts = word
       .replace(/([a-z])([A-Z])/g, "$1 $2")
       .toLowerCase()
@@ -74,9 +206,10 @@ export function parseTtsLexicon(raw: unknown): TtsLexiconEntry[] {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
     const match = String(row.match || row.from || "").trim();
-    const say = String(row.say || row.to || "").trim();
+    const say = sanitizeSayForm(String(row.say || row.to || ""));
     if (!match || !say) continue;
     if (match.length > TTS_MATCH_MAX || say.length > TTS_SAY_MAX) continue;
+    if (isBlockedMatch(match)) continue;
     try {
       const source = match.startsWith("\\b") ? match : `\\b(?:${match})\\b`;
       new RegExp(source, "gi");
@@ -85,7 +218,7 @@ export function parseTtsLexicon(raw: unknown): TtsLexiconEntry[] {
     }
     const entry: TtsLexiconEntry = {
       match,
-      say: say.slice(0, TTS_SAY_MAX),
+      say,
       langs: Array.isArray(row.langs)
         ? (row.langs as TtsLexiconEntry["langs"])
         : ["en", "sw", "sheng"],
@@ -107,11 +240,14 @@ export function mergeLexiconEntry(
   existing: TtsLexiconEntry[],
   next: TtsLexiconEntry
 ): TtsLexiconEntry[] {
-  const matchKey = next.match.trim().toLowerCase();
-  const filtered = existing.filter(
+  const cleaned = parseTtsLexicon([next]);
+  if (!cleaned.length) return parseTtsLexicon(existing);
+  const entry = cleaned[0];
+  const matchKey = entry.match.trim().toLowerCase();
+  const filtered = parseTtsLexicon(existing).filter(
     (e) => e.match.trim().toLowerCase() !== matchKey
   );
-  return parseTtsLexicon([...filtered, next]);
+  return parseTtsLexicon([...filtered, entry]);
 }
 
 /** Merge many entries (sentence coach may train several targets at once). */
@@ -119,7 +255,7 @@ export function mergeLexiconEntries(
   existing: TtsLexiconEntry[],
   next: TtsLexiconEntry[]
 ): TtsLexiconEntry[] {
-  let out = existing;
+  let out = parseTtsLexicon(existing);
   for (const entry of next) {
     out = mergeLexiconEntry(out, entry);
   }
@@ -145,11 +281,12 @@ export function lexiconForStorage(entries: TtsLexiconEntry[]): Array<{
 export function localSayFallback(phrase: string): string {
   const text = String(phrase || "").trim();
   if (!text) return "";
-  return text
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, TTS_SAY_MAX);
+  return sanitizeSayForm(
+    text
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }

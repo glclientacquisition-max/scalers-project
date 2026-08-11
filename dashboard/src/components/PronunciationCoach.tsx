@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
   confirmPronunciationRecording,
+  persistPronunciationLexicon,
   screenPronunciationSuggestionsAction,
   type ConfirmPronunciationState,
   type ScreenPronunciationState,
@@ -81,6 +82,10 @@ export function PronunciationCoach({
 
   const [confirmState, confirmAction, confirmPending] = useActionState(
     confirmPronunciationRecording,
+    confirmInitial
+  );
+  const [persistState, persistAction, persistPending] = useActionState(
+    persistPronunciationLexicon,
     confirmInitial
   );
   const [screenState, screenAction, screenPending] = useActionState(
@@ -313,6 +318,15 @@ export function PronunciationCoach({
     clearTake();
   }
 
+  function removeEntry(match: string) {
+    const next = lexicon.filter((e) => e.match !== match);
+    setLexicon(next);
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(next)));
+    persistAction(fd);
+  }
+
   function keepRecording() {
     if (!active || !audioBlob) return;
     const fd = new FormData();
@@ -353,9 +367,9 @@ export function PronunciationCoach({
           Pronunciation coach
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Record short natural sentences — greetings, places, team names — not one
-          word at a time. AI screens out obvious words. If you say something else,
-          we ask you to try again.
+          Record short natural sentences — greetings, places, team names.{" "}
+          <span className="font-medium text-[var(--ink)]">Keep saves pronunciation immediately</span>
+          {" "}for the next call. Save &amp; train below is only for the full receptionist prompt.
         </p>
         {screenPending ? (
           <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
@@ -548,25 +562,45 @@ export function PronunciationCoach({
           </ul>
 
           {lexicon.length > 0 ? (
-            <details className="text-sm text-[var(--ink-soft)]">
+            <details className="text-sm text-[var(--ink-soft)]" open>
               <summary className="cursor-pointer font-medium text-[var(--ink)]">
-                Trained pronunciations ({lexicon.length})
+                Live pronunciations ({lexicon.length}) — used on the next call
               </summary>
+              <p className="mt-2 text-xs">
+                Bad entries (common words like city/opposite) are blocked automatically.
+                Remove anything that still sounds wrong.
+              </p>
               <ul className="mt-3 space-y-2">
                 {lexicon.map((entry) => (
                   <li
                     key={entry.match}
-                    className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line)] py-2"
+                    className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] py-2"
                   >
-                    <span className="text-[var(--ink)]">
-                      {entry.label || entry.match}
+                    <span className="min-w-0">
+                      <span className="block text-[var(--ink)]">
+                        {entry.label || entry.match}
+                      </span>
+                      <span className="font-mono text-xs text-[var(--ink-soft)]">
+                        phone says → {entry.say}
+                      </span>
                     </span>
-                    <span className="font-mono text-xs text-[var(--ink-soft)]">
-                      → {entry.say}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeEntry(entry.match)}
+                      disabled={persistPending}
+                      className="text-xs text-[var(--warn)] hover:underline disabled:opacity-60"
+                    >
+                      Remove
+                    </button>
                   </li>
                 ))}
               </ul>
+              <p className="mt-3 text-xs text-[var(--ink-soft)]">
+                Remove saves immediately.{" "}
+                {persistState.error ? (
+                  <span className="text-[var(--warn)]">{persistState.error}</span>
+                ) : null}
+              </p>
             </details>
           ) : null}
         </div>

@@ -29,11 +29,15 @@ You receive a business profile and candidate hard names. Return ONLY valid JSON:
 
 Rules:
 - Prefer constructive sentences (greetings, location lines, team intros) — NEVER isolated single words
-- Each line should include 1–3 hard targets that actually need pronunciation help
-- DROP obvious English that any TTS already says fine (Street, Shop, Bookstore, Nairobi, CBD, Mall, Welcome, Delivery, Opposite, etc.)
+- Each line must be something a receptionist would actually say on a Kenyan phone call
+- Bad (reject): "Just to confirm, that is Manga and White Paper" / repeating the same names across every line / packing random FAQ nouns
+- Good: "Hi, this is Aisha from Chapter One Bookstore." / "We're on Muindi Mbingu Street, opposite City Market."
+- Each line should include 1–2 hard targets max (3 only if they naturally belong together)
+- DROP obvious English that any TTS already says fine (Street, Shop, Bookstore, Nairobi, CBD, Mall, Welcome, Delivery, Opposite, located, customers, …)
 - Only use names present in the candidates or profile — do not invent places or people
-- Max 6 lines
-- Keep prompts under 160 characters, natural spoken Kenyan English
+- Do not repeat the same target across multiple lines
+- Max 5 lines
+- Keep prompts under 140 characters, natural spoken Kenyan English
 - If nothing hard remains, return {"lines":[]}`;
 
 function extractJsonObject(text: string): Record<string, unknown> {

@@ -44,7 +44,7 @@ export type PronunciationSuggestInput = {
   existingLexicon?: TtsLexiconEntry[] | null;
 };
 
-const SUGGEST_MAX = 6;
+const SUGGEST_MAX = 5;
 
 /** Words / phrases we never ask owners to record alone (too obvious). */
 const SKIP_WORDS = new Set(
@@ -406,36 +406,7 @@ export function suggestPronunciations(
     if (line) lines.push(line);
   }
 
-  // FAQ / bulletin hard chunks → one packed line if still room
-  const extraChunks: string[] = [];
-  for (const faq of input.faqs || []) {
-    extraChunks.push(
-      ...extractProperChunks(`${faq.question || ""} ${faq.answer || ""}`)
-    );
-  }
-  for (const bulletin of input.bulletinTexts || []) {
-    extraChunks.push(...extractProperChunks(bulletin));
-  }
-  const already = new Set(
-    lines.flatMap((l) => l.targets.map((t) => normalizePhrase(t.label)))
-  );
-  const extraTargets = uniqueTargets(extraChunks, existing)
-    .filter((t) => !already.has(normalizePhrase(t.label)))
-    .slice(0, 2);
-  if (extraTargets.length && lines.length < SUGGEST_MAX) {
-    const prompt =
-      extraTargets.length === 1
-        ? `Just to confirm, that is ${extraTargets[0].label}`
-        : `Just to confirm, that is ${extraTargets[0].label} and ${extraTargets[1].label}`;
-    const line = makeLine({
-      prompt,
-      label: "Extra names",
-      reason: "Other names from your FAQs or today’s notes.",
-      targets: extraTargets,
-      priority: 70,
-    });
-    if (line) lines.push(line);
-  }
+  // Skip FAQ/bulletin "just to confirm" filler lines — they sounded unnatural.
 
   const dedup = new Map<string, PronunciationSuggestion>();
   for (const line of lines) {

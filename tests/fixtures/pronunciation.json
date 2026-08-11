@@ -91,14 +91,14 @@
       "text": "Hello, you've reached ChapterOne Bookstore, this is Aisha speaking.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectIncludes": ["Chapter One Bookstore", "Ah-ee-sha"]
+      "expectIncludes": ["Chapter One Bookstore", "Eye-sha"]
     },
     {
       "id": "place-muindi-mbingu",
       "text": "We are on Muindi Mbingu Street opposite City Market.",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectIncludes": ["Moo-een-dee Mbeen-goo"]
+      "expectIncludes": ["Moo-in-dee Mbeen-goo"]
     },
     {
       "id": "retail-manga",

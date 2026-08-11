@@ -278,3 +278,52 @@ export async function confirmPronunciationRecording(
     heard: derived.heard,
   };
 }
+
+/**
+ * Persist the current lexicon array (e.g. after owner removes a bad entry).
+ * Keep already saves on record confirm; this is for Remove without re-recording.
+ */
+export async function persistPronunciationLexicon(
+  _prev: ConfirmPronunciationState,
+  formData: FormData
+): Promise<ConfirmPronunciationState> {
+  if (!(await isAuthenticated())) {
+    return { error: "Sign in to save pronunciation." };
+  }
+
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return { error: "No workspace linked to this account." };
+  }
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id || id !== tenant.id) {
+    return { error: "Forbidden." };
+  }
+
+  const stored = lexiconForStorage(parseTtsLexicon(formData.get("tts_lexicon")));
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) {
+    return { error: "Not signed in." };
+  }
+
+  const { error } = await workspace.client
+    .from("tenants")
+    .update({ tts_lexicon: stored })
+    .eq("id", tenant.id);
+
+  if (error) {
+    if (/tts_lexicon/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
+      };
+    }
+    return { error: error.message };
+  }
+
+  return {
+    ok: true,
+    lexicon: parseTtsLexicon(stored),
+    source: "local",
+  };
+}
