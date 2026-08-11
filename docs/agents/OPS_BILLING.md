@@ -45,7 +45,7 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 
 - SQL apply order per [`docs/supabase/README.md`](../supabase/README.md); no owner-forgable credit paths
 - Admin: seed DID → assign → release → remove business paths still work
-- Owner Wallet page: balance/ledger render; beta badge when enforcement off; soft spend limit opt-in off by default
+- Owner Wallet page: balance/ledger render; beta badge when enforcement off; automatic low-balance messaging; on-demand opt-in off by default
 - If touching voice charge hook: smoke a completed-call path without double-billing
 
 ## Chat starter

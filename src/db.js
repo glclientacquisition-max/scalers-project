@@ -484,6 +484,37 @@ async function chargeCallToWallet({ callId, minutes, rateKesPerMin } = {}) {
       `[db] wallet charge call=${callId} amount_kes=${row.amount_kes} balance=${row.wallet_balance_kes}`
     );
   }
+
+  // Automatic live low/empty prepaid alerts (idempotent). Never blocks the call path.
+  try {
+    const { data: callRow, error: callErr } = await supabase
+      .from('calls')
+      .select('tenant_id')
+      .eq('id', callId)
+      .maybeSingle();
+    if (!callErr && callRow?.tenant_id) {
+      const { maybeNotifyWalletBalanceAlerts } = require('./notifications/walletAlerts');
+      const alerted = await maybeNotifyWalletBalanceAlerts(supabase, {
+        tenantId: callRow.tenant_id,
+      });
+      for (const a of alerted?.alerts || []) {
+        if (a.channel) {
+          console.log(
+            `[db] wallet ${a.kind} alert via ${a.channel}` +
+              (a.to ? ` → ${a.to}` : '') +
+              ` tenant=${callRow.tenant_id}`
+          );
+        } else {
+          console.warn(
+            `[db] wallet ${a.kind} alert skipped (${a.reason || 'no_channel'}) tenant=${callRow.tenant_id}`
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[db] wallet balance alert:', err?.message || err);
+  }
+
   return row || null;
 }
 

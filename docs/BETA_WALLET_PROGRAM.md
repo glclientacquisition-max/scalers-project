@@ -17,7 +17,10 @@ When moving to beta, ops can **waive negative balance** (trial credit) so soft-e
 
 ## Soft spend limit (owner)
 
-Separate from ops `billing_enforcement`: owners may **opt in** to a monthly soft spend budget on Desk → Wallet, and set their own KES amount. Soft = warn only (50/80/100%); never blocks calls. Off by default. See `docs/ONE_WALLET_BILLING.md` and `docs/supabase/wallet_soft_spend_limit.sql`.
+Optional monthly budget columns may exist (`wallet_soft_spend_limit.sql`) but are **not** the primary control. Preferred Cursor-like model:
+
+1. **Automatic live alerts** when prepaid is running low / empty (WhatsApp/email — no soft-limit setup).
+2. **On-demand usage** opt-in on Desk → Wallet when prepaid hits zero (`wallet_on_demand_alerts.sql`).
 
 ## Security (wallet_security_beta.sql)
 
