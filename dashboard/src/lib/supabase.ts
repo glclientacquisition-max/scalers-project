@@ -110,6 +110,26 @@ export type TenantRow = {
   daily_bulletin?: DailyBulletinEntry[] | null;
   /** Receptionist tool toggles: escalate, end_call. */
   agent_tools?: { escalate?: boolean; end_call?: boolean } | null;
+  /** Business pack: general | retail | home_services | hospitality */
+  vertical?: string | null;
+  /** Human handoff: callback | live_transfer */
+  handoff_mode?: string | null;
+  business_locations?: Array<{
+    label?: string;
+    address?: string;
+    landmark?: string;
+    directions?: string;
+    coverage_notes?: string;
+  }> | null;
+  business_policies?: {
+    returns?: string;
+    delivery?: string;
+    payment?: string;
+    deposit?: string;
+    cancellation?: string;
+    warranty?: string;
+    other?: string;
+  } | null;
   wallet_balance_kes?: number | null;
   wallet_low_balance_kes?: number | null;
   billing_enforcement?: "soft" | "hard" | "off" | null;

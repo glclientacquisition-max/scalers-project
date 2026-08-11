@@ -16,14 +16,15 @@ Output ONLY the final system prompt text — no markdown fences, no preamble.
 Requirements for the prompt you write:
 - Start with: You are <Agent Name>, the live phone receptionist for <Business Name> in Kenya.
 - Include an IDENTITY section with: agent name, how to introduce on the first turn ("Hello, you've reached <Business>, this is <Agent> speaking."), tone guidance matching the chosen tone, and a mood rule (if the caller is frustrated or angry, drop cheerful filler and stay empathetic and concise).
-- Include a BUSINESS KNOWLEDGE section with: business name, services & pricing (as given), hours & location (as given), languages (English, Kiswahili, Sheng — match the caller).
+- Include a BUSINESS KNOWLEDGE section with: business name, vertical (if given), services & pricing (as given), hours (as given), locations/landmarks/directions (as given), policies (as given), languages (English, Kiswahili, Sheng — match the caller).
 - If golden FAQs are provided, include a GOLDEN FAQs section. Treat each Q/A as authoritative. The receptionist must answer those questions from the given answers and must not invent alternatives.
-- If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Rule: the AI is the receptionist, not the expert. For anger, refunds, billing, or a matching role, acknowledge, say that teammate will follow up, capture name + reason, and use the escalate tool. If the caller asks for a role not on the list (e.g. sales when only CEO is listed), do not invent staff — offer the closest listed person (usually owner/CEO) and still escalate. Do not invent live transfers.
+- If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Rule: the AI is the receptionist, not the expert. For anger, refunds, billing, or a matching role, acknowledge, say that teammate will follow up, capture name + reason, and use the escalate tool. If the caller asks for a role not on the list (e.g. sales when only CEO is listed), do not invent staff — offer the closest listed person (usually owner/CEO) and still escalate.
+- Respect handoff mode: if callback, do not invent live transfers; if live_transfer, prefer connecting a human when asked and fall back to callback notes when transfer is unavailable.
 - If escalation is disabled, still list the team for awareness but instruct: do not escalate; capture name + reason and say the business will follow up.
-- Include a short "Your job on this call" checklist: answer from knowledge and FAQs only, get name (confirm once if unsure of pronunciation/spelling), get reason, confirm, goodbye. If the caller corrects their name, use the corrected name going forward.
-- Include live-phone conversation rules: answer first (no stalling), never end a turn on a closed/status fact alone (always say how you can still help and ask one next question), at most one clarifying question per turn, match EN/SW/Sheng, 1–2 short spoken sentences, never invent prices/availability/people outside knowledge.
+- Include a short "Your job on this call" checklist: fully assist from knowledge (answer, directions, policies) before offering callback; get name when needed for a request or handoff (confirm once if unsure); confirm the outcome; goodbye. Do not force a callback promise when you already resolved the ask. If the caller corrects their name, use the corrected name going forward.
+- Include live-phone conversation rules: answer first (no stalling), never end a turn on a closed/status fact alone (always say how you can still help and ask one next question), at most one clarifying question per turn, match EN/SW/Sheng, 1–2 short spoken sentences, never invent prices/stock/availability/people/policies outside knowledge.
 - If an "unknown request line" is provided, add a rule: when a caller asks for something outside the business knowledge and FAQs, respond with that exact line (adapted to the caller's language) instead of a generic deflection.
-- Keep it tight and phone-ready. Do not invent services, prices, hours, locations, FAQs, or teammates that were not provided.
+- Keep it tight and phone-ready. Do not invent services, prices, hours, locations, FAQs, policies, or teammates that were not provided.
 - Do not include tool markers or ###ENDCALL### — the voice engine appends those.`;
 
 export function parseAgentTone(raw: string): OnboardingTone | null {
@@ -85,6 +86,10 @@ export async function compileReceptionistPrompt(opts: {
   unknownAnswerFallback?: string;
   /** Default true. When false, prompt must not instruct escalate tool use. */
   escalateEnabled?: boolean;
+  vertical?: string;
+  handoffMode?: string;
+  locationsText?: string;
+  policiesText?: string;
 }): Promise<{ prompt: string; source: "gemini" | "local" }> {
   const answers: OnboardingAnswers = {
     servicesPricing: opts.servicesOffered.trim(),
@@ -96,6 +101,10 @@ export async function compileReceptionistPrompt(opts: {
   const teamDirectory = opts.teamDirectory || [];
   const faqs = opts.faqs || [];
   const escalateEnabled = opts.escalateEnabled !== false;
+  const vertical = String(opts.vertical || "general").trim() || "general";
+  const handoffMode = String(opts.handoffMode || "callback").trim() || "callback";
+  const locationsText = String(opts.locationsText || "").trim();
+  const policiesText = String(opts.policiesText || "").trim();
   const extras = {
     agentName,
     teamDirectory,
@@ -116,12 +125,20 @@ export async function compileReceptionistPrompt(opts: {
       `Business name: ${opts.businessName}`,
       `Agent name: ${agentName}`,
       `Tone: ${TONE_LABELS[opts.agentTone]} (${opts.agentTone})`,
+      `Vertical: ${vertical}`,
+      `Handoff mode: ${handoffMode}`,
       "",
       "Services & pricing:",
       answers.servicesPricing,
       "",
-      "Business hours & location:",
+      "Business hours:",
       answers.hoursLocation,
+      "",
+      "Locations / landmarks / directions:",
+      locationsText || "(none listed)",
+      "",
+      "Policies:",
+      policiesText || "(none listed)",
       "",
       "Team directory (Name | Role | Phone):",
       formatTeamForCompiler(teamDirectory),

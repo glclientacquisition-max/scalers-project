@@ -17,6 +17,7 @@ const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
 const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
+const { parseGeminiResponse } = require('./src/conversation/toolMarkers');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
 const callAgentTools = new Map();
@@ -1857,12 +1858,37 @@ function geminiVoiceConfig(systemPrompt) {
 }
 
 /**
- * Apply parsed tool markers (save_caller_info / escalate) for a call turn.
+ * Apply parsed tool markers (save_caller_info / escalate / create_service_request).
  */
 async function applyGeminiTools(callSid, parsed) {
   const tools = callAgentTools.get(callSid) || parseAgentTools(null);
   if (!tools.escalate) parsed.escalate = null;
   const shouldEndCall = Boolean(parsed.shouldEndCall && tools.end_call);
+
+  if (parsed.serviceRequest) {
+    try {
+      const created = await db.createServiceRequest({
+        callSid,
+        type: parsed.serviceRequest.type,
+        name: parsed.serviceRequest.name || parsed.name,
+        phone: parsed.serviceRequest.phone,
+        item: parsed.serviceRequest.item,
+        quantity: parsed.serviceRequest.quantity,
+        whenText: parsed.serviceRequest.whenText,
+        notes: parsed.serviceRequest.notes || parsed.reason,
+      });
+      if (created) {
+        console.log(
+          `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
+        );
+      }
+    } catch (err) {
+      console.error(
+        `[${callSid}] createServiceRequest error:`,
+        err?.message || err
+      );
+    }
+  }
 
   if (parsed.name || parsed.reason) {
     const saved = await db.saveCallerInfo({
@@ -2014,50 +2040,6 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   messages.push({ role: 'assistant', content: spokenText });
 
   return { spokenText, shouldEndCall };
-}
-
-function parseGeminiResponse(responseText) {
-  const output = { spokenText: responseText, shouldEndCall: false };
-  let spoken = String(responseText || '');
-  const toolRe = /###TOOL###([\s\S]*?)###ENDTOOL###/gi;
-  const blocks = [...spoken.matchAll(toolRe)];
-
-  for (const match of blocks) {
-    const toolJson = match[1].trim();
-    try {
-      const parsed = JSON.parse(toolJson);
-      if (parsed.save_caller_info) {
-        if (parsed.save_caller_info.name != null) {
-          output.name = parsed.save_caller_info.name;
-        }
-        if (parsed.save_caller_info.reason != null) {
-          output.reason = parsed.save_caller_info.reason;
-        }
-      }
-      if (parsed.escalate) {
-        output.escalate = {
-          teammate: String(
-            parsed.escalate.teammate || parsed.escalate.to || parsed.escalate.role || ''
-          ).trim(),
-          name: String(parsed.escalate.name || '').trim(),
-          reason: String(parsed.escalate.reason || '').trim(),
-        };
-      }
-    } catch (err) {
-      console.warn('[parseGeminiResponse] Failed to parse tool JSON:', err?.message || err);
-    }
-    spoken = spoken.replace(match[0], '');
-  }
-
-  output.spokenText = spoken.trim();
-
-  const endCallMatch = /###ENDCALL###/i.exec(output.spokenText);
-  if (endCallMatch) {
-    output.shouldEndCall = true;
-    output.spokenText = output.spokenText.replace(endCallMatch[0], '').trim();
-  }
-
-  return output;
 }
 
 server.listen(PORT, () => {
