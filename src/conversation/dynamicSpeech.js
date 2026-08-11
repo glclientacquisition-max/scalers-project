@@ -1,5 +1,7 @@
 // Dynamic spoken lines — instant varied greeting; optional Gemini rewrite.
 
+const { isInterruptOnlyUtterance } = require('../speech/turnTaking');
+
 /**
  * Nairobi/EAT time-of-day bucket for natural openers.
  * @returns {'morning'|'afternoon'|'evening'}
@@ -313,11 +315,14 @@ function shouldSkipCallerTurn(text, opts = {}) {
   const t = normalizeCallerText(text);
   if (!t) return true;
 
+  // After barge-in, interrupt-only finals should yield silence — not "I'm listening…".
+  if (isInterruptOnlyUtterance(t)) return true;
+
   const lastAgent = String(opts.lastAgentText || '');
   const awaiting = looksLikeAwaitingCallerReply(lastAgent);
 
-  // Corrections must always reach the model.
-  if (/^(no|nope|actually|it's|it is|not |correction|wait)\b/.test(t)) {
+  // Corrections with substance must reach the model ("no, it's Ann").
+  if (/^(no|nope|actually|it's|it is|not |correction)\b/.test(t) && !isInterruptOnlyUtterance(t)) {
     return false;
   }
 
@@ -341,6 +346,7 @@ module.exports = {
   cleanSpokenLine,
   greetingLooksValid,
   isNonSubstantiveTurn,
+  isInterruptOnlyUtterance,
   shouldSkipCallerTurn,
   looksLikeAwaitingCallerReply,
   looksLikeNamePrompt,
