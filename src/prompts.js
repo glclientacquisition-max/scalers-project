@@ -16,6 +16,7 @@ const {
   bulletinImpliesClosed,
 } = require('./conversation/dailyBulletin');
 const { parseAgentTools } = require('./conversation/agentTools');
+const { formatPlaybookForPrompt } = require('./conversation/playbooks');
 
 const DEFAULT_KNOWLEDGE = `Business: Jirani Home Services (Nairobi & environs)
 What we do: home repairs and maintenance for homes and small offices.
@@ -154,6 +155,8 @@ function buildSystemPrompt(profile = {}) {
   const header = buildContextHeader(profile);
   const liveTruth = buildLiveGroundTruth(profile);
   const liveBlock = liveTruth ? `\n\n${liveTruth}\n` : '\n';
+  const playbook = formatPlaybookForPrompt(profile);
+  const playbookBlock = playbook ? `\n\n${playbook}\n` : '\n';
   const tools = parseAgentTools(profile.agentTools);
   const escalateTools = tools.escalate
     ? `When escalating (anger, refund, billing, role match, or a role they asked for), also append:
@@ -172,6 +175,7 @@ If a caller is angry or asks for a person/refund: acknowledge, capture name + re
   if (profile.llmSystemPrompt && String(profile.llmSystemPrompt).trim()) {
     return `${header}
 ${liveBlock}
+${playbookBlock}
 ${String(profile.llmSystemPrompt).trim()}
 
 ${CONVERSATION_RULES}
@@ -197,6 +201,7 @@ Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
 
   return `${header}
 ${liveBlock}
+${playbookBlock}
 You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
 
 BUSINESS KNOWLEDGE (use this — do not invent facts outside it):
