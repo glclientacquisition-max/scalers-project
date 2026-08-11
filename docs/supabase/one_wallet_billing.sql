@@ -343,8 +343,9 @@ begin
   if v_enforcement = 'off' then
     charged := false;
     amount_kes := 0;
-    select coalesce(wallet_balance_kes, 0) into wallet_balance_kes
-    from public.tenants where id = v_call.tenant_id;
+    -- Qualify tenants column: OUT param wallet_balance_kes shadows bare name.
+    select coalesce(t.wallet_balance_kes, 0) into wallet_balance_kes
+    from public.tenants t where t.id = v_call.tenant_id;
     already_applied := false;
     return next;
     return;
@@ -354,8 +355,8 @@ begin
   if v_minutes is null or v_minutes <= 0 then
     charged := false;
     amount_kes := 0;
-    select coalesce(wallet_balance_kes, 0) into wallet_balance_kes
-    from public.tenants where id = v_call.tenant_id;
+    select coalesce(t.wallet_balance_kes, 0) into wallet_balance_kes
+    from public.tenants t where t.id = v_call.tenant_id;
     already_applied := false;
     return next;
     return;
@@ -370,8 +371,8 @@ begin
   if v_amount <= 0 then
     charged := false;
     amount_kes := 0;
-    select coalesce(wallet_balance_kes, 0) into wallet_balance_kes
-    from public.tenants where id = v_call.tenant_id;
+    select coalesce(t.wallet_balance_kes, 0) into wallet_balance_kes
+    from public.tenants t where t.id = v_call.tenant_id;
     already_applied := false;
     return next;
     return;

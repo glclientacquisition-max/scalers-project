@@ -76,6 +76,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 16 | [`wallet_metering.sql`](./wallet_metering.sql) | `owner_rls.sql` (and profile era) | Dual-wallet columns + legacy `adjust_tenant_wallet` |
 | 17 | [`one_wallet_billing.sql`](./one_wallet_billing.sql) | `wallet_metering.sql` | Single KES wallet, ledger, charge/line RPCs — see ONE_WALLET_BILLING |
 | 18 | [`wallet_security_beta.sql`](./wallet_security_beta.sql) | `one_wallet_billing.sql` | Beta defaults, RPC locks, column grants, `ops_audit_log` |
+| 18b | [`fix_charge_call_wallet_ambiguous.sql`](./fix_charge_call_wallet_ambiguous.sql) | `one_wallet_billing.sql` | Qualify `tenants.wallet_balance_kes` in `charge_call_to_wallet` early returns (OUT-param shadowing). Safe to re-run. |
 
 ### 8. Tool toggles (after wallet column grants)
 
