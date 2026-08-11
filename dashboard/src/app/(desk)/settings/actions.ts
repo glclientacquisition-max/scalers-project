@@ -28,6 +28,10 @@ import {
   formatPoliciesForCompiler,
   parseBusinessPoliciesField,
 } from "@/lib/businessPolicies";
+import {
+  lexiconForStorage,
+  parseTtsLexicon,
+} from "@/lib/pronunciationLexicon";
 
 export type SettingsCompileState = {
   error?: string;
@@ -88,6 +92,9 @@ export async function saveAndCompileSettings(
   );
   const businessPolicies = parseBusinessPoliciesField(
     formData.get("business_policies")
+  );
+  const ttsLexicon = lexiconForStorage(
+    parseTtsLexicon(formData.get("tts_lexicon"))
   );
   const scheduleForSave = hoursSchedule
     ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
@@ -169,6 +176,7 @@ export async function saveAndCompileSettings(
     handoff_mode: handoffMode,
     business_locations: businessLocations,
     business_policies: businessPolicies,
+    tts_lexicon: ttsLexicon,
     llm_system_prompt: prompt,
   };
 
@@ -208,6 +216,11 @@ export async function saveAndCompileSettings(
     if (/agent_tools/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/agent_tools.sql in Supabase.`,
+      };
+    }
+    if (/tts_lexicon/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
       };
     }
     if (/agent_name|team_directory|faqs/i.test(error.message)) {

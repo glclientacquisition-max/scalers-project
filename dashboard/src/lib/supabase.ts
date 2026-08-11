@@ -145,6 +145,13 @@ export type TenantRow = {
     warranty?: string;
     other?: string;
   } | null;
+  /** Per-tenant TTS pronunciation overrides: [{match, say, priority?}]. */
+  tts_lexicon?: Array<{
+    match?: string;
+    say?: string;
+    langs?: string[];
+    priority?: number;
+  }> | null;
   wallet_balance_kes?: number | null;
   wallet_low_balance_kes?: number | null;
   billing_enforcement?: "soft" | "hard" | "off" | null;
