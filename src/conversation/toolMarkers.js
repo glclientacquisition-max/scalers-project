@@ -11,6 +11,7 @@ function parseGeminiResponse(responseText) {
     reason: null,
     escalate: null,
     serviceRequest: null,
+    errors: [],
   };
   let spoken = String(responseText || '');
   const toolRe = /###TOOL###([\s\S]*?)###ENDTOOL###/gi;
@@ -65,6 +66,10 @@ function parseGeminiResponse(responseText) {
         }
       }
     } catch (err) {
+      output.errors.push({
+        type: 'invalid_tool_json',
+        message: String(err?.message || err),
+      });
       console.warn(
         '[parseGeminiResponse] Failed to parse tool JSON:',
         err?.message || err
@@ -75,10 +80,9 @@ function parseGeminiResponse(responseText) {
 
   output.spokenText = spoken.trim();
 
-  const endCallMatch = /###ENDCALL###/i.exec(output.spokenText);
-  if (endCallMatch) {
+  if (/###ENDCALL###/i.test(output.spokenText)) {
     output.shouldEndCall = true;
-    output.spokenText = output.spokenText.replace(endCallMatch[0], '').trim();
+    output.spokenText = output.spokenText.replace(/###ENDCALL###/gi, '').trim();
   }
 
   return output;

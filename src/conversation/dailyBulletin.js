@@ -95,7 +95,7 @@ function formatEndLabel(endsAt, now = new Date()) {
 function bulletinImpliesClosed(raw, now = new Date()) {
   const items = activeBulletinItems(raw, now);
   return items.some((item) =>
-    /\b(closed|close early|closing early|not open|shut|maandamano|no operations|off today)\b/i.test(
+    /\b(closed|not open|shut|maandamano|no operations|off today)\b/i.test(
       item.text
     )
   );
@@ -105,7 +105,7 @@ function bulletinImpliesClosed(raw, now = new Date()) {
 function bulletinClosureNotice(raw, now = new Date()) {
   const items = activeBulletinItems(raw, now);
   const hit = items.find((item) =>
-    /\b(closed|close early|closing early|not open|shut|maandamano|no operations|off today)\b/i.test(
+    /\b(closed|not open|shut|maandamano|no operations|off today)\b/i.test(
       item.text
     )
   );

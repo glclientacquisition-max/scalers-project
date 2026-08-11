@@ -21,13 +21,14 @@ Requirements for the prompt you write:
 - Keep SERVICES (delivery, sourcing, etc.) separate from PRODUCT CATALOGUE (individual titles/SKU rows).
 - If social/web handles are provided, include them so the receptionist can share Instagram/WhatsApp/website when asked.
 - If golden FAQs are provided, include a GOLDEN FAQs section. Treat each Q/A as authoritative. The receptionist must answer those questions from the given answers and must not invent alternatives.
-- If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Rule: the AI is the receptionist, not the expert. For anger, refunds, billing, or a matching role, acknowledge, say that teammate will follow up, capture name + reason, and use the escalate tool. If the caller asks for a role not on the list (e.g. sales when only CEO is listed), do not invent staff — offer the closest listed person (usually owner/CEO) and still escalate.
-- Respect handoff mode: if callback, do not invent live transfers; if live_transfer, prefer connecting a human when asked and fall back to callback notes when transfer is unavailable.
-- If escalation is disabled, still list the team for awareness but instruct: do not escalate; capture name + reason and say the business will follow up.
-- Include a short "Your job on this call" checklist: answer from knowledge and FAQs only, get name (confirm once if unsure of pronunciation/spelling), get reason, confirm, goodbye. If the caller corrects their name, use the corrected name going forward.
-- Include live-phone conversation rules: answer first (no stalling), never end a turn on a closed/status fact alone (always say how you can still help and ask one next question), at most one clarifying question per turn, match EN/SW/Sheng, 1–2 short spoken sentences, never invent prices/availability/people outside knowledge.
-- Always include an UNKNOWN ANSWER rule: when the ask is outside business knowledge and FAQs, admit you do not have that detail, keep one short sentence, then capture or confirm name + reason so the team can follow up. Never invent prices, availability, guarantees, or services.
-- If an "unknown request line" is provided, that line is the preferred spoken phrasing (adapt to the caller's language, keep the same meaning). If none is provided, use a short default like "I don't have that detail — I'll note it and the team will follow up" (or Kiswahili/Sheng equivalent).
+- If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Escalation is a last useful step: use it when the caller explicitly asks for a human, policy requires one, authority is missing, a tool fails, or repair repeatedly fails. Anger alone is not enough when the issue can be resolved.
+- Handoff mode is a preference, not proof that transfer works. Never promise or claim a live transfer; runtime authority decides actual capability.
+- If escalation is disabled, list the team for awareness but instruct the receptionist to resolve what it can and offer a saved request only when useful.
+- Include a short "Your job on this call" checklist: identify the caller goal; fully assist from knowledge first; collect only details required for an action; confirm the outcome; close. Do not force name capture or callback after a fully resolved question.
+- Include live-phone conversation rules: answer first (no stalling), at most one useful clarification per turn, match EN/SW/Sheng, use the minimum speech needed, and never invent prices/stock/availability/people/policies.
+- Always include an UNKNOWN ANSWER rule: admit the missing detail, then offer only an authorized next step. Unknown is valid; do not force a callback or promise follow-up.
+- If an "unknown request line" is provided, treat it as preferred wording only. Remove callback timing, guarantees, transfers, bookings, stock, or action promises that runtime authority does not support.
+- For actions, the prompt must say a tool marker only requests an action. It must never claim an action is saved, held, booked, sent, transferred, or confirmed; backend result confirmation is separate.
 - Keep it tight and phone-ready. Do not invent services, prices, hours, locations, FAQs, or teammates that were not provided.
 - Do not include tool markers or ###ENDCALL### — the voice engine appends those.`;
 
@@ -51,6 +52,30 @@ function stripFences(text: string): string {
     .replace(/^```(?:text|markdown)?\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
+}
+
+export function compiledPromptLooksSafe(
+  prompt: string,
+  businessName: string
+): boolean {
+  const text = String(prompt || "").trim();
+  const businessToken = String(businessName || "")
+    .trim()
+    .split(/\s+/)[0]
+    ?.toLowerCase();
+  if (text.length < 80) return false;
+  if (!/receptionist/i.test(text)) return false;
+  if (!/never invent|do not invent/i.test(text)) return false;
+  if (businessToken && !text.toLowerCase().includes(businessToken)) return false;
+  if (/###TOOL###|###ENDCALL###/i.test(text)) return false;
+  if (
+    /\b(always|must)\s+(promise|guarantee)\b|will call (you )?back (today|shortly)|claim (a )?live transfer/i.test(
+      text
+    )
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function formatTeamForCompiler(members: TeamMember[]): string {
@@ -119,6 +144,12 @@ export async function compileReceptionistPrompt(opts: {
     faqs,
     unknownAnswerFallback: unknownLine,
     escalateEnabled,
+    vertical,
+    handoffMode,
+    locationsText,
+    policiesText,
+    productsText,
+    socialText,
   };
 
   if (!process.env.GEMINI_API_KEY) {
@@ -163,7 +194,7 @@ export async function compileReceptionistPrompt(opts: {
       "",
       unknownLine
         ? `Unknown request line (preferred phrasing when asked for something outside knowledge — adapt to caller language): ${unknownLine}`
-        : "Unknown request line: (none — use a short default admit-unknown + team will follow up, then capture name + reason)",
+        : "Unknown request line: (none — briefly admit the missing detail, then offer only an authorized next step)",
       "",
       "Write the optimized llm_system_prompt now.",
     ].join("\n");
@@ -175,7 +206,7 @@ export async function compileReceptionistPrompt(opts: {
       maxOutputTokens: 2048,
     });
     const prompt = stripFences(raw);
-    if (prompt.length < 80) {
+    if (!compiledPromptLooksSafe(prompt, opts.businessName)) {
       return {
         prompt: compilePromptLocally(opts.businessName, answers, extras),
         source: "local",
