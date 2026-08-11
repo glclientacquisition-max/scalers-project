@@ -23,19 +23,20 @@ function test(name, fn) {
 
 console.log('liveKnowledge unknown-answer policy');
 
-test('formatUnknownAnswerPolicy always admits unknown + captures lead', () => {
+test('formatUnknownAnswerPolicy admits unknown without forcing a lead', () => {
   const text = formatUnknownAnswerPolicy('');
   assert.match(text, /UNKNOWN ANSWER POLICY/);
   assert.match(text, /Do NOT invent/i);
-  assert.match(text, /name \+ reason/i);
+  assert.match(text, /Do not force name\/reason capture/i);
   assert.match(text, /I don't have that detail/i);
-  assert.match(text, /Sina hiyo detail/i);
+  assert.doesNotMatch(text, /will follow up|will call|atakupigia/i);
 });
 
 test('formatUnknownAnswerPolicy prefers owner custom line', () => {
   const text = formatUnknownAnswerPolicy('Boss atakupigia leo.');
-  assert.match(text, /Preferred line/);
+  assert.match(text, /Owner preferred line/);
   assert.match(text, /Boss atakupigia leo\./);
+  assert.match(text, /remove any callback time/i);
   assert.doesNotMatch(text, /Default line ideas/);
 });
 
@@ -48,7 +49,7 @@ test('buildLiveGroundTruth injects unknown policy without custom line', () => {
   assert.match(truth, /LIVE GROUND TRUTH/);
   assert.match(truth, /UNKNOWN ANSWER POLICY/);
   assert.match(truth, /Do NOT invent/i);
-  assert.doesNotMatch(truth, /Preferred line/);
+  assert.doesNotMatch(truth, /Owner preferred line/);
 });
 
 test('buildLiveGroundTruth includes custom unknown request line', () => {
@@ -56,7 +57,7 @@ test('buildLiveGroundTruth includes custom unknown request line', () => {
     servicesCatalog: [{ name: 'Cleaning' }],
     unknownAnswerFallback: 'Let me note that — the boss will call you back today.',
   });
-  assert.match(truth, /Preferred line/);
+  assert.match(truth, /Owner preferred line/);
   assert.match(truth, /boss will call you back today/);
 });
 
