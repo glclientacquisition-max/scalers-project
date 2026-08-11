@@ -120,7 +120,8 @@ export async function confirmPronunciationRecording(
     }
     if (/row-level security|permission denied|rls/i.test(error.message)) {
       return {
-        error: `${error.message} Apply docs/supabase/owner_rls.sql if needed.`,
+        error:
+          "Couldn’t save pronunciation for this workspace. Refresh and try again — if it keeps failing, support needs to grant owner update on tts_lexicon.",
       };
     }
     return { error: error.message };

@@ -11,6 +11,7 @@ import {
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
 import {
+  isPronunciationCovered,
   suggestPronunciations,
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
@@ -106,9 +107,7 @@ export function PronunciationCoach({
       ...s,
       status: skippedIds.has(s.id)
         ? "skipped"
-        : lexicon.some(
-              (e) => e.match.toLowerCase() === s.match.toLowerCase()
-            )
+        : isPronunciationCovered(s, lexicon)
           ? "done"
           : "todo",
     }));

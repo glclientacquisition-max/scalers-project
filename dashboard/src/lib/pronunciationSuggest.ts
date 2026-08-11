@@ -186,12 +186,46 @@ function pushUnique(
 }
 
 function alreadyTrained(
-  match: string,
+  suggestion: { prompt: string; label: string; match: string },
   existing: TtsLexiconEntry[] | null | undefined
 ): boolean {
   if (!existing?.length) return false;
-  const key = match.toLowerCase();
-  return existing.some((e) => e.match.trim().toLowerCase() === key);
+  const matchKey = suggestion.match.toLowerCase();
+  const promptKey = normalizePhrase(suggestion.prompt);
+  const labelKey = normalizePhrase(suggestion.label);
+  return existing.some((e) => {
+    if (e.match.trim().toLowerCase() === matchKey) return true;
+    if (labelKey && normalizePhrase(e.label || "") === labelKey) return true;
+    if (promptKey && normalizePhrase(e.say) === promptKey) return true;
+    if (promptKey && normalizePhrase(e.label || "") === promptKey) return true;
+    try {
+      const source = e.match.startsWith("\\b")
+        ? e.match
+        : `\\b(?:${e.match})\\b`;
+      const re = new RegExp(source, "i");
+      if (re.test(suggestion.prompt) || re.test(suggestion.label)) return true;
+    } catch {
+      // ignore bad patterns
+    }
+    const matchPlain = normalizePhrase(
+      e.match.replace(/\\[sb]|[+*?|()[\]]/g, " ")
+    );
+    return Boolean(promptKey && matchPlain && matchPlain === promptKey);
+  });
+}
+
+/** Exported for coach UI status (done vs todo). */
+export function isPronunciationCovered(
+  suggestion: { prompt: string; label: string; match: string },
+  existing: TtsLexiconEntry[] | null | undefined
+): boolean {
+  return alreadyTrained(suggestion, existing);
+}
+
+function normalizePhrase(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 /**
@@ -206,25 +240,30 @@ export function suggestPronunciations(
   const businessName = String(input.businessName || "").trim();
   if (businessName && businessName.length >= 3) {
     const match = matchPatternFromPhrase(businessName);
-    if (match && !alreadyTrained(match, existing)) {
-      pushUnique(map, {
-        id: slugId("word", businessName),
-        label: businessName,
-        prompt: businessName,
-        kind: "word",
-        reason: "Your business name — callers hear this first.",
-        match,
-        priority: 100,
-      });
-      pushUnique(map, {
+    const word = {
+      id: slugId("word", businessName),
+      label: businessName,
+      prompt: businessName,
+      kind: "word" as const,
+      reason: "Your business name — callers hear this first.",
+      match,
+      priority: 100,
+    };
+    if (match && !alreadyTrained(word, existing)) {
+      pushUnique(map, word);
+      const welcomeMatch = matchPatternFromPhrase(`Welcome to ${businessName}`);
+      const welcome = {
         id: slugId("sentence", `welcome-${businessName}`),
         label: `Welcome line`,
         prompt: `Welcome to ${businessName}.`,
-        kind: "sentence",
+        kind: "sentence" as const,
         reason: "Practice the greeting the way you want it said.",
-        match: matchPatternFromPhrase(`Welcome to ${businessName}`),
+        match: welcomeMatch,
         priority: 85,
-      });
+      };
+      if (welcomeMatch && !alreadyTrained(welcome, existing)) {
+        pushUnique(map, welcome);
+      }
     }
   }
 
@@ -235,25 +274,30 @@ export function suggestPronunciations(
     !/^receptionist$/i.test(agentName)
   ) {
     const match = matchPatternFromPhrase(agentName);
-    if (match && !alreadyTrained(match, existing)) {
-      pushUnique(map, {
-        id: slugId("word", agentName),
-        label: agentName,
-        prompt: agentName,
-        kind: "word",
-        reason: "Receptionist name on every call.",
-        match,
-        priority: 98,
-      });
-      pushUnique(map, {
+    const word = {
+      id: slugId("word", agentName),
+      label: agentName,
+      prompt: agentName,
+      kind: "word" as const,
+      reason: "Receptionist name on every call.",
+      match,
+      priority: 98,
+    };
+    if (match && !alreadyTrained(word, existing)) {
+      pushUnique(map, word);
+      const introMatch = matchPatternFromPhrase(`this is ${agentName}`);
+      const intro = {
         id: slugId("sentence", `agent-${agentName}`),
         label: "Name intro",
         prompt: `Hi, this is ${agentName}.`,
-        kind: "sentence",
+        kind: "sentence" as const,
         reason: "How the agent should say their own name.",
-        match: matchPatternFromPhrase(`this is ${agentName}`),
+        match: introMatch,
         priority: 80,
-      });
+      };
+      if (introMatch && !alreadyTrained(intro, existing)) {
+        pushUnique(map, intro);
+      }
     }
   }
 
@@ -266,34 +310,35 @@ export function suggestPronunciations(
     ];
     for (const chunk of chunks) {
       const match = matchPatternFromPhrase(chunk);
-      if (!match || alreadyTrained(match, existing)) continue;
-      pushUnique(map, {
+      const word = {
         id: slugId("word", chunk),
         label: chunk,
         prompt: chunk,
-        kind: "word",
+        kind: "word" as const,
         reason: "Place name from your locations.",
         match,
         priority: 92,
-      });
+      };
+      if (!match || alreadyTrained(word, existing)) continue;
+      pushUnique(map, word);
     }
     const address = String(loc.address || "").trim();
     if (address && address.length >= 8 && address.length <= 90) {
       const hardBits = extractProperChunks(address);
       if (hardBits.length) {
         const sentence = address.replace(/\s+/g, " ").slice(0, 90);
-        const match = matchPatternFromPhrase(hardBits[0]);
-        if (match && !map.has(match.toLowerCase())) {
-          // Sentence suggestion uses its own id; match is the hard place for training focus
-          pushUnique(map, {
-            id: slugId("sentence", sentence),
-            label: "Address line",
-            prompt: sentence.endsWith(".") ? sentence : `${sentence}.`,
-            kind: "sentence",
-            reason: "Say your address the way locals say it.",
-            match: matchPatternFromPhrase(sentence),
-            priority: 78,
-          });
+        const sentenceMatch = matchPatternFromPhrase(sentence);
+        const row = {
+          id: slugId("sentence", sentence),
+          label: "Address line",
+          prompt: sentence.endsWith(".") ? sentence : `${sentence}.`,
+          kind: "sentence" as const,
+          reason: "Say your address the way locals say it.",
+          match: sentenceMatch,
+          priority: 78,
+        };
+        if (sentenceMatch && !alreadyTrained(row, existing)) {
+          pushUnique(map, row);
         }
       }
     }
@@ -302,35 +347,36 @@ export function suggestPronunciations(
   const locationNotes = String(input.locationNotes || "").trim();
   for (const chunk of extractProperChunks(locationNotes)) {
     const match = matchPatternFromPhrase(chunk);
-    if (!match || alreadyTrained(match, existing)) continue;
-    pushUnique(map, {
+    const word = {
       id: slugId("word", chunk),
       label: chunk,
       prompt: chunk,
-      kind: "word",
+      kind: "word" as const,
       reason: "From your location notes.",
       match,
       priority: 88,
-    });
+    };
+    if (!match || alreadyTrained(word, existing)) continue;
+    pushUnique(map, word);
   }
 
   for (const member of input.team || []) {
     const name = String(member.name || "").trim();
     if (!name || name.length < 2) continue;
     const match = matchPatternFromPhrase(name);
-    if (!match || alreadyTrained(match, existing)) continue;
-    // Prefer hard-looking names; still include all team names (they matter on transfers)
-    pushUnique(map, {
+    const word = {
       id: slugId("word", name),
       label: name,
       prompt: name,
-      kind: "word",
+      kind: "word" as const,
       reason: member.role
         ? `Team: ${String(member.role).trim()}`
         : "Team member name.",
       match,
       priority: looksHard(name.split(/\s+/)[0] || name) ? 90 : 70,
-    });
+    };
+    if (!match || alreadyTrained(word, existing)) continue;
+    pushUnique(map, word);
   }
 
   for (const service of input.services || []) {
@@ -340,16 +386,17 @@ export function suggestPronunciations(
     const targets = chunks.length ? chunks : looksHard(name) ? [name] : [];
     for (const chunk of targets) {
       const match = matchPatternFromPhrase(chunk);
-      if (!match || alreadyTrained(match, existing)) continue;
-      pushUnique(map, {
+      const word = {
         id: slugId("word", chunk),
         label: chunk,
         prompt: chunk,
-        kind: "word",
+        kind: "word" as const,
         reason: "Service or product name.",
         match,
         priority: 75,
-      });
+      };
+      if (!match || alreadyTrained(word, existing)) continue;
+      pushUnique(map, word);
     }
   }
 
@@ -358,32 +405,34 @@ export function suggestPronunciations(
       `${faq.question || ""} ${faq.answer || ""}`
     )) {
       const match = matchPatternFromPhrase(chunk);
-      if (!match || alreadyTrained(match, existing)) continue;
-      pushUnique(map, {
+      const word = {
         id: slugId("word", chunk),
         label: chunk,
         prompt: chunk,
-        kind: "word",
+        kind: "word" as const,
         reason: "From your FAQs.",
         match,
         priority: 72,
-      });
+      };
+      if (!match || alreadyTrained(word, existing)) continue;
+      pushUnique(map, word);
     }
   }
 
   for (const bulletin of input.bulletinTexts || []) {
     for (const chunk of extractProperChunks(bulletin)) {
       const match = matchPatternFromPhrase(chunk);
-      if (!match || alreadyTrained(match, existing)) continue;
-      pushUnique(map, {
+      const word = {
         id: slugId("word", chunk),
         label: chunk,
         prompt: chunk,
-        kind: "word",
+        kind: "word" as const,
         reason: "From today’s bulletin.",
         match,
         priority: 68,
-      });
+      };
+      if (!match || alreadyTrained(word, existing)) continue;
+      pushUnique(map, word);
     }
   }
 
