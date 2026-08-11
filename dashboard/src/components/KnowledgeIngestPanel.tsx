@@ -30,6 +30,12 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
   const [selectedFaqs, setSelectedFaqs] = useState<Set<number>>(new Set());
   const [selectedTeam, setSelectedTeam] = useState<Set<number>>(new Set());
   const [includeUnknown, setIncludeUnknown] = useState(true);
+  const [includeLocations, setIncludeLocations] = useState(true);
+  const [includeHours, setIncludeHours] = useState(true);
+  const [includePolicies, setIncludePolicies] = useState(true);
+  const [includeVertical, setIncludeVertical] = useState(true);
+  const [includeContactPhone, setIncludeContactPhone] = useState(true);
+  const [renameBusiness, setRenameBusiness] = useState(false);
   const [mergeMode, setMergeMode] = useState<"merge" | "replace_services_faqs">("merge");
 
   const [extractState, extractAction, extractPending] = useActionState(
@@ -48,6 +54,27 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
       setSelectedFaqs(new Set(extractState.draft.faqs.map((_, i) => i)));
       setSelectedTeam(new Set(extractState.draft.team.map((_, i) => i)));
       setIncludeUnknown(Boolean(extractState.draft.unknownAnswerFallback));
+      setIncludeLocations(Boolean(extractState.draft.locations?.length));
+      setIncludeHours(
+        Boolean(extractState.draft.hoursNotes || extractState.draft.hoursSchedule)
+      );
+      setIncludePolicies(
+        Boolean(
+          extractState.draft.policies &&
+            Object.values(extractState.draft.policies).some((v) =>
+              String(v || "").trim()
+            )
+        )
+      );
+      setIncludeVertical(Boolean(extractState.draft.vertical));
+      setIncludeContactPhone(Boolean(extractState.draft.contactPhone));
+      setRenameBusiness(false);
+      // For a full business brief, default to start fresh so headings/junk don't linger.
+      const looksLikeBrief =
+        Boolean(extractState.draft.locations?.length) ||
+        Boolean(extractState.draft.hoursNotes) ||
+        (extractState.draft.faqs?.length || 0) >= 3;
+      setMergeMode(looksLikeBrief ? "replace_services_faqs" : "merge");
     }
   }, [extractState]);
 
@@ -115,11 +142,13 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           Import knowledge
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Paste a menu or drop a website link. We&apos;ll suggest services and FAQs.
-          Tick what looks right before anything goes live.
+          Paste a menu, FAQ list, or a short business overview. We&apos;ll suggest
+          services, FAQs, hours, location, and policies.
         </p>
         <p className="mt-2 text-xs text-[var(--ink-soft)]">
-          Tip: paste a short menu (one item per line) or Q&amp;A pairs. Long documents work best when turned into FAQs — we skip paragraph-length &quot;services&quot;. After you add items, open Train to review the refreshed list.
+          Tip: for bookstores and shops, a full overview paste works — we map
+          location/hours/delivery into Train, not as fake services. After you add
+          items, open Train to review the refreshed list.
         </p>
       </div>
 
@@ -131,7 +160,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 {
                   id: "paste" as const,
                   label: "Paste text",
-                  blurb: "Menu, prices, or FAQs from WhatsApp or a doc",
+                  blurb: "Menu, business overview, or FAQs from WhatsApp or a doc",
                 },
                 {
                   id: "url" as const,
@@ -169,7 +198,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             {mode === "paste" ? (
               <div>
                 <label className="block text-sm font-medium" htmlFor="ingest_paste">
-                  Paste your menu or FAQs
+                  Paste your menu, overview, or FAQs
                 </label>
                 <textarea
                   id="ingest_paste"
@@ -178,7 +207,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   onChange={(e) => setPaste(e.target.value)}
                   rows={7}
                   placeholder={
-                    "Home cleaning - from 2,500 KES\nPlumbing - call out 1,500\n\nQ: Do you cover Westlands?\nA: Yes, same-day when booked before noon."
+                    "ChapterOne Bookstore — Nairobi CBD\nMon–Sat 9am–7pm\nSame-day Nairobi delivery\n\nOr a menu:\nHome cleaning - from 2,500 KES\n\nQ: Do you cover Westlands?\nA: Yes, same-day when booked before noon."
                   }
                   className={`${fieldClass} leading-relaxed`}
                 />
@@ -231,6 +260,158 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               <span className="mt-1 block text-[var(--ink-soft)]">{extractState.message}</span>
             ) : null}
           </div>
+
+          {(draft.vertical ||
+            draft.businessNameSuggestion ||
+            draft.locations?.length ||
+            draft.hoursNotes ||
+            draft.hoursSchedule ||
+            draft.contactPhone ||
+            (draft.policies &&
+              Object.values(draft.policies).some((v) =>
+                String(v || "").trim()
+              ))) ? (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[var(--ink)]">
+                Business details
+              </h3>
+              <ul className="space-y-2">
+                {draft.businessNameSuggestion ? (
+                  <li className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={renameBusiness}
+                      onChange={(e) => setRenameBusiness(e.target.checked)}
+                      aria-label="Rename business from import"
+                    />
+                    <span>
+                      <span className="font-medium text-[var(--ink)]">
+                        Rename business to
+                      </span>
+                      <span className="mt-0.5 block text-[var(--ink-soft)]">
+                        {draft.businessNameSuggestion}
+                      </span>
+                      <span className="mt-1 block text-xs text-[var(--ink-soft)]">
+                        Off by default so we don&apos;t overwrite the wrong workspace.
+                      </span>
+                    </span>
+                  </li>
+                ) : null}
+                {draft.vertical ? (
+                  <li className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={includeVertical}
+                      onChange={(e) => setIncludeVertical(e.target.checked)}
+                      aria-label="Apply business type"
+                    />
+                    <span>
+                      <span className="font-medium text-[var(--ink)]">
+                        Business type
+                      </span>
+                      <span className="mt-0.5 block text-[var(--ink-soft)]">
+                        {draft.vertical}
+                      </span>
+                    </span>
+                  </li>
+                ) : null}
+                {draft.locations?.length ? (
+                  <li className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={includeLocations}
+                      onChange={(e) => setIncludeLocations(e.target.checked)}
+                      aria-label="Apply location"
+                    />
+                    <span>
+                      <span className="font-medium text-[var(--ink)]">
+                        Location
+                      </span>
+                      {draft.locations.map((loc, i) => (
+                        <span
+                          key={`loc-${i}`}
+                          className="mt-0.5 block text-[var(--ink-soft)]"
+                        >
+                          {[loc.label, loc.address, loc.landmark, loc.coverage_notes]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                ) : null}
+                {draft.hoursNotes || draft.hoursSchedule ? (
+                  <li className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={includeHours}
+                      onChange={(e) => setIncludeHours(e.target.checked)}
+                      aria-label="Apply hours"
+                    />
+                    <span>
+                      <span className="font-medium text-[var(--ink)]">Hours</span>
+                      <span className="mt-0.5 block text-[var(--ink-soft)]">
+                        {draft.hoursNotes ||
+                          "Weekly schedule extracted from the brief"}
+                      </span>
+                    </span>
+                  </li>
+                ) : null}
+                {draft.policies &&
+                Object.values(draft.policies).some((v) =>
+                  String(v || "").trim()
+                ) ? (
+                  <li className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={includePolicies}
+                      onChange={(e) => setIncludePolicies(e.target.checked)}
+                      aria-label="Apply policies"
+                    />
+                    <span>
+                      <span className="font-medium text-[var(--ink)]">
+                        Policies
+                      </span>
+                      {Object.entries(draft.policies)
+                        .filter(([, v]) => String(v || "").trim())
+                        .map(([k, v]) => (
+                          <span
+                            key={k}
+                            className="mt-0.5 block text-[var(--ink-soft)]"
+                          >
+                            {k}: {v}
+                          </span>
+                        ))}
+                    </span>
+                  </li>
+                ) : null}
+                {draft.contactPhone ? (
+                  <li className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={includeContactPhone}
+                      onChange={(e) => setIncludeContactPhone(e.target.checked)}
+                      aria-label="Apply contact phone"
+                    />
+                    <span>
+                      <span className="font-medium text-[var(--ink)]">
+                        Sales / WhatsApp phone
+                      </span>
+                      <span className="mt-0.5 block text-[var(--ink-soft)]">
+                        {draft.contactPhone}
+                      </span>
+                    </span>
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
 
           {draft.services.length ? (
             <div className="space-y-2">
@@ -463,6 +644,36 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               name="include_unknown"
               value={includeUnknown ? "1" : "0"}
             />
+            <input
+              type="hidden"
+              name="include_locations"
+              value={includeLocations ? "1" : "0"}
+            />
+            <input
+              type="hidden"
+              name="include_hours"
+              value={includeHours ? "1" : "0"}
+            />
+            <input
+              type="hidden"
+              name="include_policies"
+              value={includePolicies ? "1" : "0"}
+            />
+            <input
+              type="hidden"
+              name="include_vertical"
+              value={includeVertical ? "1" : "0"}
+            />
+            <input
+              type="hidden"
+              name="include_contact_phone"
+              value={includeContactPhone ? "1" : "0"}
+            />
+            <input
+              type="hidden"
+              name="rename_business"
+              value={renameBusiness ? "1" : "0"}
+            />
             <button
               type="submit"
               disabled={
@@ -470,7 +681,13 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 (selectedServices.size === 0 &&
                   selectedFaqs.size === 0 &&
                   selectedTeam.size === 0 &&
-                  !includeUnknown)
+                  !includeUnknown &&
+                  !includeLocations &&
+                  !includeHours &&
+                  !includePolicies &&
+                  !includeVertical &&
+                  !includeContactPhone &&
+                  !renameBusiness)
               }
               className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
             >
