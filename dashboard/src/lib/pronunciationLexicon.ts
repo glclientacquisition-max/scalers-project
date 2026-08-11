@@ -267,19 +267,65 @@ export function mergeLexiconEntries(
   return out;
 }
 
-/** Drop coach-only fields before persisting to tenants.tts_lexicon. */
+/**
+ * Human-readable label from a match regex (when label was never stored).
+ * "muindi\\s+mbingu|…" → "Muindi Mbingu"
+ */
+export function humanLabelFromMatch(match: string): string {
+  const firstAlt = String(match || "").split("|")[0] || "";
+  const plain = firstAlt
+    .replace(/\\s\+/gi, " ")
+    .replace(/\\s\*/gi, " ")
+    .replace(/\\s/gi, " ")
+    .replace(/\\-/g, "-")
+    .replace(/\\(.)/g, "$1")
+    .replace(/[()^$?+*[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!plain) return "";
+  return plain
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ")
+    .slice(0, 120);
+}
+
+/** Prefer stored label; never fall back to phonetic `say` (that breaks Renew). */
+export function displayLexiconLabel(entry: TtsLexiconEntry): string {
+  const labeled = String(entry.label || "").trim();
+  if (labeled) return labeled;
+  return humanLabelFromMatch(entry.match) || entry.match;
+}
+
+/**
+ * Persist match/say for voice, plus label so Desk Renew/list stay readable.
+ * Voice parse ignores unknown fields safely.
+ */
 export function lexiconForStorage(entries: TtsLexiconEntry[]): Array<{
   match: string;
   say: string;
   langs?: TtsLexiconEntry["langs"];
   priority?: number;
+  label?: string;
 }> {
-  return parseTtsLexicon(entries).map((e) => ({
-    match: e.match,
-    say: e.say,
-    langs: e.langs || ["en", "sw", "sheng"],
-    priority: e.priority ?? 200,
-  }));
+  return parseTtsLexicon(entries).map((e) => {
+    const label = displayLexiconLabel(e);
+    const row: {
+      match: string;
+      say: string;
+      langs?: TtsLexiconEntry["langs"];
+      priority?: number;
+      label?: string;
+    } = {
+      match: e.match,
+      say: e.say,
+      langs: e.langs || ["en", "sw", "sheng"],
+      priority: e.priority ?? 200,
+    };
+    if (label) row.label = label;
+    return row;
+  });
 }
 
 /** Plain fallback when Gemini is unavailable: space camelCase, keep readable. */

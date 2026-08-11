@@ -5,7 +5,6 @@ import { deriveLexiconFromRecording } from "@/lib/pronunciationFromRecording";
 import {
   isBlockedMatch,
   lexiconForStorage,
-  localSayFallback,
   matchPatternFromPhrase,
   mergeLexiconEntries,
   mergeLexiconEntry,
@@ -13,7 +12,10 @@ import {
   sanitizeSayForm,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
-import { mineSuggestionsFromAgentLines } from "@/lib/pronunciationMine";
+import {
+  collectKnownPronunciationHints,
+  mineSuggestionsFromAgentLines,
+} from "@/lib/pronunciationMine";
 import { screenPronunciationSuggestions } from "@/lib/pronunciationScreen";
 import {
   parseSuggestionList,
@@ -409,13 +411,40 @@ export async function minePronunciationFromCallsAction(
       (tenant as { tts_lexicon?: unknown }).tts_lexicon
   );
 
-  const { mineSuggestionsFromAgentLines: mine } = {
-    mineSuggestionsFromAgentLines,
-  };
-  const suggestions = mine({
+  const teamRaw = (tenant as { team_directory?: unknown }).team_directory;
+  const team = Array.isArray(teamRaw)
+    ? teamRaw.map((m) =>
+        m && typeof m === "object"
+          ? { name: String((m as { name?: string }).name || "") }
+          : { name: String(m || "") }
+      )
+    : [];
+  const locRaw = (tenant as { business_locations?: unknown }).business_locations;
+  const locations = Array.isArray(locRaw)
+    ? locRaw.map((l) => {
+        const row = l && typeof l === "object" ? (l as Record<string, unknown>) : {};
+        return {
+          label: String(row.label || ""),
+          address: String(row.address || ""),
+          landmark: String(row.landmark || ""),
+        };
+      })
+    : [];
+
+  const knownHints = collectKnownPronunciationHints({
+    businessName: String(
+      (tenant as { business_name?: string }).business_name || ""
+    ),
+    agentName: String((tenant as { agent_name?: string }).agent_name || ""),
+    team,
+    locations,
+  });
+
+  const suggestions = mineSuggestionsFromAgentLines({
     lines,
     existingLexicon: existing,
-    limit: 6,
+    knownHints,
+    limit: 8,
   });
 
   return {
@@ -452,6 +481,12 @@ export async function quickAddPronunciationAction(
   if (!phrase || phrase.length > 80) {
     return { error: "Enter a short word or name (under 80 characters)." };
   }
+  if (!sayRaw) {
+    return {
+      error:
+        "Add how it should sound (e.g. Moo-in-dee Mbeen-goo), or use Queue to record instead.",
+    };
+  }
 
   const match = matchPatternFromPhrase(phrase);
   if (!match || isBlockedMatch(match)) {
@@ -461,7 +496,7 @@ export async function quickAddPronunciationAction(
     };
   }
 
-  const say = sanitizeSayForm(sayRaw || localSayFallback(phrase));
+  const say = sanitizeSayForm(sayRaw);
   if (!say) {
     return { error: "Could not build a spoken form for that phrase." };
   }

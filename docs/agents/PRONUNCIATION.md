@@ -32,10 +32,16 @@ Open-ended “learn every word from my recording” produced entries like:
 
 ## Owner workflow (studio)
 
-1. **Trained pronunciations** — see every live `say` form; **Renew** (re-record) or **Remove**.
-2. **Heard something wrong?** — type the word/sentence → **Queue to record** or **Save typed spelling**.
-3. **From recent calls** — **Scan recent calls** mines hard names from agent transcripts into the queue.
+1. **Trained pronunciations** — see every live `say` form; **Renew** (re-record), **Edit say** (typed tweak), or **Remove**. Labels are stored with the lexicon so Renew always re-trains the real name (never the phonetic spelling).
+2. **Heard something wrong?** — type the word/sentence → **Queue to record** (best) or **Save typed spelling** (requires a say-like form).
+3. **From recent calls** — **Scan recent calls** mines hard names from agent transcripts (Title Case + profile name hints for lowercase ASR) into the queue.
 4. **Training queue** — Greeting / Location / Team packs plus custom / mined / renew items.
+
+## Guardrails
+
+- Common English single-word matches are blocked (`where`, `city`, `located`, …).
+- Keep / Edit say / Remove / typed Save update `tts_lexicon` immediately for the **next call**.
+- Recording Keep verifies the take matches the asked line before learning target names only.
 
 ## Do / don’t for `say` forms
 
@@ -48,6 +54,8 @@ Open-ended “learn every word from my recording” produced entries like:
 ```bash
 node scripts/smoke-pronunciation-chapterone.js
 npm run test:tts
+cd dashboard && npx tsx --tsconfig tsconfig.json --test ../tests/pronunciationStudio.test.ts
+node --test tests/pronunciationPacks.test.js tests/pronunciationCoach.test.js
 ```
 
 Call the DID and listen for greeting + address without mangled common words.
