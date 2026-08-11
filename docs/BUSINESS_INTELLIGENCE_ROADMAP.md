@@ -548,8 +548,8 @@ Home services script mirrors with book/reschedule/area/emergency.
 | 1. SQL + `getTenantProfile` for vertical / handoff / locations / policies | **Done** | `docs/supabase/business_operating_model.sql` |
 | 2. Live ground truth + full-assist prompt job | **Done** | `liveKnowledge.js`, `src/prompts.js`, compiler |
 | 3. Desk Train + onboarding for new fields | **Done** | TenantForm + 4-step onboarding |
-| 4. `contacts` + `service_requests` + `create_service_request` | **Next** | Retail completion tools |
-| 5. Retail playbook + requests inbox | Next | |
+| 4. `contacts` + `service_requests` + `create_service_request` | **Done** | `contacts_and_requests.sql`, tool + `/requests` |
+| 5. Retail playbook + richer requests UX | **Next** | Intent router / playbooks |
 | 6. Appointments + home services pack | Next | |
 
 **Apply migration:** run `docs/supabase/business_operating_model.sql` in Supabase SQL editor (grants included for authenticated updates).

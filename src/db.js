@@ -729,6 +729,183 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
   };
 }
 
+/**
+ * Upsert a contact by tenant + phone (when phone present).
+ * Falls back to insert-only when phone is missing.
+ */
+async function upsertContact({
+  tenantId,
+  phone,
+  name,
+  lastReason,
+  notes,
+  metadata,
+} = {}) {
+  if (!tenantId) return null;
+  const phoneNorm = String(phone || '').trim() || null;
+  const nameNorm = String(name || '').trim() || null;
+  const reasonNorm = String(lastReason || '').trim() || null;
+  const notesNorm = String(notes || '').trim() || null;
+  const now = new Date().toISOString();
+
+  if (phoneNorm) {
+    const { data: existing, error: findErr } = await supabase
+      .from('contacts')
+      .select('id, name, notes, last_reason, metadata')
+      .eq('tenant_id', tenantId)
+      .eq('phone', phoneNorm)
+      .maybeSingle();
+    if (findErr && /contacts|relation/i.test(findErr.message)) {
+      console.warn('[db] upsertContact skipped (apply contacts_and_requests.sql):', findErr.message);
+      return null;
+    }
+    throwIfError('upsertContact(find)', findErr);
+
+    if (existing?.id) {
+      const patch = {
+        updated_at: now,
+        name: nameNorm || existing.name || null,
+        last_reason: reasonNorm || existing.last_reason || null,
+        notes: notesNorm || existing.notes || null,
+        metadata: {
+          ...(existing.metadata && typeof existing.metadata === 'object'
+            ? existing.metadata
+            : {}),
+          ...(metadata && typeof metadata === 'object' ? metadata : {}),
+        },
+      };
+      const { data, error } = await supabase
+        .from('contacts')
+        .update(patch)
+        .eq('id', existing.id)
+        .select('*')
+        .maybeSingle();
+      throwIfError('upsertContact(update)', error);
+      return data || null;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('contacts')
+    .insert({
+      tenant_id: tenantId,
+      phone: phoneNorm,
+      name: nameNorm,
+      last_reason: reasonNorm,
+      notes: notesNorm,
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      updated_at: now,
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (error && /contacts|relation/i.test(error.message)) {
+    console.warn('[db] upsertContact skipped (apply contacts_and_requests.sql):', error.message);
+    return null;
+  }
+  throwIfError('upsertContact(insert)', error);
+  return data || null;
+}
+
+const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
+
+/**
+ * Create a service request (hold / enquiry / order) for retail completion.
+ * Also upserts contact and mirrors a short note into call summary when callSid given.
+ */
+async function createServiceRequest({
+  callSid,
+  tenantId,
+  type,
+  name,
+  phone,
+  item,
+  quantity,
+  whenText,
+  notes,
+} = {}) {
+  let resolvedTenantId = tenantId || null;
+  let callRow = null;
+  if (callSid) {
+    callRow = await getCall(callSid);
+    if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
+  }
+  if (!resolvedTenantId) return null;
+
+  const requestType = REQUEST_TYPES.has(String(type || '').trim().toLowerCase())
+    ? String(type).trim().toLowerCase()
+    : 'enquiry';
+  const callerName = String(name || callRow?.name || '').trim() || null;
+  const callerPhone =
+    String(phone || callRow?.from_number || '').trim() || null;
+  const itemText = String(item || '').trim() || null;
+  const qtyText = String(quantity || '').trim() || null;
+  const when = String(whenText || '').trim() || null;
+  const noteText = String(notes || '').trim() || null;
+
+  const contact = await upsertContact({
+    tenantId: resolvedTenantId,
+    phone: callerPhone,
+    name: callerName,
+    lastReason:
+      [requestType, itemText, when].filter(Boolean).join(' — ') || noteText,
+  });
+
+  const { data, error } = await supabase
+    .from('service_requests')
+    .insert({
+      tenant_id: resolvedTenantId,
+      contact_id: contact?.id || null,
+      call_id: callRow?.id || null,
+      request_type: requestType,
+      status: 'open',
+      item: itemText,
+      quantity: qtyText,
+      when_text: when,
+      notes: noteText,
+      caller_name: callerName,
+      caller_phone: callerPhone,
+      updated_at: new Date().toISOString(),
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (error && /service_requests|relation/i.test(error.message)) {
+    console.warn(
+      '[db] createServiceRequest skipped (apply contacts_and_requests.sql):',
+      error.message
+    );
+    return null;
+  }
+  throwIfError('createServiceRequest', error);
+
+  if (callSid && data) {
+    const existing = await getCall(callSid);
+    if (existing) {
+      const meta = parseSummary(existing.summary);
+      meta.service_request_id = data.id;
+      meta.service_request_type = requestType;
+      if (itemText) meta.service_request_item = itemText;
+      const reasonBits = [
+        requestType,
+        itemText,
+        qtyText ? `qty ${qtyText}` : null,
+        when,
+      ].filter(Boolean);
+      if (!meta.reason && reasonBits.length) {
+        meta.reason = reasonBits.join(' — ');
+      }
+      if (callerName) meta.name = callerName;
+      await supabase
+        .from('calls')
+        .update({ summary: serializeSummary(meta) })
+        .eq('sautikit_call_sid', callSid);
+    }
+  }
+
+  return data || null;
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -744,6 +921,8 @@ module.exports = {
   listActiveTenantDids,
   markWhatsappSent,
   markEscalationSent,
+  upsertContact,
+  createServiceRequest,
   RECORDINGS_BUCKET,
   shapeCall,
 };

@@ -11,7 +11,7 @@
     "test:wiring": "node tests/voiceWiring.test.js",
     "test:tts-cancel": "node tests/sonioxTtsCancel.test.js",
     "test:voice": "npm run test:tts && npm run test:stream && npm run test:turns && npm run test:wiring && npm run test:tts-cancel",
-    "test:knowledge": "node --test tests/liveKnowledge.test.js",
+    "test:knowledge": "node --test tests/liveKnowledge.test.js tests/toolMarkers.test.js",
     "smoke:db": "node scripts/smoke-db.js",
     "tunnel": "node scripts/tunnel.js",
     "tunnel:localtunnel": "node scripts/tunnel.js",

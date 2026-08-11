@@ -181,6 +181,11 @@ Whenever you first capture OR later correct the caller's name and/or reason, app
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
+When the caller wants a hold, pickup, order note, or concrete follow-up request you can fulfill by logging it, also append:
+###TOOL###
+{"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
+###ENDTOOL###
+Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
 ${escalateTools}
 ${endCallTools}
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
@@ -211,6 +216,11 @@ ${languagePolicy}
 Whenever you first capture OR later correct name and/or reason, respond naturally and append the latest values:
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
+###ENDTOOL###
+
+When logging a hold, pickup, order, or concrete request, also append:
+###TOOL###
+{"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
 ###ENDTOOL###
 
 ${escalateTools}

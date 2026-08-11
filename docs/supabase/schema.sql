@@ -45,6 +45,15 @@
 --   metadata jsonb
 --   owner_user_id uuid → auth.users.id  (added in multi_tenant_onboarding.sql)
 --
+-- contacts  (see contacts_and_requests.sql)
+--   id uuid PK, tenant_id, phone, name, notes, last_reason, metadata, timestamps
+--
+-- service_requests  (see contacts_and_requests.sql)
+--   id uuid PK, tenant_id, contact_id, call_id
+--   request_type (hold|enquiry|order|callback|other)
+--   status (open|fulfilled|cancelled)
+--   item, quantity, when_text, notes, caller_name, caller_phone, metadata
+--
 -- tenant_members  (user ↔ tenant mapping; see multi_tenant_onboarding.sql)
 --   id uuid PK
 --   created_at timestamptz
