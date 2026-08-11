@@ -7,6 +7,8 @@ const path = require('path');
 
 const serverPath = path.join(__dirname, '..', 'server.js');
 const source = fs.readFileSync(serverPath, 'utf8');
+const sttPath = path.join(__dirname, '..', 'src/speech/sonioxStt.js');
+const sttSource = fs.readFileSync(sttPath, 'utf8');
 
 assert.match(
   source,
@@ -72,6 +74,24 @@ assert.match(
   source,
   /type:\s*['"]killAudio['"]/,
   'media clear must send drachtio killAudio on barge-in'
+);
+
+assert.match(
+  sttSource,
+  /context_used=/,
+  'Soniox STT open must log context_used for A/B measurement'
+);
+
+assert.match(
+  source,
+  /contextPromise:/,
+  'media path must pass tenant STT contextPromise into createSonioxSttSession'
+);
+
+assert.match(
+  source,
+  /buildSttContext/,
+  'media path must build per-tenant Soniox STT context'
 );
 
 console.log('Voice runtime wiring checks passed.');
