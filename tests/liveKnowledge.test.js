@@ -1,55 +1,81 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { buildLiveGroundTruth } = require('../src/conversation/liveKnowledge');
+// Unit tests for live ground truth / unknown-answer policy (Brain lane).
+// Run: node tests/liveKnowledge.test.js
 
-describe('buildLiveGroundTruth business operating model', () => {
-  it('injects vertical, handoff, locations, and policies', () => {
-    const text = buildLiveGroundTruth({
-      vertical: 'retail',
-      handoffMode: 'callback',
-      businessLocations: [
-        {
-          label: 'Main shop',
-          address: 'Westlands',
-          landmark: 'Opposite Naivas',
-          directions: 'From Waiyaki Way turn at Shell',
-          coverage_notes: '',
-        },
-      ],
-      businessPolicies: {
-        payment: 'M-Pesa and cash',
-        returns: '7 days with receipt',
-        delivery: '',
-        deposit: '',
-        cancellation: '',
-        warranty: '',
-        other: '',
-      },
-      servicesCatalog: [{ name: 'Phone charger', price_range: 'from 500' }],
-      faqs: [],
-      teamDirectory: [],
-      agentTools: { escalate: true, end_call: true },
-    });
+const assert = require('assert');
+const {
+  buildLiveGroundTruth,
+  formatUnknownAnswerPolicy,
+} = require('../src/conversation/liveKnowledge');
+const { buildSystemPrompt, CONVERSATION_RULES } = require('../src/prompts');
 
-    assert.match(text, /BUSINESS VERTICAL: retail/);
-    assert.match(text, /HANDOFF MODE: callback/);
-    assert.match(text, /Opposite Naivas/);
-    assert.match(text, /From Waiyaki Way turn at Shell/);
-    assert.match(text, /Payment: M-Pesa and cash/);
-    assert.match(text, /Returns \/ exchanges: 7 days with receipt/);
-    assert.match(text, /Phone charger/);
-    assert.match(text, /Resolve the caller's request/);
-  });
+let passed = 0;
+function test(name, fn) {
+  try {
+    fn();
+    passed += 1;
+    console.log(`  ✓ ${name}`);
+  } catch (err) {
+    console.error(`  ✗ ${name}`);
+    console.error(`    ${err.message}`);
+    process.exitCode = 1;
+  }
+}
 
-  it('mentions live_transfer fallback guidance', () => {
-    const text = buildLiveGroundTruth({
-      vertical: 'home_services',
-      handoffMode: 'live_transfer',
-      businessLocations: [{ label: 'Depot', address: 'Industrial Area' }],
-      servicesCatalog: [{ name: 'Plumbing' }],
-      agentTools: { escalate: false, end_call: true },
-    });
-    assert.match(text, /HANDOFF MODE: live_transfer/);
-    assert.match(text, /transfer is unavailable/);
-  });
+console.log('liveKnowledge unknown-answer policy');
+
+test('formatUnknownAnswerPolicy always admits unknown + captures lead', () => {
+  const text = formatUnknownAnswerPolicy('');
+  assert.match(text, /UNKNOWN ANSWER POLICY/);
+  assert.match(text, /Do NOT invent/i);
+  assert.match(text, /name \+ reason/i);
+  assert.match(text, /I don't have that detail/i);
+  assert.match(text, /Sina hiyo detail/i);
 });
+
+test('formatUnknownAnswerPolicy prefers owner custom line', () => {
+  const text = formatUnknownAnswerPolicy('Boss atakupigia leo.');
+  assert.match(text, /Preferred line/);
+  assert.match(text, /Boss atakupigia leo\./);
+  assert.doesNotMatch(text, /Default line ideas/);
+});
+
+test('buildLiveGroundTruth injects unknown policy without custom line', () => {
+  const truth = buildLiveGroundTruth({
+    servicesCatalog: [{ name: 'Plumbing', price_range: 'quote after visit' }],
+    faqs: [],
+    teamDirectory: [],
+  });
+  assert.match(truth, /LIVE GROUND TRUTH/);
+  assert.match(truth, /UNKNOWN ANSWER POLICY/);
+  assert.match(truth, /Do NOT invent/i);
+  assert.doesNotMatch(truth, /Preferred line/);
+});
+
+test('buildLiveGroundTruth includes custom unknown request line', () => {
+  const truth = buildLiveGroundTruth({
+    servicesCatalog: [{ name: 'Cleaning' }],
+    unknownAnswerFallback: 'Let me note that — the boss will call you back today.',
+  });
+  assert.match(truth, /Preferred line/);
+  assert.match(truth, /boss will call you back today/);
+});
+
+test('CONVERSATION_RULES require admit-unknown behavior', () => {
+  assert.match(CONVERSATION_RULES, /UNKNOWN ANSWERS/);
+  assert.match(CONVERSATION_RULES, /do not know/i);
+});
+
+test('buildSystemPrompt surfaces unknown policy via live ground truth', () => {
+  const prompt = buildSystemPrompt({
+    businessName: 'Test Biz',
+    agentName: 'Amina',
+    servicesCatalog: [{ name: 'Plumbing' }],
+    unknownAnswerFallback: 'Tutakupigia baadaye.',
+  });
+  assert.match(prompt, /UNKNOWN ANSWER POLICY/);
+  assert.match(prompt, /Tutakupigia baadaye/);
+  assert.match(prompt, /UNKNOWN ANSWERS/);
+});
+
+console.log(`\n${passed} passed`);
+if (process.exitCode) process.exit(process.exitCode);

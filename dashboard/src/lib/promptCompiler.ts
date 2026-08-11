@@ -21,10 +21,11 @@ Requirements for the prompt you write:
 - If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Rule: the AI is the receptionist, not the expert. For anger, refunds, billing, or a matching role, acknowledge, say that teammate will follow up, capture name + reason, and use the escalate tool. If the caller asks for a role not on the list (e.g. sales when only CEO is listed), do not invent staff — offer the closest listed person (usually owner/CEO) and still escalate.
 - Respect handoff mode: if callback, do not invent live transfers; if live_transfer, prefer connecting a human when asked and fall back to callback notes when transfer is unavailable.
 - If escalation is disabled, still list the team for awareness but instruct: do not escalate; capture name + reason and say the business will follow up.
-- Include a short "Your job on this call" checklist: fully assist from knowledge (answer, directions, policies) before offering callback; get name when needed for a request or handoff (confirm once if unsure); confirm the outcome; goodbye. Do not force a callback promise when you already resolved the ask. If the caller corrects their name, use the corrected name going forward.
-- Include live-phone conversation rules: answer first (no stalling), never end a turn on a closed/status fact alone (always say how you can still help and ask one next question), at most one clarifying question per turn, match EN/SW/Sheng, 1–2 short spoken sentences, never invent prices/stock/availability/people/policies outside knowledge.
-- If an "unknown request line" is provided, add a rule: when a caller asks for something outside the business knowledge and FAQs, respond with that exact line (adapted to the caller's language) instead of a generic deflection.
-- Keep it tight and phone-ready. Do not invent services, prices, hours, locations, FAQs, policies, or teammates that were not provided.
+- Include a short "Your job on this call" checklist: answer from knowledge and FAQs only, get name (confirm once if unsure of pronunciation/spelling), get reason, confirm, goodbye. If the caller corrects their name, use the corrected name going forward.
+- Include live-phone conversation rules: answer first (no stalling), never end a turn on a closed/status fact alone (always say how you can still help and ask one next question), at most one clarifying question per turn, match EN/SW/Sheng, 1–2 short spoken sentences, never invent prices/availability/people outside knowledge.
+- Always include an UNKNOWN ANSWER rule: when the ask is outside business knowledge and FAQs, admit you do not have that detail, keep one short sentence, then capture or confirm name + reason so the team can follow up. Never invent prices, availability, guarantees, or services.
+- If an "unknown request line" is provided, that line is the preferred spoken phrasing (adapt to the caller's language, keep the same meaning). If none is provided, use a short default like "I don't have that detail — I'll note it and the team will follow up" (or Kiswahili/Sheng equivalent).
+- Keep it tight and phone-ready. Do not invent services, prices, hours, locations, FAQs, or teammates that were not provided.
 - Do not include tool markers or ###ENDCALL### — the voice engine appends those.`;
 
 export function parseAgentTone(raw: string): OnboardingTone | null {
@@ -146,13 +147,10 @@ export async function compileReceptionistPrompt(opts: {
       "",
       "Golden FAQs:",
       formatFaqsForCompiler(faqs),
-      ...(unknownLine
-        ? [
-            "",
-            "Unknown request line (say this when asked for something we do not offer):",
-            unknownLine,
-          ]
-        : []),
+      "",
+      unknownLine
+        ? `Unknown request line (preferred phrasing when asked for something outside knowledge — adapt to caller language): ${unknownLine}`
+        : "Unknown request line: (none — use a short default admit-unknown + team will follow up, then capture name + reason)",
       "",
       "Write the optimized llm_system_prompt now.",
     ].join("\n");
