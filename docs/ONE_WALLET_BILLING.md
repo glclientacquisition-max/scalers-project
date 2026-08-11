@@ -47,24 +47,24 @@ WALLET_LINE_FEE_KES_PER_MONTH=1000
 
 Also apply `docs/supabase/wallet_security_beta.sql` (RPC locks, column protection, ops audit, beta defaults).
 
-Then apply `docs/supabase/wallet_soft_spend_limit.sql` (owner opt-in soft monthly budget).
+Then apply `docs/supabase/wallet_soft_spend_limit.sql` (optional soft-budget columns).
 
-## Soft spend limit (owner opt-in)
+Then apply `docs/supabase/wallet_on_demand_alerts.sql` (automatic low-balance live alerts + on-demand opt-in).
 
-Cursor-style monthly budget on the owner Wallet page:
+## Prepaid alerts + on-demand (Cursor-like)
 
-| Setting | Behavior |
+| Piece | Behavior |
 |---|---|
-| Off (default) | No budget tracking |
-| On + owner-chosen KES amount | Warn at 50% / 80% / 100% of month-to-date spend |
-| Soft vs hard | Soft **never blocks calls**; hard inbound gate is separate |
+| Prepaid balance | Paid wallet money used first for call + line charges |
+| Automatic live alerts | WhatsApp/email when balance drops under `wallet_low_balance_kes` (default 200) and again at ≤ 0. No owner soft-limit setup required. |
+| On-demand usage (opt-in) | Default **off**. When prepaid ≤ 0 and on-demand off → further call charges pause until top-up. When on → keep charging (overdraft). |
+| Soft inbound block | Separate hard-enforcement step (not this migration) |
 
-Owners opt in by will only and set their own limit (presets or custom, min KES 500). Prepaid counts ledger `call_charge` + `line_rental`; beta shows illustrative rate-card cost against the budget.
+Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit.
 
 ## Later
 
 - M-Pesa / Paystack STK top-up → `topup` ledger rows
-- Hard enforcement on inbound when balance ≤ 0
-- Email spend alerts at soft thresholds
+- Hard enforcement on inbound when balance ≤ 0 and on-demand off
 - Nairobi-TZ month boundaries
 - COGS-based rate tuning (Soniox + Gemini)

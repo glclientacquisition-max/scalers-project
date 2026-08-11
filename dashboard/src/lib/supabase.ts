@@ -151,6 +151,8 @@ export type TenantRow = {
   /** Owner opt-in monthly soft spend budget (warn only). */
   soft_spend_limit_enabled?: boolean | null;
   soft_spend_limit_kes?: number | null;
+  /** Owner opt-in: continue charging after prepaid hits zero. */
+  on_demand_usage_enabled?: boolean | null;
   /** @deprecated Prefer wallet_balance_kes */
   telecom_wallet_balance_kes?: number | null;
   /** @deprecated AI bundled into wallet_balance_kes */
