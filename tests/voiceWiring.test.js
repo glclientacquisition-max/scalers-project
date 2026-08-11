@@ -44,4 +44,22 @@ assert.match(
   'playback end / barge-in must release queued caller speech'
 );
 
+assert.match(
+  source,
+  /createVoiceTurnTiming/,
+  'media turns must record voice-timing markers for speed/consistency'
+);
+
+assert.match(
+  source,
+  /llm→tts stream prefetched/,
+  'reply TTS must be prefetched while Gemini starts'
+);
+
+assert.match(
+  source,
+  /Drop filler PCM via generation bump only/,
+  'filler stop must not cancel the prefetched reply TTS stream'
+);
+
 console.log('Voice runtime wiring checks passed.');
