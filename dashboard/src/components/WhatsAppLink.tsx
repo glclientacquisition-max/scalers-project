@@ -3,10 +3,13 @@
  * Renders the caller number with a green WhatsApp deep link (https://wa.me/<digits>).
  */
 
-export function waMeHref(rawNumber: string): string | null {
+export function waMeHref(rawNumber: string, message?: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
   if (digits.length < 9) return null;
-  return `https://wa.me/${digits}`;
+  const base = `https://wa.me/${digits}`;
+  const text = String(message || "").trim();
+  if (!text) return base;
+  return `${base}?text=${encodeURIComponent(text)}`;
 }
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -26,14 +29,17 @@ export function WhatsAppLink({
   number,
   label,
   compact = false,
+  message,
 }: {
   number: string;
   /** Optional visible text; defaults to the number itself. */
   label?: string;
   /** Icon-only pill (for tight table cells). */
   compact?: boolean;
+  /** Prefills the WhatsApp composer (follow-up opener). */
+  message?: string;
 }) {
-  const href = waMeHref(number);
+  const href = waMeHref(number, message);
   const text = label ?? number;
 
   if (!href) {

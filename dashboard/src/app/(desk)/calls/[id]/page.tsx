@@ -10,22 +10,17 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { CallAudioPlayer } from "@/components/CallAudioPlayer";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
+import { MarkLeadDoneButton } from "@/components/MarkLeadDoneButton";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import {
+  callsHref,
+  followUpWhatsAppMessage,
+  formatCallWhen,
+  type StatusFilterId,
+} from "@/lib/callsTriage";
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
-
-function formatWhen(iso: string) {
-  try {
-    return new Intl.DateTimeFormat("en-KE", {
-      dateStyle: "full",
-      timeStyle: "medium",
-      timeZone: "Africa/Nairobi",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
 
 /** WhatsApp-style transcript bubble. Caller = green/left, receptionist = grey/right. */
 function ChatBubble({ turn }: { turn: TranscriptRow }) {
@@ -36,7 +31,7 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
   if (isSystem) {
     return (
       <div className="flex justify-center px-2">
-        <p className="max-w-[85%] rounded-full bg-[var(--bg-deep)]/80 px-4 py-1.5 text-center text-xs text-[var(--ink-soft)]">
+        <p className="max-w-[85%] rounded-full bg-surface-muted/80 px-4 py-1.5 text-center text-xs text-ink-soft">
           {turn.text_content}
         </p>
       </div>
@@ -49,14 +44,14 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
         className={[
           "max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[75%]",
           isCaller
-            ? "rounded-bl-md bg-[#d9f4e2] text-[var(--ink)]"
-            : "rounded-br-md bg-[var(--bg-deep)]/90 text-[var(--ink)]",
+            ? "rounded-bl-md bg-[#d9f4e2] text-ink"
+            : "rounded-br-md bg-surface-muted/90 text-ink",
         ].join(" ")}
       >
         <p
           className={[
             "text-[11px] font-medium uppercase tracking-wide",
-            isCaller ? "text-[#2f6b3a]" : "text-[var(--ink-soft)]",
+            isCaller ? "text-[#2f6b3a]" : "text-ink-soft",
           ].join(" ")}
         >
           {isCaller ? "Caller" : "Receptionist"}
@@ -81,6 +76,13 @@ function buildSummarySentence(opts: {
   return `${who} called about: ${reason}.${opts.urgent ? " This sounded urgent." : ""}`;
 }
 
+function parseFromFilter(raw: string | undefined): StatusFilterId | undefined {
+  if (raw === "all" || raw === "new" || raw === "contacted" || raw === "resolved") {
+    return raw;
+  }
+  return undefined;
+}
+
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
 const CALL_SELECT_LEGACY =
@@ -88,10 +90,26 @@ const CALL_SELECT_LEGACY =
 
 export default async function CallDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const fromFilter = parseFromFilter(sp.from);
+  const backHref = fromFilter ? callsHref({ status: fromFilter }) : "/calls";
+  const backLabel =
+    fromFilter === "new"
+      ? "Back to new leads"
+      : fromFilter === "contacted"
+        ? "Back to contacted"
+        : fromFilter === "resolved"
+          ? "Back to resolved"
+          : fromFilter === "all"
+            ? "Back to all calls"
+            : "Back to inbox";
+
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
 
@@ -126,6 +144,10 @@ export default async function CallDetailPage({
   const name = typeof meta.name === "string" ? meta.name : null;
   const reason = typeof meta.reason === "string" ? meta.reason : null;
   const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
+  const leadStatus = parseLeadStatus(row.lead_status);
+  const title = name || row.caller_number;
+  const businessName = tenant.business_name?.trim() || "us";
+  const waMessage = followUpWhatsAppMessage({ businessName, name, reason });
   const escalatedTo =
     meta.escalated_to && typeof meta.escalated_to === "object"
       ? (meta.escalated_to as { name?: string; role?: string; phone?: string })
@@ -143,76 +165,96 @@ export default async function CallDetailPage({
 
   return (
     <div className="max-w-3xl">
-      <Link href="/calls" className="text-sm text-[var(--accent)] hover:underline">
-        ← All calls
+      <Link
+        href={backHref}
+        className="text-sm font-medium text-accent hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+      >
+        ← {backLabel}
       </Link>
 
-      <h1 className="mt-4 font-display text-4xl tracking-tight">Call detail</h1>
-      <p className="mt-2 text-[var(--ink-soft)]">{formatWhen(row.created_at)}</p>
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+            {title}
+          </h1>
+          <p className="mt-2 text-ink-soft">{formatCallWhen(row.created_at, "full")}</p>
+          {urgent ? (
+            <p className="mt-2 text-sm font-medium text-warn">Marked urgent by the receptionist</p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <WhatsAppLink number={row.caller_number} compact message={waMessage} />
+          {leadStatusReady && leadStatus !== "resolved" ? (
+            <MarkLeadDoneButton callId={row.id} />
+          ) : null}
+        </div>
+      </div>
 
-      {/* AI summary box — the 3-second read */}
       <section
         className={[
           "mt-6 rounded-2xl border p-5",
-          urgent
-            ? "border-warn/50 bg-warn-soft"
-            : "border-accent/30 bg-accent-soft",
+          urgent ? "border-warn/50 bg-warn-soft" : "border-accent/30 bg-accent-soft",
         ].join(" ")}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
+            <h2 className="text-xs uppercase tracking-wide text-ink-soft">
               What this call was about
             </h2>
-            <p className="mt-2 text-base leading-relaxed text-[var(--ink)]">
-              {buildSummarySentence({ name, reason, callerNumber: row.caller_number, urgent })}
+            <p className="mt-2 text-base leading-relaxed text-ink">
+              {buildSummarySentence({
+                name,
+                reason,
+                callerNumber: row.caller_number,
+                urgent,
+              })}
             </p>
           </div>
           {leadStatusReady ? (
-            <LeadStatusToggle
-              callId={row.id}
-              initial={parseLeadStatus(row.lead_status)}
-              size="md"
-            />
+            <LeadStatusToggle callId={row.id} initial={leadStatus} size="md" />
           ) : null}
         </div>
+        <p className="mt-4 text-xs text-ink-soft">
+          Tip: WhatsApp opens with a short follow-up draft. Owners can&apos;t hard-delete calls —
+          use <span className="font-medium text-ink">Done</span> to clear the queue (marks Resolved).
+        </p>
       </section>
 
       <section className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
-          <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Caller</h2>
+        <div className="rounded-2xl border border-line bg-surface p-5">
+          <h2 className="text-xs uppercase tracking-wide text-ink-soft">Caller</h2>
           <div className="mt-2 text-lg">
-            <WhatsAppLink number={row.caller_number} />
+            <WhatsAppLink number={row.caller_number} message={waMessage} />
           </div>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">
+          <p className="mt-1 text-sm text-ink-soft">
             SID {row.sautikit_call_sid || "—"}
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
-          <h2 className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Call</h2>
+        <div className="rounded-2xl border border-line bg-surface p-5">
+          <h2 className="text-xs uppercase tracking-wide text-ink-soft">Call</h2>
           <div className="mt-2 flex flex-wrap gap-3 text-sm">
             <span>Duration: {row.duration_seconds ?? "—"}s</span>
             <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
             <span>Escalation: {meta.escalation_sent ? "sent" : "no"}</span>
           </div>
           {escalatedTo?.name ? (
-            <p className="mt-2 text-sm text-[var(--ink)]">
+            <p className="mt-2 text-sm text-ink">
               Escalated to {escalatedTo.name}
               {escalatedTo.role ? ` (${escalatedTo.role})` : ""}
               {escalateReason ? `: ${escalateReason}` : ""}
             </p>
           ) : null}
           {!row.recording_url ? (
-            <p className="mt-2 text-sm text-[var(--ink-soft)]">No recording attached yet.</p>
+            <p className="mt-2 text-sm text-ink-soft">No recording attached yet.</p>
           ) : null}
         </div>
       </section>
 
       <section className="mt-8">
         <h2 className="font-display text-2xl">Conversation</h2>
-        <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--card)] px-2 py-4 sm:px-4">
+        <div className="mt-4 rounded-2xl border border-line bg-surface px-2 py-4 sm:px-4">
           {turns.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-[var(--ink-soft)]">
+            <p className="px-3 py-6 text-center text-sm text-ink-soft">
               No transcript rows for this call.
             </p>
           ) : (
