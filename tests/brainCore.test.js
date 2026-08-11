@@ -30,7 +30,7 @@ describe('Brain state and next-best-action', () => {
     assert.equal(state.goal.primary, 'learn_business_hours');
     assert.equal(decision.action, 'ANSWER');
     assert.match(decision.reason, /direct resolution/i);
-    assert.doesNotMatch(decision.reason, /capture/i);
+    assert.match(decision.reason, /before any capture or handoff/i);
   });
 
   it('routes an explicit human request to alert when transfer is unavailable', () => {
