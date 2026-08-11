@@ -47,6 +47,8 @@ function normalizeDraft(raw: unknown, sourceLabel: string): IngestDraft {
         price_range: String(r.price_range || r.priceRange || "").trim().slice(0, 80),
         notes: String(r.notes || "").trim().slice(0, 200),
         out_of_scope: String(r.out_of_scope || r.outOfScope || "").trim().slice(0, 160),
+        in_stock: "",
+        category: String(r.category || "").trim().slice(0, 80),
       };
     })
     .filter((s) => s.name)

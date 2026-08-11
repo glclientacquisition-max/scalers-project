@@ -3,10 +3,36 @@ export type ServiceItem = {
   price_range: string;
   notes: string;
   out_of_scope: string;
+  /** yes | no | unknown | "" (unset) */
+  in_stock: string;
+  category: string;
 };
 
 export function emptyService(): ServiceItem {
-  return { name: "", price_range: "", notes: "", out_of_scope: "" };
+  return {
+    name: "",
+    price_range: "",
+    notes: "",
+    out_of_scope: "",
+    in_stock: "",
+    category: "",
+  };
+}
+
+function normalizeInStock(raw: unknown): string {
+  const stockRaw = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (["yes", "true", "1", "in_stock", "available"].includes(stockRaw)) {
+    return "yes";
+  }
+  if (
+    ["no", "false", "0", "out", "out_of_stock", "unavailable"].includes(stockRaw)
+  ) {
+    return "no";
+  }
+  if (["unknown", "maybe", "?"].includes(stockRaw)) return "unknown";
+  return "";
 }
 
 export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
@@ -19,9 +45,19 @@ export function normalizeServicesCatalog(raw: unknown): ServiceItem[] {
         price_range: String(r.price_range || r.priceRange || "").trim(),
         notes: String(r.notes || "").trim(),
         out_of_scope: String(r.out_of_scope || r.outOfScope || "").trim(),
+        in_stock: normalizeInStock(r.in_stock ?? r.inStock),
+        category: String(r.category || "").trim(),
       };
     })
-    .filter((row) => row.name || row.price_range || row.notes || row.out_of_scope);
+    .filter(
+      (row) =>
+        row.name ||
+        row.price_range ||
+        row.notes ||
+        row.out_of_scope ||
+        row.in_stock ||
+        row.category
+    );
 }
 
 export function parseServicesCatalogField(raw: FormDataEntryValue | null): ServiceItem[] {
@@ -42,7 +78,9 @@ export function formatServicesForCompiler(
   const rows = services.filter((s) => s.name.trim());
   const lines = rows.map((s) => {
     const bits = [`- ${s.name.trim()}`];
+    if (s.category.trim()) bits.push(`category ${s.category.trim()}`);
     if (s.price_range.trim()) bits.push(`price ${s.price_range.trim()}`);
+    if (s.in_stock.trim()) bits.push(`in stock ${s.in_stock.trim()}`);
     if (s.notes.trim()) bits.push(s.notes.trim());
     if (s.out_of_scope.trim()) bits.push(`out of scope: ${s.out_of_scope.trim()}`);
     return bits.join(" - ");
@@ -77,6 +115,8 @@ function parseBulkServiceLine(line: string): ServiceItem | null {
       price_range: price,
       notes,
       out_of_scope: out,
+      in_stock: "",
+      category: "",
     };
   }
 
@@ -90,6 +130,8 @@ function parseBulkServiceLine(line: string): ServiceItem | null {
       price_range: price,
       notes,
       out_of_scope: out,
+      in_stock: "",
+      category: "",
     };
   }
 
@@ -104,6 +146,8 @@ function parseBulkServiceLine(line: string): ServiceItem | null {
       price_range: price,
       notes: "",
       out_of_scope: "",
+      in_stock: "",
+      category: "",
     };
   }
 
@@ -113,6 +157,8 @@ function parseBulkServiceLine(line: string): ServiceItem | null {
     price_range: "",
     notes: "",
     out_of_scope: "",
+    in_stock: "",
+    category: "",
   };
 }
 

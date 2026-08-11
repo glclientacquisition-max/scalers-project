@@ -682,13 +682,13 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-name-${index}`}>
-                      Service name
+                      {vertical === "retail" ? "Product name" : "Service name"}
                     </label>
                     <input
                       id={`svc-name-${index}`}
                       value={service.name}
                       onChange={(e) => updateService(index, "name", e.target.value)}
-                      placeholder="Home cleaning"
+                      placeholder={vertical === "retail" ? "Phone charger" : "Home cleaning"}
                       className={fieldClass}
                     />
                   </div>
@@ -701,6 +701,42 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                       value={service.price_range}
                       onChange={(e) => updateService(index, "price_range", e.target.value)}
                       placeholder="from 2,500 KES"
+                      className={fieldClass}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`svc-stock-${index}`}
+                    >
+                      In stock
+                    </label>
+                    <select
+                      id={`svc-stock-${index}`}
+                      value={service.in_stock || ""}
+                      onChange={(e) => updateService(index, "in_stock", e.target.value)}
+                      className={fieldClass}
+                    >
+                      <option value="">Not set</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`svc-category-${index}`}
+                    >
+                      Category (optional)
+                    </label>
+                    <input
+                      id={`svc-category-${index}`}
+                      value={service.category || ""}
+                      onChange={(e) => updateService(index, "category", e.target.value)}
+                      placeholder={vertical === "retail" ? "Accessories" : "Repairs"}
                       className={fieldClass}
                     />
                   </div>
