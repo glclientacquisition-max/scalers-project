@@ -16,12 +16,33 @@ function asArray(raw) {
 
 function normalizeServices(raw) {
   return asArray(raw)
-    .map((row) => ({
-      name: String(row?.name || '').trim(),
-      price_range: String(row?.price_range || row?.priceRange || '').trim(),
-      notes: String(row?.notes || '').trim(),
-      out_of_scope: String(row?.out_of_scope || row?.outOfScope || '').trim(),
-    }))
+    .map((row) => {
+      const stockRaw = String(
+        row?.in_stock ?? row?.inStock ?? ''
+      )
+        .trim()
+        .toLowerCase();
+      let in_stock = '';
+      if (['yes', 'true', '1', 'in_stock', 'available'].includes(stockRaw)) {
+        in_stock = 'yes';
+      } else if (
+        ['no', 'false', '0', 'out', 'out_of_stock', 'unavailable'].includes(
+          stockRaw
+        )
+      ) {
+        in_stock = 'no';
+      } else if (['unknown', 'maybe', '?'].includes(stockRaw)) {
+        in_stock = 'unknown';
+      }
+      return {
+        name: String(row?.name || '').trim(),
+        price_range: String(row?.price_range || row?.priceRange || '').trim(),
+        notes: String(row?.notes || '').trim(),
+        out_of_scope: String(row?.out_of_scope || row?.outOfScope || '').trim(),
+        in_stock,
+        category: String(row?.category || '').trim(),
+      };
+    })
     .filter((row) => row.name);
 }
 
@@ -49,7 +70,9 @@ function formatServicesBlock(services) {
   return services
     .map((s, i) => {
       const bits = [`${i + 1}. ${s.name}`];
+      if (s.category) bits.push(`Category: ${s.category}`);
       if (s.price_range) bits.push(`Price: ${s.price_range}`);
+      if (s.in_stock) bits.push(`In stock: ${s.in_stock}`);
       if (s.notes) bits.push(`Notes: ${s.notes}`);
       if (s.out_of_scope) bits.push(`Out of scope: ${s.out_of_scope}`);
       return bits.join(' | ');
@@ -189,7 +212,9 @@ function formatServicesForCompiler(services, extraNotes = '') {
   const rows = normalizeServices(services);
   const lines = rows.map((s) => {
     const bits = [`- ${s.name}`];
+    if (s.category) bits.push(`category ${s.category}`);
     if (s.price_range) bits.push(`price ${s.price_range}`);
+    if (s.in_stock) bits.push(`in stock ${s.in_stock}`);
     if (s.notes) bits.push(s.notes);
     if (s.out_of_scope) bits.push(`out of scope: ${s.out_of_scope}`);
     return bits.join(' - ');
