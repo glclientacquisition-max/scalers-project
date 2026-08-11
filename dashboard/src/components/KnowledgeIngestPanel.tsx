@@ -57,6 +57,13 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
       setPaste("");
       setUrl("");
       router.refresh();
+      // Bring Train into view so the remounted form is obvious.
+      window.setTimeout(() => {
+        document.getElementById("train")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 250);
     }
   }, [applyState, router]);
 
@@ -112,7 +119,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           Tick what looks right before anything goes live.
         </p>
         <p className="mt-2 text-xs text-[var(--ink-soft)]">
-          Tip: set your weekly hours and tone of voice below once first. Imports use those to retrain the assistant.
+          Tip: paste a short menu (one item per line) or Q&amp;A pairs. Long documents work best when turned into FAQs — we skip paragraph-length &quot;services&quot;. After you add items, open Train to review the refreshed list.
         </p>
       </div>
 

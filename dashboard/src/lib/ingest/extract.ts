@@ -18,20 +18,46 @@ Extract ONLY facts clearly present in the source. Do not invent prices, services
 
 Return ONLY valid JSON (no markdown fences) with this shape:
 {
-  "services": [{"name":"","price_range":"","notes":"","out_of_scope":""}],
+  "services": [{"name":"","price_range":"","notes":"","out_of_scope":"","category":""}],
   "faqs": [{"question":"","answer":""}],
   "team": [{"name":"","role":"","phone":"","email":""}],
   "unknown_answer_fallback": ""
 }
 
 Rules:
-- services: product/service menu items with prices when stated
-- faqs: real Q&A pairs from the source (or clear policy statements turned into Q&A)
+- services: ONLY short sellable items / rooms / packages / menu lines (name ideally under 60 characters). Examples: "Deluxe room", "Phone charger", "Full English breakfast". NEVER put paragraphs, section headings ("1. Business identity"), or marketing prose in services.name.
+- If the source is a long document, put location, policies, about-us, and how-to facts into faqs (Q/A), not into services.
+- faqs: real Q&A pairs. Turn clear statements into Q/A (e.g. Q: Where are you? A: Ngong Road, Kilimani).
 - team: only named people with roles; leave empty if unclear
 - unknown_answer_fallback: only if the source has a clear "if we don't offer X, say…" line; else ""
 - Prefer short phone-friendly wording
 - Max 40 services, 25 faqs, 20 team rows
 - If the source is empty or unrelated, return empty arrays`;
+
+/** True when a "service" row looks like document prose, not a catalog item. */
+export function isProseServiceName(name: string): boolean {
+  const n = String(name || "").trim();
+  if (!n) return true;
+  if (n.length > 80) return true;
+  if (/^\d+[\.)]\s/.test(n)) return true; // "1. Business identity"
+  if (
+    /\b(business identity|service philosophy|positioning|accessibility|provides the following|conveniently located)\b/i.test(
+      n
+    )
+  ) {
+    return true;
+  }
+  // Sentence-like / trailing period catalog junk
+  if (/[.!?]$/.test(n) && (n.length > 40 || (n.match(/\s+/g) || []).length >= 4)) {
+    return true;
+  }
+  if ((n.match(/\s+/g) || []).length >= 12) return true;
+  return false;
+}
+
+function qualityServiceCount(services: ServiceItem[]): number {
+  return services.filter((s) => s.name && !isProseServiceName(s.name)).length;
+}
 
 function asArray(raw: unknown): unknown[] {
   return Array.isArray(raw) ? raw : [];
@@ -43,7 +69,7 @@ function normalizeDraft(raw: unknown, sourceLabel: string): IngestDraft {
     .map((row) => {
       const r = (row || {}) as Record<string, unknown>;
       return {
-        name: String(r.name || "").trim().slice(0, 120),
+        name: String(r.name || "").trim().slice(0, 80),
         price_range: String(r.price_range || r.priceRange || "").trim().slice(0, 80),
         notes: String(r.notes || "").trim().slice(0, 200),
         out_of_scope: String(r.out_of_scope || r.outOfScope || "").trim().slice(0, 160),
@@ -51,7 +77,7 @@ function normalizeDraft(raw: unknown, sourceLabel: string): IngestDraft {
         category: String(r.category || "").trim().slice(0, 80),
       };
     })
-    .filter((s) => s.name)
+    .filter((s) => s.name && !isProseServiceName(s.name))
     .slice(0, 40);
 
   const faqs = asArray(obj.faqs)
@@ -110,9 +136,24 @@ function extractJsonObject(text: string): unknown {
 
 /** Cheap local fallback when Gemini is unavailable. */
 export function extractLocally(sourceText: string, sourceLabel: string): IngestDraft {
-  const services = parseBulkServices(sourceText).slice(0, 40);
-  const faqs: FaqEntry[] = [];
   const lines = sourceText.split("\n").map((l) => l.trim()).filter(Boolean);
+  // Only keep short menu-like lines (bullets / name - price). Skip document prose.
+  const menuLike = lines
+    .filter((line) => {
+      if (isProseServiceName(line.replace(/^[-*•]\s*/, ""))) return false;
+      if (/^q[:.]/i.test(line) || line.endsWith("?")) return false;
+      if (/^a[:.]/i.test(line)) return false;
+      return (
+        /^[-*•]/.test(line) ||
+        /\s[-–—]\s/.test(line) ||
+        (line.length <= 60 && !/[.!?]$/.test(line))
+      );
+    })
+    .join("\n");
+  const services = parseBulkServices(menuLike)
+    .filter((s) => s.name && !isProseServiceName(s.name))
+    .slice(0, 40);
+  const faqs: FaqEntry[] = [];
   for (let i = 0; i < lines.length - 1; i += 1) {
     const q = lines[i];
     const a = lines[i + 1];
@@ -178,9 +219,13 @@ export async function extractKnowledgeFromText(opts: {
     }
 
     const geminiScore =
-      draft.services.length + draft.faqs.length + draft.team.length;
+      qualityServiceCount(draft.services) * 2 +
+      draft.faqs.length +
+      draft.team.length;
     const localScore =
-      local.services.length + local.faqs.length + local.team.length;
+      qualityServiceCount(local.services) * 2 +
+      local.faqs.length +
+      local.team.length;
     if (geminiScore === 0 && localScore > 0) {
       return { draft: local, source: "local" };
     }

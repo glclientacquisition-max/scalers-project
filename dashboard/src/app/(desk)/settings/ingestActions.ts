@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
@@ -19,11 +20,22 @@ import {
 } from "@/lib/ingest/sanitize";
 import {
   extractKnowledgeFromText,
+  isProseServiceName,
   mergeIngestDraft,
   type IngestDraft,
 } from "@/lib/ingest/extract";
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
 import { parseAgentTools } from "@/lib/agentTools";
+import { parseVertical } from "@/lib/vertical";
+import { parseHandoffMode } from "@/lib/handoffMode";
+import {
+  formatLocationsForCompiler,
+  normalizeBusinessLocations,
+} from "@/lib/businessLocations";
+import {
+  formatPoliciesForCompiler,
+  normalizeBusinessPolicies,
+} from "@/lib/businessPolicies";
 
 export type IngestExtractState = {
   error?: string;
@@ -200,11 +212,15 @@ export async function applyIngestAction(
   const includeUnknown = String(formData.get("include_unknown") || "") === "1";
 
   const existingServices = normalizeServicesCatalog(tenant.services_catalog).filter(
-    (s) => s.name
+    (s) => s.name && !isProseServiceName(s.name)
   );
   const existingFaqs = normalizeFaqs(tenant.faqs);
   const existingTeam = normalizeTeam(tenant.team_directory);
   const existingUnknown = String(tenant.unknown_answer_fallback || "").trim();
+
+  const draftServices = (Array.isArray(draft.services) ? draft.services : []).filter(
+    (s) => s?.name && !isProseServiceName(String(s.name))
+  );
 
   const merged = mergeIngestDraft({
     existingServices,
@@ -212,7 +228,7 @@ export async function applyIngestAction(
     existingTeam,
     existingUnknown,
     draft: {
-      services: Array.isArray(draft.services) ? draft.services : [],
+      services: draftServices,
       faqs: Array.isArray(draft.faqs) ? draft.faqs : [],
       team: Array.isArray(draft.team) ? draft.team : [],
       unknownAnswerFallback: String(draft.unknownAnswerFallback || ""),
@@ -225,29 +241,37 @@ export async function applyIngestAction(
     mode,
   });
 
-  if (!merged.services.length && !merged.faqs.length) {
-    return { error: "Select at least one service or FAQ to add." };
-  }
+  // Drop any prose rows that slipped through selection indexes.
+  merged.services = merged.services.filter(
+    (s) => s.name && !isProseServiceName(s.name)
+  );
 
-  const agentTone = parseAgentTone(String(tenant.agent_tone || ""));
-  if (!agentTone) {
+  if (!merged.services.length && !merged.faqs.length) {
     return {
       error:
-        "Pick a tone of voice in Business settings below, save once, then import again.",
+        "No usable catalog items or FAQs in that selection. For long documents, paste a short menu (one item per line) or Q/A pairs, then try again.",
     };
   }
+
+  const agentTone =
+    parseAgentTone(String(tenant.agent_tone || "")) || "friendly";
 
   const schedule = scheduleForForm(tenant.hours_schedule, tenant.business_hours || "");
   const businessHours =
-    formatHoursForCompiler(schedule) || String(tenant.business_hours || "").trim();
-  if (businessHours.length < 8) {
-    return {
-      error: "Set your weekly hours in Business settings below before importing.",
-    };
-  }
+    formatHoursForCompiler(schedule) ||
+    String(tenant.business_hours || "").trim() ||
+    "Hours not set yet — confirm with the team.";
 
   const servicesOffered = formatServicesForCompiler(merged.services, "");
   const agentName = String(tenant.agent_name || "Receptionist").trim() || "Receptionist";
+  const vertical = parseVertical(tenant.vertical);
+  const handoffMode = parseHandoffMode(tenant.handoff_mode);
+  const locationsText = formatLocationsForCompiler(
+    normalizeBusinessLocations(tenant.business_locations)
+  );
+  const policiesText = formatPoliciesForCompiler(
+    normalizeBusinessPolicies(tenant.business_policies)
+  );
 
   const agentTools = parseAgentTools(tenant.agent_tools);
   const { prompt, source } = await compileReceptionistPrompt({
@@ -260,6 +284,10 @@ export async function applyIngestAction(
     faqs: merged.faqs,
     unknownAnswerFallback: merged.unknownAnswerFallback,
     escalateEnabled: agentTools.escalate,
+    vertical,
+    handoffMode,
+    locationsText,
+    policiesText,
   });
 
   const workspace = await createWorkspaceDataClient();
@@ -273,6 +301,13 @@ export async function applyIngestAction(
     unknown_answer_fallback: merged.unknownAnswerFallback || null,
     llm_system_prompt: prompt,
   };
+  // Persist tone if it was missing so future imports/saves don't block.
+  if (!tenant.agent_tone) {
+    patch.agent_tone = agentTone;
+  }
+  if (!String(tenant.business_hours || "").trim()) {
+    patch.business_hours = businessHours;
+  }
 
   const { error } = await workspace.client
     .from("tenants")
@@ -282,6 +317,8 @@ export async function applyIngestAction(
   if (error) {
     return { error: error.message };
   }
+
+  revalidatePath("/settings");
 
   const parts = [];
   if (merged.added.services) {
@@ -311,9 +348,9 @@ export async function applyIngestAction(
     return {
       ok: true,
       source,
-      message: `Replaced with ${svc} service${svc === 1 ? "" : "s"} and ${faq} FAQ${
+      message: `Saved ${svc} catalog item${svc === 1 ? "" : "s"} and ${faq} FAQ${
         faq === 1 ? "" : "s"
-      }. Live on the next call. Tweak anything below if needed.${capNote}`,
+      }. Train below should refresh — open Train to review. Live on the next call.${capNote}`,
     };
   }
 
@@ -322,7 +359,7 @@ export async function applyIngestAction(
     source,
     message:
       parts.length > 0
-        ? `Added ${parts.join(" and ")}. Live on the next call. No need to retype them below.${capNote}`
+        ? `Added ${parts.join(" and ")}. Open Train below to review (it refreshes after import). Live on the next call.${capNote}`
         : capNote
           ? `Nothing new fit.${capNote}`
           : "Nothing new to add (those items were already on file).",
