@@ -5,8 +5,10 @@
 
 import { generateGeminiMultimodal } from "@/lib/gemini";
 import {
+  isBlockedMatch,
   localSayFallback,
   matchPatternFromPhrase,
+  sanitizeSayForm,
   TTS_SAY_MAX,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
@@ -33,8 +35,9 @@ match_ok rules (strict):
 - Light filler ("um", "okay") around the line is OK
 
 entries rules (only when match_ok true):
-- One entry per TARGET hard name listed (not every English word)
-- "say" = Latin letters Soniox TTS can read on a phone; hyphens for hard syllables (e.g. "Moo-een-dee Mbeen-goo")
+- ONLY emit entries for the listed Hard targets — never for common English (city, market, opposite, located, book, where, what, how, white, paper, kenya, customers, …)
+- "say" = natural Latin spelling Soniox can read; light hyphens only on hard names (e.g. "Eye-sha", "Moo-in-dee Mbeen-goo")
+- Do NOT stack a hyphen on every syllable (never "Si-ti", "loh-kay-tid", "Op-po-sit")
 - Prefer the owner's pronunciation when audible
 - Max ${TTS_SAY_MAX} chars per say
 - No IPA, no quotes inside strings`;
@@ -198,36 +201,46 @@ export async function deriveLexiconFromRecording(opts: {
 
     const rawEntries = Array.isArray(json.entries) ? json.entries : [];
     const entries: TtsLexiconEntry[] = [];
+    const targetKeys = new Set(
+      targets.map((t) => t.label.trim().toLowerCase()).filter(Boolean)
+    );
 
     for (const item of rawEntries) {
       if (!item || typeof item !== "object") continue;
       const row = item as Record<string, unknown>;
       const label = String(row.label || "").trim();
-      const say = String(row.say || "")
-        .trim()
-        .replace(/^["']|["']$/g, "")
-        .slice(0, TTS_SAY_MAX);
-      if (!label || !say) continue;
-      const suggested = targets.find(
-        (t) => t.label.toLowerCase() === label.toLowerCase()
+      if (!label) continue;
+      // Only hard targets — ignore invented common-word entries.
+      const labelKey = label.toLowerCase();
+      const suggested =
+        targets.find((t) => t.label.toLowerCase() === labelKey) ||
+        targets.find((t) => labelKey.includes(t.label.toLowerCase()));
+      if (!suggested && !targetKeys.has(labelKey)) continue;
+
+      const say = sanitizeSayForm(
+        String(row.say || "")
+          .trim()
+          .replace(/^["']|["']$/g, "")
       );
+      if (!say) continue;
       const match =
-        String(row.match || "").trim() ||
         suggested?.match ||
+        String(row.match || "").trim() ||
         matchPatternFromPhrase(label);
-      if (!match) continue;
+      if (!match || isBlockedMatch(match)) continue;
       entries.push({
         match,
         say,
         langs: ["en", "sw", "sheng"],
         priority: 200,
-        label: label.slice(0, 120),
+        label: (suggested?.label || label).slice(0, 120),
         kind: "sentence",
       });
     }
 
     // Ensure every target gets an entry even if model omitted some
     for (const target of targets) {
+      if (isBlockedMatch(target.match)) continue;
       const has = entries.some(
         (e) =>
           e.label?.toLowerCase() === target.label.toLowerCase() ||
