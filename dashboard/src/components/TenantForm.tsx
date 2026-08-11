@@ -1627,8 +1627,9 @@ export function TenantForm({
             Receptionist tools
           </h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Turn capabilities on or off. Saving a caller&apos;s name and reason always
-            stays on so you never miss a lead.
+            Turn capabilities on or off, then train how names and places should sound
+            on the phone. Saving a caller&apos;s name and reason always stays on so you
+            never miss a lead.
           </p>
         </div>
         <div className="space-y-2">
@@ -1715,6 +1716,26 @@ export function TenantForm({
             );
           })}
         </div>
+
+        <PronunciationCoach
+          tenantId={tenant.id}
+          businessName={businessName}
+          agentName={agentName}
+          locationNotes={locationNotes}
+          locations={locations}
+          team={team}
+          services={services}
+          faqs={faqs}
+          bulletinTexts={
+            Array.isArray(tenant.daily_bulletin)
+              ? tenant.daily_bulletin
+                  .map((b) => String(b?.text || "").trim())
+                  .filter(Boolean)
+              : []
+          }
+          initialLexicon={ttsLexicon}
+          onLexiconChange={setTtsLexicon}
+        />
       </section>
 
       <section className={panel === "team" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}>
@@ -1947,28 +1968,6 @@ export function TenantForm({
           />
         </div>
       </section>
-
-      {panel === "faqs" ? (
-      <PronunciationCoach
-        tenantId={tenant.id}
-        businessName={businessName}
-        agentName={agentName}
-        locationNotes={locationNotes}
-        locations={locations}
-        team={team}
-        services={services}
-        faqs={faqs}
-        bulletinTexts={
-          Array.isArray(tenant.daily_bulletin)
-            ? tenant.daily_bulletin
-                .map((b) => String(b?.text || "").trim())
-                .filter(Boolean)
-            : []
-        }
-        initialLexicon={ttsLexicon}
-        onLexiconChange={setTtsLexicon}
-      />
-      ) : null}
 
       <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">
         <button

@@ -23,7 +23,7 @@ const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
   { id: "hours", label: "Hours" },
   { id: "team", label: "Team" },
   { id: "faqs", label: "FAQs" },
-  { id: "tools", label: "Tools" },
+  { id: "tools", label: "Tools & voice" },
 ];
 
 function parseTab(raw: string | null): TabId {
