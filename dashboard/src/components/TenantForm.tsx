@@ -31,6 +31,19 @@ import {
   type ServiceItem,
 } from "@/lib/servicesCatalog";
 import {
+  emptyProduct,
+  formatProductsForCompiler,
+  normalizeProductCatalog,
+  parseBulkProducts,
+  PRODUCT_CATALOG_MAX,
+  type ProductItem,
+} from "@/lib/productCatalog";
+import {
+  normalizeSocialHandles,
+  SOCIAL_FIELDS,
+  type SocialHandles,
+} from "@/lib/socialHandles";
+import {
   saveAndCompileSettings,
   type SettingsCompileState,
 } from "@/app/(desk)/settings/actions";
@@ -161,9 +174,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     const rows = normalizeServicesCatalog(tenant.services_catalog);
     return rows.length ? rows : [emptyService()];
   });
+  const [products, setProducts] = useState<ProductItem[]>(() => {
+    const rows = normalizeProductCatalog(tenant.product_catalog);
+    return rows.length ? rows : [];
+  });
+  const [socialHandles, setSocialHandles] = useState<SocialHandles>(() =>
+    normalizeSocialHandles(tenant.social_handles)
+  );
   const [showBulkServices, setShowBulkServices] = useState(false);
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
+  const [showBulkProducts, setShowBulkProducts] = useState(false);
+  const [bulkProductsText, setBulkProductsText] = useState("");
+  const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
@@ -282,10 +305,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     () => JSON.stringify(services.filter((s) => s.name.trim())),
     [services]
   );
-  const servicesOfferedSummary = useMemo(
-    () => formatServicesForCompiler(services, servicesNotes),
-    [services, servicesNotes]
+  const productsJson = useMemo(
+    () => JSON.stringify(products.filter((p) => p.name.trim())),
+    [products]
   );
+  const socialJson = useMemo(
+    () => JSON.stringify(socialHandles),
+    [socialHandles]
+  );
+  const servicesOfferedSummary = useMemo(() => {
+    const svc = formatServicesForCompiler(services, servicesNotes);
+    const prod = formatProductsForCompiler(products);
+    return [svc, prod].filter(Boolean).join("\n\n");
+  }, [services, servicesNotes, products]);
   const hoursScheduleJson = useMemo(
     () =>
       JSON.stringify({
@@ -331,6 +363,29 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     );
   }
 
+  function updateProduct(index: number, key: keyof ProductItem, value: string) {
+    setProducts((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        if (key === "aliases") {
+          return {
+            ...row,
+            aliases: value
+              .split(/[,;|]/)
+              .map((a) => a.trim())
+              .filter(Boolean)
+              .slice(0, 8),
+          };
+        }
+        return { ...row, [key]: value };
+      })
+    );
+  }
+
+  function updateSocial(key: keyof SocialHandles, value: string) {
+    setSocialHandles((prev) => ({ ...prev, [key]: value }));
+  }
+
   function updateLocation(
     index: number,
     key: keyof BusinessLocation,
@@ -345,6 +400,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     () => parseBulkServices(bulkServicesText),
     [bulkServicesText]
   );
+  const bulkProductPreview = useMemo(
+    () => parseBulkProducts(bulkProductsText),
+    [bulkProductsText]
+  );
 
   function addBlankServiceRows(count: number) {
     setServices((prev) => [
@@ -357,17 +416,38 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     const parsed = parseBulkServices(bulkServicesText);
     if (!parsed.length) {
       setBulkServicesError(
-        "Add at least one service name. Example: Home cleaning - from 2,500 KES"
+        "Add at least one service name. Example: Same-day Nairobi delivery"
       );
       return;
     }
     setServices((prev) => {
       const existing = prev.filter((s) => s.name.trim());
-      return [...existing, ...parsed];
+      return [...existing, ...parsed].slice(0, 40);
     });
     setBulkServicesText("");
     setBulkServicesError(null);
     setShowBulkServices(false);
+  }
+
+  function applyBulkProducts() {
+    const parsed = parseBulkProducts(bulkProductsText);
+    if (!parsed.length) {
+      setBulkProductsError(
+        "Add at least one product. Example: Atomic Habits - 2,500 KES"
+      );
+      return;
+    }
+    setProducts((prev) => {
+      const existing = prev.filter((p) => p.name.trim());
+      const map = new Map(existing.map((p) => [p.name.toLowerCase(), p]));
+      for (const p of parsed) {
+        if (!map.has(p.name.toLowerCase())) map.set(p.name.toLowerCase(), p);
+      }
+      return [...map.values()].slice(0, PRODUCT_CATALOG_MAX);
+    });
+    setBulkProductsText("");
+    setBulkProductsError(null);
+    setShowBulkProducts(false);
   }
 
   function setDayOpen(day: DayKey, open: boolean) {
@@ -401,6 +481,8 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="alert_email" value={alertEmail} />
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />
+      <input type="hidden" name="product_catalog" value={productsJson} />
+      <input type="hidden" name="social_handles" value={socialJson} />
       <input type="hidden" name="services_notes" value={servicesNotes} />
       <input type="hidden" name="business_hours" value={businessHoursSummary} />
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
@@ -561,9 +643,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">Services catalog</h3>
+              <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
               <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                Your menu for the receptionist. Add a few blank rows, or paste a list like you would on WhatsApp.
+                What you offer as a business (delivery, sourcing, repair visits) — not
+                individual products. Products go in the catalogue below.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -659,7 +742,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 disabled={!bulkPreview.length}
                 className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
               >
-                Add to catalog
+                Add to services
               </button>
             </div>
           ) : null}
@@ -690,13 +773,13 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-name-${index}`}>
-                      {vertical === "retail" ? "Product name" : "Service name"}
+                      Service name
                     </label>
                     <input
                       id={`svc-name-${index}`}
                       value={service.name}
                       onChange={(e) => updateService(index, "name", e.target.value)}
-                      placeholder={vertical === "retail" ? "Phone charger" : "Home cleaning"}
+                      placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"}
                       className={fieldClass}
                     />
                   </div>
@@ -713,43 +796,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                     />
                   </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`svc-stock-${index}`}
-                    >
-                      In stock
-                    </label>
-                    <select
-                      id={`svc-stock-${index}`}
-                      value={service.in_stock || ""}
-                      onChange={(e) => updateService(index, "in_stock", e.target.value)}
-                      className={fieldClass}
-                    >
-                      <option value="">Not set</option>
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                      <option value="unknown">Unknown</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`svc-category-${index}`}
-                    >
-                      Category (optional)
-                    </label>
-                    <input
-                      id={`svc-category-${index}`}
-                      value={service.category || ""}
-                      onChange={(e) => updateService(index, "category", e.target.value)}
-                      placeholder={vertical === "retail" ? "Accessories" : "Repairs"}
-                      className={fieldClass}
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-notes-${index}`}>
                       Notes / requirements
@@ -758,7 +805,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                       id={`svc-notes-${index}`}
                       value={service.notes}
                       onChange={(e) => updateService(index, "notes", e.target.value)}
-                      placeholder="2-bedroom homes, Nairobi only"
+                      placeholder="Free quotation for special orders"
                       className={fieldClass}
                     />
                   </div>
@@ -788,9 +835,224 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               value={servicesNotes}
               onChange={(e) => setServicesNotes(e.target.value)}
               rows={3}
-              placeholder="Payment, deposits, or other details that do not fit a single service row…"
+              placeholder="Anything else about how you work — coverage, lead times, what you do not do…"
               className={`${fieldClass} leading-relaxed`}
             />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ink)]">Product catalogue</h3>
+              <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                Individual items (books, SKUs). Import CSV under Import, or edit here.
+                Live calls use up to 80 titles.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setProducts((prev) => [...prev, emptyProduct()])}
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add product
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkProducts((v) => !v);
+                  setBulkProductsError(null);
+                }}
+                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)]"
+              >
+                {showBulkProducts ? "Hide paste" : "Paste products"}
+              </button>
+            </div>
+          </div>
+
+          {showBulkProducts ? (
+            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-4">
+              <textarea
+                value={bulkProductsText}
+                onChange={(e) => {
+                  setBulkProductsText(e.target.value);
+                  if (bulkProductsError) setBulkProductsError(null);
+                }}
+                rows={6}
+                placeholder={
+                  "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
+                }
+                className={`${fieldClass} text-sm leading-relaxed`}
+              />
+              {bulkProductPreview.length ? (
+                <p className="text-xs text-[var(--ink-soft)]">
+                  Ready to add {bulkProductPreview.length} product
+                  {bulkProductPreview.length === 1 ? "" : "s"}
+                </p>
+              ) : null}
+              {bulkProductsError ? (
+                <p className="text-sm text-[var(--warn)]">{bulkProductsError}</p>
+              ) : null}
+              <button
+                type="button"
+                onClick={applyBulkProducts}
+                disabled={!bulkProductPreview.length}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Add to servicesue
+              </button>
+            </div>
+          ) : null}
+
+          {products.length === 0 ? (
+            <p className="text-sm text-[var(--ink-soft)]">
+              No products yet. Use Import → product catalogue, or add rows here.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {products.map((product, index) => (
+                <div
+                  key={`product-${index}`}
+                  className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                      Product {index + 1}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProducts((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      className="text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-name-${index}`}>
+                        Product name
+                      </label>
+                      <input
+                        id={`prod-name-${index}`}
+                        value={product.name}
+                        onChange={(e) => updateProduct(index, "name", e.target.value)}
+                        placeholder="Atomic Habits"
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-price-${index}`}>
+                        Price
+                      </label>
+                      <input
+                        id={`prod-price-${index}`}
+                        value={product.price}
+                        onChange={(e) => updateProduct(index, "price", e.target.value)}
+                        placeholder="2,500 KES"
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-stock-${index}`}>
+                        In stock
+                      </label>
+                      <select
+                        id={`prod-stock-${index}`}
+                        value={product.in_stock || ""}
+                        onChange={(e) => updateProduct(index, "in_stock", e.target.value)}
+                        className={fieldClass}
+                      >
+                        <option value="">Not set</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-cat-${index}`}>
+                        Category
+                      </label>
+                      <input
+                        id={`prod-cat-${index}`}
+                        value={product.category}
+                        onChange={(e) => updateProduct(index, "category", e.target.value)}
+                        placeholder="Self-help"
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-sku-${index}`}>
+                        SKU / ISBN
+                      </label>
+                      <input
+                        id={`prod-sku-${index}`}
+                        value={product.sku}
+                        onChange={(e) => updateProduct(index, "sku", e.target.value)}
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-notes-${index}`}>
+                        Notes
+                      </label>
+                      <input
+                        id={`prod-notes-${index}`}
+                        value={product.notes}
+                        onChange={(e) => updateProduct(index, "notes", e.target.value)}
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-alias-${index}`}>
+                        Also called (aliases)
+                      </label>
+                      <input
+                        id={`prod-alias-${index}`}
+                        value={product.aliases.join(", ")}
+                        onChange={(e) => updateProduct(index, "aliases", e.target.value)}
+                        placeholder="Atomic habit, Clear"
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-[var(--ink)]">Social &amp; web</h3>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
+              Handles the receptionist can share when callers ask for Instagram, WhatsApp, or the website.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {SOCIAL_FIELDS.map((field) => (
+              <div key={field.id}>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor={`social-${field.id}`}
+                >
+                  {field.label}
+                </label>
+                <input
+                  id={`social-${field.id}`}
+                  value={socialHandles[field.id]}
+                  onChange={(e) => updateSocial(field.id, e.target.value)}
+                  placeholder={field.placeholder}
+                  className={fieldClass}
+                />
+              </div>
+            ))}
           </div>
         </div>
 

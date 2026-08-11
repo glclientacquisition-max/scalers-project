@@ -2,6 +2,7 @@ import { getCurrentTenant } from "@/lib/tenant";
 import { TenantForm } from "@/components/TenantForm";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
+import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -85,6 +86,7 @@ export default async function SettingsPage() {
 
       <div id="import" className="mt-10 scroll-mt-28 border-t border-line pt-10">
         <KnowledgeIngestPanel tenant={tenant} />
+        <CatalogImportPanel tenant={tenant} />
         <p className="mt-4 text-xs text-ink-soft">
           Jump to{" "}
           <a
@@ -104,10 +106,14 @@ export default async function SettingsPage() {
             Array.isArray(tenant.services_catalog)
               ? tenant.services_catalog.length
               : 0,
+            Array.isArray(tenant.product_catalog)
+              ? tenant.product_catalog.length
+              : 0,
             Array.isArray(tenant.faqs) ? tenant.faqs.length : 0,
             Array.isArray(tenant.team_directory) ? tenant.team_directory.length : 0,
             String(tenant.llm_system_prompt || "").length,
             tenant.vertical || "",
+            JSON.stringify(tenant.social_handles || {}),
           ].join(":")}
           tenant={tenant}
         />
