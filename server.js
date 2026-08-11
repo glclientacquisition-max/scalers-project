@@ -42,6 +42,8 @@ const {
 const {
   createSpokenStreamBuffer,
 } = require('./src/speech/spokenStreamBuffer');
+const { createVoiceTurnTiming } = require('./src/speech/voiceTiming');
+const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
@@ -657,14 +659,27 @@ function sendPcmToMedia(ws, pcm) {
   }
 }
 
-/** Best-effort stop of already-queued outbound audio on the media bridge. */
+/**
+ * Stop already-queued outbound audio on the media bridge (barge-in).
+ * SautiKit/drachtio mod_audio_fork understands `{ type: "killAudio" }`.
+ */
 function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  try {
-    // Twilio-style clear; raw PCM forks (audio.drachtio.org) may ignore this.
-    ws.send(JSON.stringify({ event: 'clear' }));
-  } catch (err) {
-    console.warn('[ws/media] clear event send failed:', err?.message || err);
+  const payloads = [
+    { type: 'killAudio' },
+    // Compatibility fallbacks seen across forks / Twilio-style bridges.
+    { event: 'clear' },
+    { type: 'clear' },
+  ];
+  for (const payload of payloads) {
+    try {
+      ws.send(JSON.stringify(payload));
+    } catch (err) {
+      console.warn(
+        `[ws/media] clear/killAudio send failed (${payload.type || payload.event}):`,
+        err?.message || err
+      );
+    }
   }
 }
 
@@ -729,6 +744,10 @@ mediaWss.on('connection', (ws, req) => {
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
   let callLanguage = 'unknown';
   let fillerUsedThisCall = false;
+  /** @type {ReturnType<typeof createVoiceTurnTiming>|null} */
+  let activeTurnTiming = null;
+  /** Rolling interim hypothesis while agent is busy (for barge-in). */
+  let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
   let ttsLexiconOverrides = [];
 
@@ -830,6 +849,7 @@ mediaWss.on('connection', (ws, req) => {
     bargeInActive = true;
     playbackGeneration += 1;
     speaking = false;
+    interimBargeText = '';
     console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
     if (tts) {
       try {
@@ -839,6 +859,10 @@ mediaWss.on('connection', (ws, req) => {
       }
     }
     clearMediaPlayback(ws);
+    if (activeTurnTiming) {
+      activeTurnTiming.log({ outcome: 'barge_in' });
+      activeTurnTiming = null;
+    }
     releaseQueuedCallerSpeech();
   }
 
@@ -910,6 +934,8 @@ mediaWss.on('connection', (ws, req) => {
 
     turnBusy = true;
     bargeInActive = false;
+    const turnTiming = createVoiceTurnTiming(sidLabel());
+    activeTurnTiming = turnTiming;
 
     const detected = detectCallerLanguage(clean);
     callLanguage = resolveCallLanguage(callLanguage, detected);
@@ -927,32 +953,28 @@ mediaWss.on('connection', (ws, req) => {
       const fillerMode = (process.env.VOICE_FILLER || 'auto').toLowerCase();
       const useFiller =
         Boolean(tts) && fillerMode !== 'off' && !fillerUsedThisCall;
-      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 550);
+      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 400);
       const fillerText =
         fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, callLanguage)
           : process.env.VOICE_FILLER;
-      let fillerPromise = Promise.resolve();
       let fillerStarted = false;
       let firstSpokenChunk = false;
 
       if (useFiller && fillerText) {
-        fillerPromise = new Promise((resolve) => {
-          fillerTimer = setTimeout(() => {
-            fillerTimer = null;
-            // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
-            if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
-              fillerStarted = true;
-              fillerUsedThisCall = true;
-              console.log(
-                `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
-              );
-              speakText(fillerText).then(resolve, resolve);
-            } else {
-              resolve();
-            }
-          }, fillerDelayMs);
-        });
+        fillerTimer = setTimeout(() => {
+          fillerTimer = null;
+          // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
+          if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
+            fillerStarted = true;
+            fillerUsedThisCall = true;
+            turnTiming.markFiller();
+            console.log(
+              `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
+            );
+            speakText(fillerText).catch(() => {});
+          }
+        }, fillerDelayMs);
       }
 
       const streamOn =
@@ -961,61 +983,92 @@ mediaWss.on('connection', (ws, req) => {
         (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
 
       let speakSession = null;
+      /** @type {Promise<any>|null} */
+      let speakSessionReady = null;
       let streamPlaybackGen = 0;
       const spokenChunks = [];
+
+      // Warm Soniox TTS while Gemini starts so first chunk isn't paying setup latency.
+      if (streamOn && tts) {
+        speakSessionReady = tts
+          .beginSpeak({
+            callLanguage,
+            extraLexicon: ttsLexiconOverrides,
+          })
+          .then((session) => {
+            speakSession = session;
+            console.log(`[ws/media][${sidLabel()}] llm→tts stream prefetched`);
+            return session;
+          })
+          .catch((err) => {
+            console.warn(
+              `[ws/media][${sidLabel()}] TTS prefetch failed:`,
+              err?.message || err
+            );
+            speakSessionReady = null;
+            return null;
+          });
+      }
 
       function stopFillerForReply() {
         clearFillerTimer();
         if (!fillerStarted) return;
         fillerStarted = false;
-        // Drop any filler PCM already in flight and do not await speak() —
-        // waiting on remote TTS terminated was delaying first reply audio.
+        // Drop filler PCM via generation bump only — do NOT tts.cancel() here,
+        // or we kill the prefetched reply stream on the same Soniox socket.
         playbackGeneration += 1;
         speaking = false;
-        if (tts) {
-          try {
-            tts.cancel();
-          } catch {
-            /* ignore */
-          }
-        }
         clearMediaPlayback(ws);
         console.log(`[ws/media][${sidLabel()}] filler cancelled for reply audio`);
+      }
+
+      async function ensureReplySpeakSession() {
+        if (speakSession) return speakSession;
+        if (speakSessionReady) {
+          const prefetched = await speakSessionReady;
+          if (prefetched) return prefetched;
+        }
+        speakSession = await tts.beginSpeak({
+          callLanguage,
+          extraLexicon: ttsLexiconOverrides,
+        });
+        console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
+        return speakSession;
       }
 
       async function onSpokenChunk(chunk) {
         const text = String(chunk || '').trim();
         if (!text || !tts) return;
         firstSpokenChunk = true;
+        turnTiming.markFirstSpokenChunk();
         stopFillerForReply();
         if (bargeInActive) return;
 
-        if (!speakSession) {
-          speaking = true;
-          speakStartedAt = Date.now();
-          activePlaybackGeneration = ++playbackGeneration;
-          streamPlaybackGen = activePlaybackGeneration;
-          speakSession = await tts.beginSpeak({
-            callLanguage,
-            extraLexicon: ttsLexiconOverrides,
-          });
-          console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
-        }
-        if (bargeInActive) {
+        const session = await ensureReplySpeakSession();
+        if (!session || bargeInActive) {
           try {
-            speakSession.cancel();
+            session?.cancel();
           } catch {
             /* ignore */
           }
           speakSession = null;
           return;
         }
-        speakSession.pushText(text);
+
+        if (!speaking || activePlaybackGeneration !== playbackGeneration) {
+          speaking = true;
+          speakStartedAt = Date.now();
+          activePlaybackGeneration = ++playbackGeneration;
+          streamPlaybackGen = activePlaybackGeneration;
+        }
+
+        session.pushText(text);
         spokenChunks.push(text);
         lastAgentText = spokenChunks.join(' ');
       }
 
       let result;
+      let turnOutcome = 'ok';
       if (!process.env.GEMINI_API_KEY) {
         result = {
           spokenText:
@@ -1024,17 +1077,27 @@ mediaWss.on('connection', (ws, req) => {
               : 'Thanks — someone from the business will call you back shortly.',
           shouldEndCall: true,
         };
-        await stopFillerForReply();
+        stopFillerForReply();
+        if (speakSession) {
+          try {
+            speakSession.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+        }
         if (!bargeInActive) {
           transcriptLog.push(`Agent: ${result.spokenText}`);
+          turnTiming.markFirstSpokenChunk();
           await speakText(result.spokenText);
         }
       } else if (streamOn) {
+        turnTiming.markLlmStart();
         result = await runGeminiTurnStreaming(messages, sidLabel(), turnSystemPrompt, {
           onSpokenChunk,
           shouldAbort: () => bargeInActive,
         });
-        await stopFillerForReply();
+        stopFillerForReply();
 
         if (speakSession) {
           if (bargeInActive) {
@@ -1051,6 +1114,8 @@ mediaWss.on('connection', (ws, req) => {
               speaking = false;
               releaseQueuedCallerSpeech();
             }
+            turnTiming.log({ outcome: 'barge_in' });
+            if (activeTurnTiming === turnTiming) activeTurnTiming = null;
             return;
           }
           try {
@@ -1071,25 +1136,49 @@ mediaWss.on('connection', (ws, req) => {
           transcriptLog.push(`Agent: ${reply}`);
         } else if (!bargeInActive) {
           // Stream produced no flushable chunks (or TTS never opened) — speak full reply.
+          if (speakSessionReady) {
+            try {
+              const unused = await speakSessionReady;
+              unused?.cancel?.();
+            } catch {
+              /* ignore */
+            }
+          }
           const reply = result?.spokenText || AI_FALLBACK_LINE;
           transcriptLog.push(`Agent: ${reply}`);
+          turnTiming.markFirstSpokenChunk();
           await speakText(reply);
+          turnOutcome = 'stream_fallback_full';
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
           bargeInActive = false;
+          turnTiming.log({ outcome: 'barge_in' });
+          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
       } else {
+        turnTiming.markLlmStart();
         result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt);
-        await stopFillerForReply();
+        stopFillerForReply();
+        if (speakSession) {
+          try {
+            speakSession.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+        }
         const reply = result?.spokenText || AI_FALLBACK_LINE;
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
           discardUnspokenAssistant(reply);
           bargeInActive = false;
+          turnTiming.log({ outcome: 'barge_in' });
+          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
         transcriptLog.push(`Agent: ${reply}`);
+        turnTiming.markFirstSpokenChunk();
         await speakText(reply);
       }
 
@@ -1103,8 +1192,12 @@ mediaWss.on('connection', (ws, req) => {
           }
         }, 800);
       }
+      turnTiming.log({ outcome: turnOutcome });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
+      turnTiming.log({ outcome: 'error' });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
       if (!bargeInActive) {
         // Persist exactly what the caller hears so dashboard transcripts expose
         // failures instead of ending after the caller's last line.
@@ -1113,6 +1206,10 @@ mediaWss.on('connection', (ws, req) => {
       }
     } finally {
       clearFillerTimer();
+      if (activeTurnTiming === turnTiming) {
+        turnTiming.log({ outcome: 'early_return' });
+        activeTurnTiming = null;
+      }
       turnBusy = false;
       kickPendingTurn();
     }
@@ -1157,13 +1254,19 @@ mediaWss.on('connection', (ws, req) => {
 
       const isInterim = !evt.isFinal;
 
-      // Instant barge-in on interim tokens while TTS plays or Gemini is generating.
+      // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
-        maybeBargeIn(text, 'interim speech');
+        if (speaking || turnBusy) {
+          interimBargeText = mergeInterimHypothesis(interimBargeText, text);
+          maybeBargeIn(interimBargeText, 'interim speech');
+        } else {
+          interimBargeText = '';
+        }
         return;
       }
 
-      // Finals: barge if needed, then accumulate for the next customer turn.
+      // Finals replace the interim hypothesis.
+      interimBargeText = '';
       maybeBargeIn(text, 'final speech');
       if (speaking && !bargeInActive) {
         const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText);
@@ -1186,6 +1289,7 @@ mediaWss.on('connection', (ws, req) => {
     }
 
     if (evt.type === 'endpoint' || evt.type === 'finished') {
+      interimBargeText = '';
       // Do not clear bargeInActive while a Gemini turn is still in flight — that flag
       // must survive until runCallerTurn discards the unspoken reply.
       if (!turnBusy) {
@@ -1230,6 +1334,7 @@ mediaWss.on('connection', (ws, req) => {
           // Drop outbound audio after barge-in cancel / superseded playback generation.
           if (!speaking) return;
           if (activePlaybackGeneration !== playbackGeneration) return;
+          if (activeTurnTiming) activeTurnTiming.markFirstPcm();
           if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         },
       });
@@ -1742,9 +1847,9 @@ function buildGeminiContents(messages) {
 function geminiVoiceConfig(systemPrompt) {
   return {
     systemInstruction: { parts: [{ text: systemPrompt }] },
-    // Lower temp + short output → faster, clearer phone replies.
-    temperature: 0.45,
-    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 160),
+    // Slightly lower temp + shorter cap → faster, more consistent phone lines.
+    temperature: Number(process.env.GEMINI_VOICE_TEMPERATURE || 0.35),
+    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 120),
     // MINIMAL keeps voice latency down; set GEMINI_THINKING_LEVEL=LOW if needed.
     thinkingConfig: {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',

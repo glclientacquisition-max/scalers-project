@@ -9,7 +9,7 @@ const SONIOX_WS_URL =
 const SONIOX_MODEL = process.env.SONIOX_STT_MODEL || 'stt-rt-v5';
 const SAMPLE_RATE = Number(process.env.SONIOX_SAMPLE_RATE || 16000);
 /** Default ceiling for Soniox endpoint detection (local flush adapts under this). */
-const MAX_ENDPOINT_DELAY_MS = Number(process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 900);
+const MAX_ENDPOINT_DELAY_MS = Number(process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 700);
 const ENDPOINT_SENSITIVITY = Math.min(
   1,
   Math.max(0, Number(process.env.SONIOX_ENDPOINT_SENSITIVITY || 0.5))

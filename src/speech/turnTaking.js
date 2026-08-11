@@ -117,10 +117,10 @@ function adaptiveFlushMs(opts = {}) {
   const base = Number(
     opts.baseMs != null
       ? opts.baseMs
-      : process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 900
+      : process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 700
   );
-  const min = Number(opts.minMs != null ? opts.minMs : process.env.VOICE_FLUSH_MIN_MS || 350);
-  const max = Number(opts.maxMs != null ? opts.maxMs : process.env.VOICE_FLUSH_MAX_MS || 1500);
+  const min = Number(opts.minMs != null ? opts.minMs : process.env.VOICE_FLUSH_MIN_MS || 300);
+  const max = Number(opts.maxMs != null ? opts.maxMs : process.env.VOICE_FLUSH_MAX_MS || 1200);
 
   const text = String(opts.text || '').replace(/\s+/g, ' ').trim();
   const norm = normalizeSpeech(text);
