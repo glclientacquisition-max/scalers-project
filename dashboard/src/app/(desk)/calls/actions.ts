@@ -35,6 +35,12 @@ export async function updateLeadStatus(
     .eq("tenant_id", tenant.id);
 
   if (error) {
+    if (/archived|lead_status.*check|check.*lead_status/i.test(error.message)) {
+      return {
+        error:
+          "Archive needs a one-time database update. Apply docs/supabase/lead_status_archive.sql in Supabase.",
+      };
+    }
     if (/lead_status|column/i.test(error.message)) {
       return {
         error: "Lead statuses are not set up yet. Apply docs/supabase/lead_status.sql in Supabase.",
@@ -48,6 +54,7 @@ export async function updateLeadStatus(
     return { error: error.message };
   }
 
+  revalidatePath("/home");
   revalidatePath("/calls");
   revalidatePath(`/calls/${callId}`);
   return { ok: true, leadStatus: status };

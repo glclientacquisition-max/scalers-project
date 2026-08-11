@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const res = NextResponse.redirect(new URL("/calls", request.url), 303);
+  const res = NextResponse.redirect(new URL("/home", request.url), 303);
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {

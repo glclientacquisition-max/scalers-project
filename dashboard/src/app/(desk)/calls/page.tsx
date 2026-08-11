@@ -9,7 +9,10 @@ import {
   CallsToolbar,
 } from "@/components/CallsCommandCenter";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
-import { MarkLeadDoneButton } from "@/components/MarkLeadDoneButton";
+import {
+  MarkLeadArchiveButton,
+  MarkLeadDoneButton,
+} from "@/components/MarkLeadDoneButton";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import {
@@ -67,8 +70,10 @@ function EmptyCalls({
       statusFilter === "new"
         ? "new leads"
         : statusFilter === "contacted"
-          ? "contacted leads"
-          : "resolved leads";
+          ? "followed-up leads"
+          : statusFilter === "resolved"
+            ? "done leads"
+            : "archived leads";
     return (
       <div className="mt-6 border-y border-line py-10 text-center">
         <p className="font-display text-xl tracking-tight text-ink">No {label}</p>
@@ -189,32 +194,39 @@ export default async function CallsPage({
       .eq("tenant_id", tenant.id)
       .eq("lead_status", status);
 
-  const [todayRes, allRes, newRes, contactedRes, resolvedRes] = await Promise.all([
-    client
-      .from("calls")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id)
-      .gte("created_at", dayStart),
-    client
-      .from("calls")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id),
-    statusCountQuery("new"),
-    statusCountQuery("contacted"),
-    statusCountQuery("resolved"),
-  ]);
+  const [todayRes, allRes, newRes, contactedRes, resolvedRes, archivedRes] =
+    await Promise.all([
+      client
+        .from("calls")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .gte("created_at", dayStart),
+      client
+        .from("calls")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .neq("lead_status", "archived"),
+      statusCountQuery("new"),
+      statusCountQuery("contacted"),
+      statusCountQuery("resolved"),
+      statusCountQuery("archived"),
+    ]);
 
   // If lead_status column missing, counts fail — fall back gracefully below.
   if (newRes.error && /lead_status|column/i.test(newRes.error.message)) {
     leadStatusReady = false;
   }
+  const archiveReady = !(
+    archivedRes.error && /lead_status|archived|check|column/i.test(archivedRes.error.message)
+  );
 
   const newCount = leadStatusReady ? newRes.count ?? 0 : 0;
   const statusCounts = {
-    all: allRes.count ?? 0,
+    all: leadStatusReady ? allRes.count ?? 0 : 0,
     new: newCount,
     contacted: leadStatusReady ? contactedRes.count ?? 0 : 0,
     resolved: leadStatusReady ? resolvedRes.count ?? 0 : 0,
+    archived: archiveReady ? archivedRes.count ?? 0 : 0,
   };
   const activeFilter = leadStatusReady
     ? resolveStatusFilter(sp.status, newCount)
@@ -227,6 +239,9 @@ export default async function CallsPage({
 
   if (leadStatusReady && activeFilter !== "all") {
     listQuery = listQuery.eq("lead_status", activeFilter);
+  } else if (leadStatusReady) {
+    // Active inbox: hide archived unless the Archived filter is chosen.
+    listQuery = listQuery.neq("lead_status", "archived");
   }
   if (q) {
     listQuery = listQuery.or(
@@ -378,6 +393,9 @@ export default async function CallsPage({
                         {lead.leadStatus !== "resolved" ? (
                           <MarkLeadDoneButton callId={lead.call.id} />
                         ) : null}
+                        {lead.leadStatus !== "archived" ? (
+                          <MarkLeadArchiveButton callId={lead.call.id} />
+                        ) : null}
                       </div>
                     ) : (
                       <span />
@@ -447,6 +465,9 @@ export default async function CallsPage({
                             />
                             {lead.leadStatus !== "resolved" ? (
                               <MarkLeadDoneButton callId={lead.call.id} />
+                            ) : null}
+                            {lead.leadStatus !== "archived" ? (
+                              <MarkLeadArchiveButton callId={lead.call.id} />
                             ) : null}
                           </div>
                         ) : (

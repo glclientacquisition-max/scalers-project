@@ -1,4 +1,5 @@
 import {
+  leadStatusLabel,
   parseLeadStatus,
   parseSummary,
   type CallRow,
@@ -17,11 +18,14 @@ export type Lead = {
 export const STATUS_FILTERS = [
   { id: "all", label: "All" },
   { id: "new", label: "New" },
-  { id: "contacted", label: "Contacted" },
-  { id: "resolved", label: "Resolved" },
+  { id: "contacted", label: "Followed Up" },
+  { id: "resolved", label: "Done" },
+  { id: "archived", label: "Archived" },
 ] as const;
 
 export type StatusFilterId = (typeof STATUS_FILTERS)[number]["id"];
+
+export { leadStatusLabel };
 
 export function toLead(call: CallRow): Lead {
   const meta = parseSummary(call.summary);
@@ -77,7 +81,14 @@ export function resolveStatusFilter(
   newCount: number
 ): StatusFilterId {
   if (raw === "all") return "all";
-  if (raw === "new" || raw === "contacted" || raw === "resolved") return raw;
+  if (
+    raw === "new" ||
+    raw === "contacted" ||
+    raw === "resolved" ||
+    raw === "archived"
+  ) {
+    return raw;
+  }
   return newCount > 0 ? "new" : "all";
 }
 

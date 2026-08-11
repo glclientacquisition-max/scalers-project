@@ -50,29 +50,33 @@ Without a Gemini key, a local template is saved instead.
 
 ### Owner command center (first open)
 
-When an owner opens the workspace they land on **`/calls`** — not a separate home route.
-That page is the command center:
+Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triage inbox.
 
-1. **Briefing** — Nairobi greeting + one headline that answers “what needs me now?”
-   (pending DID → train; live empty → test call; new leads → follow up; else caught up).
-2. **Glance metrics** — today / waiting / line status / wallet (no card clutter).
-3. **Quick actions** — Test · Requests · Today’s update · Train · Wallet.
-4. **Needs you now** — top New (urgent first) with WhatsApp draft, **Done**, Open.
-5. **Inbox** — search + All/New/Contacted/Resolved filters + list/detail.
+**Home dashboard**
+1. **Glance cards** (interactive) — Waiting · Followed Up · Today · Balance
+2. **Next action** — train / test / triage / caught up
+3. **Line & tools** — DID, Done count, Archived count, quick links
+4. **Lead triage** — top New leads with WhatsApp, Done, Archive, Open
 
-**Owner affordances (Auth + RLS safe):**
+**Inbox (`/calls`)**
+- Search + filters: All · New · Followed Up · Done · Archived
+- Bare `/calls` defaults to New when work is waiting
+- All hides Archived (recover under Archived filter)
+
+**Owner affordances (Auth + RLS safe)**
 
 | Action | Behavior |
 | --- | --- |
 | Back | Detail → inbox preserves `?from=` filter |
 | Open | Call detail titled by lead name (or number) |
 | WhatsApp | Prefills a short follow-up using name + reason |
-| Status | New → Contacted → Resolved |
-| Done / clear | Soft archive = mark **Resolved** (owners cannot hard-delete calls) |
+| Status | New → Followed Up → Done |
+| Done | Soft finish = `resolved` |
+| Archive | Soft hide = `archived` (apply `docs/supabase/lead_status_archive.sql`) |
 | Search | Name / number / reason (`summary`) |
-| Filter | Status tabs; bare `/calls` defaults to **New** when work is waiting |
 
 Hard delete, ledger writes, DID assignment, and prompt compile semantics stay Platform / Ops / Brain.
+
 
 
 ### AI Prompt Compiler (settings)

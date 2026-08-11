@@ -36,7 +36,7 @@ export async function completeOnboardingAction(
   }
 
   if (!tenantNeedsOnboarding(tenant)) {
-    redirect("/calls");
+    redirect("/home");
   }
 
   const vertical = parseVertical(formData.get("vertical"));
@@ -143,11 +143,11 @@ export async function completeOnboardingAction(
               step: 3,
             };
           }
-          redirect("/calls");
+          redirect("/home");
         }
         return { error: fallbackErr.message, step: 3 };
       }
-      redirect("/calls");
+      redirect("/home");
     }
     const missingCol = /business_hours|services_offered|agent_tone|column/i.test(
       error.message
@@ -163,7 +163,7 @@ export async function completeOnboardingAction(
           step: 3,
         };
       }
-      redirect("/calls");
+      redirect("/home");
     }
     return {
       error: /row-level security|permission denied|rls/i.test(error.message)
@@ -173,5 +173,5 @@ export async function completeOnboardingAction(
     };
   }
 
-  redirect("/calls");
+  redirect("/home");
 }

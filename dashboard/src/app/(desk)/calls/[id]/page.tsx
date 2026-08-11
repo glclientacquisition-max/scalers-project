@@ -10,7 +10,10 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { CallAudioPlayer } from "@/components/CallAudioPlayer";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
-import { MarkLeadDoneButton } from "@/components/MarkLeadDoneButton";
+import {
+  MarkLeadArchiveButton,
+  MarkLeadDoneButton,
+} from "@/components/MarkLeadDoneButton";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
   callsHref,
@@ -77,7 +80,13 @@ function buildSummarySentence(opts: {
 }
 
 function parseFromFilter(raw: string | undefined): StatusFilterId | undefined {
-  if (raw === "all" || raw === "new" || raw === "contacted" || raw === "resolved") {
+  if (
+    raw === "all" ||
+    raw === "new" ||
+    raw === "contacted" ||
+    raw === "resolved" ||
+    raw === "archived"
+  ) {
     return raw;
   }
   return undefined;
@@ -103,12 +112,14 @@ export default async function CallDetailPage({
     fromFilter === "new"
       ? "Back to new leads"
       : fromFilter === "contacted"
-        ? "Back to contacted"
+        ? "Back to followed up"
         : fromFilter === "resolved"
-          ? "Back to resolved"
-          : fromFilter === "all"
-            ? "Back to all calls"
-            : "Back to inbox";
+          ? "Back to done"
+          : fromFilter === "archived"
+            ? "Back to archived"
+            : fromFilter === "all"
+              ? "Back to all calls"
+              : "Back to inbox";
 
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
@@ -187,6 +198,9 @@ export default async function CallDetailPage({
           {leadStatusReady && leadStatus !== "resolved" ? (
             <MarkLeadDoneButton callId={row.id} />
           ) : null}
+          {leadStatusReady && leadStatus !== "archived" ? (
+            <MarkLeadArchiveButton callId={row.id} />
+          ) : null}
         </div>
       </div>
 
@@ -215,8 +229,10 @@ export default async function CallDetailPage({
           ) : null}
         </div>
         <p className="mt-4 text-xs text-ink-soft">
-          Tip: WhatsApp opens with a short follow-up draft. Owners can&apos;t hard-delete calls —
-          use <span className="font-medium text-ink">Done</span> to clear the queue (marks Resolved).
+          Tip: WhatsApp opens with a short follow-up draft. Use{" "}
+          <span className="font-medium text-ink">Done</span> when finished, or{" "}
+          <span className="font-medium text-ink">Archive</span> to hide from the
+          active inbox (not a hard delete).
         </p>
       </section>
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const LINKS = [
+  { href: "/home", label: "Home" },
   { href: "/calls", label: "Calls" },
   { href: "/requests", label: "Requests" },
   { href: "/settings", label: "Business" },
