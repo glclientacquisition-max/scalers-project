@@ -1,43 +1,66 @@
 /**
  * Lightweight checks for pronunciation coach helpers.
- * Run: node --experimental-strip-types --test tests/pronunciationCoach.test.ts
- * (falls back skipped if strip-types unavailable — also covered by dashboard build)
+ * Run: node --test tests/pronunciationCoach.test.js
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-// Inline mirrors of critical pure helpers so root tests do not need a TS loader.
-function escapeRegex(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function normalizeForCompare(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function matchPatternFromPhrase(phrase) {
-  const cleaned = String(phrase || "")
-    .trim()
-    .replace(/\s+/g, " ");
-  if (!cleaned) return "";
-  const lower = cleaned.toLowerCase();
-  const words = lower.split(" ").filter(Boolean);
-  if (!words.length) return "";
-  if (words.length === 1) {
-    return escapeRegex(words[0]).slice(0, 80);
+function localAudioLikelyMatches(opts) {
+  const heard = normalizeForCompare(opts.heard);
+  if (!heard || heard.length < 2) return false;
+  const prompt = normalizeForCompare(opts.prompt);
+  if (!prompt) return false;
+  const promptTokens = prompt.split(" ").filter((t) => t.length > 2);
+  const heardSet = new Set(heard.split(" "));
+  const overlap = promptTokens.filter((t) => heardSet.has(t)).length;
+  if (promptTokens.length && overlap / promptTokens.length >= 0.45) {
+    return true;
   }
-  const spaced = words.map(escapeRegex).join("\\s+");
-  const loose = words.map(escapeRegex).join("\\s*");
-  const glued = words.map(escapeRegex).join("");
-  return `${spaced}|${loose}|${glued}`.slice(0, 80);
+  const targets = opts.targets || [];
+  if (targets.length) {
+    const heardCompact = heard.replace(/\s+/g, "");
+    return targets.some((t) => {
+      const label = normalizeForCompare(t.label).replace(/\s+/g, "");
+      return label.length >= 3 && heardCompact.includes(label);
+    });
+  }
+  return false;
 }
 
-describe("pronunciation match patterns", () => {
-  it("builds alternates for multi-word places", () => {
-    const m = matchPatternFromPhrase("Muindi Mbingu");
-    assert.match(m, /muindi/);
-    assert.match(m, /mbingu/);
-    assert.ok(m.includes("|"));
+describe("pronunciation recording guardrails", () => {
+  it("accepts a close take of the asked line", () => {
+    assert.equal(
+      localAudioLikelyMatches({
+        prompt: "Hi, this is Aisha from ChapterOne Bookstore",
+        heard: "hi this is aisha from chapterone bookstore",
+        targets: [
+          { label: "Aisha", match: "aisha" },
+          { label: "ChapterOne Bookstore", match: "chapterone" },
+        ],
+      }),
+      true
+    );
   });
 
-  it("escapes regex metacharacters", () => {
-    const m = matchPatternFromPhrase("Co-op");
-    assert.ok(m.includes("\\-") || m.includes("co-op") || m.includes("co\\-op"));
+  it("rejects a totally different utterance", () => {
+    assert.equal(
+      localAudioLikelyMatches({
+        prompt: "Hi, this is Aisha from ChapterOne Bookstore",
+        heard: "sugar water please",
+        targets: [
+          { label: "Aisha", match: "aisha" },
+          { label: "ChapterOne Bookstore", match: "chapterone" },
+        ],
+      }),
+      false
+    );
   });
 });

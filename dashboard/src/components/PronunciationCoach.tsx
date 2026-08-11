@@ -3,7 +3,9 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
   confirmPronunciationRecording,
+  screenPronunciationSuggestionsAction,
   type ConfirmPronunciationState,
+  type ScreenPronunciationState,
 } from "@/app/(desk)/settings/pronunciationActions";
 import {
   lexiconForStorage,
@@ -21,6 +23,7 @@ type CoachItem = PronunciationSuggestion & {
 };
 
 const confirmInitial: ConfirmPronunciationState = {};
+const screenInitial: ScreenPronunciationState = {};
 
 function blobToFile(blob: Blob, name: string): File {
   return new File([blob], name, { type: blob.type || "audio/webm" });
@@ -62,6 +65,11 @@ export function PronunciationCoach({
   );
   const [skippedIds, setSkippedIds] = useState<Set<string>>(() => new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<
+    PronunciationSuggestion[] | null
+  >(null);
+  const [screenNote, setScreenNote] = useState<string | null>(null);
+  const screenedKeyRef = useRef<string>("");
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -75,8 +83,36 @@ export function PronunciationCoach({
     confirmPronunciationRecording,
     confirmInitial
   );
+  const [screenState, screenAction, screenPending] = useActionState(
+    screenPronunciationSuggestionsAction,
+    screenInitial
+  );
 
-  const suggestions = useMemo(
+  const profileKey = useMemo(
+    () =>
+      JSON.stringify({
+        businessName,
+        agentName,
+        locationNotes,
+        locations,
+        team: team.map((t) => t.name),
+        services: services.map((s) => s.name),
+        faqs: faqs.map((f) => f.question),
+        bulletinTexts,
+      }),
+    [
+      businessName,
+      agentName,
+      locationNotes,
+      locations,
+      team,
+      services,
+      faqs,
+      bulletinTexts,
+    ]
+  );
+
+  const localSuggestions = useMemo(
     () =>
       suggestPronunciations({
         businessName,
@@ -101,6 +137,51 @@ export function PronunciationCoach({
       lexicon,
     ]
   );
+
+  const suggestions = aiSuggestions ?? localSuggestions;
+
+  const lexiconJson = useMemo(
+    () => JSON.stringify(lexiconForStorage(lexicon)),
+    [lexicon]
+  );
+
+  // AI-screen suggestions when profile settles (drops obvious words, prefers sentences).
+  useEffect(() => {
+    const key = `${tenantId}:${profileKey}:${lexiconJson}`;
+    if (screenedKeyRef.current === key) return;
+    const timer = window.setTimeout(() => {
+      if (screenedKeyRef.current === key) return;
+      screenedKeyRef.current = key;
+      const fd = new FormData();
+      fd.set("id", tenantId);
+      fd.set("business_name", businessName);
+      fd.set("agent_name", agentName);
+      fd.set("location_notes", locationNotes);
+      fd.set("locations", JSON.stringify(locations));
+      fd.set("team", JSON.stringify(team));
+      fd.set("services", JSON.stringify(services));
+      fd.set("faqs", JSON.stringify(faqs));
+      fd.set("bulletin_texts", JSON.stringify(bulletinTexts || []));
+      fd.set("current_lexicon", lexiconJson);
+      screenAction(fd);
+    }, 600);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- screen when profile/lexicon identity changes
+  }, [tenantId, profileKey, lexiconJson]);
+
+  useEffect(() => {
+    if (screenState.ok && Array.isArray(screenState.suggestions)) {
+      setAiSuggestions(screenState.suggestions);
+      setScreenNote(
+        screenState.source === "gemini"
+          ? "Suggestions screened by AI — obvious words removed."
+          : "Basic suggestions (AI screen unavailable)."
+      );
+    }
+    if (screenState.error && !screenState.ok) {
+      setScreenNote(screenState.error);
+    }
+  }, [screenState]);
 
   const items: CoachItem[] = useMemo(() => {
     return suggestions.map((s) => ({
@@ -127,7 +208,6 @@ export function PronunciationCoach({
 
   useEffect(() => {
     onLexiconChange(lexicon);
-    // Parent typically passes setState — avoid depending on callback identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lexicon]);
 
@@ -211,7 +291,9 @@ export function PronunciationCoach({
       recorder.start();
       setRecording(true);
     } catch {
-      setMicError("Microphone permission blocked. Allow mic access to train pronunciation.");
+      setMicError(
+        "Microphone permission blocked. Allow mic access to train pronunciation."
+      );
     }
   }
 
@@ -231,19 +313,15 @@ export function PronunciationCoach({
     clearTake();
   }
 
-  const lexiconJson = useMemo(
-    () => JSON.stringify(lexiconForStorage(lexicon)),
-    [lexicon]
-  );
-
   function keepRecording() {
     if (!active || !audioBlob) return;
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("prompt", active.prompt);
     fd.set("label", active.label);
-    fd.set("kind", active.kind);
+    fd.set("kind", "sentence");
     fd.set("match", active.match);
+    fd.set("targets", JSON.stringify(active.targets || []));
     fd.set("current_lexicon", lexiconJson);
     fd.set(
       "audio",
@@ -257,6 +335,7 @@ export function PronunciationCoach({
 
   const doneCount = items.filter((i) => i.status === "done").length;
   const totalFocus = items.filter((i) => i.status !== "skipped").length;
+  const showMismatch = Boolean(confirmState.error && !confirmState.ok);
 
   return (
     <section
@@ -274,12 +353,22 @@ export function PronunciationCoach({
           Pronunciation coach
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          We suggest tricky names and lines from your business. Record yourself saying
-          each one clearly — no typing required. Kenya-wide words are already covered.
+          Record short natural sentences — greetings, places, team names — not one
+          word at a time. AI screens out obvious words. If you say something else,
+          we ask you to try again.
         </p>
+        {screenPending ? (
+          <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
+            Screening suggestions…
+          </p>
+        ) : screenNote ? (
+          <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
+            {screenNote}
+          </p>
+        ) : null}
         {items.length > 0 ? (
           <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
-            {doneCount} of {totalFocus} trained
+            {doneCount} of {totalFocus} lines trained
             {skippedIds.size ? ` · ${skippedIds.size} skipped` : ""}
           </p>
         ) : null}
@@ -288,23 +377,31 @@ export function PronunciationCoach({
       {!items.length ? (
         <p className="text-sm text-[var(--ink-soft)]">
           {lexicon.length
-            ? "All suggested phrases are trained. Update your business details above if new names appear."
-            : "Add your business name, places, or team above — suggestions will show up here."}
+            ? "All suggested lines are trained. Update your business details above if new names appear."
+            : "Add your business name, places, or team above — sentence suggestions will show up here."}
         </p>
       ) : (
         <div className="space-y-6">
           {active ? (
             <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/40 to-white px-5 py-6 sm:px-7">
               <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                Say this {active.kind === "sentence" ? "line" : "clearly"}
+                Say this full line
               </p>
               <p
-                className="mt-3 font-display text-3xl leading-tight tracking-tight text-[var(--ink)] sm:text-4xl"
+                className="mt-3 font-display text-2xl leading-snug tracking-tight text-[var(--ink)] sm:text-3xl"
                 aria-live="polite"
               >
                 {active.prompt}
               </p>
               <p className="mt-2 text-sm text-[var(--ink-soft)]">{active.reason}</p>
+              {active.targets?.length ? (
+                <p className="mt-3 text-xs text-[var(--ink-soft)]">
+                  Trains:{" "}
+                  <span className="font-medium text-[var(--ink)]">
+                    {active.targets.map((t) => t.label).join(" · ")}
+                  </span>
+                </p>
+              ) : null}
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 {!recording && !audioBlob ? (
@@ -317,7 +414,7 @@ export function PronunciationCoach({
                       aria-hidden="true"
                       className="h-2.5 w-2.5 rounded-full bg-white"
                     />
-                    Record
+                    Record line
                   </button>
                 ) : null}
 
@@ -356,7 +453,7 @@ export function PronunciationCoach({
                       disabled={confirmPending}
                       className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white transition hover:brightness-95 disabled:opacity-60"
                     >
-                      {confirmPending ? "Learning…" : "Keep"}
+                      {confirmPending ? "Checking…" : "Keep"}
                     </button>
                   </>
                 ) : null}
@@ -375,26 +472,33 @@ export function PronunciationCoach({
                   {micError}
                 </p>
               ) : null}
-              {confirmState.error ? (
-                <p className="mt-3 text-sm text-[var(--warn)]" role="alert">
-                  {confirmState.error}
-                </p>
+              {showMismatch ? (
+                <div className="mt-3 rounded-xl border border-[var(--warn)]/30 bg-[var(--warn-soft)] px-3 py-2">
+                  <p className="text-sm text-[var(--warn)]" role="alert">
+                    {confirmState.error}
+                  </p>
+                  {confirmState.heard ? (
+                    <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                      We heard something like: “{confirmState.heard}”
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
-              {confirmState.ok && confirmState.entry ? (
+              {confirmState.ok && confirmState.entries?.length ? (
                 <p className="mt-3 text-sm text-[var(--ok)]" role="status">
-                  Saved
-                  {confirmState.source === "local" ? " (basic spelling)" : ""}.
-                  Next call will use this.
+                  Saved {confirmState.entries.length} pronunciation
+                  {confirmState.entries.length === 1 ? "" : "s"} from this line.
+                  Next call will use them.
                 </p>
               ) : null}
             </div>
           ) : (
             <p className="text-sm text-[var(--ok)]" role="status">
-              Nice — suggested phrases are done. Save &amp; train below when you’re ready.
+              Nice — suggested lines are done. Save &amp; train below when you’re ready.
             </p>
           )}
 
-          <ul className="space-y-2" aria-label="Suggested pronunciations">
+          <ul className="space-y-2" aria-label="Suggested pronunciation lines">
             {items.map((item) => {
               const selected = active?.id === item.id;
               return (
@@ -422,11 +526,12 @@ export function PronunciationCoach({
                     ].join(" ")}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-medium text-[var(--ink)]">
+                      <span className="block font-medium text-[var(--ink)]">
                         {item.prompt}
                       </span>
                       <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
-                        {item.kind === "sentence" ? "Sentence" : "Word"} · {item.reason}
+                        {(item.targets || []).map((t) => t.label).join(" · ") ||
+                          item.reason}
                       </span>
                     </span>
                     <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">

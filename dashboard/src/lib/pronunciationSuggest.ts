@@ -1,6 +1,6 @@
 /**
- * Auto-suggest hard words and short sentences for pronunciation training.
- * Deterministic — no LLM required. Gemini only refines the spoken form after record.
+ * Auto-suggest constructive pronunciation lines (sentences), not isolated words.
+ * Deterministic first pass; Gemini screening (optional) drops obvious / low-value items.
  */
 
 import {
@@ -8,14 +8,21 @@ import {
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
 
+export type PronunciationTarget = {
+  label: string;
+  match: string;
+};
+
 export type PronunciationSuggestion = {
   id: string;
   label: string;
-  /** Phrase the owner should say out loud. */
+  /** Full constructive line the owner should say out loud. */
   prompt: string;
-  kind: "word" | "sentence";
+  kind: "sentence";
   reason: string;
-  /** Suggested match pattern for the lexicon. */
+  /** Hard names/places covered by this one recording. */
+  targets: PronunciationTarget[];
+  /** Primary match (first target) — used for list keys. */
   match: string;
   priority: number;
 };
@@ -34,14 +41,12 @@ export type PronunciationSuggestInput = {
   services?: Array<{ name?: string }> | null;
   faqs?: Array<{ question?: string; answer?: string }> | null;
   bulletinTexts?: string[] | null;
-  /** Existing lexicon — skip already trained matches. */
   existingLexicon?: TtsLexiconEntry[] | null;
 };
 
-const SUGGEST_MAX = 12;
-const SENTENCE_MAX = 4;
+const SUGGEST_MAX = 6;
 
-/** Very common English words we never ask owners to record. */
+/** Words / phrases we never ask owners to record alone (too obvious). */
 const SKIP_WORDS = new Set(
   [
     "the",
@@ -107,6 +112,12 @@ const SKIP_WORDS = new Set(
     "avenue",
     "kenya",
     "nairobi",
+    "cbd",
+    "mall",
+    "market",
+    "fashion",
+    "bookstore",
+    "books",
     "receptionist",
     "manager",
     "owner",
@@ -115,16 +126,34 @@ const SKIP_WORDS = new Set(
     "phone",
     "whatsapp",
     "email",
+    "welcome",
+    "located",
+    "opposite",
+    "delivery",
+    "shipping",
+    "countrywide",
+    "same",
+    "day",
+    "within",
+    "across",
+    "number",
+    "no",
   ].map((w) => w.toLowerCase())
 );
 
-function slugId(kind: string, text: string): string {
+function slugId(text: string): string {
   const slug = text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 48);
-  return `${kind}:${slug || "item"}`;
+    .slice(0, 56);
+  return `line:${slug || "item"}`;
+}
+
+function normalizePhrase(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 function looksHard(token: string): boolean {
@@ -133,17 +162,20 @@ function looksHard(token: string): boolean {
   const lower = t.toLowerCase();
   if (SKIP_WORDS.has(lower)) return false;
   if (/^\d+$/.test(t)) return false;
-  // Non-ASCII / accented
   if (/[^\x00-\x7F]/.test(t)) return true;
-  // CamelCase or glued brand
   if (/[a-z][A-Z]/.test(t) || /[A-Z]{2,}[a-z]/.test(t)) return true;
-  // Hyphenated multi-part names
   if (/-/.test(t) && t.length >= 5) return true;
-  // Likely proper noun (capitalized, not all-caps acronym of 2–3 letters)
   if (/^[A-Z][a-z]{2,}/.test(t) && !SKIP_WORDS.has(lower)) return true;
-  // Longer uncommon words
-  if (t.length >= 7 && !/^(company|business|limited|services)$/i.test(t)) {
-    return true;
+  // Require stronger signal than “long English word”
+  if (
+    t.length >= 8 &&
+    /[aeiou].*[aeiou]/i.test(t) &&
+    !/^(company|business|limited|services|bookstore|shopping)$/i.test(t)
+  ) {
+    // Still skip if it looks like plain English (no unusual consonant clusters / names)
+    if (/^(delivery|opposite|located|fashion|shipping|countrywide)$/i.test(t)) {
+      return false;
+    }
   }
   return false;
 }
@@ -153,7 +185,6 @@ function extractProperChunks(text: string): string[] {
   if (!raw) return [];
   const out: string[] = [];
 
-  // Multi-word Title Case runs: "Muindi Mbingu Street" → keep first 2–3 tokens if hard
   const titleRuns =
     raw.match(/\b([A-Z][a-zA-Z'’]+(?:\s+[A-Z][a-zA-Z'’]+){1,3})\b/g) || [];
   for (const run of titleRuns) {
@@ -166,7 +197,6 @@ function extractProperChunks(text: string): string[] {
     }
   }
 
-  // Single tokens
   for (const token of raw.split(/[^a-zA-Z0-9'’.-]+/)) {
     if (looksHard(token)) out.push(token.replace(/^[.-]+|[.-]+$/g, ""));
   }
@@ -174,282 +204,326 @@ function extractProperChunks(text: string): string[] {
   return out;
 }
 
-function pushUnique(
-  map: Map<string, PronunciationSuggestion>,
-  suggestion: PronunciationSuggestion
-) {
-  const key = suggestion.match.toLowerCase();
-  const prev = map.get(key);
-  if (!prev || suggestion.priority > prev.priority) {
-    map.set(key, suggestion);
+function uniqueTargets(
+  labels: string[],
+  existing: TtsLexiconEntry[]
+): PronunciationTarget[] {
+  const seen = new Set<string>();
+  const out: PronunciationTarget[] = [];
+  for (const label of labels) {
+    const clean = String(label || "").trim();
+    if (!clean) continue;
+    const match = matchPatternFromPhrase(clean);
+    if (!match) continue;
+    const key = normalizePhrase(clean);
+    if (!key || seen.has(key)) continue;
+    if (isTargetCovered({ label: clean, match }, existing)) continue;
+    seen.add(key);
+    out.push({ label: clean, match });
   }
+  return out;
 }
 
-function alreadyTrained(
-  suggestion: { prompt: string; label: string; match: string },
+export function isTargetCovered(
+  target: PronunciationTarget,
   existing: TtsLexiconEntry[] | null | undefined
 ): boolean {
   if (!existing?.length) return false;
-  const matchKey = suggestion.match.toLowerCase();
-  const promptKey = normalizePhrase(suggestion.prompt);
-  const labelKey = normalizePhrase(suggestion.label);
+  const matchKey = target.match.toLowerCase();
+  const labelKey = normalizePhrase(target.label);
   return existing.some((e) => {
     if (e.match.trim().toLowerCase() === matchKey) return true;
     if (labelKey && normalizePhrase(e.label || "") === labelKey) return true;
-    if (promptKey && normalizePhrase(e.say) === promptKey) return true;
-    if (promptKey && normalizePhrase(e.label || "") === promptKey) return true;
+    if (labelKey && normalizePhrase(e.say) === labelKey) return true;
     try {
       const source = e.match.startsWith("\\b")
         ? e.match
         : `\\b(?:${e.match})\\b`;
       const re = new RegExp(source, "i");
-      if (re.test(suggestion.prompt) || re.test(suggestion.label)) return true;
+      if (re.test(target.label)) return true;
     } catch {
-      // ignore bad patterns
+      // ignore
     }
-    const matchPlain = normalizePhrase(
-      e.match.replace(/\\[sb]|[+*?|()[\]]/g, " ")
-    );
-    return Boolean(promptKey && matchPlain && matchPlain === promptKey);
+    return false;
   });
 }
 
-/** Exported for coach UI status (done vs todo). */
+/** A line is done when every hard target is already in the lexicon. */
 export function isPronunciationCovered(
-  suggestion: { prompt: string; label: string; match: string },
+  suggestion: Pick<PronunciationSuggestion, "prompt" | "label" | "match" | "targets">,
   existing: TtsLexiconEntry[] | null | undefined
 ): boolean {
-  return alreadyTrained(suggestion, existing);
+  const targets =
+    Array.isArray(suggestion.targets) && suggestion.targets.length
+      ? suggestion.targets
+      : [{ label: suggestion.label, match: suggestion.match }];
+  return targets.every((t) => isTargetCovered(t, existing));
 }
 
-function normalizePhrase(text: string): string {
-  return String(text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
+function makeLine(opts: {
+  prompt: string;
+  label: string;
+  reason: string;
+  targets: PronunciationTarget[];
+  priority: number;
+}): PronunciationSuggestion | null {
+  const targets = opts.targets.filter((t) => t.label && t.match);
+  if (!targets.length) return null;
+  const prompt = opts.prompt.trim();
+  if (prompt.length < 8 || prompt.length > 200) return null;
+  return {
+    id: slugId(prompt),
+    label: opts.label,
+    prompt: /[.?!]$/.test(prompt) ? prompt : `${prompt}.`,
+    kind: "sentence",
+    reason: opts.reason,
+    targets,
+    match: targets[0].match,
+    priority: opts.priority,
+  };
 }
 
 /**
- * Suggest high-value words and short sentences from the business profile.
+ * Deterministic constructive lines from the business profile.
+ * Prefer natural receptionist sentences that pack hard names together.
  */
 export function suggestPronunciations(
   input: PronunciationSuggestInput
 ): PronunciationSuggestion[] {
-  const map = new Map<string, PronunciationSuggestion>();
   const existing = input.existingLexicon || [];
+  const lines: PronunciationSuggestion[] = [];
 
   const businessName = String(input.businessName || "").trim();
-  if (businessName && businessName.length >= 3) {
-    const match = matchPatternFromPhrase(businessName);
-    const word = {
-      id: slugId("word", businessName),
-      label: businessName,
-      prompt: businessName,
-      kind: "word" as const,
-      reason: "Your business name — callers hear this first.",
-      match,
-      priority: 100,
-    };
-    if (match && !alreadyTrained(word, existing)) {
-      pushUnique(map, word);
-      const welcomeMatch = matchPatternFromPhrase(`Welcome to ${businessName}`);
-      const welcome = {
-        id: slugId("sentence", `welcome-${businessName}`),
-        label: `Welcome line`,
-        prompt: `Welcome to ${businessName}.`,
-        kind: "sentence" as const,
-        reason: "Practice the greeting the way you want it said.",
-        match: welcomeMatch,
-        priority: 85,
-      };
-      if (welcomeMatch && !alreadyTrained(welcome, existing)) {
-        pushUnique(map, welcome);
-      }
-    }
-  }
-
   const agentName = String(input.agentName || "").trim();
-  if (
-    agentName &&
-    agentName.length >= 2 &&
-    !/^receptionist$/i.test(agentName)
-  ) {
-    const match = matchPatternFromPhrase(agentName);
-    const word = {
-      id: slugId("word", agentName),
-      label: agentName,
-      prompt: agentName,
-      kind: "word" as const,
-      reason: "Receptionist name on every call.",
-      match,
+  const agentOk =
+    agentName.length >= 2 && !/^receptionist$/i.test(agentName);
+
+  const bizTargets = businessName
+    ? uniqueTargets([businessName], existing)
+    : [];
+  const agentTargets = agentOk ? uniqueTargets([agentName], existing) : [];
+
+  if (bizTargets.length && agentTargets.length) {
+    const line = makeLine({
+      prompt: `Hi, this is ${agentName} from ${businessName}`,
+      label: "Greeting",
+      reason: "One line trains both your agent name and business name.",
+      targets: [...agentTargets, ...bizTargets],
+      priority: 100,
+    });
+    if (line) lines.push(line);
+  } else if (bizTargets.length) {
+    const line = makeLine({
+      prompt: `Thank you for calling ${businessName}`,
+      label: "Business name",
+      reason: "Callers hear your business name first.",
+      targets: bizTargets,
       priority: 98,
-    };
-    if (match && !alreadyTrained(word, existing)) {
-      pushUnique(map, word);
-      const introMatch = matchPatternFromPhrase(`this is ${agentName}`);
-      const intro = {
-        id: slugId("sentence", `agent-${agentName}`),
-        label: "Name intro",
-        prompt: `Hi, this is ${agentName}.`,
-        kind: "sentence" as const,
-        reason: "How the agent should say their own name.",
-        match: introMatch,
-        priority: 80,
-      };
-      if (introMatch && !alreadyTrained(intro, existing)) {
-        pushUnique(map, intro);
-      }
-    }
+    });
+    if (line) lines.push(line);
+  } else if (agentTargets.length) {
+    const line = makeLine({
+      prompt: `Hi, this is ${agentName}. How can I help you today`,
+      label: "Agent intro",
+      reason: "How the receptionist says their own name.",
+      targets: agentTargets,
+      priority: 96,
+    });
+    if (line) lines.push(line);
   }
 
   for (const loc of input.locations || []) {
-    const chunks = [
+    const placeChunks = [
+      ...extractProperChunks(loc.address || ""),
+      ...extractProperChunks(loc.landmark || ""),
+      ...extractProperChunks(loc.label || ""),
+    ];
+    const placeTargets = uniqueTargets(placeChunks, existing).slice(0, 3);
+    if (!placeTargets.length) continue;
+
+    const landmark = String(loc.landmark || "").trim();
+    const address = String(loc.address || "").trim();
+    let prompt = "";
+    if (placeTargets.length >= 2) {
+      prompt = `We're on ${placeTargets[0].label}, near ${placeTargets[1].label}`;
+    } else if (landmark && /[A-Za-z]/.test(landmark)) {
+      prompt = `We're on ${placeTargets[0].label}, opposite ${landmark.split(",")[0].trim()}`;
+    } else if (address) {
+      prompt = `Our shop is on ${placeTargets[0].label}`;
+    } else {
+      prompt = `You can find us at ${placeTargets[0].label}`;
+    }
+
+    // Landmark may introduce obvious words — keep targets as the hard chunks only
+    const line = makeLine({
+      prompt,
+      label: "Location",
+      reason: "Practice the place names callers ask for.",
+      targets: placeTargets,
+      priority: 92,
+    });
+    if (line) lines.push(line);
+    break; // one strong location line is enough from deterministic pass
+  }
+
+  const teamNames = (input.team || [])
+    .map((m) => String(m.name || "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const teamTargets = uniqueTargets(teamNames, existing).slice(0, 2);
+  if (teamTargets.length) {
+    const prompt =
+      teamTargets.length === 1
+        ? `You can ask for ${teamTargets[0].label}`
+        : `You can ask for ${teamTargets[0].label} or ${teamTargets[1].label}`;
+    const line = makeLine({
+      prompt,
+      label: "Team",
+      reason: "Team names must sound right on transfers.",
+      targets: teamTargets,
+      priority: 88,
+    });
+    if (line) lines.push(line);
+  }
+
+  const serviceChunks: string[] = [];
+  for (const service of input.services || []) {
+    serviceChunks.push(...extractProperChunks(service.name || ""));
+  }
+  const serviceTargets = uniqueTargets(serviceChunks, existing).slice(0, 2);
+  if (serviceTargets.length) {
+    const prompt =
+      serviceTargets.length === 1
+        ? `We also stock ${serviceTargets[0].label}`
+        : `We also stock ${serviceTargets[0].label} and ${serviceTargets[1].label}`;
+    const line = makeLine({
+      prompt,
+      label: "Products",
+      reason: "Product names that trip up TTS.",
+      targets: serviceTargets,
+      priority: 80,
+    });
+    if (line) lines.push(line);
+  }
+
+  // FAQ / bulletin hard chunks → one packed line if still room
+  const extraChunks: string[] = [];
+  for (const faq of input.faqs || []) {
+    extraChunks.push(
+      ...extractProperChunks(`${faq.question || ""} ${faq.answer || ""}`)
+    );
+  }
+  for (const bulletin of input.bulletinTexts || []) {
+    extraChunks.push(...extractProperChunks(bulletin));
+  }
+  const already = new Set(
+    lines.flatMap((l) => l.targets.map((t) => normalizePhrase(t.label)))
+  );
+  const extraTargets = uniqueTargets(extraChunks, existing)
+    .filter((t) => !already.has(normalizePhrase(t.label)))
+    .slice(0, 2);
+  if (extraTargets.length && lines.length < SUGGEST_MAX) {
+    const prompt =
+      extraTargets.length === 1
+        ? `Just to confirm, that is ${extraTargets[0].label}`
+        : `Just to confirm, that is ${extraTargets[0].label} and ${extraTargets[1].label}`;
+    const line = makeLine({
+      prompt,
+      label: "Extra names",
+      reason: "Other names from your FAQs or today’s notes.",
+      targets: extraTargets,
+      priority: 70,
+    });
+    if (line) lines.push(line);
+  }
+
+  const dedup = new Map<string, PronunciationSuggestion>();
+  for (const line of lines) {
+    if (isPronunciationCovered(line, existing)) continue;
+    const key = line.id;
+    const prev = dedup.get(key);
+    if (!prev || line.priority > prev.priority) dedup.set(key, line);
+  }
+
+  return [...dedup.values()]
+    .sort((a, b) => b.priority - a.priority)
+    .slice(0, SUGGEST_MAX);
+}
+
+/** Candidate hard labels for AI screening (no sentences yet). */
+export function collectHardNameCandidates(
+  input: PronunciationSuggestInput
+): string[] {
+  const existing = input.existingLexicon || [];
+  const labels: string[] = [];
+  if (input.businessName) labels.push(String(input.businessName));
+  if (input.agentName && !/^receptionist$/i.test(String(input.agentName))) {
+    labels.push(String(input.agentName));
+  }
+  for (const loc of input.locations || []) {
+    labels.push(
       ...extractProperChunks(loc.label || ""),
       ...extractProperChunks(loc.address || ""),
       ...extractProperChunks(loc.landmark || ""),
-      ...extractProperChunks(loc.directions || ""),
-    ];
-    for (const chunk of chunks) {
-      const match = matchPatternFromPhrase(chunk);
-      const word = {
-        id: slugId("word", chunk),
-        label: chunk,
-        prompt: chunk,
-        kind: "word" as const,
-        reason: "Place name from your locations.",
-        match,
-        priority: 92,
-      };
-      if (!match || alreadyTrained(word, existing)) continue;
-      pushUnique(map, word);
-    }
-    const address = String(loc.address || "").trim();
-    if (address && address.length >= 8 && address.length <= 90) {
-      const hardBits = extractProperChunks(address);
-      if (hardBits.length) {
-        const sentence = address.replace(/\s+/g, " ").slice(0, 90);
-        const sentenceMatch = matchPatternFromPhrase(sentence);
-        const row = {
-          id: slugId("sentence", sentence),
-          label: "Address line",
-          prompt: sentence.endsWith(".") ? sentence : `${sentence}.`,
-          kind: "sentence" as const,
-          reason: "Say your address the way locals say it.",
-          match: sentenceMatch,
-          priority: 78,
-        };
-        if (sentenceMatch && !alreadyTrained(row, existing)) {
-          pushUnique(map, row);
-        }
-      }
-    }
+      ...extractProperChunks(loc.directions || "")
+    );
   }
-
-  const locationNotes = String(input.locationNotes || "").trim();
-  for (const chunk of extractProperChunks(locationNotes)) {
-    const match = matchPatternFromPhrase(chunk);
-    const word = {
-      id: slugId("word", chunk),
-      label: chunk,
-      prompt: chunk,
-      kind: "word" as const,
-      reason: "From your location notes.",
-      match,
-      priority: 88,
-    };
-    if (!match || alreadyTrained(word, existing)) continue;
-    pushUnique(map, word);
-  }
-
+  labels.push(...extractProperChunks(String(input.locationNotes || "")));
   for (const member of input.team || []) {
-    const name = String(member.name || "").trim();
-    if (!name || name.length < 2) continue;
-    const match = matchPatternFromPhrase(name);
-    const word = {
-      id: slugId("word", name),
-      label: name,
-      prompt: name,
-      kind: "word" as const,
-      reason: member.role
-        ? `Team: ${String(member.role).trim()}`
-        : "Team member name.",
-      match,
-      priority: looksHard(name.split(/\s+/)[0] || name) ? 90 : 70,
-    };
-    if (!match || alreadyTrained(word, existing)) continue;
-    pushUnique(map, word);
+    if (member.name) labels.push(String(member.name));
   }
-
   for (const service of input.services || []) {
-    const name = String(service.name || "").trim();
-    if (!name || name.length < 3) continue;
-    const chunks = extractProperChunks(name);
-    const targets = chunks.length ? chunks : looksHard(name) ? [name] : [];
-    for (const chunk of targets) {
-      const match = matchPatternFromPhrase(chunk);
-      const word = {
-        id: slugId("word", chunk),
-        label: chunk,
-        prompt: chunk,
-        kind: "word" as const,
-        reason: "Service or product name.",
-        match,
-        priority: 75,
-      };
-      if (!match || alreadyTrained(word, existing)) continue;
-      pushUnique(map, word);
-    }
+    labels.push(...extractProperChunks(service.name || ""));
   }
-
   for (const faq of input.faqs || []) {
-    for (const chunk of extractProperChunks(
-      `${faq.question || ""} ${faq.answer || ""}`
-    )) {
-      const match = matchPatternFromPhrase(chunk);
-      const word = {
-        id: slugId("word", chunk),
-        label: chunk,
-        prompt: chunk,
-        kind: "word" as const,
-        reason: "From your FAQs.",
-        match,
-        priority: 72,
-      };
-      if (!match || alreadyTrained(word, existing)) continue;
-      pushUnique(map, word);
-    }
+    labels.push(
+      ...extractProperChunks(`${faq.question || ""} ${faq.answer || ""}`)
+    );
   }
-
   for (const bulletin of input.bulletinTexts || []) {
-    for (const chunk of extractProperChunks(bulletin)) {
-      const match = matchPatternFromPhrase(chunk);
-      const word = {
-        id: slugId("word", chunk),
-        label: chunk,
-        prompt: chunk,
-        kind: "word" as const,
-        reason: "From today’s bulletin.",
-        match,
-        priority: 68,
-      };
-      if (!match || alreadyTrained(word, existing)) continue;
-      pushUnique(map, word);
-    }
+    labels.push(...extractProperChunks(bulletin));
   }
 
-  const all = [...map.values()].sort((a, b) => b.priority - a.priority);
+  return uniqueTargets(labels, existing).map((t) => t.label).slice(0, 24);
+}
 
-  // Cap sentences so the coach stays focused.
-  const words: PronunciationSuggestion[] = [];
-  const sentences: PronunciationSuggestion[] = [];
-  for (const item of all) {
-    if (item.kind === "sentence") {
-      if (sentences.length < SENTENCE_MAX) sentences.push(item);
-    } else {
-      words.push(item);
-    }
+export function parseSuggestionList(raw: unknown): PronunciationSuggestion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PronunciationSuggestion[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const prompt = String(row.prompt || "").trim();
+    const label = String(row.label || "Line").trim() || "Line";
+    const reason = String(row.reason || "Trains hard names in a natural line.").trim();
+    const targetLabels = Array.isArray(row.targets)
+      ? row.targets.map((t) =>
+          typeof t === "string"
+            ? t
+            : t && typeof t === "object"
+              ? String((t as { label?: string }).label || "")
+              : ""
+        )
+      : [];
+    const targets = uniqueTargets(
+      targetLabels.filter(Boolean),
+      []
+    );
+    // If AI omitted targets, derive from prompt-ish labels listed
+    const line = makeLine({
+      prompt,
+      label,
+      reason,
+      targets:
+        targets.length > 0
+          ? targets
+          : uniqueTargets(
+              extractProperChunks(prompt).slice(0, 3),
+              []
+            ),
+      priority: Number(row.priority) > 0 ? Number(row.priority) : 85,
+    });
+    if (line) out.push(line);
   }
-
-  return [...words, ...sentences]
-    .sort((a, b) => b.priority - a.priority)
-    .slice(0, SUGGEST_MAX);
+  return out.slice(0, SUGGEST_MAX);
 }
