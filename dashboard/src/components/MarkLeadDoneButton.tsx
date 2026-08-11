@@ -4,15 +4,20 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 
+type SoftAction = "resolved" | "archived";
+
 /**
- * Soft clear: owners cannot hard-delete calls (RLS).
- * "Done" marks the lead resolved and removes it from the needs-you queue.
+ * Soft clear / hide: owners cannot hard-delete calls (RLS).
+ * Done = resolved (finished follow-up).
+ * Archive = archived (hide from active inbox; still recoverable under Archived).
  */
-export function MarkLeadDoneButton({
+export function MarkLeadActionButton({
   callId,
+  action,
   disabled = false,
 }: {
   callId: string;
+  action: SoftAction;
   disabled?: boolean;
 }) {
   const router = useRouter();
@@ -20,8 +25,16 @@ export function MarkLeadDoneButton({
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  const label = action === "archived" ? "Archive" : "Done";
+  const busyLabel = action === "archived" ? "Archiving…" : "Saving…";
+  const successLabel = action === "archived" ? "Archived" : "Done";
+  const hoverClass =
+    action === "archived"
+      ? "hover:border-ink-soft hover:text-ink"
+      : "hover:border-ok hover:text-ok";
+
   if (done) {
-    return <span className="text-xs font-medium text-ok">Cleared</span>;
+    return <span className="text-xs font-medium text-ok">{successLabel}</span>;
   }
 
   return (
@@ -32,20 +45,48 @@ export function MarkLeadDoneButton({
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            const res = await updateLeadStatus(callId, "resolved");
+            const res = await updateLeadStatus(callId, action);
             if (!res.ok) {
-              setError(res.error || "Could not clear.");
+              setError(
+                res.error ||
+                  (action === "archived"
+                    ? "Could not archive. Apply docs/supabase/lead_status_archive.sql if needed."
+                    : "Could not mark done.")
+              );
               return;
             }
             setDone(true);
             router.refresh();
           });
         }}
-        className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-soft transition hover:border-ok hover:text-ok focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-50"
+        className={[
+          "rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-soft transition focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-50",
+          hoverClass,
+        ].join(" ")}
       >
-        {pending ? "Clearing…" : "Done"}
+        {pending ? busyLabel : label}
       </button>
-      {error ? <span className="text-xs text-warn">{error}</span> : null}
+      {error ? <span className="max-w-[14rem] text-xs text-warn">{error}</span> : null}
     </span>
   );
+}
+
+export function MarkLeadDoneButton({
+  callId,
+  disabled = false,
+}: {
+  callId: string;
+  disabled?: boolean;
+}) {
+  return <MarkLeadActionButton callId={callId} action="resolved" disabled={disabled} />;
+}
+
+export function MarkLeadArchiveButton({
+  callId,
+  disabled = false,
+}: {
+  callId: string;
+  disabled?: boolean;
+}) {
+  return <MarkLeadActionButton callId={callId} action="archived" disabled={disabled} />;
 }

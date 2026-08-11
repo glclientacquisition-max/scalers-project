@@ -6,10 +6,14 @@ import {
   formatCallWhen,
   nairobiGreeting,
   walletKes,
+  STATUS_FILTERS,
   type Lead,
   type StatusFilterId,
 } from "@/lib/callsTriage";
-import { MarkLeadDoneButton } from "@/components/MarkLeadDoneButton";
+import {
+  MarkLeadArchiveButton,
+  MarkLeadDoneButton,
+} from "@/components/MarkLeadDoneButton";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 
 type Mode = "pending_did" | "ready_empty" | "needs_you" | "caught_up";
@@ -237,6 +241,7 @@ function NeedsYouRow({ lead, businessName }: { lead: Lead; businessName: string 
       <div className="flex flex-wrap items-center gap-2">
         <WhatsAppLink number={lead.call.caller_number} compact message={message} />
         <MarkLeadDoneButton callId={lead.call.id} />
+        <MarkLeadArchiveButton callId={lead.call.id} />
         <Link
           href={`/calls/${lead.call.id}?from=new`}
           className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-accent hover:border-accent focus-visible:outline-none focus-visible:shadow-focus"
@@ -254,7 +259,13 @@ export function CallsToolbar({
   q,
 }: {
   active: StatusFilterId;
-  counts: { all: number; new: number; contacted: number; resolved: number };
+  counts: {
+    all: number;
+    new: number;
+    contacted: number;
+    resolved: number;
+    archived: number;
+  };
   q: string;
 }) {
   return (
@@ -285,14 +296,7 @@ export function CallsToolbar({
 
       <nav aria-label="Filter by follow-up status" className="mt-4 border-b border-line">
         <ul className="flex gap-1 overflow-x-auto">
-          {(
-            [
-              { id: "all" as const, label: "All" },
-              { id: "new" as const, label: "New" },
-              { id: "contacted" as const, label: "Contacted" },
-              { id: "resolved" as const, label: "Resolved" },
-            ] as const
-          ).map((item) => {
+          {STATUS_FILTERS.map((item) => {
             const isActive = active === item.id;
             return (
               <li key={item.id}>
@@ -307,7 +311,12 @@ export function CallsToolbar({
                   ].join(" ")}
                 >
                   {item.label}
-                  <span className={["tabular-nums text-xs", isActive ? "text-accent-deep" : "text-ink-soft"].join(" ")}>
+                  <span
+                    className={[
+                      "tabular-nums text-xs",
+                      isActive ? "text-accent-deep" : "text-ink-soft",
+                    ].join(" ")}
+                  >
                     {counts[item.id]}
                   </span>
                 </Link>
@@ -319,7 +328,10 @@ export function CallsToolbar({
       {q ? (
         <p className="mt-3 text-sm text-ink-soft">
           Showing matches for <span className="font-medium text-ink">&ldquo;{q}&rdquo;</span>.{" "}
-          <Link href={callsHref({ status: active })} className="font-medium text-accent-deep hover:underline">
+          <Link
+            href={callsHref({ status: active })}
+            className="font-medium text-accent-deep hover:underline"
+          >
             Clear search
           </Link>
         </p>

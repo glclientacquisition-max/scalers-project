@@ -61,6 +61,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | # | File | Depends on | Notes |
 | --- | --- | --- | --- |
 | 13 | [`lead_status.sql`](./lead_status.sql) | `owner_rls.sql` | `calls.lead_status` + column-scoped owner UPDATE |
+| 13b | [`lead_status_archive.sql`](./lead_status_archive.sql) | `lead_status.sql` | Adds `archived` status (Archive action; Done stays `resolved`) |
 
 ### 6. DID pool + Super Admin helpers
 

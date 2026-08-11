@@ -24,7 +24,7 @@ export function getSupabaseAdmin(): SupabaseClient {
   return client;
 }
 
-export type LeadStatus = "new" | "contacted" | "resolved";
+export type LeadStatus = "new" | "contacted" | "resolved" | "archived";
 
 export type CallRow = {
   id: string;
@@ -41,7 +41,22 @@ export type CallRow = {
 };
 
 export function parseLeadStatus(raw: unknown): LeadStatus {
-  return raw === "contacted" || raw === "resolved" ? raw : "new";
+  if (raw === "contacted" || raw === "resolved" || raw === "archived") return raw;
+  return "new";
+}
+
+/** Owner-facing labels (DB values stay contacted/resolved/archived). */
+export function leadStatusLabel(status: LeadStatus): string {
+  switch (status) {
+    case "contacted":
+      return "Followed Up";
+    case "resolved":
+      return "Done";
+    case "archived":
+      return "Archived";
+    default:
+      return "New";
+  }
 }
 
 export type TranscriptRow = {
