@@ -22,9 +22,28 @@ const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
 const { parseGeminiResponse } = require('./src/conversation/toolMarkers');
+const {
+  createBrainState,
+  observeCallerTurn,
+  setNextBestAction,
+  recordActionResults,
+  formatBrainStateForPrompt,
+} = require('./src/conversation/brainState');
+const {
+  buildBrainCapabilities,
+  formatAuthorityPolicy,
+} = require('./src/conversation/brainPolicy');
+const { determineNextBestAction } = require('./src/conversation/nextBestAction');
+const {
+  executeBrainTools,
+  formatToolConfirmation,
+} = require('./src/conversation/toolExecution');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
 const callAgentTools = new Map();
+/** Structured semantic state and actual runtime capabilities, keyed by callSid. */
+const callBrainStates = new Map();
+const callBrainCapabilities = new Map();
 const {
   detectCallerLanguage,
   resolveCallLanguage,
@@ -793,7 +812,21 @@ mediaWss.on('connection', (ws, req) => {
         ? profile.ttsLexicon
         : [];
       if (sessionCallSid) {
-        callAgentTools.set(sessionCallSid, parseAgentTools(profile.agentTools));
+        const parsedTools = parseAgentTools(profile.agentTools);
+        callAgentTools.set(sessionCallSid, parsedTools);
+        callBrainStates.set(sessionCallSid, createBrainState(profile));
+        callBrainCapabilities.set(
+          sessionCallSid,
+          buildBrainCapabilities(
+            { ...profile, agentTools: parsedTools },
+            {
+              createServiceRequest: true,
+              notifyCallback: true,
+              // Current media runtime has no transfer executor.
+              liveTransfer: false,
+            }
+          )
+        );
       }
       greetingLine = buildGreeting(businessName, {
         agentName,
@@ -968,13 +1001,39 @@ mediaWss.on('connection', (ws, req) => {
 
     const detected = detectCallerLanguage(clean);
     callLanguage = resolveCallLanguage(callLanguage, detected);
+    const callKey = sidLabel();
+    const capabilities =
+      callBrainCapabilities.get(callKey) ||
+      buildBrainCapabilities(
+        { agentTools: callAgentTools.get(callKey) || parseAgentTools(null) },
+        { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+      );
+    let brainState = observeCallerTurn(
+      callBrainStates.get(callKey) || createBrainState(),
+      {
+        text: clean,
+        detectedLanguage: detected,
+        resolvedLanguage: callLanguage,
+      }
+    );
+    const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
+    brainState = setNextBestAction(brainState, nextBestAction);
+    callBrainStates.set(callKey, brainState);
+    callBrainCapabilities.set(callKey, capabilities);
     console.log(
-      `[ws/media][${sidLabel()}] caller turn lang=${callLanguage} detected=${detected}: ${clean}`
+      `[ws/media][${callKey}] caller turn lang=${callLanguage} detected=${detected}` +
+        ` intent=${brainState.intent} goal=${brainState.goal.primary}` +
+        ` next=${nextBestAction.action}: ${clean}`
     );
     transcriptLog.push(`Caller: ${clean}`);
     messages.push({ role: 'user', content: clean });
 
-    const turnSystemPrompt = `${systemPrompt}\n\n${languageDirective(callLanguage)}`;
+    const turnSystemPrompt = [
+      systemPrompt,
+      formatAuthorityPolicy(capabilities),
+      formatBrainStateForPrompt(brainState),
+      languageDirective(callLanguage),
+    ].join('\n\n');
 
     try {
       // VOICE_FILLER=auto (default): adaptive ack only if first spoken audio is slow.
@@ -1006,9 +1065,13 @@ mediaWss.on('connection', (ws, req) => {
         }, fillerDelayMs);
       }
 
+      const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
+        nextBestAction.action
+      );
       const streamOn =
         Boolean(process.env.GEMINI_API_KEY) &&
         Boolean(tts) &&
+        !actionMayExecute &&
         (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
 
       let speakSession = null;
@@ -1102,9 +1165,9 @@ mediaWss.on('connection', (ws, req) => {
         result = {
           spokenText:
             callLanguage === 'sw'
-              ? 'Asante — mtu kutoka kwa biashara atakupigia simu hivi karibuni.'
-              : 'Thanks — someone from the business will call you back shortly.',
-          shouldEndCall: true,
+              ? 'Samahani, siwezi kufikia taarifa za biashara sasa hivi. Tafadhali jaribu tena.'
+              : "Sorry, I can't access the business information right now. Please try again.",
+          shouldEndCall: false,
         };
         stopFillerForReply();
         if (speakSession) {
@@ -1197,7 +1260,8 @@ mediaWss.on('connection', (ws, req) => {
           }
           speakSession = null;
         }
-        const reply = result?.spokenText || AI_FALLBACK_LINE;
+        const reply =
+          result?.spokenText || (result?.actionConfirmation ? '' : AI_FALLBACK_LINE);
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
           discardUnspokenAssistant(reply);
@@ -1206,9 +1270,16 @@ mediaWss.on('connection', (ws, req) => {
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
-        transcriptLog.push(`Agent: ${reply}`);
-        turnTiming.markFirstSpokenChunk();
-        await speakText(reply);
+        if (reply) {
+          transcriptLog.push(`Agent: ${reply}`);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(reply);
+        }
+      }
+
+      if (result?.actionConfirmation && !bargeInActive) {
+        transcriptLog.push(`Agent: ${result.actionConfirmation}`);
+        await speakText(result.actionConfirmation);
       }
 
       if (result?.shouldEndCall && !bargeInActive) {
@@ -1528,6 +1599,9 @@ mediaWss.on('connection', (ws, req) => {
         durationSeconds,
         source: 'ws/media',
       }).catch(() => {});
+      callAgentTools.delete(sessionCallSid);
+      callBrainStates.delete(sessionCallSid);
+      callBrainCapabilities.delete(sessionCallSid);
     }
   });
 
@@ -1568,9 +1642,11 @@ const escalationNotifyInProgress = new Set();
  */
 async function maybeSendEscalationNotification(callSid, escalate = {}) {
   const call = await db.getCall(callSid);
-  if (!call) return;
-  if (call.escalation_sent) return;
-  if (escalationNotifyInProgress.has(callSid)) return;
+  if (!call) return { ok: false, reason: 'Call record was not found.' };
+  if (call.escalation_sent) return { ok: true, channel: 'already_sent' };
+  if (escalationNotifyInProgress.has(callSid)) {
+    return { ok: false, reason: 'An escalation is already in progress.' };
+  }
   escalationNotifyInProgress.add(callSid);
 
   try {
@@ -1647,7 +1723,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       if (refreshed?.name && refreshed?.reason) {
         await maybeSendWhatsAppNotification(callSid);
       }
-      return;
+      return { ok: false, reason: 'No working escalation channel.' };
     }
 
     for (const s of sent) {
@@ -1661,8 +1737,13 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     await db.markEscalationSent(callSid);
     await db.markWhatsappSent(callSid);
+    return {
+      ok: true,
+      channel: sent.map((item) => item.channel).filter(Boolean).join(',') || 'alert',
+    };
   } catch (err) {
     console.error(`[${callSid}] Escalation notification failed:`, err?.message || err);
+    return { ok: false, reason: err?.message || String(err) };
   } finally {
     escalationNotifyInProgress.delete(callSid);
   }
@@ -1802,6 +1883,7 @@ wss.on('connection', (ws) => {
   let systemPrompt = buildSystemPrompt();
   let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
+  let callLanguage = 'unknown';
 
   ws.on('message', async (raw) => {
     let data;
@@ -1824,7 +1906,16 @@ wss.on('connection', (ws) => {
         try {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
           systemPrompt = buildSystemPrompt(profile);
-          callAgentTools.set(callSid, parseAgentTools(profile.agentTools));
+          const parsedTools = parseAgentTools(profile.agentTools);
+          callAgentTools.set(callSid, parsedTools);
+          callBrainStates.set(callSid, createBrainState(profile));
+          callBrainCapabilities.set(
+            callSid,
+            buildBrainCapabilities(
+              { ...profile, agentTools: parsedTools },
+              { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+            )
+          );
           messages = [{ role: 'system', content: systemPrompt }];
         } catch (err) {
           console.warn(`[${callSid}] tenant prompt load failed:`, err?.message || err);
@@ -1842,10 +1933,39 @@ wss.on('connection', (ws) => {
         transcriptLog.push(`Caller: ${data.voicePrompt}`);
         messages.push({ role: 'user', content: data.voicePrompt });
 
-        const reply = await runGeminiTurn(messages, callSid, systemPrompt);
-        if (reply.spokenText) {
-          transcriptLog.push(`Agent: ${reply.spokenText}`);
-          ws.send(JSON.stringify({ type: 'text', token: reply.spokenText, last: true }));
+        const detected = detectCallerLanguage(data.voicePrompt);
+        callLanguage = resolveCallLanguage(callLanguage, detected);
+        const capabilities =
+          callBrainCapabilities.get(callSid) ||
+          buildBrainCapabilities(
+            { agentTools: callAgentTools.get(callSid) || parseAgentTools(null) },
+            { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+          );
+        let brainState = observeCallerTurn(
+          callBrainStates.get(callSid) || createBrainState(),
+          {
+            text: data.voicePrompt,
+            detectedLanguage: detected,
+            resolvedLanguage: callLanguage,
+          }
+        );
+        const decision = determineNextBestAction({ state: brainState, capabilities });
+        brainState = setNextBestAction(brainState, decision);
+        callBrainStates.set(callSid, brainState);
+        const turnPrompt = [
+          systemPrompt,
+          formatAuthorityPolicy(capabilities),
+          formatBrainStateForPrompt(brainState),
+          languageDirective(callLanguage),
+        ].join('\n\n');
+
+        const reply = await runGeminiTurn(messages, callSid, turnPrompt);
+        const replyText = [reply.spokenText, reply.actionConfirmation]
+          .filter(Boolean)
+          .join(' ');
+        if (replyText) {
+          transcriptLog.push(`Agent: ${replyText}`);
+          ws.send(JSON.stringify({ type: 'text', token: replyText, last: true }));
         }
 
         await db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') });
@@ -1877,11 +1997,16 @@ wss.on('connection', (ws) => {
         console.error(`[${callSid}] Failed to flush transcript on close:`, err?.message || err);
       });
     }
+    if (callSid) {
+      callAgentTools.delete(callSid);
+      callBrainStates.delete(callSid);
+      callBrainCapabilities.delete(callSid);
+    }
   });
 });
 
 const AI_FALLBACK_LINE =
-  "Sorry, we're having a technical issue on our end — the business will call you back shortly. Thanks for your patience.";
+  "Sorry, I'm having a technical issue and couldn't complete that. Please try again.";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -1960,58 +2085,76 @@ function geminiVoiceConfig(systemPrompt) {
  */
 async function applyGeminiTools(callSid, parsed) {
   const tools = callAgentTools.get(callSid) || parseAgentTools(null);
-  if (!tools.escalate) parsed.escalate = null;
-  const shouldEndCall = Boolean(parsed.shouldEndCall && tools.end_call);
-
-  if (parsed.serviceRequest) {
-    try {
-      const created = await db.createServiceRequest({
-        callSid,
-        type: parsed.serviceRequest.type,
-        name: parsed.serviceRequest.name || parsed.name,
-        phone: parsed.serviceRequest.phone,
-        item: parsed.serviceRequest.item,
-        quantity: parsed.serviceRequest.quantity,
-        whenText: parsed.serviceRequest.whenText,
-        notes: parsed.serviceRequest.notes || parsed.reason,
-      });
-      if (created) {
-        console.log(
-          `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
-        );
-        maybeSendServiceRequestNotification(callSid, created).catch((err) => {
-          console.error(
-            `[${callSid}] service request notify error:`,
-            err?.message || err
-          );
+  const capabilities =
+    callBrainCapabilities.get(callSid) ||
+    buildBrainCapabilities(
+      { agentTools: tools },
+      { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+    );
+  const state = callBrainStates.get(callSid) || createBrainState();
+  const execution = await executeBrainTools({
+    parsed,
+    capabilities,
+    completedFingerprints: state.actions.completedFingerprints,
+    handlers: {
+      createServiceRequest: async (request) => {
+        const created = await db.createServiceRequest({
+          callSid,
+          type: request.type,
+          name: request.name || parsed.name,
+          phone: request.phone,
+          item: request.item,
+          quantity: request.quantity,
+          whenText: request.whenText,
+          notes: request.notes || parsed.reason,
         });
-      }
-    } catch (err) {
-      console.error(
-        `[${callSid}] createServiceRequest error:`,
-        err?.message || err
-      );
-    }
-  }
+        if (created) {
+          console.log(
+            `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
+          );
+          maybeSendServiceRequestNotification(callSid, created).catch((err) => {
+            console.error(`[${callSid}] service request notify error:`, err?.message || err);
+          });
+        }
+        return created;
+      },
+      saveCallerInfo: (info) =>
+        db.saveCallerInfo({
+          callSid,
+          name: info.name || undefined,
+          reason: info.reason || undefined,
+        }),
+      escalate: (escalation) =>
+        maybeSendEscalationNotification(callSid, escalation),
+    },
+  });
 
-  if (parsed.name || parsed.reason) {
-    const saved = await db.saveCallerInfo({
-      callSid,
-      name: parsed.name || undefined,
-      reason: parsed.reason || undefined,
+  let updatedState = recordActionResults(state, execution.results);
+  if (execution.shouldEndCall) {
+    updatedState = setNextBestAction(updatedState, {
+      action: 'END',
+      reason: 'The response included a permitted end-call action.',
     });
-    if (saved?.name && saved?.reason && !parsed.escalate) {
-      maybeSendWhatsAppNotification(callSid);
-    }
+  }
+  callBrainStates.set(callSid, updatedState);
+
+  const savedInfo = execution.results.find(
+    (result) => result.action === 'save_caller_info' && result.status === 'succeeded'
+  );
+  const escalationRequested = execution.results.some(
+    (result) => result.action === 'escalate'
+  );
+  if (savedInfo?.name && savedInfo?.reason && !escalationRequested) {
+    maybeSendWhatsAppNotification(callSid);
   }
 
-  if (parsed.escalate) {
-    maybeSendEscalationNotification(callSid, parsed.escalate).catch((err) => {
-      console.error(`[${callSid}] escalate notify error:`, err?.message || err);
-    });
+  for (const result of execution.results) {
+    console.log(
+      `[${callSid}] brain action=${result.action} status=${result.status}` +
+        (result.reason ? ` reason=${result.reason}` : '')
+    );
   }
-
-  return shouldEndCall;
+  return execution;
 }
 
 /**
@@ -2085,10 +2228,23 @@ async function runGeminiTurnStreaming(
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
   const spokenText =
     buffer.getSpokenEmitted() || parsed.spokenText || AI_FALLBACK_LINE;
-  const shouldEndCall = await applyGeminiTools(callSid, parsed);
+  const execution = await applyGeminiTools(callSid, parsed);
+  const actionConfirmation = formatToolConfirmation(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  );
 
-  messages.push({ role: 'assistant', content: spokenText });
-  return { spokenText, shouldEndCall, streamed: !streamFailed };
+  messages.push({
+    role: 'assistant',
+    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+  });
+  return {
+    spokenText,
+    actionConfirmation,
+    toolResults: execution.results,
+    shouldEndCall: execution.shouldEndCall,
+    streamed: !streamFailed,
+  };
 }
 
 // Runs one turn of the conversation through Gemini, preserving the chat
@@ -2138,12 +2294,31 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
-  const spokenText = parsed.spokenText || AI_FALLBACK_LINE;
-  const shouldEndCall = await applyGeminiTools(callSid, parsed);
+  const execution = await applyGeminiTools(callSid, parsed);
+  const hasOutcomeAction = execution.results.some((result) =>
+    ['create_service_request', 'escalate', 'tool_request'].includes(result.action)
+  );
+  // Action-capable turns use the deterministic backend confirmation. This prevents
+  // model prose from claiming success before execution has actually completed.
+  const spokenText = hasOutcomeAction
+    ? ''
+    : parsed.spokenText || AI_FALLBACK_LINE;
+  const actionConfirmation = formatToolConfirmation(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  );
 
-  messages.push({ role: 'assistant', content: spokenText });
+  messages.push({
+    role: 'assistant',
+    content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+  });
 
-  return { spokenText, shouldEndCall };
+  return {
+    spokenText,
+    actionConfirmation,
+    toolResults: execution.results,
+    shouldEndCall: execution.shouldEndCall,
+  };
 }
 
 server.listen(PORT, () => {

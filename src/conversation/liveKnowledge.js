@@ -98,7 +98,7 @@ function formatTeamBlock(team) {
 
 /**
  * Spoken policy when knowledge does not cover the ask.
- * Custom owner line is preferred phrasing; default still admits unknown + captures lead.
+ * Custom owner line is preferred phrasing when it does not promise unsupported action.
  * @param {string} [customLine]
  */
 function formatUnknownAnswerPolicy(customLine = '') {
@@ -106,16 +106,17 @@ function formatUnknownAnswerPolicy(customLine = '') {
   const parts = [
     'UNKNOWN ANSWER POLICY (when the ask is outside SERVICES / FAQs / TEAM above):',
     '- Admit you do not have that fact. Do NOT invent prices, availability, guarantees, or services.',
-    '- Keep the spoken reply to 1 short sentence, then capture or confirm name + reason so the team can follow up.',
+    '- Keep the spoken reply short. Offer only the next step allowed by AUTHORITY / ACTION POLICY.',
+    '- Do not force name/reason capture. Collect them only if the caller chooses a saved request or justified handoff.',
     '- Match the caller language (English / Kiswahili / light Sheng).',
   ];
   if (line) {
     parts.push(
-      `- Preferred line (adapt wording to the caller's language, keep the same meaning): "${line}"`
+      `- Owner preferred line: "${line}". Adapt it to the caller's language, but remove any callback time, guarantee, transfer, booking, stock, or action promise that AUTHORITY / ACTION POLICY does not support.`
     );
   } else {
     parts.push(
-      '- Default line ideas (pick one short variant, do not read this list aloud): "I don\'t have that detail — I\'ll note it and the team will follow up." / "Sina hiyo detail — nitaandika, team itakupigia." / "Sijui hiyo exact — nita-note, wataku-call."'
+      '- Default line ideas (pick one short variant, do not read this list aloud): "I don\'t have that detail." / "Sina hiyo taarifa." / "Sina hiyo exact detail." Then offer an authorized option only if useful.'
     );
   }
   return parts.join('\n');
@@ -174,7 +175,7 @@ function buildLiveGroundTruth(profile = {}) {
     `BUSINESS VERTICAL: ${vertical}`,
     `HANDOFF MODE: ${handoffMode}${
       handoffMode === 'live_transfer'
-        ? ' (prefer connecting a human when asked; if transfer is unavailable, take a callback note and escalate)'
+        ? ' (tenant preference only; AUTHORITY / ACTION POLICY decides whether live transfer actually exists)'
         : ' (notify via WhatsApp/email callback — do not claim a live transfer)'
     }`,
     '',
@@ -216,10 +217,11 @@ function buildLiveGroundTruth(profile = {}) {
       'TEAM DIRECTORY (escalation — you are the receptionist, not the expert):',
       formatTeamBlock(team),
       !team.length
-        ? 'ESCALATION: No team directory on file. Do not invent staff. Capture name + reason and say the business will follow up.'
+        ? 'ESCALATION: No team directory on file. Do not invent staff. Offer a saved request only when authorized.'
         : `ESCALATION RULES:
 - Prefer matching the caller's ask to a Name or Role above. A role like "General queries" is the catch-all for unmatched asks.
-- If a caller is angry, asks for a refund/billing, or matches a role above: acknowledge, say that teammate will follow up shortly, capture name + reason, and append the escalate tool with that teammate name or role.
+- Resolve from knowledge first. Escalate when the caller explicitly requests a human, policy requires one, you lack authority, a tool fails, or useful repair attempts fail. Anger alone is not sufficient.
+- Before escalating, capture the name + reason and append the escalate tool with the teammate name or role. Say only that you will try to send the request; never claim it was sent.
 - If they ask for a role or person NOT on this list (e.g. "sales guy" but only CEO / General queries is listed): do NOT invent staff. Say you do not have that specialist on file, offer General queries or the owner/CEO to follow up, then escalate. In the escalate tool, set teammate to who they asked for (e.g. "sales") so the system can fall back and tag the notify.
 - Do not invent live transfers or claim you already WhatsApped them.`
     );
@@ -228,12 +230,12 @@ function buildLiveGroundTruth(profile = {}) {
       '',
       'TEAM DIRECTORY (for your awareness — escalate tool is OFF for this business):',
       formatTeamBlock(team),
-      'Do NOT append the escalate tool. If a caller is angry or asks for someone: acknowledge, capture name + reason, and say the business will follow up.'
+      'Do NOT append the escalate tool. Resolve what you can; if the caller asks for someone, offer an authorized saved request without promising follow-up timing.'
     );
   } else {
     parts.push(
       '',
-      'ESCALATION: escalate tool is OFF. Capture name + reason and say the business will follow up. Do not invent staff.'
+      'ESCALATION: escalate tool is OFF. Resolve what you can and offer an authorized saved request only if useful. Do not invent staff.'
     );
   }
 
