@@ -137,6 +137,15 @@ function buildLiveGroundTruth(profile = {}) {
   } = require('./businessPolicies');
 
   const services = normalizeServices(profile.servicesCatalog);
+  const products = require('./productCatalog').normalizeProducts(
+    profile.productCatalog
+  );
+  const {
+    normalizeSocialHandles,
+    socialHandlesHaveContent,
+    formatSocialHandlesBlock,
+  } = require('./socialHandles');
+  const social = normalizeSocialHandles(profile.socialHandles);
   const faqs = normalizeFaqs(profile.faqs);
   const team = normalizeTeam(profile.teamDirectory);
   const locations = normalizeLocations(profile.businessLocations);
@@ -149,10 +158,12 @@ function buildLiveGroundTruth(profile = {}) {
 
   const hasAny =
     services.length ||
+    products.length ||
     faqs.length ||
     team.length ||
     locations.length ||
     policiesHaveContent(policies) ||
+    socialHandlesHaveContent(social) ||
     unknown ||
     extras;
   if (!hasAny) return '';
@@ -170,7 +181,7 @@ function buildLiveGroundTruth(profile = {}) {
     'LOCATIONS & DIRECTIONS:',
     formatLocationsBlock(locations),
     '',
-    'SERVICES CATALOG:',
+    'SERVICES (what you offer — not individual products):',
     formatServicesBlock(services),
   ];
 
@@ -182,6 +193,17 @@ function buildLiveGroundTruth(profile = {}) {
     }
   } else if (extras && !services.length) {
     parts.push('', 'SERVICE NOTES:', extras);
+  }
+
+  const { formatProductsBlock } = require('./productCatalog');
+  parts.push(
+    '',
+    'PRODUCT CATALOGUE (individual items — prices/stock from here only):',
+    formatProductsBlock(products)
+  );
+
+  if (socialHandlesHaveContent(social)) {
+    parts.push('', 'PHONES, SOCIAL & WEB:', formatSocialHandlesBlock(social));
   }
 
   parts.push('', 'POLICIES:', formatPoliciesBlock(policies));

@@ -1729,6 +1729,72 @@ async function maybeSendWhatsAppNotification(callSid) {
   }
 }
 
+/** Dedicated hold/order/enquiry alert — does not mark lead whatsapp_sent. */
+async function maybeSendServiceRequestNotification(callSid, request) {
+  if (!request) return;
+  let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+  let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
+  let businessName = process.env.BUSINESS_NAME || 'your business';
+  try {
+    const profile = await db.getTenantProfile({ callSid });
+    ownerNumber = profile.whatsappNumber || ownerNumber;
+    ownerEmail = profile.alertEmail || ownerEmail;
+    businessName = profile.businessName || businessName;
+  } catch (err) {
+    console.warn(
+      `[${callSid}] tenant lookup for request notify failed:`,
+      err?.message || err
+    );
+  }
+
+  const type = String(request.request_type || 'enquiry').toLowerCase();
+  const typeLabel =
+    type === 'hold'
+      ? 'HOLD / PICKUP'
+      : type === 'order'
+        ? 'ORDER'
+        : type === 'callback'
+          ? 'CALLBACK'
+          : 'ENQUIRY';
+
+  const lines = [
+    `${typeLabel} — ${businessName}`,
+    request.item ? `Item: ${request.item}` : null,
+    request.quantity ? `Qty: ${request.quantity}` : null,
+    request.when_text ? `When: ${request.when_text}` : null,
+    request.caller_name ? `Caller: ${request.caller_name}` : null,
+    request.caller_phone ? `Phone: ${request.caller_phone}` : null,
+    request.notes ? `Notes: ${request.notes}` : null,
+    'Open Requests in Scalers desk to mark fulfilled.',
+  ].filter(Boolean);
+
+  const body = lines.join('\n');
+  const lead = {
+    businessName,
+    name: request.caller_name || 'Caller',
+    reason: `${typeLabel}: ${[request.item, request.when_text].filter(Boolean).join(' — ')}`,
+    callerNumber: request.caller_phone,
+  };
+
+  const result = await dispatchAlert({
+    to: ownerNumber,
+    email: ownerEmail,
+    body,
+    lead,
+    subject: `${typeLabel} — ${businessName}`,
+  });
+  if (result.channel) {
+    console.log(
+      `[${callSid}] Request notify (${type}) via ${result.channel}` +
+        (result.to ? ` → ${result.to}` : '')
+    );
+  } else {
+    console.warn(
+      `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
+    );
+  }
+}
+
 const CONTEXT_WINDOW = 16;
 
 wss.on('connection', (ws) => {
@@ -1913,6 +1979,12 @@ async function applyGeminiTools(callSid, parsed) {
         console.log(
           `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
         );
+        maybeSendServiceRequestNotification(callSid, created).catch((err) => {
+          console.error(
+            `[${callSid}] service request notify error:`,
+            err?.message || err
+          );
+        });
       }
     } catch (err) {
       console.error(

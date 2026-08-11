@@ -114,6 +114,34 @@ export type TenantRow = {
   llm_system_prompt: string | null;
   services_offered?: string | null;
   services_catalog?: ServiceCatalogEntry[] | null;
+  /** Retail/product rows — separate from services_catalog. */
+  product_catalog?: Array<{
+    name?: string;
+    sku?: string;
+    category?: string;
+    price?: string;
+    unit?: string;
+    in_stock?: string;
+    notes?: string;
+    aliases?: string[];
+  }> | null;
+  social_handles?: {
+    channels?: Array<{
+      kind?: string;
+      label?: string;
+      value?: string;
+    }>;
+    /** @deprecated flat legacy fields still normalized on read */
+    website?: string;
+    instagram?: string;
+    facebook?: string;
+    tiktok?: string;
+    twitter?: string;
+    youtube?: string;
+    whatsapp?: string;
+    phone?: string;
+    other?: string;
+  } | null;
   business_hours?: string | null;
   hours_schedule?: HoursScheduleRow | null;
   after_hours_mode?: "serve" | "message" | null;

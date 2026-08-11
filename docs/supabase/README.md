@@ -87,6 +87,14 @@ Use this order on a new environment or when catching up an older project. Skip f
 | --- | --- | --- | --- |
 | 19 | [`agent_tools.sql`](./agent_tools.sql) | `tenants`; prefer **after** `wallet_security_beta.sql` | `agent_tools` jsonb + `grant update (agent_tools)` for authenticated |
 
+### 9. Business intelligence / retail
+
+| # | File | Depends on | Notes |
+| --- | --- | --- | --- |
+| 20 | [`business_operating_model.sql`](./business_operating_model.sql) | `services_catalog.sql` era | `vertical`, `handoff_mode`, `business_locations`, `business_policies` |
+| 21 | [`contacts_and_requests.sql`](./contacts_and_requests.sql) | `business_operating_model.sql` | `contacts` + `service_requests` + RLS |
+| 22 | [`product_catalog_and_social.sql`](./product_catalog_and_social.sql) | `business_operating_model.sql` | `product_catalog` + `social_handles` (products separate from services) |
+
 ---
 
 ## Legacy / do not apply

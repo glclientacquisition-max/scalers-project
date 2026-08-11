@@ -17,7 +17,9 @@ Requirements for the prompt you write:
 - Start with: You are <Agent Name>, the live phone receptionist for <Business Name> in Kenya.
 - Include an IDENTITY section with: agent name, how to introduce on the first turn ("Hello, you've reached <Business>, this is <Agent> speaking."), tone guidance matching the chosen tone, and a mood rule (if the caller is frustrated or angry, drop cheerful filler and stay empathetic and concise).
 - Include a BUSINESS KNOWLEDGE section with: business name, vertical (if given), services & pricing (as given), hours (as given), locations/landmarks/directions (as given), policies (as given), languages (English, Kiswahili, Sheng — match the caller).
-- If vertical is retail, add a short RETAIL JOB section: fully assist hours, directions, product/price/stock from catalog, holds/pickups (log create_service_request after name+item+when), policies; never invent stock/prices; prefer resolving over callback.
+- If vertical is retail, add a short RETAIL JOB section: fully assist hours, directions, product/price/stock from the PRODUCT CATALOGUE (not from services), holds/pickups (log create_service_request after name+item+when), policies, and social handles when asked; never invent stock/prices; prefer resolving over callback.
+- Keep SERVICES (delivery, sourcing, etc.) separate from PRODUCT CATALOGUE (individual titles/SKU rows).
+- If social/web handles are provided, include them so the receptionist can share Instagram/WhatsApp/website when asked.
 - If golden FAQs are provided, include a GOLDEN FAQs section. Treat each Q/A as authoritative. The receptionist must answer those questions from the given answers and must not invent alternatives.
 - If a team directory is provided AND escalation is enabled, include a TEAM DIRECTORY / ESCALATION section listing each person as Name, Role, Phone. Rule: the AI is the receptionist, not the expert. For anger, refunds, billing, or a matching role, acknowledge, say that teammate will follow up, capture name + reason, and use the escalate tool. If the caller asks for a role not on the list (e.g. sales when only CEO is listed), do not invent staff — offer the closest listed person (usually owner/CEO) and still escalate.
 - Respect handoff mode: if callback, do not invent live transfers; if live_transfer, prefer connecting a human when asked and fall back to callback notes when transfer is unavailable.
@@ -92,6 +94,8 @@ export async function compileReceptionistPrompt(opts: {
   handoffMode?: string;
   locationsText?: string;
   policiesText?: string;
+  productsText?: string;
+  socialText?: string;
 }): Promise<{ prompt: string; source: "gemini" | "local" }> {
   const answers: OnboardingAnswers = {
     servicesPricing: opts.servicesOffered.trim(),
@@ -107,6 +111,8 @@ export async function compileReceptionistPrompt(opts: {
   const handoffMode = String(opts.handoffMode || "callback").trim() || "callback";
   const locationsText = String(opts.locationsText || "").trim();
   const policiesText = String(opts.policiesText || "").trim();
+  const productsText = String(opts.productsText || "").trim();
+  const socialText = String(opts.socialText || "").trim();
   const extras = {
     agentName,
     teamDirectory,
@@ -132,6 +138,12 @@ export async function compileReceptionistPrompt(opts: {
       "",
       "Services & pricing:",
       answers.servicesPricing,
+      "",
+      "Product catalogue (individual items — separate from services):",
+      productsText || "(none listed)",
+      "",
+      "Social & web handles:",
+      socialText || "(none listed)",
       "",
       "Business hours:",
       answers.hoursLocation,

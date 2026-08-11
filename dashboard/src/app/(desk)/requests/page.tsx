@@ -46,7 +46,11 @@ function typeLabel(type: string) {
   }
 }
 
-export default async function RequestsPage() {
+export default async function RequestsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
@@ -56,12 +60,24 @@ export default async function RequestsPage() {
     );
   }
 
+  const params = (await searchParams) || {};
+  const statusFilter = String(
+    Array.isArray(params.status) ? params.status[0] : params.status || "open"
+  )
+    .trim()
+    .toLowerCase();
+  const typeFilter = String(
+    Array.isArray(params.type) ? params.type[0] : params.type || "all"
+  )
+    .trim()
+    .toLowerCase();
+
   const workspace = await createWorkspaceDataClient();
   let rows: ServiceRequestRow[] = [];
   let loadError: string | null = null;
 
   if (workspace) {
-    const { data, error } = await workspace.client
+    let query = workspace.client
       .from("service_requests")
       .select(
         "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id"
@@ -69,6 +85,15 @@ export default async function RequestsPage() {
       .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false })
       .limit(100);
+
+    if (statusFilter && statusFilter !== "all") {
+      query = query.eq("status", statusFilter);
+    }
+    if (typeFilter && typeFilter !== "all") {
+      query = query.eq("request_type", typeFilter);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       loadError = /service_requests|relation/i.test(error.message)
@@ -80,6 +105,15 @@ export default async function RequestsPage() {
   }
 
   const openCount = rows.filter((r) => r.status === "open").length;
+
+  const filterLink = (status: string, type: string) => {
+    const q = new URLSearchParams();
+    if (status && status !== "open") q.set("status", status);
+    if (status === "all") q.set("status", "all");
+    if (type && type !== "all") q.set("type", type);
+    const s = q.toString();
+    return s ? `/requests?${s}` : "/requests";
+  };
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -94,10 +128,58 @@ export default async function RequestsPage() {
         </div>
         <div className="rounded-2xl border border-line bg-surface px-5 py-3">
           <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
-            Open
+            Showing open in list
           </p>
           <p className="font-display text-2xl text-[var(--ink)]">{openCount}</p>
         </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-2">
+        {(
+          [
+            ["open", "Open"],
+            ["fulfilled", "Fulfilled"],
+            ["cancelled", "Cancelled"],
+            ["all", "All statuses"],
+          ] as const
+        ).map(([id, label]) => (
+          <Link
+            key={id}
+            href={filterLink(id, typeFilter)}
+            className={[
+              "rounded-lg border px-3 py-1.5 text-sm",
+              statusFilter === id
+                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]"
+                : "border-line bg-surface text-[var(--ink-soft)]",
+            ].join(" ")}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {(
+          [
+            ["all", "All types"],
+            ["hold", "Holds"],
+            ["order", "Orders"],
+            ["enquiry", "Enquiries"],
+            ["callback", "Callbacks"],
+          ] as const
+        ).map(([id, label]) => (
+          <Link
+            key={id}
+            href={filterLink(statusFilter, id)}
+            className={[
+              "rounded-lg border px-3 py-1.5 text-sm",
+              typeFilter === id
+                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]"
+                : "border-line bg-surface text-[var(--ink-soft)]",
+            ].join(" ")}
+          >
+            {label}
+          </Link>
+        ))}
       </div>
 
       {loadError ? (
@@ -108,12 +190,12 @@ export default async function RequestsPage() {
 
       {!loadError && rows.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-line bg-surface px-6 py-10 text-center">
-          <p className="text-[var(--ink)] font-medium">No requests yet</p>
+          <p className="text-[var(--ink)] font-medium">No requests in this filter</p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
             When a caller asks to hold an item or leave an order note, it appears
             here.{" "}
             <Link href="/settings#train" className="text-[var(--accent)] hover:underline">
-              Train your catalog
+              Train your catalogue
             </Link>{" "}
             so the receptionist can log accurately.
           </p>
@@ -129,7 +211,8 @@ export default async function RequestsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
-                  {typeLabel(row.request_type)} · {formatWhen(row.created_at)}
+                  {typeLabel(row.request_type)} · {row.status} ·{" "}
+                  {formatWhen(row.created_at)}
                 </p>
                 <p className="mt-1 font-medium text-[var(--ink)]">
                   {row.caller_name || "Caller"}
