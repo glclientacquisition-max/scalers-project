@@ -58,7 +58,6 @@ import {
   type BusinessLocation,
 } from "@/lib/businessLocations";
 import {
-  emptyPolicies,
   normalizeBusinessPolicies,
   POLICY_FIELDS,
   type BusinessPolicies,
