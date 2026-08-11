@@ -1,6 +1,6 @@
 # Business Intelligence Roadmap — From Generalist Receptionist to Full-Assist Employee
 
-> **Status:** Product direction (agreed in Platform/full-system discussion)  
+> **Status:** In progress — Phase 0 foundations landing (vertical, handoff, locations, policies, full-assist prompt job)  
 > **Goal:** The AI can understand a business end-to-end and fully assist ~95% of callers with no extra human input  
 > **Beachheads:** Retail → Home services (immediately after) → Hospitality (hotels) later  
 > **Codebase baseline:** current `main` (SautiKit media + Gemini + Supabase tenants knowledge + desk compile)
@@ -541,18 +541,18 @@ Home services script mirrors with book/reschedule/area/emergency.
 
 ---
 
-## 11. Immediate next implementation slice (recommended first PR series)
+## 11. Implementation progress
 
-When execution starts, do not build all of Phase 0 at once. Suggested first slices:
+| Slice | Status | Notes |
+| --- | --- | --- |
+| 1. SQL + `getTenantProfile` for vertical / handoff / locations / policies | **Done** | `docs/supabase/business_operating_model.sql` |
+| 2. Live ground truth + full-assist prompt job | **Done** | `liveKnowledge.js`, `src/prompts.js`, compiler |
+| 3. Desk Train + onboarding for new fields | **Done** | TenantForm + 4-step onboarding |
+| 4. `contacts` + `service_requests` + `create_service_request` | **Next** | Retail completion tools |
+| 5. Retail playbook + requests inbox | Next | |
+| 6. Appointments + home services pack | Next | |
 
-1. **Platform:** `vertical` + `handoff_mode` + `business_locations` + `business_policies` SQL + `getTenantProfile` fields  
-2. **Brain:** inject locations/policies into live ground truth; soft prompt job shift toward “resolve then goodbye”  
-3. **Desk:** Train fields for location/landmark + policies; onboarding step to capture them into structured columns  
-4. **Platform+Brain:** `contacts` + `service_requests` + `create_service_request` tool  
-5. **Brain+Desk:** Retail playbook + retail onboarding pack + requests inbox  
-6. Then appointments + home services  
-
-Each slice: one PR, lane-aligned, additive migrations, test call on a retail fixture tenant.
+**Apply migration:** run `docs/supabase/business_operating_model.sql` in Supabase SQL editor (grants included for authenticated updates).
 
 ---
 
