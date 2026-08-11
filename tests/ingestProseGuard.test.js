@@ -8,8 +8,16 @@ function isProseServiceName(name) {
   if (n.length > 80) return true;
   if (/^\d+[\.)]\s/.test(n)) return true;
   if (
-    /\b(business identity|service philosophy|positioning|accessibility|provides the following|conveniently located)\b/i.test(
+    /\b(business identity|service philosophy|positioning|accessibility|provides the following|conveniently located|value proposition|ordering channels)\b/i.test(
       n
+    )
+  ) {
+    return true;
+  }
+  if (/[:：]\s*$/.test(n)) return true;
+  if (
+    /^(basic overview|key points|location|physical store|operating hours|services offered|pricing|ordering|website|phone|social media|online presence|value proposition|about us|contact|hours)$/i.test(
+      n.replace(/&/g, 'and').replace(/\s+/g, ' ')
     )
   ) {
     return true;

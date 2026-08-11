@@ -11,7 +11,11 @@ import {
   formatServicesForCompiler,
   normalizeServicesCatalog,
 } from "@/lib/servicesCatalog";
-import { formatHoursForCompiler, scheduleForForm } from "@/lib/hoursSchedule";
+import {
+  formatHoursForCompiler,
+  parseHoursSchedule,
+  scheduleForForm,
+} from "@/lib/hoursSchedule";
 import { fetchPublicUrlSafe } from "@/lib/ingest/ssrfFetch";
 import {
   htmlToPlainText,
@@ -151,10 +155,26 @@ export async function extractKnowledgeAction(
       businessName: tenant.business_name,
     });
 
-    if (!draft.services.length && !draft.faqs.length && !draft.team.length) {
+    const hasStructured =
+      Boolean(draft.locations?.length) ||
+      Boolean(draft.hoursNotes) ||
+      Boolean(draft.hoursSchedule) ||
+      Boolean(
+        draft.policies &&
+          Object.values(draft.policies).some((v) => String(v || "").trim())
+      ) ||
+      Boolean(draft.vertical) ||
+      Boolean(draft.contactPhone);
+
+    if (
+      !draft.services.length &&
+      !draft.faqs.length &&
+      !draft.team.length &&
+      !hasStructured
+    ) {
       return {
         error:
-          "We couldn't find clear services or FAQs in that. Try a cleaner paste (one service per line) or a page that lists your menu.",
+          "We couldn't find clear services, FAQs, or business details in that. Try a cleaner paste (menu lines, Q/A, or a short business overview).",
       };
     }
 
@@ -162,6 +182,14 @@ export async function extractKnowledgeAction(
     if (draft.services.length) bits.push(`${draft.services.length} service${draft.services.length === 1 ? "" : "s"}`);
     if (draft.faqs.length) bits.push(`${draft.faqs.length} FAQ${draft.faqs.length === 1 ? "" : "s"}`);
     if (draft.team.length) bits.push(`${draft.team.length} teammate${draft.team.length === 1 ? "" : "s"}`);
+    if (draft.locations?.length) bits.push("location");
+    if (draft.hoursNotes || draft.hoursSchedule) bits.push("hours");
+    if (
+      draft.policies &&
+      Object.values(draft.policies).some((v) => String(v || "").trim())
+    ) {
+      bits.push("policies");
+    }
 
     return {
       ok: true,
@@ -210,6 +238,17 @@ export async function applyIngestAction(
       ? "replace_services_faqs"
       : "merge";
   const includeUnknown = String(formData.get("include_unknown") || "") === "1";
+  const includeLocations =
+    String(formData.get("include_locations") || "") === "1";
+  const includeHours = String(formData.get("include_hours") || "") === "1";
+  const includePolicies =
+    String(formData.get("include_policies") || "") === "1";
+  const includeVertical =
+    String(formData.get("include_vertical") || "") === "1";
+  const includeContactPhone =
+    String(formData.get("include_contact_phone") || "") === "1";
+  const renameBusiness =
+    String(formData.get("rename_business") || "") === "1";
 
   const existingServices = normalizeServicesCatalog(tenant.services_catalog).filter(
     (s) => s.name && !isProseServiceName(s.name)
@@ -246,36 +285,101 @@ export async function applyIngestAction(
     (s) => s.name && !isProseServiceName(s.name)
   );
 
-  if (!merged.services.length && !merged.faqs.length) {
+  const draftLocations = includeLocations
+    ? normalizeBusinessLocations(draft.locations)
+    : [];
+  const draftPolicies = includePolicies
+    ? normalizeBusinessPolicies(draft.policies || {})
+    : normalizeBusinessPolicies({});
+  const policiesFilled = Object.values(draftPolicies).some((v) =>
+    String(v || "").trim()
+  );
+  const draftHoursNotes = includeHours
+    ? String(draft.hoursNotes || "").trim()
+    : "";
+  const parsedDraftSchedule = includeHours
+    ? parseHoursSchedule(draft.hoursSchedule || null)
+    : null;
+  const draftVertical =
+    includeVertical && draft.vertical ? parseVertical(draft.vertical) : null;
+  const draftPhone = includeContactPhone
+    ? String(draft.contactPhone || "").trim()
+    : "";
+  const nameSuggestion = renameBusiness
+    ? String(draft.businessNameSuggestion || "").trim()
+    : "";
+
+  const hasStructuredApply =
+    draftLocations.length > 0 ||
+    Boolean(draftHoursNotes) ||
+    Boolean(parsedDraftSchedule) ||
+    policiesFilled ||
+    Boolean(draftVertical) ||
+    Boolean(draftPhone) ||
+    Boolean(nameSuggestion);
+
+  if (!merged.services.length && !merged.faqs.length && !hasStructuredApply) {
     return {
       error:
-        "No usable catalog items or FAQs in that selection. For long documents, paste a short menu (one item per line) or Q/A pairs, then try again.",
+        "No usable catalog items, FAQs, or business details in that selection. For long documents, paste a short overview (or menu / Q&A), then try again.",
     };
   }
 
   const agentTone =
     parseAgentTone(String(tenant.agent_tone || "")) || "friendly";
 
-  const schedule = scheduleForForm(tenant.hours_schedule, tenant.business_hours || "");
+  const nextLocations =
+    draftLocations.length > 0
+      ? draftLocations
+      : normalizeBusinessLocations(tenant.business_locations);
+
+  const locFallback =
+    draftLocations[0]?.address ||
+    nextLocations[0]?.address ||
+    String(tenant.business_hours || "").trim() ||
+    "";
+
+  let nextSchedule = scheduleForForm(tenant.hours_schedule, locFallback);
+  if (parsedDraftSchedule) {
+    nextSchedule = {
+      ...parsedDraftSchedule,
+      location: parsedDraftSchedule.location || locFallback,
+    };
+  }
+
   const businessHours =
-    formatHoursForCompiler(schedule) ||
+    (includeHours && draftHoursNotes
+      ? draftHoursNotes
+      : formatHoursForCompiler(nextSchedule)) ||
     String(tenant.business_hours || "").trim() ||
     "Hours not set yet — confirm with the team.";
 
+  const existingPolicies = normalizeBusinessPolicies(tenant.business_policies);
+  const nextPolicies = policiesFilled
+    ? {
+        ...existingPolicies,
+        payment: draftPolicies.payment || existingPolicies.payment,
+        returns: draftPolicies.returns || existingPolicies.returns,
+        delivery: draftPolicies.delivery || existingPolicies.delivery,
+        deposit: draftPolicies.deposit || existingPolicies.deposit,
+        cancellation:
+          draftPolicies.cancellation || existingPolicies.cancellation,
+        warranty: draftPolicies.warranty || existingPolicies.warranty,
+        other: draftPolicies.other || existingPolicies.other,
+      }
+    : existingPolicies;
+
   const servicesOffered = formatServicesForCompiler(merged.services, "");
   const agentName = String(tenant.agent_name || "Receptionist").trim() || "Receptionist";
-  const vertical = parseVertical(tenant.vertical);
+  const vertical = draftVertical || parseVertical(tenant.vertical);
   const handoffMode = parseHandoffMode(tenant.handoff_mode);
-  const locationsText = formatLocationsForCompiler(
-    normalizeBusinessLocations(tenant.business_locations)
-  );
-  const policiesText = formatPoliciesForCompiler(
-    normalizeBusinessPolicies(tenant.business_policies)
-  );
+  const locationsText = formatLocationsForCompiler(nextLocations);
+  const policiesText = formatPoliciesForCompiler(nextPolicies);
+  const businessName = nameSuggestion || tenant.business_name;
 
   const agentTools = parseAgentTools(tenant.agent_tools);
   const { prompt, source } = await compileReceptionistPrompt({
-    businessName: tenant.business_name,
+    businessName,
     servicesOffered,
     businessHours,
     agentTone,
@@ -305,8 +409,28 @@ export async function applyIngestAction(
   if (!tenant.agent_tone) {
     patch.agent_tone = agentTone;
   }
-  if (!String(tenant.business_hours || "").trim()) {
+  if (nameSuggestion) {
+    patch.business_name = nameSuggestion;
+  }
+  if (draftLocations.length > 0) {
+    patch.business_locations = nextLocations;
+  }
+  if (includeHours) {
     patch.business_hours = businessHours;
+    if (parsedDraftSchedule) {
+      patch.hours_schedule = nextSchedule;
+    }
+  } else if (!String(tenant.business_hours || "").trim()) {
+    patch.business_hours = businessHours;
+  }
+  if (policiesFilled) {
+    patch.business_policies = nextPolicies;
+  }
+  if (draftVertical) {
+    patch.vertical = draftVertical;
+  }
+  if (draftPhone) {
+    patch.whatsapp_notification_number = draftPhone.replace(/\s+/g, "");
   }
 
   const { error } = await workspace.client
@@ -315,6 +439,11 @@ export async function applyIngestAction(
     .eq("id", tenant.id);
 
   if (error) {
+    if (/vertical|business_locations|business_policies/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/business_operating_model.sql in Supabase.`,
+      };
+    }
     return { error: error.message };
   }
 
@@ -334,6 +463,11 @@ export async function applyIngestAction(
       `${merged.added.team} teammate${merged.added.team === 1 ? "" : "s"}`
     );
   }
+  if (draftLocations.length) parts.push("location");
+  if (includeHours && (draftHoursNotes || draft.hoursSchedule)) parts.push("hours");
+  if (policiesFilled) parts.push("policies");
+  if (draftVertical) parts.push(`vertical (${draftVertical})`);
+  if (nameSuggestion) parts.push("business name");
 
   const capNote =
     merged.skippedFaqCap && merged.skippedFaqCap > 0
@@ -343,14 +477,10 @@ export async function applyIngestAction(
       : "";
 
   if (mode === "replace_services_faqs") {
-    const svc = merged.services.length;
-    const faq = merged.faqs.length;
     return {
       ok: true,
       source,
-      message: `Saved ${svc} catalog item${svc === 1 ? "" : "s"} and ${faq} FAQ${
-        faq === 1 ? "" : "s"
-      }. Train below should refresh — open Train to review. Live on the next call.${capNote}`,
+      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Train below should refresh — open Train to review. Live on the next call.${capNote}`,
     };
   }
 
