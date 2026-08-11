@@ -62,6 +62,11 @@ import {
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
+import { PronunciationCoach } from "@/components/PronunciationCoach";
+import {
+  parseTtsLexicon,
+  type TtsLexiconEntry,
+} from "@/lib/pronunciationLexicon";
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
@@ -213,6 +218,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     const rows = normalizeFaqs(tenant.faqs);
     return rows.length ? rows : [emptyFaq()];
   });
+  const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
+    parseTtsLexicon(tenant.tts_lexicon)
+  );
   const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -1411,6 +1419,26 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           ))}
         </div>
       </section>
+
+      <PronunciationCoach
+        tenantId={tenant.id}
+        businessName={businessName}
+        agentName={agentName}
+        locationNotes={locationNotes}
+        locations={locations}
+        team={team}
+        services={services}
+        faqs={faqs}
+        bulletinTexts={
+          Array.isArray(tenant.daily_bulletin)
+            ? tenant.daily_bulletin
+                .map((b) => String(b?.text || "").trim())
+                .filter(Boolean)
+            : []
+        }
+        initialLexicon={ttsLexicon}
+        onLexiconChange={setTtsLexicon}
+      />
 
       <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">
         <button

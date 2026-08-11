@@ -6,6 +6,10 @@
 /** Keep desk training snappy; fall back to the local template on timeout. */
 const GEMINI_TIMEOUT_MS = 12_000;
 
+export type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
 function extractText(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
   const root = payload as {
@@ -23,12 +27,23 @@ function extractText(payload: unknown): string {
     .join("");
 }
 
-export async function generateGeminiText(opts: {
+function toApiParts(parts: GeminiPart[]): Array<Record<string, unknown>> {
+  return parts.map((part) => {
+    if ("text" in part) return { text: part.text };
+    return {
+      inline_data: {
+        mime_type: part.inlineData.mimeType,
+        data: part.inlineData.data,
+      },
+    };
+  });
+}
+
+async function generateGeminiContent(opts: {
   systemInstruction: string;
-  userText: string;
+  parts: GeminiPart[];
   temperature?: number;
   maxOutputTokens?: number;
-  /** Override default desk timeout (ms). */
   timeoutMs?: number;
 }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -59,7 +74,7 @@ export async function generateGeminiText(opts: {
         contents: [
           {
             role: "user",
-            parts: [{ text: opts.userText }],
+            parts: toApiParts(opts.parts),
           },
         ],
         generationConfig: {
@@ -96,4 +111,32 @@ export async function generateGeminiText(opts: {
   const text = extractText(json).trim();
   if (!text) throw new Error("Gemini returned an empty prompt");
   return text;
+}
+
+export async function generateGeminiText(opts: {
+  systemInstruction: string;
+  userText: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+  /** Override default desk timeout (ms). */
+  timeoutMs?: number;
+}): Promise<string> {
+  return generateGeminiContent({
+    systemInstruction: opts.systemInstruction,
+    parts: [{ text: opts.userText }],
+    temperature: opts.temperature,
+    maxOutputTokens: opts.maxOutputTokens,
+    timeoutMs: opts.timeoutMs,
+  });
+}
+
+/** Text + optional inline audio/image parts (pronunciation coach, etc.). */
+export async function generateGeminiMultimodal(opts: {
+  systemInstruction: string;
+  parts: GeminiPart[];
+  temperature?: number;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
+}): Promise<string> {
+  return generateGeminiContent(opts);
 }

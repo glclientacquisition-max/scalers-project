@@ -54,7 +54,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | # | File | Depends on | Notes |
 | --- | --- | --- | --- |
 | 11 | [`alert_email.sql`](./alert_email.sql) | `tenants` | Email fallback when WhatsApp unavailable |
-| 12 | [`tts_lexicon.sql`](./tts_lexicon.sql) | `tenants` | Per-tenant TTS pronunciation overrides |
+| 12 | [`tts_lexicon.sql`](./tts_lexicon.sql) | `tenants` | Per-tenant TTS pronunciation overrides (Train pronunciation coach) |
 
 ### 5. Owner CRM
 
