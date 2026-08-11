@@ -85,6 +85,27 @@
       "extraLexicon": [{ "match": "wanjiku", "say": "Wan-jee-koo" }],
       "expectLanguage": "en",
       "expectIncludes": ["Wan-jee-koo"]
+    },
+    {
+      "id": "bookstore-chapterone",
+      "text": "Hello, you've reached ChapterOne Bookstore, this is Aisha speaking.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["Chapter One Bookstore", "Ah-ee-sha"]
+    },
+    {
+      "id": "place-muindi-mbingu",
+      "text": "We are on Muindi Mbingu Street opposite City Market.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["Moo-een-dee Mbeen-goo"]
+    },
+    {
+      "id": "retail-manga",
+      "text": "Manga books are available today.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectIncludes": ["Man-gah"]
     }
   ]
 }
