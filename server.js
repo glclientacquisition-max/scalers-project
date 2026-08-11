@@ -8,7 +8,11 @@ const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
 const http = require('http');
 const { GoogleGenAI } = require('@google/genai');
-const { createSonioxSttSession, isSonioxConfigured } = require('./src/speech/sonioxStt');
+const {
+  createSonioxSttSession,
+  isSonioxConfigured,
+  buildSttContext,
+} = require('./src/speech/sonioxStt');
 const {
   createSonioxTtsSession,
   isSonioxTtsConfigured,
@@ -17,6 +21,7 @@ const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
 const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
 const { parseAgentTools } = require('./src/conversation/agentTools');
+const { parseGeminiResponse } = require('./src/conversation/toolMarkers');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
 const callAgentTools = new Map();
@@ -36,10 +41,13 @@ const {
   adaptiveFlushMs,
   evaluateBargeIn,
   looksLikeEcho: turnLooksLikeEcho,
+  classifyFinalDuringAgentSpeech,
 } = require('./src/speech/turnTaking');
 const {
   createSpokenStreamBuffer,
 } = require('./src/speech/spokenStreamBuffer');
+const { createVoiceTurnTiming } = require('./src/speech/voiceTiming');
+const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
@@ -655,14 +663,27 @@ function sendPcmToMedia(ws, pcm) {
   }
 }
 
-/** Best-effort stop of already-queued outbound audio on the media bridge. */
+/**
+ * Stop already-queued outbound audio on the media bridge (barge-in).
+ * SautiKit/drachtio mod_audio_fork understands `{ type: "killAudio" }`.
+ */
 function clearMediaPlayback(ws) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  try {
-    // Twilio-style clear; raw PCM forks (audio.drachtio.org) may ignore this.
-    ws.send(JSON.stringify({ event: 'clear' }));
-  } catch (err) {
-    console.warn('[ws/media] clear event send failed:', err?.message || err);
+  const payloads = [
+    { type: 'killAudio' },
+    // Compatibility fallbacks seen across forks / Twilio-style bridges.
+    { event: 'clear' },
+    { type: 'clear' },
+  ];
+  for (const payload of payloads) {
+    try {
+      ws.send(JSON.stringify(payload));
+    } catch (err) {
+      console.warn(
+        `[ws/media] clear/killAudio send failed (${payload.type || payload.event}):`,
+        err?.message || err
+      );
+    }
   }
 }
 
@@ -727,13 +748,38 @@ mediaWss.on('connection', (ws, req) => {
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
   let callLanguage = 'unknown';
   let fillerUsedThisCall = false;
+  /** @type {ReturnType<typeof createVoiceTurnTiming>|null} */
+  let activeTurnTiming = null;
+  /** Rolling interim hypothesis while agent is busy (for barge-in). */
+  let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
   let ttsLexiconOverrides = [];
+  /** Latest tenant fields used to build Soniox STT context (hearing path). */
+  let sttTenantSnapshot = null;
 
   const sidLabel = () => sessionCallSid || `media_${connectedAt}`;
 
+  function publishSttContext(profile) {
+    if (!profile) {
+      sttTenantSnapshot = null;
+      return null;
+    }
+    sttTenantSnapshot = {
+      businessName: profile.businessName || businessName,
+      agentName: profile.agentName || agentName,
+      vertical: profile.vertical || 'general',
+      servicesCatalog: profile.servicesCatalog || [],
+      businessLocations: profile.businessLocations || [],
+      teamDirectory: profile.teamDirectory || [],
+      ttsLexicon: Array.isArray(profile.ttsLexicon) ? profile.ttsLexicon : [],
+    };
+    return buildSttContext(sttTenantSnapshot);
+  }
+
   async function ensureTenantPrompt() {
-    if (profileLoaded && profileCallSid === sessionCallSid) return;
+    if (profileLoaded && profileCallSid === sessionCallSid) {
+      return buildSttContext(sttTenantSnapshot);
+    }
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
       businessName = profile.businessName || businessName;
@@ -759,16 +805,20 @@ mediaWss.on('connection', (ws, req) => {
       profileLoaded = true;
       profileCallSid = sessionCallSid;
       const tools = parseAgentTools(profile.agentTools);
+      const sttCtx = publishSttContext(profile);
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} ttsLexicon=${ttsLexiconOverrides.length} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} ttsLexicon=${ttsLexiconOverrides.length} sttTerms=${sttCtx?.terms?.length || 0} langs=en,sw,sheng(auto)`
       );
+      return sttCtx;
     } catch (err) {
       profileLoaded = true;
       profileCallSid = sessionCallSid;
+      publishSttContext(null);
       console.warn(
         `[ws/media][${sidLabel()}] tenant prompt load failed, using defaults:`,
         err?.message || err
       );
+      return null;
     }
   }
 
@@ -777,6 +827,14 @@ mediaWss.on('connection', (ws, req) => {
       clearTimeout(fillerTimer);
       fillerTimer = null;
     }
+  }
+
+  function releaseQueuedCallerSpeech() {
+    if (utteranceParts.length) {
+      scheduleUtteranceFlush();
+      return;
+    }
+    kickPendingTurn();
   }
 
   async function speakText(text, opts = {}) {
@@ -808,7 +866,10 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
     } finally {
-      if (activePlaybackGeneration === gen) speaking = false;
+      if (activePlaybackGeneration === gen) {
+        speaking = false;
+        releaseQueuedCallerSpeech();
+      }
     }
   }
 
@@ -817,6 +878,7 @@ mediaWss.on('connection', (ws, req) => {
     bargeInActive = true;
     playbackGeneration += 1;
     speaking = false;
+    interimBargeText = '';
     console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
     if (tts) {
       try {
@@ -826,6 +888,11 @@ mediaWss.on('connection', (ws, req) => {
       }
     }
     clearMediaPlayback(ws);
+    if (activeTurnTiming) {
+      activeTurnTiming.log({ outcome: 'barge_in' });
+      activeTurnTiming = null;
+    }
+    releaseQueuedCallerSpeech();
   }
 
   function discardUnspokenAssistant(reply) {
@@ -896,6 +963,8 @@ mediaWss.on('connection', (ws, req) => {
 
     turnBusy = true;
     bargeInActive = false;
+    const turnTiming = createVoiceTurnTiming(sidLabel());
+    activeTurnTiming = turnTiming;
 
     const detected = detectCallerLanguage(clean);
     callLanguage = resolveCallLanguage(callLanguage, detected);
@@ -913,32 +982,28 @@ mediaWss.on('connection', (ws, req) => {
       const fillerMode = (process.env.VOICE_FILLER || 'auto').toLowerCase();
       const useFiller =
         Boolean(tts) && fillerMode !== 'off' && !fillerUsedThisCall;
-      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 550);
+      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 400);
       const fillerText =
         fillerMode === 'ack' || fillerMode === 'auto'
           ? pickContextualAck(clean, callLanguage)
           : process.env.VOICE_FILLER;
-      let fillerPromise = Promise.resolve();
       let fillerStarted = false;
       let firstSpokenChunk = false;
 
       if (useFiller && fillerText) {
-        fillerPromise = new Promise((resolve) => {
-          fillerTimer = setTimeout(() => {
-            fillerTimer = null;
-            // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
-            if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
-              fillerStarted = true;
-              fillerUsedThisCall = true;
-              console.log(
-                `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
-              );
-              speakText(fillerText).then(resolve, resolve);
-            } else {
-              resolve();
-            }
-          }, fillerDelayMs);
-        });
+        fillerTimer = setTimeout(() => {
+          fillerTimer = null;
+          // Adaptive: skip if LLM→TTS already started (stream chunk or full reply).
+          if (turnBusy && !speaking && !bargeInActive && !firstSpokenChunk) {
+            fillerStarted = true;
+            fillerUsedThisCall = true;
+            turnTiming.markFiller();
+            console.log(
+              `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
+            );
+            speakText(fillerText).catch(() => {});
+          }
+        }, fillerDelayMs);
       }
 
       const streamOn =
@@ -947,55 +1012,92 @@ mediaWss.on('connection', (ws, req) => {
         (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
 
       let speakSession = null;
+      /** @type {Promise<any>|null} */
+      let speakSessionReady = null;
       let streamPlaybackGen = 0;
       const spokenChunks = [];
 
-      async function stopFillerForReply() {
+      // Warm Soniox TTS while Gemini starts so first chunk isn't paying setup latency.
+      if (streamOn && tts) {
+        speakSessionReady = tts
+          .beginSpeak({
+            callLanguage,
+            extraLexicon: ttsLexiconOverrides,
+          })
+          .then((session) => {
+            speakSession = session;
+            console.log(`[ws/media][${sidLabel()}] llm→tts stream prefetched`);
+            return session;
+          })
+          .catch((err) => {
+            console.warn(
+              `[ws/media][${sidLabel()}] TTS prefetch failed:`,
+              err?.message || err
+            );
+            speakSessionReady = null;
+            return null;
+          });
+      }
+
+      function stopFillerForReply() {
         clearFillerTimer();
-        if (fillerStarted && tts) {
-          try {
-            tts.cancel();
-          } catch {
-            /* ignore */
-          }
-          fillerStarted = false;
-          await fillerPromise.catch(() => {});
+        if (!fillerStarted) return;
+        fillerStarted = false;
+        // Drop filler PCM via generation bump only — do NOT tts.cancel() here,
+        // or we kill the prefetched reply stream on the same Soniox socket.
+        playbackGeneration += 1;
+        speaking = false;
+        clearMediaPlayback(ws);
+        console.log(`[ws/media][${sidLabel()}] filler cancelled for reply audio`);
+      }
+
+      async function ensureReplySpeakSession() {
+        if (speakSession) return speakSession;
+        if (speakSessionReady) {
+          const prefetched = await speakSessionReady;
+          if (prefetched) return prefetched;
         }
+        speakSession = await tts.beginSpeak({
+          callLanguage,
+          extraLexicon: ttsLexiconOverrides,
+        });
+        console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
+        return speakSession;
       }
 
       async function onSpokenChunk(chunk) {
         const text = String(chunk || '').trim();
         if (!text || !tts) return;
         firstSpokenChunk = true;
-        await stopFillerForReply();
+        turnTiming.markFirstSpokenChunk();
+        stopFillerForReply();
         if (bargeInActive) return;
 
-        if (!speakSession) {
-          speaking = true;
-          speakStartedAt = Date.now();
-          activePlaybackGeneration = ++playbackGeneration;
-          streamPlaybackGen = activePlaybackGeneration;
-          speakSession = await tts.beginSpeak({
-            callLanguage,
-            extraLexicon: ttsLexiconOverrides,
-          });
-          console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);
-        }
-        if (bargeInActive) {
+        const session = await ensureReplySpeakSession();
+        if (!session || bargeInActive) {
           try {
-            speakSession.cancel();
+            session?.cancel();
           } catch {
             /* ignore */
           }
           speakSession = null;
           return;
         }
-        speakSession.pushText(text);
+
+        if (!speaking || activePlaybackGeneration !== playbackGeneration) {
+          speaking = true;
+          speakStartedAt = Date.now();
+          activePlaybackGeneration = ++playbackGeneration;
+          streamPlaybackGen = activePlaybackGeneration;
+        }
+
+        session.pushText(text);
         spokenChunks.push(text);
         lastAgentText = spokenChunks.join(' ');
       }
 
       let result;
+      let turnOutcome = 'ok';
       if (!process.env.GEMINI_API_KEY) {
         result = {
           spokenText:
@@ -1004,17 +1106,27 @@ mediaWss.on('connection', (ws, req) => {
               : 'Thanks — someone from the business will call you back shortly.',
           shouldEndCall: true,
         };
-        await stopFillerForReply();
+        stopFillerForReply();
+        if (speakSession) {
+          try {
+            speakSession.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+        }
         if (!bargeInActive) {
           transcriptLog.push(`Agent: ${result.spokenText}`);
+          turnTiming.markFirstSpokenChunk();
           await speakText(result.spokenText);
         }
       } else if (streamOn) {
+        turnTiming.markLlmStart();
         result = await runGeminiTurnStreaming(messages, sidLabel(), turnSystemPrompt, {
           onSpokenChunk,
           shouldAbort: () => bargeInActive,
         });
-        await stopFillerForReply();
+        stopFillerForReply();
 
         if (speakSession) {
           if (bargeInActive) {
@@ -1027,7 +1139,12 @@ mediaWss.on('connection', (ws, req) => {
             discardUnspokenAssistant(result?.spokenText || spokenChunks.join(' '));
             bargeInActive = false;
             speakSession = null;
-            if (activePlaybackGeneration === streamPlaybackGen) speaking = false;
+            if (activePlaybackGeneration === streamPlaybackGen) {
+              speaking = false;
+              releaseQueuedCallerSpeech();
+            }
+            turnTiming.log({ outcome: 'barge_in' });
+            if (activeTurnTiming === turnTiming) activeTurnTiming = null;
             return;
           }
           try {
@@ -1038,32 +1155,59 @@ mediaWss.on('connection', (ws, req) => {
               err?.message || err
             );
           } finally {
-            if (activePlaybackGeneration === streamPlaybackGen) speaking = false;
+            if (activePlaybackGeneration === streamPlaybackGen) {
+              speaking = false;
+              releaseQueuedCallerSpeech();
+            }
             speakSession = null;
           }
           const reply = result?.spokenText || spokenChunks.join(' ') || AI_FALLBACK_LINE;
           transcriptLog.push(`Agent: ${reply}`);
         } else if (!bargeInActive) {
           // Stream produced no flushable chunks (or TTS never opened) — speak full reply.
+          if (speakSessionReady) {
+            try {
+              const unused = await speakSessionReady;
+              unused?.cancel?.();
+            } catch {
+              /* ignore */
+            }
+          }
           const reply = result?.spokenText || AI_FALLBACK_LINE;
           transcriptLog.push(`Agent: ${reply}`);
+          turnTiming.markFirstSpokenChunk();
           await speakText(reply);
+          turnOutcome = 'stream_fallback_full';
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
           bargeInActive = false;
+          turnTiming.log({ outcome: 'barge_in' });
+          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
       } else {
+        turnTiming.markLlmStart();
         result = await runGeminiTurn(messages, sidLabel(), turnSystemPrompt);
-        await stopFillerForReply();
+        stopFillerForReply();
+        if (speakSession) {
+          try {
+            speakSession.cancel();
+          } catch {
+            /* ignore */
+          }
+          speakSession = null;
+        }
         const reply = result?.spokenText || AI_FALLBACK_LINE;
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
           discardUnspokenAssistant(reply);
           bargeInActive = false;
+          turnTiming.log({ outcome: 'barge_in' });
+          if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
         transcriptLog.push(`Agent: ${reply}`);
+        turnTiming.markFirstSpokenChunk();
         await speakText(reply);
       }
 
@@ -1077,8 +1221,12 @@ mediaWss.on('connection', (ws, req) => {
           }
         }, 800);
       }
+      turnTiming.log({ outcome: turnOutcome });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
+      turnTiming.log({ outcome: 'error' });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
       if (!bargeInActive) {
         // Persist exactly what the caller hears so dashboard transcripts expose
         // failures instead of ending after the caller's last line.
@@ -1087,6 +1235,10 @@ mediaWss.on('connection', (ws, req) => {
       }
     } finally {
       clearFillerTimer();
+      if (activeTurnTiming === turnTiming) {
+        turnTiming.log({ outcome: 'early_return' });
+        activeTurnTiming = null;
+      }
       turnBusy = false;
       kickPendingTurn();
     }
@@ -1131,16 +1283,33 @@ mediaWss.on('connection', (ws, req) => {
 
       const isInterim = !evt.isFinal;
 
-      // Instant barge-in on interim tokens while TTS plays or Gemini is generating.
+      // Instant barge-in on accumulated interim tokens while TTS/LLM is busy.
       if (isInterim) {
-        maybeBargeIn(text, 'interim speech');
+        if (speaking || turnBusy) {
+          interimBargeText = mergeInterimHypothesis(interimBargeText, text);
+          maybeBargeIn(interimBargeText, 'interim speech');
+        } else {
+          interimBargeText = '';
+        }
         return;
       }
 
-      // Finals: barge if needed, then accumulate for the next customer turn.
+      // Finals replace the interim hypothesis.
+      interimBargeText = '';
       maybeBargeIn(text, 'final speech');
       if (speaking && !bargeInActive) {
-        // Still playing and not confident it was a barge — ignore finals (echo).
+        const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText);
+        if (overlap === 'drop_echo') {
+          console.log(
+            `[ws/media][${sidLabel()}] drop echo final while TTS: ${text.slice(0, 80)}`
+          );
+          return;
+        }
+        // Real overlap that wasn't strong enough to barge — keep for after playback.
+        utteranceParts.push(text);
+        console.log(
+          `[ws/media][${sidLabel()}] queue overlapping final while TTS: ${text.slice(0, 80)}`
+        );
         return;
       }
       utteranceParts.push(text);
@@ -1149,6 +1318,7 @@ mediaWss.on('connection', (ws, req) => {
     }
 
     if (evt.type === 'endpoint' || evt.type === 'finished') {
+      interimBargeText = '';
       // Do not clear bargeInActive while a Gemini turn is still in flight — that flag
       // must survive until runCallerTurn discards the unspoken reply.
       if (!turnBusy) {
@@ -1163,15 +1333,18 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   // Warm tenant prompt early when callSid is already on the WS URL.
-  if (sessionCallSid) {
-    ensureTenantPrompt().catch(() => {});
-  }
+  const tenantWarm =
+    sessionCallSid
+      ? ensureTenantPrompt().catch(() => null)
+      : Promise.resolve(null);
 
   if (isSonioxConfigured()) {
     try {
       stt = createSonioxSttSession({
         callSid: sidLabel(),
         onEvent: onSttEvent,
+        // Prefer awaited profile; fall back quickly if load is slow (audio still buffers).
+        contextPromise: tenantWarm.then((ctx) => ctx || buildSttContext(sttTenantSnapshot)),
       });
       stt.ready.catch((err) => {
         console.error(`[ws/media] Soniox STT failed to start:`, err?.message || err);
@@ -1193,6 +1366,7 @@ mediaWss.on('connection', (ws, req) => {
           // Drop outbound audio after barge-in cancel / superseded playback generation.
           if (!speaking) return;
           if (activePlaybackGeneration !== playbackGeneration) return;
+          if (activeTurnTiming) activeTurnTiming.markFirstPcm();
           if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         },
       });
@@ -1555,6 +1729,72 @@ async function maybeSendWhatsAppNotification(callSid) {
   }
 }
 
+/** Dedicated hold/order/enquiry alert — does not mark lead whatsapp_sent. */
+async function maybeSendServiceRequestNotification(callSid, request) {
+  if (!request) return;
+  let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+  let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
+  let businessName = process.env.BUSINESS_NAME || 'your business';
+  try {
+    const profile = await db.getTenantProfile({ callSid });
+    ownerNumber = profile.whatsappNumber || ownerNumber;
+    ownerEmail = profile.alertEmail || ownerEmail;
+    businessName = profile.businessName || businessName;
+  } catch (err) {
+    console.warn(
+      `[${callSid}] tenant lookup for request notify failed:`,
+      err?.message || err
+    );
+  }
+
+  const type = String(request.request_type || 'enquiry').toLowerCase();
+  const typeLabel =
+    type === 'hold'
+      ? 'HOLD / PICKUP'
+      : type === 'order'
+        ? 'ORDER'
+        : type === 'callback'
+          ? 'CALLBACK'
+          : 'ENQUIRY';
+
+  const lines = [
+    `${typeLabel} — ${businessName}`,
+    request.item ? `Item: ${request.item}` : null,
+    request.quantity ? `Qty: ${request.quantity}` : null,
+    request.when_text ? `When: ${request.when_text}` : null,
+    request.caller_name ? `Caller: ${request.caller_name}` : null,
+    request.caller_phone ? `Phone: ${request.caller_phone}` : null,
+    request.notes ? `Notes: ${request.notes}` : null,
+    'Open Requests in Scalers desk to mark fulfilled.',
+  ].filter(Boolean);
+
+  const body = lines.join('\n');
+  const lead = {
+    businessName,
+    name: request.caller_name || 'Caller',
+    reason: `${typeLabel}: ${[request.item, request.when_text].filter(Boolean).join(' — ')}`,
+    callerNumber: request.caller_phone,
+  };
+
+  const result = await dispatchAlert({
+    to: ownerNumber,
+    email: ownerEmail,
+    body,
+    lead,
+    subject: `${typeLabel} — ${businessName}`,
+  });
+  if (result.channel) {
+    console.log(
+      `[${callSid}] Request notify (${type}) via ${result.channel}` +
+        (result.to ? ` → ${result.to}` : '')
+    );
+  } else {
+    console.warn(
+      `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
+    );
+  }
+}
+
 const CONTEXT_WINDOW = 16;
 
 wss.on('connection', (ws) => {
@@ -1705,9 +1945,9 @@ function buildGeminiContents(messages) {
 function geminiVoiceConfig(systemPrompt) {
   return {
     systemInstruction: { parts: [{ text: systemPrompt }] },
-    // Lower temp + short output → faster, clearer phone replies.
-    temperature: 0.45,
-    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 160),
+    // Slightly lower temp + shorter cap → faster, more consistent phone lines.
+    temperature: Number(process.env.GEMINI_VOICE_TEMPERATURE || 0.35),
+    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 120),
     // MINIMAL keeps voice latency down; set GEMINI_THINKING_LEVEL=LOW if needed.
     thinkingConfig: {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
@@ -1716,12 +1956,43 @@ function geminiVoiceConfig(systemPrompt) {
 }
 
 /**
- * Apply parsed tool markers (save_caller_info / escalate) for a call turn.
+ * Apply parsed tool markers (save_caller_info / escalate / create_service_request).
  */
 async function applyGeminiTools(callSid, parsed) {
   const tools = callAgentTools.get(callSid) || parseAgentTools(null);
   if (!tools.escalate) parsed.escalate = null;
   const shouldEndCall = Boolean(parsed.shouldEndCall && tools.end_call);
+
+  if (parsed.serviceRequest) {
+    try {
+      const created = await db.createServiceRequest({
+        callSid,
+        type: parsed.serviceRequest.type,
+        name: parsed.serviceRequest.name || parsed.name,
+        phone: parsed.serviceRequest.phone,
+        item: parsed.serviceRequest.item,
+        quantity: parsed.serviceRequest.quantity,
+        whenText: parsed.serviceRequest.whenText,
+        notes: parsed.serviceRequest.notes || parsed.reason,
+      });
+      if (created) {
+        console.log(
+          `[${callSid}] service_request created id=${created.id} type=${created.request_type}`
+        );
+        maybeSendServiceRequestNotification(callSid, created).catch((err) => {
+          console.error(
+            `[${callSid}] service request notify error:`,
+            err?.message || err
+          );
+        });
+      }
+    } catch (err) {
+      console.error(
+        `[${callSid}] createServiceRequest error:`,
+        err?.message || err
+      );
+    }
+  }
 
   if (parsed.name || parsed.reason) {
     const saved = await db.saveCallerInfo({
@@ -1873,50 +2144,6 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   messages.push({ role: 'assistant', content: spokenText });
 
   return { spokenText, shouldEndCall };
-}
-
-function parseGeminiResponse(responseText) {
-  const output = { spokenText: responseText, shouldEndCall: false };
-  let spoken = String(responseText || '');
-  const toolRe = /###TOOL###([\s\S]*?)###ENDTOOL###/gi;
-  const blocks = [...spoken.matchAll(toolRe)];
-
-  for (const match of blocks) {
-    const toolJson = match[1].trim();
-    try {
-      const parsed = JSON.parse(toolJson);
-      if (parsed.save_caller_info) {
-        if (parsed.save_caller_info.name != null) {
-          output.name = parsed.save_caller_info.name;
-        }
-        if (parsed.save_caller_info.reason != null) {
-          output.reason = parsed.save_caller_info.reason;
-        }
-      }
-      if (parsed.escalate) {
-        output.escalate = {
-          teammate: String(
-            parsed.escalate.teammate || parsed.escalate.to || parsed.escalate.role || ''
-          ).trim(),
-          name: String(parsed.escalate.name || '').trim(),
-          reason: String(parsed.escalate.reason || '').trim(),
-        };
-      }
-    } catch (err) {
-      console.warn('[parseGeminiResponse] Failed to parse tool JSON:', err?.message || err);
-    }
-    spoken = spoken.replace(match[0], '');
-  }
-
-  output.spokenText = spoken.trim();
-
-  const endCallMatch = /###ENDCALL###/i.exec(output.spokenText);
-  if (endCallMatch) {
-    output.shouldEndCall = true;
-    output.spokenText = output.spokenText.replace(endCallMatch[0], '').trim();
-  }
-
-  return output;
 }
 
 server.listen(PORT, () => {

@@ -8,7 +8,7 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 
 | Path | Role |
 | --- | --- |
-| `docs/supabase/wallet_*.sql`, `one_wallet_billing.sql` | Wallet schema / RPCs (coordinate Platform on apply order) |
+| `docs/supabase/wallet_*.sql`, `one_wallet_billing.sql` | Wallet schema / RPCs (coordinate Platform; apply order in [`docs/supabase/README.md`](../supabase/README.md)) |
 | `docs/supabase/did_number_pool.sql`, `super_admin_ops.sql` | DID pool + ops helpers |
 | `docs/ONE_WALLET_BILLING.md`, `BETA_WALLET_PROGRAM.md`, `PRODUCTION_DID_POOL.md`, `SUPER_ADMIN_REQUIREMENTS.md` | Ops docs |
 | `dashboard/src/app/admin/**` | Super Admin shell + pages |
@@ -43,9 +43,9 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 
 ## Test / verify
 
-- SQL apply order documented; no owner-forgable credit paths
+- SQL apply order per [`docs/supabase/README.md`](../supabase/README.md); no owner-forgable credit paths
 - Admin: seed DID → assign → release → remove business paths still work
-- Owner Wallet page: balance/ledger render; beta badge when enforcement off
+- Owner Wallet page: balance/ledger render; beta badge when enforcement off; automatic low-balance messaging; on-demand opt-in off by default
 - If touching voice charge hook: smoke a completed-call path without double-billing
 
 ## Chat starter

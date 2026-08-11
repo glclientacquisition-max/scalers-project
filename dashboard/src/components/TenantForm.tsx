@@ -31,6 +31,22 @@ import {
   type ServiceItem,
 } from "@/lib/servicesCatalog";
 import {
+  emptyProduct,
+  formatProductsForCompiler,
+  normalizeProductCatalog,
+  parseBulkProducts,
+  PRODUCT_CATALOG_MAX,
+  type ProductItem,
+} from "@/lib/productCatalog";
+import {
+  emptySocialChannel,
+  normalizeSocialHandles,
+  SOCIAL_CHANNEL_KINDS,
+  SOCIAL_CHANNELS_MAX,
+  type SocialChannel,
+  type SocialHandles,
+} from "@/lib/socialHandles";
+import {
   saveAndCompileSettings,
   type SettingsCompileState,
 } from "@/app/(desk)/settings/actions";
@@ -41,6 +57,32 @@ import {
   FAQ_STARTERS,
   normalizeFaqKey,
 } from "@/lib/faqs";
+import {
+  parseVertical,
+  VERTICAL_OPTIONS,
+  type BusinessVertical,
+} from "@/lib/vertical";
+import {
+  HANDOFF_OPTIONS,
+  parseHandoffMode,
+  type HandoffMode,
+} from "@/lib/handoffMode";
+import {
+  emptyLocation,
+  LOCATIONS_MAX,
+  normalizeBusinessLocations,
+  type BusinessLocation,
+} from "@/lib/businessLocations";
+import {
+  normalizeBusinessPolicies,
+  POLICY_FIELDS,
+  type BusinessPolicies,
+} from "@/lib/businessPolicies";
+import { PronunciationCoach } from "@/components/PronunciationCoach";
+import {
+  parseTtsLexicon,
+  type TtsLexiconEntry,
+} from "@/lib/pronunciationLexicon";
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
@@ -135,9 +177,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     const rows = normalizeServicesCatalog(tenant.services_catalog);
     return rows.length ? rows : [emptyService()];
   });
+  const [products, setProducts] = useState<ProductItem[]>(() => {
+    const rows = normalizeProductCatalog(tenant.product_catalog);
+    return rows.length ? rows : [];
+  });
+  const [socialHandles, setSocialHandles] = useState<SocialHandles>(() =>
+    normalizeSocialHandles(tenant.social_handles)
+  );
   const [showBulkServices, setShowBulkServices] = useState(false);
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
+  const [showBulkProducts, setShowBulkProducts] = useState(false);
+  const [bulkProductsText, setBulkProductsText] = useState("");
+  const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
@@ -154,6 +206,33 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [afterHoursMode, setAfterHoursMode] = useState<AfterHoursMode>(() =>
     parseAfterHoursMode(tenant.after_hours_mode)
   );
+  const [vertical, setVertical] = useState<BusinessVertical>(() =>
+    parseVertical(tenant.vertical)
+  );
+  const [handoffMode, setHandoffMode] = useState<HandoffMode>(() =>
+    parseHandoffMode(tenant.handoff_mode)
+  );
+  const [locations, setLocations] = useState<BusinessLocation[]>(() => {
+    const rows = normalizeBusinessLocations(tenant.business_locations);
+    if (rows.length) return rows;
+    const fallback =
+      scheduleForForm(tenant.hours_schedule, "").location ||
+      extractLocationFallback(tenant.business_hours || "");
+    return fallback
+      ? [
+          {
+            label: "Main",
+            address: fallback,
+            landmark: "",
+            directions: "",
+            coverage_notes: "",
+          },
+        ]
+      : [emptyLocation()];
+  });
+  const [policies, setPolicies] = useState<BusinessPolicies>(() =>
+    normalizeBusinessPolicies(tenant.business_policies)
+  );
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -165,6 +244,9 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     const rows = normalizeFaqs(tenant.faqs);
     return rows.length ? rows : [emptyFaq()];
   });
+  const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
+    parseTtsLexicon(tenant.tts_lexicon)
+  );
   const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -191,6 +273,21 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       ),
     [faqs]
   );
+  const locationsJson = useMemo(
+    () =>
+      JSON.stringify(
+        locations.filter(
+          (loc) =>
+            loc.label.trim() ||
+            loc.address.trim() ||
+            loc.landmark.trim() ||
+            loc.directions.trim() ||
+            loc.coverage_notes.trim()
+        )
+      ),
+    [locations]
+  );
+  const policiesJson = useMemo(() => JSON.stringify(policies), [policies]);
   const faqDupIndexes = useMemo(() => {
     const seen = new Map<string, number>();
     const dups = new Set<number>();
@@ -211,10 +308,19 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     () => JSON.stringify(services.filter((s) => s.name.trim())),
     [services]
   );
-  const servicesOfferedSummary = useMemo(
-    () => formatServicesForCompiler(services, servicesNotes),
-    [services, servicesNotes]
+  const productsJson = useMemo(
+    () => JSON.stringify(products.filter((p) => p.name.trim())),
+    [products]
   );
+  const socialJson = useMemo(
+    () => JSON.stringify(socialHandles),
+    [socialHandles]
+  );
+  const servicesOfferedSummary = useMemo(() => {
+    const svc = formatServicesForCompiler(services, servicesNotes);
+    const prod = formatProductsForCompiler(products);
+    return [svc, prod].filter(Boolean).join("\n\n");
+  }, [services, servicesNotes, products]);
   const hoursScheduleJson = useMemo(
     () =>
       JSON.stringify({
@@ -260,9 +366,75 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     );
   }
 
+  function updateProduct(index: number, key: keyof ProductItem, value: string) {
+    setProducts((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        if (key === "aliases") {
+          return {
+            ...row,
+            aliases: value
+              .split(/[,;|]/)
+              .map((a) => a.trim())
+              .filter(Boolean)
+              .slice(0, 8),
+          };
+        }
+        return { ...row, [key]: value };
+      })
+    );
+  }
+
+  function updateSocialChannel(
+    index: number,
+    key: keyof SocialChannel,
+    value: string
+  ) {
+    setSocialHandles((prev) => ({
+      channels: prev.channels.map((row, i) =>
+        i === index ? { ...row, [key]: value } : row
+      ),
+    }));
+  }
+
+  function addSocialChannel(kind = "phone") {
+    setSocialHandles((prev) => {
+      if (prev.channels.length >= SOCIAL_CHANNELS_MAX) return prev;
+      const label =
+        kind === "phone" || kind === "whatsapp"
+          ? prev.channels.some((c) => c.kind === "phone" || c.kind === "whatsapp")
+            ? "Sales"
+            : "Main"
+          : SOCIAL_CHANNEL_KINDS.find((k) => k.id === kind)?.label || "Other";
+      return {
+        channels: [...prev.channels, emptySocialChannel(kind, label)],
+      };
+    });
+  }
+
+  function removeSocialChannel(index: number) {
+    setSocialHandles((prev) => ({
+      channels: prev.channels.filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateLocation(
+    index: number,
+    key: keyof BusinessLocation,
+    value: string
+  ) {
+    setLocations((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+    );
+  }
+
   const bulkPreview = useMemo(
     () => parseBulkServices(bulkServicesText),
     [bulkServicesText]
+  );
+  const bulkProductPreview = useMemo(
+    () => parseBulkProducts(bulkProductsText),
+    [bulkProductsText]
   );
 
   function addBlankServiceRows(count: number) {
@@ -276,17 +448,38 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     const parsed = parseBulkServices(bulkServicesText);
     if (!parsed.length) {
       setBulkServicesError(
-        "Add at least one service name. Example: Home cleaning - from 2,500 KES"
+        "Add at least one service name. Example: Same-day Nairobi delivery"
       );
       return;
     }
     setServices((prev) => {
       const existing = prev.filter((s) => s.name.trim());
-      return [...existing, ...parsed];
+      return [...existing, ...parsed].slice(0, 40);
     });
     setBulkServicesText("");
     setBulkServicesError(null);
     setShowBulkServices(false);
+  }
+
+  function applyBulkProducts() {
+    const parsed = parseBulkProducts(bulkProductsText);
+    if (!parsed.length) {
+      setBulkProductsError(
+        "Add at least one product. Example: Atomic Habits - 2,500 KES"
+      );
+      return;
+    }
+    setProducts((prev) => {
+      const existing = prev.filter((p) => p.name.trim());
+      const map = new Map(existing.map((p) => [p.name.toLowerCase(), p]));
+      for (const p of parsed) {
+        if (!map.has(p.name.toLowerCase())) map.set(p.name.toLowerCase(), p);
+      }
+      return [...map.values()].slice(0, PRODUCT_CATALOG_MAX);
+    });
+    setBulkProductsText("");
+    setBulkProductsError(null);
+    setShowBulkProducts(false);
   }
 
   function setDayOpen(day: DayKey, open: boolean) {
@@ -320,11 +513,17 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="alert_email" value={alertEmail} />
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />
+      <input type="hidden" name="product_catalog" value={productsJson} />
+      <input type="hidden" name="social_handles" value={socialJson} />
       <input type="hidden" name="services_notes" value={servicesNotes} />
       <input type="hidden" name="business_hours" value={businessHoursSummary} />
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
       <input type="hidden" name="location_notes" value={locationNotes} />
       <input type="hidden" name="after_hours_mode" value={afterHoursMode} />
+      <input type="hidden" name="vertical" value={vertical} />
+      <input type="hidden" name="handoff_mode" value={handoffMode} />
+      <input type="hidden" name="business_locations" value={locationsJson} />
+      <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
@@ -341,6 +540,36 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Give your digital employee a name and voice so callers hear a real receptionist.
           </p>
+        </div>
+
+        <div>
+          <p className="block text-sm font-medium">Business type</p>
+          <p className="mt-1 text-xs text-[var(--ink-soft)]">
+            Chooses how the receptionist is trained. Retail first; home services next.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {VERTICAL_OPTIONS.map((opt) => {
+              const selected = vertical === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setVertical(opt.id)}
+                  className={[
+                    "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
+                    selected
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                  ].join(" ")}
+                >
+                  <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                  <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                    {opt.blurb}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -446,9 +675,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">Services catalog</h3>
+              <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
               <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                Your menu for the receptionist. Add a few blank rows, or paste a list like you would on WhatsApp.
+                What you offer as a business (delivery, sourcing, repair visits) — not
+                individual products. Products go in the catalogue below.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -544,7 +774,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 disabled={!bulkPreview.length}
                 className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
               >
-                Add to catalog
+                Add to services
               </button>
             </div>
           ) : null}
@@ -581,7 +811,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                       id={`svc-name-${index}`}
                       value={service.name}
                       onChange={(e) => updateService(index, "name", e.target.value)}
-                      placeholder="Home cleaning"
+                      placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"}
                       className={fieldClass}
                     />
                   </div>
@@ -598,7 +828,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                     />
                   </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-notes-${index}`}>
                       Notes / requirements
@@ -607,7 +837,7 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                       id={`svc-notes-${index}`}
                       value={service.notes}
                       onChange={(e) => updateService(index, "notes", e.target.value)}
-                      placeholder="2-bedroom homes, Nairobi only"
+                      placeholder="Free quotation for special orders"
                       className={fieldClass}
                     />
                   </div>
@@ -637,10 +867,320 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               value={servicesNotes}
               onChange={(e) => setServicesNotes(e.target.value)}
               rows={3}
-              placeholder="Payment, deposits, or other details that do not fit a single service row…"
+              placeholder="Anything else about how you work — coverage, lead times, what you do not do…"
               className={`${fieldClass} leading-relaxed`}
             />
           </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ink)]">Product catalogue</h3>
+              <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                Individual items (books, SKUs). Import CSV under Import, or edit here.
+                Live calls use up to 80 titles.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setProducts((prev) => [...prev, emptyProduct()])}
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add product
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkProducts((v) => !v);
+                  setBulkProductsError(null);
+                }}
+                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)]"
+              >
+                {showBulkProducts ? "Hide paste" : "Paste products"}
+              </button>
+            </div>
+          </div>
+
+          {showBulkProducts ? (
+            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-4">
+              <textarea
+                value={bulkProductsText}
+                onChange={(e) => {
+                  setBulkProductsText(e.target.value);
+                  if (bulkProductsError) setBulkProductsError(null);
+                }}
+                rows={6}
+                placeholder={
+                  "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
+                }
+                className={`${fieldClass} text-sm leading-relaxed`}
+              />
+              {bulkProductPreview.length ? (
+                <p className="text-xs text-[var(--ink-soft)]">
+                  Ready to add {bulkProductPreview.length} product
+                  {bulkProductPreview.length === 1 ? "" : "s"}
+                </p>
+              ) : null}
+              {bulkProductsError ? (
+                <p className="text-sm text-[var(--warn)]">{bulkProductsError}</p>
+              ) : null}
+              <button
+                type="button"
+                onClick={applyBulkProducts}
+                disabled={!bulkProductPreview.length}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Add to servicesue
+              </button>
+            </div>
+          ) : null}
+
+          {products.length === 0 ? (
+            <p className="text-sm text-[var(--ink-soft)]">
+              No products yet. Use Import → product catalogue, or add rows here.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {products.map((product, index) => (
+                <div
+                  key={`product-${index}`}
+                  className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                      Product {index + 1}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProducts((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      className="text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-name-${index}`}>
+                        Product name
+                      </label>
+                      <input
+                        id={`prod-name-${index}`}
+                        value={product.name}
+                        onChange={(e) => updateProduct(index, "name", e.target.value)}
+                        placeholder="Atomic Habits"
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-price-${index}`}>
+                        Price
+                      </label>
+                      <input
+                        id={`prod-price-${index}`}
+                        value={product.price}
+                        onChange={(e) => updateProduct(index, "price", e.target.value)}
+                        placeholder="2,500 KES"
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-stock-${index}`}>
+                        In stock
+                      </label>
+                      <select
+                        id={`prod-stock-${index}`}
+                        value={product.in_stock || ""}
+                        onChange={(e) => updateProduct(index, "in_stock", e.target.value)}
+                        className={fieldClass}
+                      >
+                        <option value="">Not set</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-cat-${index}`}>
+                        Category
+                      </label>
+                      <input
+                        id={`prod-cat-${index}`}
+                        value={product.category}
+                        onChange={(e) => updateProduct(index, "category", e.target.value)}
+                        placeholder="Self-help"
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-sku-${index}`}>
+                        SKU / ISBN
+                      </label>
+                      <input
+                        id={`prod-sku-${index}`}
+                        value={product.sku}
+                        onChange={(e) => updateProduct(index, "sku", e.target.value)}
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-notes-${index}`}>
+                        Notes
+                      </label>
+                      <input
+                        id={`prod-notes-${index}`}
+                        value={product.notes}
+                        onChange={(e) => updateProduct(index, "notes", e.target.value)}
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-alias-${index}`}>
+                        Also called (aliases)
+                      </label>
+                      <input
+                        id={`prod-alias-${index}`}
+                        value={product.aliases.join(", ")}
+                        onChange={(e) => updateProduct(index, "aliases", e.target.value)}
+                        placeholder="Atomic habit, Clear"
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ink)]">
+                Phones, social &amp; web
+              </h3>
+              <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                Add as many phone/WhatsApp numbers and social handles as you need.
+                Label each one (Main, Sales, Orders) so the receptionist shares the
+                right contact.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => addSocialChannel("phone")}
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add phone
+              </button>
+              <button
+                type="button"
+                onClick={() => addSocialChannel("whatsapp")}
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => addSocialChannel("instagram")}
+                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)]"
+              >
+                Add social
+              </button>
+            </div>
+          </div>
+
+          {socialHandles.channels.length === 0 ? (
+            <p className="text-sm text-[var(--ink-soft)]">
+              No public contacts yet. Add a Main phone/WhatsApp and Instagram if you
+              have them.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {socialHandles.channels.map((channel, index) => (
+                <div
+                  key={`social-ch-${index}`}
+                  className="grid gap-3 rounded-xl border border-[var(--line)] bg-white p-4 sm:grid-cols-[8rem_7rem_1fr_auto]"
+                >
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`social-kind-${index}`}
+                    >
+                      Type
+                    </label>
+                    <select
+                      id={`social-kind-${index}`}
+                      value={channel.kind}
+                      onChange={(e) =>
+                        updateSocialChannel(index, "kind", e.target.value)
+                      }
+                      className={fieldClass}
+                    >
+                      {SOCIAL_CHANNEL_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`social-label-${index}`}
+                    >
+                      Label
+                    </label>
+                    <input
+                      id={`social-label-${index}`}
+                      value={channel.label}
+                      onChange={(e) =>
+                        updateSocialChannel(index, "label", e.target.value)
+                      }
+                      placeholder="Main"
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`social-value-${index}`}
+                    >
+                      Number / handle / URL
+                    </label>
+                    <input
+                      id={`social-value-${index}`}
+                      value={channel.value}
+                      onChange={(e) =>
+                        updateSocialChannel(index, "value", e.target.value)
+                      }
+                      placeholder={
+                        SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
+                          ?.placeholder || ""
+                      }
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => removeSocialChannel(index)}
+                      className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -707,18 +1247,164 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               );
             })}
           </div>
-          <div>
-            <label className="block text-sm font-medium" htmlFor="location_notes">
-              Location &amp; coverage
-            </label>
-            <textarea
-              id="location_notes"
-              value={locationNotes}
-              onChange={(e) => setLocationNotes(e.target.value)}
-              rows={2}
-              placeholder="e.g. Westlands, Nairobi. We cover Kiambu and Ruiru."
-              className={`${fieldClass} leading-relaxed`}
-            />
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-medium text-[var(--ink)]">
+                  Locations &amp; directions
+                </h3>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  Landmark-first directions callers can use on the phone.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={locations.length >= LOCATIONS_MAX}
+                onClick={() =>
+                  setLocations((prev) =>
+                    prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
+                  )
+                }
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
+              >
+                Add location
+              </button>
+            </div>
+            <div className="space-y-4">
+              {locations.map((loc, index) => (
+                <div
+                  key={`loc-${index}`}
+                  className="space-y-3 rounded-xl border border-[var(--line)] bg-white/60 p-4"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-[var(--ink-soft)]"
+                        htmlFor={`loc-label-${index}`}
+                      >
+                        Label
+                      </label>
+                      <input
+                        id={`loc-label-${index}`}
+                        value={loc.label}
+                        onChange={(e) => {
+                          updateLocation(index, "label", e.target.value);
+                          if (index === 0) {
+                            setLocationNotes(
+                              [e.target.value, loc.address, loc.landmark]
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .join(" — ") || locationNotes
+                            );
+                          }
+                        }}
+                        placeholder="Main shop"
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-[var(--ink-soft)]"
+                        htmlFor={`loc-landmark-${index}`}
+                      >
+                        Landmark
+                      </label>
+                      <input
+                        id={`loc-landmark-${index}`}
+                        value={loc.landmark}
+                        onChange={(e) => {
+                          updateLocation(index, "landmark", e.target.value);
+                          if (index === 0) {
+                            const next = {
+                              ...loc,
+                              landmark: e.target.value,
+                            };
+                            setLocationNotes(
+                              [next.label, next.address, next.landmark]
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .join(" — ")
+                            );
+                          }
+                        }}
+                        placeholder="Opposite Naivas, next to…"
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`loc-address-${index}`}
+                    >
+                      Address / area
+                    </label>
+                    <input
+                      id={`loc-address-${index}`}
+                      value={loc.address}
+                      onChange={(e) => {
+                        updateLocation(index, "address", e.target.value);
+                        if (index === 0) {
+                          const next = { ...loc, address: e.target.value };
+                          setLocationNotes(
+                            [next.label, next.address, next.landmark]
+                              .map((s) => s.trim())
+                              .filter(Boolean)
+                              .join(" — ")
+                          );
+                        }
+                      }}
+                      placeholder="Westlands, Nairobi"
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`loc-directions-${index}`}
+                    >
+                      Directions (spoken)
+                    </label>
+                    <textarea
+                      id={`loc-directions-${index}`}
+                      value={loc.directions}
+                      onChange={(e) => updateLocation(index, "directions", e.target.value)}
+                      rows={2}
+                      placeholder="From Waiyaki Way, turn at the Shell — we are on the left."
+                      className={`${fieldClass} leading-relaxed`}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`loc-coverage-${index}`}
+                    >
+                      Coverage notes
+                    </label>
+                    <input
+                      id={`loc-coverage-${index}`}
+                      value={loc.coverage_notes}
+                      onChange={(e) =>
+                        updateLocation(index, "coverage_notes", e.target.value)
+                      }
+                      placeholder="We also cover Kiambu and Ruiru"
+                      className={fieldClass}
+                    />
+                  </div>
+                  {locations.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLocations((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      className="text-xs text-[var(--warn)] hover:underline"
+                    >
+                      Remove location
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
@@ -749,6 +1435,37 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 );
               })}
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
+              Exact rules the receptionist may speak — leave blank if unused.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {POLICY_FIELDS.map((field) => (
+              <div key={field.id} className={field.id === "other" ? "sm:col-span-2" : ""}>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor={`policy-${field.id}`}
+                >
+                  {field.label}
+                </label>
+                <textarea
+                  id={`policy-${field.id}`}
+                  value={policies[field.id]}
+                  onChange={(e) =>
+                    setPolicies((prev) => ({ ...prev, [field.id]: e.target.value }))
+                  }
+                  rows={2}
+                  placeholder={field.placeholder}
+                  className={`${fieldClass} leading-relaxed`}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -788,6 +1505,39 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             Turn capabilities on or off. Saving a caller&apos;s name and reason always
             stays on so you never miss a lead.
           </p>
+        </div>
+        <div className="space-y-2">
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">When a human is needed</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              Callback works today. Live transfer uses callback until telephony transfer ships.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Handoff mode">
+            {HANDOFF_OPTIONS.map((opt) => {
+              const selected = handoffMode === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setHandoffMode(opt.id)}
+                  className={[
+                    "w-full text-left rounded-xl border px-4 py-3 transition",
+                    selected
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                  ].join(" ")}
+                >
+                  <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                  <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                    {opt.blurb}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="space-y-4">
           {AGENT_TOOL_OPTIONS.map((opt) => {
@@ -1058,6 +1808,26 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           ))}
         </div>
       </section>
+
+      <PronunciationCoach
+        tenantId={tenant.id}
+        businessName={businessName}
+        agentName={agentName}
+        locationNotes={locationNotes}
+        locations={locations}
+        team={team}
+        services={services}
+        faqs={faqs}
+        bulletinTexts={
+          Array.isArray(tenant.daily_bulletin)
+            ? tenant.daily_bulletin
+                .map((b) => String(b?.text || "").trim())
+                .filter(Boolean)
+            : []
+        }
+        initialLexicon={ttsLexicon}
+        onLexiconChange={setTtsLexicon}
+      />
 
       <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">
         <button

@@ -32,7 +32,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
         <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-3.5 sm:px-6 sm:py-4">
           <div className="min-w-0 flex-1">
             <BrandLockup
-              href="/calls"
+              href="/home"
               name="Scalers"
               context={businessName}
               size="md"

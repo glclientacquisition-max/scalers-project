@@ -69,15 +69,41 @@ function looksLikeEcho(callerText, agentText) {
 
 /**
  * True when the caller seems mid-thought (don't flush yet).
+ * STT often sticks a period on trailing conjunctions ("room, and.") — strip that
+ * before deciding the thought is complete.
  * @param {string} text
  */
 function utteranceLooksIncomplete(text) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return false;
-  if (/[.!?]$/.test(raw)) return false;
-  if (INCOMPLETE_TAIL.test(raw)) return true;
+
+  // Live call HD_0cdf315f02e9: "executive room,and." was flushed mid-thought.
+  const core = raw.replace(/[.!?,;:…]+$/g, '').trim();
+  if (!core) return false;
+
+  if (INCOMPLETE_TAIL.test(core) || INCOMPLETE_TAIL.test(raw)) return true;
+  // Trailing comma / "and," without finishing the clause.
+  if (/,\s*(and|but|so|or)?$/i.test(core)) return true;
   // "my name is" / "jina langu ni" without the name yet.
-  if (/\b(my name is|i am|i'm|jina langu ni|ninaitwa)\s*$/i.test(raw)) return true;
+  if (/\b(my name is|i am|i'm|jina langu ni|ninaitwa)\s*$/i.test(core)) return true;
+  return false;
+}
+
+/**
+ * Pure barge / yield cues with no new request — after cancel, just listen.
+ * @param {string} text
+ */
+function isInterruptOnlyUtterance(text) {
+  const t = normalizeSpeech(text);
+  if (!t) return false;
+  // "wait" / "stop stop" / "no wait" / "hold on" / SW equivalents
+  if (
+    /^(no\s+|nope\s+|actually\s+)?(wait|stop|hold on|subiri|simama|acha|kusubiri)(\s+(wait|stop|hold on|subiri|simama|acha))*$/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -117,10 +143,10 @@ function adaptiveFlushMs(opts = {}) {
   const base = Number(
     opts.baseMs != null
       ? opts.baseMs
-      : process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 900
+      : process.env.SONIOX_MAX_ENDPOINT_DELAY_MS || 700
   );
-  const min = Number(opts.minMs != null ? opts.minMs : process.env.VOICE_FLUSH_MIN_MS || 350);
-  const max = Number(opts.maxMs != null ? opts.maxMs : process.env.VOICE_FLUSH_MAX_MS || 1500);
+  const min = Number(opts.minMs != null ? opts.minMs : process.env.VOICE_FLUSH_MIN_MS || 300);
+  const max = Number(opts.maxMs != null ? opts.maxMs : process.env.VOICE_FLUSH_MAX_MS || 1200);
 
   const text = String(opts.text || '').replace(/\s+/g, ' ').trim();
   const norm = normalizeSpeech(text);
@@ -128,10 +154,11 @@ function adaptiveFlushMs(opts = {}) {
   const awaiting = agentAwaitingReply(opts.lastAgentText);
 
   if (utteranceLooksIncomplete(text)) {
-    return clamp(base + 350, min, max);
+    // Give the caller room to finish ("…and—" / "my name is—").
+    return clamp(Math.max(base + 450, min + 200), min, max);
   }
 
-  if (/[.!?]$/.test(text)) {
+  if (/[.!?]$/.test(text) && !utteranceLooksIncomplete(text)) {
     return clamp(Math.min(base, 480), min, max);
   }
 
@@ -206,12 +233,27 @@ function evaluateBargeIn(opts) {
   return { barge: true, reason: 'interrupt_llm' };
 }
 
+/**
+ * Final STT while agent audio is still playing and barge did not fire.
+ * Drop clear echoes; keep real overlap for the next caller turn.
+ *
+ * @param {string} callerText
+ * @param {string} agentText
+ * @returns {'drop_echo' | 'queue'}
+ */
+function classifyFinalDuringAgentSpeech(callerText, agentText) {
+  if (looksLikeEcho(callerText, agentText)) return 'drop_echo';
+  return 'queue';
+}
+
 module.exports = {
   normalizeSpeech,
   looksLikeEcho,
   utteranceLooksIncomplete,
+  isInterruptOnlyUtterance,
   agentAwaitingReply,
   hasBargeContent,
   adaptiveFlushMs,
   evaluateBargeIn,
+  classifyFinalDuringAgentSpeech,
 };

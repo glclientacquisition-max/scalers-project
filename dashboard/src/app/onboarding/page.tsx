@@ -30,7 +30,7 @@ export default async function OnboardingPage() {
   }
 
   if (!tenantNeedsOnboarding(tenant)) {
-    redirect("/calls");
+    redirect("/home");
   }
 
   return (

@@ -9,7 +9,7 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!(await isLegacyAuthenticated())) {
-    redirect((await getAuthUser()) ? "/calls" : "/login");
+    redirect((await getAuthUser()) ? "/home" : "/login");
   }
 
   return (

@@ -30,6 +30,8 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 
 ## Apply order
 
+Full project order: [`docs/supabase/README.md`](./supabase/README.md) (wallet section steps 16–18).
+
 1. Apply `docs/supabase/wallet_metering.sql` if not already applied (adds dual columns + old RPC).
 2. Apply `docs/supabase/one_wallet_billing.sql`.
 3. Deploy dashboard + voice engine.
@@ -45,9 +47,24 @@ WALLET_LINE_FEE_KES_PER_MONTH=1000
 
 Also apply `docs/supabase/wallet_security_beta.sql` (RPC locks, column protection, ops audit, beta defaults).
 
+Then apply `docs/supabase/wallet_soft_spend_limit.sql` (optional soft-budget columns).
+
+Then apply `docs/supabase/wallet_on_demand_alerts.sql` (automatic low-balance live alerts + on-demand opt-in).
+
+## Prepaid alerts + on-demand (Cursor-like)
+
+| Piece | Behavior |
+|---|---|
+| Prepaid balance | Paid wallet money used first for call + line charges |
+| Automatic live alerts | WhatsApp/email when balance drops under `wallet_low_balance_kes` (default 200) and again at ≤ 0. No owner soft-limit setup required. |
+| On-demand usage (opt-in) | Default **off**. When prepaid ≤ 0 and on-demand off → further call charges pause until top-up. When on → keep charging (overdraft). |
+| Soft inbound block | Separate hard-enforcement step (not this migration) |
+
+Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit.
+
 ## Later
 
 - M-Pesa / Paystack STK top-up → `topup` ledger rows
-- Hard enforcement on inbound when balance ≤ 0
+- Hard enforcement on inbound when balance ≤ 0 and on-demand off
 - Nairobi-TZ month boundaries
 - COGS-based rate tuning (Soniox + Gemini)

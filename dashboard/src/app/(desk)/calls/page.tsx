@@ -1,158 +1,101 @@
 import Link from "next/link";
 import {
-  parseLeadStatus,
-  parseSummary,
   type CallRow,
   type LeadStatus,
-  type TenantRow,
 } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import {
+  CallsCommandCenter,
+  CallsToolbar,
+} from "@/components/CallsCommandCenter";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
+import {
+  MarkLeadArchiveButton,
+  MarkLeadDoneButton,
+} from "@/components/MarkLeadDoneButton";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-
-function formatWhen(iso: string) {
-  try {
-    return new Intl.DateTimeFormat("en-KE", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "Africa/Nairobi",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
-function nairobiDayStartIso(): string {
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Nairobi",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const day = fmt.format(new Date()); // YYYY-MM-DD
-  return new Date(`${day}T00:00:00+03:00`).toISOString();
-}
-
-type Lead = {
-  call: CallRow;
-  name: string | null;
-  reason: string | null;
-  notified: boolean;
-  urgent: boolean;
-  leadStatus: LeadStatus;
-};
-
-function toLead(call: CallRow): Lead {
-  const meta = parseSummary(call.summary);
-  return {
-    call,
-    name: typeof meta.name === "string" ? meta.name : null,
-    reason: typeof meta.reason === "string" ? meta.reason : null,
-    notified: Boolean(meta.whatsapp_sent),
-    urgent: String(call.sentiment || "").toLowerCase() === "urgent",
-    leadStatus: parseLeadStatus(call.lead_status),
-  };
-}
-
-function Kpi({
-  label,
-  value,
-  hint,
-  warn = false,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  warn?: boolean;
-}) {
-  return (
-    <div
-      className={[
-        "rounded-2xl border px-5 py-4",
-        warn ? "border-warn/50 bg-warn-soft" : "border-line bg-surface",
-      ].join(" ")}
-    >
-      <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">{label}</p>
-      <p
-        className={[
-          "mt-2 font-display text-3xl tracking-tight",
-          warn ? "text-[var(--warn)]" : "text-[var(--ink)]",
-        ].join(" ")}
-      >
-        {value}
-      </p>
-      {hint ? (
-        <p className={["mt-1 text-xs", warn ? "text-[var(--warn)]" : "text-[var(--ink-soft)]"].join(" ")}>
-          {hint}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function KpiStrip({
-  tenant,
-  todayCount,
-  newCount,
-  capturedOnPage,
-}: {
-  tenant: TenantRow;
-  todayCount: number;
-  newCount: number;
-  capturedOnPage: number;
-}) {
-  const kes = Number(
-    tenant.wallet_balance_kes ??
-      (Number(tenant.telecom_wallet_balance_kes ?? 0) +
-        Math.round(Number(tenant.ai_wallet_balance_usd ?? 0) * 130))
-  );
-  const lowWallet = kes < 200;
-
-  return (
-    <section className="mt-6 grid gap-3 sm:grid-cols-3">
-      <Kpi
-        label="Today's calls"
-        value={todayCount}
-        hint={newCount > 0 ? `${newCount} waiting for follow-up` : "All followed up"}
-        warn={newCount > 0}
-      />
-      <Kpi label="Leads shown" value={capturedOnPage} hint="Name or reason on this page" />
-      <Link href="/wallet" className="block rounded-2xl focus-visible:outline-none focus-visible:shadow-focus">
-        <Kpi
-          label="Wallet"
-          value={`KES ${kes.toLocaleString("en-KE")}`}
-          hint={lowWallet ? "Low balance. Top up soon." : "Prepaid KES balance"}
-          warn={lowWallet}
-        />
-      </Link>
-    </section>
-  );
-}
+import {
+  callsHref,
+  followUpWhatsAppMessage,
+  formatCallWhen,
+  nairobiDayStartIso,
+  resolveStatusFilter,
+  sanitizeSearchQuery,
+  toLead,
+  type Lead,
+  type StatusFilterId,
+} from "@/lib/callsTriage";
 
 function EmptyCalls({
   total,
   pendingDid,
   did,
+  statusFilter,
+  q,
 }: {
   total: number;
   pendingDid: boolean;
   did: string;
+  statusFilter: StatusFilterId;
+  q: string;
 }) {
   if (total > 0) {
     return (
-      <div className="mt-6 rounded-2xl border border-line bg-surface px-4 py-10 text-center text-ink-soft">
+      <div className="mt-6 border-y border-line py-10 text-center text-ink-soft">
         No calls on this page.
+      </div>
+    );
+  }
+
+  if (q) {
+    return (
+      <div className="mt-6 border-y border-line py-10 text-center">
+        <p className="font-display text-xl tracking-tight text-ink">No matches</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+          Nothing matched &ldquo;{q}&rdquo; in this filter.
+        </p>
+        <Link
+          href={callsHref({ status: statusFilter })}
+          className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-accent-deep transition hover:border-accent focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          Clear search
+        </Link>
+      </div>
+    );
+  }
+
+  if (statusFilter !== "all") {
+    const label =
+      statusFilter === "new"
+        ? "new leads"
+        : statusFilter === "contacted"
+          ? "followed-up leads"
+          : statusFilter === "resolved"
+            ? "done leads"
+            : "archived leads";
+    return (
+      <div className="mt-6 border-y border-line py-10 text-center">
+        <p className="font-display text-xl tracking-tight text-ink">No {label}</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+          Nothing in this follow-up bucket right now.
+        </p>
+        <Link
+          href={callsHref({ status: "all" })}
+          className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-accent-deep transition hover:border-accent focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          Show all calls
+        </Link>
       </div>
     );
   }
 
   if (pendingDid) {
     return (
-      <div className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-10 text-center">
+      <div className="mt-6 border-y border-accent/30 bg-accent-soft/40 py-10 text-center">
         <p className="font-display text-xl tracking-tight text-ink">Number being assigned</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-          Your assistant line is almost ready. Train the business profile now. Once the number is live, place a test call and leads will show up here.
+          Train the business profile now. Once the number is live, test calls land here.
         </p>
         <Link
           href="/settings#train"
@@ -165,7 +108,7 @@ function EmptyCalls({
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-line bg-surface px-4 py-10 text-center text-ink-soft">
+    <div className="mt-6 border-y border-line py-10 text-center text-ink-soft">
       <p className="font-display text-xl tracking-tight text-ink">No calls yet</p>
       <p className="mx-auto mt-2 max-w-md text-sm">
         Place a test call to{" "}
@@ -175,7 +118,7 @@ function EmptyCalls({
         >
           {did}
         </a>{" "}
-        from another phone. Captured leads will land here for triage.
+        from another phone.
       </p>
       <Link
         href="/settings#test"
@@ -190,11 +133,9 @@ function EmptyCalls({
 function StatusBadges({ lead }: { lead: Lead }) {
   return (
     <span className="inline-flex items-center gap-2">
-      {lead.notified ? <span className="text-xs text-[var(--ok)]">alerted</span> : null}
+      {lead.notified ? <span className="text-xs text-ok">alerted</span> : null}
       {lead.urgent ? (
-        <span className="rounded-full bg-[var(--warn)]/10 px-2 py-0.5 text-xs font-medium text-[var(--warn)]">
-          urgent
-        </span>
+        <span className="text-xs font-medium text-warn">urgent</span>
       ) : null}
     </span>
   );
@@ -206,23 +147,25 @@ const CALL_SELECT_LEGACY =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
+const NEEDS_YOU_LIMIT = 5;
 
 export default async function CallsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; status?: string; q?: string }>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
+  const q = sanitizeSearchQuery(sp.q);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 text-[var(--ink-soft)]">
+      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[var(--accent)]">
+        <Link href="/signup" className="text-accent">
           Create one
         </Link>
         .
@@ -233,7 +176,7 @@ export default async function CallsPage({
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
     return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
+      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
         Not signed in.
       </div>
     );
@@ -242,11 +185,71 @@ export default async function CallsPage({
   let leadStatusReady = true;
   const dayStart = nairobiDayStartIso();
   const client = workspace.client;
+  const businessName = tenant.business_name?.trim() || "us";
 
-  let first = await client
+  const statusCountQuery = (status: LeadStatus) =>
+    client
+      .from("calls")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("lead_status", status);
+
+  const [todayRes, allRes, newRes, contactedRes, resolvedRes, archivedRes] =
+    await Promise.all([
+      client
+        .from("calls")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .gte("created_at", dayStart),
+      client
+        .from("calls")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .neq("lead_status", "archived"),
+      statusCountQuery("new"),
+      statusCountQuery("contacted"),
+      statusCountQuery("resolved"),
+      statusCountQuery("archived"),
+    ]);
+
+  // If lead_status column missing, counts fail — fall back gracefully below.
+  if (newRes.error && /lead_status|column/i.test(newRes.error.message)) {
+    leadStatusReady = false;
+  }
+  const archiveReady = !(
+    archivedRes.error && /lead_status|archived|check|column/i.test(archivedRes.error.message)
+  );
+
+  const newCount = leadStatusReady ? newRes.count ?? 0 : 0;
+  const statusCounts = {
+    all: leadStatusReady ? allRes.count ?? 0 : 0,
+    new: newCount,
+    contacted: leadStatusReady ? contactedRes.count ?? 0 : 0,
+    resolved: leadStatusReady ? resolvedRes.count ?? 0 : 0,
+    archived: archiveReady ? archivedRes.count ?? 0 : 0,
+  };
+  const activeFilter = leadStatusReady
+    ? resolveStatusFilter(sp.status, newCount)
+    : "all";
+
+  let listQuery = client
     .from("calls")
     .select(CALL_SELECT, { count: "exact" })
-    .eq("tenant_id", tenant.id)
+    .eq("tenant_id", tenant.id);
+
+  if (leadStatusReady && activeFilter !== "all") {
+    listQuery = listQuery.eq("lead_status", activeFilter);
+  } else if (leadStatusReady) {
+    // Active inbox: hide archived unless the Archived filter is chosen.
+    listQuery = listQuery.neq("lead_status", "archived");
+  }
+  if (q) {
+    listQuery = listQuery.or(
+      `caller_number.ilike.%${q}%,summary.ilike.%${q}%`
+    );
+  }
+
+  const first = await listQuery
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -256,10 +259,16 @@ export default async function CallsPage({
 
   if (error && /lead_status|column/i.test(error.message)) {
     leadStatusReady = false;
-    const retry = await client
+    let retryQuery = client
       .from("calls")
       .select(CALL_SELECT_LEGACY, { count: "exact" })
-      .eq("tenant_id", tenant.id)
+      .eq("tenant_id", tenant.id);
+    if (q) {
+      retryQuery = retryQuery.or(
+        `caller_number.ilike.%${q}%,summary.ilike.%${q}%`
+      );
+    }
+    const retry = await retryQuery
       .order("created_at", { ascending: false })
       .range(from, to);
     data = retry.data as CallRow[] | null;
@@ -269,10 +278,10 @@ export default async function CallsPage({
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
+      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
         Could not load calls: {error.message}
         {/row-level security|permission denied|rls/i.test(error.message) ? (
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+          <p className="mt-2 text-sm text-ink-soft">
             Apply docs/supabase/owner_rls.sql in Supabase if you have not yet.
           </p>
         ) : null}
@@ -280,109 +289,132 @@ export default async function CallsPage({
     );
   }
 
-  const [todayRes, newRes] = await Promise.all([
-    client
+  let needsYou: Lead[] = [];
+  let urgentNew = 0;
+  if (leadStatusReady && newCount > 0) {
+    const needsRes = await client
       .from("calls")
-      .select("id", { count: "exact", head: true })
+      .select(CALL_SELECT)
       .eq("tenant_id", tenant.id)
-      .gte("created_at", dayStart),
-    leadStatusReady
-      ? client
-          .from("calls")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenant.id)
-          .eq("lead_status", "new")
-      : Promise.resolve({ count: 0, error: null }),
-  ]);
+      .eq("lead_status", "new")
+      .order("created_at", { ascending: false })
+      .limit(40);
+    if (!needsRes.error && needsRes.data) {
+      const mapped = (needsRes.data as CallRow[]).map(toLead);
+      urgentNew = mapped.filter((l) => l.urgent).length;
+      needsYou = [...mapped]
+        .sort((a, b) => Number(b.urgent) - Number(a.urgent))
+        .slice(0, NEEDS_YOU_LIMIT);
+    }
+  }
 
   const leads = (data || []).map(toLead);
-  const capturedOnPage = leads.filter((l) => l.name || l.reason).length;
   const todayCount = todayRes.count ?? 0;
-  const newCount = newRes.count ?? 0;
+  const paginationParams: Record<string, string | undefined> = {
+    status: activeFilter,
+    q: q || undefined,
+  };
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight text-[var(--ink)] sm:text-4xl">
-            Calls
-          </h1>
-          <p className="mt-1 text-sm text-[var(--ink-soft)] sm:text-base">
-            Triage leads and follow up while they are hot.
-          </p>
-        </div>
-      </div>
-
-      <KpiStrip
+      <CallsCommandCenter
         tenant={tenant}
         todayCount={todayCount}
         newCount={newCount}
-        capturedOnPage={capturedOnPage}
+        totalCalls={statusCounts.all}
+        urgentNew={urgentNew}
+        needsYou={needsYou}
+        leadStatusReady={leadStatusReady}
       />
 
       {!leadStatusReady ? (
-        <p className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-xs text-[var(--ink-soft)]">
+        <p className="mt-6 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-ink-soft">
           Lead statuses need a one-time database update. Apply{" "}
           <code>docs/supabase/lead_status.sql</code> in Supabase.
         </p>
-      ) : null}
+      ) : (
+        <CallsToolbar active={activeFilter} counts={statusCounts} q={q} />
+      )}
 
       {leads.length === 0 ? (
         <EmptyCalls
           total={total}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
           did={tenant.sautikit_virtual_number}
+          statusFilter={activeFilter}
+          q={q}
         />
       ) : (
         <>
-          {/* Mobile + tablet: cards. Desktop lg+: table */}
-          <ul className="mt-6 space-y-3 lg:hidden">
-            {leads.map((lead) => (
-              <li
-                key={lead.call.id}
-                className={[
-                  "rounded-2xl border bg-[var(--card)] p-4",
-                  lead.urgent ? "border-warn/50 bg-warn-soft" : "border-line",
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs text-[var(--ink-soft)]">
-                      {formatWhen(lead.call.created_at)}
-                    </p>
-                    <p className="mt-1 truncate text-base font-medium text-[var(--ink)]">
-                      {lead.name || lead.call.caller_number}
-                    </p>
-                    <p className="mt-0.5 text-sm text-[var(--ink-soft)] line-clamp-2">
-                      {lead.reason || "No reason yet"}
-                    </p>
-                    <div className="mt-1.5">
-                      <StatusBadges lead={lead} />
+          <ul className="mt-4 space-y-3 lg:hidden">
+            {leads.map((lead) => {
+              const message = followUpWhatsAppMessage({
+                businessName,
+                name: lead.name,
+                reason: lead.reason,
+              });
+              return (
+                <li
+                  key={lead.call.id}
+                  className={[
+                    "rounded-2xl border bg-surface p-4",
+                    lead.urgent ? "border-warn/50 bg-warn-soft" : "border-line",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-ink-soft">
+                        {formatCallWhen(lead.call.created_at)}
+                      </p>
+                      <p className="mt-1 truncate text-base font-medium text-ink">
+                        {lead.name || lead.call.caller_number}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">
+                        {lead.reason || "No reason yet"}
+                      </p>
+                      <div className="mt-1.5">
+                        <StatusBadges lead={lead} />
+                      </div>
                     </div>
+                    <WhatsAppLink
+                      number={lead.call.caller_number}
+                      compact
+                      message={message}
+                    />
                   </div>
-                  <WhatsAppLink number={lead.call.caller_number} compact />
-                </div>
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  {leadStatusReady ? (
-                    <LeadStatusToggle callId={lead.call.id} initial={lead.leadStatus} />
-                  ) : (
-                    <span />
-                  )}
-                  <Link
-                    href={`/calls/${lead.call.id}`}
-                    className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] hover:border-[var(--accent)]"
-                  >
-                    Open
-                  </Link>
-                </div>
-              </li>
-            ))}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    {leadStatusReady ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <LeadStatusToggle
+                          callId={lead.call.id}
+                          initial={lead.leadStatus}
+                        />
+                        {lead.leadStatus !== "resolved" ? (
+                          <MarkLeadDoneButton callId={lead.call.id} />
+                        ) : null}
+                        {lead.leadStatus !== "archived" ? (
+                          <MarkLeadArchiveButton callId={lead.call.id} />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span />
+                    )}
+                    <Link
+                      href={`/calls/${lead.call.id}?from=${activeFilter}`}
+                      className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-accent hover:border-accent"
+                    >
+                      Open
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
 
-          <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--card)] lg:block">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="bg-[var(--bg-deep)]/70 text-[var(--ink-soft)]">
+          <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-line bg-surface lg:block">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-surface-muted/70 text-ink-soft">
                 <tr>
                   <th className="px-4 py-3 font-medium">When</th>
                   <th className="px-4 py-3 font-medium">Caller</th>
@@ -392,53 +424,80 @@ export default async function CallsPage({
                 </tr>
               </thead>
               <tbody>
-                {leads.map((lead) => (
-                  <tr
-                    key={lead.call.id}
-                    className={[
-                      "border-t border-[var(--line)]/70",
-                      lead.urgent ? "bg-warn-soft" : "",
-                    ].join(" ")}
-                  >
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {formatWhen(lead.call.created_at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <WhatsAppLink number={lead.call.caller_number} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 font-medium">
-                        {lead.name || "—"}
-                        <StatusBadges lead={lead} />
-                      </div>
-                      <div className="text-[var(--ink-soft)] line-clamp-1">
-                        {lead.reason || "No reason yet"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {leadStatusReady ? (
-                        <LeadStatusToggle callId={lead.call.id} initial={lead.leadStatus} />
-                      ) : (
-                        <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs">
-                          {lead.call.status || "unknown"}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/calls/${lead.call.id}`}
-                        className="font-medium text-[var(--accent)] hover:text-[var(--accent-deep)]"
-                      >
-                        Open
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {leads.map((lead) => {
+                  const message = followUpWhatsAppMessage({
+                    businessName,
+                    name: lead.name,
+                    reason: lead.reason,
+                  });
+                  return (
+                    <tr
+                      key={lead.call.id}
+                      className={[
+                        "border-t border-line/70",
+                        lead.urgent ? "bg-warn-soft" : "",
+                      ].join(" ")}
+                    >
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {formatCallWhen(lead.call.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <WhatsAppLink
+                          number={lead.call.caller_number}
+                          message={message}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 font-medium">
+                          {lead.name || "—"}
+                          <StatusBadges lead={lead} />
+                        </div>
+                        <div className="line-clamp-1 text-ink-soft">
+                          {lead.reason || "No reason yet"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {leadStatusReady ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <LeadStatusToggle
+                              callId={lead.call.id}
+                              initial={lead.leadStatus}
+                            />
+                            {lead.leadStatus !== "resolved" ? (
+                              <MarkLeadDoneButton callId={lead.call.id} />
+                            ) : null}
+                            {lead.leadStatus !== "archived" ? (
+                              <MarkLeadArchiveButton callId={lead.call.id} />
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs">
+                            {lead.call.status || "unknown"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/calls/${lead.call.id}?from=${activeFilter}`}
+                          className="font-medium text-accent hover:text-accent-deep"
+                        >
+                          Open
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          <Pagination page={page} pageSize={PAGE_SIZE} total={total} href="/calls" />
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            href="/calls"
+            params={paginationParams}
+          />
         </>
       )}
     </div>

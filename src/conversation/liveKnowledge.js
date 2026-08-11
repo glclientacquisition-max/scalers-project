@@ -16,12 +16,33 @@ function asArray(raw) {
 
 function normalizeServices(raw) {
   return asArray(raw)
-    .map((row) => ({
-      name: String(row?.name || '').trim(),
-      price_range: String(row?.price_range || row?.priceRange || '').trim(),
-      notes: String(row?.notes || '').trim(),
-      out_of_scope: String(row?.out_of_scope || row?.outOfScope || '').trim(),
-    }))
+    .map((row) => {
+      const stockRaw = String(
+        row?.in_stock ?? row?.inStock ?? ''
+      )
+        .trim()
+        .toLowerCase();
+      let in_stock = '';
+      if (['yes', 'true', '1', 'in_stock', 'available'].includes(stockRaw)) {
+        in_stock = 'yes';
+      } else if (
+        ['no', 'false', '0', 'out', 'out_of_stock', 'unavailable'].includes(
+          stockRaw
+        )
+      ) {
+        in_stock = 'no';
+      } else if (['unknown', 'maybe', '?'].includes(stockRaw)) {
+        in_stock = 'unknown';
+      }
+      return {
+        name: String(row?.name || '').trim(),
+        price_range: String(row?.price_range || row?.priceRange || '').trim(),
+        notes: String(row?.notes || '').trim(),
+        out_of_scope: String(row?.out_of_scope || row?.outOfScope || '').trim(),
+        in_stock,
+        category: String(row?.category || '').trim(),
+      };
+    })
     .filter((row) => row.name);
 }
 
@@ -49,7 +70,9 @@ function formatServicesBlock(services) {
   return services
     .map((s, i) => {
       const bits = [`${i + 1}. ${s.name}`];
+      if (s.category) bits.push(`Category: ${s.category}`);
       if (s.price_range) bits.push(`Price: ${s.price_range}`);
+      if (s.in_stock) bits.push(`In stock: ${s.in_stock}`);
       if (s.notes) bits.push(`Notes: ${s.notes}`);
       if (s.out_of_scope) bits.push(`Out of scope: ${s.out_of_scope}`);
       return bits.join(' | ');
@@ -104,20 +127,61 @@ function formatUnknownAnswerPolicy(customLine = '') {
  */
 function buildLiveGroundTruth(profile = {}) {
   const { parseAgentTools } = require('./agentTools');
+  const { parseVertical } = require('./vertical');
+  const { parseHandoffMode } = require('./handoffMode');
+  const { normalizeLocations, formatLocationsBlock } = require('./businessLocations');
+  const {
+    normalizePolicies,
+    policiesHaveContent,
+    formatPoliciesBlock,
+  } = require('./businessPolicies');
+
   const services = normalizeServices(profile.servicesCatalog);
+  const products = require('./productCatalog').normalizeProducts(
+    profile.productCatalog
+  );
+  const {
+    normalizeSocialHandles,
+    socialHandlesHaveContent,
+    formatSocialHandlesBlock,
+  } = require('./socialHandles');
+  const social = normalizeSocialHandles(profile.socialHandles);
   const faqs = normalizeFaqs(profile.faqs);
   const team = normalizeTeam(profile.teamDirectory);
+  const locations = normalizeLocations(profile.businessLocations);
+  const policies = normalizePolicies(profile.businessPolicies);
   const unknown = String(profile.unknownAnswerFallback || '').trim();
   const extras = String(profile.servicesNotes || profile.servicesOffered || '').trim();
   const tools = parseAgentTools(profile.agentTools);
+  const vertical = parseVertical(profile.vertical);
+  const handoffMode = parseHandoffMode(profile.handoffMode);
 
-  const hasAny = services.length || faqs.length || team.length || unknown || extras;
+  const hasAny =
+    services.length ||
+    products.length ||
+    faqs.length ||
+    team.length ||
+    locations.length ||
+    policiesHaveContent(policies) ||
+    socialHandlesHaveContent(social) ||
+    unknown ||
+    extras;
   if (!hasAny) return '';
 
   const parts = [
     'LIVE GROUND TRUTH (highest priority facts — if this conflicts with older prompt text, follow THIS):',
     '',
-    'SERVICES CATALOG:',
+    `BUSINESS VERTICAL: ${vertical}`,
+    `HANDOFF MODE: ${handoffMode}${
+      handoffMode === 'live_transfer'
+        ? ' (prefer connecting a human when asked; if transfer is unavailable, take a callback note and escalate)'
+        : ' (notify via WhatsApp/email callback — do not claim a live transfer)'
+    }`,
+    '',
+    'LOCATIONS & DIRECTIONS:',
+    formatLocationsBlock(locations),
+    '',
+    'SERVICES (what you offer — not individual products):',
     formatServicesBlock(services),
   ];
 
@@ -130,6 +194,19 @@ function buildLiveGroundTruth(profile = {}) {
   } else if (extras && !services.length) {
     parts.push('', 'SERVICE NOTES:', extras);
   }
+
+  const { formatProductsBlock } = require('./productCatalog');
+  parts.push(
+    '',
+    'PRODUCT CATALOGUE (individual items — prices/stock from here only):',
+    formatProductsBlock(products)
+  );
+
+  if (socialHandlesHaveContent(social)) {
+    parts.push('', 'PHONES, SOCIAL & WEB:', formatSocialHandlesBlock(social));
+  }
+
+  parts.push('', 'POLICIES:', formatPoliciesBlock(policies));
 
   parts.push('', 'GOLDEN FAQs (answer these exactly when asked):', formatFaqsBlock(faqs));
 
@@ -164,7 +241,8 @@ function buildLiveGroundTruth(profile = {}) {
 
   parts.push(
     '',
-    'Never invent prices, services, people, or FAQ answers outside this ground truth.'
+    'Never invent prices, stock, availability, services, locations, policies, people, or FAQ answers outside this ground truth.',
+    'Resolve the caller\'s request from this truth when you can. Capture a clear next step. Only hand off when the playbook or caller requires a human.'
   );
 
   return parts.filter((p, i, arr) => !(p === '' && arr[i - 1] === '')).join('\n');
@@ -175,7 +253,9 @@ function formatServicesForCompiler(services, extraNotes = '') {
   const rows = normalizeServices(services);
   const lines = rows.map((s) => {
     const bits = [`- ${s.name}`];
+    if (s.category) bits.push(`category ${s.category}`);
     if (s.price_range) bits.push(`price ${s.price_range}`);
+    if (s.in_stock) bits.push(`in stock ${s.in_stock}`);
     if (s.notes) bits.push(s.notes);
     if (s.out_of_scope) bits.push(`out of scope: ${s.out_of_scope}`);
     return bits.join(' - ');

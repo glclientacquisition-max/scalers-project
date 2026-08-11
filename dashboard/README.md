@@ -48,12 +48,36 @@ New owners with a blank/default `llm_system_prompt` are redirected to `/onboardi
 with Gemini (`GEMINI_API_KEY`) into `tenants.llm_system_prompt`, then opens `/calls`.
 Without a Gemini key, a local template is saved instead.
 
-### Triage inbox (CRM)
+### Owner command center (first open)
 
-1. Apply `docs/supabase/lead_status.sql` (adds `calls.lead_status`, owner update policy).
-2. `/calls` shows a KPI strip (today's missed calls, leads captured, wallet) and
-   New → Contacted → Resolved toggles per lead.
-3. Call detail gets an AI summary box and a sticky recording player (1x / 1.5x / 2x).
+Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triage inbox.
+
+**Home dashboard**
+1. **Glance cards** (interactive) — Waiting · Followed Up · Today · Balance
+2. **Next action** — train / test / triage / caught up
+3. **Line & tools** — DID, Done count, Archived count, quick links
+4. **Lead triage** — top New leads with WhatsApp, Done, Archive, Open
+
+**Inbox (`/calls`)**
+- Search + filters: All · New · Followed Up · Done · Archived
+- Bare `/calls` defaults to New when work is waiting
+- All hides Archived (recover under Archived filter)
+
+**Owner affordances (Auth + RLS safe)**
+
+| Action | Behavior |
+| --- | --- |
+| Back | Detail → inbox preserves `?from=` filter |
+| Open | Call detail titled by lead name (or number) |
+| WhatsApp | Prefills a short follow-up using name + reason |
+| Status | New → Followed Up → Done |
+| Done | Soft finish = `resolved` |
+| Archive | Soft hide = `archived` (apply `docs/supabase/lead_status_archive.sql`) |
+| Search | Name / number / reason (`summary`) |
+
+Hard delete, ledger writes, DID assignment, and prompt compile semantics stay Platform / Ops / Brain.
+
+
 
 ### AI Prompt Compiler (settings)
 

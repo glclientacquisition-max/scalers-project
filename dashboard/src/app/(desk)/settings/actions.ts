@@ -16,8 +16,31 @@ import {
   formatServicesForCompiler,
   parseServicesCatalogField,
 } from "@/lib/servicesCatalog";
+import {
+  formatProductsForCompiler,
+  parseProductCatalogField,
+  PRODUCT_CATALOG_MAX,
+} from "@/lib/productCatalog";
+import {
+  formatSocialHandlesForCompiler,
+  parseSocialHandlesField,
+} from "@/lib/socialHandles";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseAgentTools } from "@/lib/agentTools";
+import { parseVertical } from "@/lib/vertical";
+import { parseHandoffMode } from "@/lib/handoffMode";
+import {
+  formatLocationsForCompiler,
+  parseBusinessLocationsField,
+} from "@/lib/businessLocations";
+import {
+  formatPoliciesForCompiler,
+  parseBusinessPoliciesField,
+} from "@/lib/businessPolicies";
+import {
+  lexiconForStorage,
+  parseTtsLexicon,
+} from "@/lib/pronunciationLexicon";
 
 export type SettingsCompileState = {
   error?: string;
@@ -52,8 +75,15 @@ export async function saveAndCompileSettings(
     .toLowerCase();
   const servicesNotes = String(formData.get("services_notes") || "").trim();
   const servicesCatalog = parseServicesCatalogField(formData.get("services_catalog"));
+  const productCatalog = parseProductCatalogField(formData.get("product_catalog"));
+  const socialHandles = parseSocialHandlesField(formData.get("social_handles"));
+  const servicesBlock = formatServicesForCompiler(servicesCatalog, servicesNotes);
+  const productsBlock = formatProductsForCompiler(productCatalog);
+  const socialBlock = formatSocialHandlesForCompiler(socialHandles);
   const servicesOffered =
-    formatServicesForCompiler(servicesCatalog, servicesNotes) ||
+    [servicesBlock, productsBlock, socialBlock ? `Social & web:\n${socialBlock}` : ""]
+      .filter(Boolean)
+      .join("\n\n") ||
     String(formData.get("services_offered") || "").trim();
   const agentName =
     String(formData.get("agent_name") || "").trim() || "Receptionist";
@@ -71,12 +101,25 @@ export async function saveAndCompileSettings(
   const hoursSchedule = parseHoursSchedule(formData.get("hours_schedule"));
   const locationNotes = String(formData.get("location_notes") || "").trim();
   const afterHoursMode = parseAfterHoursMode(formData.get("after_hours_mode"));
+  const vertical = parseVertical(formData.get("vertical"));
+  const handoffMode = parseHandoffMode(formData.get("handoff_mode"));
+  const businessLocations = parseBusinessLocationsField(
+    formData.get("business_locations")
+  );
+  const businessPolicies = parseBusinessPoliciesField(
+    formData.get("business_policies")
+  );
+  const ttsLexicon = lexiconForStorage(
+    parseTtsLexicon(formData.get("tts_lexicon"))
+  );
   const scheduleForSave = hoursSchedule
     ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
     : null;
   const businessHours =
     formatHoursForCompiler(scheduleForSave) ||
     String(formData.get("business_hours") || "").trim();
+  const locationsText = formatLocationsForCompiler(businessLocations);
+  const policiesText = formatPoliciesForCompiler(businessPolicies);
 
   if (!businessName) {
     return { error: "Business name is required." };
@@ -84,11 +127,23 @@ export async function saveAndCompileSettings(
   if (agentName.length > 40) {
     return { error: "Agent name should be under 40 characters." };
   }
-  if (!servicesCatalog.length && servicesOffered.length < 12) {
-    return { error: "Add at least one service with a name, or extra service notes." };
+  if (
+    !servicesCatalog.length &&
+    !productCatalog.length &&
+    servicesOffered.length < 12
+  ) {
+    return {
+      error:
+        "Add at least one service or product, or extra service notes.",
+    };
   }
   if (servicesCatalog.length > 40) {
-    return { error: "Services catalog is limited to 40 items." };
+    return { error: "Services are limited to 40 items." };
+  }
+  if (productCatalog.length > PRODUCT_CATALOG_MAX) {
+    return {
+      error: `Product catalogue is limited to ${PRODUCT_CATALOG_MAX} items.`,
+    };
   }
   if (!scheduleForSave) {
     return { error: "Set at least one open day in weekly hours." };
@@ -119,6 +174,12 @@ export async function saveAndCompileSettings(
     faqs,
     unknownAnswerFallback,
     escalateEnabled: agentTools.escalate,
+    vertical,
+    handoffMode,
+    locationsText,
+    policiesText,
+    productsText: productsBlock,
+    socialText: socialBlock,
   });
 
   const workspace = await createWorkspaceDataClient();
@@ -132,6 +193,8 @@ export async function saveAndCompileSettings(
     alert_email: alertEmail || null,
     services_offered: servicesOffered,
     services_catalog: servicesCatalog,
+    product_catalog: productCatalog,
+    social_handles: socialHandles,
     business_hours: businessHours,
     hours_schedule: scheduleForSave,
     after_hours_mode: afterHoursMode,
@@ -141,12 +204,27 @@ export async function saveAndCompileSettings(
     faqs,
     unknown_answer_fallback: unknownAnswerFallback || null,
     agent_tools: agentTools,
+    vertical,
+    handoff_mode: handoffMode,
+    business_locations: businessLocations,
+    business_policies: businessPolicies,
+    tts_lexicon: ttsLexicon,
     llm_system_prompt: prompt,
   };
 
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
 
   if (error) {
+    if (/product_catalog|social_handles/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/product_catalog_and_social.sql in Supabase.`,
+      };
+    }
+    if (/vertical|handoff_mode|business_locations|business_policies/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/business_operating_model.sql in Supabase.`,
+      };
+    }
     if (/alert_email/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/alert_email.sql in Supabase.`,
@@ -175,6 +253,11 @@ export async function saveAndCompileSettings(
     if (/agent_tools/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/agent_tools.sql in Supabase.`,
+      };
+    }
+    if (/tts_lexicon/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
       };
     }
     if (/agent_name|team_directory|faqs/i.test(error.message)) {

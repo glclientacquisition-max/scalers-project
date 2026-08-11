@@ -507,7 +507,12 @@ grant update (
   voice_languages,
   voice_language_other,
   escalation_enabled,
-  agent_tools
+  agent_tools,
+  vertical,
+  handoff_mode,
+  business_locations,
+  business_policies,
+  tts_lexicon
 ) on public.tenants to authenticated;
 
 -- ---------------------------------------------------------------------------

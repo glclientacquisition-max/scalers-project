@@ -289,11 +289,21 @@ function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {
   }
 
   function cancelStream(streamId) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const targets = streamId ? [streamId] : [...active.keys()];
     for (const id of targets) {
       const waiter = active.get(id);
-      if (waiter) waiter.cancelled = true;
+      // Resolve locally so speak()/end() does not stall waiting on a remote
+      // `terminated` that may be slow or missing after cancel.
+      if (waiter) {
+        waiter.cancelled = true;
+        active.delete(id);
+        try {
+          waiter.resolve({ cancelled: true });
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!ws || ws.readyState !== WebSocket.OPEN) continue;
       try {
         sendJson({ stream_id: id, cancel: true });
       } catch (err) {

@@ -7,8 +7,21 @@ import {
 } from "./actions";
 import type { OnboardingTone } from "@/lib/onboarding";
 import { TONE_LABELS } from "@/lib/onboarding";
+import {
+  VERTICAL_OPTIONS,
+  type BusinessVertical,
+} from "@/lib/vertical";
+import {
+  HANDOFF_OPTIONS,
+  type HandoffMode,
+} from "@/lib/handoffMode";
 
-const STEPS = ["Services & pricing", "Hours & location", "Tone of voice"] as const;
+const STEPS = [
+  "Business type",
+  "Services & pricing",
+  "Hours & location",
+  "Tone & handoff",
+] as const;
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
@@ -33,9 +46,13 @@ const initial: OnboardingState = {};
 
 export function OnboardingWizard({ businessName }: { businessName: string }) {
   const [step, setStep] = useState(0);
+  const [vertical, setVertical] = useState<BusinessVertical | "">("retail");
   const [servicesPricing, setServicesPricing] = useState("");
   const [hoursLocation, setHoursLocation] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [directions, setDirections] = useState("");
   const [tone, setTone] = useState<OnboardingTone | "">("");
+  const [handoffMode, setHandoffMode] = useState<HandoffMode>("callback");
   const [state, formAction, pending] = useActionState(completeOnboardingAction, initial);
   const [visible, setVisible] = useState(true);
 
@@ -54,9 +71,10 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
   }
 
   function canAdvance(): boolean {
-    if (step === 0) return servicesPricing.trim().length >= 12;
-    if (step === 1) return hoursLocation.trim().length >= 8;
-    if (step === 2) return Boolean(tone);
+    if (step === 0) return Boolean(vertical);
+    if (step === 1) return servicesPricing.trim().length >= 12;
+    if (step === 2) return hoursLocation.trim().length >= 8;
+    if (step === 3) return Boolean(tone);
     return false;
   }
 
@@ -108,13 +126,52 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
         ].join(" ")}
       >
+        <input type="hidden" name="vertical" value={vertical} />
         <input type="hidden" name="services_pricing" value={servicesPricing} />
         <input type="hidden" name="hours_location" value={hoursLocation} />
+        <input type="hidden" name="landmark" value={landmark} />
+        <input type="hidden" name="directions" value={directions} />
         <input type="hidden" name="tone" value={tone} />
+        <input type="hidden" name="handoff_mode" value={handoffMode} />
 
         {step === 0 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">Services & pricing</h2>
+            <h2 className="font-display text-2xl text-[var(--ink)]">Business type</h2>
+            <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
+              We train your receptionist for how {businessName} actually works. Start with
+              retail if you sell products.
+            </p>
+            <div className="mt-5 space-y-3">
+              {VERTICAL_OPTIONS.map((opt) => {
+                const selected = vertical === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setVertical(opt.id)}
+                    className={[
+                      "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
+                      selected
+                        ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
+                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                    ].join(" ")}
+                  >
+                    <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                    <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                      {opt.blurb}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {step === 1 ? (
+          <div>
+            <h2 className="font-display text-2xl text-[var(--ink)]">
+              {vertical === "retail" ? "Products & pricing" : "Services & pricing"}
+            </h2>
             <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
               What does {businessName} offer, and how should the receptionist talk about price?
             </p>
@@ -124,26 +181,9 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
               onChange={(e) => setServicesPricing(e.target.value)}
               rows={8}
               placeholder={
-                "e.g. Plumbing repairs, electrical fixes, and deep cleaning across Nairobi.\nPricing: we quote after understanding the job. Call-out from KES 1,500. M-Pesa and cash."
-              }
-              className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
-            />
-          </div>
-        ) : null}
-
-        {step === 1 ? (
-          <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">Hours & location</h2>
-            <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-              When are you open, and which areas do you cover?
-            </p>
-            <textarea
-              autoFocus
-              value={hoursLocation}
-              onChange={(e) => setHoursLocation(e.target.value)}
-              rows={7}
-              placeholder={
-                "e.g. Mon–Sat 8:00am–6:00pm EAT. Closed Sundays.\nService area: Nairobi, Kiambu, Ruiru. Note after-hours for callback."
+                vertical === "retail"
+                  ? "e.g. Phone accessories, chargers, and screen protectors.\nPricing: chargers from 500 KES. We can hold items with a name until evening. M-Pesa and cash."
+                  : "e.g. Plumbing repairs, electrical fixes, and deep cleaning across Nairobi.\nPricing: we quote after understanding the job. Call-out from KES 1,500. M-Pesa and cash."
               }
               className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
             />
@@ -152,30 +192,108 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
 
         {step === 2 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">Tone of voice</h2>
+            <h2 className="font-display text-2xl text-[var(--ink)]">Hours & location</h2>
             <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-              How should callers feel when they reach your AI receptionist?
+              When are you open, and how should callers find you?
             </p>
-            <div className="mt-5 space-y-3">
-              {TONE_OPTIONS.map((opt) => {
-                const selected = tone === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setTone(opt.id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
-                      selected
-                        ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
-                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                    ].join(" ")}
-                  >
-                    <span className="font-medium text-[var(--ink)]">{TONE_LABELS[opt.id]}</span>
-                    <span className="mt-1 block text-sm text-[var(--ink-soft)]">{opt.blurb}</span>
-                  </button>
-                );
-              })}
+            <textarea
+              autoFocus
+              value={hoursLocation}
+              onChange={(e) => setHoursLocation(e.target.value)}
+              rows={5}
+              placeholder={
+                "e.g. Mon–Sat 8:00am–6:00pm EAT. Closed Sundays.\nWestlands, Nairobi. We cover nearby estates."
+              }
+              className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+            />
+            <label className="mt-4 block text-sm font-medium text-[var(--ink)]" htmlFor="landmark">
+              Landmark (optional)
+            </label>
+            <input
+              id="landmark"
+              value={landmark}
+              onChange={(e) => setLandmark(e.target.value)}
+              placeholder="Opposite Naivas, next to the Shell"
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)]"
+            />
+            <label
+              className="mt-4 block text-sm font-medium text-[var(--ink)]"
+              htmlFor="directions"
+            >
+              Spoken directions (optional)
+            </label>
+            <textarea
+              id="directions"
+              value={directions}
+              onChange={(e) => setDirections(e.target.value)}
+              rows={3}
+              placeholder="From Waiyaki Way, turn at the Shell — we are on the left."
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+            />
+          </div>
+        ) : null}
+
+        {step === 3 ? (
+          <div className="space-y-8">
+            <div>
+              <h2 className="font-display text-2xl text-[var(--ink)]">Tone of voice</h2>
+              <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
+                How should callers feel when they reach your AI receptionist?
+              </p>
+              <div className="mt-5 space-y-3">
+                {TONE_OPTIONS.map((opt) => {
+                  const selected = tone === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTone(opt.id)}
+                      className={[
+                        "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
+                        selected
+                          ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
+                          : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                      ].join(" ")}
+                    >
+                      <span className="font-medium text-[var(--ink)]">
+                        {TONE_LABELS[opt.id]}
+                      </span>
+                      <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                        {opt.blurb}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ink)]">When a human is needed</h3>
+              <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                You can change this later in Business settings.
+              </p>
+              <div className="mt-3 space-y-3">
+                {HANDOFF_OPTIONS.map((opt) => {
+                  const selected = handoffMode === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setHandoffMode(opt.id)}
+                      className={[
+                        "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
+                        selected
+                          ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
+                          : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                      ].join(" ")}
+                    >
+                      <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                      <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                        {opt.blurb}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         ) : null}

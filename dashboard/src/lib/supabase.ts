@@ -24,7 +24,7 @@ export function getSupabaseAdmin(): SupabaseClient {
   return client;
 }
 
-export type LeadStatus = "new" | "contacted" | "resolved";
+export type LeadStatus = "new" | "contacted" | "resolved" | "archived";
 
 export type CallRow = {
   id: string;
@@ -41,7 +41,22 @@ export type CallRow = {
 };
 
 export function parseLeadStatus(raw: unknown): LeadStatus {
-  return raw === "contacted" || raw === "resolved" ? raw : "new";
+  if (raw === "contacted" || raw === "resolved" || raw === "archived") return raw;
+  return "new";
+}
+
+/** Owner-facing labels (DB values stay contacted/resolved/archived). */
+export function leadStatusLabel(status: LeadStatus): string {
+  switch (status) {
+    case "contacted":
+      return "Followed Up";
+    case "resolved":
+      return "Done";
+    case "archived":
+      return "Archived";
+    default:
+      return "New";
+  }
 }
 
 export type TranscriptRow = {
@@ -99,6 +114,34 @@ export type TenantRow = {
   llm_system_prompt: string | null;
   services_offered?: string | null;
   services_catalog?: ServiceCatalogEntry[] | null;
+  /** Retail/product rows — separate from services_catalog. */
+  product_catalog?: Array<{
+    name?: string;
+    sku?: string;
+    category?: string;
+    price?: string;
+    unit?: string;
+    in_stock?: string;
+    notes?: string;
+    aliases?: string[];
+  }> | null;
+  social_handles?: {
+    channels?: Array<{
+      kind?: string;
+      label?: string;
+      value?: string;
+    }>;
+    /** @deprecated flat legacy fields still normalized on read */
+    website?: string;
+    instagram?: string;
+    facebook?: string;
+    tiktok?: string;
+    twitter?: string;
+    youtube?: string;
+    whatsapp?: string;
+    phone?: string;
+    other?: string;
+  } | null;
   business_hours?: string | null;
   hours_schedule?: HoursScheduleRow | null;
   after_hours_mode?: "serve" | "message" | null;
@@ -110,9 +153,41 @@ export type TenantRow = {
   daily_bulletin?: DailyBulletinEntry[] | null;
   /** Receptionist tool toggles: escalate, end_call. */
   agent_tools?: { escalate?: boolean; end_call?: boolean } | null;
+  /** Business pack: general | retail | home_services | hospitality */
+  vertical?: string | null;
+  /** Human handoff: callback | live_transfer */
+  handoff_mode?: string | null;
+  business_locations?: Array<{
+    label?: string;
+    address?: string;
+    landmark?: string;
+    directions?: string;
+    coverage_notes?: string;
+  }> | null;
+  business_policies?: {
+    returns?: string;
+    delivery?: string;
+    payment?: string;
+    deposit?: string;
+    cancellation?: string;
+    warranty?: string;
+    other?: string;
+  } | null;
+  /** Per-tenant TTS pronunciation overrides: [{match, say, priority?}]. */
+  tts_lexicon?: Array<{
+    match?: string;
+    say?: string;
+    langs?: string[];
+    priority?: number;
+  }> | null;
   wallet_balance_kes?: number | null;
   wallet_low_balance_kes?: number | null;
   billing_enforcement?: "soft" | "hard" | "off" | null;
+  /** Owner opt-in monthly soft spend budget (warn only). */
+  soft_spend_limit_enabled?: boolean | null;
+  soft_spend_limit_kes?: number | null;
+  /** Owner opt-in: continue charging after prepaid hits zero. */
+  on_demand_usage_enabled?: boolean | null;
   /** @deprecated Prefer wallet_balance_kes */
   telecom_wallet_balance_kes?: number | null;
   /** @deprecated AI bundled into wallet_balance_kes */
