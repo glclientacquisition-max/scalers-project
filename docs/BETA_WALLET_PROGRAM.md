@@ -11,6 +11,7 @@
 New workspaces default to **`off`** (beta).
 
 Ops graduates a workspace: Admin → **Wallets** → Plan → `soft` (or `hard`).
+The Plan panel confirms before leaving beta (real charges start) and before waiving a negative balance on return to beta.
 
 When moving to beta, ops can **waive negative balance** (trial credit) so soft-era debt disappears.
 

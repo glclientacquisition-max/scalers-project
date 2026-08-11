@@ -83,10 +83,13 @@ Run npm run test:voice before finishing.
 Task: <one concrete voice bug or improvement>
 ```
 
+## Speed & consistency
+
+Program plan: [`VOICE_SPEED_CONSISTENCY.md`](./VOICE_SPEED_CONSISTENCY.md)  
+Target: first audible audio usually **≤ 800–1200 ms** after the caller stops, with stable pacing.
+
 ## Good first tickets
 
-- Tighten barge-in false positives / missed interrupts
-- Faster first audio (filler + stream buffer tuning)
+- Phase 2 from `VOICE_SPEED_CONSISTENCY.md` (media clear, interim barge, cached ack PCM)
 - Kenya TTS pronunciation edge cases (money, names, Sheng)
-- STT endpointing / adaptive flush for short yes/no answers
 - Extract media session from `server.js` toward `src/telephony/mediaStreamHandler.js` without behavior change

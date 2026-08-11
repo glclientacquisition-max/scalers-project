@@ -41,6 +41,28 @@ import {
   FAQ_STARTERS,
   normalizeFaqKey,
 } from "@/lib/faqs";
+import {
+  parseVertical,
+  VERTICAL_OPTIONS,
+  type BusinessVertical,
+} from "@/lib/vertical";
+import {
+  HANDOFF_OPTIONS,
+  parseHandoffMode,
+  type HandoffMode,
+} from "@/lib/handoffMode";
+import {
+  emptyLocation,
+  LOCATIONS_MAX,
+  normalizeBusinessLocations,
+  type BusinessLocation,
+} from "@/lib/businessLocations";
+import {
+  emptyPolicies,
+  normalizeBusinessPolicies,
+  POLICY_FIELDS,
+  type BusinessPolicies,
+} from "@/lib/businessPolicies";
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
@@ -154,6 +176,33 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
   const [afterHoursMode, setAfterHoursMode] = useState<AfterHoursMode>(() =>
     parseAfterHoursMode(tenant.after_hours_mode)
   );
+  const [vertical, setVertical] = useState<BusinessVertical>(() =>
+    parseVertical(tenant.vertical)
+  );
+  const [handoffMode, setHandoffMode] = useState<HandoffMode>(() =>
+    parseHandoffMode(tenant.handoff_mode)
+  );
+  const [locations, setLocations] = useState<BusinessLocation[]>(() => {
+    const rows = normalizeBusinessLocations(tenant.business_locations);
+    if (rows.length) return rows;
+    const fallback =
+      scheduleForForm(tenant.hours_schedule, "").location ||
+      extractLocationFallback(tenant.business_hours || "");
+    return fallback
+      ? [
+          {
+            label: "Main",
+            address: fallback,
+            landmark: "",
+            directions: "",
+            coverage_notes: "",
+          },
+        ]
+      : [emptyLocation()];
+  });
+  const [policies, setPolicies] = useState<BusinessPolicies>(() =>
+    normalizeBusinessPolicies(tenant.business_policies)
+  );
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -191,6 +240,21 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       ),
     [faqs]
   );
+  const locationsJson = useMemo(
+    () =>
+      JSON.stringify(
+        locations.filter(
+          (loc) =>
+            loc.label.trim() ||
+            loc.address.trim() ||
+            loc.landmark.trim() ||
+            loc.directions.trim() ||
+            loc.coverage_notes.trim()
+        )
+      ),
+    [locations]
+  );
+  const policiesJson = useMemo(() => JSON.stringify(policies), [policies]);
   const faqDupIndexes = useMemo(() => {
     const seen = new Map<string, number>();
     const dups = new Set<number>();
@@ -260,6 +324,16 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
     );
   }
 
+  function updateLocation(
+    index: number,
+    key: keyof BusinessLocation,
+    value: string
+  ) {
+    setLocations((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+    );
+  }
+
   const bulkPreview = useMemo(
     () => parseBulkServices(bulkServicesText),
     [bulkServicesText]
@@ -325,6 +399,10 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
       <input type="hidden" name="location_notes" value={locationNotes} />
       <input type="hidden" name="after_hours_mode" value={afterHoursMode} />
+      <input type="hidden" name="vertical" value={vertical} />
+      <input type="hidden" name="handoff_mode" value={handoffMode} />
+      <input type="hidden" name="business_locations" value={locationsJson} />
+      <input type="hidden" name="business_policies" value={policiesJson} />
       <input type="hidden" name="agent_name" value={agentName} />
       <input type="hidden" name="agent_tone" value={tone} />
       <input type="hidden" name="unknown_answer_fallback" value={unknownFallback} />
@@ -341,6 +419,36 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Give your digital employee a name and voice so callers hear a real receptionist.
           </p>
+        </div>
+
+        <div>
+          <p className="block text-sm font-medium">Business type</p>
+          <p className="mt-1 text-xs text-[var(--ink-soft)]">
+            Chooses how the receptionist is trained. Retail first; home services next.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {VERTICAL_OPTIONS.map((opt) => {
+              const selected = vertical === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setVertical(opt.id)}
+                  className={[
+                    "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
+                    selected
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                  ].join(" ")}
+                >
+                  <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                  <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                    {opt.blurb}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -707,18 +815,164 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
               );
             })}
           </div>
-          <div>
-            <label className="block text-sm font-medium" htmlFor="location_notes">
-              Location &amp; coverage
-            </label>
-            <textarea
-              id="location_notes"
-              value={locationNotes}
-              onChange={(e) => setLocationNotes(e.target.value)}
-              rows={2}
-              placeholder="e.g. Westlands, Nairobi. We cover Kiambu and Ruiru."
-              className={`${fieldClass} leading-relaxed`}
-            />
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-medium text-[var(--ink)]">
+                  Locations &amp; directions
+                </h3>
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                  Landmark-first directions callers can use on the phone.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={locations.length >= LOCATIONS_MAX}
+                onClick={() =>
+                  setLocations((prev) =>
+                    prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
+                  )
+                }
+                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
+              >
+                Add location
+              </button>
+            </div>
+            <div className="space-y-4">
+              {locations.map((loc, index) => (
+                <div
+                  key={`loc-${index}`}
+                  className="space-y-3 rounded-xl border border-[var(--line)] bg-white/60 p-4"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-[var(--ink-soft)]"
+                        htmlFor={`loc-label-${index}`}
+                      >
+                        Label
+                      </label>
+                      <input
+                        id={`loc-label-${index}`}
+                        value={loc.label}
+                        onChange={(e) => {
+                          updateLocation(index, "label", e.target.value);
+                          if (index === 0) {
+                            setLocationNotes(
+                              [e.target.value, loc.address, loc.landmark]
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .join(" — ") || locationNotes
+                            );
+                          }
+                        }}
+                        placeholder="Main shop"
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-[var(--ink-soft)]"
+                        htmlFor={`loc-landmark-${index}`}
+                      >
+                        Landmark
+                      </label>
+                      <input
+                        id={`loc-landmark-${index}`}
+                        value={loc.landmark}
+                        onChange={(e) => {
+                          updateLocation(index, "landmark", e.target.value);
+                          if (index === 0) {
+                            const next = {
+                              ...loc,
+                              landmark: e.target.value,
+                            };
+                            setLocationNotes(
+                              [next.label, next.address, next.landmark]
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .join(" — ")
+                            );
+                          }
+                        }}
+                        placeholder="Opposite Naivas, next to…"
+                        className={fieldClass}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`loc-address-${index}`}
+                    >
+                      Address / area
+                    </label>
+                    <input
+                      id={`loc-address-${index}`}
+                      value={loc.address}
+                      onChange={(e) => {
+                        updateLocation(index, "address", e.target.value);
+                        if (index === 0) {
+                          const next = { ...loc, address: e.target.value };
+                          setLocationNotes(
+                            [next.label, next.address, next.landmark]
+                              .map((s) => s.trim())
+                              .filter(Boolean)
+                              .join(" — ")
+                          );
+                        }
+                      }}
+                      placeholder="Westlands, Nairobi"
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`loc-directions-${index}`}
+                    >
+                      Directions (spoken)
+                    </label>
+                    <textarea
+                      id={`loc-directions-${index}`}
+                      value={loc.directions}
+                      onChange={(e) => updateLocation(index, "directions", e.target.value)}
+                      rows={2}
+                      placeholder="From Waiyaki Way, turn at the Shell — we are on the left."
+                      className={`${fieldClass} leading-relaxed`}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-xs font-medium text-[var(--ink-soft)]"
+                      htmlFor={`loc-coverage-${index}`}
+                    >
+                      Coverage notes
+                    </label>
+                    <input
+                      id={`loc-coverage-${index}`}
+                      value={loc.coverage_notes}
+                      onChange={(e) =>
+                        updateLocation(index, "coverage_notes", e.target.value)
+                      }
+                      placeholder="We also cover Kiambu and Ruiru"
+                      className={fieldClass}
+                    />
+                  </div>
+                  {locations.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLocations((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      className="text-xs text-[var(--warn)] hover:underline"
+                    >
+                      Remove location
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
@@ -749,6 +1003,37 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
                 );
               })}
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
+              Exact rules the receptionist may speak — leave blank if unused.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {POLICY_FIELDS.map((field) => (
+              <div key={field.id} className={field.id === "other" ? "sm:col-span-2" : ""}>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor={`policy-${field.id}`}
+                >
+                  {field.label}
+                </label>
+                <textarea
+                  id={`policy-${field.id}`}
+                  value={policies[field.id]}
+                  onChange={(e) =>
+                    setPolicies((prev) => ({ ...prev, [field.id]: e.target.value }))
+                  }
+                  rows={2}
+                  placeholder={field.placeholder}
+                  className={`${fieldClass} leading-relaxed`}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -788,6 +1073,39 @@ export function TenantForm({ tenant }: { tenant: TenantRow }) {
             Turn capabilities on or off. Saving a caller&apos;s name and reason always
             stays on so you never miss a lead.
           </p>
+        </div>
+        <div className="space-y-2">
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">When a human is needed</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              Callback works today. Live transfer uses callback until telephony transfer ships.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Handoff mode">
+            {HANDOFF_OPTIONS.map((opt) => {
+              const selected = handoffMode === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setHandoffMode(opt.id)}
+                  className={[
+                    "w-full text-left rounded-xl border px-4 py-3 transition",
+                    selected
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                  ].join(" ")}
+                >
+                  <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                  <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                    {opt.blurb}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="space-y-4">
           {AGENT_TOOL_OPTIONS.map((opt) => {

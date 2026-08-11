@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   parseLeadStatus,
   parseSummary,
@@ -55,6 +56,28 @@ function toLead(call: CallRow): Lead {
   };
 }
 
+const STATUS_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "new", label: "New" },
+  { id: "contacted", label: "Contacted" },
+  { id: "resolved", label: "Resolved" },
+] as const;
+
+type StatusFilterId = (typeof STATUS_FILTERS)[number]["id"];
+
+function parseStatusFilter(raw: string | undefined): StatusFilterId {
+  if (raw === "new" || raw === "contacted" || raw === "resolved") return raw;
+  return "all";
+}
+
+function callsHref(opts: { status?: StatusFilterId; page?: number } = {}): string {
+  const q = new URLSearchParams();
+  if (opts.status && opts.status !== "all") q.set("status", opts.status);
+  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  const qs = q.toString();
+  return qs ? `/calls?${qs}` : "/calls";
+}
+
 function Kpi({
   label,
   value,
@@ -63,7 +86,7 @@ function Kpi({
 }: {
   label: string;
   value: string | number;
-  hint?: string;
+  hint?: ReactNode;
   warn?: boolean;
 }) {
   return (
@@ -83,9 +106,9 @@ function Kpi({
         {value}
       </p>
       {hint ? (
-        <p className={["mt-1 text-xs", warn ? "text-[var(--warn)]" : "text-[var(--ink-soft)]"].join(" ")}>
+        <div className={["mt-1 text-xs", warn ? "text-[var(--warn)]" : "text-[var(--ink-soft)]"].join(" ")}>
           {hint}
-        </p>
+        </div>
       ) : null}
     </div>
   );
@@ -96,11 +119,13 @@ function KpiStrip({
   todayCount,
   newCount,
   capturedOnPage,
+  statusFilter,
 }: {
   tenant: TenantRow;
   todayCount: number;
   newCount: number;
   capturedOnPage: number;
+  statusFilter: StatusFilterId;
 }) {
   const kes = Number(
     tenant.wallet_balance_kes ??
@@ -114,7 +139,22 @@ function KpiStrip({
       <Kpi
         label="Today's calls"
         value={todayCount}
-        hint={newCount > 0 ? `${newCount} waiting for follow-up` : "All followed up"}
+        hint={
+          newCount > 0 ? (
+            statusFilter === "new" ? (
+              `${newCount} waiting for follow-up`
+            ) : (
+              <Link
+                href={callsHref({ status: "new" })}
+                className="font-medium underline decoration-warn/40 underline-offset-2 transition hover:decoration-warn focus-visible:outline-none focus-visible:shadow-focus"
+              >
+                {newCount} waiting for follow-up — show New
+              </Link>
+            )
+          ) : (
+            "All followed up"
+          )
+        }
         warn={newCount > 0}
       />
       <Kpi label="Leads shown" value={capturedOnPage} hint="Name or reason on this page" />
@@ -130,19 +170,90 @@ function KpiStrip({
   );
 }
 
+function StatusFilterNav({
+  active,
+  counts,
+}: {
+  active: StatusFilterId;
+  counts: { all: number; new: number; contacted: number; resolved: number };
+}) {
+  return (
+    <nav
+      aria-label="Filter by follow-up status"
+      className="mt-6 border-b border-line"
+    >
+      <ul className="flex gap-1 overflow-x-auto">
+        {STATUS_FILTERS.map((item) => {
+          const isActive = active === item.id;
+          const count = counts[item.id];
+          return (
+            <li key={item.id}>
+              <Link
+                href={callsHref({ status: item.id })}
+                aria-current={isActive ? "page" : undefined}
+                className={[
+                  "inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
+                  isActive
+                    ? "border-accent text-accent-deep"
+                    : "border-transparent text-ink-soft hover:border-line hover:text-ink",
+                ].join(" ")}
+              >
+                {item.label}
+                <span
+                  className={[
+                    "tabular-nums text-xs",
+                    isActive ? "text-accent-deep" : "text-ink-soft",
+                  ].join(" ")}
+                >
+                  {count}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 function EmptyCalls({
   total,
   pendingDid,
   did,
+  statusFilter,
 }: {
   total: number;
   pendingDid: boolean;
   did: string;
+  statusFilter: StatusFilterId;
 }) {
   if (total > 0) {
     return (
       <div className="mt-6 rounded-2xl border border-line bg-surface px-4 py-10 text-center text-ink-soft">
         No calls on this page.
+      </div>
+    );
+  }
+
+  if (statusFilter !== "all") {
+    const label =
+      statusFilter === "new"
+        ? "new leads"
+        : statusFilter === "contacted"
+          ? "contacted leads"
+          : "resolved leads";
+    return (
+      <div className="mt-6 rounded-2xl border border-line bg-surface px-4 py-10 text-center">
+        <p className="font-display text-xl tracking-tight text-ink">No {label}</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+          Nothing in this follow-up bucket right now. Switch filters to see other calls.
+        </p>
+        <Link
+          href={callsHref()}
+          className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-accent-deep transition hover:border-accent focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          Show all calls
+        </Link>
       </div>
     );
   }
@@ -210,10 +321,11 @@ const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 export default async function CallsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; status?: string }>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
+  const statusFilter = parseStatusFilter(sp.status);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
@@ -242,11 +354,18 @@ export default async function CallsPage({
   let leadStatusReady = true;
   const dayStart = nairobiDayStartIso();
   const client = workspace.client;
+  const effectiveFilter: StatusFilterId = statusFilter;
 
-  let first = await client
+  let listQuery = client
     .from("calls")
     .select(CALL_SELECT, { count: "exact" })
-    .eq("tenant_id", tenant.id)
+    .eq("tenant_id", tenant.id);
+
+  if (effectiveFilter !== "all") {
+    listQuery = listQuery.eq("lead_status", effectiveFilter);
+  }
+
+  const first = await listQuery
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -280,18 +399,31 @@ export default async function CallsPage({
     );
   }
 
-  const [todayRes, newRes] = await Promise.all([
+  const statusCountQuery = (status: LeadStatus) =>
+    client
+      .from("calls")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("lead_status", status);
+
+  const [todayRes, allRes, newRes, contactedRes, resolvedRes] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
+    client
+      .from("calls")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id),
     leadStatusReady
-      ? client
-          .from("calls")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenant.id)
-          .eq("lead_status", "new")
+      ? statusCountQuery("new")
+      : Promise.resolve({ count: 0, error: null }),
+    leadStatusReady
+      ? statusCountQuery("contacted")
+      : Promise.resolve({ count: 0, error: null }),
+    leadStatusReady
+      ? statusCountQuery("resolved")
       : Promise.resolve({ count: 0, error: null }),
   ]);
 
@@ -299,6 +431,15 @@ export default async function CallsPage({
   const capturedOnPage = leads.filter((l) => l.name || l.reason).length;
   const todayCount = todayRes.count ?? 0;
   const newCount = newRes.count ?? 0;
+  const statusCounts = {
+    all: allRes.count ?? 0,
+    new: newCount,
+    contacted: contactedRes.count ?? 0,
+    resolved: resolvedRes.count ?? 0,
+  };
+  const activeFilter = leadStatusReady ? effectiveFilter : "all";
+  const paginationParams =
+    activeFilter !== "all" ? { status: activeFilter } : undefined;
 
   return (
     <div>
@@ -318,6 +459,7 @@ export default async function CallsPage({
         todayCount={todayCount}
         newCount={newCount}
         capturedOnPage={capturedOnPage}
+        statusFilter={activeFilter}
       />
 
       {!leadStatusReady ? (
@@ -325,13 +467,16 @@ export default async function CallsPage({
           Lead statuses need a one-time database update. Apply{" "}
           <code>docs/supabase/lead_status.sql</code> in Supabase.
         </p>
-      ) : null}
+      ) : (
+        <StatusFilterNav active={activeFilter} counts={statusCounts} />
+      )}
 
       {leads.length === 0 ? (
         <EmptyCalls
           total={total}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
           did={tenant.sautikit_virtual_number}
+          statusFilter={activeFilter}
         />
       ) : (
         <>
@@ -438,7 +583,13 @@ export default async function CallsPage({
             </table>
           </div>
 
-          <Pagination page={page} pageSize={PAGE_SIZE} total={total} href="/calls" />
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            href="/calls"
+            params={paginationParams}
+          />
         </>
       )}
     </div>

@@ -62,6 +62,15 @@ test('early comma flush for first audio', () => {
   assert.match(chunks[0], /Sure,/);
 });
 
+test('early word-window flush for first audio', () => {
+  const { chunks, rest } = splitSpeakableChunks(
+    'We can send someone this afternoon if that works',
+    { final: false, earlyFlushChars: 18, earlyFlushWords: 5 }
+  );
+  assert.deepStrictEqual(chunks, ['We can send someone this']);
+  assert.strictEqual(rest, 'afternoon if that works');
+});
+
 console.log('createSpokenStreamBuffer');
 test('streams sentence then tools without speaking markers', () => {
   const buf = createSpokenStreamBuffer({ earlyFlushChars: 80 });

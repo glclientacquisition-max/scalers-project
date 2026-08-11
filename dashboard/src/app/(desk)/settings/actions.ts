@@ -18,6 +18,16 @@ import {
 } from "@/lib/servicesCatalog";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseAgentTools } from "@/lib/agentTools";
+import { parseVertical } from "@/lib/vertical";
+import { parseHandoffMode } from "@/lib/handoffMode";
+import {
+  formatLocationsForCompiler,
+  parseBusinessLocationsField,
+} from "@/lib/businessLocations";
+import {
+  formatPoliciesForCompiler,
+  parseBusinessPoliciesField,
+} from "@/lib/businessPolicies";
 
 export type SettingsCompileState = {
   error?: string;
@@ -71,12 +81,22 @@ export async function saveAndCompileSettings(
   const hoursSchedule = parseHoursSchedule(formData.get("hours_schedule"));
   const locationNotes = String(formData.get("location_notes") || "").trim();
   const afterHoursMode = parseAfterHoursMode(formData.get("after_hours_mode"));
+  const vertical = parseVertical(formData.get("vertical"));
+  const handoffMode = parseHandoffMode(formData.get("handoff_mode"));
+  const businessLocations = parseBusinessLocationsField(
+    formData.get("business_locations")
+  );
+  const businessPolicies = parseBusinessPoliciesField(
+    formData.get("business_policies")
+  );
   const scheduleForSave = hoursSchedule
     ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
     : null;
   const businessHours =
     formatHoursForCompiler(scheduleForSave) ||
     String(formData.get("business_hours") || "").trim();
+  const locationsText = formatLocationsForCompiler(businessLocations);
+  const policiesText = formatPoliciesForCompiler(businessPolicies);
 
   if (!businessName) {
     return { error: "Business name is required." };
@@ -119,6 +139,10 @@ export async function saveAndCompileSettings(
     faqs,
     unknownAnswerFallback,
     escalateEnabled: agentTools.escalate,
+    vertical,
+    handoffMode,
+    locationsText,
+    policiesText,
   });
 
   const workspace = await createWorkspaceDataClient();
@@ -141,12 +165,21 @@ export async function saveAndCompileSettings(
     faqs,
     unknown_answer_fallback: unknownAnswerFallback || null,
     agent_tools: agentTools,
+    vertical,
+    handoff_mode: handoffMode,
+    business_locations: businessLocations,
+    business_policies: businessPolicies,
     llm_system_prompt: prompt,
   };
 
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
 
   if (error) {
+    if (/vertical|handoff_mode|business_locations|business_policies/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/business_operating_model.sql in Supabase.`,
+      };
+    }
     if (/alert_email/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/alert_email.sql in Supabase.`,

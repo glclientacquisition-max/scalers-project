@@ -36,13 +36,23 @@ function stripMarkersForSpeech(raw, opts = {}) {
 
 /**
  * Split speakable text into completed sentences; keep the remainder.
+ * Prefers early first-audio: short clauses / word windows before a full sentence.
  * @param {string} text
- * @param {{ final?: boolean, earlyFlushChars?: number }} [opts]
+ * @param {{ final?: boolean, earlyFlushChars?: number, earlyFlushWords?: number }} [opts]
  * @returns {{ chunks: string[], rest: string }}
  */
 function splitSpeakableChunks(text, opts = {}) {
   const final = Boolean(opts.final);
-  const earlyFlushChars = Number(opts.earlyFlushChars || 28);
+  const earlyFlushChars = Number(
+    opts.earlyFlushChars != null
+      ? opts.earlyFlushChars
+      : process.env.VOICE_STREAM_EARLY_CHARS || 18
+  );
+  const earlyFlushWords = Number(
+    opts.earlyFlushWords != null
+      ? opts.earlyFlushWords
+      : process.env.VOICE_STREAM_EARLY_WORDS || 5
+  );
   const src = String(text || '').replace(/\s+/g, ' ').trim();
   if (!src) return { chunks: [], rest: '' };
 
@@ -70,6 +80,21 @@ function splitSpeakableChunks(text, opts = {}) {
     }
   }
 
+  // Second boost: if still no sentence/comma flush, speak the first N words once
+  // we have a stable clause-sized window (keeps first audio under ~1s).
+  if (!final && !chunks.length && rest) {
+    const words = rest.split(/\s+/).filter(Boolean);
+    if (words.length >= earlyFlushWords && rest.length >= earlyFlushChars) {
+      const head = words.slice(0, earlyFlushWords).join(' ');
+      const tail = words.slice(earlyFlushWords).join(' ');
+      // Avoid flushing mid-toolish fragments or tiny acknowledgements alone.
+      if (head.length >= 10 && !/[,:;]$/.test(head)) {
+        chunks.push(head);
+        rest = tail;
+      }
+    }
+  }
+
   if (final && rest) {
     chunks.push(rest);
     rest = '';
@@ -85,6 +110,7 @@ function createSpokenStreamBuffer(opts = {}) {
   let raw = '';
   let emittedSpoken = '';
   const earlyFlushChars = opts.earlyFlushChars;
+  const earlyFlushWords = opts.earlyFlushWords;
 
   /**
    * @param {string} delta
@@ -108,7 +134,7 @@ function createSpokenStreamBuffer(opts = {}) {
 
     const { chunks, rest } = splitSpeakableChunks(
       emittedSpoken ? `${pending}` : speakable,
-      { final, earlyFlushChars }
+      { final, earlyFlushChars, earlyFlushWords }
     );
 
     // When emittedSpoken is set, splitSpeakableChunks already got only pending.

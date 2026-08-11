@@ -1,4 +1,5 @@
 -- Live Supabase schema (introspected 2026-08-06) for MISSED-CALL-PROJECT.
+-- REFERENCE ONLY — not an apply migration. See docs/supabase/README.md for apply order.
 -- App code in src/db.js maps to these tables. Do not invent alternate names.
 
 -- tenants
@@ -18,6 +19,10 @@
 --   hours_schedule jsonb    (weekly open hours; hours_schedule.sql — used live for open/closed)
 --   after_hours_mode text   (serve | message; after_hours_mode.sql)
 --   services_catalog jsonb  ([{name, price_range, notes, out_of_scope}]; services_catalog.sql)
+--   vertical text           (general | retail | home_services | hospitality; business_operating_model.sql)
+--   handoff_mode text       (callback | live_transfer; business_operating_model.sql)
+--   business_locations jsonb ([{label,address,landmark,directions,coverage_notes}])
+--   business_policies jsonb ({returns,delivery,payment,deposit,cancellation,warranty,other})
 --   daily_bulletin jsonb    ([{id,text,active,starts_at,ends_at}]; daily_bulletin.sql)
 --   voice_languages text[]  (auto: en, sw, sheng — see voice_languages.sql; locals later)
 --   voice_language_other text  (reserved)
@@ -40,6 +45,15 @@
 --   note text
 --   metadata jsonb
 --   owner_user_id uuid → auth.users.id  (added in multi_tenant_onboarding.sql)
+--
+-- contacts  (see contacts_and_requests.sql)
+--   id uuid PK, tenant_id, phone, name, notes, last_reason, metadata, timestamps
+--
+-- service_requests  (see contacts_and_requests.sql)
+--   id uuid PK, tenant_id, contact_id, call_id
+--   request_type (hold|enquiry|order|callback|other)
+--   status (open|fulfilled|cancelled)
+--   item, quantity, when_text, notes, caller_name, caller_phone, metadata
 --
 -- tenant_members  (user ↔ tenant mapping; see multi_tenant_onboarding.sql)
 --   id uuid PK

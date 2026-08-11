@@ -5,10 +5,12 @@ const assert = require('assert');
 const {
   looksLikeEcho,
   utteranceLooksIncomplete,
+  isInterruptOnlyUtterance,
   adaptiveFlushMs,
   evaluateBargeIn,
   hasBargeContent,
   agentAwaitingReply,
+  classifyFinalDuringAgentSpeech,
 } = require('../src/speech/turnTaking');
 
 let passed = 0;
@@ -54,9 +56,28 @@ test('flags trailing conjunctions', () => {
   assert.strictEqual(utteranceLooksIncomplete('I need help with'), true);
   assert.strictEqual(utteranceLooksIncomplete('Nina shida na'), true);
 });
+test('flags STT period stuck on trailing and', () => {
+  assert.strictEqual(
+    utteranceLooksIncomplete('I\'d like to make a booking of an executive room,and.'),
+    true
+  );
+  assert.strictEqual(utteranceLooksIncomplete('I need a room, and.'), true);
+});
 test('complete sentences are complete', () => {
   assert.strictEqual(utteranceLooksIncomplete('I need a plumber.'), false);
   assert.strictEqual(utteranceLooksIncomplete('My name is John'), false);
+});
+
+console.log('isInterruptOnlyUtterance');
+test('detects wait/stop only turns', () => {
+  assert.strictEqual(isInterruptOnlyUtterance('Wait.'), true);
+  assert.strictEqual(isInterruptOnlyUtterance('Stop, stop, stop.'), true);
+  assert.strictEqual(isInterruptOnlyUtterance('No wait'), true);
+  assert.strictEqual(isInterruptOnlyUtterance('Wait.Wait.'), true);
+});
+test('does not treat real requests as interrupt-only', () => {
+  assert.strictEqual(isInterruptOnlyUtterance('Wait, my name is Ann'), false);
+  assert.strictEqual(isInterruptOnlyUtterance('I need an executive room'), false);
 });
 
 console.log('adaptiveFlushMs');
@@ -164,6 +185,27 @@ test('hasBargeContent / agentAwaitingReply', () => {
   assert.strictEqual(hasBargeContent('mm'), false);
   assert.strictEqual(agentAwaitingReply('Was that John?'), true);
   assert.strictEqual(agentAwaitingReply('We are open today.'), false);
+});
+
+console.log('classifyFinalDuringAgentSpeech');
+test('drops echo finals during agent speech', () => {
+  assert.strictEqual(
+    classifyFinalDuringAgentSpeech(
+      'call you back shortly',
+      'Someone will call you back shortly.'
+    ),
+    'drop_echo'
+  );
+});
+test('queues real overlap finals during agent speech', () => {
+  assert.strictEqual(
+    classifyFinalDuringAgentSpeech('My name is Ann', 'How can I help you today?'),
+    'queue'
+  );
+  assert.strictEqual(
+    classifyFinalDuringAgentSpeech('yes', 'Was that John?'),
+    'queue'
+  );
 });
 
 if (process.exitCode) {

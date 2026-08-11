@@ -23,6 +23,8 @@ export default async function AdminWalletsPage() {
         <h1 className="font-display text-3xl tracking-tight">Wallets</h1>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
           Manage prepaid balances and beta whitelist. Beta workspaces are metered but not charged.
+          Graduating a workspace to prepaid requires confirmation — set the ops actor field to your name
+          before credits or plan changes.
         </p>
       </div>
       <AdminWalletsPanel {...overview} />

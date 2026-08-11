@@ -34,7 +34,7 @@ Also owns: merge conflicts on shared files; defining new stable function signatu
    `upsertCall`, `saveCallerInfo`, `appendTranscript`, `attachRecording`, `getCall`, `markWhatsappSent`, `updateCallStatus`, `chargeCallToWallet`, `getTenantProfile`, …
 2. Voice engine + Super Admin + signup provisioner use **service role**; owners use Auth JWT + **RLS**.
 3. Never put service role in `NEXT_PUBLIC_*` or client bundles.
-4. SQL files are additive/ordered; document apply order in the migration header + relevant docs.
+4. SQL files are additive/ordered; document apply order in the migration header + [`docs/supabase/README.md`](../supabase/README.md).
 5. Tenant isolation via `tenant_members`; no cross-tenant leaks in owner policies.
 6. Prefer expanding `src/db.js` behind old names over breaking `server.js` call sites.
 7. Deploy split stays: voice on Railway/Render; desk on Vercel (`dashboard` root).
@@ -61,7 +61,7 @@ Task: <one concrete platform / schema / auth / deploy change>
 
 ## Good first tickets
 
-- Documented apply-order index for all `docs/supabase/*.sql`
+- ~~Documented apply-order index for all `docs/supabase/*.sql`~~ → [`docs/supabase/README.md`](../supabase/README.md)
 - Harden owner RLS gaps on new tables
 - Extract remaining storage helpers with zero behavior change
 - Environment matrix sync (root `.env.example` ↔ dashboard `.env.example`)

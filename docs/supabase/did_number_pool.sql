@@ -1,5 +1,6 @@
 -- Phase C: SautiKit DID number pool
--- Run in the Supabase SQL editor AFTER seeding available numbers.
+-- Run after multi_tenant_onboarding.sql (needs public.tenants).
+-- Then seed available numbers (see docs/PRODUCTION_DID_POOL.md).
 --
 -- MVP: pre-buy DIDs in SautiKit console, point voice/events webhooks at Railway,
 -- insert them here as status='available'. Signup assigns the next free DID.

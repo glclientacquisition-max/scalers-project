@@ -104,18 +104,48 @@ function formatUnknownAnswerPolicy(customLine = '') {
  */
 function buildLiveGroundTruth(profile = {}) {
   const { parseAgentTools } = require('./agentTools');
+  const { parseVertical } = require('./vertical');
+  const { parseHandoffMode } = require('./handoffMode');
+  const { normalizeLocations, formatLocationsBlock } = require('./businessLocations');
+  const {
+    normalizePolicies,
+    policiesHaveContent,
+    formatPoliciesBlock,
+  } = require('./businessPolicies');
+
   const services = normalizeServices(profile.servicesCatalog);
   const faqs = normalizeFaqs(profile.faqs);
   const team = normalizeTeam(profile.teamDirectory);
+  const locations = normalizeLocations(profile.businessLocations);
+  const policies = normalizePolicies(profile.businessPolicies);
   const unknown = String(profile.unknownAnswerFallback || '').trim();
   const extras = String(profile.servicesNotes || profile.servicesOffered || '').trim();
   const tools = parseAgentTools(profile.agentTools);
+  const vertical = parseVertical(profile.vertical);
+  const handoffMode = parseHandoffMode(profile.handoffMode);
 
-  const hasAny = services.length || faqs.length || team.length || unknown || extras;
+  const hasAny =
+    services.length ||
+    faqs.length ||
+    team.length ||
+    locations.length ||
+    policiesHaveContent(policies) ||
+    unknown ||
+    extras;
   if (!hasAny) return '';
 
   const parts = [
     'LIVE GROUND TRUTH (highest priority facts — if this conflicts with older prompt text, follow THIS):',
+    '',
+    `BUSINESS VERTICAL: ${vertical}`,
+    `HANDOFF MODE: ${handoffMode}${
+      handoffMode === 'live_transfer'
+        ? ' (prefer connecting a human when asked; if transfer is unavailable, take a callback note and escalate)'
+        : ' (notify via WhatsApp/email callback — do not claim a live transfer)'
+    }`,
+    '',
+    'LOCATIONS & DIRECTIONS:',
+    formatLocationsBlock(locations),
     '',
     'SERVICES CATALOG:',
     formatServicesBlock(services),
@@ -130,6 +160,8 @@ function buildLiveGroundTruth(profile = {}) {
   } else if (extras && !services.length) {
     parts.push('', 'SERVICE NOTES:', extras);
   }
+
+  parts.push('', 'POLICIES:', formatPoliciesBlock(policies));
 
   parts.push('', 'GOLDEN FAQs (answer these exactly when asked):', formatFaqsBlock(faqs));
 
@@ -164,7 +196,8 @@ function buildLiveGroundTruth(profile = {}) {
 
   parts.push(
     '',
-    'Never invent prices, services, people, or FAQ answers outside this ground truth.'
+    'Never invent prices, stock, availability, services, locations, policies, people, or FAQ answers outside this ground truth.',
+    'Resolve the caller\'s request from this truth when you can. Capture a clear next step. Only hand off when the playbook or caller requires a human.'
   );
 
   return parts.filter((p, i, arr) => !(p === '' && arr[i - 1] === '')).join('\n');

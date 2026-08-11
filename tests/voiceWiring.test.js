@@ -20,4 +20,58 @@ assert.match(
   'spoken technical fallbacks must also be persisted in the transcript'
 );
 
+assert.match(
+  source,
+  /classifyFinalDuringAgentSpeech/,
+  'media path must classify finals heard during TTS (echo drop vs queue)'
+);
+
+assert.match(
+  source,
+  /filler cancelled for reply audio/,
+  'reply path must cancel thinking-ack without awaiting remote TTS terminated'
+);
+
+assert.match(
+  source,
+  /queue overlapping final while TTS/,
+  'non-echo finals during TTS must be queued for the next caller turn'
+);
+
+assert.match(
+  source,
+  /function releaseQueuedCallerSpeech/,
+  'playback end / barge-in must release queued caller speech'
+);
+
+assert.match(
+  source,
+  /createVoiceTurnTiming/,
+  'media turns must record voice-timing markers for speed/consistency'
+);
+
+assert.match(
+  source,
+  /llm→tts stream prefetched/,
+  'reply TTS must be prefetched while Gemini starts'
+);
+
+assert.match(
+  source,
+  /Drop filler PCM via generation bump only/,
+  'filler stop must not cancel the prefetched reply TTS stream'
+);
+
+assert.match(
+  source,
+  /mergeInterimHypothesis/,
+  'barge-in must accumulate interim STT hypotheses'
+);
+
+assert.match(
+  source,
+  /type:\s*['"]killAudio['"]/,
+  'media clear must send drachtio killAudio on barge-in'
+);
+
 console.log('Voice runtime wiring checks passed.');
