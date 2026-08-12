@@ -289,10 +289,3 @@ export async function getTenantUsageSummary(
     softSpendLimit,
   };
 }
-
-/** Owner top-up request until M-Pesa STK ships (Ops handles manually). */
-export function walletTopUpWhatsAppHref(businessName: string): string {
-  const name = businessName.trim() || "my workspace";
-  const text = `Hi Scalers, I'd like to top up my prepaid wallet for ${name}.`;
-  return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-}

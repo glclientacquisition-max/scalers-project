@@ -5,9 +5,7 @@ import {
   WALLET_LOW_BALANCE_KES,
   WALLET_RATE_KES_PER_MINUTE,
   getTenantUsageSummary,
-  walletTopUpWhatsAppHref,
 } from "@/lib/wallet";
-import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -65,36 +63,21 @@ export default async function WalletPage() {
   const prepaidEmpty = !usage.isBeta && usage.walletBalanceKes <= 0;
   const prepaidLow =
     !usage.isBeta && usage.walletBalanceKes > 0 && usage.walletBalanceKes < lowThreshold;
-  const businessName = tenant.business_name?.trim() || "my workspace";
-  const topUpHref = walletTopUpWhatsAppHref(businessName);
 
   return (
     <div className="max-w-3xl">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">Wallet</h1>
-        {!usage.isBeta ? (
-          <a
-            href={topUpHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
-          >
-            Top up
-          </a>
-        ) : (
-          <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-line bg-surface px-6 py-3 text-sm font-medium text-ink-soft">
+        {usage.isBeta ? (
+          <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-[#0096FF]/30 bg-[#0096FF]/5 px-6 py-3 text-sm font-medium text-[#005ccc]">
             Free beta
           </span>
-        )}
+        ) : null}
       </header>
 
       {(prepaidEmpty || prepaidLow) && !usage.isBeta ? (
         <p className="mt-4 rounded-xl border border-warn/40 bg-white px-4 py-3 text-sm text-warn">
-          {prepaidEmpty
-            ? tenant.on_demand_usage_enabled
-              ? "Prepaid empty. On-demand is on."
-              : "Prepaid empty. Top up or enable on-demand."
-            : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
+          {prepaidEmpty ? "Prepaid empty." : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
         </p>
       ) : null}
 
@@ -102,32 +85,25 @@ export default async function WalletPage() {
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-              Balance
+              {usage.isBeta ? "Usage this month" : "Balance"}
             </p>
             <p
               className={[
                 "mt-2 font-display text-5xl tracking-tight sm:text-[3.25rem]",
-                !usage.isBeta && usage.lowBalance ? "text-warn" : "text-ink",
+                usage.isBeta || !usage.lowBalance ? "text-ink" : "text-warn",
               ].join(" ")}
             >
-              KES {usage.walletBalanceKes.toLocaleString("en-KE")}
+              {usage.isBeta
+                ? `KES ${usage.estimatedCostKes.toLocaleString("en-KE")}`
+                : `KES ${usage.walletBalanceKes.toLocaleString("en-KE")}`}
             </p>
             <p className="mt-2 text-sm text-ink-soft">
-              {usage.isBeta ? "Metered only during beta" : "Prepaid KES"}
+              {usage.isBeta
+                ? "Metered automatically. No charges during beta."
+                : "Prepaid KES"}
             </p>
           </div>
           <dl className="grid min-w-[12rem] gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">
-                {usage.isBeta ? "Est. month" : "Billed month"}
-              </dt>
-              <dd className="mt-1 font-display text-2xl text-ink">
-                KES{" "}
-                {(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString(
-                  "en-KE"
-                )}
-              </dd>
-            </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Calls</dt>
               <dd className="mt-1 font-display text-2xl text-ink">{usage.callsThisMonth}</dd>
@@ -136,44 +112,84 @@ export default async function WalletPage() {
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Minutes</dt>
               <dd className="mt-1 font-display text-2xl text-ink">{usage.minutesThisMonth}</dd>
             </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
-              <dd className="mt-1 font-display text-2xl text-ink">
-                KES {usage.lineFeeKes.toLocaleString("en-KE")}
-              </dd>
-            </div>
+            {!usage.isBeta ? (
+              <>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Billed month</dt>
+                  <dd className="mt-1 font-display text-2xl text-ink">
+                    KES {billedThisMonth.toLocaleString("en-KE")}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
+                  <dd className="mt-1 font-display text-2xl text-ink">
+                    KES {usage.lineFeeKes.toLocaleString("en-KE")}
+                  </dd>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Call rate</dt>
+                  <dd className="mt-1 font-display text-2xl text-ink">
+                    KES {WALLET_RATE_KES_PER_MINUTE}/min
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
+                  <dd className="mt-1 font-display text-2xl text-ink">
+                    KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
+                  </dd>
+                </div>
+              </>
+            )}
           </dl>
         </div>
 
         <dl className="mt-8 grid gap-3 border-t border-line pt-6 sm:grid-cols-3 text-sm">
-          <div>
-            <dt className="text-ink-soft">Call rate</dt>
-            <dd className="mt-1 font-medium text-ink">
-              KES {WALLET_RATE_KES_PER_MINUTE}/min
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">Line rental</dt>
-            <dd className="mt-1 font-medium text-ink">
-              KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">Call charges</dt>
-            <dd className="mt-1 font-medium text-ink">
-              KES {usage.callChargesKes.toLocaleString("en-KE")}
-            </dd>
-          </div>
+          {usage.isBeta ? (
+            <>
+              <div>
+                <dt className="text-ink-soft">Call charges</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  KES {usage.callChargesKes.toLocaleString("en-KE")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">Line fee (est.)</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  KES {usage.lineFeeKes.toLocaleString("en-KE")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">Billing</dt>
+                <dd className="mt-1 font-medium text-ink">Automatic metering</dd>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <dt className="text-ink-soft">Call rate</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  KES {WALLET_RATE_KES_PER_MINUTE}/min
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">Line rental</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">Call charges</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  KES {usage.callChargesKes.toLocaleString("en-KE")}
+                </dd>
+              </div>
+            </>
+          )}
         </dl>
       </section>
-
-      <div className="mt-6">
-        <OnDemandUsagePanel
-          tenantId={tenant.id}
-          enabled={Boolean(tenant.on_demand_usage_enabled)}
-          isBeta={usage.isBeta}
-        />
-      </div>
 
       <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
         <h2 className="font-display text-xl tracking-tight text-ink">Recent activity</h2>
