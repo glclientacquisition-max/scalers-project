@@ -205,6 +205,20 @@ const BLOCKED_MATCH_TOKENS = new Set(
     'call',
     'calling',
     'reached',
+    // Extra fillers that leaked from call-mining / weak Gemini takes
+    'may',
+    'let',
+    'since',
+    'good',
+    'just',
+    'money',
+    'great',
+    'time',
+    'take',
+    'name',
+    'habari',
+    'jambo',
+    'sasa',
   ].map((t) => t.toLowerCase())
 );
 
