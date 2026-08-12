@@ -6,6 +6,7 @@ import {
   WALLET_RATE_KES_PER_MINUTE,
   getTenantUsageSummary,
 } from "@/lib/wallet";
+import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -77,7 +78,11 @@ export default async function WalletPage() {
 
       {(prepaidEmpty || prepaidLow) && !usage.isBeta ? (
         <p className="mt-4 rounded-xl border border-warn/40 bg-white px-4 py-3 text-sm text-warn">
-          {prepaidEmpty ? "Prepaid empty." : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
+          {prepaidEmpty
+            ? tenant.on_demand_usage_enabled
+              ? "Prepaid empty. On-demand is on."
+              : "Prepaid empty. Enable on-demand below to keep answering."
+            : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
         </p>
       ) : null}
 
@@ -151,6 +156,16 @@ export default async function WalletPage() {
           </div>
         </dl>
       </section>
+
+      <div className="mt-6">
+        <OnDemandUsagePanel
+          tenantId={tenant.id}
+          enabled={Boolean(tenant.on_demand_usage_enabled)}
+          isBeta={usage.isBeta}
+          walletBalanceKes={usage.walletBalanceKes}
+          lowThresholdKes={lowThreshold}
+        />
+      </div>
 
       <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
         <h2 className="font-display text-xl tracking-tight text-ink">Recent activity</h2>
