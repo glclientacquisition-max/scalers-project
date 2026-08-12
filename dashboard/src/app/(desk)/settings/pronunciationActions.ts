@@ -1,6 +1,7 @@
 "use server";
 
 import { isAuthenticated } from "@/lib/auth";
+import { normalizeAudioMimeForGemini } from "@/lib/gemini";
 import { deriveLexiconFromRecording } from "@/lib/pronunciationFromRecording";
 import {
   isBlockedMatch,
@@ -208,13 +209,15 @@ export async function confirmPronunciationRecording(
       if (!mime.startsWith("audio/") && mime !== "application/octet-stream") {
         return { error: "Upload an audio recording." };
       }
-      audioMimeType = mime.startsWith("audio/") ? mime : "audio/webm";
+      audioMimeType = normalizeAudioMimeForGemini(mime);
       audioBase64 = asBase64(await file.arrayBuffer());
     }
   }
 
   if (!audioBase64) {
-    return { error: "Record yourself saying the line, then tap Keep." };
+    return {
+      error: "Record yourself saying the line, then tap Use this take.",
+    };
   }
 
   let derived: Awaited<ReturnType<typeof deriveLexiconFromRecording>>;

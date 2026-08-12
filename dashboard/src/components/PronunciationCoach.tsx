@@ -248,7 +248,13 @@ export function PronunciationCoach({
   useEffect(() => {
     if (confirmState.ok && confirmState.entries?.length) {
       const n = confirmState.entries.length;
-      setKeepNote(`Saved ${n} pronunciation${n === 1 ? "" : "s"} — live on the next call.`);
+      const localNote =
+        confirmState.source === "local"
+          ? " (basic spelling — voice check was unavailable)"
+          : "";
+      setKeepNote(
+        `Saved ${n} pronunciation${n === 1 ? "" : "s"} — live on the next call.${localNote}`
+      );
     }
   }, [confirmState]);
 

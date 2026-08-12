@@ -45,6 +45,7 @@ async function generateGeminiContent(opts: {
   temperature?: number;
   maxOutputTokens?: number;
   timeoutMs?: number;
+  model?: string;
 }): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -52,7 +53,8 @@ async function generateGeminiContent(opts: {
   }
 
   // gemini-2.0-flash was shut down; match current Flash-Lite for fast compile.
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+  const model =
+    opts.model || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -130,6 +132,26 @@ export async function generateGeminiText(opts: {
   });
 }
 
+/**
+ * Normalize browser MediaRecorder MIME types for Gemini inline audio.
+ * `audio/webm;codecs=opus` is valid for MediaRecorder but rejected by Gemini.
+ */
+export function normalizeAudioMimeForGemini(mime: string | null | undefined): string {
+  const raw = String(mime || "")
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
+  if (!raw || raw === "application/octet-stream") return "audio/webm";
+  if (raw === "audio/webm" || raw === "audio/mp4" || raw === "audio/mpeg") {
+    return raw;
+  }
+  if (raw === "audio/mp3" || raw === "audio/m4a" || raw === "audio/wav" || raw === "audio/ogg") {
+    return raw;
+  }
+  if (raw.startsWith("audio/")) return raw;
+  return "audio/webm";
+}
+
 /** Text + optional inline audio/image parts (pronunciation coach, etc.). */
 export async function generateGeminiMultimodal(opts: {
   systemInstruction: string;
@@ -137,6 +159,20 @@ export async function generateGeminiMultimodal(opts: {
   temperature?: number;
   maxOutputTokens?: number;
   timeoutMs?: number;
+  /** Override model (defaults to GEMINI_AUDIO_MODEL || GEMINI_MODEL || flash-lite). */
+  model?: string;
 }): Promise<string> {
-  return generateGeminiContent(opts);
+  const audioModel =
+    opts.model ||
+    process.env.GEMINI_AUDIO_MODEL ||
+    process.env.GEMINI_MODEL ||
+    "gemini-3.5-flash-lite";
+  return generateGeminiContent({
+    systemInstruction: opts.systemInstruction,
+    parts: opts.parts,
+    temperature: opts.temperature,
+    maxOutputTokens: opts.maxOutputTokens,
+    timeoutMs: opts.timeoutMs,
+    model: audioModel,
+  });
 }
