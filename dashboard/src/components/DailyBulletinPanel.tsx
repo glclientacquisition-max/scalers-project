@@ -14,6 +14,7 @@ import {
   postBulletinAction,
   type BulletinActionState,
 } from "@/app/(desk)/settings/bulletinActions";
+import { settingsChipClass, settingsFieldClass } from "@/components/settingsUi";
 
 const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
@@ -78,7 +79,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           onChange={(e) => setText(e.target.value)}
           maxLength={160}
           placeholder="Out of chicken today"
-          className="mt-1 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+          className={settingsFieldClass}
         />
 
         <div className="flex flex-wrap gap-2">
@@ -89,12 +90,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 key={opt.id}
                 type="button"
                 onClick={() => setExpiry(opt.id)}
-                className={[
-                  "rounded-lg border px-3 py-1.5 text-xs font-medium transition",
-                  selected
-                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                    : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]/50",
-                ].join(" ")}
+                className={settingsChipClass(selected)}
               >
                 {opt.label}
               </button>

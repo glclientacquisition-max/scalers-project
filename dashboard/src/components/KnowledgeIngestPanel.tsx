@@ -11,9 +11,12 @@ import {
   type IngestApplyState,
   type IngestExtractState,
 } from "@/app/(desk)/settings/ingestActions";
+import {
+  settingsFieldClass,
+  settingsRadioCardClass,
+} from "@/components/settingsUi";
 
-const fieldClass =
-  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus";
+const fieldClass = settingsFieldClass;
 
 const extractInitial: IngestExtractState = {};
 const applyInitial: IngestApplyState = {};
@@ -174,12 +177,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   key={opt.id}
                   type="button"
                   onClick={() => setMode(opt.id)}
-                  className={[
-                    "w-full rounded-xl border px-4 py-3 text-left transition",
-                    selected
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
-                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                  ].join(" ")}
+                  className={settingsRadioCardClass(selected)}
                 >
                   <span className="font-medium text-[var(--ink)]">{opt.label}</span>
                   <span className="mt-1 block text-sm text-[var(--ink-soft)]">
