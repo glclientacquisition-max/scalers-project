@@ -44,6 +44,7 @@ export function PronunciationCoach({
   tenantId,
   businessName,
   agentName,
+  sonioxVoiceId,
   locations,
   team,
   initialLexicon,
@@ -52,6 +53,7 @@ export function PronunciationCoach({
   tenantId: string;
   businessName: string;
   agentName: string;
+  sonioxVoiceId?: string | null;
   locationNotes?: string;
   locations: Array<{
     label: string;
@@ -243,6 +245,7 @@ export function PronunciationCoach({
         body: JSON.stringify({
           text: greetingPreview,
           lexicon: lexiconForStorage(lexicon),
+          voiceId: sonioxVoiceId || undefined,
         }),
       });
       if (!res.ok) {

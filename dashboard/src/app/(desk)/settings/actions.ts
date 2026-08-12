@@ -29,6 +29,7 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseAgentTools } from "@/lib/agentTools";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
+import { parseSonioxVoiceId } from "@/lib/sonioxVoiceCatalog";
 import {
   formatLocationsForCompiler,
   parseBusinessLocationsField,
@@ -103,6 +104,7 @@ export async function saveAndCompileSettings(
   const afterHoursMode = parseAfterHoursMode(formData.get("after_hours_mode"));
   const vertical = parseVertical(formData.get("vertical"));
   const handoffMode = parseHandoffMode(formData.get("handoff_mode"));
+  const sonioxVoiceId = parseSonioxVoiceId(formData.get("soniox_voice_id"));
   const businessLocations = parseBusinessLocationsField(
     formData.get("business_locations")
   );
@@ -206,6 +208,7 @@ export async function saveAndCompileSettings(
     agent_tools: agentTools,
     vertical,
     handoff_mode: handoffMode,
+    soniox_voice_id: sonioxVoiceId,
     business_locations: businessLocations,
     business_policies: businessPolicies,
     tts_lexicon: ttsLexicon,
@@ -253,6 +256,11 @@ export async function saveAndCompileSettings(
     if (/agent_tools/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/agent_tools.sql in Supabase.`,
+      };
+    }
+    if (/soniox_voice_id/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/soniox_voice_id.sql in Supabase.`,
       };
     }
     if (/tts_lexicon/i.test(error.message)) {

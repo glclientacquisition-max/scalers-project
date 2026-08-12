@@ -13,6 +13,7 @@ export async function fetchTtsPreviewWav(opts: {
   text: string;
   lexicon?: unknown;
   language?: string;
+  voiceId?: string | null;
 }): Promise<TtsPreviewResult> {
   const text = String(opts.text || "").trim();
   if (!text) {
@@ -33,6 +34,7 @@ export async function fetchTtsPreviewWav(opts: {
       lexicon: opts.lexicon,
       language: opts.language,
       callLanguage: opts.language || "en",
+      voiceId: opts.voiceId,
     }),
     cache: "no-store",
   });

@@ -37,12 +37,18 @@ function isSonioxTtsConfigured() {
  * Persistent Soniox TTS connection. Each speak() uses a fresh stream_id.
  * @param {object} opts
  * @param {string} opts.callSid
+ * @param {string} [opts.voiceId] Tenant curated voice override
  * @param {(pcm: Buffer, meta: { streamId: string, audioEnd?: boolean }) => void} [opts.onAudio]
  * @param {(evt: object) => void} [opts.onEvent]
  */
-function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {} }) {
+function createSonioxTtsSession({
+  callSid,
+  voiceId,
+  onAudio = () => {},
+  onEvent = () => {},
+}) {
   const apiKey = process.env.SONIOX_API_KEY;
-  const voice = resolveSonioxVoice();
+  const voice = resolveSonioxVoice(voiceId);
   if (!apiKey) throw new Error('SONIOX_API_KEY is not configured');
 
   let closed = false;

@@ -219,6 +219,8 @@ export type TenantRow = {
     langs?: string[];
     priority?: number;
   }> | null;
+  /** Curated Soniox cloned voice UUID; null uses platform default. */
+  soniox_voice_id?: string | null;
   wallet_balance_kes?: number | null;
   wallet_low_balance_kes?: number | null;
   billing_enforcement?: "soft" | "hard" | "off" | null;

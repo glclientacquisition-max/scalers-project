@@ -68,6 +68,11 @@ import {
   type HandoffMode,
 } from "@/lib/handoffMode";
 import {
+  getDefaultSonioxVoiceId,
+  isAllowedSonioxVoiceId,
+  listCuratedSonioxVoices,
+} from "@/lib/sonioxVoiceCatalog";
+import {
   emptyLocation,
   LOCATIONS_MAX,
   normalizeBusinessLocations,
@@ -102,6 +107,14 @@ const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
     blurb: "Natural Kenyan voice with light Sheng when the caller uses it.",
   },
 ];
+
+const CURATED_SONIOX_VOICES = listCuratedSonioxVoices();
+
+function initialSonioxVoiceId(tenant: TenantRow): string {
+  const raw = tenant.soniox_voice_id;
+  if (raw && isAllowedSonioxVoiceId(raw)) return raw;
+  return getDefaultSonioxVoiceId() || "";
+}
 
 function initialTone(tenant: TenantRow): OnboardingTone | "" {
   const t = String(tenant.agent_tone || "").toLowerCase();
@@ -306,6 +319,9 @@ export function TenantForm({
   );
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
+  );
+  const [sonioxVoiceId, setSonioxVoiceId] = useState(() =>
+    initialSonioxVoiceId(tenant)
   );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
@@ -620,6 +636,7 @@ export function TenantForm({
       <input type="hidden" name="faqs" value={faqsJson} />
       <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
       <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
+      <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} />
 
       <section className={panel === "identity" ? "space-y-5" : "hidden"}>
         <div>
@@ -1634,6 +1651,51 @@ export function TenantForm({
         </div>
         <div className="space-y-2">
           <div>
+            <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              The Soniox voice callers hear on live calls. Save &amp; train after
+              changing.
+            </p>
+          </div>
+          {CURATED_SONIOX_VOICES.length <= 1 ? (
+            <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)]">
+              {CURATED_SONIOX_VOICES[0]?.label || "Default"}
+              {CURATED_SONIOX_VOICES[0]?.description
+                ? ` — ${CURATED_SONIOX_VOICES[0].description}`
+                : ""}
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Phone voice">
+              {CURATED_SONIOX_VOICES.map((voice) => {
+                const selected = sonioxVoiceId === voice.id;
+                return (
+                  <button
+                    key={voice.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setSonioxVoiceId(voice.id)}
+                    className={[
+                      "w-full text-left rounded-xl border px-4 py-3 transition",
+                      selected
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                    ].join(" ")}
+                  >
+                    <span className="font-medium text-[var(--ink)]">{voice.label}</span>
+                    {voice.description ? (
+                      <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                        {voice.description}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
+          <div>
             <p className="text-sm font-medium text-[var(--ink)]">When a human is needed</p>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
               Callback works today. Live transfer uses callback until telephony transfer ships.
@@ -1721,6 +1783,7 @@ export function TenantForm({
           tenantId={tenant.id}
           businessName={businessName}
           agentName={agentName}
+          sonioxVoiceId={sonioxVoiceId}
           locationNotes={locationNotes}
           locations={locations}
           team={team}

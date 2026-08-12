@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       text,
       lexicon: body.lexicon,
       language: body.language,
+      voiceId: body.voiceId ?? body.soniox_voice_id ?? null,
     });
     const headers = new Headers({
       "Content-Type": "audio/wav",
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     if (result.language) {
       headers.set("X-Tts-Language", result.language);
     }
-    return new NextResponse(result.wav, { status: 200, headers });
+    return new NextResponse(new Uint8Array(result.wav), { status: 200, headers });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Could not generate phone preview.";

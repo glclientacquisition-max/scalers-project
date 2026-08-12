@@ -5,6 +5,9 @@ import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TENANT_SELECT =
+  "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, soniox_voice_id, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
+
+const TENANT_SELECT_NO_SONIOX_VOICE =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, alert_email, llm_system_prompt, services_offered, services_catalog, product_catalog, social_handles, business_hours, hours_schedule, after_hours_mode, agent_name, agent_tone, team_directory, faqs, unknown_answer_fallback, daily_bulletin, agent_tools, vertical, handoff_mode, business_locations, business_policies, tts_lexicon, wallet_balance_kes, wallet_low_balance_kes, billing_enforcement, soft_spend_limit_enabled, soft_spend_limit_kes, on_demand_usage_enabled, telecom_wallet_balance_kes, ai_wallet_balance_usd, is_active";
 
 const TENANT_SELECT_NO_SOFT_LIMIT =
@@ -18,6 +21,10 @@ const TENANT_SELECT_NO_PRODUCT_SOCIAL =
 
 const TENANT_SELECT_LEGACY =
   "id, business_name, sautikit_virtual_number, whatsapp_notification_number, llm_system_prompt, is_active";
+
+function isMissingSonioxVoiceColumnError(message: string): boolean {
+  return /soniox_voice_id/i.test(message);
+}
 
 function isMissingSoftSpendLimitColumnError(message: string): boolean {
   return /soft_spend_limit_enabled|soft_spend_limit_kes|on_demand_usage_enabled/i.test(message);
@@ -80,6 +87,14 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
       .eq("id", membership.tenant_id)
       .maybeSingle();
 
+    if (error && isMissingSonioxVoiceColumnError(error.message)) {
+      ({ data, error } = await supabase
+        .from("tenants")
+        .select(TENANT_SELECT_NO_SONIOX_VOICE)
+        .eq("id", membership.tenant_id)
+        .maybeSingle());
+    }
+
     if (error && isMissingProductSocialColumnError(error.message)) {
       ({ data, error } = await supabase
         .from("tenants")
@@ -126,6 +141,16 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
+
+    if (error && isMissingSonioxVoiceColumnError(error.message)) {
+      ({ data, error } = await admin
+        .from("tenants")
+        .select(TENANT_SELECT_NO_SONIOX_VOICE)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle());
+    }
 
     if (error && isMissingProductSocialColumnError(error.message)) {
       ({ data, error } = await admin
