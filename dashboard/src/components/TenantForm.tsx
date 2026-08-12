@@ -1482,158 +1482,6 @@ export function TenantForm({
               );
             })}
           </div>
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <h3 className="text-sm font-medium text-[var(--ink)]">Locations</h3>
-              <button
-                type="button"
-                disabled={locations.length >= LOCATIONS_MAX}
-                onClick={() =>
-                  setLocations((prev) =>
-                    prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
-                  )
-                }
-                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
-              >
-                Add location
-              </button>
-            </div>
-            <div className="space-y-2">
-              {locations.map((loc, index) => (
-                <div
-                  key={`loc-${index}`}
-                  className="space-y-2 rounded-xl border border-[var(--line)] bg-white/60 p-3"
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label
-                        className="block text-xs font-medium text-[var(--ink-soft)]"
-                        htmlFor={`loc-label-${index}`}
-                      >
-                        Label
-                      </label>
-                      <input
-                        id={`loc-label-${index}`}
-                        value={loc.label}
-                        onChange={(e) => {
-                          updateLocation(index, "label", e.target.value);
-                          if (index === 0) {
-                            setLocationNotes(
-                              [e.target.value, loc.address, loc.landmark]
-                                .map((s) => s.trim())
-                                .filter(Boolean)
-                                .join(" · ") || locationNotes
-                            );
-                          }
-                        }}
-                        placeholder="Main shop"
-                        className={fieldClass}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        className="block text-xs font-medium text-[var(--ink-soft)]"
-                        htmlFor={`loc-landmark-${index}`}
-                      >
-                        Landmark
-                      </label>
-                      <input
-                        id={`loc-landmark-${index}`}
-                        value={loc.landmark}
-                        onChange={(e) => {
-                          updateLocation(index, "landmark", e.target.value);
-                          if (index === 0) {
-                            const next = {
-                              ...loc,
-                              landmark: e.target.value,
-                            };
-                            setLocationNotes(
-                              [next.label, next.address, next.landmark]
-                                .map((s) => s.trim())
-                                .filter(Boolean)
-                                .join(" · ")
-                            );
-                          }
-                        }}
-                        placeholder="Opposite Naivas, next to…"
-                        className={fieldClass}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`loc-address-${index}`}
-                    >
-                      Address / area
-                    </label>
-                    <input
-                      id={`loc-address-${index}`}
-                      value={loc.address}
-                      onChange={(e) => {
-                        updateLocation(index, "address", e.target.value);
-                        if (index === 0) {
-                          const next = { ...loc, address: e.target.value };
-                          setLocationNotes(
-                            [next.label, next.address, next.landmark]
-                              .map((s) => s.trim())
-                              .filter(Boolean)
-                              .join(" · ")
-                          );
-                        }
-                      }}
-                      placeholder="Westlands, Nairobi"
-                      className={fieldClass}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`loc-directions-${index}`}
-                    >
-                      Directions (spoken)
-                    </label>
-                    <textarea
-                      id={`loc-directions-${index}`}
-                      value={loc.directions}
-                      onChange={(e) => updateLocation(index, "directions", e.target.value)}
-                      rows={2}
-                      placeholder="From Waiyaki Way, turn at the Shell. We are on the left."
-                      className={`${fieldClass} leading-relaxed`}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`loc-coverage-${index}`}
-                    >
-                      Coverage notes
-                    </label>
-                    <input
-                      id={`loc-coverage-${index}`}
-                      value={loc.coverage_notes}
-                      onChange={(e) =>
-                        updateLocation(index, "coverage_notes", e.target.value)
-                      }
-                      placeholder="We also cover Kiambu and Ruiru"
-                      className={fieldClass}
-                    />
-                  </div>
-                  {locations.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setLocations((prev) => prev.filter((_, i) => i !== index))
-                      }
-                      className="text-xs text-[var(--warn)] hover:underline"
-                    >
-                      Remove location
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
 
           <div>
             <p className="block text-sm font-medium">After hours</p>
@@ -1659,7 +1507,166 @@ export function TenantForm({
             </div>
           </div>
         </div>
+      </section>
 
+      <section
+        className={panel === "locations" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h3 className="text-sm font-medium text-[var(--ink)]">Locations</h3>
+          <button
+            type="button"
+            disabled={locations.length >= LOCATIONS_MAX}
+            onClick={() =>
+              setLocations((prev) =>
+                prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
+              )
+            }
+            className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
+          >
+            Add location
+          </button>
+        </div>
+        <div className="space-y-2">
+          {locations.map((loc, index) => (
+            <div
+              key={`loc-${index}`}
+              className="space-y-2 rounded-xl border border-[var(--line)] bg-white/60 p-3"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="block text-xs font-medium text-[var(--ink-soft)]"
+                    htmlFor={`loc-label-${index}`}
+                  >
+                    Label
+                  </label>
+                  <input
+                    id={`loc-label-${index}`}
+                    value={loc.label}
+                    onChange={(e) => {
+                      updateLocation(index, "label", e.target.value);
+                      if (index === 0) {
+                        setLocationNotes(
+                          [e.target.value, loc.address, loc.landmark]
+                            .map((s) => s.trim())
+                            .filter(Boolean)
+                            .join(" · ") || locationNotes
+                        );
+                      }
+                    }}
+                    placeholder="Main shop"
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-xs font-medium text-[var(--ink-soft)]"
+                    htmlFor={`loc-landmark-${index}`}
+                  >
+                    Landmark
+                  </label>
+                  <input
+                    id={`loc-landmark-${index}`}
+                    value={loc.landmark}
+                    onChange={(e) => {
+                      updateLocation(index, "landmark", e.target.value);
+                      if (index === 0) {
+                        const next = {
+                          ...loc,
+                          landmark: e.target.value,
+                        };
+                        setLocationNotes(
+                          [next.label, next.address, next.landmark]
+                            .map((s) => s.trim())
+                            .filter(Boolean)
+                            .join(" · ")
+                        );
+                      }
+                    }}
+                    placeholder="Opposite Naivas, next to…"
+                    className={fieldClass}
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor={`loc-address-${index}`}
+                >
+                  Address / area
+                </label>
+                <input
+                  id={`loc-address-${index}`}
+                  value={loc.address}
+                  onChange={(e) => {
+                    updateLocation(index, "address", e.target.value);
+                    if (index === 0) {
+                      const next = { ...loc, address: e.target.value };
+                      setLocationNotes(
+                        [next.label, next.address, next.landmark]
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .join(" · ")
+                      );
+                    }
+                  }}
+                  placeholder="Westlands, Nairobi"
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor={`loc-directions-${index}`}
+                >
+                  Directions (spoken)
+                </label>
+                <textarea
+                  id={`loc-directions-${index}`}
+                  value={loc.directions}
+                  onChange={(e) => updateLocation(index, "directions", e.target.value)}
+                  rows={2}
+                  placeholder="From Waiyaki Way, turn at the Shell. We are on the left."
+                  className={`${fieldClass} leading-relaxed`}
+                />
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  htmlFor={`loc-coverage-${index}`}
+                >
+                  Coverage notes
+                </label>
+                <input
+                  id={`loc-coverage-${index}`}
+                  value={loc.coverage_notes}
+                  onChange={(e) =>
+                    updateLocation(index, "coverage_notes", e.target.value)
+                  }
+                  placeholder="We also cover Kiambu and Ruiru"
+                  className={fieldClass}
+                />
+              </div>
+              {locations.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLocations((prev) => prev.filter((_, i) => i !== index))
+                  }
+                  className="text-xs text-[var(--warn)] hover:underline"
+                >
+                  Remove location
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section
+        className={panel === "policies" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}
+      >
         <div className="space-y-2">
           <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -1856,29 +1863,35 @@ export function TenantForm({
             );
           })}
         </div>
+      </section>
 
-        {panel === "tools" ? (
-        <PronunciationCoach
-          tenantId={tenant.id}
-          businessName={businessName}
-          agentName={agentName}
-          sonioxVoiceId={sonioxVoiceId}
-          locationNotes={locationNotes}
-          locations={locations}
-          team={team}
-          services={services}
-          faqs={faqs}
-          bulletinTexts={
-            Array.isArray(tenant.daily_bulletin)
-              ? tenant.daily_bulletin
-                  .map((b) => String(b?.text || "").trim())
-                  .filter(Boolean)
-              : []
-          }
-          initialLexicon={ttsLexicon}
-          onLexiconChange={setTtsLexicon}
-          omitLexiconField
-        />
+      <section
+        className={
+          panel === "pronunciation" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"
+        }
+      >
+        {panel === "pronunciation" ? (
+          <PronunciationCoach
+            tenantId={tenant.id}
+            businessName={businessName}
+            agentName={agentName}
+            sonioxVoiceId={sonioxVoiceId}
+            locationNotes={locationNotes}
+            locations={locations}
+            team={team}
+            services={services}
+            faqs={faqs}
+            bulletinTexts={
+              Array.isArray(tenant.daily_bulletin)
+                ? tenant.daily_bulletin
+                    .map((b) => String(b?.text || "").trim())
+                    .filter(Boolean)
+                : []
+            }
+            initialLexicon={ttsLexicon}
+            onLexiconChange={setTtsLexicon}
+            omitLexiconField
+          />
         ) : null}
       </section>
 

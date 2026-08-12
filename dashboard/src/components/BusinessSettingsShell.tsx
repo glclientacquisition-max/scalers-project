@@ -22,10 +22,13 @@ const PRIMARY_NAV = [
 
 const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
   { id: "identity", label: "Agent Persona" },
-  { id: "hours", label: "Business Hours" },
+  { id: "hours", label: "Hours" },
+  { id: "locations", label: "Locations" },
+  { id: "policies", label: "Policies" },
   { id: "team", label: "Escalation Team" },
   { id: "faqs", label: "FAQs" },
   { id: "tools", label: "Tools & voice" },
+  { id: "pronunciation", label: "Pronunciation" },
 ];
 
 function navLinkClass(active: boolean) {
