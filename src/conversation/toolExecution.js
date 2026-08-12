@@ -119,6 +119,76 @@ function validateEscalation(raw) {
   return { valid: true, value };
 }
 
+function validateCreateAppointment(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { valid: false, reason: 'Missing appointment payload.' };
+  }
+  const value = {
+    serviceName: clean(raw.serviceName || raw.service_name || raw.service, 200),
+    name: clean(raw.name, 120),
+    phone: clean(raw.phone, 40),
+    whenText: clean(raw.whenText || raw.when_text || raw.when, 160),
+    landmark: clean(
+      raw.landmark || raw.address_landmark || raw.address,
+      240
+    ),
+    notes: clean(raw.notes, 400),
+    windowStart: clean(raw.windowStart || raw.window_start, 64),
+    windowEnd: clean(raw.windowEnd || raw.window_end, 64),
+  };
+  const missing = [];
+  if (!value.serviceName) missing.push('service');
+  if (!value.name) missing.push('name');
+  if (!value.whenText) missing.push('when_text');
+  if (!value.landmark) missing.push('landmark');
+  if (missing.length) {
+    return {
+      valid: false,
+      reason: `Visit booking needs ${missing.join(', ')} before saving.`,
+      missingSlots: missing,
+      value,
+    };
+  }
+  return { valid: true, value };
+}
+
+const APPOINTMENT_UPDATE_STATUSES = new Set([
+  'requested',
+  'confirmed',
+  'cancelled',
+  'done',
+]);
+
+function validateUpdateAppointment(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { valid: false, reason: 'Missing appointment update payload.' };
+  }
+  const statusRaw = clean(raw.status, 40).toLowerCase();
+  const value = {
+    appointmentId: clean(raw.appointmentId || raw.id || raw.appointment_id, 80),
+    status: APPOINTMENT_UPDATE_STATUSES.has(statusRaw) ? statusRaw : '',
+    whenText: clean(raw.whenText || raw.when_text || raw.when, 160),
+    landmark: clean(
+      raw.landmark || raw.address_landmark || raw.address,
+      240
+    ),
+    notes: clean(raw.notes, 400),
+    serviceName: clean(raw.serviceName || raw.service_name || raw.service, 200),
+    phone: clean(raw.phone, 40),
+    windowStart: clean(raw.windowStart || raw.window_start, 64),
+    windowEnd: clean(raw.windowEnd || raw.window_end, 64),
+  };
+  if (!value.status && !value.whenText && !value.landmark && !value.notes) {
+    return {
+      valid: false,
+      reason: 'Appointment update needs a status, new time, or note.',
+      missingSlots: ['status'],
+      value,
+    };
+  }
+  return { valid: true, value };
+}
+
 async function executeBrainTools({
   parsed,
   capabilities = {},
@@ -190,6 +260,117 @@ async function executeBrainTools({
       } catch (error) {
         results.push({
           action: 'create_service_request',
+          status: 'failed',
+          fingerprint,
+          reason: clean(error?.message || error, 300),
+        });
+      }
+    }
+  }
+
+  if (parsed?.appointment) {
+    const validation = validateCreateAppointment(parsed.appointment);
+    const fingerprint = validation.valid
+      ? stableFingerprint('create_appointment', validation.value)
+      : null;
+    if (!capabilities.createAppointment) {
+      results.push({
+        action: 'create_appointment',
+        status: 'disabled',
+        reason: 'Appointment booking is not available.',
+      });
+    } else if (!validation.valid) {
+      results.push({
+        action: 'create_appointment',
+        status: 'invalid',
+        reason: validation.reason,
+        missingSlots: validation.missingSlots || [],
+      });
+    } else if (completed.has(fingerprint)) {
+      results.push({
+        action: 'create_appointment',
+        status: 'duplicate',
+        fingerprint,
+      });
+    } else {
+      try {
+        const created = await handlers.createAppointment?.(validation.value);
+        results.push(
+          created
+            ? {
+                action: 'create_appointment',
+                status: 'succeeded',
+                fingerprint,
+                id: created.id || null,
+                value: validation.value,
+                record: created,
+              }
+            : {
+                action: 'create_appointment',
+                status: 'failed',
+                fingerprint,
+                reason: 'The backend did not create an appointment.',
+              }
+        );
+      } catch (error) {
+        results.push({
+          action: 'create_appointment',
+          status: 'failed',
+          fingerprint,
+          reason: clean(error?.message || error, 300),
+        });
+      }
+    }
+  }
+
+  if (parsed?.appointmentUpdate) {
+    const validation = validateUpdateAppointment(parsed.appointmentUpdate);
+    const fingerprint = validation.valid
+      ? stableFingerprint('update_appointment', validation.value)
+      : null;
+    if (!capabilities.updateAppointment) {
+      results.push({
+        action: 'update_appointment',
+        status: 'disabled',
+        reason: 'Appointment updates are not available.',
+      });
+    } else if (!validation.valid) {
+      results.push({
+        action: 'update_appointment',
+        status: 'invalid',
+        reason: validation.reason,
+        missingSlots: validation.missingSlots || [],
+      });
+    } else if (completed.has(fingerprint)) {
+      results.push({
+        action: 'update_appointment',
+        status: 'duplicate',
+        fingerprint,
+      });
+    } else {
+      try {
+        const updated = await handlers.updateAppointment?.(validation.value);
+        results.push(
+          updated
+            ? {
+                action: 'update_appointment',
+                status: 'succeeded',
+                fingerprint,
+                id: updated.id || null,
+                appointmentStatus: updated.status || validation.value.status,
+                value: validation.value,
+                record: updated,
+              }
+            : {
+                action: 'update_appointment',
+                status: 'failed',
+                fingerprint,
+                reason: 'No matching open appointment was found to update.',
+              }
+        );
+      } catch (error) {
+        results.push({
+          action: 'update_appointment',
           status: 'failed',
           fingerprint,
           reason: clean(error?.message || error, 300),
@@ -287,7 +468,13 @@ async function executeBrainTools({
 
 function formatToolConfirmation(results = [], language = 'en') {
   const meaningful = results.find((result) =>
-    ['create_service_request', 'escalate', 'tool_request'].includes(result.action)
+    [
+      'create_appointment',
+      'update_appointment',
+      'create_service_request',
+      'escalate',
+      'tool_request',
+    ].includes(result.action)
   );
   if (!meaningful) return '';
 
@@ -297,6 +484,69 @@ function formatToolConfirmation(results = [], language = 'en') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';
     if (sheng) return 'Sijaweza ku-complete hiyo action.';
     return "I couldn't complete that action.";
+  }
+  if (meaningful.action === 'create_appointment') {
+    if (meaningful.status === 'succeeded') {
+      if (sw) return 'Sawa — nimehifadhi ombi la ziara.';
+      if (sheng) return 'Poa — nime-save visit request.';
+      return "Done — I've logged your visit request.";
+    }
+    if (meaningful.status === 'duplicate') {
+      if (sw) return 'Ombi la ziara tayari limehifadhiwa.';
+      if (sheng) return 'Hiyo visit request tayari iko saved.';
+      return 'That visit request is already saved.';
+    }
+    if (meaningful.status === 'invalid') {
+      const missing = Array.isArray(meaningful.missingSlots)
+        ? meaningful.missingSlots
+        : [];
+      if (missing.includes('landmark') || missing.includes('when_text')) {
+        if (sw) {
+          return 'Niambie jina, huduma, wakati, na landmark ndio nihifadhi ziara.';
+        }
+        if (sheng) {
+          return 'Niambie jina, service, when, na landmark ndio ni-save visit.';
+        }
+        return 'Tell me your name, the service, when, and a landmark so I can book the visit.';
+      }
+      if (missing.includes('name') || missing.includes('service')) {
+        if (sw) return 'Niambie jina lako na huduma unayohitaji.';
+        if (sheng) return 'Niambie jina yako na service unahitaji.';
+        return 'Tell me your name and which service you need.';
+      }
+      if (sw) return 'Nahitaji kidogo zaidi kabla nihifadhi ziara.';
+      if (sheng) return 'Nahitaji detail kidogo kabla ni-save visit.';
+      return 'I need a bit more detail before I can book that visit.';
+    }
+    if (sw) return 'Sijaweza kuhifadhi ziara sasa hivi.';
+    if (sheng) return 'Sijaweza ku-save hiyo visit saa hii.';
+    return "I couldn't save that visit request right now.";
+  }
+  if (meaningful.action === 'update_appointment') {
+    if (meaningful.status === 'succeeded') {
+      const st = String(meaningful.appointmentStatus || '').toLowerCase();
+      if (st === 'cancelled') {
+        if (sw) return 'Sawa — nimeghairi ziara hiyo.';
+        if (sheng) return 'Poa — nime-cancel hiyo visit.';
+        return "Done — I've cancelled that visit.";
+      }
+      if (sw) return 'Sawa — nimebadilisha ratiba ya ziara.';
+      if (sheng) return 'Poa — nime-update visit schedule.';
+      return "Done — I've updated that visit.";
+    }
+    if (meaningful.status === 'duplicate') {
+      if (sw) return 'Badiliko hilo tayari limetumwa.';
+      if (sheng) return 'Hiyo update tayari ilitumwa.';
+      return 'That visit update was already saved.';
+    }
+    if (meaningful.status === 'invalid') {
+      if (sw) return 'Niambie muda mpya au kama unataka kughairi.';
+      if (sheng) return 'Niambie new time au kama unataka cancel.';
+      return 'Tell me the new time, or say if you want to cancel.';
+    }
+    if (sw) return 'Sijaweza kupata ziara ya kubadilisha sasa hivi.';
+    if (sheng) return 'Sijaweza find visit ya ku-update saa hii.';
+    return "I couldn't find an open visit to update right now.";
   }
   if (meaningful.action === 'create_service_request') {
     if (meaningful.status === 'succeeded') {
@@ -365,6 +615,8 @@ module.exports = {
   validateServiceRequest,
   validateCallerInfo,
   validateEscalation,
+  validateCreateAppointment,
+  validateUpdateAppointment,
   executeBrainTools,
   formatToolConfirmation,
 };

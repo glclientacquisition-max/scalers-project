@@ -24,8 +24,15 @@ const INTENT_ALIASES = Object.freeze({
   human: 'human',
   product_inquiry: 'product_inquiry',
   general_enquiry: 'general_enquiry',
-  booking: 'booking',
-  cancellation: 'cancellation',
+  booking: 'book_visit',
+  book_visit: 'book_visit',
+  cancellation: 'cancel',
+  cancel: 'cancel',
+  reschedule: 'reschedule',
+  service_inquiry: 'service_inquiry',
+  service_area: 'service_area',
+  price_band: 'price_band',
+  emergency: 'emergency',
   complaint: 'complaint',
 });
 
@@ -35,9 +42,12 @@ const DIRECT_ANSWER_INTENTS = new Set([
   'location',
   'directions',
   'price',
+  'price_band',
   'availability',
   'policy',
   'product_inquiry',
+  'service_inquiry',
+  'service_area',
   'general_enquiry',
 ]);
 
@@ -79,7 +89,10 @@ function deriveCallResolution(opts = {}) {
 
   const requestOk = results.some(
     (r) =>
-      r.action === 'create_service_request' && r.status === 'succeeded'
+      (r.action === 'create_service_request' ||
+        r.action === 'create_appointment' ||
+        r.action === 'update_appointment') &&
+      r.status === 'succeeded'
   );
   const escalateOk = results.some(
     (r) => r.action === 'escalate' && r.status === 'succeeded'
@@ -111,15 +124,30 @@ function deriveCallResolution(opts = {}) {
       : 'Caller needed a human';
   } else if (requestOk) {
     resolution = 'resolved';
-    const type = results.find(
+    const appointmentOk = results.some(
       (r) =>
-        r.action === 'create_service_request' && r.status === 'succeeded'
-    )?.requestType;
-    const typeNote =
-      type === 'hold' || type === 'hold_or_pickup'
-        ? 'hold'
-        : type || null;
-    note = typeNote ? `Request saved (${typeNote})` : 'Request saved';
+        (r.action === 'create_appointment' ||
+          r.action === 'update_appointment') &&
+        r.status === 'succeeded'
+    );
+    if (appointmentOk) {
+      const updated = results.find(
+        (r) => r.action === 'update_appointment' && r.status === 'succeeded'
+      );
+      note = updated
+        ? `Visit updated (${updated.appointmentStatus || 'updated'})`
+        : 'Visit request saved';
+    } else {
+      const type = results.find(
+        (r) =>
+          r.action === 'create_service_request' && r.status === 'succeeded'
+      )?.requestType;
+      const typeNote =
+        type === 'hold' || type === 'hold_or_pickup'
+          ? 'hold'
+          : type || null;
+      note = typeNote ? `Request saved (${typeNote})` : 'Request saved';
+    }
   } else if (
     state.resolution?.status === 'resolved' ||
     state.resolution?.nextBestAction === 'END' ||

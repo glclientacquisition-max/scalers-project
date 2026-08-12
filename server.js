@@ -862,6 +862,8 @@ mediaWss.on('connection', (ws, req) => {
             { ...profile, agentTools: parsedTools },
             {
               createServiceRequest: true,
+              createAppointment: true,
+              updateAppointment: true,
               notifyCallback: true,
               // Current media runtime has no transfer executor.
               liveTransfer: false,
@@ -1048,7 +1050,7 @@ mediaWss.on('connection', (ws, req) => {
       callBrainCapabilities.get(callKey) ||
       buildBrainCapabilities(
         { agentTools: callAgentTools.get(callKey) || parseAgentTools(null) },
-        { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+        { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
       );
     const previousBrainState =
       callBrainStates.get(callKey) || createBrainState(brainProfile);
@@ -1944,6 +1946,75 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   }
 }
 
+/** Visit booking alert for home-services appointments. */
+async function maybeSendAppointmentNotification(callSid, appointment, kind = 'created') {
+  if (!appointment) return;
+  let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+  let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
+  let businessName = process.env.BUSINESS_NAME || 'your business';
+  try {
+    const profile = await db.getTenantProfile({ callSid });
+    ownerNumber = profile.whatsappNumber || ownerNumber;
+    ownerEmail = profile.alertEmail || ownerEmail;
+    businessName = profile.businessName || businessName;
+  } catch (err) {
+    console.warn(
+      `[${callSid}] tenant lookup for appointment notify failed:`,
+      err?.message || err
+    );
+  }
+
+  const status = String(appointment.status || 'requested').toLowerCase();
+  const title =
+    kind === 'updated'
+      ? status === 'cancelled'
+        ? 'VISIT CANCELLED'
+        : 'VISIT UPDATED'
+      : 'VISIT REQUEST';
+
+  const lines = [
+    `${title} — ${businessName}`,
+    appointment.service_name ? `Service: ${appointment.service_name}` : null,
+    appointment.when_text ? `When: ${appointment.when_text}` : null,
+    appointment.address_landmark
+      ? `Where: ${appointment.address_landmark}`
+      : null,
+    appointment.caller_name ? `Caller: ${appointment.caller_name}` : null,
+    appointment.caller_phone ? `Phone: ${appointment.caller_phone}` : null,
+    appointment.notes ? `Notes: ${appointment.notes}` : null,
+    `Status: ${status}`,
+    'Open Appointments in Scalers desk to confirm or cancel.',
+  ].filter(Boolean);
+
+  const body = lines.join('\n');
+  const lead = {
+    businessName,
+    name: appointment.caller_name || 'Caller',
+    reason: `${title}: ${[appointment.service_name, appointment.when_text]
+      .filter(Boolean)
+      .join(' — ')}`,
+    callerNumber: appointment.caller_phone,
+  };
+
+  const result = await dispatchAlert({
+    to: ownerNumber,
+    email: ownerEmail,
+    body,
+    lead,
+    subject: `${title} — ${businessName}`,
+  });
+  if (result.channel) {
+    console.log(
+      `[${callSid}] Appointment notify (${kind}/${status}) via ${result.channel}` +
+        (result.to ? ` → ${result.to}` : '')
+    );
+  } else {
+    console.warn(
+      `[${callSid}] Appointment notify skipped (${result.reason || 'unknown'})`
+    );
+  }
+}
+
 const CONTEXT_WINDOW = 16;
 
 wss.on('connection', (ws) => {
@@ -1985,7 +2056,7 @@ wss.on('connection', (ws) => {
             callSid,
             buildBrainCapabilities(
               { ...profile, agentTools: parsedTools },
-              { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+              { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
             )
           );
           messages = [{ role: 'system', content: systemPrompt }];
@@ -2012,7 +2083,7 @@ wss.on('connection', (ws) => {
           callBrainCapabilities.get(callSid) ||
           buildBrainCapabilities(
             { agentTools: callAgentTools.get(callSid) || parseAgentTools(null) },
-            { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+            { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
           );
         const previousBrainState =
           callBrainStates.get(callSid) || createBrainState(brainProfile);
@@ -2185,7 +2256,7 @@ async function applyGeminiTools(callSid, parsed) {
     callBrainCapabilities.get(callSid) ||
     buildBrainCapabilities(
       { agentTools: tools },
-      { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+      { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
     );
   const state = callBrainStates.get(callSid) || createBrainState();
   const groundedProfile = callTenantProfiles.get(callSid) || {};
@@ -2215,6 +2286,51 @@ async function applyGeminiTools(callSid, parsed) {
           });
         }
         return created;
+      },
+      createAppointment: async (appointment) => {
+        const created = await db.createAppointment({
+          callSid,
+          serviceName: appointment.serviceName,
+          name: appointment.name || parsed.name,
+          phone: appointment.phone,
+          whenText: appointment.whenText,
+          landmark: appointment.landmark,
+          notes: appointment.notes || parsed.reason,
+          windowStart: appointment.windowStart,
+          windowEnd: appointment.windowEnd,
+        });
+        if (created) {
+          console.log(
+            `[${callSid}] appointment created id=${created.id} service=${created.service_name}`
+          );
+          maybeSendAppointmentNotification(callSid, created, 'created').catch((err) => {
+            console.error(`[${callSid}] appointment notify error:`, err?.message || err);
+          });
+        }
+        return created;
+      },
+      updateAppointment: async (appointment) => {
+        const updated = await db.updateAppointment({
+          callSid,
+          appointmentId: appointment.appointmentId,
+          phone: appointment.phone,
+          status: appointment.status,
+          whenText: appointment.whenText,
+          landmark: appointment.landmark,
+          notes: appointment.notes,
+          serviceName: appointment.serviceName,
+          windowStart: appointment.windowStart,
+          windowEnd: appointment.windowEnd,
+        });
+        if (updated) {
+          console.log(
+            `[${callSid}] appointment updated id=${updated.id} status=${updated.status}`
+          );
+          maybeSendAppointmentNotification(callSid, updated, 'updated').catch((err) => {
+            console.error(`[${callSid}] appointment update notify error:`, err?.message || err);
+          });
+        }
+        return updated;
       },
       saveCallerInfo: (info) =>
         db.saveCallerInfo({

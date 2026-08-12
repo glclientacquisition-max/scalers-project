@@ -187,6 +187,16 @@ Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for 
 For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
 For type "order": ONLY append when you have name + item.
 In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
+When booking a home-services visit, append:
+###TOOL###
+{"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","landmark":"<address or landmark>","notes":"<optional>"}}
+###ENDTOOL###
+ONLY when you already have service_name + name + when_text + landmark. If any is missing, ask ONE short question.
+To reschedule or cancel a visit, append:
+###TOOL###
+{"update_appointment":{"status":"cancelled|requested","when_text":"<new time if rescheduling>","notes":"<optional>"}}
+###ENDTOOL###
+Never claim booked, moved, or cancelled until the backend confirmation is spoken.
 ${escalateTools}
 ${endCallTools}
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
@@ -229,6 +239,17 @@ Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for 
 For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
 For type "order": ONLY append when you have name + item.
 In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
+
+When booking a home-services visit, append:
+###TOOL###
+{"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","landmark":"<address or landmark>","notes":"<optional>"}}
+###ENDTOOL###
+ONLY when you already have service_name + name + when_text + landmark. If any is missing, ask ONE short question.
+To reschedule or cancel a visit, append:
+###TOOL###
+{"update_appointment":{"status":"cancelled|requested","when_text":"<new time if rescheduling>","notes":"<optional>"}}
+###ENDTOOL###
+Never claim booked, moved, or cancelled until the backend confirmation is spoken.
 
 ${escalateTools}
 

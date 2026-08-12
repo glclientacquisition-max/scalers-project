@@ -60,6 +60,12 @@
 --   status (open|fulfilled|cancelled)
 --   item, quantity, when_text, notes, caller_name, caller_phone, metadata
 --
+-- appointments  (see appointments.sql)
+--   id uuid PK, tenant_id, contact_id, call_id
+--   service_name, status (requested|confirmed|cancelled|done)
+--   when_text, window_start, window_end, address_landmark
+--   notes, caller_name, caller_phone, metadata
+--
 -- tenant_members  (user ↔ tenant mapping; see multi_tenant_onboarding.sql)
 --   id uuid PK
 --   created_at timestamptz

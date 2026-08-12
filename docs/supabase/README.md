@@ -95,6 +95,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 20 | [`business_operating_model.sql`](./business_operating_model.sql) | `services_catalog.sql` era | `vertical`, `handoff_mode`, `business_locations`, `business_policies` |
 | 21 | [`contacts_and_requests.sql`](./contacts_and_requests.sql) | `business_operating_model.sql` | `contacts` + `service_requests` + RLS |
 | 22 | [`product_catalog_and_social.sql`](./product_catalog_and_social.sql) | `business_operating_model.sql` | `product_catalog` + `social_handles` (products separate from services) |
+| 23 | [`appointments.sql`](./appointments.sql) | `contacts_and_requests.sql` | Home-services visit bookings (`requested\|confirmed\|cancelled\|done`) + RLS |
 
 ---
 

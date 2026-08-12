@@ -3,6 +3,9 @@
 const { parseVertical } = require('../vertical');
 const { parseHandoffMode } = require('../handoffMode');
 const { formatRetailPlaybookForPrompt } = require('./retail');
+const {
+  formatHomeServicesPlaybookForPrompt,
+} = require('./homeServices');
 
 /**
  * @param {object} [profile]
@@ -15,8 +18,11 @@ function formatPlaybookForPrompt(profile = {}) {
   if (vertical === 'retail') {
     return formatRetailPlaybookForPrompt({ handoffMode });
   }
+  if (vertical === 'home_services') {
+    return formatHomeServicesPlaybookForPrompt({ handoffMode });
+  }
 
-  // Home services / hospitality packs land later; general uses core rules only.
+  // Hospitality pack lands later; general uses core rules only.
   return '';
 }
 
