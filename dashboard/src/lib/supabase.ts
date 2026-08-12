@@ -26,6 +26,13 @@ export function getSupabaseAdmin(): SupabaseClient {
 
 export type LeadStatus = "new" | "contacted" | "resolved" | "archived";
 
+export type CallResolution =
+  | "resolved"
+  | "needs_human"
+  | "abandoned"
+  | "unresolved"
+  | "unknown";
+
 export type CallRow = {
   id: string;
   created_at: string;
@@ -38,11 +45,43 @@ export type CallRow = {
   summary: string | null;
   sentiment: string | null;
   lead_status?: LeadStatus | null;
+  resolution?: CallResolution | null;
+  primary_intent?: string | null;
+  resolution_note?: string | null;
 };
 
 export function parseLeadStatus(raw: unknown): LeadStatus {
   if (raw === "contacted" || raw === "resolved" || raw === "archived") return raw;
   return "new";
+}
+
+export function parseCallResolution(raw: unknown): CallResolution {
+  if (
+    raw === "resolved" ||
+    raw === "needs_human" ||
+    raw === "abandoned" ||
+    raw === "unresolved" ||
+    raw === "unknown"
+  ) {
+    return raw;
+  }
+  return "unknown";
+}
+
+/** Owner-facing labels for AI assist outcome. */
+export function callResolutionLabel(resolution: CallResolution): string {
+  switch (resolution) {
+    case "resolved":
+      return "Resolved";
+    case "needs_human":
+      return "Needs human";
+    case "abandoned":
+      return "Abandoned";
+    case "unresolved":
+      return "Unresolved";
+    default:
+      return "Unknown";
+  }
 }
 
 /** Owner-facing labels (DB values stay contacted/resolved/archived). */

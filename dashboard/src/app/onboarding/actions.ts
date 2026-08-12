@@ -12,6 +12,9 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { formatLocationsForCompiler } from "@/lib/businessLocations";
+import { formatPoliciesForCompiler } from "@/lib/businessPolicies";
+import { formatServicesForCompiler } from "@/lib/servicesCatalog";
+import { buildRetailOnboardingSeed } from "@/lib/retailOnboardingPack";
 
 export type OnboardingState = {
   error?: string;
@@ -70,21 +73,36 @@ export async function completeOnboardingAction(
     },
   ];
   const locationsText = formatLocationsForCompiler(businessLocations);
+  const seed = buildRetailOnboardingSeed({
+    vertical,
+    servicesPricing,
+    hoursLocation,
+    landmark,
+  });
+  const servicesOffered =
+    formatServicesForCompiler(seed.servicesCatalog, servicesPricing) ||
+    servicesPricing;
+  const policiesText = seed.businessPolicies
+    ? formatPoliciesForCompiler(seed.businessPolicies)
+    : "";
 
   const answers: OnboardingAnswers = {
-    servicesPricing,
+    servicesPricing: servicesOffered,
     hoursLocation,
     tone,
   };
 
   let { prompt } = await compileReceptionistPrompt({
     businessName: tenant.business_name,
-    servicesOffered: servicesPricing,
+    servicesOffered,
     businessHours: hoursLocation,
     agentTone: tone,
     vertical,
     handoffMode,
     locationsText,
+    policiesText,
+    faqs: seed.faqs,
+    unknownAnswerFallback: seed.unknownAnswerFallback || undefined,
   });
 
   if (!prompt || prompt.length < 80) {
@@ -102,14 +120,22 @@ export async function completeOnboardingAction(
   }
 
   const patch: Record<string, unknown> = {
-    services_offered: servicesPricing,
+    services_offered: servicesOffered,
+    services_catalog: seed.servicesCatalog,
     business_hours: hoursLocation,
     agent_tone: tone,
     vertical,
     handoff_mode: handoffMode,
     business_locations: businessLocations,
+    faqs: seed.faqs,
     llm_system_prompt: prompt,
   };
+  if (seed.businessPolicies) {
+    patch.business_policies = seed.businessPolicies;
+  }
+  if (seed.unknownAnswerFallback) {
+    patch.unknown_answer_fallback = seed.unknownAnswerFallback;
+  }
 
   const { error } = await workspace.client
     .from("tenants")
@@ -117,6 +143,41 @@ export async function completeOnboardingAction(
     .eq("id", tenant.id);
 
   if (error) {
+    // Peel optional retail pack columns if migrations are not applied yet.
+    if (
+      /faqs|business_policies|services_catalog|unknown_answer_fallback|column/i.test(
+        error.message
+      )
+    ) {
+      const corePatch: Record<string, unknown> = {
+        services_offered: servicesOffered,
+        business_hours: hoursLocation,
+        agent_tone: tone,
+        vertical,
+        handoff_mode: handoffMode,
+        business_locations: businessLocations,
+        llm_system_prompt: prompt,
+      };
+      const { error: coreErr } = await workspace.client
+        .from("tenants")
+        .update(corePatch)
+        .eq("id", tenant.id);
+      if (!coreErr) {
+        redirect("/home");
+      }
+      if (/vertical|handoff_mode|business_locations/i.test(coreErr.message)) {
+        const { error: fallbackErr } = await workspace.client
+          .from("tenants")
+          .update({
+            services_offered: servicesPricing,
+            business_hours: hoursLocation,
+            agent_tone: tone,
+            llm_system_prompt: prompt,
+          })
+          .eq("id", tenant.id);
+        if (!fallbackErr) redirect("/home");
+      }
+    }
     if (/vertical|handoff_mode|business_locations/i.test(error.message)) {
       // Columns not applied yet — still save core profile + prompt.
       const { error: fallbackErr } = await workspace.client

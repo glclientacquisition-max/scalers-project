@@ -247,6 +247,9 @@ function recordActionResults(state, results = []) {
   next.actions.lastResults = safeResults.map((result) => ({
     action: String(result.action || ''),
     status: String(result.status || ''),
+    ...(result.requestType
+      ? { requestType: String(result.requestType) }
+      : {}),
   }));
   for (const result of safeResults) {
     if (result.status === 'succeeded' && result.fingerprint) {

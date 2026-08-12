@@ -66,7 +66,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['product', 'name', 'when'],
     optionalSlots: ['quantity'],
     completion:
-      'Once product + caller name + pickup/when are known, confirm and append create_service_request type=hold. Then goodbye.',
+      'Once product + caller name + pickup/when are known, confirm and append create_service_request type=hold with name, item, and when_text. Never fire hold without all three. Then goodbye.',
     tool: 'create_service_request:hold',
     patterns: [
       /\b(hold|weka|reserve|pickup|pick\s*up|nitapita|nitakuja|keep (it|one|two|them) for)\b/i,
@@ -78,7 +78,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['product', 'name'],
     optionalSlots: ['quantity', 'when'],
     completion:
-      'Confirm product (+ qty if given) and name, append create_service_request type=order, set expectations for owner follow-up.',
+      'Confirm product (+ qty if given) and name, append create_service_request type=order with name + item. Do not fire order without name and item.',
     tool: 'create_service_request:order',
     patterns: [
       /\b(order|buy|purchase|nataka kununua|ninaorder|deliver(y)?)\b/i,

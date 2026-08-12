@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  callResolutionLabel,
+  parseCallResolution,
   parseLeadStatus,
   parseSummary,
   type CallRow,
@@ -93,6 +95,8 @@ function parseFromFilter(raw: string | undefined): StatusFilterId | undefined {
 }
 
 const CALL_SELECT =
+  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
+const CALL_SELECT_LEAD =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
 const CALL_SELECT_LEGACY =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
@@ -137,6 +141,17 @@ export default async function CallDetailPage({
   let call = first.data as CallRow | null;
   let error = first.error;
 
+  if (error && /resolution|primary_intent|resolution_note|column/i.test(error.message)) {
+    const retry = await workspace.client
+      .from("calls")
+      .select(CALL_SELECT_LEAD)
+      .eq("id", id)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    call = retry.data as CallRow | null;
+    error = retry.error;
+  }
+
   if (error && /lead_status|column/i.test(error.message)) {
     leadStatusReady = false;
     const retry = await workspace.client
@@ -156,6 +171,7 @@ export default async function CallDetailPage({
   const reason = typeof meta.reason === "string" ? meta.reason : null;
   const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
   const leadStatus = parseLeadStatus(row.lead_status);
+  const resolution = parseCallResolution(row.resolution);
   const title = name || row.caller_number;
   const businessName = tenant.business_name?.trim() || "us";
   const waMessage = followUpWhatsAppMessage({ businessName, name, reason });
@@ -253,6 +269,22 @@ export default async function CallDetailPage({
             <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
             <span>Escalation: {meta.escalation_sent ? "sent" : "no"}</span>
           </div>
+          {row.resolution != null || row.primary_intent || row.resolution_note ? (
+            <div className="mt-2 space-y-1 text-sm">
+              <p>
+                Assist:{" "}
+                <span className="font-medium text-ink">
+                  {callResolutionLabel(resolution)}
+                </span>
+                {row.primary_intent ? (
+                  <span className="text-ink-soft"> · {row.primary_intent}</span>
+                ) : null}
+              </p>
+              {row.resolution_note ? (
+                <p className="text-ink-soft">{row.resolution_note}</p>
+              ) : null}
+            </div>
+          ) : null}
           {escalatedTo?.name ? (
             <p className="mt-2 text-sm text-ink">
               Escalated to {escalatedTo.name}

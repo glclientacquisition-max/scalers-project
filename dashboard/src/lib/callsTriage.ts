@@ -1,7 +1,9 @@
 import {
   leadStatusLabel,
+  parseCallResolution,
   parseLeadStatus,
   parseSummary,
+  type CallResolution,
   type CallRow,
   type LeadStatus,
 } from "@/lib/supabase";
@@ -13,6 +15,8 @@ export type Lead = {
   notified: boolean;
   urgent: boolean;
   leadStatus: LeadStatus;
+  resolution: CallResolution;
+  primaryIntent: string | null;
 };
 
 export const STATUS_FILTERS = [
@@ -36,6 +40,8 @@ export function toLead(call: CallRow): Lead {
     notified: Boolean(meta.whatsapp_sent),
     urgent: String(call.sentiment || "").toLowerCase() === "urgent",
     leadStatus: parseLeadStatus(call.lead_status),
+    resolution: parseCallResolution(call.resolution),
+    primaryIntent: call.primary_intent?.trim() || null,
   };
 }
 
