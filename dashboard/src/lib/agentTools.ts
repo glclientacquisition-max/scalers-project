@@ -20,16 +20,14 @@ export const AGENT_TOOL_OPTIONS: {
   {
     id: "escalate",
     label: "Alert a teammate",
-    blurb:
-      "When a caller is angry, asks for a refund, or wants a specific person, notify that teammate (WhatsApp or email).",
+    blurb: "Notify for anger, refunds, or role requests.",
     onLabel: "On: send alerts",
-    offLabel: "Off: just take a note",
+    offLabel: "Off: take a note",
   },
   {
     id: "end_call",
     label: "Hang up after goodbye",
-    blurb:
-      "Let the receptionist end the call after a clear goodbye. Turn off if you prefer the line to stay open.",
+    blurb: "End the call after a clear goodbye.",
     onLabel: "On: can hang up",
     offLabel: "Off: stay on the line",
   },
