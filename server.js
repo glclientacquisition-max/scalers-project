@@ -17,6 +17,11 @@ const {
   createSonioxTtsSession,
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
+const {
+  resolveSonioxVoice,
+  ensureSonioxVoiceReady,
+} = require('./src/speech/sonioxVoice');
+const { synthesizeTtsPreview } = require('./src/speech/ttsPreview');
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
 const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
@@ -141,7 +146,54 @@ app.use((req, res, next) => {
 });
 
 app.get('/healthz', (_req, res) => {
-  res.status(200).json({ ok: true });
+  res.status(200).json({
+    ok: true,
+    soniox: {
+      stt: isSonioxConfigured(),
+      tts: isSonioxTtsConfigured(),
+      voice: resolveSonioxVoice(),
+    },
+  });
+});
+
+function voicePreviewAuthorized(req) {
+  const secret = String(process.env.VOICE_INTERNAL_SECRET || '').trim();
+  if (!secret) {
+    return process.env.NODE_ENV !== 'production';
+  }
+  const header = String(req.headers['x-voice-internal-secret'] || '').trim();
+  return header === secret;
+}
+
+app.post('/api/tts/preview', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!isSonioxTtsConfigured()) {
+    return res.status(503).json({ error: 'Soniox TTS not configured' });
+  }
+
+  const text = String(req.body?.text || '').trim();
+  if (!text || text.length > 500) {
+    return res.status(400).json({ error: 'text required (max 500 chars)' });
+  }
+
+  try {
+    const result = await synthesizeTtsPreview({
+      text,
+      callLanguage: req.body?.callLanguage,
+      language: req.body?.language,
+      lexicon: req.body?.lexicon,
+    });
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('X-Spoken-Text', encodeURIComponent(result.spokenText));
+    res.setHeader('X-Tts-Language', result.language);
+    res.setHeader('X-Soniox-Voice', resolveSonioxVoice());
+    return res.send(result.wav);
+  } catch (err) {
+    console.error('[api/tts/preview] failed:', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'preview failed' });
+  }
 });
 
 /**
@@ -1514,7 +1566,7 @@ mediaWss.on('connection', (ws, req) => {
       tts = null;
     }
   } else {
-    console.warn('[ws/media] SONIOX_VOICE missing — skipping TTS for this call');
+    console.warn('[ws/media] SONIOX_API_KEY missing — skipping TTS for this call');
   }
 
   // Greet once media + TTS + tenant prompt are ready.
@@ -2460,13 +2512,18 @@ server.listen(PORT, () => {
     console.log(`ℹ GEMINI_API_KEY not set (optional for Phase 2 webhook tests)`);
   }
   if (isSonioxConfigured()) {
-    console.log(
-      `✓ SONIOX_API_KEY present (STT on /ws/media)${process.env.SONIOX_VOICE ? ` voice=${process.env.SONIOX_VOICE}` : ''}`
-    );
+    console.log(`✓ SONIOX_API_KEY present (STT on /ws/media)`);
     if (isSonioxTtsConfigured()) {
-      console.log(`✓ SONIOX_VOICE present (TTS replies enabled)`);
+      console.log(
+        `✓ Soniox TTS enabled cloned voice=${resolveSonioxVoice()}`
+      );
+      ensureSonioxVoiceReady({ log: console.log }).catch((err) => {
+        console.warn(
+          `⚠ Soniox voice readiness check failed: ${err?.message || err}`
+        );
+      });
     } else {
-      console.log(`ℹ SONIOX_VOICE not set — STT only, no spoken replies`);
+      console.log(`ℹ SONIOX_API_KEY missing — no spoken replies`);
     }
   } else {
     console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
