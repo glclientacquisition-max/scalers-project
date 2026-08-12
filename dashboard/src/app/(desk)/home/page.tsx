@@ -1,14 +1,8 @@
 import Link from "next/link";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import {
-  MarkLeadArchiveButton,
-  MarkLeadDoneButton,
-} from "@/components/MarkLeadDoneButton";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { TriageLeadCard } from "@/components/TriageLeadCard";
 import {
   callsHref,
-  followUpWhatsAppMessage,
-  formatCallWhen,
   nairobiDayStartIso,
   nairobiGreeting,
   toLead,
@@ -24,13 +18,11 @@ function GlanceCard({
   href,
   label,
   value,
-  hint,
   warn = false,
 }: {
   href: string;
   label: string;
   value: string;
-  hint: string;
   warn?: boolean;
 }) {
   return (
@@ -40,10 +32,12 @@ function GlanceCard({
         "block rounded-2xl border px-4 py-4 transition focus-visible:outline-none focus-visible:shadow-focus",
         warn
           ? "border-warn/45 bg-warn-soft hover:border-warn"
-          : "border-line bg-surface hover:border-accent/50",
+          : "border-line bg-surface hover:border-[#0096FF]/45",
       ].join(" ")}
     >
-      <p className="text-xs uppercase tracking-wide text-ink-soft">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+        {label}
+      </p>
       <p
         className={[
           "mt-2 font-display text-3xl tracking-tight",
@@ -52,9 +46,6 @@ function GlanceCard({
       >
         {value}
       </p>
-      <p className={["mt-1 text-xs", warn ? "text-warn" : "text-ink-soft"].join(" ")}>
-        {hint}
-      </p>
     </Link>
   );
 }
@@ -62,28 +53,25 @@ function GlanceCard({
 function ActionCard({
   href,
   title,
-  body,
   cta,
   solid = false,
 }: {
   href: string;
   title: string;
-  body: string;
   cta: string;
   solid?: boolean;
 }) {
   const isTel = href.startsWith("tel:");
   const className = [
-    "mt-4 inline-flex min-h-10 items-center rounded-xl px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
+    "mt-4 inline-flex min-h-11 items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
     solid
-      ? "bg-accent text-white hover:bg-accent-deep"
-      : "border border-line text-accent-deep hover:border-accent",
+      ? "bg-[#0096FF] text-white hover:bg-[#0088e8]"
+      : "border border-line text-[#005ccc] hover:border-[#0096FF]",
   ].join(" ");
 
   return (
     <div className="rounded-2xl border border-line bg-surface px-5 py-5">
       <h2 className="font-display text-xl tracking-tight text-ink">{title}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-ink-soft">{body}</p>
       {isTel ? (
         <a href={href} className={className}>
           {cta}
@@ -97,49 +85,6 @@ function ActionCard({
   );
 }
 
-function TriageCard({ lead, businessName }: { lead: Lead; businessName: string }) {
-  const message = followUpWhatsAppMessage({
-    businessName,
-    name: lead.name,
-    reason: lead.reason,
-  });
-
-  return (
-    <li
-      className={[
-        "rounded-2xl border bg-surface p-4",
-        lead.urgent ? "border-warn/50 bg-warn-soft" : "border-line",
-      ].join(" ")}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs text-ink-soft">{formatCallWhen(lead.call.created_at)}</p>
-          <p className="mt-1 truncate text-base font-medium text-ink">
-            {lead.name || lead.call.caller_number}
-            {lead.urgent ? (
-              <span className="ml-2 align-middle text-xs font-medium text-warn">urgent</span>
-            ) : null}
-          </p>
-          <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">
-            {lead.reason || "No reason captured yet"}
-          </p>
-        </div>
-        <WhatsAppLink number={lead.call.caller_number} compact message={message} />
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <MarkLeadDoneButton callId={lead.call.id} />
-        <MarkLeadArchiveButton callId={lead.call.id} />
-        <Link
-          href={`/calls/${lead.call.id}?from=new`}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-accent hover:border-accent focus-visible:outline-none focus-visible:shadow-focus"
-        >
-          Open
-        </Link>
-      </div>
-    </li>
-  );
-}
-
 function resolveNextAction(opts: {
   pendingDid: boolean;
   did: string;
@@ -149,7 +94,6 @@ function resolveNextAction(opts: {
   if (opts.pendingDid) {
     return {
       title: "Finish setup",
-      body: "Your number is being assigned. Train the receptionist so the first calls sound right.",
       href: "/settings#train",
       cta: "Train receptionist",
       solid: true,
@@ -158,7 +102,6 @@ function resolveNextAction(opts: {
   if (opts.totalCalls === 0) {
     return {
       title: "Place a test call",
-      body: `Call ${opts.did} from another phone. Captured leads will appear here for triage.`,
       href: `tel:${opts.did}`,
       cta: "Call your line",
       solid: true,
@@ -166,29 +109,27 @@ function resolveNextAction(opts: {
   }
   if (opts.newCount > 0) {
     return {
-      title: "Lead triage",
-      body: `${opts.newCount} new lead${opts.newCount === 1 ? "" : "s"} waiting. Follow up on WhatsApp, then mark Done or Archive.`,
+      title: "Action Required",
       href: callsHref({ status: "new" }),
-      cta: "Open new leads",
+      cta: `Open ${opts.newCount} waiting`,
       solid: true,
     };
   }
   return {
-    title: "You're caught up",
-    body: "No new leads right now. Post today’s update or refine training anytime.",
+    title: "Caught up",
     href: "/settings#today",
-    cta: "Post today's update",
+    cta: "Post update",
     solid: false,
   };
 }
 
-export default async function HomeDashboardPage() {
+export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-accent">
+        <Link href="/signup" className="text-[#0096FF]">
           Create one
         </Link>
         .
@@ -257,9 +198,7 @@ export default async function HomeDashboardPage() {
   const followedCount = leadStatusReady ? followedRes.count ?? 0 : 0;
   const doneCount = leadStatusReady ? doneRes.count ?? 0 : 0;
   const archivedCount = archiveReady ? archivedRes.count ?? 0 : 0;
-  const activeTotal = leadStatusReady
-    ? allRes.count ?? 0
-    : todayCount;
+  const activeTotal = leadStatusReady ? allRes.count ?? 0 : todayCount;
 
   let needsYou: Lead[] = [];
   if (leadStatusReady && needsRes.data && !needsRes.error) {
@@ -284,11 +223,8 @@ export default async function HomeDashboardPage() {
         {greeting}, <span className="font-medium text-ink">{business}</span>
       </p>
       <h1 className="mt-1 font-display text-3xl tracking-tight text-ink sm:text-4xl">
-        Dashboard
+        Overview
       </h1>
-      <p className="mt-2 max-w-2xl text-sm text-ink-soft sm:text-base">
-        Lead triage, balance, and your next step — at a glance.
-      </p>
 
       <section
         aria-label="Key numbers"
@@ -298,26 +234,22 @@ export default async function HomeDashboardPage() {
           href={callsHref({ status: "new" })}
           label="Waiting"
           value={String(newCount)}
-          hint={newCount > 0 ? "New leads to triage" : "Inbox clear"}
           warn={newCount > 0}
         />
         <GlanceCard
           href={callsHref({ status: "contacted" })}
           label="Followed Up"
           value={String(followedCount)}
-          hint="In progress"
         />
         <GlanceCard
           href={callsHref()}
           label="Today"
           value={String(todayCount)}
-          hint="Calls since midnight EAT"
         />
         <GlanceCard
           href="/wallet"
           label="Balance"
           value={`KES ${kes.toLocaleString("en-KE")}`}
-          hint={lowWallet ? "Low — top up soon" : "Prepaid wallet"}
           warn={lowWallet}
         />
       </section>
@@ -326,7 +258,6 @@ export default async function HomeDashboardPage() {
         <ActionCard
           href={next.href}
           title={next.title}
-          body={next.body}
           cta={next.cta}
           solid={next.solid}
         />
@@ -336,7 +267,7 @@ export default async function HomeDashboardPage() {
             <div className="flex justify-between gap-3">
               <dt className="text-ink-soft">Receptionist line</dt>
               <dd className="font-medium text-ink">
-                {pendingDid ? "Pending" : did || "—"}
+                {pendingDid ? "Pending" : did || "Not set"}
               </dd>
             </div>
             <div className="flex justify-between gap-3">
@@ -346,38 +277,58 @@ export default async function HomeDashboardPage() {
             <div className="flex justify-between gap-3">
               <dt className="text-ink-soft">Archived</dt>
               <dd className="font-medium text-ink">
-                {archiveReady ? archivedCount : "—"}
+                {archiveReady ? archivedCount : "N/A"}
               </dd>
             </div>
           </dl>
           <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            <Link href="/calls" className="font-medium text-accent-deep hover:underline">
+            <Link
+              href="/calls"
+              className="font-medium text-[#005ccc] hover:underline"
+            >
               Inbox
             </Link>
-            <Link href="/requests" className="font-medium text-accent-deep hover:underline">
+            <Link
+              href="/requests"
+              className="font-medium text-[#005ccc] hover:underline"
+            >
               Requests
             </Link>
-            <Link href="/settings#today" className="font-medium text-accent-deep hover:underline">
+            <Link
+              href="/settings#today"
+              className="font-medium text-[#005ccc] hover:underline"
+            >
               Today&apos;s update
             </Link>
-            <Link href="/settings#train" className="font-medium text-accent-deep hover:underline">
+            <Link
+              href="/settings#train"
+              className="font-medium text-[#005ccc] hover:underline"
+            >
               Train
             </Link>
-            <Link href="/wallet" className="font-medium text-accent-deep hover:underline">
+            <Link
+              href="/wallet"
+              className="font-medium text-[#005ccc] hover:underline"
+            >
               Wallet
             </Link>
           </nav>
         </div>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-8" aria-labelledby="action-required-heading">
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="font-display text-2xl tracking-tight text-ink">Lead triage</h2>
+          <h2
+            id="action-required-heading"
+            className="font-display text-2xl tracking-tight text-ink"
+          >
+            Action Required
+          </h2>
           <Link
             href={callsHref({ status: "new" })}
-            className="text-sm font-medium text-accent-deep hover:underline"
+            className="text-sm font-medium text-[#005ccc] hover:underline"
           >
-            {newCount > 0 ? `View all ${newCount} new` : "Open inbox"}
+            {newCount > 0 ? `View all ${newCount}` : "Open inbox"}
           </Link>
         </div>
 
@@ -388,16 +339,13 @@ export default async function HomeDashboardPage() {
             <code>docs/supabase/lead_status_archive.sql</code>.
           </p>
         ) : needsYou.length === 0 ? (
-          <div className="mt-4 rounded-2xl border border-line bg-surface px-5 py-8 text-center">
+          <div className="mt-4 rounded-2xl border border-line bg-surface px-5 py-10 text-center">
             <p className="font-display text-xl text-ink">No leads waiting</p>
-            <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-              New callers will show here with WhatsApp, Done, and Archive actions.
-            </p>
           </div>
         ) : (
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-4 space-y-4">
             {needsYou.map((lead) => (
-              <TriageCard key={lead.call.id} lead={lead} businessName={business} />
+              <TriageLeadCard key={lead.call.id} lead={lead} businessName={business} />
             ))}
           </ul>
         )}
