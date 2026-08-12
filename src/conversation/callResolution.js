@@ -8,11 +8,50 @@ const RESOLUTIONS = new Set([
   'unknown',
 ]);
 
+/** Map runtime intent ids onto desk-facing taxonomy. */
+const INTENT_ALIASES = Object.freeze({
+  hold: 'hold_or_pickup',
+  hold_or_pickup: 'hold_or_pickup',
+  hours: 'hours_open',
+  hours_open: 'hours_open',
+  location: 'directions',
+  directions: 'directions',
+  order: 'order_enquiry',
+  order_enquiry: 'order_enquiry',
+  price: 'price',
+  availability: 'availability',
+  policy: 'policy',
+  human: 'human',
+  product_inquiry: 'product_inquiry',
+  general_enquiry: 'general_enquiry',
+  booking: 'booking',
+  cancellation: 'cancellation',
+  complaint: 'complaint',
+});
+
+const DIRECT_ANSWER_INTENTS = new Set([
+  'hours',
+  'hours_open',
+  'location',
+  'directions',
+  'price',
+  'availability',
+  'policy',
+  'product_inquiry',
+  'general_enquiry',
+]);
+
 function clean(value, max = 240) {
   return String(value == null ? '' : value)
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, max);
+}
+
+function normalizePrimaryIntent(raw) {
+  const key = clean(raw, 80).toLowerCase();
+  if (!key || key === 'unknown') return null;
+  return INTENT_ALIASES[key] || key;
 }
 
 /**
@@ -35,7 +74,8 @@ function deriveCallResolution(opts = {}) {
       ? opts.turnCount
       : state.conversation?.turnCount || 0
   );
-  const intent = clean(state.intent || opts.primaryIntent || '', 80) || null;
+  const rawIntent = state.intent || opts.primaryIntent || '';
+  const intent = normalizePrimaryIntent(rawIntent);
 
   const requestOk = results.some(
     (r) =>
@@ -48,6 +88,18 @@ function deriveCallResolution(opts = {}) {
   const handoff =
     Boolean(state.handoff?.requested || state.handoff?.required) ||
     escalateAttempted;
+
+  const missingSlots = Array.isArray(state.goal?.missingSlots)
+    ? state.goal.missingSlots
+    : [];
+  const answeredDirect =
+    DIRECT_ANSWER_INTENTS.has(String(state.intent || '').toLowerCase()) &&
+    missingSlots.length === 0 &&
+    turnCount >= 1 &&
+    (state.resolution?.nextBestAction === 'ANSWER' ||
+      state.resolution?.nextBestAction === 'END' ||
+      state.goal?.status === 'completed' ||
+      state.resolution?.status === 'resolved');
 
   let resolution = 'unknown';
   let note = '';
@@ -63,14 +115,23 @@ function deriveCallResolution(opts = {}) {
       (r) =>
         r.action === 'create_service_request' && r.status === 'succeeded'
     )?.requestType;
-    note = type ? `Request saved (${type})` : 'Request saved';
+    const typeNote =
+      type === 'hold' || type === 'hold_or_pickup'
+        ? 'hold'
+        : type || null;
+    note = typeNote ? `Request saved (${typeNote})` : 'Request saved';
   } else if (
     state.resolution?.status === 'resolved' ||
     state.resolution?.nextBestAction === 'END' ||
-    state.goal?.status === 'completed'
+    state.goal?.status === 'completed' ||
+    answeredDirect
   ) {
     resolution = 'resolved';
-    note = clean(state.resolution?.reason || 'Caller question answered', 200);
+    note = clean(
+      state.resolution?.reason ||
+        (intent ? `Answered ${intent}` : 'Caller question answered'),
+      200
+    );
   } else if (turnCount <= 1) {
     resolution = 'abandoned';
     note = 'Very short call — little conversation';
@@ -83,7 +144,7 @@ function deriveCallResolution(opts = {}) {
 
   return {
     resolution,
-    primaryIntent: intent && intent !== 'unknown' ? intent : null,
+    primaryIntent: intent,
     resolutionNote: note || null,
   };
 }
@@ -95,6 +156,8 @@ function parseResolution(raw) {
 
 module.exports = {
   RESOLUTIONS,
+  INTENT_ALIASES,
   deriveCallResolution,
+  normalizePrimaryIntent,
   parseResolution,
 };

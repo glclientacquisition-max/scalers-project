@@ -1,5 +1,7 @@
 // Validate and execute model-proposed actions, returning backend-confirmed outcomes.
 
+const { findProductMatch, normalizeProducts } = require('./productCatalog');
+
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
 function clean(value, max = 240) {
@@ -19,12 +21,18 @@ function stableFingerprint(action, payload) {
   return `${action}:${JSON.stringify(normalized)}`;
 }
 
-function validateServiceRequest(raw) {
+function validateServiceRequest(raw, { productCatalog } = {}) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing service request payload.' };
   }
   const typeRaw = clean(raw.type || 'enquiry', 40).toLowerCase();
-  const type = REQUEST_TYPES.has(typeRaw) ? typeRaw : 'enquiry';
+  // Accept retail playbook alias; persist as hold.
+  const type =
+    typeRaw === 'hold_or_pickup'
+      ? 'hold'
+      : REQUEST_TYPES.has(typeRaw)
+        ? typeRaw
+        : 'enquiry';
   const value = {
     type,
     name: clean(raw.name, 120),
@@ -50,6 +58,21 @@ function validateServiceRequest(raw) {
         missingSlots: missing,
         value,
       };
+    }
+    const catalog = normalizeProducts(productCatalog);
+    if (catalog.length && value.item) {
+      const match = findProductMatch(value.item, catalog);
+      if (!match) {
+        return {
+          valid: false,
+          reason:
+            'That title is not in the grounded catalogue — log an enquiry or special-order quote instead of a hold.',
+          missingSlots: ['catalog_item'],
+          code: 'catalog_miss',
+          value,
+        };
+      }
+      value.item = clean(match.product.name, 200);
     }
   }
   // Orders: require product + name (when optional).
@@ -101,6 +124,7 @@ async function executeBrainTools({
   capabilities = {},
   handlers = {},
   completedFingerprints = [],
+  productCatalog = null,
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
@@ -116,7 +140,9 @@ async function executeBrainTools({
   }
 
   if (parsed?.serviceRequest) {
-    const validation = validateServiceRequest(parsed.serviceRequest);
+    const validation = validateServiceRequest(parsed.serviceRequest, {
+      productCatalog,
+    });
     const fingerprint = validation.valid
       ? stableFingerprint('create_service_request', validation.value)
       : null;
@@ -132,6 +158,7 @@ async function executeBrainTools({
         status: 'invalid',
         reason: validation.reason,
         missingSlots: validation.missingSlots || [],
+        code: validation.code || null,
       });
     } else if (completed.has(fingerprint)) {
       results.push({
@@ -286,6 +313,18 @@ function formatToolConfirmation(results = [], language = 'en') {
       const missing = Array.isArray(meaningful.missingSlots)
         ? meaningful.missingSlots
         : [];
+      if (
+        meaningful.code === 'catalog_miss' ||
+        missing.includes('catalog_item')
+      ) {
+        if (sw) {
+          return 'Sina hiyo kwenye orodha ya sasa — naweza kuhifadhi ombi la quotation badala yake.';
+        }
+        if (sheng) {
+          return 'Siko na hiyo kwa catalogue sasa — naweza save enquiry/quote badala yake.';
+        }
+        return "I don't see that title in our current catalogue — I can log an enquiry or quote request instead.";
+      }
       if (missing.includes('when_text') || /when_text/i.test(meaningful.reason || '')) {
         if (sw) return 'Niambie jina lako na wakati utakapopita ndio nihifadhi hold.';
         if (sheng) return 'Niambie jina yako na when utapita ndio ni-save hold.';

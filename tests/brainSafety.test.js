@@ -9,6 +9,8 @@ const { formatUnknownAnswerPolicy } = require('../src/conversation/liveKnowledge
 const {
   bulletinImpliesClosed,
   bulletinClosureNotice,
+  formatBulletinForPrompt,
+  bulletinKind,
 } = require('../src/conversation/dailyBulletin');
 
 describe('Brain production safety', () => {
@@ -61,5 +63,22 @@ describe('Brain production safety', () => {
     ];
     assert.equal(bulletinImpliesClosed(closed), true);
     assert.equal(bulletinClosureNotice(closed), 'We are closed today.');
+  });
+
+  it('classifies promo bulletins and forbids volunteering them off-topic', () => {
+    assert.equal(
+      bulletinKind('White Paper Books go for 3 Books at KSH 1000'),
+      'promo'
+    );
+    assert.equal(bulletinKind('We are closed today.'), 'operational');
+    const block = formatBulletinForPrompt([
+      {
+        id: 'promo',
+        text: 'Notify Customers: White Paper Books go for 3 Books at KSH 1000',
+        active: true,
+      },
+    ]);
+    assert.match(block, /\[promo\]/);
+    assert.match(block, /NEVER volunteer a promo/i);
   });
 });

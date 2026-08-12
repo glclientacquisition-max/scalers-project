@@ -66,7 +66,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['product', 'name', 'when'],
     optionalSlots: ['quantity'],
     completion:
-      'Once product + caller name + pickup/when are known, confirm and append create_service_request type=hold with name, item, and when_text. Never fire hold without all three. Then goodbye.',
+      'Once product + caller name + pickup/when are known, confirm and append create_service_request type=hold with name, item, and when_text. Never fire hold without all three. Never hold a title that is not in PRODUCT CATALOGUE — offer enquiry/special-order quote instead. Then goodbye.',
     tool: 'create_service_request:hold',
     patterns: [
       /\b(hold|weka|reserve|pickup|pick\s*up|nitapita|nitakuja|keep (it|one|two|them) for)\b/i,

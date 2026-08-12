@@ -48,6 +48,8 @@ const callAgentTools = new Map();
 /** Structured semantic state and actual runtime capabilities, keyed by callSid. */
 const callBrainStates = new Map();
 const callBrainCapabilities = new Map();
+/** Per-call tenant grounding (product catalogue) for hold/order validation. */
+const callTenantProfiles = new Map();
 const {
   analyzeCallerLanguage,
   createLanguageState,
@@ -852,6 +854,7 @@ mediaWss.on('connection', (ws, req) => {
       if (sessionCallSid) {
         const parsedTools = parseAgentTools(profile.agentTools);
         callAgentTools.set(sessionCallSid, parsedTools);
+        callTenantProfiles.set(sessionCallSid, profile);
         callBrainStates.set(sessionCallSid, createBrainState(profile));
         callBrainCapabilities.set(
           sessionCallSid,
@@ -1665,6 +1668,7 @@ mediaWss.on('connection', (ws, req) => {
           callAgentTools.delete(sessionCallSid);
           callBrainStates.delete(sessionCallSid);
           callBrainCapabilities.delete(sessionCallSid);
+          callTenantProfiles.delete(sessionCallSid);
         });
     }
   });
@@ -1975,6 +1979,7 @@ wss.on('connection', (ws) => {
           systemPrompt = buildSystemPrompt(profile);
           const parsedTools = parseAgentTools(profile.agentTools);
           callAgentTools.set(callSid, parsedTools);
+          callTenantProfiles.set(callSid, profile);
           callBrainStates.set(callSid, createBrainState(profile));
           callBrainCapabilities.set(
             callSid,
@@ -2090,6 +2095,7 @@ wss.on('connection', (ws) => {
           callAgentTools.delete(callSid);
           callBrainStates.delete(callSid);
           callBrainCapabilities.delete(callSid);
+          callTenantProfiles.delete(callSid);
         });
     }
   });
@@ -2182,10 +2188,12 @@ async function applyGeminiTools(callSid, parsed) {
       { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
     );
   const state = callBrainStates.get(callSid) || createBrainState();
+  const groundedProfile = callTenantProfiles.get(callSid) || {};
   const execution = await executeBrainTools({
     parsed,
     capabilities,
     completedFingerprints: state.actions.completedFingerprints,
+    productCatalog: groundedProfile.productCatalog || null,
     handlers: {
       createServiceRequest: async (request) => {
         const created = await db.createServiceRequest({

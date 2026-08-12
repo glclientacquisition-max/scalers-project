@@ -24,6 +24,33 @@ describe('deriveCallResolution', () => {
     assert.match(out.resolutionNote || '', /hold/i);
   });
 
+  it('maps runtime hold intent onto hold_or_pickup', () => {
+    let state = createBrainState();
+    state.intent = 'hold';
+    state = recordActionResults(state, [
+      {
+        action: 'create_service_request',
+        status: 'succeeded',
+        requestType: 'hold',
+        fingerprint: 'y',
+      },
+    ]);
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.primaryIntent, 'hold_or_pickup');
+  });
+
+  it('marks answered direct intents as resolved', () => {
+    const state = createBrainState();
+    state.intent = 'hours';
+    state.conversation.turnCount = 2;
+    state.goal.missingSlots = [];
+    state.resolution.nextBestAction = 'ANSWER';
+    state.resolution.status = 'unresolved';
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.resolution, 'resolved');
+    assert.equal(out.primaryIntent, 'hours_open');
+  });
+
   it('marks escalation as needs_human', () => {
     const out = deriveCallResolution({
       brainState: createBrainState(),
