@@ -191,6 +191,59 @@ const fieldClass =
 const tableFieldClass =
   "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
 
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+function ToolSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={[
+        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
+        checked ? "bg-[#0096FF]" : "bg-line",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "inline-block h-5 w-5 rounded-full bg-white shadow transition",
+          checked ? "translate-x-6" : "translate-x-1",
+        ].join(" ")}
+      />
+    </button>
+  );
+}
+
 const SERVICE_PAGE_SIZE = 5;
 const PRODUCT_PAGE_SIZE = 8;
 const FAQ_PAGE_SIZE = 5;
@@ -1643,9 +1696,8 @@ export function TenantForm({
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              How {agentName || "your receptionist"} <em>sounds</em> on live calls
-              (Soniox). The spoken name comes from Agent Persona. Save &amp; train
-              after changing.
+              How {agentName || "your receptionist"} sounds on calls (Soniox).
+              Spoken name comes from Agent Persona. Save &amp; train after changing.
             </p>
           </div>
           {voiceOptions.length > 1 ? (
@@ -1662,8 +1714,8 @@ export function TenantForm({
                     className={[
                       "w-full text-left rounded-xl border px-4 py-3 transition",
                       selected
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
-                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                        ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
+                        : "border-line bg-white hover:border-[#0096FF]/40",
                     ].join(" ")}
                   >
                     <span className="font-medium text-[var(--ink)]">
@@ -1692,7 +1744,7 @@ export function TenantForm({
               Name this voice
             </label>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Your label for this sound — only your team sees it here.
+              Desk-only label for your team.
             </p>
             <input
               id="soniox_voice_label"
@@ -1750,8 +1802,8 @@ export function TenantForm({
                   className={[
                     "w-full text-left rounded-xl border px-4 py-3 transition",
                     selected
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
-                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
+                      : "border-line bg-white hover:border-[#0096FF]/40",
                   ].join(" ")}
                 >
                   <span className="font-medium text-[var(--ink)]">{opt.label}</span>
@@ -1763,53 +1815,36 @@ export function TenantForm({
             })}
           </div>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {AGENT_TOOL_OPTIONS.map((opt) => {
             const on = agentTools[opt.id];
             return (
-              <div key={opt.id} className="space-y-2">
-                <div>
+              <div
+                key={opt.id}
+                className={[
+                  "flex items-start justify-between gap-4 rounded-xl border px-4 py-3 transition",
+                  on
+                    ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
+                    : "border-line bg-white",
+                ].join(" ")}
+              >
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-[var(--ink)]">{opt.label}</p>
                   <p className="mt-0.5 text-xs text-[var(--ink-soft)]">{opt.blurb}</p>
+                  <p className="mt-1 text-xs font-medium text-[var(--ink)]">
+                    {on ? opt.onLabel : opt.offLabel}
+                  </p>
                 </div>
-                <div
-                  className="grid gap-2 sm:grid-cols-2"
-                  role="radiogroup"
-                  aria-label={opt.label}
-                >
-                  {(
-                    [
-                      { value: true, label: opt.onLabel },
-                      { value: false, label: opt.offLabel },
-                    ] as const
-                  ).map((choice) => {
-                    const selected = on === choice.value;
-                    return (
-                      <button
-                        key={`${opt.id}-${choice.value ? "on" : "off"}`}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() =>
-                          setAgentTools((prev) => ({
-                            ...prev,
-                            [opt.id]: choice.value,
-                          }))
-                        }
-                        className={[
-                          "w-full rounded-xl border px-4 py-3 text-left text-sm transition",
-                          selected
-                            ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
-                            : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                        ].join(" ")}
-                      >
-                        <span className="font-medium text-[var(--ink)]">
-                          {choice.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <ToolSwitch
+                  checked={on}
+                  label={opt.label}
+                  onChange={(next) =>
+                    setAgentTools((prev) => ({
+                      ...prev,
+                      [opt.id]: next,
+                    }))
+                  }
+                />
               </div>
             );
           })}
@@ -1911,10 +1946,10 @@ export function TenantForm({
                     prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
                   )
                 }
-                className="mb-0.5 h-[46px] rounded-xl px-3 text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                className="mb-0.5 inline-flex h-[46px] w-11 items-center justify-center rounded-xl text-ink-soft transition hover:bg-surface hover:text-warn"
                 aria-label={`Remove teammate ${index + 1}`}
               >
-                Remove
+                <TrashIcon className="h-4 w-4" />
               </button>
             </div>
           ))}

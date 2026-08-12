@@ -142,13 +142,12 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           Import knowledge
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Paste a menu, FAQ list, or a short business overview. We&apos;ll suggest
-          services, FAQs, hours, location, and policies.
+          Paste a menu, FAQ list, or short overview. We suggest services, FAQs,
+          hours, location, and policies.
         </p>
         <p className="mt-2 text-xs text-[var(--ink-soft)]">
-          Tip: for bookstores and shops, a full overview paste works — we map
-          location/hours/delivery into Train, not as fake services. After you add
-          items, open Train to review the refreshed list.
+          Tip: for shops, paste a full overview. Location, hours, and delivery map
+          into Train (not as fake services). Review under Train after adding.
         </p>
       </div>
 
@@ -207,10 +206,19 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   onChange={(e) => setPaste(e.target.value)}
                   rows={7}
                   placeholder={
-                    "ChapterOne Bookstore — Nairobi CBD\nMon–Sat 9am–7pm\nSame-day Nairobi delivery\n\nOr a menu:\nHome cleaning - from 2,500 KES\n\nQ: Do you cover Westlands?\nA: Yes, same-day when booked before noon."
+                    "ChapterOne Bookstore, Nairobi CBD\nMon-Sat 9am-7pm\nSame-day Nairobi delivery\n\nOr a menu:\nHome cleaning - from 2,500 KES\n\nQ: Do you cover Westlands?\nA: Yes, same-day when booked before noon."
                   }
                   className={`${fieldClass} leading-relaxed`}
                 />
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={extractPending}
+                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+                  >
+                    {extractPending ? "Finding services…" : "Scan and suggest"}
+                  </button>
+                </div>
               </div>
             ) : (
               <div>
@@ -229,24 +237,22 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
                   Public pages only. If the scan is thin, paste the text instead.
                 </p>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={extractPending}
+                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+                  >
+                    {extractPending ? "Opening page…" : "Scan and suggest"}
+                  </button>
+                </div>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={extractPending}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
-            >
-              {extractPending
-                ? mode === "url"
-                  ? "Opening page…"
-                  : "Finding services…"
-                : "Scan and suggest"}
-            </button>
             {extractPending ? (
-              <p className="text-xs text-[var(--ink-soft)]">
+              <p className="text-right text-xs text-[var(--ink-soft)]">
                 {mode === "url"
-                  ? "Usually under 10 seconds. If the site hides its menu in the browser, we’ll ask you to paste instead."
+                  ? "Usually under 10 seconds. If the site hides its menu, paste instead."
                   : "Usually a few seconds."}
               </p>
             ) : null}
