@@ -37,9 +37,21 @@ Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain t
 Desk structured fields (hours, services, FAQs, team, bulletin, tone)
   → Gemini prompt compiler → tenants.llm_system_prompt
 Voice loads tenant profile per call
-  → buildSystemPrompt + CONTEXT HEADER + LIVE GROUND TRUTH
-  → Gemini turn → tool markers (save_caller_info / escalate / end_call)
+  → structured Brain state (goal / intent / entities / language / repair)
+  → authority policy + next-best-action
+  → buildSystemPrompt + CONTEXT HEADER + LIVE GROUND TRUTH + CALL STATE
+  → Gemini response plan → validated tool request
+  → backend result → caller confirmation
 ```
+
+Core runtime modules:
+
+- `src/conversation/brainState.js` — call-local semantic memory
+- `src/conversation/entityExtraction.js`, `goalModel.js` — grounded slots and completion
+- `src/conversation/brainPolicy.js`, `nextBestAction.js` — authority + resolution ladder
+- `src/conversation/conversationRepair.js` — bounded contextual repair
+- `src/conversation/toolExecution.js` — validated actions and confirmed results
+- `src/conversation/brainObservability.js` — PII-safe structured decision traces
 
 ## Invariants
 
@@ -54,6 +66,7 @@ Voice loads tenant profile per call
 ## Test / verify
 
 - Escalation smoke: `node scripts/smoke-escalation-scenarios.js` (when relevant)
+- Brain outcomes: `npm run test:brain`
 - Manual: change settings → compile → place a test call; confirm CONTEXT HEADER / ground truth behavior
 - Do not require `npm run test:voice` unless you touched media path (you shouldn’t)
 
