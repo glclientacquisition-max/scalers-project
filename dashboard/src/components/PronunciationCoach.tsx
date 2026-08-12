@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import {
   confirmPronunciationRecording,
   minePronunciationFromCallsAction,
@@ -126,7 +126,7 @@ export function PronunciationCoach({
       const fd = new FormData();
       fd.set("id", tenantId);
       fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(cleaned)));
-      persistAction(fd);
+      startTransition(() => persistAction(fd));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -328,7 +328,7 @@ export function PronunciationCoach({
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(next)));
-    persistAction(fd);
+    startTransition(() => persistAction(fd));
   }
 
   function renewEntry(entry: TtsLexiconEntry) {
@@ -372,8 +372,9 @@ export function PronunciationCoach({
     return true;
   }
 
-  function keepRecording() {
-    if (!active || !audioBlob) return;
+  function submitRecording(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!active || !audioBlob || confirmPending) return;
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("prompt", active.prompt);
@@ -389,14 +390,16 @@ export function PronunciationCoach({
         `pronunciation-${active.id.replace(/[^a-z0-9-]/gi, "")}.webm`
       )
     );
-    confirmAction(fd);
+    startTransition(() => {
+      confirmAction(fd);
+    });
   }
 
   function scanCalls() {
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("current_lexicon", lexiconJson);
-    mineAction(fd);
+    startTransition(() => mineAction(fd));
   }
 
   function submitQuickAdd(modeAdd: "record" | "save") {
@@ -415,7 +418,7 @@ export function PronunciationCoach({
     fd.set("phrase", phrase);
     fd.set("say", addSay.trim());
     fd.set("current_lexicon", lexiconJson);
-    quickAction(fd);
+    startTransition(() => quickAction(fd));
   }
 
   const doneCount = items.filter((i) => i.status === "done").length;
@@ -614,8 +617,11 @@ export function PronunciationCoach({
                         Stop
                       </button>
                     ) : null}
-                    {audioBlob && audioUrl && !recording ? (
-                      <>
+                    {audioBlob && audioUrl && !recording && active ? (
+                      <form
+                        className="contents"
+                        onSubmit={submitRecording}
+                      >
                         <audio
                           src={audioUrl}
                           controls
@@ -630,14 +636,13 @@ export function PronunciationCoach({
                           Retry
                         </button>
                         <button
-                          type="button"
-                          onClick={keepRecording}
+                          type="submit"
                           disabled={confirmPending}
                           className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
                         >
                           {confirmPending ? "Checking…" : "Use this take"}
                         </button>
-                      </>
+                      </form>
                     ) : null}
                     <button
                       type="button"

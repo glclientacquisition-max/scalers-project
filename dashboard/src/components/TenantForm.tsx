@@ -232,9 +232,13 @@ function CatalogPager({
 export function TenantForm({
   tenant,
   panel = "identity",
+  voiceCoachMounted = false,
+  voiceCoachVisible = false,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
+  voiceCoachMounted?: boolean;
+  voiceCoachVisible?: boolean;
 }) {
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
@@ -1964,26 +1968,28 @@ export function TenantForm({
 
     </form>
 
-    {panel === "tools" ? (
-      <PronunciationCoach
-        tenantId={tenant.id}
-        businessName={businessName}
-        agentName={agentName}
-        locationNotes={locationNotes}
-        locations={locations}
-        team={team}
-        services={services}
-        faqs={faqs}
-        bulletinTexts={
-          Array.isArray(tenant.daily_bulletin)
-            ? tenant.daily_bulletin
-                .map((b) => String(b?.text || "").trim())
-                .filter(Boolean)
-            : []
-        }
-        initialLexicon={ttsLexicon}
-        onLexiconChange={setTtsLexicon}
-      />
+    {voiceCoachMounted ? (
+      <div className={voiceCoachVisible ? undefined : "hidden"} aria-hidden={!voiceCoachVisible}>
+        <PronunciationCoach
+          tenantId={tenant.id}
+          businessName={businessName}
+          agentName={agentName}
+          locationNotes={locationNotes}
+          locations={locations}
+          team={team}
+          services={services}
+          faqs={faqs}
+          bulletinTexts={
+            Array.isArray(tenant.daily_bulletin)
+              ? tenant.daily_bulletin
+                  .map((b) => String(b?.text || "").trim())
+                  .filter(Boolean)
+              : []
+          }
+          initialLexicon={ttsLexicon}
+          onLexiconChange={setTtsLexicon}
+        />
+      </div>
     ) : null}
 
       <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">

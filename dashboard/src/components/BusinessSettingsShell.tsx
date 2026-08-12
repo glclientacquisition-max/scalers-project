@@ -8,6 +8,10 @@ import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { TenantForm, type SettingsPanel } from "@/components/TenantForm";
 import type { SettingsTabId } from "@/lib/settingsNav";
+import {
+  parseSettingsTab,
+  parseSettingsTrainPanel,
+} from "@/lib/settingsNav";
 
 const TABS = [
   { id: "today", label: "Today" },
@@ -45,8 +49,14 @@ export function BusinessSettingsShell({
   const pendingDid = String(tenant.sautikit_virtual_number || "").startsWith("pending:");
 
   useEffect(() => {
-    setTab(tabFromUrl);
-    setTrainPanel(trainPanelFromUrl);
+    if (typeof window === "undefined") {
+      setTab(tabFromUrl);
+      setTrainPanel(trainPanelFromUrl);
+      return;
+    }
+    const q = new URLSearchParams(window.location.search);
+    setTab(parseSettingsTab(q.get("tab")));
+    setTrainPanel(parseSettingsTrainPanel(q.get("panel")));
   }, [tabFromUrl, trainPanelFromUrl]);
 
   const setQuery = useCallback(
@@ -235,6 +245,8 @@ export function BusinessSettingsShell({
           ].join(":")}
           tenant={tenant}
           panel={formPanel}
+          voiceCoachMounted={tab === "train"}
+          voiceCoachVisible={tab === "train" && trainPanel === "tools"}
         />
       </div>
     </div>
