@@ -145,27 +145,58 @@ export default async function HomeOverviewPage() {
       {primaryUpdate ? (
         <aside
           aria-label="Live updates"
-          className="mx-auto mt-8 w-full min-w-0 max-w-md text-center"
+          className="mx-auto mt-8 w-full min-w-0 max-w-lg"
         >
-          <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-[#005ccc] sm:text-xs">
-            Live update
-            {liveUpdates.length > 1 ? ` · ${liveUpdates.length}` : ""}
-          </p>
-          <p className="mt-2 text-sm font-medium leading-snug text-ink [overflow-wrap:anywhere]">
-            {primaryUpdate.text}
-          </p>
-          <p className="mt-1 text-xs text-ink-soft [overflow-wrap:anywhere]">
-            {formatBulletinEndLabel(primaryUpdate.ends_at)}
-            {liveUpdates.length > 1
-              ? ` · +${liveUpdates.length - 1} more`
-              : ""}
-          </p>
-          <Link
-            href={businessSettingsHref("updates")}
-            className="mt-3 inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium text-[#0096FF] hover:text-[#005ccc] focus-visible:outline-none focus-visible:underline"
-          >
-            Manage updates
-          </Link>
+          <div className="relative overflow-hidden rounded-2xl border border-[#0096FF]/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,white)] px-4 py-4 sm:px-5 sm:py-5">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[#0096FF]"
+            />
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 pl-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span
+                  aria-hidden
+                  className="relative inline-flex h-2 w-2 shrink-0"
+                >
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0096FF]/40" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0096FF]" />
+                </span>
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#005ccc] sm:text-xs">
+                  Updates
+                  {liveUpdates.length > 1 ? (
+                    <span className="font-medium tracking-normal text-ink-soft normal-case">
+                      {" "}
+                      · {liveUpdates.length} live
+                    </span>
+                  ) : (
+                    <span className="font-medium tracking-normal text-ink-soft normal-case">
+                      {" "}
+                      · live
+                    </span>
+                  )}
+                </p>
+              </div>
+              <p className="text-xs text-ink-soft [overflow-wrap:anywhere]">
+                {formatBulletinEndLabel(primaryUpdate.ends_at)}
+                {liveUpdates.length > 1
+                  ? ` · +${liveUpdates.length - 1} more`
+                  : ""}
+              </p>
+            </div>
+
+            <p className="mt-3 pl-2 font-display leading-snug tracking-tight text-ink [overflow-wrap:anywhere] text-[clamp(1rem,2.8vw,1.2rem)]">
+              {primaryUpdate.text}
+            </p>
+
+            <div className="mt-4 flex pl-2">
+              <Link
+                href={businessSettingsHref("updates")}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#0096FF]/35 bg-white px-4 text-sm font-semibold text-[#0096FF] transition hover:border-[#0096FF] hover:bg-[#0096FF]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
+              >
+                Manage updates
+              </Link>
+            </div>
+          </div>
         </aside>
       ) : null}
 
