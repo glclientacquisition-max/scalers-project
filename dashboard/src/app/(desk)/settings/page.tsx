@@ -1,9 +1,9 @@
+import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
 import {
-  BusinessSettingsShell,
   parseBusinessSettingsPanel,
   parseBusinessSettingsTab,
-} from "@/components/BusinessSettingsShell";
-import { listCuratedSonioxVoices } from "@/lib/sonioxVoiceCatalog";
+} from "@/lib/businessSettingsNav";
+import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { getCurrentTenant } from "@/lib/tenant";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
@@ -45,12 +45,19 @@ export default async function SettingsPage({
   const tab = parseBusinessSettingsTab(tabRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw);
 
+  let curatedVoices: CuratedSonioxVoice[];
+  try {
+    curatedVoices = await listCuratedSonioxVoices();
+  } catch {
+    curatedVoices = [];
+  }
+
   return (
     <BusinessSettingsShell
       tenant={tenant}
       tab={tab}
       trainPanel={trainPanel}
-      curatedVoices={await listCuratedSonioxVoices()}
+      curatedVoices={curatedVoices}
     />
   );
 }

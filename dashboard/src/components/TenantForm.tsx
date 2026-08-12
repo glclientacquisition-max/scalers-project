@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import type { OnboardingTone } from "@/lib/onboarding";
 import { TONE_LABELS } from "@/lib/onboarding";
@@ -85,11 +85,18 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
-import { TENANT_SETTINGS_FORM_ID } from "@/components/TenantSettingsSaveButton";
+import {
+  TenantSettingsSaveButton,
+  TENANT_SETTINGS_FORM_ID,
+} from "@/components/TenantSettingsSaveButton";
 import {
   parseTtsLexicon,
+  lexiconForStorage,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import type { SettingsPanel } from "@/lib/businessSettingsNav";
+
+export type { SettingsPanel } from "@/lib/businessSettingsNav";
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
@@ -184,14 +191,6 @@ const fieldClass =
 const tableFieldClass =
   "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
 
-export type SettingsPanel =
-  | "catalog"
-  | "identity"
-  | "hours"
-  | "team"
-  | "faqs"
-  | "tools";
-
 const SERVICE_PAGE_SIZE = 5;
 const PRODUCT_PAGE_SIZE = 8;
 const FAQ_PAGE_SIZE = 5;
@@ -250,12 +249,16 @@ export function TenantForm({
   tenant,
   panel = "identity",
   curatedVoices,
-  onPendingChange,
+  heading = null,
+  lineNumber = "",
+  sidebar = null,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
-  onPendingChange?: (pending: boolean) => void;
+  heading?: string | null;
+  lineNumber?: string;
+  sidebar?: ReactNode;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -355,9 +358,10 @@ export function TenantForm({
   const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
   const [flash, setFlash] = useState<string | null>(null);
 
-  useEffect(() => {
-    onPendingChange?.(pending);
-  }, [pending, onPendingChange]);
+  const ttsLexiconJson = useMemo(
+    () => JSON.stringify(lexiconForStorage(ttsLexicon)),
+    [ttsLexicon]
+  );
 
   const teamJson = useMemo(
     () =>
@@ -633,7 +637,29 @@ export function TenantForm({
   }
 
   return (
-    <form id={TENANT_SETTINGS_FORM_ID} action={formAction} className="space-y-8">
+    <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
+      <header className="sticky top-16 z-30 -mx-4 mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+            Business
+          </h1>
+          {lineNumber ? (
+            <p className="mt-0.5 text-sm text-ink-soft">
+              Line <span className="font-medium text-ink">{lineNumber}</span>
+            </p>
+          ) : null}
+        </div>
+        <TenantSettingsSaveButton pending={pending} />
+      </header>
+
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+        {sidebar}
+
+        <div className="min-w-0 flex-1 space-y-8">
+          {heading ? (
+            <h2 className="font-display text-2xl tracking-tight text-ink">{heading}</h2>
+          ) : null}
+
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
@@ -660,6 +686,7 @@ export function TenantForm({
       <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
       <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} />
       <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} />
+      <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-5" : "hidden"}>
         <div>
@@ -1715,6 +1742,7 @@ export function TenantForm({
           })}
         </div>
 
+        {panel === "tools" ? (
         <PronunciationCoach
           tenantId={tenant.id}
           businessName={businessName}
@@ -1734,7 +1762,9 @@ export function TenantForm({
           }
           initialLexicon={ttsLexicon}
           onLexiconChange={setTtsLexicon}
+          omitLexiconField
         />
+        ) : null}
       </section>
 
       <section className={panel === "team" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}>
@@ -1955,6 +1985,8 @@ export function TenantForm({
           {flash}
         </p>
       ) : null}
+        </div>
+      </div>
     </form>
   );
 }

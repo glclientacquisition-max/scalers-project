@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getAuthUser, isAuthenticated } from "@/lib/auth";
 import {
   parseAgentTone,
@@ -292,6 +293,8 @@ export async function saveAndCompileSettings(
   }
 
   await getAuthUser();
+
+  revalidatePath("/settings");
 
   return { ok: true, source };
 }

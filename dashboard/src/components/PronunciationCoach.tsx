@@ -49,6 +49,7 @@ export function PronunciationCoach({
   team,
   initialLexicon,
   onLexiconChange,
+  omitLexiconField = false,
 }: {
   tenantId: string;
   businessName: string;
@@ -68,6 +69,8 @@ export function PronunciationCoach({
   bulletinTexts?: string[];
   initialLexicon: TtsLexiconEntry[];
   onLexiconChange: (entries: TtsLexiconEntry[]) => void;
+  /** When embedded in TenantForm, lexicon is submitted via the parent hidden field. */
+  omitLexiconField?: boolean;
 }) {
   const rawInitialCount = Array.isArray(initialLexicon)
     ? initialLexicon.length
@@ -578,7 +581,9 @@ export function PronunciationCoach({
       className="space-y-5 border-t border-[var(--line)] pt-8"
       aria-labelledby="pronunciation-coach-heading"
     >
-      <input type="hidden" name="tts_lexicon" value={lexiconJson} />
+      {omitLexiconField ? null : (
+        <input type="hidden" name="tts_lexicon" value={lexiconJson} />
+      )}
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
