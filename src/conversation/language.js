@@ -128,29 +128,42 @@ const BACKCHANNELS = new Set([
   'gemini',
 ]);
 
+function markerAppears(raw, marker) {
+  const escaped = String(marker)
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\s+/g, '\\s+');
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`, 'iu').test(
+    raw
+  );
+}
+
+function countMarkers(raw, markers) {
+  return markers.reduce(
+    (count, marker) => count + (markerAppears(raw, marker) ? 1 : 0),
+    0
+  );
+}
+
 /**
+ * Evidence-bearing detection for stateful language policy.
  * @param {string} text
- * @returns {'en'|'sw'|'sheng'|'mixed'|'unknown'}
  */
-function detectCallerLanguage(text) {
+function analyzeCallerLanguage(text) {
   const raw = String(text || '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
-  if (!raw) return 'unknown';
+  if (!raw) {
+    return {
+      language: 'unknown',
+      confidence: 0,
+      scores: { en: 0, sw: 0, sheng: 0 },
+    };
+  }
 
-  let swHits = 0;
-  let enHits = 0;
-  let shengHits = 0;
-  for (const w of SWAHILI_MARKERS) {
-    if (raw.includes(w)) swHits += 1;
-  }
-  for (const w of ENGLISH_MARKERS) {
-    if (raw.includes(w)) enHits += 1;
-  }
-  for (const w of SHENG_MARKERS) {
-    if (raw.includes(w)) shengHits += 1;
-  }
+  let swHits = countMarkers(raw, SWAHILI_MARKERS);
+  let enHits = countMarkers(raw, ENGLISH_MARKERS);
+  const shengHits = countMarkers(raw, SHENG_MARKERS);
 
   if (
     !swHits &&
@@ -160,16 +173,98 @@ function detectCallerLanguage(text) {
     enHits += 2;
   }
 
-  // Need a clear Sheng signal — avoid flipping on a single slang word.
-  if (shengHits >= 2) return 'sheng';
-
-  if (swHits === 0 && enHits === 0) return 'unknown';
-  if (swHits > 0 && enHits > 0) {
-    if (swHits >= enHits + 2) return 'sw';
-    if (enHits >= swHits + 2) return 'en';
-    return 'mixed';
+  let language = 'unknown';
+  if (shengHits >= 2 && shengHits >= swHits && shengHits >= enHits) {
+    language = 'sheng';
+  } else if (swHits === 0 && enHits === 0) {
+    language = 'unknown';
+  } else if (swHits > 0 && enHits > 0) {
+    if (swHits >= enHits + 2) language = 'sw';
+    else if (enHits >= swHits + 2) language = 'en';
+    else language = 'mixed';
+  } else {
+    language = swHits > enHits ? 'sw' : 'en';
   }
-  return swHits > enHits ? 'sw' : 'en';
+
+  const scores = { en: enHits, sw: swHits, sheng: shengHits };
+  const ranked = Object.values(scores).sort((a, b) => b - a);
+  const top = ranked[0] || 0;
+  const margin = top - (ranked[1] || 0);
+  const confidence =
+    language === 'unknown'
+      ? 0
+      : language === 'mixed'
+        ? 0.55
+        : Math.min(0.98, top === 1 ? 0.58 : 0.55 + top * 0.12 + margin * 0.08);
+  return { language, confidence, scores };
+}
+
+/**
+ * @param {string} text
+ * @returns {'en'|'sw'|'sheng'|'mixed'|'unknown'}
+ */
+function detectCallerLanguage(text) {
+  return analyzeCallerLanguage(text).language;
+}
+
+function createLanguageState() {
+  return {
+    current: 'unknown',
+    detected: 'unknown',
+    confidence: 0,
+    pending: null,
+    pendingCount: 0,
+    switchCount: 0,
+  };
+}
+
+function resolveLanguageState(previous, evidence) {
+  const state = { ...createLanguageState(), ...(previous || {}) };
+  const detected = evidence?.language || 'unknown';
+  const confidence = Number(evidence?.confidence || 0);
+  state.detected = detected;
+
+  if (detected === 'unknown' || detected === 'mixed') {
+    if (state.current === 'unknown' && detected === 'mixed') {
+      state.current = 'mixed';
+      state.confidence = confidence;
+    } else {
+      state.confidence = Math.max(0.4, Number(state.confidence || 0) - 0.05);
+    }
+    state.pending = null;
+    state.pendingCount = 0;
+    return state;
+  }
+
+  if (state.current === 'unknown' || state.current === 'mixed') {
+    state.current = detected;
+    state.confidence = confidence;
+    state.pending = null;
+    state.pendingCount = 0;
+    return state;
+  }
+
+  if (detected === state.current) {
+    state.confidence = Math.max(Number(state.confidence || 0), confidence);
+    state.pending = null;
+    state.pendingCount = 0;
+    return state;
+  }
+
+  const pendingCount = state.pending === detected ? Number(state.pendingCount || 0) + 1 : 1;
+  if (confidence >= 0.82 || pendingCount >= 2) {
+    state.current = detected;
+    state.confidence = confidence;
+    state.switchCount = Number(state.switchCount || 0) + 1;
+    state.pending = null;
+    state.pendingCount = 0;
+    return state;
+  }
+
+  state.pending = detected;
+  state.pendingCount = pendingCount;
+  state.confidence = Math.max(0.4, Number(state.confidence || 0) - 0.08);
+  return state;
 }
 
 /**
@@ -247,7 +342,10 @@ function languageDirective(lang) {
 }
 
 module.exports = {
+  analyzeCallerLanguage,
   detectCallerLanguage,
+  createLanguageState,
+  resolveLanguageState,
   resolveCallLanguage,
   pickFillerText,
   ttsLanguageFor,

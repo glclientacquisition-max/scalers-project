@@ -11,11 +11,14 @@ const DIRECT_ANSWER_INTENTS = new Set([
   'policy',
 ]);
 
-const REQUEST_INTENTS = new Set(['order', 'booking', 'cancellation']);
+const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
 
 function determineNextBestAction({ state, capabilities = {} } = {}) {
   const intent = String(state?.intent || 'unknown');
   const repairCount = Number(state?.repair?.failureCount || 0);
+  const missingSlots = Array.isArray(state?.goal?.missingSlots)
+    ? state.goal.missingSlots
+    : [];
 
   if (state?.resolution?.status === 'resolved' || state?.goal?.status === 'completed') {
     return {
@@ -37,10 +40,28 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
         };
   }
 
+  if (repairCount > 0) {
+    return {
+      action: ACTIONS.REPAIR,
+      reason:
+        repairCount === 1
+          ? 'Use a contextual clarification based on what was already understood.'
+          : 'Simplify the question or explanation; do not repeat the same wording.',
+    };
+  }
+
   if (intent === 'unknown') {
     return {
       action: ACTIONS.ASK_CLARIFICATION,
       reason: 'The caller goal is not established; ask one useful question.',
+    };
+  }
+
+  if (missingSlots.length) {
+    return {
+      action: ACTIONS.ASK_CLARIFICATION,
+      slot: missingSlots[0],
+      reason: `The goal needs ${missingSlots[0]}; ask for that one slot only.`,
     };
   }
 

@@ -24,16 +24,19 @@ const { parseAgentTools } = require('./src/conversation/agentTools');
 const { parseGeminiResponse } = require('./src/conversation/toolMarkers');
 const {
   createBrainState,
+  inferIntent,
   observeCallerTurn,
   setNextBestAction,
   recordActionResults,
   formatBrainStateForPrompt,
 } = require('./src/conversation/brainState');
+const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const {
   buildBrainCapabilities,
   formatAuthorityPolicy,
 } = require('./src/conversation/brainPolicy');
 const { determineNextBestAction } = require('./src/conversation/nextBestAction');
+const { logBrainTrace } = require('./src/conversation/brainObservability');
 const {
   executeBrainTools,
   formatToolConfirmation,
@@ -46,8 +49,9 @@ const callAgentTools = new Map();
 const callBrainStates = new Map();
 const callBrainCapabilities = new Map();
 const {
-  detectCallerLanguage,
-  resolveCallLanguage,
+  analyzeCallerLanguage,
+  createLanguageState,
+  resolveLanguageState,
   isBackchannel,
   languageDirective,
 } = require('./src/conversation/language');
@@ -797,6 +801,8 @@ mediaWss.on('connection', (ws, req) => {
   let profileCallSid = null;
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
   let callLanguage = 'unknown';
+  let callLanguageState = createLanguageState();
+  let brainProfile = {};
   let fillerUsedThisCall = false;
   /** @type {ReturnType<typeof createVoiceTurnTiming>|null} */
   let activeTurnTiming = null;
@@ -832,6 +838,7 @@ mediaWss.on('connection', (ws, req) => {
     }
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
+      brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
       hoursSchedule = profile.hoursSchedule || null;
@@ -1030,29 +1037,52 @@ mediaWss.on('connection', (ws, req) => {
     const turnTiming = createVoiceTurnTiming(sidLabel());
     activeTurnTiming = turnTiming;
 
-    const detected = detectCallerLanguage(clean);
-    callLanguage = resolveCallLanguage(callLanguage, detected);
     const callKey = sidLabel();
+    const languageEvidence = analyzeCallerLanguage(clean);
+    callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
+    callLanguage = callLanguageState.current;
     const capabilities =
       callBrainCapabilities.get(callKey) ||
       buildBrainCapabilities(
         { agentTools: callAgentTools.get(callKey) || parseAgentTools(null) },
         { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
       );
+    const previousBrainState =
+      callBrainStates.get(callKey) || createBrainState(brainProfile);
+    const provisionalIntent = inferIntent(clean);
+    const entityIntent =
+      provisionalIntent === 'general_enquiry' &&
+      previousBrainState.goal.status === 'active'
+        ? previousBrainState.intent
+        : provisionalIntent;
+    const entities = extractConversationEntities(clean, {
+      profile: brainProfile,
+      intent: entityIntent,
+      state: previousBrainState,
+    });
     let brainState = observeCallerTurn(
-      callBrainStates.get(callKey) || createBrainState(),
+      previousBrainState,
       {
         text: clean,
-        detectedLanguage: detected,
-        resolvedLanguage: callLanguage,
+        languageState: callLanguageState,
+        entities,
+        profile: brainProfile,
+        lastAgentText,
       }
     );
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
     callBrainStates.set(callKey, brainState);
     callBrainCapabilities.set(callKey, capabilities);
+    logBrainTrace({
+      callSid: callKey,
+      phase: 'decision',
+      state: brainState,
+      decision: nextBestAction,
+    });
     console.log(
-      `[ws/media][${callKey}] caller turn lang=${callLanguage} detected=${detected}` +
+      `[ws/media][${callKey}] caller turn lang=${callLanguage}` +
+        ` detected=${languageEvidence.language} confidence=${languageEvidence.confidence}` +
         ` intent=${brainState.intent} goal=${brainState.goal.primary}` +
         ` next=${nextBestAction.action}: ${clean}`
     );
@@ -1918,6 +1948,8 @@ wss.on('connection', (ws) => {
   let messages = [{ role: 'system', content: systemPrompt }];
   let transcriptLog = [];
   let callLanguage = 'unknown';
+  let callLanguageState = createLanguageState();
+  let brainProfile = {};
 
   ws.on('message', async (raw) => {
     let data;
@@ -1939,6 +1971,7 @@ wss.on('connection', (ws) => {
         });
         try {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
+          brainProfile = profile;
           systemPrompt = buildSystemPrompt(profile);
           const parsedTools = parseAgentTools(profile.agentTools);
           callAgentTools.set(callSid, parsedTools);
@@ -1967,25 +2000,46 @@ wss.on('connection', (ws) => {
         transcriptLog.push(`Caller: ${data.voicePrompt}`);
         messages.push({ role: 'user', content: data.voicePrompt });
 
-        const detected = detectCallerLanguage(data.voicePrompt);
-        callLanguage = resolveCallLanguage(callLanguage, detected);
+        const languageEvidence = analyzeCallerLanguage(data.voicePrompt);
+        callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
+        callLanguage = callLanguageState.current;
         const capabilities =
           callBrainCapabilities.get(callSid) ||
           buildBrainCapabilities(
             { agentTools: callAgentTools.get(callSid) || parseAgentTools(null) },
             { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
           );
+        const previousBrainState =
+          callBrainStates.get(callSid) || createBrainState(brainProfile);
+        const provisionalIntent = inferIntent(data.voicePrompt);
+        const entityIntent =
+          provisionalIntent === 'general_enquiry' &&
+          previousBrainState.goal.status === 'active'
+            ? previousBrainState.intent
+            : provisionalIntent;
+        const entities = extractConversationEntities(data.voicePrompt, {
+          profile: brainProfile,
+          intent: entityIntent,
+          state: previousBrainState,
+        });
         let brainState = observeCallerTurn(
-          callBrainStates.get(callSid) || createBrainState(),
+          previousBrainState,
           {
             text: data.voicePrompt,
-            detectedLanguage: detected,
-            resolvedLanguage: callLanguage,
+            languageState: callLanguageState,
+            entities,
+            profile: brainProfile,
           }
         );
         const decision = determineNextBestAction({ state: brainState, capabilities });
         brainState = setNextBestAction(brainState, decision);
         callBrainStates.set(callSid, brainState);
+        logBrainTrace({
+          callSid,
+          phase: 'decision',
+          state: brainState,
+          decision,
+        });
         const turnPrompt = [
           systemPrompt,
           formatAuthorityPolicy(capabilities),
@@ -2173,6 +2227,12 @@ async function applyGeminiTools(callSid, parsed) {
     });
   }
   callBrainStates.set(callSid, updatedState);
+  logBrainTrace({
+    callSid,
+    phase: 'action_result',
+    state: updatedState,
+    toolResults: execution.results,
+  });
 
   const savedInfo = execution.results.find(
     (result) => result.action === 'save_caller_info' && result.status === 'succeeded'
