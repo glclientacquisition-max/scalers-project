@@ -4,6 +4,7 @@ export type TtsPreviewResult = {
   wav: Buffer;
   spokenText?: string;
   language?: string;
+  voiceId?: string;
 };
 
 /**
@@ -20,24 +21,46 @@ export async function fetchTtsPreviewWav(opts: {
     throw new Error("Preview text is required.");
   }
 
-  const base = getVoicePublicBase().replace(/\/+$/, "");
+  const base = getVoicePublicBase();
   const secret = String(process.env.VOICE_INTERNAL_SECRET || "").trim();
+  let url: string;
+  try {
+    url = new URL("/api/tts/preview", `${base}/`).toString();
+  } catch {
+    throw new Error(
+      `Invalid VOICE_PUBLIC_BASE_URL (${base}). Use https://your-railway-host with no path.`
+    );
+  }
 
-  const res = await fetch(`${base}/api/tts/preview`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(secret ? { "x-voice-internal-secret": secret } : {}),
-    },
-    body: JSON.stringify({
-      text,
-      lexicon: opts.lexicon,
-      language: opts.language,
-      callLanguage: opts.language || "en",
-      voiceId: opts.voiceId,
-    }),
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(secret ? { "x-voice-internal-secret": secret } : {}),
+      },
+      body: JSON.stringify({
+        text,
+        lexicon: opts.lexicon,
+        language: opts.language,
+        callLanguage: opts.language || "en",
+        voiceId: opts.voiceId,
+      }),
+      cache: "no-store",
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Could not reach voice engine at ${base}. Check VOICE_PUBLIC_BASE_URL on Vercel. (${detail})`
+    );
+  }
+
+  if (res.status === 401) {
+    throw new Error(
+      "Voice preview unauthorized. Set the same VOICE_INTERNAL_SECRET on Vercel and Railway, then redeploy."
+    );
+  }
 
   if (!res.ok) {
     const errJson = await res.json().catch(() => null);
@@ -51,6 +74,7 @@ export async function fetchTtsPreviewWav(opts: {
   const wav = Buffer.from(await res.arrayBuffer());
   const spokenHeader = res.headers.get("x-spoken-text");
   const language = res.headers.get("x-tts-language") || undefined;
+  const voiceId = res.headers.get("x-soniox-voice") || undefined;
   let spokenText: string | undefined;
   if (spokenHeader) {
     try {
@@ -60,5 +84,5 @@ export async function fetchTtsPreviewWav(opts: {
     }
   }
 
-  return { wav, spokenText, language };
+  return { wav, spokenText, language, voiceId };
 }

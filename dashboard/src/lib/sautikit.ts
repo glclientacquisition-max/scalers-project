@@ -106,12 +106,12 @@ export type SautikitAvailableNumber = {
   outbound_per_min_minor: number;
 };
 
+import { normalizeVoicePublicBase } from "@/lib/voicePublicBase.js";
+
 export function getVoicePublicBase(): string {
-  const raw =
-    process.env.VOICE_PUBLIC_BASE_URL ||
-    process.env.PUBLIC_BASE_URL ||
-    "https://scalers-project-production.up.railway.app";
-  return String(raw).replace(/\/+$/, "");
+  return normalizeVoicePublicBase(
+    process.env.VOICE_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL
+  );
 }
 
 export function getSautikitKeyDiagnostics(): SautikitKeyDiagnostics {
