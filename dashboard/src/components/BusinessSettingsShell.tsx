@@ -7,6 +7,7 @@ import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { TenantForm, type SettingsPanel } from "@/components/TenantForm";
+import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 
 const TABS = [
   { id: "today", label: "Today" },
@@ -50,7 +51,13 @@ function parseTrainPanel(raw: string | null): SettingsPanel {
  * Business settings shell: one job per tab so owners are not scrolling a mega-form.
  * Catalog / Train keep TenantForm mounted for Save & train.
  */
-export function BusinessSettingsShell({ tenant }: { tenant: TenantRow }) {
+export function BusinessSettingsShell({
+  tenant,
+  curatedVoices = [],
+}: {
+  tenant: TenantRow;
+  curatedVoices?: CuratedSonioxVoice[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -241,6 +248,7 @@ export function BusinessSettingsShell({ tenant }: { tenant: TenantRow }) {
           ].join(":")}
           tenant={tenant}
           panel={formPanel}
+          curatedVoices={curatedVoices}
         />
       </div>
     </div>

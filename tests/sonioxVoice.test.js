@@ -15,7 +15,7 @@ const {
 } = require('../src/speech/sonioxVoiceCatalog');
 
 describe('sonioxVoice catalog', () => {
-  it('default voice is the Scalers Aisha clone', () => {
+  it('default voice is the Scalers clone UUID', () => {
     assert.equal(getDefaultVoiceId(), '7b197f3c-84b4-4404-986f-114e4dac1432');
     assert.equal(SCALERS_SONIOX_VOICE_ID, getDefaultVoiceId());
   });

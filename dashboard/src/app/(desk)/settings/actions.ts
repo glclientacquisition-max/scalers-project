@@ -104,7 +104,7 @@ export async function saveAndCompileSettings(
   const afterHoursMode = parseAfterHoursMode(formData.get("after_hours_mode"));
   const vertical = parseVertical(formData.get("vertical"));
   const handoffMode = parseHandoffMode(formData.get("handoff_mode"));
-  const sonioxVoiceId = parseSonioxVoiceId(formData.get("soniox_voice_id"));
+  const sonioxVoiceId = await parseSonioxVoiceId(formData.get("soniox_voice_id"));
   const sonioxVoiceLabel = parseSonioxVoiceLabel(formData.get("soniox_voice_label"));
   const businessLocations = parseBusinessLocationsField(
     formData.get("business_locations")

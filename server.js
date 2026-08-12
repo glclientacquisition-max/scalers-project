@@ -21,6 +21,7 @@ const {
   resolveSonioxVoice,
   ensureSonioxVoiceReady,
   listCuratedVoices,
+  refreshCuratedVoicesFromDb,
 } = require('./src/speech/sonioxVoice');
 const { synthesizeTtsPreview } = require('./src/speech/ttsPreview');
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
@@ -162,8 +163,13 @@ app.get('/healthz', (_req, res) => {
   });
 });
 
-app.get('/api/voices', (_req, res) => {
-  res.status(200).json({ voices: listCuratedVoices() });
+app.get('/api/voices', async (_req, res) => {
+  try {
+    const voices = await refreshCuratedVoicesFromDb({ force: true });
+    res.status(200).json({ voices });
+  } catch (err) {
+    res.status(200).json({ voices: listCuratedVoices() });
+  }
 });
 
 function voicePreviewAuthorized(req) {
@@ -2538,13 +2544,20 @@ server.listen(PORT, () => {
     console.log(`✓ SONIOX_API_KEY present (STT on /ws/media)`);
     if (isSonioxTtsConfigured()) {
       console.log(
-        `✓ Soniox TTS enabled cloned voice=${resolveSonioxVoice()}`
+        `✓ Soniox TTS enabled default voice=${resolveSonioxVoice()}`
       );
-      ensureSonioxVoiceReady({ log: console.log }).catch((err) => {
-        console.warn(
-          `⚠ Soniox voice readiness check failed: ${err?.message || err}`
-        );
-      });
+      refreshCuratedVoicesFromDb({ force: true })
+        .then((voices) => {
+          console.log(
+            `✓ Soniox voice catalog loaded count=${voices.length} source=db-or-fallback`
+          );
+          return ensureSonioxVoiceReady({ log: console.log });
+        })
+        .catch((err) => {
+          console.warn(
+            `⚠ Soniox voice readiness check failed: ${err?.message || err}`
+          );
+        });
     } else {
       console.log(`ℹ SONIOX_API_KEY missing — no spoken replies`);
     }

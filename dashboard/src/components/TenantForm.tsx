@@ -69,9 +69,9 @@ import {
 } from "@/lib/handoffMode";
 import {
   displaySonioxVoiceLabel,
-  getDefaultSonioxVoiceId,
-  isAllowedSonioxVoiceId,
-  listCuratedSonioxVoices,
+  getDefaultSonioxVoiceIdSync,
+  listCuratedSonioxVoicesSync,
+  type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import {
   emptyLocation,
@@ -109,12 +109,14 @@ const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   },
 ];
 
-const CURATED_SONIOX_VOICES = listCuratedSonioxVoices();
-
-function initialSonioxVoiceId(tenant: TenantRow): string {
-  const raw = tenant.soniox_voice_id;
-  if (raw && isAllowedSonioxVoiceId(raw)) return raw;
-  return getDefaultSonioxVoiceId() || "";
+function initialSonioxVoiceId(
+  tenant: TenantRow,
+  curated: CuratedSonioxVoice[]
+): string {
+  const raw = String(tenant.soniox_voice_id || "").trim();
+  if (raw && curated.some((v) => v.id === raw)) return raw;
+  const marked = curated.find((v) => v.default);
+  return marked?.id || curated[0]?.id || getDefaultSonioxVoiceIdSync() || "";
 }
 
 function initialTone(tenant: TenantRow): OnboardingTone | "" {
@@ -243,10 +245,16 @@ function CatalogPager({
 export function TenantForm({
   tenant,
   panel = "identity",
+  curatedVoices,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
+  curatedVoices?: CuratedSonioxVoice[];
 }) {
+  const voiceOptions =
+    curatedVoices && curatedVoices.length
+      ? curatedVoices
+      : listCuratedSonioxVoicesSync();
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
     tenant.whatsapp_notification_number || ""
@@ -322,7 +330,7 @@ export function TenantForm({
     parseAgentTools(tenant.agent_tools)
   );
   const [sonioxVoiceId, setSonioxVoiceId] = useState(() =>
-    initialSonioxVoiceId(tenant)
+    initialSonioxVoiceId(tenant, voiceOptions)
   );
   const [sonioxVoiceLabel, setSonioxVoiceLabel] = useState(
     () => String(tenant.soniox_voice_label || "").trim()
@@ -1663,9 +1671,9 @@ export function TenantForm({
               sound only. Save &amp; train after changing.
             </p>
           </div>
-          {CURATED_SONIOX_VOICES.length > 1 ? (
+          {voiceOptions.length > 1 ? (
             <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Phone voice profile">
-              {CURATED_SONIOX_VOICES.map((voice, index) => {
+              {voiceOptions.map((voice, index) => {
                 const selected = sonioxVoiceId === voice.id;
                 return (
                   <button
@@ -1693,9 +1701,9 @@ export function TenantForm({
                 );
               })}
             </div>
-          ) : CURATED_SONIOX_VOICES[0]?.description ? (
+          ) : voiceOptions[0]?.description ? (
             <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink-soft)]">
-              {CURATED_SONIOX_VOICES[0].description}
+              {voiceOptions[0].description}
             </p>
           ) : null}
           <div>
@@ -1718,7 +1726,11 @@ export function TenantForm({
               <p className="mt-2 text-xs text-[var(--ink-soft)]">
                 Selected:{" "}
                 <span className="font-medium text-[var(--ink)]">
-                  {displaySonioxVoiceLabel(sonioxVoiceLabel, sonioxVoiceId)}
+                  {displaySonioxVoiceLabel(
+                    sonioxVoiceLabel,
+                    sonioxVoiceId,
+                    voiceOptions
+                  )}
                 </span>
               </p>
             ) : null}

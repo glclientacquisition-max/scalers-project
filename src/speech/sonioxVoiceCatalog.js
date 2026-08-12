@@ -1,20 +1,40 @@
-// Curated Soniox voice allowlist (Option A). Add clones in dashboard/src/data/soniox-voices.json.
-const catalog = require('../../dashboard/src/data/soniox-voices.json');
+// Load curated Soniox voices from platform_soniox_voices (DB) with JSON fallback.
+
+const fallbackCatalog = require('../../dashboard/src/data/soniox-voices.json');
 
 /**
- * @typedef {{ id: string, description?: string, default?: boolean }} CuratedVoice
+ * @typedef {{ id: string, description?: string, default?: boolean, sortOrder?: number, active?: boolean }} CuratedVoice
  */
 
-/** @returns {CuratedVoice[]} */
-function listCuratedVoices() {
-  const voices = Array.isArray(catalog?.voices) ? catalog.voices : [];
-  return voices
+/** @type {CuratedVoice[]|null} */
+let cachedDbVoices = null;
+let cachedAt = 0;
+const CACHE_MS = Number(process.env.SONIOX_VOICE_CATALOG_CACHE_MS || 30000);
+
+function normalizeRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
     .map((v) => ({
       id: String(v?.id || '').trim(),
       description: String(v?.description || '').trim(),
-      default: Boolean(v?.default),
+      default: Boolean(v?.default ?? v?.is_default),
+      sortOrder: Number(v?.sortOrder ?? v?.sort_order ?? 100),
+      active: v?.active !== false && v?.is_active !== false,
     }))
-    .filter((v) => v.id);
+    .filter((v) => v.id && v.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+}
+
+function fallbackVoices() {
+  return normalizeRows(fallbackCatalog?.voices || []);
+}
+
+/**
+ * Synchronous list — prefers last DB cache, else JSON seed file.
+ * @returns {CuratedVoice[]}
+ */
+function listCuratedVoices() {
+  if (cachedDbVoices && cachedDbVoices.length) return cachedDbVoices;
+  return fallbackVoices();
 }
 
 function getDefaultVoiceId() {
@@ -43,9 +63,56 @@ function resolveCuratedVoiceId(tenantVoiceId) {
   return fallback;
 }
 
+/**
+ * Refresh allowlist from Supabase (service role). Safe to call on boot / interval.
+ * @param {{ force?: boolean }} [opts]
+ */
+async function refreshCuratedVoicesFromDb(opts = {}) {
+  const now = Date.now();
+  if (!opts.force && cachedDbVoices && now - cachedAt < CACHE_MS) {
+    return cachedDbVoices;
+  }
+
+  try {
+    const { supabase } = require('../lib/supabaseClient');
+    const { data, error } = await supabase
+      .from('platform_soniox_voices')
+      .select('id, description, is_default, is_active, sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.warn(
+        `[soniox-voice-catalog] DB load failed, using JSON fallback: ${error.message}`
+      );
+      cachedDbVoices = null;
+      return fallbackVoices();
+    }
+
+    const rows = normalizeRows(data || []);
+    if (!rows.length) {
+      console.warn('[soniox-voice-catalog] DB empty — using JSON fallback');
+      cachedDbVoices = null;
+      return fallbackVoices();
+    }
+
+    cachedDbVoices = rows;
+    cachedAt = now;
+    return rows;
+  } catch (err) {
+    console.warn(
+      `[soniox-voice-catalog] DB load error, using JSON fallback: ${err?.message || err}`
+    );
+    cachedDbVoices = null;
+    return fallbackVoices();
+  }
+}
+
 module.exports = {
   listCuratedVoices,
   getDefaultVoiceId,
   isAllowedVoiceId,
   resolveCuratedVoiceId,
+  refreshCuratedVoicesFromDb,
+  fallbackVoices,
 };

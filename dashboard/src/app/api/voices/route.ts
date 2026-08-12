@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { listCuratedSonioxVoices } from "@/lib/sonioxVoiceCatalog";
 
-/** Curated Soniox receptionist voices (Option A allowlist). */
+/** Curated Soniox receptionist voices (DB allowlist; JSON fallback). */
 export async function GET() {
-  return NextResponse.json({ voices: listCuratedSonioxVoices() });
+  const voices = await listCuratedSonioxVoices();
+  return NextResponse.json({ voices });
 }

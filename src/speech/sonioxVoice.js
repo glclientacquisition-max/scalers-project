@@ -4,6 +4,7 @@ const {
   resolveCuratedVoiceId,
   isAllowedVoiceId,
   listCuratedVoices,
+  refreshCuratedVoicesFromDb,
 } = require('./sonioxVoiceCatalog');
 
 const SCALERS_SONIOX_VOICE_ID = getDefaultVoiceId();
@@ -153,6 +154,7 @@ module.exports = {
   isUuidVoice,
   isAllowedVoiceId,
   listCuratedVoices,
+  refreshCuratedVoicesFromDb,
   fetchVoiceModelStatus,
   recomputeVoiceForModel,
   ensureSonioxVoiceReady,

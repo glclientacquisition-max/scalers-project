@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getCurrentTenant } from "@/lib/tenant";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
+import { listCuratedSonioxVoices } from "@/lib/sonioxVoiceCatalog";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -37,7 +38,10 @@ export default async function SettingsPage() {
         <div className="max-w-3xl py-10 text-sm text-ink-soft">Loading business settings…</div>
       }
     >
-      <BusinessSettingsShell tenant={tenant} />
+      <BusinessSettingsShell
+        tenant={tenant}
+        curatedVoices={await listCuratedSonioxVoices()}
+      />
     </Suspense>
   );
 }
