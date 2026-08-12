@@ -80,9 +80,12 @@ import {
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import {
+  lexiconForStorage,
   parseTtsLexicon,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+
+const TENANT_SETTINGS_FORM_ID = "tenant-settings-form";
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
@@ -317,6 +320,10 @@ export function TenantForm({
   });
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
+  );
+  const ttsLexiconJson = useMemo(
+    () => JSON.stringify(lexiconForStorage(ttsLexicon)),
+    [ttsLexicon]
   );
   const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
   const [flash, setFlash] = useState<string | null>(null);
@@ -595,7 +602,12 @@ export function TenantForm({
   }
 
   return (
-    <form action={formAction} className="space-y-10">
+    <div className="space-y-10">
+    <form
+      id={TENANT_SETTINGS_FORM_ID}
+      action={formAction}
+      className="space-y-10"
+    >
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
@@ -620,6 +632,7 @@ export function TenantForm({
       <input type="hidden" name="faqs" value={faqsJson} />
       <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
       <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
+      <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-5" : "hidden"}>
         <div>
@@ -1716,26 +1729,6 @@ export function TenantForm({
             );
           })}
         </div>
-
-        <PronunciationCoach
-          tenantId={tenant.id}
-          businessName={businessName}
-          agentName={agentName}
-          locationNotes={locationNotes}
-          locations={locations}
-          team={team}
-          services={services}
-          faqs={faqs}
-          bulletinTexts={
-            Array.isArray(tenant.daily_bulletin)
-              ? tenant.daily_bulletin
-                  .map((b) => String(b?.text || "").trim())
-                  .filter(Boolean)
-              : []
-          }
-          initialLexicon={ttsLexicon}
-          onLexiconChange={setTtsLexicon}
-        />
       </section>
 
       <section className={panel === "team" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}>
@@ -1969,9 +1962,34 @@ export function TenantForm({
         </div>
       </section>
 
+    </form>
+
+    {panel === "tools" ? (
+      <PronunciationCoach
+        tenantId={tenant.id}
+        businessName={businessName}
+        agentName={agentName}
+        locationNotes={locationNotes}
+        locations={locations}
+        team={team}
+        services={services}
+        faqs={faqs}
+        bulletinTexts={
+          Array.isArray(tenant.daily_bulletin)
+            ? tenant.daily_bulletin
+                .map((b) => String(b?.text || "").trim())
+                .filter(Boolean)
+            : []
+        }
+        initialLexicon={ttsLexicon}
+        onLexiconChange={setTtsLexicon}
+      />
+    ) : null}
+
       <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">
         <button
           type="submit"
+          form={TENANT_SETTINGS_FORM_ID}
           disabled={pending || !tone}
           className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-white font-medium transition hover:bg-accent-deep focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-60"
         >
@@ -1999,6 +2017,6 @@ export function TenantForm({
           </p>
         ) : null}
       </div>
-    </form>
+    </div>
   );
 }

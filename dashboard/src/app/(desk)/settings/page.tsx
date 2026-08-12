@@ -1,11 +1,22 @@
-import { Suspense } from "react";
 import { getCurrentTenant } from "@/lib/tenant";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
+import {
+  parseSettingsTab,
+  parseSettingsTrainPanel,
+} from "@/lib/settingsNav";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; panel?: string }>;
+}) {
+  const sp = await searchParams;
+  const tab = parseSettingsTab(sp.tab);
+  const trainPanel = parseSettingsTrainPanel(sp.panel);
+
   let tenant;
   try {
     tenant = await getCurrentTenant();
@@ -32,12 +43,10 @@ export default async function SettingsPage() {
   }
 
   return (
-    <Suspense
-      fallback={
-        <div className="max-w-3xl py-10 text-sm text-ink-soft">Loading business settings…</div>
-      }
-    >
-      <BusinessSettingsShell tenant={tenant} />
-    </Suspense>
+    <BusinessSettingsShell
+      tenant={tenant}
+      tab={tab}
+      trainPanel={trainPanel}
+    />
   );
 }

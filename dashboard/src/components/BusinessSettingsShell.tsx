@@ -1,12 +1,13 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TenantRow } from "@/lib/supabase";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { TenantForm, type SettingsPanel } from "@/components/TenantForm";
+import type { SettingsTabId } from "@/lib/settingsNav";
 
 const TABS = [
   { id: "today", label: "Today" },
@@ -14,9 +15,7 @@ const TABS = [
   { id: "train", label: "Train" },
   { id: "import", label: "Import" },
   { id: "test", label: "Test" },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
+] as const satisfies ReadonlyArray<{ id: SettingsTabId; label: string }>;
 
 const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
   { id: "identity", label: "Identity" },
@@ -26,51 +25,46 @@ const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
   { id: "tools", label: "Tools & voice" },
 ];
 
-function parseTab(raw: string | null): TabId {
-  if (raw === "catalog" || raw === "train" || raw === "import" || raw === "test") {
-    return raw;
-  }
-  return "today";
-}
-
-function parseTrainPanel(raw: string | null): SettingsPanel {
-  if (
-    raw === "identity" ||
-    raw === "hours" ||
-    raw === "team" ||
-    raw === "faqs" ||
-    raw === "tools"
-  ) {
-    return raw;
-  }
-  return "identity";
-}
-
 /**
  * Business settings shell: one job per tab so owners are not scrolling a mega-form.
  * Catalog / Train keep TenantForm mounted for Save & train.
  */
-export function BusinessSettingsShell({ tenant }: { tenant: TenantRow }) {
+export function BusinessSettingsShell({
+  tenant,
+  tab: tabFromUrl,
+  trainPanel: trainPanelFromUrl,
+}: {
+  tenant: TenantRow;
+  tab: SettingsTabId;
+  trainPanel: SettingsPanel;
+}) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const tab = parseTab(searchParams.get("tab"));
-  const trainPanel = parseTrainPanel(searchParams.get("panel"));
+  const [tab, setTab] = useState(tabFromUrl);
+  const [trainPanel, setTrainPanel] = useState(trainPanelFromUrl);
   const pendingDid = String(tenant.sautikit_virtual_number || "").startsWith("pending:");
 
+  useEffect(() => {
+    setTab(tabFromUrl);
+    setTrainPanel(trainPanelFromUrl);
+  }, [tabFromUrl, trainPanelFromUrl]);
+
   const setQuery = useCallback(
-    (next: { tab?: TabId; panel?: SettingsPanel }) => {
-      const q = new URLSearchParams(searchParams.toString());
+    (next: { tab?: SettingsTabId; panel?: SettingsPanel }) => {
       const nextTab = next.tab ?? tab;
+      const nextPanel = next.panel ?? trainPanel;
+      setTab(nextTab);
+      if (nextTab === "train") {
+        setTrainPanel(nextPanel);
+      }
+      const q = new URLSearchParams();
       q.set("tab", nextTab);
       if (nextTab === "train") {
-        q.set("panel", next.panel ?? trainPanel);
-      } else {
-        q.delete("panel");
+        q.set("panel", nextPanel);
       }
       router.replace(`${pathname}?${q.toString()}`, { scroll: false });
     },
-    [pathname, router, searchParams, tab, trainPanel]
+    [pathname, router, tab, trainPanel]
   );
 
   const formPanel: SettingsPanel = useMemo(() => {

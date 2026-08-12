@@ -457,9 +457,8 @@ export function PronunciationCoach({
       id="pronunciation-coach"
       className="space-y-5 border-t border-[var(--line)] pt-8"
       aria-labelledby="pronunciation-coach-heading"
+      aria-busy={confirmPending}
     >
-      <input type="hidden" name="tts_lexicon" value={lexiconJson} />
-
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2
@@ -547,6 +546,21 @@ export function PronunciationCoach({
             <>
               {active ? (
                 <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/35 to-white px-5 py-6 sm:px-7">
+                  {confirmPending ? (
+                    <div
+                      className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/75 backdrop-blur-[1px]"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
+                        <span
+                          aria-hidden="true"
+                          className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent)]/30 border-t-[var(--accent)]"
+                        />
+                        Checking your take…
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                       {active.label} · say this line
