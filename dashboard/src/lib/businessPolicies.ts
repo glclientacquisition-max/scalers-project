@@ -16,37 +16,37 @@ export const POLICY_FIELDS: {
   {
     id: "payment",
     label: "Payment",
-    placeholder: "e.g. M-Pesa and cash. Cards on request.",
+    placeholder: "M-Pesa and cash",
   },
   {
     id: "returns",
-    label: "Returns / exchanges",
-    placeholder: "e.g. Unused items within 7 days with receipt.",
+    label: "Returns",
+    placeholder: "Unused within 7 days",
   },
   {
     id: "delivery",
-    label: "Delivery / service area",
-    placeholder: "e.g. Delivery in Nairobi CBD; same-day before 2pm.",
+    label: "Delivery",
+    placeholder: "Nairobi CBD, same-day before 2pm",
   },
   {
     id: "deposit",
-    label: "Deposits / holds",
-    placeholder: "e.g. We can hold items until evening with a name.",
+    label: "Holds",
+    placeholder: "Hold until evening with a name",
   },
   {
     id: "cancellation",
     label: "Cancellation",
-    placeholder: "e.g. Cancel bookings 2 hours before the visit.",
+    placeholder: "Cancel 2 hours before",
   },
   {
     id: "warranty",
-    label: "Warranty / guarantee",
-    placeholder: "e.g. 30-day workmanship warranty on repairs.",
+    label: "Warranty",
+    placeholder: "30-day workmanship warranty",
   },
   {
     id: "other",
-    label: "Other policy",
-    placeholder: "Anything else callers ask about often.",
+    label: "Other",
+    placeholder: "Other caller FAQs",
   },
 ];
 

@@ -61,22 +61,15 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
-          Today&apos;s updates
-        </h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Temporary notes for the receptionist. Callers hear your wording (e.g. &quot;Out of
-          chicken today&quot;). The expiry only controls when the note stops applying. No
-          retraining needed.
-        </p>
-      </div>
+      <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
+        Today
+      </h2>
 
       <form action={postAction} className="space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
         <label className="block text-sm font-medium" htmlFor="bulletin_text">
-          What&apos;s different today?
+          Update
         </label>
         <input
           id="bulletin_text"
@@ -84,8 +77,8 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={160}
-          placeholder="e.g. Out of chicken today"
-          className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus"
+          placeholder="Out of chicken today"
+          className="mt-1 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
         />
 
         <div className="flex flex-wrap gap-2">

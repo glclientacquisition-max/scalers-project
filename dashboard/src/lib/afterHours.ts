@@ -7,15 +7,13 @@ export const AFTER_HOURS_OPTIONS: {
 }[] = [
   {
     id: "serve",
-    label: "Keep helping after hours",
-    blurb:
-      "Still answer questions and capture the lead. Be clear you are closed for walk-in or same-day service.",
+    label: "Keep helping",
+    blurb: "Answer and capture leads when closed.",
   },
   {
     id: "message",
-    label: "Take a message only",
-    blurb:
-      "Say you are closed, note name and request, and promise a callback when the team is open.",
+    label: "Message only",
+    blurb: "Note the request for a callback.",
   },
 ];
 

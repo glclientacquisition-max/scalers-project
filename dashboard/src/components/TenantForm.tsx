@@ -101,19 +101,19 @@ export type { SettingsPanel } from "@/lib/businessSettingsNav";
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   {
     id: "professional",
-    blurb: "Calm, clear, and polished. Best for clinics, offices, and formal brands.",
+    blurb: "Calm and clear",
   },
   {
     id: "friendly",
-    blurb: "Warm and helpful, like a receptionist people enjoy talking to.",
+    blurb: "Warm and helpful",
   },
   {
     id: "empathetic",
-    blurb: "Steady and caring. Acknowledges frustration before solving.",
+    blurb: "Steady and caring",
   },
   {
     id: "localized",
-    blurb: "Natural Kenyan voice with light Sheng when the caller uses it.",
+    blurb: "Natural Kenyan voice",
   },
 ];
 
@@ -186,10 +186,42 @@ function extractLocationFallback(businessHours: string): string {
 const initial: SettingsCompileState = {};
 
 const fieldClass =
-  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus";
+  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40 focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
 
 const tableFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
+  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40 focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
+
+const denseFieldClass =
+  "w-full min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+
+function PolicyTextarea({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <textarea
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      rows={2}
+      onFocus={(e) => {
+        e.currentTarget.rows = 4;
+      }}
+      onBlur={(e) => {
+        e.currentTarget.rows = 2;
+      }}
+      placeholder={placeholder}
+      className={`${fieldClass} leading-relaxed`}
+    />
+  );
+}
 
 function TrashIcon({ className }: { className?: string }) {
   return (
@@ -742,7 +774,7 @@ export function TenantForm({
 
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
-      <header className="sticky top-16 z-30 -mx-4 mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+      <header className="sticky top-0 z-20 -mx-4 mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
         <div className="min-w-0">
           <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
             Business
@@ -806,14 +838,11 @@ export function TenantForm({
                   className={[
                     "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
                     selected
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
-                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
+                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
                   ].join(" ")}
                 >
                   <span className="font-medium text-[var(--ink)]">{opt.label}</span>
-                  <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                    {opt.blurb}
-                  </span>
                 </button>
               );
             })}
@@ -861,15 +890,12 @@ export function TenantForm({
                   className={[
                     "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
                     selected
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
-                      : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
+                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
                   ].join(" ")}
                 >
                   <span className="font-medium text-[var(--ink)]">
                     {TONE_LABELS[opt.id]}
-                  </span>
-                  <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                    {opt.blurb}
                   </span>
                 </button>
               );
@@ -946,11 +972,8 @@ export function TenantForm({
           {showBulkServices ? (
             <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-4">
               <label className="block text-sm font-medium" htmlFor="bulk_services">
-                Paste your service list
+                Paste list
               </label>
-              <p className="text-xs text-[var(--ink-soft)]">
-                One service per line. Optional price after a dash.
-              </p>
               <textarea
                 id="bulk_services"
                 value={bulkServicesText}
@@ -966,14 +989,13 @@ export function TenantForm({
               />
               <details className="text-xs text-[var(--ink-soft)]">
                 <summary className="cursor-pointer font-medium text-[var(--ink)]">
-                  Spreadsheet format still works
+                  Spreadsheet format
                 </summary>
                 <p className="mt-2 leading-relaxed">
-                  Paste columns as{" "}
+                  Columns:{" "}
                   <span className="font-medium text-[var(--ink)]">
                     name | price | notes | out of scope
                   </span>
-                  , or copy rows from Excel / Sheets.
                 </p>
               </details>
 
@@ -1105,7 +1127,7 @@ export function TenantForm({
 
           <div>
             <label className="block text-sm font-medium" htmlFor="services_notes">
-              Additional service notes (optional)
+              Notes
             </label>
             <textarea
               id="services_notes"
@@ -1283,28 +1305,28 @@ export function TenantForm({
       </section>
 
       <section className={panel === "identity" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-medium text-[var(--ink)]">Contacts</h3>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => addSocialChannel("phone")}
-                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-[#0096FF]/10"
               >
                 Add phone
               </button>
               <button
                 type="button"
                 onClick={() => addSocialChannel("whatsapp")}
-                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-[#0096FF]/10"
               >
                 Add WhatsApp
               </button>
               <button
                 type="button"
                 onClick={() => addSocialChannel("instagram")}
-                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)]"
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink hover:border-[#0096FF]/40"
               >
                 Add social
               </button>
@@ -1312,93 +1334,97 @@ export function TenantForm({
           </div>
 
           {socialHandles.channels.length === 0 ? (
-            <p className="text-sm text-[var(--ink-soft)]">No contacts yet.</p>
+            <p className="text-sm text-ink-soft">No contacts yet.</p>
           ) : (
-            <div className="space-y-3">
-              {socialHandles.channels.map((channel, index) => (
-                <div
-                  key={`social-ch-${index}`}
-                  className="grid gap-3 rounded-xl border border-[var(--line)] bg-white p-4 sm:grid-cols-[8rem_7rem_1fr_auto]"
-                >
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`social-kind-${index}`}
-                    >
-                      Type
-                    </label>
-                    <select
-                      id={`social-kind-${index}`}
-                      value={channel.kind}
-                      onChange={(e) =>
-                        updateSocialChannel(index, "kind", e.target.value)
-                      }
-                      className={fieldClass}
-                    >
-                      {SOCIAL_CHANNEL_KINDS.map((k) => (
-                        <option key={k.id} value={k.id}>
-                          {k.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`social-label-${index}`}
-                    >
-                      Label
-                    </label>
-                    <input
-                      id={`social-label-${index}`}
-                      value={channel.label}
-                      onChange={(e) =>
-                        updateSocialChannel(index, "label", e.target.value)
-                      }
-                      placeholder="Main"
-                      className={fieldClass}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="block text-xs font-medium text-[var(--ink-soft)]"
-                      htmlFor={`social-value-${index}`}
-                    >
-                      Number / handle / URL
-                    </label>
-                    <input
-                      id={`social-value-${index}`}
-                      value={channel.value}
-                      onChange={(e) =>
-                        updateSocialChannel(index, "value", e.target.value)
-                      }
-                      placeholder={
-                        SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
-                          ?.placeholder || ""
-                      }
-                      className={fieldClass}
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      onClick={() => removeSocialChannel(index)}
-                      className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-hidden rounded-xl border border-line">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                      <th className="px-3 py-2 font-medium w-36">Type</th>
+                      <th className="px-3 py-2 font-medium w-28">Label</th>
+                      <th className="px-3 py-2 font-medium">Handle / URL</th>
+                      <th className="px-3 py-2 font-medium w-12">
+                        <span className="sr-only">Action</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line bg-white">
+                    {socialHandles.channels.map((channel, index) => (
+                      <tr key={`social-ch-${index}`} className="align-middle">
+                        <td className="px-3 py-1.5">
+                          <label className="sr-only" htmlFor={`social-kind-${index}`}>
+                            Type
+                          </label>
+                          <select
+                            id={`social-kind-${index}`}
+                            value={channel.kind}
+                            onChange={(e) =>
+                              updateSocialChannel(index, "kind", e.target.value)
+                            }
+                            className={denseFieldClass}
+                          >
+                            {SOCIAL_CHANNEL_KINDS.map((k) => (
+                              <option key={k.id} value={k.id}>
+                                {k.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <label className="sr-only" htmlFor={`social-label-${index}`}>
+                            Label
+                          </label>
+                          <input
+                            id={`social-label-${index}`}
+                            value={channel.label}
+                            onChange={(e) =>
+                              updateSocialChannel(index, "label", e.target.value)
+                            }
+                            placeholder="Main"
+                            className={denseFieldClass}
+                          />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <label className="sr-only" htmlFor={`social-value-${index}`}>
+                            Handle / URL
+                          </label>
+                          <input
+                            id={`social-value-${index}`}
+                            value={channel.value}
+                            onChange={(e) =>
+                              updateSocialChannel(index, "value", e.target.value)
+                            }
+                            placeholder={
+                              SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
+                                ?.placeholder || ""
+                            }
+                            className={denseFieldClass}
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => removeSocialChannel(index)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                            aria-label={`Remove contact ${index + 1}`}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
-
       </section>
 
       <section className={panel === "hours" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-[var(--ink)]">Weekly hours (EAT)</h3>
+          <h3 className="text-sm font-medium text-[var(--ink)]">Hours</h3>
           <div className="space-y-2">
             {DAY_ORDER.map((day) => {
               const slot = hoursSchedule.days[day];
@@ -1433,7 +1459,7 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--accent)]"
+                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
                       />
                       <span className="text-xs text-[var(--ink-soft)]">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
@@ -1444,7 +1470,7 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--accent)]"
+                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
                       />
                     </div>
                   ) : (
@@ -1610,10 +1636,7 @@ export function TenantForm({
           </div>
 
           <div>
-            <p className="block text-sm font-medium">When you are closed</p>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Controls how the receptionist handles after-hours callers.
-            </p>
+            <p className="block text-sm font-medium">After hours</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {AFTER_HOURS_OPTIONS.map((opt) => {
                 const selected = afterHoursMode === opt.id;
@@ -1625,14 +1648,11 @@ export function TenantForm({
                     className={[
                       "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
                       selected
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
-                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                        ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
+                        : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
                     ].join(" ")}
                   >
                     <span className="font-medium text-[var(--ink)]">{opt.label}</span>
-                    <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                      {opt.blurb}
-                    </span>
                   </button>
                 );
               })}
@@ -1640,31 +1660,24 @@ export function TenantForm({
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Policies. Leave blank if unused.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
             {POLICY_FIELDS.map((field) => (
               <div key={field.id} className={field.id === "other" ? "sm:col-span-2" : ""}>
                 <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  className="block text-xs font-medium text-ink-soft"
                   htmlFor={`policy-${field.id}`}
                 >
                   {field.label}
                 </label>
-                <textarea
+                <PolicyTextarea
                   id={`policy-${field.id}`}
                   value={policies[field.id]}
-                  onChange={(e) =>
-                    setPolicies((prev) => ({ ...prev, [field.id]: e.target.value }))
+                  onChange={(value) =>
+                    setPolicies((prev) => ({ ...prev, [field.id]: value }))
                   }
-                  rows={2}
                   placeholder={field.placeholder}
-                  className={`${fieldClass} leading-relaxed`}
                 />
               </div>
             ))}
@@ -1673,15 +1686,13 @@ export function TenantForm({
 
         <div>
           <label className="block text-sm font-medium" htmlFor="unknown_answer_fallback">
-            Unknown request fallback
+            Unknown fallback
           </label>
-          <textarea
+          <PolicyTextarea
             id="unknown_answer_fallback"
             value={unknownFallback}
-            onChange={(e) => setUnknownFallback(e.target.value)}
-            rows={2}
-            placeholder={'e.g. "The team will call you back today to confirm."'}
-            className={`${fieldClass} leading-relaxed`}
+            onChange={setUnknownFallback}
+            placeholder="Team will call you back today."
           />
         </div>
       </section>
@@ -1696,8 +1707,7 @@ export function TenantForm({
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              How {agentName || "your receptionist"} sounds on calls (Soniox).
-              Spoken name comes from Agent Persona. Save &amp; train after changing.
+              Call sound. Save &amp; train after changing.
             </p>
           </div>
           {voiceOptions.length > 1 ? (
@@ -1741,19 +1751,16 @@ export function TenantForm({
           )}
           <div>
             <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="soniox_voice_label">
-              Name this voice
+              Voice label
             </label>
-            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Desk-only label for your team.
-            </p>
             <input
               id="soniox_voice_label"
               type="text"
               maxLength={40}
               value={sonioxVoiceLabel}
               onChange={(e) => setSonioxVoiceLabel(e.target.value)}
-              placeholder="e.g. Front desk voice"
-              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
+              placeholder="Front desk voice"
+              className="mt-2 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">

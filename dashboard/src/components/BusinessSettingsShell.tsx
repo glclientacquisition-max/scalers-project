@@ -164,7 +164,7 @@ export function BusinessSettingsShell({
         />
       ) : (
         <>
-          <header className="sticky top-16 z-30 -mx-4 mb-8 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+          <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
             <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
               Business
             </h1>

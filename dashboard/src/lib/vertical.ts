@@ -12,22 +12,22 @@ export const VERTICAL_OPTIONS: {
   {
     id: "retail",
     label: "Retail / shop",
-    blurb: "Products, prices, stock questions, holds, and pickup requests.",
+    blurb: "Products and stock",
   },
   {
     id: "home_services",
     label: "Home services",
-    blurb: "Repairs, cleaning, visits — booking and service-area questions.",
+    blurb: "Repairs and visits",
   },
   {
     id: "hospitality",
     label: "Hotel / lodge / restaurant",
-    blurb: "Stays, tables, amenities, and directions (full booking pack later).",
+    blurb: "Stays and tables",
   },
   {
     id: "general",
     label: "Other / general",
-    blurb: "Use the core receptionist until a specialist pack fits better.",
+    blurb: "General receptionist",
   },
 ];
 
