@@ -28,7 +28,8 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 GEMINI_API_KEY=
 SONIOX_API_KEY=
-SONIOX_VOICE=
+# Scalers cloned voice is fixed in code (7b197f3c-84b4-4404-986f-114e4dac1432).
+# Optional: VOICE_INTERNAL_SECRET (desk phone preview auth)
 PUBLIC_BASE_URL=https://YOUR-PRODUCTION-HOST
 ```
 

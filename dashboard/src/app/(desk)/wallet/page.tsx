@@ -7,39 +7,15 @@ import {
   getTenantUsageSummary,
 } from "@/lib/wallet";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
-
-function Kpi({
-  label,
-  value,
-  hint,
-  warn,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  warn?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] px-5 py-4">
-      <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">{label}</p>
-      <p
-        className={`mt-2 font-display text-3xl tracking-tight ${
-          warn ? "text-[var(--warn)]" : "text-[var(--ink)]"
-        }`}
-      >
-        {value}
-      </p>
-      {hint ? <p className="mt-1 text-xs text-[var(--ink-soft)]">{hint}</p> : null}
-    </div>
-  );
-}
+import { WalletTopUpButton } from "@/components/WalletTopUpButton";
+import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
   if (kind === "line_rental") return "Line fee";
   if (kind === "admin_adjustment") return "Adjustment";
   if (kind === "topup") return "Top-up";
-  if (kind === "trial_credit") return "Trial / beta credit";
+  if (kind === "trial_credit") return "Trial credit";
   return kind;
 }
 
@@ -47,9 +23,9 @@ export default async function WalletPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 text-[var(--ink-soft)]">
+      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[var(--accent)]">
+        <Link href="/signup" className="text-[#0096FF]">
           Create one
         </Link>
         .
@@ -60,7 +36,7 @@ export default async function WalletPage() {
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
     return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
+      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
         Not signed in.
       </div>
     );
@@ -79,7 +55,7 @@ export default async function WalletPage() {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
+      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
         Could not load usage: {message}
       </div>
     );
@@ -87,123 +63,141 @@ export default async function WalletPage() {
 
   const billedThisMonth = usage.callChargesKes + usage.lineFeeKes;
   const lowThreshold = Number(tenant.wallet_low_balance_kes ?? WALLET_LOW_BALANCE_KES);
-  const prepaidLow =
-    !usage.isBeta &&
-    usage.walletBalanceKes > 0 &&
-    usage.walletBalanceKes < lowThreshold;
   const prepaidEmpty = !usage.isBeta && usage.walletBalanceKes <= 0;
+  const prepaidLow =
+    !usage.isBeta && usage.walletBalanceKes > 0 && usage.walletBalanceKes < lowThreshold;
+  const topUpConfig = getWalletTopUpConfig();
 
   return (
     <div className="max-w-3xl">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-4xl tracking-tight">Wallet</h1>
-          <p className="mt-2 text-[var(--ink-soft)]">
-            One prepaid KES balance for line rental and assistant minutes.
-          </p>
-        </div>
-        <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-medium text-[var(--accent-deep)]">
-          {usage.isBeta ? "Free beta (not charged)" : "Prepaid · KES"}
-        </span>
-      </div>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">Wallet</h1>
+        {usage.isBeta ? (
+          <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-[#0096FF]/30 bg-[#0096FF]/5 px-6 py-3 text-sm font-medium text-[#005ccc]">
+            Free beta
+          </span>
+        ) : (
+          <WalletTopUpButton
+            tenantId={tenant.id}
+            topUpEnabled={topUpConfig.enabled}
+            presets={topUpConfig.presets}
+          />
+        )}
+      </header>
 
-      {prepaidEmpty ? (
-        <p className="mt-4 rounded-xl border border-[var(--warn)]/40 bg-white px-4 py-3 text-sm text-[var(--warn)]">
-          Prepaid is empty.
-          {tenant.on_demand_usage_enabled
-            ? " On-demand is on — calls can continue and bill beyond prepaid."
-            : " On-demand is off — further charges pause until you top up or enable on-demand."}
-        </p>
-      ) : prepaidLow ? (
-        <p className="mt-4 rounded-xl border border-[var(--warn)]/40 bg-white px-4 py-3 text-sm text-[var(--warn)]">
-          Prepaid is running low (under KES {lowThreshold.toLocaleString("en-KE")}). We also send a
-          live WhatsApp/email alert when this happens.
+      {(prepaidEmpty || prepaidLow) && !usage.isBeta ? (
+        <p className="mt-4 rounded-xl border border-warn/40 bg-white px-4 py-3 text-sm text-warn">
+          {prepaidEmpty
+            ? tenant.on_demand_usage_enabled
+              ? "Prepaid empty. On-demand is on."
+              : "Prepaid empty. Top up or enable on-demand below."
+            : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
         </p>
       ) : null}
 
-      <section className="mt-8 grid gap-3 sm:grid-cols-2">
-        <Kpi
-          label="Wallet balance"
-          value={`KES ${usage.walletBalanceKes.toLocaleString("en-KE")}`}
-          hint={
-            usage.isBeta
-              ? "Beta workspace: usage is tracked, nothing is deducted."
-              : usage.lowBalance
-                ? "Low balance — top up soon. Live alert is sent automatically."
-                : "Covers line fee + call minutes"
-          }
-          warn={!usage.isBeta && usage.lowBalance}
-        />
-        <Kpi
-          label={usage.isBeta ? "Would cost this month" : "Billed this month"}
-          value={`KES ${(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString("en-KE")}`}
-          hint={
-            usage.isBeta
-              ? `Illustrative at KES ${WALLET_RATE_KES_PER_MINUTE}/min (not charged)`
-              : `Calls KES ${usage.callChargesKes.toLocaleString("en-KE")} · Line KES ${usage.lineFeeKes.toLocaleString("en-KE")}`
-          }
-        />
-      </section>
-
-      <OnDemandUsagePanel
-        tenantId={tenant.id}
-        enabled={Boolean(tenant.on_demand_usage_enabled)}
-        walletBalanceKes={usage.walletBalanceKes}
-        isBeta={usage.isBeta}
-        lowThresholdKes={lowThreshold}
-      />
-
-      <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl tracking-tight">This month</h2>
-        <dl className="mt-4 grid gap-3 sm:grid-cols-3 text-sm">
+      <section className="mt-8 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <dt className="text-[var(--ink-soft)]">Calls answered</dt>
-            <dd className="mt-1 font-display text-2xl">{usage.callsThisMonth}</dd>
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              Prepaid balance
+            </p>
+            <p
+              className={[
+                "mt-2 font-display text-5xl tracking-tight sm:text-[3.25rem]",
+                !usage.isBeta && usage.lowBalance ? "text-warn" : "text-ink",
+              ].join(" ")}
+            >
+              KES {usage.walletBalanceKes.toLocaleString("en-KE")}
+            </p>
+            <p className="mt-2 text-sm text-ink-soft">
+              {usage.isBeta
+                ? "Metered automatically. No charges during beta."
+                : "Covers line fee and call minutes"}
+            </p>
+          </div>
+          <dl className="grid min-w-[12rem] gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">
+                {usage.isBeta ? "Est. month" : "Billed month"}
+              </dt>
+              <dd className="mt-1 font-display text-2xl text-ink">
+                KES{" "}
+                {(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString(
+                  "en-KE"
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">Calls</dt>
+              <dd className="mt-1 font-display text-2xl text-ink">{usage.callsThisMonth}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">Minutes</dt>
+              <dd className="mt-1 font-display text-2xl text-ink">{usage.minutesThisMonth}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
+              <dd className="mt-1 font-display text-2xl text-ink">
+                KES {usage.lineFeeKes.toLocaleString("en-KE")}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <dl className="mt-8 grid gap-3 border-t border-line pt-6 sm:grid-cols-3 text-sm">
+          <div>
+            <dt className="text-ink-soft">Call rate</dt>
+            <dd className="mt-1 font-medium text-ink">
+              KES {WALLET_RATE_KES_PER_MINUTE}/min
+            </dd>
           </div>
           <div>
-            <dt className="text-[var(--ink-soft)]">Receptionist minutes</dt>
-            <dd className="mt-1 font-display text-2xl">{usage.minutesThisMonth}</dd>
+            <dt className="text-ink-soft">Line rental</dt>
+            <dd className="mt-1 font-medium text-ink">
+              KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
+            </dd>
           </div>
           <div>
-            <dt className="text-[var(--ink-soft)]">Minutes at rate card</dt>
-            <dd className="mt-1 font-display text-2xl">
-              KES {usage.estimatedCostKes.toLocaleString("en-KE")}
+            <dt className="text-ink-soft">Call charges</dt>
+            <dd className="mt-1 font-medium text-ink">
+              KES {usage.callChargesKes.toLocaleString("en-KE")}
             </dd>
           </div>
         </dl>
-        <p className="mt-4 text-xs text-[var(--ink-soft)] leading-relaxed">
-          Rate card: KES {WALLET_RATE_KES_PER_MINUTE}/min (AI included) + KES{" "}
-          {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo line fee
-          {usage.isBeta
-            ? ". You are on the beta whitelist (metered only)."
-            : ". Prepaid is billed first; enable on-demand if you want usage after the balance hits zero."}
-        </p>
       </section>
 
-      <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl tracking-tight">Recent activity</h2>
+      <div className="mt-6">
+        <OnDemandUsagePanel
+          tenantId={tenant.id}
+          enabled={Boolean(tenant.on_demand_usage_enabled)}
+          isBeta={usage.isBeta}
+          walletBalanceKes={usage.walletBalanceKes}
+          lowThresholdKes={lowThreshold}
+        />
+      </div>
+
+      <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
+        <h2 className="font-display text-xl tracking-tight text-ink">Recent activity</h2>
         {usage.recentLedger.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--ink-soft)]">
-            {usage.isBeta
-              ? "No charges while on free beta. Usage still appears above."
-              : "No ledger entries yet."}
+          <p className="mt-3 text-sm text-ink-soft">
+            {usage.isBeta ? "No charges during beta." : "No ledger entries yet."}
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-[var(--line)]">
+          <ul className="mt-4 divide-y divide-line">
             {usage.recentLedger.map((row) => {
               const credit = row.amount_kes > 0;
               return (
                 <li key={row.id} className="flex items-baseline justify-between gap-3 py-3 text-sm">
                   <div className="min-w-0">
-                    <p className="font-medium text-[var(--ink)]">{kindLabel(row.kind)}</p>
-                    <p className="text-xs text-[var(--ink-soft)]">
+                    <p className="font-medium text-ink">{kindLabel(row.kind)}</p>
+                    <p className="text-xs text-ink-soft">
                       {new Date(row.created_at).toLocaleString("en-KE")}
                       {row.note ? ` · ${row.note}` : ""}
                     </p>
                   </div>
                   <p
                     className={`shrink-0 font-medium ${
-                      credit ? "text-[var(--accent-deep)]" : "text-[var(--ink)]"
+                      credit ? "text-[#005ccc]" : "text-ink"
                     }`}
                   >
                     {credit ? "+" : ""}

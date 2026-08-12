@@ -21,6 +21,43 @@ function stableFingerprint(action, payload) {
   return `${action}:${JSON.stringify(normalized)}`;
 }
 
+/**
+ * Identity for hold dedupe/refine: same caller+item = one hold per call,
+ * even when when_text gets more specific (Tomorrow → Tomorrow at 5 PM).
+ */
+function requestIdentityFingerprint(value) {
+  if (!value || typeof value !== 'object') return null;
+  if (value.type === 'hold') {
+    return stableFingerprint('create_service_request', {
+      type: value.type,
+      name: value.name,
+      item: value.item,
+      phone: value.phone,
+    });
+  }
+  return stableFingerprint('create_service_request', value);
+}
+
+function findPriorHold(priorHolds, identity) {
+  if (!identity || !Array.isArray(priorHolds)) return null;
+  return (
+    priorHolds.find(
+      (row) =>
+        row &&
+        row.identity === identity &&
+        (row.id || row.status === 'succeeded')
+    ) || null
+  );
+}
+
+function whenTextIsRefinement(previous, next) {
+  const a = clean(previous).toLowerCase();
+  const b = clean(next).toLowerCase();
+  if (!a || !b) return Boolean(b && b !== a);
+  if (a === b) return false;
+  return b.includes(a) || a.includes(b) || true;
+}
+
 function validateServiceRequest(raw, { productCatalog } = {}) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing service request payload.' };
@@ -124,6 +161,7 @@ async function executeBrainTools({
   capabilities = {},
   handlers = {},
   completedFingerprints = [],
+  priorHolds = [],
   productCatalog = null,
 } = {}) {
   const completed = new Set(completedFingerprints);
@@ -146,6 +184,13 @@ async function executeBrainTools({
     const fingerprint = validation.valid
       ? stableFingerprint('create_service_request', validation.value)
       : null;
+    const identity = validation.valid
+      ? requestIdentityFingerprint(validation.value)
+      : null;
+    const priorHold =
+      validation.valid && validation.value.type === 'hold'
+        ? findPriorHold(priorHolds, identity)
+        : null;
     if (!capabilities.createServiceRequest) {
       results.push({
         action: 'create_service_request',
@@ -165,6 +210,62 @@ async function executeBrainTools({
         action: 'create_service_request',
         status: 'duplicate',
         fingerprint,
+        identity,
+      });
+    } else if (
+      priorHold &&
+      validation.value.type === 'hold' &&
+      whenTextIsRefinement(priorHold.whenText, validation.value.whenText)
+    ) {
+      try {
+        const updated = await handlers.updateServiceRequest?.({
+          id: priorHold.id,
+          ...validation.value,
+        });
+        if (updated) {
+          results.push({
+            action: 'create_service_request',
+            status: 'updated',
+            fingerprint,
+            identity,
+            id: updated.id || priorHold.id,
+            requestType: updated.request_type || validation.value.type,
+            value: validation.value,
+            record: updated,
+          });
+        } else if (priorHold.id && !handlers.updateServiceRequest) {
+          // No updater available — treat refined when_text as duplicate of the open hold.
+          results.push({
+            action: 'create_service_request',
+            status: 'duplicate',
+            fingerprint: identity,
+            identity,
+            reason: 'Hold already saved; pickup time refinement was noted.',
+          });
+        } else {
+          results.push({
+            action: 'create_service_request',
+            status: 'duplicate',
+            fingerprint: identity,
+            identity,
+            reason: 'Hold already saved for this title.',
+          });
+        }
+      } catch (error) {
+        results.push({
+          action: 'create_service_request',
+          status: 'failed',
+          fingerprint,
+          identity,
+          reason: clean(error?.message || error, 300),
+        });
+      }
+    } else if (priorHold && validation.value.type === 'hold') {
+      results.push({
+        action: 'create_service_request',
+        status: 'duplicate',
+        fingerprint: identity,
+        identity,
       });
     } else {
       try {
@@ -175,6 +276,7 @@ async function executeBrainTools({
                 action: 'create_service_request',
                 status: 'succeeded',
                 fingerprint,
+                identity,
                 id: created.id || null,
                 requestType: created.request_type || validation.value.type,
                 value: validation.value,
@@ -184,6 +286,7 @@ async function executeBrainTools({
                 action: 'create_service_request',
                 status: 'failed',
                 fingerprint,
+                identity,
                 reason: 'The backend did not create a request.',
               }
         );
@@ -192,6 +295,7 @@ async function executeBrainTools({
           action: 'create_service_request',
           status: 'failed',
           fingerprint,
+          identity,
           reason: clean(error?.message || error, 300),
         });
       }
@@ -299,7 +403,12 @@ function formatToolConfirmation(results = [], language = 'en') {
     return "I couldn't complete that action.";
   }
   if (meaningful.action === 'create_service_request') {
-    if (meaningful.status === 'succeeded') {
+    if (meaningful.status === 'succeeded' || meaningful.status === 'updated') {
+      if (meaningful.status === 'updated') {
+        if (sw) return 'Sawa — nimesasisha hold yako.';
+        if (sheng) return 'Poa — nime-update hold yako.';
+        return "Done — I've updated your hold.";
+      }
       if (sw) return 'Sawa — nimehifadhi ombi lako.';
       if (sheng) return 'Poa — nime-save request yako.';
       return "Done — I've saved your request.";
@@ -362,6 +471,9 @@ function formatToolConfirmation(results = [], language = 'en') {
 module.exports = {
   REQUEST_TYPES,
   stableFingerprint,
+  requestIdentityFingerprint,
+  findPriorHold,
+  whenTextIsRefinement,
   validateServiceRequest,
   validateCallerInfo,
   validateEscalation,

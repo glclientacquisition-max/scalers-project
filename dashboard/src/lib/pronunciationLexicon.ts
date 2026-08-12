@@ -106,6 +106,20 @@ export const BLOCKED_MATCH_TOKENS = new Set(
     "call",
     "calling",
     "reached",
+    // Extra fillers that leaked from call-mining / weak Gemini takes
+    "may",
+    "let",
+    "since",
+    "good",
+    "just",
+    "money",
+    "great",
+    "time",
+    "take",
+    "name",
+    "habari",
+    "jambo",
+    "sasa",
   ].map((t) => t.toLowerCase())
 );
 
@@ -179,17 +193,34 @@ export function matchPatternFromPhrase(phrase: string): string {
       .split(/\s+/)
       .filter(Boolean);
     if (camelParts.length > 1) {
-      const spaced = camelParts.map(escapeRegex).join("\\s*");
-      const glued = camelParts.map(escapeRegex).join("");
-      return `${spaced}|${glued}`.slice(0, TTS_MATCH_MAX);
+      return pickMatchAlternatives([
+        camelParts.map(escapeRegex).join("\\s*"),
+        camelParts.map(escapeRegex).join(""),
+      ]);
     }
     return escapeRegex(word).slice(0, TTS_MATCH_MAX);
   }
 
-  const spaced = words.map(escapeRegex).join("\\s+");
-  const loose = words.map(escapeRegex).join("\\s*");
-  const glued = words.map(escapeRegex).join("");
-  return `${spaced}|${loose}|${glued}`.slice(0, TTS_MATCH_MAX);
+  return pickMatchAlternatives([
+    words.map(escapeRegex).join("\\s+"),
+    words.map(escapeRegex).join("\\s*"),
+    words.map(escapeRegex).join(""),
+  ]);
+}
+
+/** Join regex alternatives without truncating mid-pattern (avoids broken | tails). */
+function pickMatchAlternatives(alts: string[]): string {
+  const usable = alts
+    .map((a) => a.trim())
+    .filter((a) => a.length > 0 && a.length <= TTS_MATCH_MAX);
+  if (!usable.length) return (alts[0] || "").slice(0, TTS_MATCH_MAX);
+  let out = usable[0];
+  for (let i = 1; i < usable.length; i += 1) {
+    const next = `${out}|${usable[i]}`;
+    if (next.length > TTS_MATCH_MAX) break;
+    out = next;
+  }
+  return out;
 }
 
 export function parseTtsLexicon(raw: unknown): TtsLexiconEntry[] {

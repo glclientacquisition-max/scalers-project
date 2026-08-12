@@ -79,6 +79,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
+import { TENANT_SETTINGS_FORM_ID } from "@/components/TenantSettingsSaveButton";
 import {
   parseTtsLexicon,
   type TtsLexiconEntry,
@@ -318,7 +319,7 @@ export function TenantForm({
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
-  const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
+  const [state, formAction] = useActionState(saveAndCompileSettings, initial);
   const [flash, setFlash] = useState<string | null>(null);
 
   const teamJson = useMemo(
@@ -595,7 +596,7 @@ export function TenantForm({
   }
 
   return (
-    <form action={formAction} className="space-y-10">
+    <form id={TENANT_SETTINGS_FORM_ID} action={formAction} className="space-y-10">
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
@@ -1969,36 +1970,16 @@ export function TenantForm({
         </div>
       </section>
 
-      <div className="sticky bottom-0 z-30 -mx-1 mt-2 border-t border-line bg-surface-canvas/95 px-1 py-4 backdrop-blur-sm">
-        <button
-          type="submit"
-          disabled={pending || !tone}
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-white font-medium transition hover:bg-accent-deep focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-60"
-        >
-          {pending ? (
-            <>
-              <span
-                aria-hidden="true"
-                className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-              />
-              Training your receptionist (usually under 15 seconds)…
-            </>
-          ) : (
-            "Save & train receptionist"
-          )}
-        </button>
-
-        {state.error ? (
-          <p className="mt-3 text-sm text-warn" role="alert">
-            {state.error}
-          </p>
-        ) : null}
-        {flash && !state.error ? (
-          <p className="mt-3 text-sm text-ok" role="status">
-            {flash}
-          </p>
-        ) : null}
-      </div>
+      {state.error ? (
+        <p className="text-sm text-warn" role="alert">
+          {state.error}
+        </p>
+      ) : null}
+      {flash && !state.error ? (
+        <p className="text-sm text-ok" role="status">
+          {flash}
+        </p>
+      ) : null}
     </form>
   );
 }

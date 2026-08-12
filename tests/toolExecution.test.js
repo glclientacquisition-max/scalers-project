@@ -160,6 +160,67 @@ describe('validated tool execution', () => {
     assert.equal(saved.item, 'Rich Dad Poor Dad');
   });
 
+  it('updates an existing hold when when_text is refined instead of creating a second row', async () => {
+    const catalog = [{ name: 'The Smart Money Tribe' }];
+    const firstParsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"hold","name":"Brian","item":"The Smart Money Tribe","when_text":"Tomorrow"}}###ENDTOOL###'
+    );
+    const first = await executeBrainTools({
+      parsed: firstParsed,
+      capabilities,
+      productCatalog: catalog,
+      handlers: {
+        createServiceRequest: async (request) => ({
+          id: 'hold_1',
+          request_type: request.type,
+        }),
+      },
+    });
+    assert.equal(first.results[0].status, 'succeeded');
+
+    const { recordActionResults, createBrainState } = require('../src/conversation/brainState');
+    const state = recordActionResults(createBrainState(), first.results);
+
+    let creates = 0;
+    let updates = 0;
+    let updatedPayload = null;
+    const secondParsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"hold","name":"Brian","item":"The Smart Money Tribe","when_text":"Tomorrow at 5:00 PM"}}###ENDTOOL###'
+    );
+    const second = await executeBrainTools({
+      parsed: secondParsed,
+      capabilities,
+      productCatalog: catalog,
+      priorHolds: state.actions.openHolds,
+      completedFingerprints: state.actions.completedFingerprints,
+      handlers: {
+        createServiceRequest: async () => {
+          creates += 1;
+          return { id: 'should_not' };
+        },
+        updateServiceRequest: async (request) => {
+          updates += 1;
+          updatedPayload = request;
+          return {
+            id: request.id,
+            request_type: 'hold',
+            when_text: request.whenText,
+          };
+        },
+      },
+    });
+
+    assert.equal(creates, 0);
+    assert.equal(updates, 1);
+    assert.equal(second.results[0].status, 'updated');
+    assert.equal(updatedPayload.id, 'hold_1');
+    assert.equal(updatedPayload.whenText, 'Tomorrow at 5:00 PM');
+    assert.match(
+      formatToolConfirmation(second.results, 'en'),
+      /updated your hold/i
+    );
+  });
+
   it('rejects orders missing a caller name', async () => {
     let calls = 0;
     const parsed = parseGeminiResponse(

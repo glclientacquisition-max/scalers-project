@@ -60,9 +60,10 @@ Core runtime modules:
 3. Auto language match: en / sw / sheng; switch when the caller switches.
 4. Lead capture: name + reason only when required for a saved request or justified handoff; confirm unclear names.
 5. After-hours / bulletin: honesty first, then still help per `after_hours_mode` (serve vs message). Promo bulletins must not be volunteered off-topic.
-6. Holds require catalogue-grounded titles (plus name + when); unlisted titles → enquiry / special-order quote, not hold.
-7. Compiled `llm_system_prompt` is written by Desk compiler; owners do not edit raw prompt in UI. Stale compiled prompts that force name capture fight resolution-first runtime — recompile after Brain policy changes.
-8. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`.
+6. Holds require catalogue-grounded titles (plus name + when); unlisted titles → enquiry / special-order quote, not hold. Refining pickup time updates the same hold.
+7. Missing catalogue prices and empty policy fields are unknown — never invent amounts or policy wording; do not force name capture.
+8. Compiled `llm_system_prompt` is written by Desk compiler; owners do not edit raw prompt in UI. Stale compiled prompts that force name capture fight resolution-first runtime — recompile after Brain policy changes.
+9. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`.
 
 ## Test / verify
 

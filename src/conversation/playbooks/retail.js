@@ -42,7 +42,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['product'],
     optionalSlots: [],
     completion:
-      'Answer price_range/price from catalog for that product. If unknown, say so and offer to note an enquiry — never invent a price.',
+      'Answer price ONLY from PRODUCT CATALOGUE Price field. If Price is unknown/missing, say you do not have the exact price and offer a quote/enquiry — never invent a KSh amount. Do not ask for a name before stating that the price is unknown.',
     tool: null,
     patterns: [
       /\b(how much|price|bei|gharama|inaenda|cost|pesa gani)\b/i,
@@ -102,7 +102,7 @@ const RETAIL_INTENTS = [
     requiredSlots: [],
     optionalSlots: ['policy_key'],
     completion:
-      'Answer from POLICIES (payment, returns, delivery, deposit, etc.). If missing, say you will note it — never invent policy.',
+      'Answer from POLICIES only. If that policy is "(not on file)" or missing, admit you do not have that detail — never invent, and do not force name/reason capture unless the caller asks to leave a note.',
     tool: null,
     patterns: [
       /\b(return|refund|exchange|policy|delivery|deposit|warranty|mpesa|m-?pesa|payment|lipa)\b/i,
@@ -217,7 +217,8 @@ function formatRetailPlaybookForPrompt(opts = {}) {
     'Completion rules:',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
     '- For hold_or_pickup / order_enquiry: only fire create_service_request after required slots are known.',
-    '- Never invent products, prices, stock, or policies.',
+    '- For hold_or_pickup: if refining pickup time on the same title+name, append create_service_request again with the fuller when_text — backend updates the same hold (do not create a second hold).',
+    '- Never invent products, prices, stock, or policies. Missing price/policy → admit unknown.',
     '- After a clear completion (answered or request logged), confirm briefly and goodbye.'
   );
 

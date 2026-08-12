@@ -5,6 +5,7 @@ const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
 
 const { prepareForTts } = require('./ttsNormalize');
+const { resolveSonioxVoice } = require('./sonioxVoice');
 
 const SONIOX_TTS_URL =
   process.env.SONIOX_TTS_URL || 'wss://tts-rt.soniox.com/tts-websocket';
@@ -29,7 +30,7 @@ function speedForLanguage(lang) {
 }
 
 function isSonioxTtsConfigured() {
-  return Boolean(process.env.SONIOX_API_KEY && process.env.SONIOX_VOICE);
+  return Boolean(process.env.SONIOX_API_KEY);
 }
 
 /**
@@ -41,9 +42,8 @@ function isSonioxTtsConfigured() {
  */
 function createSonioxTtsSession({ callSid, onAudio = () => {}, onEvent = () => {} }) {
   const apiKey = process.env.SONIOX_API_KEY;
-  const voice = process.env.SONIOX_VOICE;
+  const voice = resolveSonioxVoice();
   if (!apiKey) throw new Error('SONIOX_API_KEY is not configured');
-  if (!voice) throw new Error('SONIOX_VOICE is not configured');
 
   let closed = false;
   let ws = null;
