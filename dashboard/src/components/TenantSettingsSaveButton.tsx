@@ -19,7 +19,7 @@ export function TenantSettingsSaveButton({ pending = false }: { pending?: boolea
           Training…
         </>
       ) : (
-        "Save & train receptionist"
+        "Save & train assistant"
       )}
     </button>
   );

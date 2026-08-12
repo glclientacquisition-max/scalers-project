@@ -12,6 +12,7 @@ import {
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
+import { settingsStickyHeaderClass } from "@/components/settingsUi";
 
 const PRIMARY_NAV = [
   { id: "today", label: "Today" },
@@ -22,10 +23,13 @@ const PRIMARY_NAV = [
 
 const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
   { id: "identity", label: "Agent Persona" },
-  { id: "hours", label: "Business Hours" },
+  { id: "hours", label: "Hours" },
+  { id: "locations", label: "Locations" },
+  { id: "policies", label: "Policies" },
   { id: "team", label: "Escalation Team" },
   { id: "faqs", label: "FAQs" },
   { id: "tools", label: "Tools & voice" },
+  { id: "pronunciation", label: "Pronunciation" },
 ];
 
 function navLinkClass(active: boolean) {
@@ -164,21 +168,23 @@ export function BusinessSettingsShell({
         />
       ) : (
         <>
-          <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
-            <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
-              Business
-            </h1>
-            <BusinessLine tenant={tenant} />
+          <header className={settingsStickyHeaderClass}>
+            <div className="min-w-0">
+              <h1 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">
+                Business
+              </h1>
+              <BusinessLine tenant={tenant} />
+            </div>
           </header>
 
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <SettingsSidebar tab={tab} trainPanel={trainPanel} />
 
             <div className="min-w-0 flex-1">
               {tab === "today" ? <DailyBulletinPanel tenant={tenant} /> : null}
 
               {tab === "import" ? (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   <KnowledgeIngestPanel tenant={tenant} />
                   <CatalogImportPanel tenant={tenant} />
                 </div>

@@ -578,7 +578,7 @@ export function PronunciationCoach({
   return (
     <section
       id="pronunciation-coach"
-      className="space-y-5 border-t border-[var(--line)] pt-8"
+      className={omitLexiconField ? "space-y-4" : "space-y-5 border-t border-[var(--line)] pt-8"}
       aria-labelledby="pronunciation-coach-heading"
     >
       {omitLexiconField ? null : (
@@ -587,12 +587,21 @@ export function PronunciationCoach({
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2
-            id="pronunciation-coach-heading"
-            className="font-display text-2xl tracking-tight text-[var(--ink)]"
-          >
-            Pronunciation Overrides
-          </h2>
+          {omitLexiconField ? (
+            <h3
+              id="pronunciation-coach-heading"
+              className="text-sm font-medium text-[var(--ink)]"
+            >
+              Practice lines
+            </h3>
+          ) : (
+            <h2
+              id="pronunciation-coach-heading"
+              className="font-display text-2xl tracking-tight text-[var(--ink)]"
+            >
+              Pronunciation Overrides
+            </h2>
+          )}
           {cleanNote ? (
             <p className="mt-2 text-xs text-[var(--ok)]" role="status">
               {cleanNote}
@@ -684,7 +693,7 @@ export function PronunciationCoach({
           ) : (
             <>
               {active ? (
-                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/35 to-white px-5 py-6 sm:px-7">
+                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/35 to-white px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                       {active.label} · say this line
@@ -696,14 +705,14 @@ export function PronunciationCoach({
                     ) : null}
                   </div>
                   <p
-                    className="mt-3 font-display text-2xl leading-snug tracking-tight text-[var(--ink)] sm:text-3xl"
+                    className="mt-2 font-display text-xl leading-snug tracking-tight text-[var(--ink)] sm:text-2xl"
                     aria-live="polite"
                   >
                     {active.prompt}
                   </p>
                   <p className="mt-2 text-sm text-[var(--ink-soft)]">{active.reason}</p>
                   {active.targets?.length ? (
-                    <p className="mt-3 text-xs text-[var(--ink-soft)]">
+                    <p className="mt-2 text-xs text-[var(--ink-soft)]">
                       Learns:{" "}
                       <span className="font-medium text-[var(--ink)]">
                         {active.targets.map((t) => t.label).join(" · ")}
@@ -711,7 +720,7 @@ export function PronunciationCoach({
                     </p>
                   ) : null}
 
-                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
                     {!recording && !audioBlob ? (
                       <button
                         type="button"

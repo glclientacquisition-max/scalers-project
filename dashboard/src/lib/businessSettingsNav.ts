@@ -2,9 +2,12 @@ export type SettingsPanel =
   | "catalog"
   | "identity"
   | "hours"
+  | "locations"
+  | "policies"
   | "team"
   | "faqs"
-  | "tools";
+  | "tools"
+  | "pronunciation";
 
 export type BusinessSettingsTab =
   | "today"
@@ -28,9 +31,12 @@ export function parseBusinessSettingsPanel(
   if (
     raw === "identity" ||
     raw === "hours" ||
+    raw === "locations" ||
+    raw === "policies" ||
     raw === "team" ||
     raw === "faqs" ||
-    raw === "tools"
+    raw === "tools" ||
+    raw === "pronunciation"
   ) {
     return raw;
   }
