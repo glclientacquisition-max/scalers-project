@@ -85,25 +85,34 @@ export default async function WalletPage() {
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-              {usage.isBeta ? "Usage this month" : "Balance"}
+              Prepaid balance
             </p>
             <p
               className={[
                 "mt-2 font-display text-5xl tracking-tight sm:text-[3.25rem]",
-                usage.isBeta || !usage.lowBalance ? "text-ink" : "text-warn",
+                !usage.isBeta && usage.lowBalance ? "text-warn" : "text-ink",
               ].join(" ")}
             >
-              {usage.isBeta
-                ? `KES ${usage.estimatedCostKes.toLocaleString("en-KE")}`
-                : `KES ${usage.walletBalanceKes.toLocaleString("en-KE")}`}
+              KES {usage.walletBalanceKes.toLocaleString("en-KE")}
             </p>
             <p className="mt-2 text-sm text-ink-soft">
               {usage.isBeta
                 ? "Metered automatically. No charges during beta."
-                : "Prepaid KES"}
+                : "Covers line fee and call minutes"}
             </p>
           </div>
           <dl className="grid min-w-[12rem] gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">
+                {usage.isBeta ? "Est. month" : "Billed month"}
+              </dt>
+              <dd className="mt-1 font-display text-2xl text-ink">
+                KES{" "}
+                {(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString(
+                  "en-KE"
+                )}
+              </dd>
+            </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Calls</dt>
               <dd className="mt-1 font-display text-2xl text-ink">{usage.callsThisMonth}</dd>
@@ -112,82 +121,34 @@ export default async function WalletPage() {
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Minutes</dt>
               <dd className="mt-1 font-display text-2xl text-ink">{usage.minutesThisMonth}</dd>
             </div>
-            {!usage.isBeta ? (
-              <>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Billed month</dt>
-                  <dd className="mt-1 font-display text-2xl text-ink">
-                    KES {billedThisMonth.toLocaleString("en-KE")}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
-                  <dd className="mt-1 font-display text-2xl text-ink">
-                    KES {usage.lineFeeKes.toLocaleString("en-KE")}
-                  </dd>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Call rate</dt>
-                  <dd className="mt-1 font-display text-2xl text-ink">
-                    KES {WALLET_RATE_KES_PER_MINUTE}/min
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
-                  <dd className="mt-1 font-display text-2xl text-ink">
-                    KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
-                  </dd>
-                </div>
-              </>
-            )}
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
+              <dd className="mt-1 font-display text-2xl text-ink">
+                KES {usage.lineFeeKes.toLocaleString("en-KE")}
+              </dd>
+            </div>
           </dl>
         </div>
 
         <dl className="mt-8 grid gap-3 border-t border-line pt-6 sm:grid-cols-3 text-sm">
-          {usage.isBeta ? (
-            <>
-              <div>
-                <dt className="text-ink-soft">Call charges</dt>
-                <dd className="mt-1 font-medium text-ink">
-                  KES {usage.callChargesKes.toLocaleString("en-KE")}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-soft">Line fee (est.)</dt>
-                <dd className="mt-1 font-medium text-ink">
-                  KES {usage.lineFeeKes.toLocaleString("en-KE")}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-soft">Billing</dt>
-                <dd className="mt-1 font-medium text-ink">Automatic metering</dd>
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <dt className="text-ink-soft">Call rate</dt>
-                <dd className="mt-1 font-medium text-ink">
-                  KES {WALLET_RATE_KES_PER_MINUTE}/min
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-soft">Line rental</dt>
-                <dd className="mt-1 font-medium text-ink">
-                  KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-soft">Call charges</dt>
-                <dd className="mt-1 font-medium text-ink">
-                  KES {usage.callChargesKes.toLocaleString("en-KE")}
-                </dd>
-              </div>
-            </>
-          )}
+          <div>
+            <dt className="text-ink-soft">Call rate</dt>
+            <dd className="mt-1 font-medium text-ink">
+              KES {WALLET_RATE_KES_PER_MINUTE}/min
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-soft">Line rental</dt>
+            <dd className="mt-1 font-medium text-ink">
+              KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-soft">Call charges</dt>
+            <dd className="mt-1 font-medium text-ink">
+              KES {usage.callChargesKes.toLocaleString("en-KE")}
+            </dd>
+          </div>
         </dl>
       </section>
 
