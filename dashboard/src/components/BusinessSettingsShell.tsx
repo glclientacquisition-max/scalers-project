@@ -15,7 +15,7 @@ import {
 import { settingsStickyHeaderClass } from "@/components/settingsUi";
 
 const PRIMARY_NAV = [
-  { id: "today", label: "Today" },
+  { id: "updates", label: "Updates" },
   { id: "catalog", label: "Catalog" },
   { id: "import", label: "Import" },
   { id: "test", label: "Test" },
@@ -181,7 +181,7 @@ export function BusinessSettingsShell({
             <SettingsSidebar tab={tab} trainPanel={trainPanel} />
 
             <div className="min-w-0 flex-1">
-              {tab === "today" ? <DailyBulletinPanel tenant={tenant} /> : null}
+              {tab === "updates" ? <DailyBulletinPanel tenant={tenant} /> : null}
 
               {tab === "import" ? (
                 <div className="space-y-6">

@@ -6,6 +6,11 @@ import {
   nairobiGreeting,
   walletKes,
 } from "@/lib/callsTriage";
+import {
+  formatBulletinEndLabel,
+  liveBulletinItems,
+} from "@/lib/dailyBulletin";
+import { businessSettingsHref } from "@/lib/businessSettingsNav";
 
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
@@ -74,6 +79,8 @@ export default async function HomeOverviewPage() {
   const kes = walletKes(tenant);
   const lowWallet = kes < 200;
   const business = tenant.business_name?.trim() || "your workspace";
+  const liveUpdates = liveBulletinItems(tenant.daily_bulletin);
+  const primaryUpdate = liveUpdates[0] ?? null;
 
   const countEq = (status: string) =>
     client
@@ -133,6 +140,31 @@ export default async function HomeOverviewPage() {
           Overview
         </h1>
       </header>
+
+      {primaryUpdate ? (
+        <aside
+          aria-label="Live updates"
+          className="mx-auto mt-8 max-w-md text-center"
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-[#005ccc]">
+            Live update
+            {liveUpdates.length > 1 ? ` · ${liveUpdates.length}` : ""}
+          </p>
+          <p className="mt-1.5 text-sm font-medium text-ink">{primaryUpdate.text}</p>
+          <p className="mt-1 text-xs text-ink-soft">
+            {formatBulletinEndLabel(primaryUpdate.ends_at)}
+            {liveUpdates.length > 1
+              ? ` · +${liveUpdates.length - 1} more`
+              : ""}
+          </p>
+          <Link
+            href={businessSettingsHref("updates")}
+            className="mt-2 inline-block text-sm font-medium text-[#0096FF] hover:text-[#005ccc] focus-visible:outline-none focus-visible:underline"
+          >
+            Manage updates
+          </Link>
+        </aside>
+      ) : null}
 
       <section
         aria-label="Executive summary"

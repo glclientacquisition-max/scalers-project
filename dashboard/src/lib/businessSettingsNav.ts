@@ -10,7 +10,7 @@ export type SettingsPanel =
   | "pronunciation";
 
 export type BusinessSettingsTab =
-  | "today"
+  | "updates"
   | "catalog"
   | "train"
   | "import"
@@ -22,7 +22,11 @@ export function parseBusinessSettingsTab(
   if (raw === "catalog" || raw === "train" || raw === "import" || raw === "test") {
     return raw;
   }
-  return "today";
+  // "today" kept as a legacy alias for bookmarked /settings?tab=today links.
+  if (raw === "updates" || raw === "today") {
+    return "updates";
+  }
+  return "updates";
 }
 
 export function parseBusinessSettingsPanel(
