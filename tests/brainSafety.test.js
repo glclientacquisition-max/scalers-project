@@ -26,6 +26,8 @@ describe('Brain production safety', () => {
   it('uses resolution-first rules without mandatory lead capture', () => {
     assert.match(CONVERSATION_RULES, /FULL ASSISTANCE/);
     assert.match(CONVERSATION_RULES, /Do not force lead capture/);
+    assert.match(CONVERSATION_RULES, /never guess a shilling amount/i);
+    assert.match(CONVERSATION_RULES, /Empty policies/i);
     const prompt = buildSystemPrompt({
       businessName: 'Test Shop',
       servicesCatalog: [{ name: 'Printing' }],

@@ -122,6 +122,7 @@ function createBrainState(profile = {}) {
     actions: {
       completedFingerprints: [],
       lastResults: [],
+      openHolds: [],
     },
   };
 }
@@ -251,18 +252,42 @@ function recordActionResults(state, results = []) {
       ? { requestType: String(result.requestType) }
       : {}),
   }));
+  if (!Array.isArray(next.actions.openHolds)) next.actions.openHolds = [];
   for (const result of safeResults) {
-    if (result.status === 'succeeded' && result.fingerprint) {
+    if (
+      (result.status === 'succeeded' || result.status === 'updated') &&
+      result.fingerprint
+    ) {
       if (!next.actions.completedFingerprints.includes(result.fingerprint)) {
         next.actions.completedFingerprints.push(result.fingerprint);
       }
+    }
+    if (
+      result.action === 'create_service_request' &&
+      (result.status === 'succeeded' || result.status === 'updated') &&
+      result.identity
+    ) {
+      const holdRow = {
+        identity: String(result.identity),
+        id: result.id || null,
+        fingerprint: result.fingerprint || null,
+        whenText: result.value?.whenText || result.value?.when_text || null,
+        item: result.value?.item || null,
+        name: result.value?.name || null,
+      };
+      const idx = next.actions.openHolds.findIndex(
+        (row) => row.identity === holdRow.identity
+      );
+      if (idx >= 0) next.actions.openHolds[idx] = holdRow;
+      else next.actions.openHolds.push(holdRow);
+      next.actions.openHolds = next.actions.openHolds.slice(-10);
     }
     if (result.action === 'save_caller_info' && result.status === 'succeeded') {
       if (result.name) next.caller.name = String(result.name);
     }
     if (
       (result.action === 'create_service_request' || result.action === 'escalate') &&
-      result.status === 'succeeded'
+      (result.status === 'succeeded' || result.status === 'updated')
     ) {
       next.resolution.status = 'resolved';
       next.goal.status = 'completed';

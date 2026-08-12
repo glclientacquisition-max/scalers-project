@@ -1001,6 +1001,54 @@ async function createServiceRequest({
   return data || null;
 }
 
+/**
+ * Update an existing service request (e.g. refine hold when_text on the same call).
+ */
+async function updateServiceRequest({
+  id,
+  type,
+  name,
+  phone,
+  item,
+  quantity,
+  whenText,
+  notes,
+} = {}) {
+  if (!id) return null;
+  const patch = {
+    updated_at: new Date().toISOString(),
+  };
+  if (type != null) {
+    const requestType = REQUEST_TYPES.has(String(type || '').trim().toLowerCase())
+      ? String(type).trim().toLowerCase()
+      : null;
+    if (requestType) patch.request_type = requestType;
+  }
+  if (name != null) patch.caller_name = String(name || '').trim() || null;
+  if (phone != null) patch.caller_phone = String(phone || '').trim() || null;
+  if (item != null) patch.item = String(item || '').trim() || null;
+  if (quantity != null) patch.quantity = String(quantity || '').trim() || null;
+  if (whenText != null) patch.when_text = String(whenText || '').trim() || null;
+  if (notes != null) patch.notes = String(notes || '').trim() || null;
+
+  const { data, error } = await supabase
+    .from('service_requests')
+    .update(patch)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error && /service_requests|relation/i.test(error.message)) {
+    console.warn(
+      '[db] updateServiceRequest skipped (apply contacts_and_requests.sql):',
+      error.message
+    );
+    return null;
+  }
+  throwIfError('updateServiceRequest', error);
+  return data || null;
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -1019,6 +1067,7 @@ module.exports = {
   markEscalationSent,
   upsertContact,
   createServiceRequest,
+  updateServiceRequest,
   RECORDINGS_BUCKET,
   shapeCall,
 };

@@ -2193,6 +2193,7 @@ async function applyGeminiTools(callSid, parsed) {
     parsed,
     capabilities,
     completedFingerprints: state.actions.completedFingerprints,
+    priorHolds: state.actions.openHolds || [],
     productCatalog: groundedProfile.productCatalog || null,
     handlers: {
       createServiceRequest: async (request) => {
@@ -2215,6 +2216,24 @@ async function applyGeminiTools(callSid, parsed) {
           });
         }
         return created;
+      },
+      updateServiceRequest: async (request) => {
+        const updated = await db.updateServiceRequest({
+          id: request.id,
+          type: request.type,
+          name: request.name || parsed.name,
+          phone: request.phone,
+          item: request.item,
+          quantity: request.quantity,
+          whenText: request.whenText,
+          notes: request.notes || parsed.reason,
+        });
+        if (updated) {
+          console.log(
+            `[${callSid}] service_request updated id=${updated.id} type=${updated.request_type} when=${updated.when_text || ''}`
+          );
+        }
+        return updated;
       },
       saveCallerInfo: (info) =>
         db.saveCallerInfo({

@@ -78,5 +78,35 @@ test('buildSystemPrompt surfaces unknown policy via live ground truth', () => {
   assert.match(prompt, /UNKNOWN ANSWERS/);
 });
 
+test('formatProductsBlock marks missing prices as unknown do-not-invent', () => {
+  const { formatProductsBlock } = require('../src/conversation/productCatalog');
+  const block = formatProductsBlock([
+    { name: 'The Smart Money Tribe', price: '', category: 'Finance' },
+    { name: 'Priced Book', price: 'KSh 900' },
+  ]);
+  assert.match(block, /The Smart Money Tribe/);
+  assert.match(block, /Price: unknown \(do not invent a number/i);
+  assert.match(block, /Price: KSh 900/);
+  assert.match(block, /PRICE RULE/i);
+});
+
+test('formatPoliciesBlock marks empty returns as not on file without forcing name', () => {
+  const {
+    formatPoliciesBlock,
+    lookupPolicy,
+  } = require('../src/conversation/businessPolicies');
+  const block = formatPoliciesBlock({
+    delivery: 'Countrywide shipping',
+    returns: '',
+  });
+  assert.match(block, /Delivery \/ service area: Countrywide shipping/);
+  assert.match(block, /Returns \/ exchanges: \(not on file/i);
+  assert.match(block, /do not force name capture/i);
+  assert.match(block, /POLICY RULE/i);
+  const hit = lookupPolicy({ returns: '', delivery: 'Same-day' }, 'return policy');
+  assert.equal(hit.key, 'returns');
+  assert.equal(hit.text, '');
+});
+
 console.log(`\n${passed} passed`);
 if (process.exitCode) process.exit(process.exitCode);

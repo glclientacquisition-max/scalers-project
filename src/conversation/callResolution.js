@@ -79,7 +79,8 @@ function deriveCallResolution(opts = {}) {
 
   const requestOk = results.some(
     (r) =>
-      r.action === 'create_service_request' && r.status === 'succeeded'
+      r.action === 'create_service_request' &&
+      (r.status === 'succeeded' || r.status === 'updated')
   );
   const escalateOk = results.some(
     (r) => r.action === 'escalate' && r.status === 'succeeded'
@@ -113,7 +114,8 @@ function deriveCallResolution(opts = {}) {
     resolution = 'resolved';
     const type = results.find(
       (r) =>
-        r.action === 'create_service_request' && r.status === 'succeeded'
+        r.action === 'create_service_request' &&
+        (r.status === 'succeeded' || r.status === 'updated')
     )?.requestType;
     const typeNote =
       type === 'hold' || type === 'hold_or_pickup'
