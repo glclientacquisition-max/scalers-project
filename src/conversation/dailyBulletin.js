@@ -113,6 +113,30 @@ function bulletinClosureNotice(raw, now = new Date()) {
 }
 
 /**
+ * Classify whether a bulletin is operational (hours/closure/delay) vs promo/offer.
+ * Promos must not be volunteered on unrelated turns.
+ */
+function bulletinKind(text) {
+  const value = String(text || '');
+  if (
+    /\b(closed|not open|shut|maandamano|no operations|off today|closing early|open late|delay|delayed|power|outage|strike)\b/i.test(
+      value
+    )
+  ) {
+    return 'operational';
+  }
+  if (
+    /\b(offer|promo|promotion|deal|discount|sale|%|ksh|kes|bob|free|buy\s*\d|go for|\d+\s*(books?|items?)\s*(at|for))\b/i.test(
+      value
+    ) ||
+    /\bnotify customers?\b/i.test(value)
+  ) {
+    return 'promo';
+  }
+  return 'notice';
+}
+
+/**
  * Prompt block for CONTEXT HEADER. Empty string if nothing active.
  */
 function formatBulletinForPrompt(raw, now = new Date()) {
@@ -121,17 +145,20 @@ function formatBulletinForPrompt(raw, now = new Date()) {
 
   const lines = items.map((item) => {
     const until = formatEndLabel(item.ends_at, now);
-    return `- Fact to tell callers: "${item.text}" [internal expiry: ${until} — do not read this expiry aloud]`;
+    const kind = bulletinKind(item.text);
+    return `- [${kind}] Fact: "${item.text}" [internal expiry: ${until} — do not read this expiry aloud]`;
   });
 
-  return `DAILY BULLETIN (highest priority facts for this call — override menu/FAQs if they conflict):
+  return `DAILY BULLETIN (override conflicting menu/FAQs only when the fact applies):
 ${lines.join('\n')}
 SPEAKING RULES FOR BULLETIN:
-- When the caller asks about these topics (or if a bulletin says you are closed today), tell them the Fact text in natural words.
+- Operational / closure facts: tell them when the caller asks about hours/open status, or when a bulletin says you are closed today.
+- Promo / offer / price-deal facts: ONLY mention when the caller asks about that product, that promo, today's offers, or a matching price/deal. NEVER volunteer a promo on unrelated turns (hours, location, holds for other titles, general chat, Sheng small-talk).
+- Notice facts: share only when the topic clearly matches.
 - Speak the owner's Fact text. Do NOT invent or speak the expiry/clear time unless the caller asks how long this lasts.
 - Do not say the word "bulletin". Do not say "until tonight" / clock times from the internal expiry.
 - Do not offer something a bulletin says is unavailable.
-- After stating a closure / interruption fact, NEVER go silent. In the SAME turn, say you can still help (or take a message) and ask one short next question (what they need, or their name).
+- After stating a closure / interruption fact, NEVER go silent. In the SAME turn, say you can still help (or take a message) and ask one short next question (what they need).
 - Example shape: "<fact in natural words>. Even so, I can still help — what do you need?"`;
 }
 
@@ -142,4 +169,5 @@ module.exports = {
   formatEndLabel,
   bulletinImpliesClosed,
   bulletinClosureNotice,
+  bulletinKind,
 };

@@ -204,5 +204,6 @@ Conversation rules (live phone — be conclusive and intelligent):
 - Ask at most ONE clarifying question per turn.
 - Automatically match the caller in English, Kiswahili, or light Sheng. If they switch, switch with them.
 - Use the minimum speech needed to move the caller forward.
-- Never invent prices, stock, availability, policies, team members, actions, or guarantees outside the knowledge above.`;
+- Never invent prices, stock, availability, policies, team members, actions, or guarantees outside the knowledge above.
+- Do not volunteer today's promo/offer unless the caller asks about that product, that deal, or today's offers.`;
 }

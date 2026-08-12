@@ -81,8 +81,53 @@ function formatProductsBlock(products) {
   return lines.join('\n');
 }
 
+function normalizeMatchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}+\s:'’-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Find a catalogue product for a hold/order item string.
+ * Exact name/sku/alias preferred; otherwise a clear containment match.
+ * @returns {{product: object, matched: string, score: number}|null}
+ */
+function findProductMatch(item, rawCatalog) {
+  const needle = normalizeMatchText(item);
+  if (!needle || needle.length < 2) return null;
+  const products = normalizeProducts(rawCatalog);
+  let best = null;
+  for (const product of products) {
+    const terms = [product.name, product.sku, ...product.aliases].filter(Boolean);
+    for (const term of terms) {
+      const hay = normalizeMatchText(term);
+      if (!hay) continue;
+      let score = 0;
+      if (hay === needle) score = 1000 + hay.length;
+      else if (hay.includes(needle) || needle.includes(hay)) {
+        const shorter = Math.min(hay.length, needle.length);
+        const longer = Math.max(hay.length, needle.length);
+        // Avoid weak overlaps like "the" matching inside longer titles.
+        if (shorter < 4 && longer > shorter + 2) continue;
+        if (shorter / longer < 0.5) continue;
+        score = 100 + shorter;
+      } else {
+        continue;
+      }
+      if (!best || score > best.score) {
+        best = { product, matched: term, score };
+      }
+    }
+  }
+  return best;
+}
+
 module.exports = {
   normalizeProducts,
   formatProductsBlock,
   LIVE_INJECT_MAX,
+  findProductMatch,
+  normalizeMatchText,
 };
