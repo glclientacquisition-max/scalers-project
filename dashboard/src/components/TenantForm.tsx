@@ -218,7 +218,7 @@ function PolicyTextarea({
         e.currentTarget.rows = 2;
       }}
       placeholder={placeholder}
-      className={`${fieldClass} leading-relaxed`}
+      className={`${fieldClass} mt-1 py-2 leading-relaxed`}
     />
   );
 }
@@ -1422,10 +1422,10 @@ export function TenantForm({
         </div>
       </section>
 
-      <section className={panel === "hours" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
-        <div className="space-y-4">
+      <section className={panel === "hours" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}>
+        <div className="space-y-3">
           <h3 className="text-sm font-medium text-[var(--ink)]">Hours</h3>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {DAY_ORDER.map((day) => {
               const slot = hoursSchedule.days[day];
               const open = Boolean(slot);
@@ -1482,7 +1482,7 @@ export function TenantForm({
               );
             })}
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <h3 className="text-sm font-medium text-[var(--ink)]">Locations</h3>
               <button
@@ -1498,11 +1498,11 @@ export function TenantForm({
                 Add location
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {locations.map((loc, index) => (
                 <div
                   key={`loc-${index}`}
-                  className="space-y-3 rounded-xl border border-[var(--line)] bg-white/60 p-4"
+                  className="space-y-2 rounded-xl border border-[var(--line)] bg-white/60 p-3"
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
@@ -1660,9 +1660,9 @@ export function TenantForm({
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {POLICY_FIELDS.map((field) => (
               <div key={field.id} className={field.id === "other" ? "sm:col-span-2" : ""}>
                 <label
@@ -1965,12 +1965,12 @@ export function TenantForm({
 
       <section
         id="golden-faqs"
-        className={panel === "faqs" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}
+        className={panel === "faqs" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}
       >
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h3 className="text-sm font-medium text-[var(--ink)]">FAQs</h3>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]" aria-live="polite">
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]" aria-live="polite">
               {filledFaqCount} of {FAQ_MAX}
             </p>
           </div>
@@ -1990,7 +1990,7 @@ export function TenantForm({
         {filledFaqCount === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3">
             <p className="text-sm text-[var(--ink-soft)]">Common questions</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               {FAQ_STARTERS.map((starter) => (
                 <button
                   key={starter.question}
@@ -2015,12 +2015,12 @@ export function TenantForm({
           </div>
         ) : null}
 
-        <div className="space-y-5">
+        <div className="space-y-2">
           {visibleFaqs.map((faq, localIndex) => {
             const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
             return (
-            <div key={`faq-${index}`} className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
+            <div key={`faq-${index}`} className="space-y-1.5 rounded-xl border border-line bg-white px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                   FAQ {index + 1}
                 </p>
@@ -2031,7 +2031,7 @@ export function TenantForm({
                       prev.length <= 1 ? [emptyFaq()] : prev.filter((_, i) => i !== index)
                     )
                   }
-                  className="text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                  className="text-xs text-[var(--ink-soft)] hover:text-[var(--warn)]"
                   aria-label={`Remove FAQ ${index + 1}`}
                 >
                   Remove
@@ -2051,7 +2051,7 @@ export function TenantForm({
                   aria-describedby={
                     faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
                   }
-                  className={fieldClass}
+                  className={`${fieldClass} mt-1 py-2`}
                 />
                 {faqDupIndexes.has(index) ? (
                   <p id={`faq-dup-${index}`} className="mt-1 text-xs text-[var(--warn)]" role="status">
@@ -2070,9 +2070,9 @@ export function TenantForm({
                   onChange={(e) => updateFaq(index, "answer", e.target.value)}
                   rows={2}
                   placeholder="Yes, free parking behind the building."
-                  className={`${fieldClass} leading-relaxed`}
+                  className={`${fieldClass} mt-1 py-2 leading-relaxed`}
                 />
-                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
                   {faq.answer.length}/{FAQ_ANSWER_MAX}
                 </p>
               </div>
