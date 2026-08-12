@@ -33,19 +33,36 @@ describe('Brain state and next-best-action', () => {
     assert.match(decision.reason, /before any capture or handoff/i);
   });
 
-  it('routes an explicit human request to alert when transfer is unavailable', () => {
+  it('collects the required name before routing an explicit human request', () => {
     const capabilities = buildBrainCapabilities(
       { agentTools: { escalate: true, end_call: true } },
       { liveTransfer: false }
     );
-    const state = observeCallerTurn(createBrainState(), {
+    let state = observeCallerTurn(createBrainState(), {
       text: 'I want to speak to the manager',
       detectedLanguage: 'en',
       resolvedLanguage: 'en',
     });
-    const decision = determineNextBestAction({ state, capabilities });
+    let decision = determineNextBestAction({ state, capabilities });
 
     assert.equal(state.handoff.requested, true);
+    assert.equal(decision.action, 'ASK_CLARIFICATION');
+    assert.equal(decision.slot, 'name');
+
+    state = observeCallerTurn(state, {
+      text: 'My name is Kim',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: {
+        name: {
+          value: 'Kim',
+          source: 'caller_explicit',
+          confidence: 0.95,
+          confirmed: true,
+        },
+      },
+    });
+    decision = determineNextBestAction({ state, capabilities });
     assert.equal(decision.action, 'ESCALATE');
     assert.match(decision.reason, /live transfer is unavailable/i);
   });
