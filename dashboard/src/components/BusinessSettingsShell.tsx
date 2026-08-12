@@ -167,21 +167,21 @@ export function BusinessSettingsShell({
         />
       ) : (
         <>
-          <header className="sticky top-[4.5rem] z-30 -mx-4 mb-6 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
-            <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+          <header className="sticky top-[4.5rem] z-30 -mx-4 mb-4 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
+            <h1 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">
               Business
             </h1>
             <BusinessLine tenant={tenant} />
           </header>
 
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <SettingsSidebar tab={tab} trainPanel={trainPanel} />
 
             <div className="min-w-0 flex-1">
               {tab === "today" ? <DailyBulletinPanel tenant={tenant} /> : null}
 
               {tab === "import" ? (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   <KnowledgeIngestPanel tenant={tenant} />
                   <CatalogImportPanel tenant={tenant} />
                 </div>

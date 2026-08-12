@@ -194,6 +194,15 @@ const tableFieldClass =
 const denseFieldClass =
   "w-full min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
 
+function choiceChipClass(selected: boolean) {
+  return [
+    "rounded-lg border px-3 py-2 text-left text-sm font-medium transition",
+    selected
+      ? "border-transparent bg-[#0096FF]/10 text-[#005ccc] ring-1 ring-[#0096FF]"
+      : "border-line bg-white text-ink hover:border-[#0096FF]/40",
+  ].join(" ");
+}
+
 function PolicyTextarea({
   id,
   value,
@@ -774,9 +783,9 @@ export function TenantForm({
 
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
-      <header className="sticky top-[4.5rem] z-30 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
+      <header className="sticky top-[4.5rem] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+          <h1 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">
             Business
           </h1>
           {lineNumber ? (
@@ -788,12 +797,12 @@ export function TenantForm({
         <TenantSettingsSaveButton pending={pending} />
       </header>
 
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {sidebar}
 
-        <div className="min-w-0 flex-1 space-y-8">
+        <div className="min-w-0 flex-1 space-y-4">
           {heading ? (
-            <h2 className="font-display text-2xl tracking-tight text-ink">{heading}</h2>
+            <h2 className="font-display text-xl tracking-tight text-ink">{heading}</h2>
           ) : null}
 
       <input type="hidden" name="id" value={tenant.id} />
@@ -824,34 +833,31 @@ export function TenantForm({
       <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} />
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
-      <section className={panel === "identity" ? "space-y-5" : "hidden"}>
+      <section className={panel === "identity" ? "space-y-4" : "hidden"}>
         <div>
           <p className="block text-sm font-medium">Business type</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Business type">
             {VERTICAL_OPTIONS.map((opt) => {
               const selected = vertical === opt.id;
               return (
                 <button
                   key={opt.id}
                   type="button"
+                  role="radio"
+                  aria-checked={selected}
                   onClick={() => setVertical(opt.id)}
-                  className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
-                    selected
-                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
-                  ].join(" ")}
+                  className={choiceChipClass(selected)}
                 >
-                  <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                  {opt.label}
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium" htmlFor="agent_name">
+            <label className="block text-xs font-medium text-ink-soft" htmlFor="agent_name">
               Agent name
             </label>
             <input
@@ -860,54 +866,47 @@ export function TenantForm({
               onChange={(e) => setAgentName(e.target.value)}
               placeholder="e.g. Aisha"
               maxLength={40}
-              className={fieldClass}
+              className={`${denseFieldClass} mt-1`}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium" htmlFor="business_name">
+            <label className="block text-xs font-medium text-ink-soft" htmlFor="business_name">
               Business name
             </label>
             <input
               id="business_name"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
-              className={fieldClass}
+              className={`${denseFieldClass} mt-1`}
             />
           </div>
         </div>
 
         <div>
           <p className="block text-sm font-medium">Tone</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Tone">
             {TONE_OPTIONS.map((opt) => {
               const selected = tone === opt.id;
               return (
                 <button
                   key={opt.id}
                   type="button"
+                  role="radio"
+                  aria-checked={selected}
                   onClick={() => setTone(opt.id)}
-                  className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
-                    selected
-                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
-                  ].join(" ")}
+                  className={choiceChipClass(selected)}
                 >
-                  <span className="font-medium text-[var(--ink)]">
-                    {TONE_LABELS[opt.id]}
-                  </span>
+                  {TONE_LABELS[opt.id]}
                 </button>
               );
             })}
           </div>
         </div>
-      </section>
 
-      <section className={panel === "identity" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium" htmlFor="owner">
+            <label className="block text-xs font-medium text-ink-soft" htmlFor="owner">
               Owner alert WhatsApp
             </label>
             <input
@@ -915,11 +914,11 @@ export function TenantForm({
               value={ownerWhatsapp}
               onChange={(e) => setOwnerWhatsapp(e.target.value)}
               placeholder="+2547…"
-              className={fieldClass}
+              className={`${denseFieldClass} mt-1`}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium" htmlFor="alert_email">
+            <label className="block text-xs font-medium text-ink-soft" htmlFor="alert_email">
               Alert email
             </label>
             <input
@@ -928,383 +927,11 @@ export function TenantForm({
               value={alertEmail}
               onChange={(e) => setAlertEmail(e.target.value)}
               placeholder="owner@business.com"
-              className={fieldClass}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className={panel === "catalog" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setServices((prev) => [...prev, emptyService()]);
-                  setServicePage(Math.floor(services.length / SERVICE_PAGE_SIZE));
-                }}
-                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
-              >
-                Add 1
-              </button>
-              <button
-                type="button"
-                onClick={() => addBlankServiceRows(3)}
-                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
-              >
-                Add 3 blank
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowBulkServices((v) => !v);
-                  setBulkServicesError(null);
-                }}
-                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)]/50"
-              >
-                {showBulkServices ? "Hide paste" : "Paste list"}
-              </button>
-            </div>
-          </div>
-
-          {showBulkServices ? (
-            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-4">
-              <label className="block text-sm font-medium" htmlFor="bulk_services">
-                Paste list
-              </label>
-              <textarea
-                id="bulk_services"
-                value={bulkServicesText}
-                onChange={(e) => {
-                  setBulkServicesText(e.target.value);
-                  if (bulkServicesError) setBulkServicesError(null);
-                }}
-                rows={6}
-                placeholder={
-                  "Home cleaning - from 2,500 KES\nPlumbing\nElectrical - quote after visit"
-                }
-                className={`${fieldClass} text-sm leading-relaxed`}
-              />
-              <details className="text-xs text-[var(--ink-soft)]">
-                <summary className="cursor-pointer font-medium text-[var(--ink)]">
-                  Spreadsheet format
-                </summary>
-                <p className="mt-2 leading-relaxed">
-                  Columns:{" "}
-                  <span className="font-medium text-[var(--ink)]">
-                    name | price | notes | out of scope
-                  </span>
-                </p>
-              </details>
-
-              {bulkPreview.length > 0 ? (
-                <div className="rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                  <p className="text-xs font-medium text-[var(--ink)]">
-                    Ready to add {bulkPreview.length} service
-                    {bulkPreview.length === 1 ? "" : "s"}
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm text-[var(--ink-soft)]">
-                    {bulkPreview.slice(0, 8).map((row, i) => (
-                      <li key={`${row.name}-${i}`}>
-                        <span className="font-medium text-[var(--ink)]">{row.name}</span>
-                        {row.price_range ? ` · ${row.price_range}` : ""}
-                      </li>
-                    ))}
-                    {bulkPreview.length > 8 ? (
-                      <li>+{bulkPreview.length - 8} more</li>
-                    ) : null}
-                  </ul>
-                </div>
-              ) : null}
-
-              {bulkServicesError ? (
-                <p className="text-sm text-[var(--warn)]" role="alert">
-                  {bulkServicesError}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                onClick={applyBulkServices}
-                disabled={!bulkPreview.length}
-                className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
-              >
-                Add to services
-              </button>
-            </div>
-          ) : null}
-
-          <div className="space-y-4">
-            {visibleServices.map((service, localIndex) => {
-              const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
-              return (
-              <div
-                key={`service-${index}`}
-                className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                    Service {index + 1}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setServices((prev) =>
-                        prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
-                      )
-                    }
-                    className="text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
-                    aria-label={`Remove service ${index + 1}`}
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-name-${index}`}>
-                      Service name
-                    </label>
-                    <input
-                      id={`svc-name-${index}`}
-                      value={service.name}
-                      onChange={(e) => updateService(index, "name", e.target.value)}
-                      placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"}
-                      className={fieldClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-price-${index}`}>
-                      Price range
-                    </label>
-                    <input
-                      id={`svc-price-${index}`}
-                      value={service.price_range}
-                      onChange={(e) => updateService(index, "price_range", e.target.value)}
-                      placeholder="from 2,500 KES"
-                      className={fieldClass}
-                    />
-                  </div>
-                </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-notes-${index}`}>
-                      Notes / requirements
-                    </label>
-                    <input
-                      id={`svc-notes-${index}`}
-                      value={service.notes}
-                      onChange={(e) => updateService(index, "notes", e.target.value)}
-                      placeholder="Free quotation for special orders"
-                      className={fieldClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`svc-oos-${index}`}>
-                      Out of scope
-                    </label>
-                    <input
-                      id={`svc-oos-${index}`}
-                      value={service.out_of_scope}
-                      onChange={(e) => updateService(index, "out_of_scope", e.target.value)}
-                      placeholder="No commercial offices"
-                      className={fieldClass}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-            })}
-            <CatalogPager
-              page={safeServicePage}
-              pageSize={SERVICE_PAGE_SIZE}
-              total={services.length}
-              noun="service"
-              onPrev={() => setServicePage((p) => Math.max(0, p - 1))}
-              onNext={() => setServicePage((p) => Math.min(servicePageCount - 1, p + 1))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium" htmlFor="services_notes">
-              Notes
-            </label>
-            <textarea
-              id="services_notes"
-              value={servicesNotes}
-              onChange={(e) => setServicesNotes(e.target.value)}
-              rows={3}
-              placeholder="Coverage, lead times, exclusions"
-              className={`${fieldClass} leading-relaxed`}
+              className={`${denseFieldClass} mt-1`}
             />
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h3 className="text-sm font-medium text-[var(--ink)]">Products</h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setProducts((prev) => [...prev, emptyProduct()]);
-                  setProductPage(Math.floor(products.length / PRODUCT_PAGE_SIZE));
-                }}
-                className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
-              >
-                Add product
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowBulkProducts((v) => !v);
-                  setBulkProductsError(null);
-                }}
-                className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium text-[var(--ink)]"
-              >
-                {showBulkProducts ? "Hide paste" : "Paste products"}
-              </button>
-            </div>
-          </div>
-
-          {showBulkProducts ? (
-            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-4">
-              <textarea
-                value={bulkProductsText}
-                onChange={(e) => {
-                  setBulkProductsText(e.target.value);
-                  if (bulkProductsError) setBulkProductsError(null);
-                }}
-                rows={6}
-                placeholder={
-                  "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
-                }
-                className={`${fieldClass} text-sm leading-relaxed`}
-              />
-              {bulkProductPreview.length ? (
-                <p className="text-xs text-[var(--ink-soft)]">
-                  Ready to add {bulkProductPreview.length} product
-                  {bulkProductPreview.length === 1 ? "" : "s"}
-                </p>
-              ) : null}
-              {bulkProductsError ? (
-                <p className="text-sm text-[var(--warn)]">{bulkProductsError}</p>
-              ) : null}
-              <button
-                type="button"
-                onClick={applyBulkProducts}
-                disabled={!bulkProductPreview.length}
-                className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                Add to catalogue
-              </button>
-            </div>
-          ) : null}
-
-          {products.length === 0 ? (
-            <p className="text-sm text-[var(--ink-soft)]">No products yet.</p>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-line">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead>
-                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
-                      <th className="px-3 py-2.5 font-medium">Name</th>
-                      <th className="px-3 py-2.5 font-medium">Price</th>
-                      <th className="px-3 py-2.5 font-medium">Category</th>
-                      <th className="px-3 py-2.5 font-medium">Stock</th>
-                      <th className="px-3 py-2.5 font-medium w-24">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line bg-white">
-                    {visibleProducts.map((product, localIndex) => {
-                      const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
-                      return (
-                        <tr key={`product-${index}`} className="align-middle">
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-name-${index}`}>
-                              Product name
-                            </label>
-                            <input
-                              id={`prod-name-${index}`}
-                              value={product.name}
-                              onChange={(e) => updateProduct(index, "name", e.target.value)}
-                              placeholder="Atomic Habits"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-price-${index}`}>
-                              Price
-                            </label>
-                            <input
-                              id={`prod-price-${index}`}
-                              value={product.price}
-                              onChange={(e) => updateProduct(index, "price", e.target.value)}
-                              placeholder="2,500 KES"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-cat-${index}`}>
-                              Category
-                            </label>
-                            <input
-                              id={`prod-cat-${index}`}
-                              value={product.category}
-                              onChange={(e) => updateProduct(index, "category", e.target.value)}
-                              placeholder="Self-help"
-                              className={tableFieldClass}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <label className="sr-only" htmlFor={`prod-stock-${index}`}>
-                              Stock status
-                            </label>
-                            <select
-                              id={`prod-stock-${index}`}
-                              value={product.in_stock || ""}
-                              onChange={(e) => updateProduct(index, "in_stock", e.target.value)}
-                              className={tableFieldClass}
-                            >
-                              <option value="">Not set</option>
-                              <option value="yes">In stock</option>
-                              <option value="no">Out of stock</option>
-                              <option value="unknown">Unknown</option>
-                            </select>
-                          </td>
-                          <td className="px-3 py-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setProducts((prev) => prev.filter((_, i) => i !== index))
-                              }
-                              className="text-sm font-medium text-ink-soft hover:text-warn"
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <CatalogPager
-                page={safeProductPage}
-                pageSize={PRODUCT_PAGE_SIZE}
-                total={products.length}
-                noun="product"
-                onPrev={() => setProductPage((p) => Math.max(0, p - 1))}
-                onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
-              />
-            </div>
-          )}
-        </div>
-
-      </section>
-
-      <section className={panel === "identity" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-medium text-[var(--ink)]">Contacts</h3>
@@ -1422,9 +1049,394 @@ export function TenantForm({
         </div>
       </section>
 
-      <section className={panel === "hours" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}>
+      <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-[var(--ink)]">Hours</h3>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setServices((prev) => [...prev, emptyService()]);
+                  setServicePage(Math.floor(services.length / SERVICE_PAGE_SIZE));
+                }}
+                className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add 1
+              </button>
+              <button
+                type="button"
+                onClick={() => addBlankServiceRows(3)}
+                className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add 3 blank
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkServices((v) => !v);
+                  setBulkServicesError(null);
+                }}
+                className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:border-[var(--accent)]/50"
+              >
+                {showBulkServices ? "Hide paste" : "Paste list"}
+              </button>
+            </div>
+          </div>
+
+          {showBulkServices ? (
+            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-3">
+              <label className="block text-sm font-medium" htmlFor="bulk_services">
+                Paste list
+              </label>
+              <textarea
+                id="bulk_services"
+                value={bulkServicesText}
+                onChange={(e) => {
+                  setBulkServicesText(e.target.value);
+                  if (bulkServicesError) setBulkServicesError(null);
+                }}
+                rows={4}
+                placeholder={
+                  "Home cleaning - from 2,500 KES\nPlumbing\nElectrical - quote after visit"
+                }
+                className={`${denseFieldClass} text-sm leading-relaxed`}
+              />
+              <details className="text-xs text-[var(--ink-soft)]">
+                <summary className="cursor-pointer font-medium text-[var(--ink)]">
+                  Spreadsheet format
+                </summary>
+                <p className="mt-2 leading-relaxed">
+                  Columns:{" "}
+                  <span className="font-medium text-[var(--ink)]">
+                    name | price | notes | out of scope
+                  </span>
+                </p>
+              </details>
+
+              {bulkPreview.length > 0 ? (
+                <div className="rounded-xl border border-[var(--line)] bg-white px-3 py-2">
+                  <p className="text-xs font-medium text-[var(--ink)]">
+                    Ready to add {bulkPreview.length} service
+                    {bulkPreview.length === 1 ? "" : "s"}
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-[var(--ink-soft)]">
+                    {bulkPreview.slice(0, 8).map((row, i) => (
+                      <li key={`${row.name}-${i}`}>
+                        <span className="font-medium text-[var(--ink)]">{row.name}</span>
+                        {row.price_range ? ` · ${row.price_range}` : ""}
+                      </li>
+                    ))}
+                    {bulkPreview.length > 8 ? (
+                      <li>+{bulkPreview.length - 8} more</li>
+                    ) : null}
+                  </ul>
+                </div>
+              ) : null}
+
+              {bulkServicesError ? (
+                <p className="text-sm text-[var(--warn)]" role="alert">
+                  {bulkServicesError}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={applyBulkServices}
+                disabled={!bulkPreview.length}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
+              >
+                Add to services
+              </button>
+            </div>
+          ) : null}
+
+          <div className="overflow-hidden rounded-xl border border-line">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    <th className="px-3 py-2.5 font-medium">Name</th>
+                    <th className="px-3 py-2.5 font-medium">Price</th>
+                    <th className="px-3 py-2.5 font-medium">Notes</th>
+                    <th className="px-3 py-2.5 font-medium">Out of scope</th>
+                    <th className="px-3 py-2.5 font-medium w-16">
+                      <span className="sr-only">Action</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line bg-white">
+                  {visibleServices.map((service, localIndex) => {
+                    const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
+                    return (
+                      <tr key={`service-${index}`} className="align-middle">
+                        <td className="px-3 py-2">
+                          <label className="sr-only" htmlFor={`svc-name-${index}`}>
+                            Service name
+                          </label>
+                          <input
+                            id={`svc-name-${index}`}
+                            value={service.name}
+                            onChange={(e) => updateService(index, "name", e.target.value)}
+                            placeholder={
+                              vertical === "retail"
+                                ? "Book sourcing / special orders"
+                                : "Home cleaning"
+                            }
+                            className={tableFieldClass}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <label className="sr-only" htmlFor={`svc-price-${index}`}>
+                            Price range
+                          </label>
+                          <input
+                            id={`svc-price-${index}`}
+                            value={service.price_range}
+                            onChange={(e) =>
+                              updateService(index, "price_range", e.target.value)
+                            }
+                            placeholder="from 2,500 KES"
+                            className={tableFieldClass}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <label className="sr-only" htmlFor={`svc-notes-${index}`}>
+                            Notes
+                          </label>
+                          <input
+                            id={`svc-notes-${index}`}
+                            value={service.notes}
+                            onChange={(e) => updateService(index, "notes", e.target.value)}
+                            placeholder="Free quotation"
+                            className={tableFieldClass}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <label className="sr-only" htmlFor={`svc-oos-${index}`}>
+                            Out of scope
+                          </label>
+                          <input
+                            id={`svc-oos-${index}`}
+                            value={service.out_of_scope}
+                            onChange={(e) =>
+                              updateService(index, "out_of_scope", e.target.value)
+                            }
+                            placeholder="No commercial offices"
+                            className={tableFieldClass}
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setServices((prev) =>
+                                prev.length <= 1
+                                  ? [emptyService()]
+                                  : prev.filter((_, i) => i !== index)
+                              )
+                            }
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                            aria-label={`Remove service ${index + 1}`}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <CatalogPager
+              page={safeServicePage}
+              pageSize={SERVICE_PAGE_SIZE}
+              total={services.length}
+              noun="service"
+              onPrev={() => setServicePage((p) => Math.max(0, p - 1))}
+              onNext={() => setServicePage((p) => Math.min(servicePageCount - 1, p + 1))}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-soft" htmlFor="services_notes">
+              Notes
+            </label>
+            <textarea
+              id="services_notes"
+              value={servicesNotes}
+              onChange={(e) => setServicesNotes(e.target.value)}
+              rows={2}
+              placeholder="Coverage, lead times, exclusions"
+              className={`${denseFieldClass} mt-1 leading-relaxed`}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h3 className="text-sm font-medium text-[var(--ink)]">Products</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setProducts((prev) => [...prev, emptyProduct()]);
+                  setProductPage(Math.floor(products.length / PRODUCT_PAGE_SIZE));
+                }}
+                className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              >
+                Add product
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkProducts((v) => !v);
+                  setBulkProductsError(null);
+                }}
+                className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)]"
+              >
+                {showBulkProducts ? "Hide paste" : "Paste products"}
+              </button>
+            </div>
+          </div>
+
+          {showBulkProducts ? (
+            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-3">
+              <textarea
+                value={bulkProductsText}
+                onChange={(e) => {
+                  setBulkProductsText(e.target.value);
+                  if (bulkProductsError) setBulkProductsError(null);
+                }}
+                rows={4}
+                placeholder={
+                  "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
+                }
+                className={`${denseFieldClass} text-sm leading-relaxed`}
+              />
+              {bulkProductPreview.length ? (
+                <p className="text-xs text-[var(--ink-soft)]">
+                  Ready to add {bulkProductPreview.length} product
+                  {bulkProductPreview.length === 1 ? "" : "s"}
+                </p>
+              ) : null}
+              {bulkProductsError ? (
+                <p className="text-sm text-[var(--warn)]">{bulkProductsError}</p>
+              ) : null}
+              <button
+                type="button"
+                onClick={applyBulkProducts}
+                disabled={!bulkProductPreview.length}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Add to catalogue
+              </button>
+            </div>
+          ) : null}
+
+          {products.length === 0 ? (
+            <p className="text-sm text-[var(--ink-soft)]">No products yet.</p>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-line">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                      <th className="px-3 py-2.5 font-medium">Name</th>
+                      <th className="px-3 py-2.5 font-medium">Price</th>
+                      <th className="px-3 py-2.5 font-medium">Category</th>
+                      <th className="px-3 py-2.5 font-medium">Stock</th>
+                      <th className="px-3 py-2.5 font-medium w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line bg-white">
+                    {visibleProducts.map((product, localIndex) => {
+                      const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                      return (
+                        <tr key={`product-${index}`} className="align-middle">
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-name-${index}`}>
+                              Product name
+                            </label>
+                            <input
+                              id={`prod-name-${index}`}
+                              value={product.name}
+                              onChange={(e) => updateProduct(index, "name", e.target.value)}
+                              placeholder="Atomic Habits"
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-price-${index}`}>
+                              Price
+                            </label>
+                            <input
+                              id={`prod-price-${index}`}
+                              value={product.price}
+                              onChange={(e) => updateProduct(index, "price", e.target.value)}
+                              placeholder="2,500 KES"
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-cat-${index}`}>
+                              Category
+                            </label>
+                            <input
+                              id={`prod-cat-${index}`}
+                              value={product.category}
+                              onChange={(e) => updateProduct(index, "category", e.target.value)}
+                              placeholder="Self-help"
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-stock-${index}`}>
+                              Stock status
+                            </label>
+                            <select
+                              id={`prod-stock-${index}`}
+                              value={product.in_stock || ""}
+                              onChange={(e) => updateProduct(index, "in_stock", e.target.value)}
+                              className={tableFieldClass}
+                            >
+                              <option value="">Not set</option>
+                              <option value="yes">In stock</option>
+                              <option value="no">Out of stock</option>
+                              <option value="unknown">Unknown</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProducts((prev) => prev.filter((_, i) => i !== index))
+                              }
+                              className="text-sm font-medium text-ink-soft hover:text-warn"
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <CatalogPager
+                page={safeProductPage}
+                pageSize={PRODUCT_PAGE_SIZE}
+                total={products.length}
+                noun="product"
+                onPrev={() => setProductPage((p) => Math.max(0, p - 1))}
+                onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
+              />
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className={panel === "hours" ? "space-y-3" : "hidden"}>
+        <div className="space-y-3">
           <div className="space-y-1.5">
             {DAY_ORDER.map((day) => {
               const slot = hoursSchedule.days[day];
@@ -1485,22 +1497,19 @@ export function TenantForm({
 
           <div>
             <p className="block text-sm font-medium">After hours</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="After hours">
               {AFTER_HOURS_OPTIONS.map((opt) => {
                 const selected = afterHoursMode === opt.id;
                 return (
                   <button
                     key={opt.id}
                     type="button"
+                    role="radio"
+                    aria-checked={selected}
                     onClick={() => setAfterHoursMode(opt.id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
-                      selected
-                        ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                        : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
-                    ].join(" ")}
+                    className={choiceChipClass(selected)}
                   >
-                    <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                    {opt.label}
                   </button>
                 );
               })}
@@ -1510,10 +1519,12 @@ export function TenantForm({
       </section>
 
       <section
-        className={panel === "locations" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}
+        className={panel === "locations" ? "space-y-3" : "hidden"}
       >
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h3 className="text-sm font-medium text-[var(--ink)]">Locations</h3>
+          <p className="text-xs text-ink-soft">
+            {locations.length} of {LOCATIONS_MAX}
+          </p>
           <button
             type="button"
             disabled={locations.length >= LOCATIONS_MAX}
@@ -1522,7 +1533,7 @@ export function TenantForm({
                 prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
               )
             }
-            className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
+            className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
           >
             Add location
           </button>
@@ -1533,7 +1544,7 @@ export function TenantForm({
               key={`loc-${index}`}
               className="space-y-2 rounded-xl border border-[var(--line)] bg-white/60 p-3"
             >
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <label
                     className="block text-xs font-medium text-[var(--ink-soft)]"
@@ -1556,7 +1567,7 @@ export function TenantForm({
                       }
                     }}
                     placeholder="Main shop"
-                    className={fieldClass}
+                    className={`${denseFieldClass} mt-1`}
                   />
                 </div>
                 <div>
@@ -1585,7 +1596,7 @@ export function TenantForm({
                       }
                     }}
                     placeholder="Opposite Naivas, next to…"
-                    className={fieldClass}
+                    className={`${denseFieldClass} mt-1`}
                   />
                 </div>
               </div>
@@ -1612,7 +1623,7 @@ export function TenantForm({
                     }
                   }}
                   placeholder="Westlands, Nairobi"
-                  className={fieldClass}
+                  className={`${denseFieldClass} mt-1`}
                 />
               </div>
               <div>
@@ -1628,7 +1639,7 @@ export function TenantForm({
                   onChange={(e) => updateLocation(index, "directions", e.target.value)}
                   rows={2}
                   placeholder="From Waiyaki Way, turn at the Shell. We are on the left."
-                  className={`${fieldClass} leading-relaxed`}
+                  className={`${denseFieldClass} mt-1 leading-relaxed`}
                 />
               </div>
               <div>
@@ -1645,7 +1656,7 @@ export function TenantForm({
                     updateLocation(index, "coverage_notes", e.target.value)
                   }
                   placeholder="We also cover Kiambu and Ruiru"
-                  className={fieldClass}
+                  className={`${denseFieldClass} mt-1`}
                 />
               </div>
               {locations.length > 1 ? (
@@ -1665,10 +1676,9 @@ export function TenantForm({
       </section>
 
       <section
-        className={panel === "policies" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}
+        className={panel === "policies" ? "space-y-3" : "hidden"}
       >
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
           <div className="grid gap-2 sm:grid-cols-2">
             {POLICY_FIELDS.map((field) => (
               <div key={field.id} className={field.id === "other" ? "sm:col-span-2" : ""}>
@@ -1704,13 +1714,8 @@ export function TenantForm({
         </div>
       </section>
 
-      <section
-        className={panel === "tools" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}
-      >
-        <div>
-          <h3 className="text-sm font-medium text-[var(--ink)]">Tools &amp; voice</h3>
-        </div>
-        <div className="space-y-3">
+            <section className={panel === "tools" ? "space-y-4" : "hidden"}>
+        <div className="space-y-2">
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
@@ -1718,7 +1723,7 @@ export function TenantForm({
             </p>
           </div>
           {voiceOptions.length > 1 ? (
-            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Phone voice profile">
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Phone voice profile">
               {voiceOptions.map((voice, index) => {
                 const selected = sonioxVoiceId === voice.id;
                 return (
@@ -1727,62 +1732,49 @@ export function TenantForm({
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    title={voice.description || undefined}
                     onClick={() => setSonioxVoiceId(voice.id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-3 transition",
-                      selected
-                        ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                        : "border-line bg-white hover:border-[#0096FF]/40",
-                    ].join(" ")}
+                    className={choiceChipClass(selected)}
                   >
-                    <span className="font-medium text-[var(--ink)]">
-                      Voice option {index + 1}
-                    </span>
-                    {voice.description ? (
-                      <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                        {voice.description}
-                      </span>
-                    ) : null}
+                    Voice option {index + 1}
                   </button>
                 );
               })}
             </div>
           ) : voiceOptions[0]?.description ? (
-            <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink-soft)]">
-              {voiceOptions[0].description}
-            </p>
+            <p className="text-sm text-[var(--ink-soft)]">{voiceOptions[0].description}</p>
           ) : (
-            <p className="rounded-xl border border-dashed border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink-soft)]">
+            <p className="text-sm text-[var(--ink-soft)]">
               No platform voices loaded yet. Super Admin can add them under Voices.
             </p>
           )}
-          <div>
-            <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="soniox_voice_label">
-              Voice label
-            </label>
-            <input
-              id="soniox_voice_label"
-              type="text"
-              maxLength={40}
-              value={sonioxVoiceLabel}
-              onChange={(e) => setSonioxVoiceLabel(e.target.value)}
-              placeholder="Front desk voice"
-              className="mt-2 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[12rem] flex-1">
+              <label className="block text-xs font-medium text-ink-soft" htmlFor="soniox_voice_label">
+                Voice label
+              </label>
+              <input
+                id="soniox_voice_label"
+                type="text"
+                maxLength={40}
+                value={sonioxVoiceLabel}
+                onChange={(e) => setSonioxVoiceLabel(e.target.value)}
+                placeholder="Front desk voice"
+                className={`${denseFieldClass} mt-1`}
+              />
+            </div>
             <button
               type="button"
               onClick={() => void playVoiceSample()}
               disabled={voiceSampleLoading}
-              className="rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+              className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
             >
               {voiceSampleLoading ? "Generating…" : "Hear sample"}
             </button>
-            {voiceSampleUrl ? (
-              <audio src={voiceSampleUrl} controls className="max-w-full" />
-            ) : null}
           </div>
+          {voiceSampleUrl ? (
+            <audio src={voiceSampleUrl} controls className="max-w-full" />
+          ) : null}
           {voiceSampleError ? (
             <p className="text-xs text-[var(--warn)]" role="alert">
               {voiceSampleError}
@@ -1803,7 +1795,7 @@ export function TenantForm({
         </div>
         <div className="space-y-2">
           <p className="text-sm font-medium text-[var(--ink)]">Handoff</p>
-          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Handoff mode">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
             {HANDOFF_OPTIONS.map((opt) => {
               const selected = handoffMode === opt.id;
               return (
@@ -1812,40 +1804,27 @@ export function TenantForm({
                   type="button"
                   role="radio"
                   aria-checked={selected}
+                  title={opt.blurb}
                   onClick={() => setHandoffMode(opt.id)}
-                  className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition",
-                    selected
-                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                      : "border-line bg-white hover:border-[#0096FF]/40",
-                  ].join(" ")}
+                  className={choiceChipClass(selected)}
                 >
-                  <span className="font-medium text-[var(--ink)]">{opt.label}</span>
-                  <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                    {opt.blurb}
-                  </span>
+                  {opt.label}
                 </button>
               );
             })}
           </div>
         </div>
-        <div className="space-y-3">
+        <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
           {AGENT_TOOL_OPTIONS.map((opt) => {
             const on = agentTools[opt.id];
             return (
               <div
                 key={opt.id}
-                className={[
-                  "flex items-start justify-between gap-4 rounded-xl border px-4 py-3 transition",
-                  on
-                    ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                    : "border-line bg-white",
-                ].join(" ")}
+                className="flex items-center justify-between gap-4 px-3 py-2.5"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-[var(--ink)]">{opt.label}</p>
-                  <p className="mt-0.5 text-xs text-[var(--ink-soft)]">{opt.blurb}</p>
-                  <p className="mt-1 text-xs font-medium text-[var(--ink)]">
+                  <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
                     {on ? opt.onLabel : opt.offLabel}
                   </p>
                 </div>
@@ -1865,10 +1844,8 @@ export function TenantForm({
         </div>
       </section>
 
-      <section
-        className={
-          panel === "pronunciation" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"
-        }
+<section
+        className={panel === "pronunciation" ? "space-y-4" : "hidden"}
       >
         {panel === "pronunciation" ? (
           <PronunciationCoach
@@ -1895,21 +1872,21 @@ export function TenantForm({
         ) : null}
       </section>
 
-      <section className={panel === "team" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}>
+      <section className={panel === "team" ? "space-y-4" : "hidden"}>
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h3 className="text-sm font-medium text-[var(--ink)]">Escalation Team</h3>
+          <p className="text-xs text-ink-soft">{team.length} teammate{team.length === 1 ? "" : "s"}</p>
           <button
             type="button"
             onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-            className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
           >
             Add teammate
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-2">
           {team.map((member, index) => (
-            <div key={`team-${index}`} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
+            <div key={`team-${index}`} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
               <div>
                 <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-name-${index}`}>
                   Name
@@ -1919,7 +1896,7 @@ export function TenantForm({
                   value={member.name}
                   onChange={(e) => updateTeam(index, "name", e.target.value)}
                   placeholder="Jane Doe"
-                  className={fieldClass}
+                  className={`${denseFieldClass} mt-1`}
                 />
               </div>
               <div>
@@ -1931,7 +1908,7 @@ export function TenantForm({
                   value={member.role}
                   onChange={(e) => updateTeam(index, "role", e.target.value)}
                   placeholder="General queries"
-                  className={fieldClass}
+                  className={`${denseFieldClass} mt-1`}
                 />
               </div>
               <div>
@@ -1943,7 +1920,7 @@ export function TenantForm({
                   value={member.phone}
                   onChange={(e) => updateTeam(index, "phone", e.target.value)}
                   placeholder="+2547…"
-                  className={fieldClass}
+                  className={`${denseFieldClass} mt-1`}
                 />
               </div>
               <div>
@@ -1956,7 +1933,7 @@ export function TenantForm({
                   value={member.email || ""}
                   onChange={(e) => updateTeam(index, "email", e.target.value)}
                   placeholder="jane@…"
-                  className={fieldClass}
+                  className={`${denseFieldClass} mt-1`}
                 />
               </div>
               <button
@@ -1966,7 +1943,7 @@ export function TenantForm({
                     prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
                   )
                 }
-                className="mb-0.5 inline-flex h-[46px] w-11 items-center justify-center rounded-xl text-ink-soft transition hover:bg-surface hover:text-warn"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
                 aria-label={`Remove teammate ${index + 1}`}
               >
                 <TrashIcon className="h-4 w-4" />
@@ -1978,15 +1955,12 @@ export function TenantForm({
 
       <section
         id="golden-faqs"
-        className={panel === "faqs" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}
+        className={panel === "faqs" ? "space-y-3" : "hidden"}
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-medium text-[var(--ink)]">FAQs</h3>
-            <p className="mt-0.5 text-xs text-[var(--ink-soft)]" aria-live="polite">
-              {filledFaqCount} of {FAQ_MAX}
-            </p>
-          </div>
+          <p className="text-xs text-[var(--ink-soft)]" aria-live="polite">
+            {filledFaqCount} of {FAQ_MAX}
+          </p>
           <button
             type="button"
             onClick={() => {
@@ -1994,7 +1968,7 @@ export function TenantForm({
               setFaqPage(Math.floor(faqs.length / FAQ_PAGE_SIZE));
             }}
             disabled={faqs.length >= FAQ_MAX}
-            className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+            className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
           >
             Add FAQ
           </button>
