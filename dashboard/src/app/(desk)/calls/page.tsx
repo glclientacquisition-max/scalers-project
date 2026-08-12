@@ -337,7 +337,59 @@ export default async function CallsPage({
         />
       ) : (
         <>
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
+          <ul className="mt-6 space-y-3 md:hidden">
+            {leads.map((lead) => {
+              const message = followUpWhatsAppMessage({
+                businessName,
+                name: lead.name,
+                reason: lead.reason,
+              });
+              return (
+                <li
+                  key={`m-${lead.call.id}`}
+                  className={[
+                    "min-w-0 rounded-2xl border border-line bg-surface p-4",
+                    lead.urgent ? "border-warn/40 bg-warn-soft/40" : "",
+                  ].join(" ")}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-ink-soft">{formatCallWhen(lead.call.created_at)}</p>
+                      <p className="mt-1 font-medium text-ink [overflow-wrap:anywhere]">
+                        {lead.name || "Unknown"}
+                      </p>
+                      <div className="mt-1"><StatusBadges lead={lead} /></div>
+                    </div>
+                    <Link
+                      href={`/calls/${lead.call.id}?from=${activeFilter}`}
+                      className="inline-flex min-h-11 items-center font-medium text-[#0096FF] hover:text-[#005ccc]"
+                    >
+                      Open
+                    </Link>
+                  </div>
+                  <p className="mt-2 text-sm text-ink-soft [overflow-wrap:anywhere]">
+                    {lead.reason || "No reason yet"}
+                  </p>
+                  <div className="mt-3 min-w-0">
+                    <WhatsAppLink number={lead.call.caller_number} message={message} />
+                  </div>
+                  {leadStatusReady ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <LeadStatusToggle callId={lead.call.id} initial={lead.leadStatus} />
+                      {lead.leadStatus !== "resolved" ? (
+                        <MarkLeadDoneButton callId={lead.call.id} />
+                      ) : null}
+                      {lead.leadStatus !== "archived" ? (
+                        <MarkLeadArchiveButton callId={lead.call.id} />
+                      ) : null}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-line bg-surface md:block">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b border-line bg-surface-muted/70 text-ink-soft">
                 <tr>

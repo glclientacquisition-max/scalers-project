@@ -27,9 +27,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const businessName = tenant?.business_name?.trim() || "Workspace";
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen min-w-0">
       <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/95 backdrop-blur">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-3.5 sm:px-6 sm:py-4">
+        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-3.5">
           <div className="min-w-0 flex-1">
             <BrandLockup
               href="/home"
@@ -43,7 +43,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <DeskNav />
         </div>
       </header>
-      <main className="mx-auto max-w-desk px-4 py-8 sm:px-6 sm:py-10">{children}</main>
+      <main className="mx-auto w-full min-w-0 max-w-desk px-4 py-6 sm:px-6 sm:py-10">{children}</main>
     </div>
   );
 }
