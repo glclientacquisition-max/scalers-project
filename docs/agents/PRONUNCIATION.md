@@ -41,7 +41,9 @@ Open-ended “learn every word from my recording” produced entries like:
 
 - Common English single-word matches are blocked (`where`, `city`, `located`, …).
 - Keep / Edit say / Remove / typed Save update `tts_lexicon` immediately for the **next call**.
-- Recording Keep verifies the take matches the asked line before learning target names only.
+- Recording **Use this take** verifies via Gemini multimodal (requires `GEMINI_API_KEY` on Vercel).
+- Browser MIME is normalized (`audio/webm;codecs=opus` → `audio/webm`) before Gemini.
+- If Gemini is down/misconfigured, we still save **only the known pack targets** with a local say-as (never open-ended inventing).
 
 ## Do / don’t for `say` forms
 

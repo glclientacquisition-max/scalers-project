@@ -3,7 +3,10 @@
  * Guardrail: if they were asked for "sugar" but said "water", reject.
  */
 
-import { generateGeminiMultimodal } from "@/lib/gemini";
+import {
+  generateGeminiMultimodal,
+  normalizeAudioMimeForGemini,
+} from "@/lib/gemini";
 import {
   isBlockedMatch,
   localSayFallback,
@@ -149,9 +152,11 @@ export async function deriveLexiconFromRecording(opts: {
   if (!opts.audioBase64) {
     return {
       ok: false,
-      error: "Record yourself saying the line, then tap Keep.",
+      error: "Record yourself saying the line, then tap Use this take.",
     };
   }
+
+  const audioMimeType = normalizeAudioMimeForGemini(opts.audioMimeType);
 
   const userText = [
     `TARGET sentence (must match): ${prompt}`,
@@ -162,26 +167,39 @@ export async function deriveLexiconFromRecording(opts: {
     .filter(Boolean)
     .join("\n");
 
+  function localEntriesFromTargets(): TtsLexiconEntry[] {
+    return targets
+      .filter((t) => t.match && !isBlockedMatch(t.match))
+      .map((target) => ({
+        match: target.match,
+        say: localSayFallback(target.label),
+        langs: ["en", "sw", "sheng"] as TtsLexiconEntry["langs"],
+        priority: 200,
+        label: target.label,
+        kind: "sentence" as const,
+      }))
+      .filter((e) => e.say);
+  }
+
   try {
     const parts: Array<
       { text: string } | { inlineData: { mimeType: string; data: string } }
-    > = [{ text: userText }];
-
-    if (opts.audioMimeType) {
-      parts.push({
+    > = [
+      { text: userText },
+      {
         inlineData: {
-          mimeType: opts.audioMimeType,
+          mimeType: audioMimeType,
           data: opts.audioBase64,
         },
-      });
-    }
+      },
+    ];
 
     const raw = await generateGeminiMultimodal({
       systemInstruction: SYSTEM,
       parts,
       temperature: 0.15,
       maxOutputTokens: 512,
-      timeoutMs: 22_000,
+      timeoutMs: 28_000,
     });
 
     const json = extractJsonObject(raw);
@@ -267,12 +285,41 @@ export async function deriveLexiconFromRecording(opts: {
     }
 
     return { ok: true, entries, source: "gemini", heard };
-  } catch {
-    // Without multimodal we cannot safely accept arbitrary audio.
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err || "");
+    // Gemini down / bad mime / timeout: still train only the known pack targets
+    // with a local say-as (never invent common-word matches). Unblocks Practice.
+    const local = localEntriesFromTargets();
+    if (local.length) {
+      return { ok: true, entries: local, source: "local" };
+    }
+
+    if (/GEMINI_API_KEY is not configured/i.test(message)) {
+      return {
+        ok: false,
+        error:
+          "Pronunciation check isn’t configured (missing Gemini). Ask support to set GEMINI_API_KEY.",
+      };
+    }
+    if (/timed out/i.test(message)) {
+      return {
+        ok: false,
+        error:
+          "Verification timed out. Tap Use this take again — or record a shorter, clearer take.",
+      };
+    }
+    if (/unsupported|invalid.*(mime|argument)|does not support/i.test(message)) {
+      return {
+        ok: false,
+        error:
+          "This browser’s audio format wasn’t accepted. Try Chrome, or record again.",
+      };
+    }
+
     return {
       ok: false,
       error:
-        "Couldn’t verify your recording right now. Please try Keep again in a moment.",
+        "Couldn’t verify your recording right now. Please tap Use this take again in a moment.",
     };
   }
 }
