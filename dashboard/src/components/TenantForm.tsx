@@ -233,9 +233,11 @@ function CatalogPager({
 export function TenantForm({
   tenant,
   panel = "identity",
+  onPendingChange,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
+  onPendingChange?: (pending: boolean) => void;
 }) {
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
@@ -322,8 +324,12 @@ export function TenantForm({
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
-  const [state, formAction] = useActionState(saveAndCompileSettings, initial);
+  const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
   const [flash, setFlash] = useState<string | null>(null);
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
 
   const teamJson = useMemo(
     () =>
