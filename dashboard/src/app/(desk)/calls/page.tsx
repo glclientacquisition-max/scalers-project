@@ -131,20 +131,31 @@ function EmptyCalls({
 }
 
 function StatusBadges({ lead }: { lead: Lead }) {
+  const showResolution =
+    lead.resolution && lead.resolution !== "unknown";
   return (
     <span className="inline-flex items-center gap-2">
       {lead.notified ? <span className="text-xs text-ok">alerted</span> : null}
       {lead.urgent ? (
         <span className="text-xs font-medium text-warn">urgent</span>
       ) : null}
+      {showResolution ? (
+        <span className="text-xs text-ink-soft">
+          {lead.resolution === "needs_human"
+            ? "needs human"
+            : lead.resolution}
+        </span>
+      ) : null}
     </span>
   );
 }
 
 const CALL_SELECT =
-  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
+  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
 const CALL_SELECT_LEGACY =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
+const CALL_SELECT_LEAD =
+  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 const NEEDS_YOU_LIMIT = 5;
@@ -256,6 +267,29 @@ export default async function CallsPage({
   let data = first.data as CallRow[] | null;
   let error = first.error;
   let total = first.count ?? 0;
+
+  if (error && /resolution|primary_intent|resolution_note|column/i.test(error.message)) {
+    let retryQuery = client
+      .from("calls")
+      .select(CALL_SELECT_LEAD, { count: "exact" })
+      .eq("tenant_id", tenant.id);
+    if (leadStatusReady && activeFilter !== "all") {
+      retryQuery = retryQuery.eq("lead_status", activeFilter);
+    } else if (leadStatusReady) {
+      retryQuery = retryQuery.neq("lead_status", "archived");
+    }
+    if (q) {
+      retryQuery = retryQuery.or(
+        `caller_number.ilike.%${q}%,summary.ilike.%${q}%`
+      );
+    }
+    const retry = await retryQuery
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    data = retry.data as CallRow[] | null;
+    error = retry.error;
+    total = retry.count ?? 0;
+  }
 
   if (error && /lead_status|column/i.test(error.message)) {
     leadStatusReady = false;

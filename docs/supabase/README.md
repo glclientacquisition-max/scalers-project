@@ -62,6 +62,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | --- | --- | --- | --- |
 | 13 | [`lead_status.sql`](./lead_status.sql) | `owner_rls.sql` | `calls.lead_status` + column-scoped owner UPDATE |
 | 13b | [`lead_status_archive.sql`](./lead_status_archive.sql) | `lead_status.sql` | Adds `archived` status (Archive action; Done stays `resolved`) |
+| 13c | [`call_resolution.sql`](./call_resolution.sql) | `lead_status.sql` | `calls.resolution` + `primary_intent` + `resolution_note` (AI assist outcome; owner may correct) |
 
 ### 6. DID pool + Super Admin helpers
 

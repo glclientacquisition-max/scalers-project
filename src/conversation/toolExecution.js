@@ -37,6 +37,35 @@ function validateServiceRequest(raw) {
   if (!value.item && !value.notes) {
     return { valid: false, reason: 'A request needs an item or concise notes.' };
   }
+  // Retail hold/pickup: require product + caller name + when (playbook slots).
+  if (type === 'hold') {
+    const missing = [];
+    if (!value.item) missing.push('item');
+    if (!value.name) missing.push('name');
+    if (!value.whenText) missing.push('when_text');
+    if (missing.length) {
+      return {
+        valid: false,
+        reason: `Hold needs ${missing.join(', ')} before saving.`,
+        missingSlots: missing,
+        value,
+      };
+    }
+  }
+  // Orders: require product + name (when optional).
+  if (type === 'order') {
+    const missing = [];
+    if (!value.item) missing.push('item');
+    if (!value.name) missing.push('name');
+    if (missing.length) {
+      return {
+        valid: false,
+        reason: `Order needs ${missing.join(', ')} before saving.`,
+        missingSlots: missing,
+        value,
+      };
+    }
+  }
   return { valid: true, value };
 }
 
@@ -102,6 +131,7 @@ async function executeBrainTools({
         action: 'create_service_request',
         status: 'invalid',
         reason: validation.reason,
+        missingSlots: validation.missingSlots || [],
       });
     } else if (completed.has(fingerprint)) {
       results.push({
@@ -251,6 +281,24 @@ function formatToolConfirmation(results = [], language = 'en') {
       if (sw) return 'Ombi hilo tayari limehifadhiwa.';
       if (sheng) return 'Hiyo request tayari iko saved.';
       return 'That request is already saved.';
+    }
+    if (meaningful.status === 'invalid') {
+      const missing = Array.isArray(meaningful.missingSlots)
+        ? meaningful.missingSlots
+        : [];
+      if (missing.includes('when_text') || /when_text/i.test(meaningful.reason || '')) {
+        if (sw) return 'Niambie jina lako na wakati utakapopita ndio nihifadhi hold.';
+        if (sheng) return 'Niambie jina yako na when utapita ndio ni-save hold.';
+        return 'Tell me your name and when you will pick up so I can save the hold.';
+      }
+      if (missing.includes('name') || /name/i.test(meaningful.reason || '')) {
+        if (sw) return 'Niambie jina lako ndio nihifadhi ombi.';
+        if (sheng) return 'Niambie jina yako ndio ni-save request.';
+        return 'Tell me your name so I can save the request.';
+      }
+      if (sw) return 'Nahitaji kidogo zaidi kabla nihifadhi ombi.';
+      if (sheng) return 'Nahitaji detail kidogo kabla ni-save request.';
+      return 'I need a bit more detail before I can save that request.';
     }
     if (sw) return 'Sijaweza kuhifadhi ombi hilo sasa hivi.';
     if (sheng) return 'Sijaweza ku-save hiyo request saa hii.';
