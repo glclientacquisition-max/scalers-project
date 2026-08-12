@@ -1,9 +1,10 @@
-import { getCurrentTenant } from "@/lib/tenant";
 import {
   BusinessSettingsShell,
   parseBusinessSettingsPanel,
   parseBusinessSettingsTab,
 } from "@/components/BusinessSettingsShell";
+import { listCuratedSonioxVoices } from "@/lib/sonioxVoiceCatalog";
+import { getCurrentTenant } from "@/lib/tenant";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -45,6 +46,11 @@ export default async function SettingsPage({
   const trainPanel = parseBusinessSettingsPanel(panelRaw);
 
   return (
-    <BusinessSettingsShell tenant={tenant} tab={tab} trainPanel={trainPanel} />
+    <BusinessSettingsShell
+      tenant={tenant}
+      tab={tab}
+      trainPanel={trainPanel}
+      curatedVoices={await listCuratedSonioxVoices()}
+    />
   );
 }

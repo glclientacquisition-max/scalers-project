@@ -8,6 +8,7 @@ import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { TenantForm, type SettingsPanel } from "@/components/TenantForm";
 import { TenantSettingsSaveButton } from "@/components/TenantSettingsSaveButton";
+import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 
 const PRIMARY_NAV = [
   { id: "today", label: "Today" },
@@ -59,10 +60,12 @@ export function BusinessSettingsShell({
   tenant,
   tab,
   trainPanel,
+  curatedVoices = [],
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
+  curatedVoices?: CuratedSonioxVoice[];
 }) {
   const pendingDid = String(tenant.sautikit_virtual_number || "").startsWith("pending:");
   const formPanel: SettingsPanel =
@@ -195,6 +198,7 @@ export function BusinessSettingsShell({
                 ].join(":")}
                 tenant={tenant}
                 panel={formPanel}
+                curatedVoices={curatedVoices}
                 onPendingChange={setSavePending}
               />
             </div>

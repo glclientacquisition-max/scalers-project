@@ -8,6 +8,7 @@ const NAV = [
   { href: "/admin/wallets", label: "Wallets", exact: false as boolean },
   { href: "/admin/businesses", label: "Businesses", exact: false as boolean },
   { href: "/admin/numbers", label: "Numbers", exact: false as boolean },
+  { href: "/admin/voices", label: "Voices", exact: false as boolean },
 ];
 
 export function AdminNav({ onDark = false }: { onDark?: boolean }) {

@@ -20,6 +20,8 @@ const {
 const {
   resolveSonioxVoice,
   ensureSonioxVoiceReady,
+  listCuratedVoices,
+  refreshCuratedVoicesFromDb,
 } = require('./src/speech/sonioxVoice');
 const { synthesizeTtsPreview } = require('./src/speech/ttsPreview');
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
@@ -151,9 +153,23 @@ app.get('/healthz', (_req, res) => {
     soniox: {
       stt: isSonioxConfigured(),
       tts: isSonioxTtsConfigured(),
-      voice: resolveSonioxVoice(),
+      defaultVoice: resolveSonioxVoice(),
+      curatedVoices: listCuratedVoices().map((v) => ({
+        id: v.id,
+        description: v.description,
+        default: v.default,
+      })),
     },
   });
+});
+
+app.get('/api/voices', async (_req, res) => {
+  try {
+    const voices = await refreshCuratedVoicesFromDb({ force: true });
+    res.status(200).json({ voices });
+  } catch (err) {
+    res.status(200).json({ voices: listCuratedVoices() });
+  }
 });
 
 function voicePreviewAuthorized(req) {
@@ -179,17 +195,20 @@ app.post('/api/tts/preview', async (req, res) => {
   }
 
   try {
+    const voiceId = req.body?.voiceId || req.body?.soniox_voice_id || null;
     const result = await synthesizeTtsPreview({
       text,
       callLanguage: req.body?.callLanguage,
       language: req.body?.language,
       lexicon: req.body?.lexicon,
+      voiceId,
     });
+    const resolvedVoice = resolveSonioxVoice(voiceId);
     res.setHeader('Content-Type', 'audio/wav');
     res.setHeader('X-Spoken-Text', encodeURIComponent(result.spokenText));
     res.setHeader('X-Tts-Language', result.language);
-    res.setHeader('X-Soniox-Voice', resolveSonioxVoice());
-    return res.send(result.wav);
+    res.setHeader('X-Soniox-Voice', resolvedVoice);
+    return res.send(new Uint8Array(result.wav));
   } catch (err) {
     console.error('[api/tts/preview] failed:', err?.message || err);
     return res.status(500).json({ error: err?.message || 'preview failed' });
@@ -864,6 +883,8 @@ mediaWss.on('connection', (ws, req) => {
   let interimBargeText = '';
   /** Optional per-tenant TTS lexicon overrides: [{ match, say }]. */
   let ttsLexiconOverrides = [];
+  /** Tenant-selected Soniox voice from curated catalog. */
+  let tenantSonioxVoiceId = null;
   /** Latest tenant fields used to build Soniox STT context (hearing path). */
   let sttTenantSnapshot = null;
 
@@ -903,6 +924,7 @@ mediaWss.on('connection', (ws, req) => {
       ttsLexiconOverrides = Array.isArray(profile.ttsLexicon)
         ? profile.ttsLexicon
         : [];
+      tenantSonioxVoiceId = profile.sonioxVoiceId || null;
       if (sessionCallSid) {
         const parsedTools = parseAgentTools(profile.agentTools);
         callAgentTools.set(sessionCallSid, parsedTools);
@@ -933,7 +955,7 @@ mediaWss.on('connection', (ws, req) => {
       const tools = parseAgentTools(profile.agentTools);
       const sttCtx = publishSttContext(profile);
       console.log(
-        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} ttsLexicon=${ttsLexiconOverrides.length} sttTerms=${sttCtx?.terms?.length || 0} langs=en,sw,sheng(auto)`
+        `[ws/media][${sidLabel()}] tenant prompt loaded business=${businessName || 'unknown'} agent=${agentName} voice=${resolveSonioxVoice(tenantSonioxVoiceId)} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)} customPrompt=${Boolean(profile.llmSystemPrompt)} escalate=${tools.escalate} endCall=${tools.end_call} ttsLexicon=${ttsLexiconOverrides.length} sttTerms=${sttCtx?.terms?.length || 0} langs=en,sw,sheng(auto)`
       );
       return sttCtx;
     } catch (err) {
@@ -1546,25 +1568,32 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   if (isSonioxTtsConfigured()) {
-    try {
-      tts = createSonioxTtsSession({
-        callSid: sidLabel(),
-        onAudio: (pcm) => {
-          // Drop outbound audio after barge-in cancel / superseded playback generation.
-          if (!speaking) return;
-          if (activePlaybackGeneration !== playbackGeneration) return;
-          if (activeTurnTiming) activeTurnTiming.markFirstPcm();
-          if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
-        },
+    tenantWarm
+      .then(() => {
+        try {
+          tts = createSonioxTtsSession({
+            callSid: sidLabel(),
+            voiceId: tenantSonioxVoiceId,
+            onAudio: (pcm) => {
+              // Drop outbound audio after barge-in cancel / superseded playback generation.
+              if (!speaking) return;
+              if (activePlaybackGeneration !== playbackGeneration) return;
+              if (activeTurnTiming) activeTurnTiming.markFirstPcm();
+              if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+            },
+          });
+          tts.ready.catch((err) => {
+            console.error(`[ws/media] Soniox TTS failed to start:`, err?.message || err);
+            tts = null;
+          });
+        } catch (err) {
+          console.error(`[ws/media] Soniox TTS init error:`, err?.message || err);
+          tts = null;
+        }
+      })
+      .catch((err) => {
+        console.error(`[ws/media] Soniox TTS tenant warm failed:`, err?.message || err);
       });
-      tts.ready.catch((err) => {
-        console.error(`[ws/media] Soniox TTS failed to start:`, err?.message || err);
-        tts = null;
-      });
-    } catch (err) {
-      console.error(`[ws/media] Soniox TTS init error:`, err?.message || err);
-      tts = null;
-    }
   } else {
     console.warn('[ws/media] SONIOX_API_KEY missing — skipping TTS for this call');
   }
@@ -2515,13 +2544,20 @@ server.listen(PORT, () => {
     console.log(`✓ SONIOX_API_KEY present (STT on /ws/media)`);
     if (isSonioxTtsConfigured()) {
       console.log(
-        `✓ Soniox TTS enabled cloned voice=${resolveSonioxVoice()}`
+        `✓ Soniox TTS enabled default voice=${resolveSonioxVoice()}`
       );
-      ensureSonioxVoiceReady({ log: console.log }).catch((err) => {
-        console.warn(
-          `⚠ Soniox voice readiness check failed: ${err?.message || err}`
-        );
-      });
+      refreshCuratedVoicesFromDb({ force: true })
+        .then((voices) => {
+          console.log(
+            `✓ Soniox voice catalog loaded count=${voices.length} source=db-or-fallback`
+          );
+          return ensureSonioxVoiceReady({ log: console.log });
+        })
+        .catch((err) => {
+          console.warn(
+            `⚠ Soniox voice readiness check failed: ${err?.message || err}`
+          );
+        });
     } else {
       console.log(`ℹ SONIOX_API_KEY missing — no spoken replies`);
     }

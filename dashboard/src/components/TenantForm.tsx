@@ -68,6 +68,12 @@ import {
   type HandoffMode,
 } from "@/lib/handoffMode";
 import {
+  displaySonioxVoiceLabel,
+  getDefaultSonioxVoiceIdSync,
+  listCuratedSonioxVoicesSync,
+  type CuratedSonioxVoice,
+} from "@/lib/sonioxVoiceCatalog";
+import {
   emptyLocation,
   LOCATIONS_MAX,
   normalizeBusinessLocations,
@@ -103,6 +109,16 @@ const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
     blurb: "Natural Kenyan voice with light Sheng when the caller uses it.",
   },
 ];
+
+function initialSonioxVoiceId(
+  tenant: TenantRow,
+  curated: CuratedSonioxVoice[]
+): string {
+  const raw = String(tenant.soniox_voice_id || "").trim();
+  if (raw && curated.some((v) => v.id === raw)) return raw;
+  const marked = curated.find((v) => v.default);
+  return marked?.id || curated[0]?.id || getDefaultSonioxVoiceIdSync() || "";
+}
 
 function initialTone(tenant: TenantRow): OnboardingTone | "" {
   const t = String(tenant.agent_tone || "").toLowerCase();
@@ -233,12 +249,18 @@ function CatalogPager({
 export function TenantForm({
   tenant,
   panel = "identity",
+  curatedVoices,
   onPendingChange,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
+  curatedVoices?: CuratedSonioxVoice[];
   onPendingChange?: (pending: boolean) => void;
 }) {
+  const voiceOptions =
+    curatedVoices && curatedVoices.length
+      ? curatedVoices
+      : listCuratedSonioxVoicesSync();
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
     tenant.whatsapp_notification_number || ""
@@ -312,6 +334,12 @@ export function TenantForm({
   );
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
+  );
+  const [sonioxVoiceId, setSonioxVoiceId] = useState(() =>
+    initialSonioxVoiceId(tenant, voiceOptions)
+  );
+  const [sonioxVoiceLabel, setSonioxVoiceLabel] = useState(
+    () => String(tenant.soniox_voice_label || "").trim()
   );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
@@ -630,6 +658,8 @@ export function TenantForm({
       <input type="hidden" name="faqs" value={faqsJson} />
       <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
       <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
+      <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} />
+      <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} />
 
       <section className={panel === "identity" ? "space-y-5" : "hidden"}>
         <div>
@@ -1531,6 +1561,80 @@ export function TenantForm({
         <div>
           <h3 className="text-sm font-medium text-[var(--ink)]">Tools &amp; voice</h3>
         </div>
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              Pick how {agentName || "your receptionist"} sounds on live calls.
+              Callers still hear the agent name from Identity above — this is the
+              sound only. Save &amp; train after changing.
+            </p>
+          </div>
+          {voiceOptions.length > 1 ? (
+            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Phone voice profile">
+              {voiceOptions.map((voice, index) => {
+                const selected = sonioxVoiceId === voice.id;
+                return (
+                  <button
+                    key={voice.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setSonioxVoiceId(voice.id)}
+                    className={[
+                      "w-full text-left rounded-xl border px-4 py-3 transition",
+                      selected
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[inset_0_0_0_1px_var(--accent)]"
+                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                    ].join(" ")}
+                  >
+                    <span className="font-medium text-[var(--ink)]">
+                      Voice option {index + 1}
+                    </span>
+                    {voice.description ? (
+                      <span className="mt-1 block text-sm text-[var(--ink-soft)]">
+                        {voice.description}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : voiceOptions[0]?.description ? (
+            <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink-soft)]">
+              {voiceOptions[0].description}
+            </p>
+          ) : null}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="soniox_voice_label">
+              Name this voice
+            </label>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              Your label for this sound — only your team sees it here.
+            </p>
+            <input
+              id="soniox_voice_label"
+              type="text"
+              maxLength={40}
+              value={sonioxVoiceLabel}
+              onChange={(e) => setSonioxVoiceLabel(e.target.value)}
+              placeholder="e.g. Front desk voice"
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
+            />
+            {sonioxVoiceLabel.trim() || sonioxVoiceId ? (
+              <p className="mt-2 text-xs text-[var(--ink-soft)]">
+                Selected:{" "}
+                <span className="font-medium text-[var(--ink)]">
+                  {displaySonioxVoiceLabel(
+                    sonioxVoiceLabel,
+                    sonioxVoiceId,
+                    voiceOptions
+                  )}
+                </span>
+              </p>
+            ) : null}
+          </div>
+        </div>
         <div className="space-y-2">
           <p className="text-sm font-medium text-[var(--ink)]">Handoff</p>
           <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Handoff mode">
@@ -1615,6 +1719,7 @@ export function TenantForm({
           tenantId={tenant.id}
           businessName={businessName}
           agentName={agentName}
+          sonioxVoiceId={sonioxVoiceId}
           locationNotes={locationNotes}
           locations={locations}
           team={team}

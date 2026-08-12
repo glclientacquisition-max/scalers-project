@@ -7,7 +7,7 @@ const { parseLexiconOverrides } = require('./pronunciationLexicon');
 
 /**
  * Synthesize preview audio with the Scalers cloned voice.
- * @param {{ text: string, callLanguage?: string, language?: string, lexicon?: unknown }} opts
+ * @param {{ text: string, callLanguage?: string, language?: string, lexicon?: unknown, voiceId?: string }} opts
  * @returns {Promise<{ wav: Buffer, spokenText: string, language: string }>}
  */
 async function synthesizeTtsPreview(opts) {
@@ -30,6 +30,7 @@ async function synthesizeTtsPreview(opts) {
   const chunks = [];
   const session = createSonioxTtsSession({
     callSid: 'preview',
+    voiceId: opts.voiceId,
     onAudio: (pcm) => {
       if (pcm?.length) chunks.push(pcm);
     },

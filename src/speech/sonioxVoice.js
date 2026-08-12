@@ -1,15 +1,23 @@
-// Canonical Scalers receptionist voice — Soniox cloned voice (UUID, not built-in name).
-const SCALERS_SONIOX_VOICE_ID = '7b197f3c-84b4-4404-986f-114e4dac1432';
+// Canonical Scalers receptionist voice — kept for backwards-compatible imports.
+const {
+  getDefaultVoiceId,
+  resolveCuratedVoiceId,
+  isAllowedVoiceId,
+  listCuratedVoices,
+  refreshCuratedVoicesFromDb,
+} = require('./sonioxVoiceCatalog');
+
+const SCALERS_SONIOX_VOICE_ID = getDefaultVoiceId();
 
 const SONIOX_VOICES_API =
   process.env.SONIOX_VOICES_API || 'https://api.soniox.com/v1/voices';
 
 /**
- * Scalers production TTS voice. Built-in Soniox voice names are not used.
- * SONIOX_VOICE is ignored when set to a different value (logged once at startup).
+ * Resolve Soniox TTS voice for a call or preview.
+ * @param {string|null|undefined} [tenantVoiceId]
  */
-function resolveSonioxVoice() {
-  return SCALERS_SONIOX_VOICE_ID;
+function resolveSonioxVoice(tenantVoiceId) {
+  return resolveCuratedVoiceId(tenantVoiceId);
 }
 
 function isUuidVoice(value) {
@@ -20,16 +28,16 @@ function isUuidVoice(value) {
 
 /**
  * @param {string} model
- * @returns {Promise<{ ok: boolean, status?: string, voiceId: string, model: string, error?: string, raw?: unknown }>}
+ * @param {string} [voiceId]
  */
-async function fetchVoiceModelStatus(model) {
+async function fetchVoiceModelStatus(model, voiceId) {
   const apiKey = process.env.SONIOX_API_KEY;
-  const voiceId = resolveSonioxVoice();
+  const resolvedId = resolveSonioxVoice(voiceId);
   if (!apiKey) {
-    return { ok: false, voiceId, model, error: 'SONIOX_API_KEY missing' };
+    return { ok: false, voiceId: resolvedId, model, error: 'SONIOX_API_KEY missing' };
   }
 
-  const url = `${SONIOX_VOICES_API}/${encodeURIComponent(voiceId)}`;
+  const url = `${SONIOX_VOICES_API}/${encodeURIComponent(resolvedId)}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
@@ -38,7 +46,7 @@ async function fetchVoiceModelStatus(model) {
     const body = await res.text().catch(() => '');
     return {
       ok: false,
-      voiceId,
+      voiceId: resolvedId,
       model,
       error: `GET voice failed ${res.status}: ${body.slice(0, 200)}`,
     };
@@ -51,7 +59,7 @@ async function fetchVoiceModelStatus(model) {
   return {
     ok: status === 'ready',
     status,
-    voiceId,
+    voiceId: resolvedId,
     model,
     error:
       status === 'ready'
@@ -62,15 +70,15 @@ async function fetchVoiceModelStatus(model) {
 }
 
 /**
- * Prepare cloned voice for the active TTS model if Soniox reports not_computed.
  * @param {string} model
+ * @param {string} [voiceId]
  */
-async function recomputeVoiceForModel(model) {
+async function recomputeVoiceForModel(model, voiceId) {
   const apiKey = process.env.SONIOX_API_KEY;
-  const voiceId = resolveSonioxVoice();
+  const resolvedId = resolveSonioxVoice(voiceId);
   if (!apiKey) return { ok: false, error: 'SONIOX_API_KEY missing' };
 
-  const url = `${SONIOX_VOICES_API}/${encodeURIComponent(voiceId)}/recompute`;
+  const url = `${SONIOX_VOICES_API}/${encodeURIComponent(resolvedId)}/recompute`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -89,52 +97,64 @@ async function recomputeVoiceForModel(model) {
 }
 
 /**
- * Verify cloned voice is ready for realtime TTS; trigger recompute when needed.
+ * Verify curated voices are ready for realtime TTS; trigger recompute when needed.
  * @param {{ model?: string, log?: (line: string) => void }} [opts]
  */
 async function ensureSonioxVoiceReady(opts = {}) {
   const log = opts.log || console.log;
   const model =
     opts.model || process.env.SONIOX_TTS_MODEL || 'tts-rt-v1';
-  const voiceId = resolveSonioxVoice();
 
   const envVoice = String(process.env.SONIOX_VOICE || '').trim();
-  if (envVoice && envVoice !== voiceId) {
+  if (envVoice && !isAllowedVoiceId(envVoice)) {
+    log(`ℹ SONIOX_VOICE=${envVoice} ignored — use tenants.soniox_voice_id + curated catalog`);
+  }
+
+  const voices = listCuratedVoices();
+  if (!voices.length) {
+    log('⚠ No curated Soniox voices in config/soniox-voices.json');
+    return { ok: false, error: 'empty catalog' };
+  }
+
+  let allOk = true;
+  for (const voice of voices) {
+    let status = await fetchVoiceModelStatus(model, voice.id);
+    if (status.ok) {
+      log(`✓ Soniox voice ready model=${model} voice=${voice.id}${voice.description ? ` (${voice.description})` : ''}`);
+      continue;
+    }
+
+    if (status.status === 'not_computed') {
+      log(`ℹ Soniox voice ${voice.id} not prepared for ${model} — recompute…`);
+      const recompute = await recomputeVoiceForModel(model, voice.id);
+      if (!recompute.ok) {
+        log(`⚠ Soniox voice recompute failed (${voice.id}): ${recompute.error}`);
+        allOk = false;
+        continue;
+      }
+      status = await fetchVoiceModelStatus(model, voice.id);
+      if (status.ok) {
+        log(`✓ Soniox voice ready after recompute voice=${voice.id}`);
+        continue;
+      }
+    }
+
+    allOk = false;
     log(
-      `ℹ SONIOX_VOICE=${envVoice} ignored — Scalers uses cloned voice ${voiceId}`
+      `⚠ Soniox voice not ready voice=${voice.id} model=${model} status=${status.status || 'unknown'} — ${status.error || ''}`
     );
   }
 
-  let status = await fetchVoiceModelStatus(model);
-  if (status.ok) {
-    log(`✓ Soniox cloned voice ready model=${model} voice=${voiceId}`);
-    return status;
-  }
-
-  if (status.status === 'not_computed') {
-    log(`ℹ Soniox voice not prepared for ${model} — requesting recompute…`);
-    const recompute = await recomputeVoiceForModel(model);
-    if (!recompute.ok) {
-      log(`⚠ Soniox voice recompute failed: ${recompute.error}`);
-      return { ...status, ok: false, error: recompute.error };
-    }
-    status = await fetchVoiceModelStatus(model);
-    if (status.ok) {
-      log(`✓ Soniox cloned voice ready after recompute model=${model}`);
-      return status;
-    }
-  }
-
-  log(
-    `⚠ Soniox cloned voice not ready model=${model} status=${status.status || 'unknown'} — ${status.error || ''}`
-  );
-  return status;
+  return { ok: allOk };
 }
 
 module.exports = {
   SCALERS_SONIOX_VOICE_ID,
   resolveSonioxVoice,
   isUuidVoice,
+  isAllowedVoiceId,
+  listCuratedVoices,
+  refreshCuratedVoicesFromDb,
   fetchVoiceModelStatus,
   recomputeVoiceForModel,
   ensureSonioxVoiceReady,

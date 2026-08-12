@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       text,
       lexicon: body.lexicon,
       language: body.language,
+      voiceId: body.voiceId ?? body.soniox_voice_id ?? null,
     });
     const headers = new Headers({
       "Content-Type": "audio/wav",
