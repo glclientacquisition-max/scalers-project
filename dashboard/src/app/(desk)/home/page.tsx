@@ -15,6 +15,7 @@ import { businessSettingsHref } from "@/lib/businessSettingsNav";
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
 
+/** 8px rhythm: space units stay on the 0.5rem grid. */
 function MetricCard({
   href,
   label,
@@ -30,18 +31,19 @@ function MetricCard({
     <Link
       href={href}
       className={[
-        "block rounded-2xl border px-6 py-7 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
+        "block min-w-0 rounded-2xl border px-4 py-6 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 sm:px-6 sm:py-7",
         warn
           ? "border-warn/45 bg-warn-soft hover:border-warn"
           : "border-line bg-surface hover:border-[#0096FF]/45",
       ].join(" ")}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+      <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-ink-soft sm:text-xs">
         {label}
       </p>
       <p
         className={[
-          "mt-3 font-display text-4xl tracking-tight sm:text-[2.75rem]",
+          "mt-2 font-display tracking-tight [overflow-wrap:anywhere] sm:mt-3",
+          "text-[clamp(1.75rem,6vw,2.75rem)]",
           warn ? "text-warn" : "text-ink",
         ].join(" ")}
       >
@@ -130,13 +132,13 @@ export default async function HomeOverviewPage() {
   const greeting = nairobiGreeting();
 
   return (
-    <div className="mx-auto max-w-2xl px-1 py-6 sm:py-12">
-      <header className="text-center">
-        <p className="text-sm text-ink-soft">
+    <div className="mx-auto w-full max-w-2xl min-w-0 px-1 py-6 sm:py-12">
+      <header className="min-w-0 text-center">
+        <p className="text-sm text-ink-soft [overflow-wrap:anywhere]">
           {greeting},{" "}
           <span className="font-medium text-ink">{business}</span>
         </p>
-        <h1 className="mt-2 font-display text-3xl tracking-tight text-ink sm:text-4xl">
+        <h1 className="mt-2 font-display tracking-tight text-ink text-[clamp(1.75rem,5vw,2.25rem)]">
           Overview
         </h1>
       </header>
@@ -144,14 +146,16 @@ export default async function HomeOverviewPage() {
       {primaryUpdate ? (
         <aside
           aria-label="Live updates"
-          className="mx-auto mt-8 max-w-md text-center"
+          className="mx-auto mt-8 w-full min-w-0 max-w-md px-1 text-center"
         >
-          <p className="text-xs font-medium uppercase tracking-wide text-[#005ccc]">
+          <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-[#005ccc] sm:text-xs">
             Live update
             {liveUpdates.length > 1 ? ` · ${liveUpdates.length}` : ""}
           </p>
-          <p className="mt-1.5 text-sm font-medium text-ink">{primaryUpdate.text}</p>
-          <p className="mt-1 text-xs text-ink-soft">
+          <p className="mt-2 text-sm font-medium leading-snug text-ink [overflow-wrap:anywhere]">
+            {primaryUpdate.text}
+          </p>
+          <p className="mt-1 text-xs text-ink-soft [overflow-wrap:anywhere]">
             {formatBulletinEndLabel(primaryUpdate.ends_at)}
             {liveUpdates.length > 1
               ? ` · +${liveUpdates.length - 1} more`
@@ -159,7 +163,7 @@ export default async function HomeOverviewPage() {
           </p>
           <Link
             href={businessSettingsHref("updates")}
-            className="mt-2 inline-block text-sm font-medium text-[#0096FF] hover:text-[#005ccc] focus-visible:outline-none focus-visible:underline"
+            className="mt-3 inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium text-[#0096FF] hover:text-[#005ccc] focus-visible:outline-none focus-visible:underline"
           >
             Manage updates
           </Link>
@@ -168,7 +172,7 @@ export default async function HomeOverviewPage() {
 
       <section
         aria-label="Executive summary"
-        className="mt-14 grid gap-4 sm:grid-cols-2"
+        className="mt-10 grid grid-cols-1 gap-4 min-[375px]:grid-cols-2 sm:mt-14"
       >
         <MetricCard
           href={callsHref({ status: "new" })}
@@ -194,19 +198,20 @@ export default async function HomeOverviewPage() {
         />
       </section>
 
-      <div className="mt-14 flex justify-center px-2">
+      {/* Primary CTA sits in the lower thumb zone on small viewports. */}
+      <div className="mt-10 flex justify-center px-1 sm:mt-14 sm:px-2">
         <Link
           href="/calls"
-          className="inline-flex min-h-[3.25rem] w-full max-w-md items-center justify-center rounded-xl bg-[#0096FF] px-8 py-3.5 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
+          className="inline-flex min-h-12 w-full max-w-md items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3.5 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 sm:px-8"
         >
           Process Pending Leads
         </Link>
       </div>
 
       {!leadStatusReady ? (
-        <p className="mx-auto mt-10 max-w-md text-center text-xs text-ink-soft">
+        <p className="mx-auto mt-10 max-w-md px-1 text-center text-xs text-ink-soft [overflow-wrap:anywhere]">
           Lead statuses need{" "}
-          <code className="text-[11px]">docs/supabase/lead_status.sql</code>.
+          <code className="text-[0.6875rem]">docs/supabase/lead_status.sql</code>.
         </p>
       ) : null}
     </div>
