@@ -46,6 +46,19 @@ function typeLabel(type: string) {
   }
 }
 
+function statusLabel(status: string) {
+  switch (status) {
+    case "fulfilled":
+      return "Done";
+    case "cancelled":
+      return "Cancelled";
+    case "open":
+      return "Open";
+    default:
+      return status;
+  }
+}
+
 export default async function RequestsPage({
   searchParams,
 }: {
@@ -54,8 +67,8 @@ export default async function RequestsPage({
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16">
-        <p className="text-[var(--ink-soft)]">Sign in to view requests.</p>
+      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
+        Sign in to view requests.
       </div>
     );
   }
@@ -116,138 +129,146 @@ export default async function RequestsPage({
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight text-[var(--ink)]">
-            Requests
-          </h1>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Holds, pickups, and order notes your receptionist logged from calls.
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+          Requests
+        </h1>
+        <div className="rounded-2xl border border-line bg-surface px-4 py-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+            Open
           </p>
-        </div>
-        <div className="rounded-2xl border border-line bg-surface px-5 py-3">
-          <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
-            Showing open in list
-          </p>
-          <p className="font-display text-2xl text-[var(--ink)]">{openCount}</p>
+          <p className="font-display text-2xl tracking-tight text-ink">{openCount}</p>
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {(
-          [
-            ["open", "Open"],
-            ["fulfilled", "Fulfilled"],
-            ["cancelled", "Cancelled"],
-            ["all", "All statuses"],
-          ] as const
-        ).map(([id, label]) => (
-          <Link
-            key={id}
-            href={filterLink(id, typeFilter)}
-            className={[
-              "rounded-lg border px-3 py-1.5 text-sm",
-              statusFilter === id
-                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]"
-                : "border-line bg-surface text-[var(--ink-soft)]",
-            ].join(" ")}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {(
-          [
-            ["all", "All types"],
-            ["hold", "Holds"],
-            ["order", "Orders"],
-            ["enquiry", "Enquiries"],
-            ["callback", "Callbacks"],
-          ] as const
-        ).map(([id, label]) => (
-          <Link
-            key={id}
-            href={filterLink(statusFilter, id)}
-            className={[
-              "rounded-lg border px-3 py-1.5 text-sm",
-              typeFilter === id
-                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]"
-                : "border-line bg-surface text-[var(--ink-soft)]",
-            ].join(" ")}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
+      <nav
+        aria-label="Filter by status"
+        className="mt-6 border-b border-line"
+      >
+        <ul className="flex gap-1 overflow-x-auto">
+          {(
+            [
+              ["open", "Open"],
+              ["fulfilled", "Done"],
+              ["cancelled", "Cancelled"],
+              ["all", "All"],
+            ] as const
+          ).map(([id, label]) => {
+            const active = statusFilter === id;
+            return (
+              <li key={id}>
+                <Link
+                  href={filterLink(id, typeFilter)}
+                  aria-current={active ? "page" : undefined}
+                  className={[
+                    "inline-flex border-b-2 px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
+                    active
+                      ? "border-[#0096FF] text-[#005ccc]"
+                      : "border-transparent text-ink-soft hover:border-line hover:text-ink",
+                  ].join(" ")}
+                >
+                  {label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      <nav aria-label="Filter by type" className="mt-2 border-b border-line">
+        <ul className="flex gap-1 overflow-x-auto">
+          {(
+            [
+              ["all", "All types"],
+              ["hold", "Holds"],
+              ["order", "Orders"],
+              ["enquiry", "Enquiries"],
+              ["callback", "Callbacks"],
+            ] as const
+          ).map(([id, label]) => {
+            const active = typeFilter === id;
+            return (
+              <li key={id}>
+                <Link
+                  href={filterLink(statusFilter, id)}
+                  aria-current={active ? "page" : undefined}
+                  className={[
+                    "inline-flex border-b-2 px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
+                    active
+                      ? "border-[#0096FF] text-[#005ccc]"
+                      : "border-transparent text-ink-soft hover:border-line hover:text-ink",
+                  ].join(" ")}
+                >
+                  {label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
       {loadError ? (
-        <p className="mt-8 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-[var(--warn)]">
+        <p className="mt-6 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
           {loadError}
         </p>
       ) : null}
 
       {!loadError && rows.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-line bg-surface px-6 py-10 text-center">
-          <p className="text-[var(--ink)] font-medium">No requests in this filter</p>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            When a caller asks to hold an item or leave an order note, it appears
-            here.{" "}
-            <Link href="/settings#train" className="text-[var(--accent)] hover:underline">
-              Train your catalogue
-            </Link>{" "}
-            so the receptionist can log accurately.
+        <div className="mt-6 border-y border-line py-10 text-center">
+          <p className="font-display text-xl tracking-tight text-ink">
+            No requests in this filter
           </p>
         </div>
       ) : null}
 
-      <ul className="mt-8 space-y-3">
+      <ul className="mt-6 space-y-3">
         {rows.map((row) => (
           <li
             key={row.id}
-            className="rounded-2xl border border-line bg-surface px-5 py-4"
+            className="rounded-2xl border border-line bg-surface px-5 py-5"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
-                  {typeLabel(row.request_type)} · {row.status} ·{" "}
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  {typeLabel(row.request_type)} · {statusLabel(row.status)} ·{" "}
                   {formatWhen(row.created_at)}
                 </p>
-                <p className="mt-1 font-medium text-[var(--ink)]">
+                <p className="mt-1 text-lg font-semibold text-ink">
                   {row.caller_name || "Caller"}
-                  {row.item ? (
-                    <span className="font-normal text-[var(--ink-soft)]">
-                      {" "}
-                      — {row.item}
-                      {row.quantity ? ` (×${row.quantity})` : ""}
-                    </span>
-                  ) : null}
                 </p>
-                {row.when_text ? (
-                  <p className="mt-1 text-sm text-[var(--ink)]">
-                    When: {row.when_text}
+                {row.item ? (
+                  <p className="mt-0.5 text-sm text-ink-soft">
+                    {row.item}
+                    {row.quantity ? ` (×${row.quantity})` : ""}
                   </p>
                 ) : null}
+                {row.when_text ? (
+                  <p className="mt-2 text-sm text-ink">When: {row.when_text}</p>
+                ) : null}
                 {row.notes ? (
-                  <p className="mt-1 text-sm text-[var(--ink-soft)]">{row.notes}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+                    {row.notes}
+                  </p>
                 ) : null}
               </div>
               <RequestStatusToggle id={row.id} status={row.status} />
             </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-sm">
-              {row.caller_phone ? (
-                <WhatsAppLink number={row.caller_phone} label="WhatsApp caller" />
-              ) : null}
-              {row.call_id ? (
-                <Link
-                  href={`/calls`}
-                  className="text-[var(--accent)] hover:underline"
-                >
-                  Related calls
-                </Link>
-              ) : null}
-            </div>
+            {(row.caller_phone || row.call_id) && (
+              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-line/80 pt-4 text-sm">
+                {row.caller_phone ? (
+                  <WhatsAppLink number={row.caller_phone} label="WhatsApp caller" />
+                ) : null}
+                {row.call_id ? (
+                  <Link
+                    href={`/calls/${row.call_id}`}
+                    className="font-medium text-[#0096FF] hover:text-[#005ccc] hover:underline"
+                  >
+                    Open call
+                  </Link>
+                ) : null}
+              </div>
+            )}
           </li>
         ))}
       </ul>
