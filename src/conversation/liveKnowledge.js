@@ -105,9 +105,10 @@ function formatUnknownAnswerPolicy(customLine = '') {
   const line = String(customLine || '').trim();
   const parts = [
     'UNKNOWN ANSWER POLICY (when the ask is outside SERVICES / FAQs / TEAM above):',
-    '- Admit you do not have that fact. Do NOT invent prices, availability, guarantees, or services.',
+    '- Admit you do not have that fact. Do NOT invent prices, availability, guarantees, services, or policy wording.',
     '- Keep the spoken reply short. Offer only the next step allowed by AUTHORITY / ACTION POLICY.',
     '- Do not force name/reason capture. Collect them only if the caller chooses a saved request or justified handoff.',
+    '- Missing catalogue prices and empty policy fields are unknown — admit that; never guess amounts or invent returns/refund text.',
     '- Match the caller language (English / Kiswahili / light Sheng).',
   ];
   if (line) {
@@ -244,6 +245,8 @@ function buildLiveGroundTruth(profile = {}) {
   parts.push(
     '',
     'Never invent prices, stock, availability, services, locations, policies, people, or FAQ answers outside this ground truth.',
+    'If PRODUCT CATALOGUE Price is unknown, say you do not have the exact price — never guess a shilling amount.',
+    'If a POLICIES line is "(not on file)", admit unknown; do not invent policy text or force name capture.',
     'Resolve the caller\'s request from this truth when you can. Capture a clear next step. Only hand off when the playbook or caller requires a human.'
   );
 

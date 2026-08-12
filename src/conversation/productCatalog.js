@@ -60,24 +60,33 @@ function normalizeProducts(raw) {
 }
 
 function formatProductsBlock(products) {
-  const rows = products.slice(0, LIVE_INJECT_MAX);
+  const all = normalizeProducts(products);
+  const rows = all.slice(0, LIVE_INJECT_MAX);
   if (!rows.length) return '(none listed)';
   const lines = rows.map((p, i) => {
     const bits = [`${i + 1}. ${p.name}`];
     if (p.category) bits.push(`Category: ${p.category}`);
     if (p.sku) bits.push(`SKU: ${p.sku}`);
-    if (p.price) bits.push(`Price: ${p.price}`);
+    // Always emit a Price field so the model cannot fill silence with an invented number.
+    bits.push(
+      p.price
+        ? `Price: ${p.price}`
+        : 'Price: unknown (do not invent a number — say you do not have the exact price)'
+    );
     if (p.unit) bits.push(`Unit: ${p.unit}`);
     if (p.in_stock) bits.push(`In stock: ${p.in_stock}`);
     if (p.aliases.length) bits.push(`Also called: ${p.aliases.join(', ')}`);
     if (p.notes) bits.push(`Notes: ${p.notes}`);
     return bits.join(' | ');
   });
-  if (products.length > rows.length) {
+  if (all.length > rows.length) {
     lines.push(
-      `(…${products.length - rows.length} more products on file — ask for the exact title; if missing, log an enquiry)`
+      `(…${all.length - rows.length} more products on file — ask for the exact title; if missing, log an enquiry)`
     );
   }
+  lines.push(
+    'PRICE RULE: Speak a money amount only when Price is a concrete value above. If Price is unknown, admit you do not have the exact price and offer a quote/enquiry — never guess KSh amounts.'
+  );
   return lines.join('\n');
 }
 

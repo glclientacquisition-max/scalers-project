@@ -48,10 +48,55 @@ function policiesHaveContent(policies) {
 function formatPoliciesBlock(policies) {
   const p = normalizePolicies(policies);
   const lines = [];
+  let anyContent = false;
   for (const [key, label] of Object.entries(POLICY_LABELS)) {
-    if (p[key]) lines.push(`- ${label}: ${p[key]}`);
+    if (p[key]) {
+      anyContent = true;
+      lines.push(`- ${label}: ${p[key]}`);
+    } else {
+      lines.push(
+        `- ${label}: (not on file — admit you do not have that detail; never invent; do not force name capture)`
+      );
+    }
   }
-  return lines.length ? lines.join('\n') : '(none listed)';
+  if (!anyContent) {
+    return [
+      '(no policy text on file)',
+      'POLICY RULE: For any policy ask (returns, refunds, payment, etc.), say you do not have that detail. Offer to save a note ONLY if the caller asks. Never invent policy wording. Never force name/reason capture.',
+    ].join('\n');
+  }
+  lines.push(
+    'POLICY RULE: Answer only from lines that have real text. If the asked policy is "(not on file)", admit unknown. Do not invent. Do not ask for a name unless the caller wants a saved note.'
+  );
+  return lines.join('\n');
+}
+
+/**
+ * Resolve a policy answer from structured policies for an asked key / utterance.
+ * @returns {{key: string, text: string}|null} text empty when key known but not on file
+ */
+function lookupPolicy(policies, asked = '') {
+  const p = normalizePolicies(policies);
+  const value = String(asked || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!value) return null;
+  const aliases = {
+    returns: ['return', 'returns', 'refund', 'exchange', 'exchanges'],
+    delivery: ['delivery', 'deliver', 'shipping', 'ship', 'courier'],
+    payment: ['payment', 'pay', 'mpesa', 'm-pesa', 'cash', 'card'],
+    deposit: ['deposit', 'hold deposit', 'booking fee'],
+    cancellation: ['cancel', 'cancellation', 'reschedule'],
+    warranty: ['warranty', 'guarantee'],
+    other: ['other', 'policy'],
+  };
+  for (const [key, words] of Object.entries(aliases)) {
+    if (words.some((w) => value.includes(w))) {
+      return { key, text: p[key] || '' };
+    }
+  }
+  return null;
 }
 
 module.exports = {
@@ -59,4 +104,5 @@ module.exports = {
   normalizePolicies,
   policiesHaveContent,
   formatPoliciesBlock,
+  lookupPolicy,
 };
