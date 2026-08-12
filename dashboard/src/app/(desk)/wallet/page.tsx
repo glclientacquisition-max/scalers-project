@@ -7,6 +7,8 @@ import {
   getTenantUsageSummary,
 } from "@/lib/wallet";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
+import { WalletTopUpButton } from "@/components/WalletTopUpButton";
+import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -64,6 +66,7 @@ export default async function WalletPage() {
   const prepaidEmpty = !usage.isBeta && usage.walletBalanceKes <= 0;
   const prepaidLow =
     !usage.isBeta && usage.walletBalanceKes > 0 && usage.walletBalanceKes < lowThreshold;
+  const topUpConfig = getWalletTopUpConfig();
 
   return (
     <div className="max-w-3xl">
@@ -73,7 +76,13 @@ export default async function WalletPage() {
           <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-[#0096FF]/30 bg-[#0096FF]/5 px-6 py-3 text-sm font-medium text-[#005ccc]">
             Free beta
           </span>
-        ) : null}
+        ) : (
+          <WalletTopUpButton
+            tenantId={tenant.id}
+            topUpEnabled={topUpConfig.enabled}
+            presets={topUpConfig.presets}
+          />
+        )}
       </header>
 
       {(prepaidEmpty || prepaidLow) && !usage.isBeta ? (
@@ -81,7 +90,7 @@ export default async function WalletPage() {
           {prepaidEmpty
             ? tenant.on_demand_usage_enabled
               ? "Prepaid empty. On-demand is on."
-              : "Prepaid empty. Enable on-demand below to keep answering."
+              : "Prepaid empty. Top up or enable on-demand below."
             : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
         </p>
       ) : null}
