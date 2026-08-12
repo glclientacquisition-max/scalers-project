@@ -23,7 +23,7 @@ export function TenantSettingsSaveButton() {
           Training…
         </>
       ) : (
-        "Save & train"
+        "Save & train receptionist"
       )}
     </button>
   );
