@@ -774,7 +774,7 @@ export function TenantForm({
 
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
-      <header className="sticky top-0 z-20 -mx-4 mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+      <header className="sticky top-[4.5rem] z-30 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
         <div className="min-w-0">
           <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
             Business
