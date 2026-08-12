@@ -344,6 +344,9 @@ export function TenantForm({
   const [sonioxVoiceLabel, setSonioxVoiceLabel] = useState(
     () => String(tenant.soniox_voice_label || "").trim()
   );
+  const [voiceSampleLoading, setVoiceSampleLoading] = useState(false);
+  const [voiceSampleError, setVoiceSampleError] = useState<string | null>(null);
+  const [voiceSampleUrl, setVoiceSampleUrl] = useState<string | null>(null);
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
     return rows.length ? rows : [emptyMember()];
@@ -478,6 +481,54 @@ export function TenantForm({
       );
     }
   }, [state]);
+
+  useEffect(() => {
+    return () => {
+      if (voiceSampleUrl) URL.revokeObjectURL(voiceSampleUrl);
+    };
+  }, [voiceSampleUrl]);
+
+  async function playVoiceSample() {
+    const sample =
+      agentName && businessName
+        ? `Hello, you've reached ${businessName}, this is ${agentName} speaking. How can I help?`
+        : "Hello, how can I help you today?";
+    setVoiceSampleLoading(true);
+    setVoiceSampleError(null);
+    if (voiceSampleUrl) {
+      URL.revokeObjectURL(voiceSampleUrl);
+      setVoiceSampleUrl(null);
+    }
+    try {
+      const res = await fetch("/api/pronunciation/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: sample,
+          lexicon: lexiconForStorage(ttsLexicon),
+          voiceId: sonioxVoiceId || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(
+          errJson && typeof errJson.error === "string"
+            ? errJson.error
+            : `Preview failed (${res.status})`
+        );
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setVoiceSampleUrl(url);
+      await new Audio(url).play();
+    } catch (err) {
+      setVoiceSampleError(
+        err instanceof Error ? err.message : "Could not play voice sample."
+      );
+    } finally {
+      setVoiceSampleLoading(false);
+    }
+  }
 
   function updateTeam(index: number, key: keyof TeamDirectoryEntry, value: string) {
     setTeam((prev) =>
@@ -1592,9 +1643,9 @@ export function TenantForm({
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Pick how {agentName || "your receptionist"} sounds on live calls.
-              Callers still hear the agent name from Identity above — this is the
-              sound only. Save &amp; train after changing.
+              How {agentName || "your receptionist"} <em>sounds</em> on live calls
+              (Soniox). The spoken name comes from Agent Persona. Save &amp; train
+              after changing.
             </p>
           </div>
           {voiceOptions.length > 1 ? (
@@ -1631,7 +1682,11 @@ export function TenantForm({
             <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink-soft)]">
               {voiceOptions[0].description}
             </p>
-          ) : null}
+          ) : (
+            <p className="rounded-xl border border-dashed border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink-soft)]">
+              No platform voices loaded yet. Super Admin can add them under Voices.
+            </p>
+          )}
           <div>
             <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="soniox_voice_label">
               Name this voice
@@ -1648,19 +1703,37 @@ export function TenantForm({
               placeholder="e.g. Front desk voice"
               className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
             />
-            {sonioxVoiceLabel.trim() || sonioxVoiceId ? (
-              <p className="mt-2 text-xs text-[var(--ink-soft)]">
-                Selected:{" "}
-                <span className="font-medium text-[var(--ink)]">
-                  {displaySonioxVoiceLabel(
-                    sonioxVoiceLabel,
-                    sonioxVoiceId,
-                    voiceOptions
-                  )}
-                </span>
-              </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void playVoiceSample()}
+              disabled={voiceSampleLoading}
+              className="rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+            >
+              {voiceSampleLoading ? "Generating…" : "Hear sample"}
+            </button>
+            {voiceSampleUrl ? (
+              <audio src={voiceSampleUrl} controls className="max-w-full" />
             ) : null}
           </div>
+          {voiceSampleError ? (
+            <p className="text-xs text-[var(--warn)]" role="alert">
+              {voiceSampleError}
+            </p>
+          ) : null}
+          {sonioxVoiceLabel.trim() || sonioxVoiceId ? (
+            <p className="text-xs text-[var(--ink-soft)]">
+              Selected:{" "}
+              <span className="font-medium text-[var(--ink)]">
+                {displaySonioxVoiceLabel(
+                  sonioxVoiceLabel,
+                  sonioxVoiceId,
+                  voiceOptions
+                )}
+              </span>
+            </p>
+          ) : null}
         </div>
         <div className="space-y-2">
           <p className="text-sm font-medium text-[var(--ink)]">Handoff</p>

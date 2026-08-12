@@ -141,7 +141,8 @@ Open http://localhost:3000 (or the port Next prints).
 | `GEMINI_MODEL` | Optional: defaults to `gemini-3.5-flash-lite` (desk compile; 12s timeout then local fallback) |
 | `SAUTIKIT_API_KEY` | Optional: Super Admin telecom panel + “Sync from SautiKit” (server-only) |
 | `SAUTIKIT_ADMIN_OPS_KEY` | Optional Key B: Buy number (`numbers.claim`) — Vercel only |
-| `VOICE_PUBLIC_BASE_URL` | Optional: Railway voice base for webhook routing after buy |
+| `VOICE_PUBLIC_BASE_URL` | Railway voice base (`https://…`, required for phone preview + webhook routing after buy) |
+| `VOICE_INTERNAL_SECRET` | Same secret as Railway — auth for desk → `/api/tts/preview` |
 | `SAUTIKIT_API_BASE` | Optional: defaults to `https://api.sautikit.com` |
 | `DASHBOARD_PASSWORD` | Optional legacy shared-password desk |
 | `DASHBOARD_OPEN=true` | Dev only: skip login if no password |
