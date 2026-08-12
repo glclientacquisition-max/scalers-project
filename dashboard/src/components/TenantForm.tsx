@@ -165,6 +165,9 @@ const initial: SettingsCompileState = {};
 const fieldClass =
   "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus";
 
+const tableFieldClass =
+  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
+
 export type SettingsPanel =
   | "catalog"
   | "identity"
@@ -197,7 +200,7 @@ function CatalogPager({
   const from = page * pageSize + 1;
   const to = Math.min(total, (page + 1) * pageSize);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 pt-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-canvas px-3 py-3">
       <p className="text-xs text-ink-soft">
         {from}–{to} of {total} {noun}
         {total === 1 ? "" : "s"}
@@ -596,7 +599,7 @@ export function TenantForm({
   }
 
   return (
-    <form id={TENANT_SETTINGS_FORM_ID} action={formAction} className="space-y-10">
+    <form id={TENANT_SETTINGS_FORM_ID} action={formAction} className="space-y-8">
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
@@ -624,19 +627,7 @@ export function TenantForm({
 
       <section className={panel === "identity" ? "space-y-5" : "hidden"}>
         <div>
-          <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
-            Persona &amp; Identity
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Give your digital employee a name and voice so callers hear a real receptionist.
-          </p>
-        </div>
-
-        <div>
           <p className="block text-sm font-medium">Business type</p>
-          <p className="mt-1 text-xs text-[var(--ink-soft)]">
-            Chooses how the receptionist is trained. Retail first; home services next.
-          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {VERTICAL_OPTIONS.map((opt) => {
               const selected = vertical === opt.id;
@@ -675,10 +666,6 @@ export function TenantForm({
               maxLength={40}
               className={fieldClass}
             />
-            <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-              Live on every call: &quot;you&apos;ve reached {businessName.trim() || "your business"}, this is{" "}
-              {agentName.trim() || "Receptionist"} speaking&quot;.
-            </p>
           </div>
 
           <div>
@@ -696,9 +683,6 @@ export function TenantForm({
 
         <div>
           <p className="block text-sm font-medium">Tone</p>
-          <p className="mt-1 text-xs text-[var(--ink-soft)]">
-            We rewrite the live call prompt from these fields. You never edit the raw AI prompt.
-          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {TONE_OPTIONS.map((opt) => {
               const selected = tone === opt.id;
@@ -731,7 +715,7 @@ export function TenantForm({
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium" htmlFor="owner">
-              Owner alert WhatsApp number
+              Owner alert WhatsApp
             </label>
             <input
               id="owner"
@@ -740,13 +724,10 @@ export function TenantForm({
               placeholder="+2547…"
               className={fieldClass}
             />
-            <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-              Primary when WhatsApp Business messaging is connected.
-            </p>
           </div>
           <div>
             <label className="block text-sm font-medium" htmlFor="alert_email">
-              Alert email (fallback)
+              Alert email
             </label>
             <input
               id="alert_email"
@@ -756,9 +737,6 @@ export function TenantForm({
               placeholder="owner@business.com"
               className={fieldClass}
             />
-            <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-              Used if WhatsApp is not ready or a send fails.
-            </p>
           </div>
         </div>
       </section>
@@ -766,13 +744,7 @@ export function TenantForm({
       <section className={panel === "catalog" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
-              <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                What you offer as a business (delivery, sourcing, repair visits) — not
-                individual products. Products go in the catalogue below.
-              </p>
-            </div>
+            <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -973,7 +945,7 @@ export function TenantForm({
               value={servicesNotes}
               onChange={(e) => setServicesNotes(e.target.value)}
               rows={3}
-              placeholder="Anything else about how you work — coverage, lead times, what you do not do…"
+              placeholder="Coverage, lead times, exclusions"
               className={`${fieldClass} leading-relaxed`}
             />
           </div>
@@ -981,13 +953,7 @@ export function TenantForm({
 
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">Product catalogue</h3>
-              <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                Individual items (books, SKUs). Import CSV under Import, or edit here.
-                Live calls use up to 80 titles.
-              </p>
-            </div>
+            <h3 className="text-sm font-medium text-[var(--ink)]">Products</h3>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1047,127 +1013,94 @@ export function TenantForm({
           ) : null}
 
           {products.length === 0 ? (
-            <p className="text-sm text-[var(--ink-soft)]">
-              No products yet. Use Import → product catalogue, or add rows here.
-            </p>
+            <p className="text-sm text-[var(--ink-soft)]">No products yet.</p>
           ) : (
-            <div className="space-y-4">
-              {visibleProducts.map((product, localIndex) => {
-                const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
-                return (
-                <div
-                  key={`product-${index}`}
-                  className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                      Product {index + 1}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setProducts((prev) => prev.filter((_, i) => i !== index))
-                      }
-                      className="text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-name-${index}`}>
-                        Product name
-                      </label>
-                      <input
-                        id={`prod-name-${index}`}
-                        value={product.name}
-                        onChange={(e) => updateProduct(index, "name", e.target.value)}
-                        placeholder="Atomic Habits"
-                        className={fieldClass}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-price-${index}`}>
-                        Price
-                      </label>
-                      <input
-                        id={`prod-price-${index}`}
-                        value={product.price}
-                        onChange={(e) => updateProduct(index, "price", e.target.value)}
-                        placeholder="2,500 KES"
-                        className={fieldClass}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-stock-${index}`}>
-                        In stock
-                      </label>
-                      <select
-                        id={`prod-stock-${index}`}
-                        value={product.in_stock || ""}
-                        onChange={(e) => updateProduct(index, "in_stock", e.target.value)}
-                        className={fieldClass}
-                      >
-                        <option value="">Not set</option>
-                        <option value="yes">Yes</option>
-                        <option value="no">No</option>
-                        <option value="unknown">Unknown</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-cat-${index}`}>
-                        Category
-                      </label>
-                      <input
-                        id={`prod-cat-${index}`}
-                        value={product.category}
-                        onChange={(e) => updateProduct(index, "category", e.target.value)}
-                        placeholder="Self-help"
-                        className={fieldClass}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-sku-${index}`}>
-                        SKU / ISBN
-                      </label>
-                      <input
-                        id={`prod-sku-${index}`}
-                        value={product.sku}
-                        onChange={(e) => updateProduct(index, "sku", e.target.value)}
-                        className={fieldClass}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-notes-${index}`}>
-                        Notes
-                      </label>
-                      <input
-                        id={`prod-notes-${index}`}
-                        value={product.notes}
-                        onChange={(e) => updateProduct(index, "notes", e.target.value)}
-                        className={fieldClass}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`prod-alias-${index}`}>
-                        Also called (aliases)
-                      </label>
-                      <input
-                        id={`prod-alias-${index}`}
-                        value={product.aliases.join(", ")}
-                        onChange={(e) => updateProduct(index, "aliases", e.target.value)}
-                        placeholder="Atomic habit, Clear"
-                        className={fieldClass}
-                      />
-                    </div>
-                  </div>
-                </div>
-                );
-              })}
+            <div className="overflow-hidden rounded-xl border border-line">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                      <th className="px-3 py-2.5 font-medium">Name</th>
+                      <th className="px-3 py-2.5 font-medium">Price</th>
+                      <th className="px-3 py-2.5 font-medium">Category</th>
+                      <th className="px-3 py-2.5 font-medium">Stock</th>
+                      <th className="px-3 py-2.5 font-medium w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line bg-white">
+                    {visibleProducts.map((product, localIndex) => {
+                      const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                      return (
+                        <tr key={`product-${index}`} className="align-middle">
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-name-${index}`}>
+                              Product name
+                            </label>
+                            <input
+                              id={`prod-name-${index}`}
+                              value={product.name}
+                              onChange={(e) => updateProduct(index, "name", e.target.value)}
+                              placeholder="Atomic Habits"
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-price-${index}`}>
+                              Price
+                            </label>
+                            <input
+                              id={`prod-price-${index}`}
+                              value={product.price}
+                              onChange={(e) => updateProduct(index, "price", e.target.value)}
+                              placeholder="2,500 KES"
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-cat-${index}`}>
+                              Category
+                            </label>
+                            <input
+                              id={`prod-cat-${index}`}
+                              value={product.category}
+                              onChange={(e) => updateProduct(index, "category", e.target.value)}
+                              placeholder="Self-help"
+                              className={tableFieldClass}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="sr-only" htmlFor={`prod-stock-${index}`}>
+                              Stock status
+                            </label>
+                            <select
+                              id={`prod-stock-${index}`}
+                              value={product.in_stock || ""}
+                              onChange={(e) => updateProduct(index, "in_stock", e.target.value)}
+                              className={tableFieldClass}
+                            >
+                              <option value="">Not set</option>
+                              <option value="yes">In stock</option>
+                              <option value="no">Out of stock</option>
+                              <option value="unknown">Unknown</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProducts((prev) => prev.filter((_, i) => i !== index))
+                              }
+                              className="text-sm font-medium text-ink-soft hover:text-warn"
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
               <CatalogPager
                 page={safeProductPage}
                 pageSize={PRODUCT_PAGE_SIZE}
@@ -1185,16 +1118,7 @@ export function TenantForm({
       <section className={panel === "identity" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">
-                Phones, social &amp; web
-              </h3>
-              <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                Add as many phone/WhatsApp numbers and social handles as you need.
-                Label each one (Main, Sales, Orders) so the receptionist shares the
-                right contact.
-              </p>
-            </div>
+            <h3 className="text-sm font-medium text-[var(--ink)]">Contacts</h3>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1221,10 +1145,7 @@ export function TenantForm({
           </div>
 
           {socialHandles.channels.length === 0 ? (
-            <p className="text-sm text-[var(--ink-soft)]">
-              No public contacts yet. Add a Main phone/WhatsApp and Instagram if you
-              have them.
-            </p>
+            <p className="text-sm text-[var(--ink-soft)]">No contacts yet.</p>
           ) : (
             <div className="space-y-3">
               {socialHandles.channels.map((channel, index) => (
@@ -1310,12 +1231,7 @@ export function TenantForm({
 
       <section className={panel === "hours" ? "space-y-5 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-[var(--ink)]">Weekly hours (EAT)</h3>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Used live on every call so the receptionist knows if you are open or closed.
-            </p>
-          </div>
+          <h3 className="text-sm font-medium text-[var(--ink)]">Weekly hours (EAT)</h3>
           <div className="space-y-2">
             {DAY_ORDER.map((day) => {
               const slot = hoursSchedule.days[day];
@@ -1375,14 +1291,7 @@ export function TenantForm({
           </div>
           <div className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-medium text-[var(--ink)]">
-                  Locations &amp; directions
-                </h3>
-                <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                  Landmark-first directions callers can use on the phone.
-                </p>
-              </div>
+              <h3 className="text-sm font-medium text-[var(--ink)]">Locations</h3>
               <button
                 type="button"
                 disabled={locations.length >= LOCATIONS_MAX}
@@ -1420,7 +1329,7 @@ export function TenantForm({
                               [e.target.value, loc.address, loc.landmark]
                                 .map((s) => s.trim())
                                 .filter(Boolean)
-                                .join(" — ") || locationNotes
+                                .join(" · ") || locationNotes
                             );
                           }
                         }}
@@ -1449,7 +1358,7 @@ export function TenantForm({
                               [next.label, next.address, next.landmark]
                                 .map((s) => s.trim())
                                 .filter(Boolean)
-                                .join(" — ")
+                                .join(" · ")
                             );
                           }
                         }}
@@ -1476,7 +1385,7 @@ export function TenantForm({
                             [next.label, next.address, next.landmark]
                               .map((s) => s.trim())
                               .filter(Boolean)
-                              .join(" — ")
+                              .join(" · ")
                           );
                         }
                       }}
@@ -1496,7 +1405,7 @@ export function TenantForm({
                       value={loc.directions}
                       onChange={(e) => updateLocation(index, "directions", e.target.value)}
                       rows={2}
-                      placeholder="From Waiyaki Way, turn at the Shell — we are on the left."
+                      placeholder="From Waiyaki Way, turn at the Shell. We are on the left."
                       className={`${fieldClass} leading-relaxed`}
                     />
                   </div>
@@ -1568,7 +1477,7 @@ export function TenantForm({
           <div>
             <h3 className="text-sm font-medium text-[var(--ink)]">Policies</h3>
             <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Exact rules the receptionist may speak — leave blank if unused.
+              Policies. Leave blank if unused.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1597,49 +1506,27 @@ export function TenantForm({
 
         <div>
           <label className="block text-sm font-medium" htmlFor="unknown_answer_fallback">
-            If a customer asks for something you don&apos;t offer, what should the receptionist
-            say?
+            Unknown request fallback
           </label>
           <textarea
             id="unknown_answer_fallback"
             value={unknownFallback}
             onChange={(e) => setUnknownFallback(e.target.value)}
             rows={2}
-            placeholder={'e.g. "Let me note that down. The boss will call you back today to confirm."'}
+            placeholder={'e.g. "The team will call you back today to confirm."'}
             className={`${fieldClass} leading-relaxed`}
           />
-          <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-            Optional preferred phrasing. Without it, the receptionist admits they
-            don&apos;t have the detail, notes the request, and says the team will
-            follow up — still in the caller&apos;s language.
-          </p>
         </div>
       </section>
 
       <section
         className={panel === "tools" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}
-        aria-labelledby="receptionist-tools-heading"
       >
         <div>
-          <h2
-            id="receptionist-tools-heading"
-            className="font-display text-2xl tracking-tight text-[var(--ink)]"
-          >
-            Receptionist tools
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Turn capabilities on or off, then train how names and places should sound
-            on the phone. Saving a caller&apos;s name and reason always stays on so you
-            never miss a lead.
-          </p>
+          <h3 className="text-sm font-medium text-[var(--ink)]">Tools &amp; voice</h3>
         </div>
         <div className="space-y-2">
-          <div>
-            <p className="text-sm font-medium text-[var(--ink)]">When a human is needed</p>
-            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Callback works today. Live transfer uses callback until telephony transfer ships.
-            </p>
-          </div>
+          <p className="text-sm font-medium text-[var(--ink)]">Handoff</p>
           <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Handoff mode">
             {HANDOFF_OPTIONS.map((opt) => {
               const selected = handoffMode === opt.id;
@@ -1741,17 +1628,7 @@ export function TenantForm({
 
       <section className={panel === "team" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}>
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
-              Team Directory
-            </h2>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              People the AI can escalate to. Their Phone / WhatsApp is the plug-and-play
-              destination when Business messaging is connected. Tip: use role{" "}
-              <span className="font-medium text-[var(--ink)]">General queries</span> as
-              the catch-all when someone asks for a role you have not listed.
-            </p>
-          </div>
+          <h3 className="text-sm font-medium text-[var(--ink)]">Escalation Team</h3>
           <button
             type="button"
             onClick={() => setTeam((prev) => [...prev, emptyMember()])}
@@ -1833,22 +1710,12 @@ export function TenantForm({
       <section
         id="golden-faqs"
         className={panel === "faqs" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}
-        aria-labelledby="golden-faqs-heading"
       >
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2
-              id="golden-faqs-heading"
-              className="font-display text-2xl tracking-tight text-[var(--ink)]"
-            >
-              Golden FAQs
-            </h2>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              Short answers the receptionist must use when callers ask these. Tip: you
-              can also add ideas from a call under Calls.
-            </p>
+            <h3 className="text-sm font-medium text-[var(--ink)]">FAQs</h3>
             <p className="mt-1 text-xs text-[var(--ink-soft)]" aria-live="polite">
-              {filledFaqCount} of {FAQ_MAX} saved
+              {filledFaqCount} of {FAQ_MAX}
             </p>
           </div>
           <button
@@ -1866,10 +1733,7 @@ export function TenantForm({
 
         {filledFaqCount === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3">
-            <p className="text-sm text-[var(--ink)]">Start with a common question</p>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]">
-              Tap one to fill the first blank, then edit it to match your business.
-            </p>
+            <p className="text-sm text-[var(--ink-soft)]">Common questions</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {FAQ_STARTERS.map((starter) => (
                 <button
