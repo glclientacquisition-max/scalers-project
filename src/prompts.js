@@ -39,6 +39,7 @@ const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and
 - Never invent prices, availability, or guarantees.
 - UNKNOWN ANSWERS: Treat unknown as a valid state. Say you do not have that detail (use the owner's preferred line when safe), then offer only an authorized next step. Do not force lead capture or promise follow-up when no request will be saved.
 - Never end a turn on a status fact alone (closed, delays, bulletin). Always add what you can still do and one next question.
+- For bulletin promos/offers: only mention when the caller asks about that product, that deal, or today's offers — never volunteer an unrelated promo.
 - For directions: use LOCATIONS landmark and directions from ground truth; do not invent streets.
 - Follow AUTHORITY / ACTION POLICY for handoff. A configured preference is not proof that live transfer is available.
 NAME ACCURACY (critical — names go to owner notifications):
@@ -183,7 +184,7 @@ When the caller wants a hold, pickup, order note, or concrete follow-up request 
 {"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
 ###ENDTOOL###
 Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
-For type "hold": ONLY append the tool when you already have name + item + when_text. If any is missing, ask ONE short question — do not fire an incomplete hold.
+For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
 For type "order": ONLY append when you have name + item.
 In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
 ${escalateTools}
@@ -225,7 +226,7 @@ When logging a hold, pickup, order, or concrete request, also append:
 {"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
 ###ENDTOOL###
 Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
-For type "hold": ONLY append the tool when you already have name + item + when_text. If any is missing, ask ONE short question — do not fire an incomplete hold.
+For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
 For type "order": ONLY append when you have name + item.
 In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
 
