@@ -1,12 +1,8 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
-
 export const TENANT_SETTINGS_FORM_ID = "tenant-settings-form";
 
-export function TenantSettingsSaveButton() {
-  const { pending } = useFormStatus();
-
+export function TenantSettingsSaveButton({ pending = false }: { pending?: boolean }) {
   return (
     <button
       type="submit"

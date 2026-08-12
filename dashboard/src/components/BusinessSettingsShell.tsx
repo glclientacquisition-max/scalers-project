@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { TenantRow } from "@/lib/supabase";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
@@ -68,6 +69,7 @@ export function BusinessSettingsShell({
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
   const showForm = tab === "catalog" || tab === "train";
   const heading = panelHeading(tab, trainPanel);
+  const [savePending, setSavePending] = useState(false);
 
   return (
     <div className="max-w-5xl">
@@ -83,7 +85,7 @@ export function BusinessSettingsShell({
             </span>
           </p>
         </div>
-        {showForm ? <TenantSettingsSaveButton /> : null}
+        {showForm ? <TenantSettingsSaveButton pending={savePending} /> : null}
       </header>
 
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
@@ -193,6 +195,7 @@ export function BusinessSettingsShell({
                 ].join(":")}
                 tenant={tenant}
                 panel={formPanel}
+                onPendingChange={setSavePending}
               />
             </div>
           ) : null}
