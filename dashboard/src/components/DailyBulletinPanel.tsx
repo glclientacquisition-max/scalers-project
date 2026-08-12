@@ -63,14 +63,14 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   return (
     <section className="space-y-4">
       <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
-        Today
+        Updates
       </h2>
 
       <form action={postAction} className="space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
         <label className="block text-sm font-medium" htmlFor="bulletin_text">
-          Update
+          What should callers know
         </label>
         <input
           id="bulletin_text"
@@ -109,7 +109,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
       {items.length === 0 ? (
         <p className="text-sm text-[var(--ink-soft)]">
-          No updates today. The receptionist will use your normal services and FAQs.
+          No live updates. The assistant will use your normal services and FAQs.
         </p>
       ) : (
         <ul className="space-y-3">

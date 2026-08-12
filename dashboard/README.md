@@ -86,8 +86,8 @@ Hard delete, ledger writes, DID assignment, and prompt compile semantics stay Pl
 3. Apply `docs/supabase/hours_schedule.sql` (adds `hours_schedule` for live open/closed).
 4. Apply `docs/supabase/after_hours_mode.sql` (`serve` vs `message` when closed).
 5. Apply `docs/supabase/services_catalog.sql` (structured services table).
-6. Apply `docs/supabase/daily_bulletin.sql` (Today's updates / temporary overrides).
-7. `/settings` edits structured fields (persona, weekly hours, services, FAQs, team) plus immediate Today's updates.
+6. Apply `docs/supabase/daily_bulletin.sql` (Updates / temporary overrides).
+7. `/settings` edits structured fields (persona, weekly hours, services, FAQs, team) plus immediate Updates.
 8. `saveAndCompileSettings` saves the fields, asks Gemini to write `llm_system_prompt`, and stores the result for the voice engine.
 9. Voice injects a live CONTEXT HEADER (including daily bulletin) plus LIVE GROUND TRUTH on every call.
 
