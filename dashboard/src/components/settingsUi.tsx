@@ -17,7 +17,10 @@ export const settingsSectionClass = "space-y-3";
 
 /** Sticks below the desk shell nav so Save stays visible while scrolling. */
 export const settingsStickyHeaderClass =
-  "sticky top-[4.5rem] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
+  "sticky top-[var(--desk-header-h,4.5rem)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
+
+export const settingsActionClass =
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition hover:border-[#0096FF]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
@@ -30,7 +33,7 @@ export function settingsRadioCardClass(selected: boolean) {
 
 export function settingsChipClass(selected: boolean) {
   return [
-    "rounded-lg border px-3 py-2 text-left text-sm font-medium transition",
+    "inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium transition",
     selected
       ? "border-transparent bg-[#0096FF]/10 text-[#005ccc] ring-1 ring-[#0096FF]"
       : "border-line bg-white text-ink hover:border-[#0096FF]/40",

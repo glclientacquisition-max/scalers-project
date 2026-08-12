@@ -733,7 +733,7 @@ export function TenantForm({
         <TenantSettingsSaveButton pending={pending} />
       </header>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
         {sidebar}
 
         <div className="min-w-0 flex-1 space-y-4">
@@ -899,7 +899,63 @@ export function TenantForm({
           {socialHandles.channels.length === 0 ? (
             <p className="text-sm text-ink-soft">No contacts yet.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-line">
+            <>
+            <div className="space-y-3 md:hidden">
+              {socialHandles.channels.map((channel, index) => (
+                <div
+                  key={`social-m-${index}`}
+                  className="space-y-2 rounded-xl border border-line bg-white p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                      Contact {index + 1}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => removeSocialChannel(index)}
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-surface hover:text-warn"
+                      aria-label={`Remove contact ${index + 1}`}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-kind-m-${index}`}>Type</label>
+                    <select
+                      id={`social-kind-m-${index}`}
+                      value={channel.kind}
+                      onChange={(e) => updateSocialChannel(index, "kind", e.target.value)}
+                      className={`${denseFieldClass} mt-1`}
+                    >
+                      {SOCIAL_CHANNEL_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>{k.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-label-m-${index}`}>Label</label>
+                    <input
+                      id={`social-label-m-${index}`}
+                      value={channel.label}
+                      onChange={(e) => updateSocialChannel(index, "label", e.target.value)}
+                      placeholder="Main"
+                      className={`${denseFieldClass} mt-1`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-value-m-${index}`}>Handle / URL</label>
+                    <input
+                      id={`social-value-m-${index}`}
+                      value={channel.value}
+                      onChange={(e) => updateSocialChannel(index, "value", e.target.value)}
+                      placeholder={SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)?.placeholder || ""}
+                      className={`${denseFieldClass} mt-1 [overflow-wrap:anywhere]`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-hidden rounded-xl border border-line md:block">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
@@ -981,6 +1037,7 @@ export function TenantForm({
                 </table>
               </div>
             </div>
+            </>
           )}
         </div>
       </section>
@@ -1086,7 +1143,56 @@ export function TenantForm({
             </div>
           ) : null}
 
-          <div className="overflow-hidden rounded-xl border border-line">
+          <div className="space-y-3 md:hidden">
+            {visibleServices.map((service, localIndex) => {
+              const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
+              return (
+                <div key={`service-m-${index}`} className="space-y-2 rounded-xl border border-line bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Service {index + 1}</p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setServices((prev) =>
+                          prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
+                        )
+                      }
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-surface hover:text-warn"
+                      aria-label={`Remove service ${index + 1}`}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-name-m-${index}`}>Name</label>
+                    <input id={`svc-name-m-${index}`} value={service.name} onChange={(e) => updateService(index, "name", e.target.value)} placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"} className={`${denseFieldClass} mt-1`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-price-m-${index}`}>Price</label>
+                    <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder="from 2,500 KES" className={`${denseFieldClass} mt-1`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-notes-m-${index}`}>Notes</label>
+                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={`${denseFieldClass} mt-1`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-oos-m-${index}`}>Out of scope</label>
+                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} placeholder="No commercial offices" className={`${denseFieldClass} mt-1`} />
+                  </div>
+                </div>
+              );
+            })}
+            <CatalogPager
+              page={safeServicePage}
+              pageSize={SERVICE_PAGE_SIZE}
+              total={services.length}
+              noun="service"
+              onPrev={() => setServicePage((p) => Math.max(0, p - 1))}
+              onNext={() => setServicePage((p) => Math.min(servicePageCount - 1, p + 1))}
+            />
+          </div>
+
+          <div className="hidden overflow-hidden rounded-xl border border-line md:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
@@ -1272,7 +1378,52 @@ export function TenantForm({
           {products.length === 0 ? (
             <p className="text-sm text-[var(--ink-soft)]">No products yet.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-line">
+            <>
+            <div className="space-y-3 md:hidden">
+              {visibleProducts.map((product, localIndex) => {
+                const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
+                return (
+                  <div key={`product-m-${index}`} className="space-y-2 rounded-xl border border-line bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Product {index + 1}</p>
+                      <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:text-warn" aria-label={`Remove product ${index + 1}`}>
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-name-m-${index}`}>Name</label>
+                      <input id={`prod-name-m-${index}`} value={product.name} onChange={(e) => updateProduct(index, "name", e.target.value)} placeholder="Atomic Habits" className={`${denseFieldClass} mt-1`} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-price-m-${index}`}>Price</label>
+                      <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="2,500 KES" className={`${denseFieldClass} mt-1`} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-cat-m-${index}`}>Category</label>
+                      <input id={`prod-cat-m-${index}`} value={product.category} onChange={(e) => updateProduct(index, "category", e.target.value)} placeholder="Self-help" className={`${denseFieldClass} mt-1`} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-stock-m-${index}`}>Stock</label>
+                      <select id={`prod-stock-m-${index}`} value={product.in_stock || ""} onChange={(e) => updateProduct(index, "in_stock", e.target.value)} className={`${denseFieldClass} mt-1`}>
+                        <option value="">Not set</option>
+                        <option value="yes">In stock</option>
+                        <option value="no">Out of stock</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+              <CatalogPager
+                page={safeProductPage}
+                pageSize={PRODUCT_PAGE_SIZE}
+                total={products.length}
+                noun="product"
+                onPrev={() => setProductPage((p) => Math.max(0, p - 1))}
+                onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
+              />
+            </div>
+            <div className="hidden overflow-hidden rounded-xl border border-line md:block">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
@@ -1367,6 +1518,7 @@ export function TenantForm({
                 onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
               />
             </div>
+            </>
           )}
         </div>
       </section>
@@ -1380,7 +1532,7 @@ export function TenantForm({
               return (
                 <div
                   key={day}
-                  className="grid grid-cols-[7rem_auto_1fr] items-center gap-3 sm:grid-cols-[8.5rem_auto_1fr_1fr]"
+                  className="flex min-w-0 flex-col gap-2 rounded-lg border border-line/70 bg-white/60 px-3 py-2.5 sm:grid sm:grid-cols-[8.5rem_auto_1fr_1fr] sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
                 >
                   <span className="text-sm font-medium text-[var(--ink)]">
                     {DAY_LABELS[day]}
@@ -1389,7 +1541,7 @@ export function TenantForm({
                     type="button"
                     onClick={() => setDayOpen(day, !open)}
                     className={[
-                      "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                      "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium transition",
                       open
                         ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
                         : "border-[var(--line)] text-[var(--ink-soft)]",
@@ -1398,7 +1550,7 @@ export function TenantForm({
                     {open ? "Open" : "Closed"}
                   </button>
                   {open && slot ? (
-                    <div className="col-span-1 flex flex-wrap items-center gap-2 sm:col-span-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 sm:col-span-2">
                       <label className="sr-only" htmlFor={`open-${day}`}>
                         Opens
                       </label>
@@ -1407,7 +1559,7 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
                       />
                       <span className="text-xs text-[var(--ink-soft)]">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
@@ -1418,7 +1570,7 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
                       />
                     </div>
                   ) : (
