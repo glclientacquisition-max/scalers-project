@@ -129,7 +129,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             <input type="hidden" name="tenant_id" value={tenant.id} />
             <input type="hidden" name="source_mode" value={mode} />
             {mode === "url" ? (
-              <div>
+              <div className="flex flex-col gap-1.5">
                 <label className="block text-sm font-medium" htmlFor="catalog_url">
                   Catalogue page URL
                 </label>
@@ -140,9 +140,9 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://yourshop.co.ke/shop"
-                  className={fieldClass}
+                  className={`${fieldClass} mt-0`}
                 />
-                <div className="mt-3 flex justify-end">
+                <div className="flex justify-end self-end">
                   <button
                     type="submit"
                     disabled={previewPending}
@@ -153,7 +153,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                 </div>
               </div>
             ) : (
-              <div>
+              <div className="flex flex-col gap-1.5">
                 <label className="block text-sm font-medium" htmlFor="catalog_paste">
                   {mode === "csv" ? "Paste CSV rows" : "Paste product list"}
                 </label>
@@ -168,9 +168,9 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                       ? "name,price,category,in_stock,sku\nAtomic Habits,2500 KES,Self-help,yes,\nRich Dad Poor Dad,1800 KES,Finance,yes,"
                       : "Atomic Habits - 2,500 KES\nRich Dad Poor Dad - 1,800 KES"
                   }
-                  className={`${fieldClass} text-sm leading-relaxed`}
+                  className={`${fieldClass} mt-0 text-sm leading-relaxed`}
                 />
-                <div className="mt-3 flex justify-end">
+                <div className="flex justify-end self-end">
                   <button
                     type="submit"
                     disabled={previewPending}

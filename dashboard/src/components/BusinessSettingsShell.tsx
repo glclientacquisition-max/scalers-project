@@ -79,8 +79,8 @@ function SettingsSidebar({
           </li>
         ))}
 
-        <li className="pt-2">
-          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+        <li>
+          <p className="mt-6 mb-2 px-3 text-xs font-bold uppercase tracking-wider text-gray-500 pointer-events-none select-none">
             Train
           </p>
           <ul className="space-y-0.5">

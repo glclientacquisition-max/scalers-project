@@ -195,7 +195,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             <input type="hidden" name="source_mode" value={mode} />
 
             {mode === "paste" ? (
-              <div>
+              <div className="flex flex-col gap-1.5">
                 <label className="block text-sm font-medium" htmlFor="ingest_paste">
                   Paste your menu, overview, or FAQs
                 </label>
@@ -208,9 +208,9 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   placeholder={
                     "ChapterOne Bookstore, Nairobi CBD\nMon-Sat 9am-7pm\nSame-day Nairobi delivery\n\nOr a menu:\nHome cleaning - from 2,500 KES\n\nQ: Do you cover Westlands?\nA: Yes, same-day when booked before noon."
                   }
-                  className={`${fieldClass} leading-relaxed`}
+                  className={`${fieldClass} mt-0 leading-relaxed`}
                 />
-                <div className="mt-3 flex justify-end">
+                <div className="flex justify-end self-end">
                   <button
                     type="submit"
                     disabled={extractPending}
@@ -221,7 +221,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 </div>
               </div>
             ) : (
-              <div>
+              <div className="flex flex-col gap-1.5">
                 <label className="block text-sm font-medium" htmlFor="ingest_url">
                   Website link
                 </label>
@@ -232,12 +232,12 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://yourbusiness.co.ke/services"
-                  className={fieldClass}
+                  className={`${fieldClass} mt-0`}
                 />
-                <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
+                <p className="text-xs text-[var(--ink-soft)]">
                   Public pages only. If the scan is thin, paste the text instead.
                 </p>
-                <div className="mt-3 flex justify-end">
+                <div className="flex justify-end self-end">
                   <button
                     type="submit"
                     disabled={extractPending}
