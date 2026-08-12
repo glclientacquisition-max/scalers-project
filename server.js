@@ -155,7 +155,7 @@ app.get('/healthz', (_req, res) => {
       defaultVoice: resolveSonioxVoice(),
       curatedVoices: listCuratedVoices().map((v) => ({
         id: v.id,
-        label: v.label,
+        description: v.description,
         default: v.default,
       })),
     },

@@ -2,7 +2,7 @@ import catalog from "@/data/soniox-voices.json";
 
 export type CuratedSonioxVoice = {
   id: string;
-  label: string;
+  /** Optional Scalers ops hint — not shown as the voice name to owners. */
   description?: string;
   default?: boolean;
 };
@@ -12,7 +12,6 @@ export function listCuratedSonioxVoices(): CuratedSonioxVoice[] {
   return voices
     .map((v) => ({
       id: String(v?.id || "").trim(),
-      label: String(v?.label || "").trim() || "Voice",
       description: String(v?.description || "").trim(),
       default: Boolean(v?.default),
     }))
@@ -38,11 +37,22 @@ export function parseSonioxVoiceId(raw: FormDataEntryValue | string | null | und
   return isAllowedSonioxVoiceId(id) ? id : null;
 }
 
-export function resolveSonioxVoiceLabel(voiceId: string | null | undefined): string {
+export function parseSonioxVoiceLabel(
+  raw: FormDataEntryValue | string | null | undefined
+): string | null {
+  const label = String(raw || "").trim();
+  if (!label) return null;
+  return label.slice(0, 40);
+}
+
+export function displaySonioxVoiceLabel(
+  ownerLabel: string | null | undefined,
+  voiceId: string | null | undefined
+): string {
+  const custom = String(ownerLabel || "").trim();
+  if (custom) return custom;
   const id = String(voiceId || "").trim();
   const match = listCuratedSonioxVoices().find((v) => v.id === id);
-  if (match) return match.label;
-  const fallback = getDefaultSonioxVoiceId();
-  const defaultVoice = listCuratedSonioxVoices().find((v) => v.id === fallback);
-  return defaultVoice?.label || "Default";
+  if (match?.description) return match.description;
+  return "Default phone voice";
 }

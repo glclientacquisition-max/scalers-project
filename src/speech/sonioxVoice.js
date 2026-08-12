@@ -119,28 +119,28 @@ async function ensureSonioxVoiceReady(opts = {}) {
   for (const voice of voices) {
     let status = await fetchVoiceModelStatus(model, voice.id);
     if (status.ok) {
-      log(`✓ Soniox voice ready label=${voice.label} model=${model} voice=${voice.id}`);
+      log(`✓ Soniox voice ready model=${model} voice=${voice.id}${voice.description ? ` (${voice.description})` : ''}`);
       continue;
     }
 
     if (status.status === 'not_computed') {
-      log(`ℹ Soniox voice ${voice.label} not prepared for ${model} — recompute…`);
+      log(`ℹ Soniox voice ${voice.id} not prepared for ${model} — recompute…`);
       const recompute = await recomputeVoiceForModel(model, voice.id);
       if (!recompute.ok) {
-        log(`⚠ Soniox voice recompute failed (${voice.label}): ${recompute.error}`);
+        log(`⚠ Soniox voice recompute failed (${voice.id}): ${recompute.error}`);
         allOk = false;
         continue;
       }
       status = await fetchVoiceModelStatus(model, voice.id);
       if (status.ok) {
-        log(`✓ Soniox voice ready after recompute label=${voice.label}`);
+        log(`✓ Soniox voice ready after recompute voice=${voice.id}`);
         continue;
       }
     }
 
     allOk = false;
     log(
-      `⚠ Soniox voice not ready label=${voice.label} model=${model} status=${status.status || 'unknown'} — ${status.error || ''}`
+      `⚠ Soniox voice not ready voice=${voice.id} model=${model} status=${status.status || 'unknown'} — ${status.error || ''}`
     );
   }
 

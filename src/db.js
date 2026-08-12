@@ -636,12 +636,12 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, vertical, handoff_mode, business_locations, business_policies, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
 
-  if (error && /soniox_voice_id/i.test(error.message)) {
+  if (error && /soniox_voice_id|soniox_voice_label/i.test(error.message)) {
     ({ data, error } = await supabase
       .from('tenants')
       .select(
@@ -789,6 +789,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       agentTools: { escalate: true, end_call: true },
       ttsLexicon: [],
       sonioxVoiceId: null,
+      sonioxVoiceLabel: null,
       vertical: 'general',
       handoffMode: 'callback',
       businessLocations: [],
@@ -829,6 +830,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     agentTools: parseAgentTools(row.agent_tools),
     ttsLexicon: parseLexiconOverrides(row.tts_lexicon),
     sonioxVoiceId: row.soniox_voice_id || null,
+    sonioxVoiceLabel: row.soniox_voice_label || null,
     vertical: parseVertical(row.vertical),
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],

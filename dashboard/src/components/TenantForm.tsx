@@ -68,6 +68,7 @@ import {
   type HandoffMode,
 } from "@/lib/handoffMode";
 import {
+  displaySonioxVoiceLabel,
   getDefaultSonioxVoiceId,
   isAllowedSonioxVoiceId,
   listCuratedSonioxVoices,
@@ -322,6 +323,9 @@ export function TenantForm({
   );
   const [sonioxVoiceId, setSonioxVoiceId] = useState(() =>
     initialSonioxVoiceId(tenant)
+  );
+  const [sonioxVoiceLabel, setSonioxVoiceLabel] = useState(
+    () => String(tenant.soniox_voice_label || "").trim()
   );
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
     const rows = normalizeTeam(tenant.team_directory);
@@ -637,6 +641,7 @@ export function TenantForm({
       <input type="hidden" name="tool_escalate" value={agentTools.escalate ? "1" : "0"} />
       <input type="hidden" name="tool_end_call" value={agentTools.end_call ? "1" : "0"} />
       <input type="hidden" name="soniox_voice_id" value={sonioxVoiceId} />
+      <input type="hidden" name="soniox_voice_label" value={sonioxVoiceLabel} />
 
       <section className={panel === "identity" ? "space-y-5" : "hidden"}>
         <div>
@@ -1649,24 +1654,18 @@ export function TenantForm({
             never miss a lead.
           </p>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              The Soniox voice callers hear on live calls. Save &amp; train after
-              changing.
+              Pick how {agentName || "your receptionist"} sounds on live calls.
+              Callers still hear the agent name from Identity above — this is the
+              sound only. Save &amp; train after changing.
             </p>
           </div>
-          {CURATED_SONIOX_VOICES.length <= 1 ? (
-            <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)]">
-              {CURATED_SONIOX_VOICES[0]?.label || "Default"}
-              {CURATED_SONIOX_VOICES[0]?.description
-                ? ` — ${CURATED_SONIOX_VOICES[0].description}`
-                : ""}
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Phone voice">
-              {CURATED_SONIOX_VOICES.map((voice) => {
+          {CURATED_SONIOX_VOICES.length > 1 ? (
+            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Phone voice profile">
+              {CURATED_SONIOX_VOICES.map((voice, index) => {
                 const selected = sonioxVoiceId === voice.id;
                 return (
                   <button
@@ -1682,7 +1681,9 @@ export function TenantForm({
                         : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
                     ].join(" ")}
                   >
-                    <span className="font-medium text-[var(--ink)]">{voice.label}</span>
+                    <span className="font-medium text-[var(--ink)]">
+                      Voice option {index + 1}
+                    </span>
                     {voice.description ? (
                       <span className="mt-1 block text-sm text-[var(--ink-soft)]">
                         {voice.description}
@@ -1692,7 +1693,36 @@ export function TenantForm({
                 );
               })}
             </div>
-          )}
+          ) : CURATED_SONIOX_VOICES[0]?.description ? (
+            <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink-soft)]">
+              {CURATED_SONIOX_VOICES[0].description}
+            </p>
+          ) : null}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="soniox_voice_label">
+              Name this voice
+            </label>
+            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+              Your label for this sound — only your team sees it here.
+            </p>
+            <input
+              id="soniox_voice_label"
+              type="text"
+              maxLength={40}
+              value={sonioxVoiceLabel}
+              onChange={(e) => setSonioxVoiceLabel(e.target.value)}
+              placeholder="e.g. Front desk voice"
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
+            />
+            {sonioxVoiceLabel.trim() || sonioxVoiceId ? (
+              <p className="mt-2 text-xs text-[var(--ink-soft)]">
+                Selected:{" "}
+                <span className="font-medium text-[var(--ink)]">
+                  {displaySonioxVoiceLabel(sonioxVoiceLabel, sonioxVoiceId)}
+                </span>
+              </p>
+            ) : null}
+          </div>
         </div>
         <div className="space-y-2">
           <div>

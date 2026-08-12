@@ -221,6 +221,8 @@ export type TenantRow = {
   }> | null;
   /** Curated Soniox cloned voice UUID; null uses platform default. */
   soniox_voice_id?: string | null;
+  /** Owner label for phone voice profile (desk only). */
+  soniox_voice_label?: string | null;
   wallet_balance_kes?: number | null;
   wallet_low_balance_kes?: number | null;
   billing_enforcement?: "soft" | "hard" | "off" | null;

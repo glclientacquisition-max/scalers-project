@@ -2,7 +2,7 @@
 const catalog = require('../../dashboard/src/data/soniox-voices.json');
 
 /**
- * @typedef {{ id: string, label: string, description?: string, default?: boolean }} CuratedVoice
+ * @typedef {{ id: string, description?: string, default?: boolean }} CuratedVoice
  */
 
 /** @returns {CuratedVoice[]} */
@@ -11,7 +11,6 @@ function listCuratedVoices() {
   return voices
     .map((v) => ({
       id: String(v?.id || '').trim(),
-      label: String(v?.label || '').trim() || 'Voice',
       description: String(v?.description || '').trim(),
       default: Boolean(v?.default),
     }))
