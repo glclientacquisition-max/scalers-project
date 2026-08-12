@@ -12,6 +12,7 @@ import {
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
+import { settingsStickyHeaderClass } from "@/components/settingsUi";
 
 const PRIMARY_NAV = [
   { id: "today", label: "Today" },
@@ -164,11 +165,13 @@ export function BusinessSettingsShell({
         />
       ) : (
         <>
-          <header className="sticky top-0 z-20 -mx-4 mb-8 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
-            <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
-              Business
-            </h1>
-            <BusinessLine tenant={tenant} />
+          <header className={settingsStickyHeaderClass}>
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+                Business
+              </h1>
+              <BusinessLine tenant={tenant} />
+            </div>
           </header>
 
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start">

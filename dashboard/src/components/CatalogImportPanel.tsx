@@ -11,9 +11,12 @@ import {
   previewCatalogImportAction,
   type CatalogImportState,
 } from "@/app/(desk)/settings/catalogActions";
+import {
+  settingsFieldClass,
+  settingsRadioCardClass,
+} from "@/components/settingsUi";
 
-const fieldClass =
-  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus";
+const fieldClass = settingsFieldClass;
 
 const initial: CatalogImportState = {};
 
@@ -110,12 +113,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                 key={opt.id}
                 type="button"
                 onClick={() => setMode(opt.id)}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left text-sm",
-                  mode === opt.id
-                    ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                    : "border-[var(--line)] bg-white",
-                ].join(" ")}
+                className={settingsRadioCardClass(mode === opt.id)}
               >
                 <span className="font-medium text-[var(--ink)]">{opt.label}</span>
                 <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">

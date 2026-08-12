@@ -90,6 +90,17 @@ import {
   TENANT_SETTINGS_FORM_ID,
 } from "@/components/TenantSettingsSaveButton";
 import {
+  ExpandTextarea,
+  settingsDenseFieldClass,
+  settingsFieldClass,
+  settingsRadioCardClass,
+  settingsSectionClass,
+  settingsStickyHeaderClass,
+  settingsTableFieldClass,
+  ToolSwitch,
+  TrashButton,
+} from "@/components/settingsUi";
+import {
   parseTtsLexicon,
   lexiconForStorage,
   type TtsLexiconEntry,
@@ -98,23 +109,11 @@ import type { SettingsPanel } from "@/lib/businessSettingsNav";
 
 export type { SettingsPanel } from "@/lib/businessSettingsNav";
 
-const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
-  {
-    id: "professional",
-    blurb: "Calm and clear",
-  },
-  {
-    id: "friendly",
-    blurb: "Warm and helpful",
-  },
-  {
-    id: "empathetic",
-    blurb: "Steady and caring",
-  },
-  {
-    id: "localized",
-    blurb: "Natural Kenyan voice",
-  },
+const TONE_OPTIONS: OnboardingTone[] = [
+  "professional",
+  "friendly",
+  "empathetic",
+  "localized",
 ];
 
 function initialSonioxVoiceId(
@@ -185,96 +184,9 @@ function extractLocationFallback(businessHours: string): string {
 
 const initial: SettingsCompileState = {};
 
-const fieldClass =
-  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40 focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
-
-const tableFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40 focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
-
-const denseFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
-
-function PolicyTextarea({
-  id,
-  value,
-  onChange,
-  placeholder,
-}: {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <textarea
-      id={id}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      rows={2}
-      onFocus={(e) => {
-        e.currentTarget.rows = 4;
-      }}
-      onBlur={(e) => {
-        e.currentTarget.rows = 2;
-      }}
-      placeholder={placeholder}
-      className={`${fieldClass} mt-1 py-2 leading-relaxed`}
-    />
-  );
-}
-
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  );
-}
-
-function ToolSwitch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={[
-        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
-        checked ? "bg-[#0096FF]" : "bg-line",
-      ].join(" ")}
-    >
-      <span
-        className={[
-          "inline-block h-5 w-5 rounded-full bg-white shadow transition",
-          checked ? "translate-x-6" : "translate-x-1",
-        ].join(" ")}
-      />
-    </button>
-  );
-}
+const fieldClass = settingsFieldClass;
+const tableFieldClass = settingsTableFieldClass;
+const denseFieldClass = settingsDenseFieldClass;
 
 const SERVICE_PAGE_SIZE = 5;
 const PRODUCT_PAGE_SIZE = 8;
@@ -774,7 +686,7 @@ export function TenantForm({
 
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
-      <header className="sticky top-0 z-20 -mx-4 mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-canvas/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+      <header className={settingsStickyHeaderClass}>
         <div className="min-w-0">
           <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
             Business
@@ -835,12 +747,7 @@ export function TenantForm({
                   key={opt.id}
                   type="button"
                   onClick={() => setVertical(opt.id)}
-                  className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
-                    selected
-                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
-                  ].join(" ")}
+                  className={settingsRadioCardClass(selected)}
                 >
                   <span className="font-medium text-[var(--ink)]">{opt.label}</span>
                 </button>
@@ -881,21 +788,16 @@ export function TenantForm({
           <p className="block text-sm font-medium">Tone</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {TONE_OPTIONS.map((opt) => {
-              const selected = tone === opt.id;
+              const selected = tone === opt;
               return (
                 <button
-                  key={opt.id}
+                  key={opt}
                   type="button"
-                  onClick={() => setTone(opt.id)}
-                  className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
-                    selected
-                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                      : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
-                  ].join(" ")}
+                  onClick={() => setTone(opt)}
+                  className={settingsRadioCardClass(selected)}
                 >
                   <span className="font-medium text-[var(--ink)]">
-                    {TONE_LABELS[opt.id]}
+                    {TONE_LABELS[opt]}
                   </span>
                 </button>
               );
@@ -1047,18 +949,14 @@ export function TenantForm({
                   <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                     Service {index + 1}
                   </p>
-                  <button
-                    type="button"
+                  <TrashButton
+                    label={`Remove service ${index + 1}`}
                     onClick={() =>
                       setServices((prev) =>
                         prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
                       )
                     }
-                    className="text-sm text-[var(--ink-soft)] hover:text-[var(--warn)]"
-                    aria-label={`Remove service ${index + 1}`}
-                  >
-                    Remove
-                  </button>
+                  />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
@@ -1273,16 +1171,13 @@ export function TenantForm({
                               <option value="unknown">Unknown</option>
                             </select>
                           </td>
-                          <td className="px-3 py-2">
-                            <button
-                              type="button"
+                          <td className="px-2 py-1.5">
+                            <TrashButton
+                              label={`Remove product ${index + 1}`}
                               onClick={() =>
                                 setProducts((prev) => prev.filter((_, i) => i !== index))
                               }
-                              className="text-sm font-medium text-ink-soft hover:text-warn"
-                            >
-                              Remove
-                            </button>
+                            />
                           </td>
                         </tr>
                       );
@@ -1403,14 +1298,10 @@ export function TenantForm({
                           />
                         </td>
                         <td className="px-2 py-1.5">
-                          <button
-                            type="button"
+                          <TrashButton
+                            label={`Remove contact ${index + 1}`}
                             onClick={() => removeSocialChannel(index)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
-                            aria-label={`Remove contact ${index + 1}`}
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
+                          />
                         </td>
                       </tr>
                     ))}
@@ -1422,7 +1313,7 @@ export function TenantForm({
         </div>
       </section>
 
-      <section className={panel === "hours" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}>
+      <section className={panel === "hours" ? settingsSectionClass : "hidden"}>
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-[var(--ink)]">Hours</h3>
           <div className="space-y-1.5">
@@ -1620,15 +1511,14 @@ export function TenantForm({
                     />
                   </div>
                   {locations.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setLocations((prev) => prev.filter((_, i) => i !== index))
-                      }
-                      className="text-xs text-[var(--warn)] hover:underline"
-                    >
-                      Remove location
-                    </button>
+                    <div className="flex justify-end">
+                      <TrashButton
+                        label={`Remove location ${index + 1}`}
+                        onClick={() =>
+                          setLocations((prev) => prev.filter((_, i) => i !== index))
+                        }
+                      />
+                    </div>
                   ) : null}
                 </div>
               ))}
@@ -1637,7 +1527,7 @@ export function TenantForm({
 
           <div>
             <p className="block text-sm font-medium">After hours</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {AFTER_HOURS_OPTIONS.map((opt) => {
                 const selected = afterHoursMode === opt.id;
                 return (
@@ -1645,12 +1535,7 @@ export function TenantForm({
                     key={opt.id}
                     type="button"
                     onClick={() => setAfterHoursMode(opt.id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-3 transition duration-200",
-                      selected
-                        ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                        : "border-[var(--line)] bg-white hover:border-[#0096FF]/40",
-                    ].join(" ")}
+                    className={settingsRadioCardClass(selected)}
                   >
                     <span className="font-medium text-[var(--ink)]">{opt.label}</span>
                   </button>
@@ -1671,7 +1556,7 @@ export function TenantForm({
                 >
                   {field.label}
                 </label>
-                <PolicyTextarea
+                <ExpandTextarea
                   id={`policy-${field.id}`}
                   value={policies[field.id]}
                   onChange={(value) =>
@@ -1688,7 +1573,7 @@ export function TenantForm({
           <label className="block text-sm font-medium" htmlFor="unknown_answer_fallback">
             Unknown fallback
           </label>
-          <PolicyTextarea
+          <ExpandTextarea
             id="unknown_answer_fallback"
             value={unknownFallback}
             onChange={setUnknownFallback}
@@ -1698,7 +1583,7 @@ export function TenantForm({
       </section>
 
       <section
-        className={panel === "tools" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}
+        className={panel === "tools" ? settingsSectionClass : "hidden"}
       >
         <div>
           <h3 className="text-sm font-medium text-[var(--ink)]">Tools &amp; voice</h3>
@@ -1721,12 +1606,7 @@ export function TenantForm({
                     role="radio"
                     aria-checked={selected}
                     onClick={() => setSonioxVoiceId(voice.id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-3 transition",
-                      selected
-                        ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                        : "border-line bg-white hover:border-[#0096FF]/40",
-                    ].join(" ")}
+                    className={settingsRadioCardClass(selected)}
                   >
                     <span className="font-medium text-[var(--ink)]">
                       Voice option {index + 1}
@@ -1806,12 +1686,7 @@ export function TenantForm({
                   role="radio"
                   aria-checked={selected}
                   onClick={() => setHandoffMode(opt.id)}
-                  className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition",
-                    selected
-                      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-                      : "border-line bg-white hover:border-[#0096FF]/40",
-                  ].join(" ")}
+                  className={settingsRadioCardClass(selected)}
                 >
                   <span className="font-medium text-[var(--ink)]">{opt.label}</span>
                   <span className="mt-1 block text-sm text-[var(--ink-soft)]">
@@ -1882,90 +1757,107 @@ export function TenantForm({
         ) : null}
       </section>
 
-      <section className={panel === "team" ? "space-y-4 border-t border-[var(--line)] pt-8" : "hidden"}>
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <section className={panel === "team" ? settingsSectionClass : "hidden"}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium text-[var(--ink)]">Escalation Team</h3>
           <button
             type="button"
             onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-            className="rounded-xl border border-[var(--accent)]/40 px-3 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-[#0096FF]/10"
           >
             Add teammate
           </button>
         </div>
 
-        <div className="space-y-4">
-          {team.map((member, index) => (
-            <div key={`team-${index}`} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
-              <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-name-${index}`}>
-                  Name
-                </label>
-                <input
-                  id={`team-name-${index}`}
-                  value={member.name}
-                  onChange={(e) => updateTeam(index, "name", e.target.value)}
-                  placeholder="Jane Doe"
-                  className={fieldClass}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-role-${index}`}>
-                  Role
-                </label>
-                <input
-                  id={`team-role-${index}`}
-                  value={member.role}
-                  onChange={(e) => updateTeam(index, "role", e.target.value)}
-                  placeholder="General queries"
-                  className={fieldClass}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-phone-${index}`}>
-                  Phone / WhatsApp
-                </label>
-                <input
-                  id={`team-phone-${index}`}
-                  value={member.phone}
-                  onChange={(e) => updateTeam(index, "phone", e.target.value)}
-                  placeholder="+2547…"
-                  className={fieldClass}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-email-${index}`}>
-                  Email
-                </label>
-                <input
-                  id={`team-email-${index}`}
-                  type="email"
-                  value={member.email || ""}
-                  onChange={(e) => updateTeam(index, "email", e.target.value)}
-                  placeholder="jane@…"
-                  className={fieldClass}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setTeam((prev) =>
-                    prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
-                  )
-                }
-                className="mb-0.5 inline-flex h-[46px] w-11 items-center justify-center rounded-xl text-ink-soft transition hover:bg-surface hover:text-warn"
-                aria-label={`Remove teammate ${index + 1}`}
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+        <div className="overflow-hidden rounded-xl border border-line">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  <th className="px-3 py-2 font-medium">Name</th>
+                  <th className="px-3 py-2 font-medium">Role</th>
+                  <th className="px-3 py-2 font-medium">Phone</th>
+                  <th className="px-3 py-2 font-medium">Email</th>
+                  <th className="px-3 py-2 font-medium w-12">
+                    <span className="sr-only">Action</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line bg-white">
+                {team.map((member, index) => (
+                  <tr key={`team-${index}`} className="align-middle">
+                    <td className="px-3 py-1.5">
+                      <label className="sr-only" htmlFor={`team-name-${index}`}>
+                        Name
+                      </label>
+                      <input
+                        id={`team-name-${index}`}
+                        value={member.name}
+                        onChange={(e) => updateTeam(index, "name", e.target.value)}
+                        placeholder="Jane Doe"
+                        className={denseFieldClass}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <label className="sr-only" htmlFor={`team-role-${index}`}>
+                        Role
+                      </label>
+                      <input
+                        id={`team-role-${index}`}
+                        value={member.role}
+                        onChange={(e) => updateTeam(index, "role", e.target.value)}
+                        placeholder="General queries"
+                        className={denseFieldClass}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <label className="sr-only" htmlFor={`team-phone-${index}`}>
+                        Phone
+                      </label>
+                      <input
+                        id={`team-phone-${index}`}
+                        value={member.phone}
+                        onChange={(e) => updateTeam(index, "phone", e.target.value)}
+                        placeholder="+2547…"
+                        className={denseFieldClass}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <label className="sr-only" htmlFor={`team-email-${index}`}>
+                        Email
+                      </label>
+                      <input
+                        id={`team-email-${index}`}
+                        type="email"
+                        value={member.email || ""}
+                        onChange={(e) => updateTeam(index, "email", e.target.value)}
+                        placeholder="jane@…"
+                        className={denseFieldClass}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <TrashButton
+                        label={`Remove teammate ${index + 1}`}
+                        onClick={() =>
+                          setTeam((prev) =>
+                            prev.length <= 1
+                              ? [emptyMember()]
+                              : prev.filter((_, i) => i !== index)
+                          )
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
       <section
         id="golden-faqs"
-        className={panel === "faqs" ? "space-y-3 border-t border-[var(--line)] pt-6" : "hidden"}
+        className={panel === "faqs" ? settingsSectionClass : "hidden"}
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
@@ -2024,18 +1916,14 @@ export function TenantForm({
                 <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                   FAQ {index + 1}
                 </p>
-                <button
-                  type="button"
+                <TrashButton
+                  label={`Remove FAQ ${index + 1}`}
                   onClick={() =>
                     setFaqs((prev) =>
                       prev.length <= 1 ? [emptyFaq()] : prev.filter((_, i) => i !== index)
                     )
                   }
-                  className="text-xs text-[var(--ink-soft)] hover:text-[var(--warn)]"
-                  aria-label={`Remove FAQ ${index + 1}`}
-                >
-                  Remove
-                </button>
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`faq-q-${index}`}>
@@ -2051,7 +1939,7 @@ export function TenantForm({
                   aria-describedby={
                     faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
                   }
-                  className={`${fieldClass} mt-1 py-2`}
+                  className={fieldClass}
                 />
                 {faqDupIndexes.has(index) ? (
                   <p id={`faq-dup-${index}`} className="mt-1 text-xs text-[var(--warn)]" role="status">
@@ -2063,14 +1951,12 @@ export function TenantForm({
                 <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`faq-a-${index}`}>
                   Answer
                 </label>
-                <textarea
+                <ExpandTextarea
                   id={`faq-a-${index}`}
                   value={faq.answer}
                   maxLength={FAQ_ANSWER_MAX}
-                  onChange={(e) => updateFaq(index, "answer", e.target.value)}
-                  rows={2}
+                  onChange={(value) => updateFaq(index, "answer", value)}
                   placeholder="Yes, free parking behind the building."
-                  className={`${fieldClass} mt-1 py-2 leading-relaxed`}
                 />
                 <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
                   {faq.answer.length}/{FAQ_ANSWER_MAX}
