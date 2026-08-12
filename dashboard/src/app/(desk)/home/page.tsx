@@ -30,19 +30,19 @@ function MetricCard({
     <Link
       href={href}
       className={[
-        "block min-w-0 rounded-2xl border px-4 py-6 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 sm:px-6 sm:py-7",
+        "flex min-h-[5.5rem] min-w-0 flex-col justify-center rounded-2xl border px-3 py-3 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 sm:min-h-[6.5rem] sm:px-4 sm:py-4",
         warn
           ? "border-warn/45 bg-warn-soft hover:border-warn"
           : "border-line bg-surface hover:border-[#0096FF]/45",
       ].join(" ")}
     >
-      <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-ink-soft sm:text-xs">
+      <p className="text-[0.625rem] font-medium uppercase tracking-wide text-ink-soft sm:text-[0.6875rem]">
         {label}
       </p>
       <p
         className={[
-          "mt-2 font-display tracking-tight [overflow-wrap:anywhere] sm:mt-3",
-          "text-[clamp(1.75rem,6vw,2.75rem)]",
+          "mt-1 font-display tracking-tight [overflow-wrap:anywhere]",
+          "text-[clamp(1.35rem,4.5vw,2rem)]",
           warn ? "text-warn" : "text-ink",
         ].join(" ")}
       >
@@ -131,69 +131,60 @@ export default async function HomeOverviewPage() {
   const greeting = nairobiGreeting();
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-2xl py-6 sm:py-12">
-      <header className="min-w-0 text-center">
+    <div className="mx-auto w-full min-w-0 max-w-3xl py-4 sm:py-8">
+      <header className="min-w-0 text-center sm:text-left">
         <p className="text-sm text-ink-soft [overflow-wrap:anywhere]">
           {greeting},{" "}
           <span className="font-medium text-ink">{business}</span>
         </p>
-        <h1 className="mt-2 font-display tracking-tight text-ink text-[clamp(1.75rem,5vw,2.25rem)]">
+        <h1 className="mt-1 font-display tracking-tight text-ink text-[clamp(1.625rem,4vw,2rem)]">
           Overview
         </h1>
       </header>
 
       {primaryUpdate ? (
-        <aside
-          aria-label="Live updates"
-          className="mx-auto mt-8 w-full min-w-0 max-w-lg"
-        >
-          <div className="relative overflow-hidden rounded-2xl border border-[#0096FF]/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,white)] px-4 py-4 sm:px-5 sm:py-5">
+        <aside aria-label="Live updates" className="mt-5 w-full min-w-0">
+          <div className="relative overflow-hidden rounded-2xl border border-[#0096FF]/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,white)] px-3 py-3 sm:px-4 sm:py-3.5">
             <div
               aria-hidden
               className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[#0096FF]"
             />
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 pl-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  aria-hidden
-                  className="relative inline-flex h-2 w-2 shrink-0"
-                >
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0096FF]/40" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0096FF]" />
-                </span>
-                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#005ccc] sm:text-xs">
-                  Updates
-                  {liveUpdates.length > 1 ? (
-                    <span className="font-medium tracking-normal text-ink-soft normal-case">
-                      {" "}
-                      · {liveUpdates.length} live
+            <div className="flex min-w-0 flex-col gap-3 pl-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="relative inline-flex h-2 w-2 shrink-0"
+                    >
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0096FF]/40" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0096FF]" />
                     </span>
-                  ) : (
-                    <span className="font-medium tracking-normal text-ink-soft normal-case">
-                      {" "}
-                      · live
-                    </span>
-                  )}
+                    <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#005ccc]">
+                      Updates
+                      <span className="font-medium normal-case tracking-normal text-ink-soft">
+                        {liveUpdates.length > 1
+                          ? ` · ${liveUpdates.length} live`
+                          : " · live"}
+                      </span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-ink-soft [overflow-wrap:anywhere]">
+                    {formatBulletinEndLabel(primaryUpdate.ends_at)}
+                    {liveUpdates.length > 1
+                      ? ` · +${liveUpdates.length - 1} more`
+                      : ""}
+                  </p>
+                </div>
+                <p className="mt-2 font-display leading-snug tracking-tight text-ink [overflow-wrap:anywhere] text-[clamp(0.95rem,2.4vw,1.125rem)]">
+                  {primaryUpdate.text}
                 </p>
               </div>
-              <p className="text-xs text-ink-soft [overflow-wrap:anywhere]">
-                {formatBulletinEndLabel(primaryUpdate.ends_at)}
-                {liveUpdates.length > 1
-                  ? ` · +${liveUpdates.length - 1} more`
-                  : ""}
-              </p>
-            </div>
-
-            <p className="mt-3 pl-2 font-display leading-snug tracking-tight text-ink [overflow-wrap:anywhere] text-[clamp(1rem,2.8vw,1.2rem)]">
-              {primaryUpdate.text}
-            </p>
-
-            <div className="mt-4 flex pl-2">
               <Link
                 href={businessSettingsHref("updates")}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#0096FF]/35 bg-white px-4 text-sm font-semibold text-[#0096FF] transition hover:border-[#0096FF] hover:bg-[#0096FF]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-[#0096FF]/35 bg-white px-4 text-sm font-semibold text-[#0096FF] transition hover:border-[#0096FF] hover:bg-[#0096FF]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
               >
-                Manage updates
+                Manage
               </Link>
             </div>
           </div>
@@ -202,7 +193,7 @@ export default async function HomeOverviewPage() {
 
       <section
         aria-label="Executive summary"
-        className="mt-10 grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-4 sm:mt-14"
+        className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 lg:grid-cols-4"
       >
         <MetricCard
           href={callsHref({ status: "new" })}
@@ -228,17 +219,17 @@ export default async function HomeOverviewPage() {
         />
       </section>
 
-      <div className="mt-10 flex justify-center sm:mt-14">
+      <div className="mt-5 sm:mt-6">
         <Link
           href="/calls"
-          className="inline-flex min-h-12 w-full max-w-md items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3.5 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 sm:px-8"
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
         >
           Process Pending Leads
         </Link>
       </div>
 
       {!leadStatusReady ? (
-        <p className="mx-auto mt-10 max-w-md text-center text-xs text-ink-soft [overflow-wrap:anywhere]">
+        <p className="mt-6 text-center text-xs text-ink-soft [overflow-wrap:anywhere] sm:text-left">
           Lead statuses need{" "}
           <code className="text-[0.6875rem]">docs/supabase/lead_status.sql</code>.
         </p>
