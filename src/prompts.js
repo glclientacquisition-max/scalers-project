@@ -183,6 +183,8 @@ When the caller wants a hold, pickup, order note, or concrete follow-up request 
 {"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
 ###ENDTOOL###
 Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
+For type "hold": ONLY append the tool when you already have name + item + when_text. If any is missing, ask ONE short question — do not fire an incomplete hold.
+For type "order": ONLY append when you have name + item.
 In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
 ${escalateTools}
 ${endCallTools}
@@ -222,6 +224,9 @@ When logging a hold, pickup, order, or concrete request, also append:
 ###TOOL###
 {"create_service_request":{"type":"hold|enquiry|order|callback","name":"<caller name>","item":"<product or need>","quantity":"<optional>","when_text":"<pickup/visit time if any>","notes":"<short note>"}}
 ###ENDTOOL###
+Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
+For type "hold": ONLY append the tool when you already have name + item + when_text. If any is missing, ask ONE short question — do not fire an incomplete hold.
+For type "order": ONLY append when you have name + item.
 In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
 
 ${escalateTools}

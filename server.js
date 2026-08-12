@@ -38,6 +38,7 @@ const {
   executeBrainTools,
   formatToolConfirmation,
 } = require('./src/conversation/toolExecution');
+const { deriveCallResolution } = require('./src/conversation/callResolution');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
 const callAgentTools = new Map();
@@ -362,6 +363,34 @@ function detectCallTermination(body = {}, kind = '') {
   return { terminal: false, status: null };
 }
 
+async function persistCallResolution(callSid, source = 'call') {
+  if (!callSid) return null;
+  const brainState = callBrainStates.get(callSid);
+  if (!brainState) return null;
+  try {
+    const derived = deriveCallResolution({ brainState });
+    const saved = await db.setCallResolution({
+      callSid,
+      resolution: derived.resolution,
+      primaryIntent: derived.primaryIntent,
+      resolutionNote: derived.resolutionNote,
+    });
+    if (saved) {
+      console.log(
+        `[${source}] call resolution ${callSid} → ${derived.resolution}` +
+          (derived.primaryIntent ? ` intent=${derived.primaryIntent}` : '')
+      );
+    }
+    return saved;
+  } catch (err) {
+    console.warn(
+      `[${source}] setCallResolution failed:`,
+      err?.message || err
+    );
+    return null;
+  }
+}
+
 async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, source }) {
   if (!callSid) {
     console.warn(`[${source}] termination detected but no callSid — skipping DB update`);
@@ -377,6 +406,8 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       durationSeconds: durationSeconds ?? null,
       found: Boolean(updated),
     });
+    // Best-effort outcome while Brain state may still be in memory.
+    await persistCallResolution(callSid, source);
     return updated;
   } catch (err) {
     console.error(`[${source}] updateCallStatus failed:`, err?.message || err);
@@ -1598,10 +1629,13 @@ mediaWss.on('connection', (ws, req) => {
         status: 'complete',
         durationSeconds,
         source: 'ws/media',
-      }).catch(() => {});
-      callAgentTools.delete(sessionCallSid);
-      callBrainStates.delete(sessionCallSid);
-      callBrainCapabilities.delete(sessionCallSid);
+      })
+        .catch(() => {})
+        .finally(() => {
+          callAgentTools.delete(sessionCallSid);
+          callBrainStates.delete(sessionCallSid);
+          callBrainCapabilities.delete(sessionCallSid);
+        });
     }
   });
 
@@ -1996,11 +2030,13 @@ wss.on('connection', (ws) => {
       db.appendTranscript({ callSid, transcript: transcriptLog.join('\n') }).catch((err) => {
         console.error(`[${callSid}] Failed to flush transcript on close:`, err?.message || err);
       });
-    }
-    if (callSid) {
-      callAgentTools.delete(callSid);
-      callBrainStates.delete(callSid);
-      callBrainCapabilities.delete(callSid);
+      persistCallResolution(callSid, 'ws/fallback')
+        .catch(() => {})
+        .finally(() => {
+          callAgentTools.delete(callSid);
+          callBrainStates.delete(callSid);
+          callBrainCapabilities.delete(callSid);
+        });
     }
   });
 });

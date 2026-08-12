@@ -42,7 +42,7 @@ describe('validated tool execution', () => {
 
   it('reports failure and prevents end-call when the backend fails', async () => {
     const parsed = parseGeminiResponse(
-      'Let me save that. ###TOOL###{"create_service_request":{"type":"order","item":"charger"}}###ENDTOOL### ###ENDCALL###'
+      'Let me save that. ###TOOL###{"create_service_request":{"type":"order","name":"Ali","item":"charger"}}###ENDTOOL### ###ENDCALL###'
     );
     const execution = await executeBrainTools({
       parsed,
@@ -62,7 +62,7 @@ describe('validated tool execution', () => {
 
   it('deduplicates a completed request fingerprint', async () => {
     const parsed = parseGeminiResponse(
-      '###TOOL###{"create_service_request":{"type":"hold","item":"charger","when_text":"evening"}}###ENDTOOL###'
+      '###TOOL###{"create_service_request":{"type":"hold","name":"Sam","item":"charger","when_text":"evening"}}###ENDTOOL###'
     );
     const first = await executeBrainTools({
       parsed,
@@ -85,6 +85,51 @@ describe('validated tool execution', () => {
 
     assert.equal(second.results[0].status, 'duplicate');
     assert.equal(formatToolConfirmation(second.results, 'en'), 'That request is already saved.');
+  });
+
+  it('rejects incomplete holds without writing a row', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"hold","item":"Atomic Habits"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        createServiceRequest: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.deepEqual(execution.results[0].missingSlots, ['name', 'when_text']);
+    assert.match(
+      formatToolConfirmation(execution.results, 'en'),
+      /name and when you will pick up/i
+    );
+  });
+
+  it('rejects orders missing a caller name', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"order","item":"Notebook"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        createServiceRequest: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.deepEqual(execution.results[0].missingSlots, ['name']);
+    assert.match(formatToolConfirmation(execution.results, 'en'), /name/i);
   });
 
   it('does not confirm escalation without a working channel', async () => {

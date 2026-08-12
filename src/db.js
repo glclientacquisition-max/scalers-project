@@ -451,6 +451,57 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
 }
 
 /**
+ * Persist AI assist outcome on a call row.
+ * Soft-fails when call_resolution.sql has not been applied yet.
+ */
+async function setCallResolution({
+  callSid,
+  resolution,
+  primaryIntent,
+  resolutionNote,
+} = {}) {
+  if (!callSid) return null;
+  const allowed = new Set([
+    'resolved',
+    'needs_human',
+    'abandoned',
+    'unresolved',
+    'unknown',
+  ]);
+  const nextResolution = allowed.has(String(resolution || '').toLowerCase())
+    ? String(resolution).toLowerCase()
+    : 'unknown';
+  const patch = {
+    resolution: nextResolution,
+    primary_intent: primaryIntent
+      ? String(primaryIntent).replace(/\s+/g, ' ').trim().slice(0, 80)
+      : null,
+    resolution_note: resolutionNote
+      ? String(resolutionNote).replace(/\s+/g, ' ').trim().slice(0, 240)
+      : null,
+  };
+
+  const { data, error } = await supabase
+    .from('calls')
+    .update(patch)
+    .eq('sautikit_call_sid', callSid)
+    .select('id, resolution, primary_intent, resolution_note')
+    .maybeSingle();
+
+  if (error) {
+    if (/resolution|primary_intent|column|schema cache/i.test(error.message || '')) {
+      console.warn(
+        '[db] setCallResolution skipped (apply docs/supabase/call_resolution.sql):',
+        error.message
+      );
+      return null;
+    }
+    throwIfError('setCallResolution', error);
+  }
+  return data || null;
+}
+
+/**
  * Debit tenant KES wallet for a completed call.
  * Idempotent in Postgres (unique ledger reference = call id).
  */
@@ -957,6 +1008,7 @@ module.exports = {
   appendTranscript,
   attachRecording,
   updateCallStatus,
+  setCallResolution,
   chargeCallToWallet,
   uploadRecordingBuffer,
   getCall,
