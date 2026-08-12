@@ -185,22 +185,24 @@ export function BusinessSettingsShell({
               ) : null}
 
               {tab === "test" ? (
-                <section className="rounded-2xl border border-[#0096FF]/30 bg-[#0096FF]/5 p-6">
+                <section className="rounded-2xl border border-[#0096FF]/30 bg-[#0096FF]/5 p-6 sm:p-8">
                   <h2 className="font-display text-2xl tracking-tight text-[#005ccc]">
                     Test line
                   </h2>
                   {pendingDid ? (
                     <p className="mt-3 text-sm text-ink-soft">Number pending.</p>
                   ) : (
-                    <p className="mt-3 text-sm text-ink">
-                      Call{" "}
+                    <div className="mt-6">
+                      <p className="text-sm text-ink-soft">
+                        Call your receptionist from this device.
+                      </p>
                       <a
                         href={`tel:${tenant.sautikit_virtual_number}`}
-                        className="font-display text-xl font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-4 focus-visible:outline-none focus-visible:shadow-focus"
+                        className="mt-4 flex min-h-[4.5rem] w-full items-center justify-center rounded-2xl bg-[#0096FF] px-6 py-5 text-center font-display text-2xl font-semibold tracking-tight text-white shadow-sm transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 sm:text-3xl"
                       >
                         {tenant.sautikit_virtual_number}
                       </a>
-                    </p>
+                    </div>
                   )}
                 </section>
               ) : null}

@@ -304,10 +304,10 @@ export function PronunciationCoach({
       const n = confirmState.entries.length;
       const localNote =
         confirmState.source === "local"
-          ? " (basic spelling — voice check was unavailable)"
+          ? " (basic spelling; voice check was unavailable)"
           : "";
       setKeepNote(
-        `Saved ${n} pronunciation${n === 1 ? "" : "s"} — live on the next call.${localNote}`
+        `Saved ${n} pronunciation${n === 1 ? "" : "s"}. Live on the next call.${localNote}`
       );
     }
   }, [confirmState]);
@@ -438,16 +438,16 @@ export function PronunciationCoach({
   }
 
   function renewEntry(entry: TtsLexiconEntry) {
-    // Never use phonetic `say` as the phrase — that would train the wrong match.
+    // Never use phonetic `say` as the phrase; that would train the wrong match.
     const phrase = displayLexiconLabel(entry);
     const line = customTrainingLine({
       phrase,
       idPrefix: "renew",
-      reason: `Renew “${entry.say}” — record a clearer take.`,
+      reason: `Renew “${entry.say}”. Record a clearer take.`,
     });
     if (!line) {
       setAddError(
-        `Couldn’t queue “${phrase}” for renew — try adding it under Fix.`
+        `Couldn’t queue “${phrase}” for renew. Try adding it under Fix.`
       );
       setMode("fix");
       return;
@@ -591,12 +591,8 @@ export function PronunciationCoach({
             id="pronunciation-coach-heading"
             className="font-display text-2xl tracking-tight text-[var(--ink)]"
           >
-            Pronunciation studio
+            Pronunciation Overrides
           </h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Teach how names and places should sound on the phone. Changes apply on
-            the next call.
-          </p>
           {cleanNote ? (
             <p className="mt-2 text-xs text-[var(--ok)]" role="status">
               {cleanNote}
@@ -1011,7 +1007,7 @@ export function PronunciationCoach({
           ) : null}
           {persistState.ok && !persistState.error ? (
             <p className="text-xs text-[var(--ok)]" role="status">
-              Updated — next call will use it.
+              Updated. Next call will use it.
             </p>
           ) : null}
           {addError && mode === "library" ? (
@@ -1100,7 +1096,7 @@ export function PronunciationCoach({
             ) : null}
             {quickState.ok && !quickState.error ? (
               <p className="text-xs text-[var(--ok)]" role="status">
-                Saved — next call will use it.
+                Saved. Next call will use it.
               </p>
             ) : null}
           </div>
@@ -1110,7 +1106,7 @@ export function PronunciationCoach({
               <div>
                 <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
                 <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                  Finds hard names from recent agent lines (including lowercase ASR) and your profile places — queues them for Practice.
+                  Finds hard names from recent agent lines and your profile places. Queues them for Practice.
                 </p>
               </div>
               <button

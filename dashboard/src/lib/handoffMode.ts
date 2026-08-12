@@ -8,14 +8,12 @@ export const HANDOFF_OPTIONS: {
   {
     id: "callback",
     label: "WhatsApp / email callback",
-    blurb:
-      "Notify you or a teammate. The AI stays on the line and takes a clear message.",
+    blurb: "Notify a teammate. AI stays on the line and takes a message.",
   },
   {
     id: "live_transfer",
     label: "Live transfer (when available)",
-    blurb:
-      "Prefer connecting the caller to a human. Falls back to callback if transfer is not ready.",
+    blurb: "Connect to a human. Falls back to callback if transfer is not ready.",
   },
 ];
 

@@ -91,8 +91,8 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
           Import product catalogue
         </h3>
         <p className="mt-1 text-xs text-[var(--ink-soft)]">
-          Add individual products (books, SKUs) separately from services. CSV from
-          your shop admin works best; paste or a public product page also work.
+          Products (books, SKUs) separate from services. CSV works best; paste or a
+          public product page also work.
         </p>
       </div>
 
@@ -142,6 +142,15 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   placeholder="https://yourshop.co.ke/shop"
                   className={fieldClass}
                 />
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={previewPending}
+                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {previewPending ? "Scanning…" : "Scan catalogue"}
+                  </button>
+                </div>
               </div>
             ) : (
               <div>
@@ -161,15 +170,17 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   }
                   className={`${fieldClass} text-sm leading-relaxed`}
                 />
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={previewPending}
+                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {previewPending ? "Scanning…" : "Scan catalogue"}
+                  </button>
+                </div>
               </div>
             )}
-            <button
-              type="submit"
-              disabled={previewPending}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-            >
-              {previewPending ? "Scanning…" : "Scan catalogue"}
-            </button>
           </form>
         </div>
       ) : (
