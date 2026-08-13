@@ -349,7 +349,7 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
               disabled={!canAdvance() || pending}
               className="rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-50"
             >
-              {pending ? "Building your receptionist…" : "Finish setup"}
+              {pending ? "Opening your line…" : "Finish setup — answer missed calls"}
             </button>
           )}
         </div>

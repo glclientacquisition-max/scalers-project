@@ -16,7 +16,21 @@ Reliability over breadth. Do not market workflows we cannot execute.
 
 ---
 
-## 2. What “answers unanswered calls efficiently” means
+## 2. Business assistant introduction (top-level)
+
+How the line opens every unanswered call:
+
+1. **Brand first** — business name in the first sentence  
+2. **Agent named** — “this is {agent} speaking”  
+3. **English-default first open** — no random Kiswahili opener before the caller speaks (language match starts on their turn)  
+4. **One invite** — “How can I help?” (or message/closed honesty)  
+5. **Same line in Desk Test** — Settings → Test preview uses the same composer as live voice  
+
+Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `dashboard/src/lib/businessAssistantIntro.ts` (Desk).
+
+---
+
+## 3. What “answers unanswered calls efficiently” means
 
 | Caller need | MVP behavior |
 | --- | --- |
@@ -28,20 +42,20 @@ Reliability over breadth. Do not market workflows we cannot execute.
 | Hold / order (retail) | Catalogue-grounded or enquiry — never fake |
 | Leave a message / callback | Save + WhatsApp/email notify |
 | Speak to a human | Async escalate (name required); never fake live transfer |
-| Language | en / sw / sheng match |
+| Language | en / sw / sheng match **after** the caller speaks |
 
 **Out of MVP claim (still on the long-term plan):** live transfer, calendar booking, POS sync, RAG, multi-vertical depth, “95% full assist.”
 
 ---
 
-## 3. Onboard → answer path (required)
+## 4. Onboard → answer path (required)
 
 ```text
 Signup (DID + notify WA)
   → Onboarding wizard (vertical, offers, hours/location, tone)
   → Seed FAQs / policies / unknown line / hours_schedule / team catch-all
   → Compile llm_system_prompt
-  → Line answers live calls
+  → Line answers live calls (brand-first introduction)
   → Owner gets WA/email on message / hold / escalate
 ```
 
@@ -61,7 +75,7 @@ Without a catalogue, retail still **answers** hours/location/FAQ/message — but
 
 ---
 
-## 4. Automated gate
+## 5. Automated gate
 
 ```bash
 npm run test:mvp
@@ -71,12 +85,13 @@ Blocks ship when Brain/knowledge/MVP smokes fail.
 
 ---
 
-## 5. Live DID pack (ChapterOne / new tenants)
+## 6. Live DID pack (ChapterOne / new tenants)
 
 Call the business DID. Log SID, pass/fail, class `K|U|A|P|V|O`.
 
 | # | Say | Pass if |
 | --- | --- | --- |
+| 0 | *(listen to opener)* | Brand name + agent name in English; no Habari lottery |
 | 1 | “Are you open tomorrow?” | Correct hours; no forced name |
 | 2 | “Where are you?” | Landmark/street correct; short |
 | 3 | Listed product price (if catalogue) | Money only if on file; else admit |
@@ -84,7 +99,7 @@ Call the business DID. Log SID, pass/fail, class `K|U|A|P|V|O`.
 | 5 | Hold listed title + name + when | Hold saved; owner notified |
 | 6 | Unlisted title order | Enquiry/quote — not clean order |
 | 7 | “Speak to the manager” + real name | Escalate fires (not WhatsApp-only) |
-| 8 | One Swahili then English turn | Sticky language |
+| 8 | One Swahili then English turn | Sticky language after caller speaks |
 | 9 | After-hours window | Honest closed + still help per mode |
 | 10 | Clear goodbye | Natural end |
 

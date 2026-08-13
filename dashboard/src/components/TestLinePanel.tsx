@@ -7,6 +7,9 @@ import {
   lexiconForStorage,
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
+import {
+  previewBusinessAssistantIntro,
+} from "@/lib/businessAssistantIntro";
 import { previewSpokenLine } from "@/lib/pronunciationPacks";
 import {
   displaySonioxVoiceLabel,
@@ -39,13 +42,11 @@ export function TestLinePanel({
   );
 
   const greetingPreview = useMemo(() => {
-    const sample =
-      agentName && businessName
-        ? `Hello, you've reached ${businessName}, this is ${agentName} speaking. How can I help?`
-        : businessName
-          ? `Thank you for calling ${businessName}.`
-          : "";
-    if (!sample) return "";
+    if (!businessName) return "";
+    const sample = previewBusinessAssistantIntro({
+      businessName,
+      agentName,
+    });
     return previewSpokenLine(sample, lexicon);
   }, [businessName, agentName, lexicon]);
 
@@ -113,8 +114,8 @@ export function TestLinePanel({
           Test
         </h2>
         <p className="text-sm text-[var(--ink-soft)]">
-          Hear the opening line with your current voice and pronunciations, then
-          call the live number if it sounds right.
+          Hear how your assistant introduces the business — brand first, then the
+          agent name — with your current voice and pronunciations.
         </p>
       </header>
 
