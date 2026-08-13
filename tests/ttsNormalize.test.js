@@ -144,6 +144,28 @@ test('SW speed env override', () => {
   else process.env.SONIOX_TTS_SPEED_SW = prev;
 });
 
+test('default speaking tempo is 1.08 when SONIOX_TTS_SPEED unset', () => {
+  const { spawnSync } = require('child_process');
+  const script = `
+    delete process.env.SONIOX_TTS_SPEED;
+    delete process.env.SONIOX_TTS_SPEED_EN;
+    delete process.env.SONIOX_TTS_SPEED_SW;
+    const { speedForLanguage } = require('./src/speech/sonioxTts');
+    if (speedForLanguage('en') !== 1.08) process.exit(2);
+    if (speedForLanguage('sw') !== 1.08) process.exit(3);
+  `;
+  const r = spawnSync(process.execPath, ['-e', script], {
+    cwd: path.join(__dirname, '..'),
+    env: { ...process.env },
+    encoding: 'utf8',
+  });
+  assert.strictEqual(
+    r.status,
+    0,
+    `default TTS speed should be 1.08 (status=${r.status} stderr=${r.stderr})`
+  );
+});
+
 console.log('golden fixtures');
 const goldenPath = path.join(__dirname, 'fixtures', 'pronunciation.json');
 const golden = JSON.parse(fs.readFileSync(goldenPath, 'utf8'));
