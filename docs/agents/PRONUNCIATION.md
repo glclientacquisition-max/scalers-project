@@ -30,13 +30,25 @@ Open-ended “learn every word from my recording” produced entries like:
 | Location | “We're on Muindi Mbingu Street, opposite City Market Fashion Mall.” | hard place names |
 | Team | “I can have Harrison Maina follow up with you.” | team names |
 
-## Owner workflow (studio)
+## Owner workflow (best path)
 
-1. **Trained pronunciations** — see every live `say` form; **Renew** (re-record), **Edit say** (typed tweak), or **Remove**. Labels are stored with the lexicon so Renew always re-trains the real name (never the phonetic spelling).
-2. **Heard something wrong?** — type the word/sentence → **Queue to record** (best) or **Save typed spelling** (requires a say-like form).
-3. **From recent calls** — **Scan recent calls** mines hard names from agent transcripts (Title Case + profile name hints for lowercase ASR) into the queue. Weak single English/Sheng fillers (`Just`, `Money`, `Habari`) are skipped; profile hits and multi-word places/names rank first.
-4. **Gemini Scan** — listens to recent **call recordings** with Gemini and drafts Fix-queue candidates (`AGENT_MISPRONUNCIATION` / `LIKELY_MISHEARD`). Drafts are **pending review only**.
-5. **Training queue** — Greeting / Location / Team packs plus custom / mined / renew items.
+**Goal:** hard names sound right on the live DID — with as few clicks as possible.
+
+| Step | Where | What |
+| --- | --- | --- |
+| 1 | **Practice** | Run Greeting / Location / Team packs. **Use this take** saves to live lexicon. |
+| 2 | **Fix → Needs review** | Clear AI drafts first. Primary: **Record**. Secondary: **Approve spelling**. Reject/Snooze under More. |
+| 3 | **Fix → Add a fix** | Type the bad name → **Record & train**. Typed spelling is a fallback (“Or save a spelling…”). |
+| 4 | **Fix → Find more** | **Quick scan** = transcripts → Practice. **AI listen** = Gemini on recordings → Needs review (never auto-applies). |
+| 5 | **Test** | **Play phone preview** (same Soniox path as calls), then tap the live DID. |
+
+**Do not** train common English (`where`, `city`, …). **Do** prefer real audio over AI phonetic guesses.
+
+### Tabs (unchanged product shape)
+
+1. **Library** — every live `say`; Renew / Edit say / Remove.
+2. **Practice** — packs + mined / renew / record-from-review items.
+3. **Fix** — Needs review → Add a fix → Find more (Quick scan + AI listen).
 
 ## Gemini Scan review gate (do not “helpfully” remove)
 
@@ -71,8 +83,13 @@ Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / 
 ```bash
 node scripts/smoke-pronunciation-chapterone.js
 npm run test:tts
-cd dashboard && npx tsx --tsconfig tsconfig.json --test ../tests/pronunciationStudio.test.ts ../tests/pronunciationGeminiScan.test.ts
-node --test tests/pronunciationPacks.test.js tests/pronunciationCoach.test.js
+cd dashboard && npx tsx --tsconfig tsconfig.json --test \
+  ../tests/pronunciationStudio.test.ts \
+  ../tests/pronunciationGeminiScan.test.ts \
+  ../tests/pronunciationFlow.test.ts
+node --test tests/pronunciationPacks.test.js tests/pronunciationCoach.test.js tests/pronunciationVerify.test.js
+node --test tests/voicePublicBase.test.js tests/wavPack.test.js tests/sonioxVoice.test.js
+cd dashboard && npm run build
 ```
 
 Call the DID and listen for greeting + address without mangled common words.
