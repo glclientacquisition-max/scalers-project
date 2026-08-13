@@ -2438,6 +2438,9 @@ async function applyGeminiTools(callSid, parsed) {
     completedFingerprints: state.actions.completedFingerprints,
     priorHolds: state.actions.openHolds || [],
     productCatalog: groundedProfile.productCatalog || null,
+    agentName: groundedProfile.agentName || process.env.AGENT_NAME || '',
+    businessName:
+      groundedProfile.businessName || process.env.BUSINESS_NAME || '',
     handlers: {
       createServiceRequest: async (request) => {
         const created = await db.createServiceRequest({

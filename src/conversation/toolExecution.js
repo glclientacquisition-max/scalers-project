@@ -4,11 +4,101 @@ const { findProductMatch, normalizeProducts } = require('./productCatalog');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
+/** Names that must never be persisted as the caller (STT / model mix-ups). */
+const RESERVED_CALLER_NAMES = new Set([
+  'unknown',
+  'caller',
+  'customer',
+  'client',
+  'guest',
+  'user',
+  'test',
+  'testing',
+  'n/a',
+  'na',
+  'none',
+  'receptionist',
+  'agent',
+  'assistant',
+  'ai',
+  'bot',
+]);
+
 function clean(value, max = 240) {
   return String(value == null ? '' : value)
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, max);
+}
+
+function normalizeNameKey(value) {
+  return clean(value, 120)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * True when the proposed caller name is the agent, business, or a reserved placeholder.
+ * Live beta failure: orders/enquiries saved with name "Aisha" (the agent).
+ */
+function isReservedCallerName(name, { agentName = '', businessName = '' } = {}) {
+  const key = normalizeNameKey(name);
+  if (!key || key.length < 2) return true;
+  if (RESERVED_CALLER_NAMES.has(key)) return true;
+
+  const agentKey = normalizeNameKey(agentName);
+  if (agentKey && (key === agentKey || key.includes(agentKey) || agentKey.includes(key))) {
+    // Avoid blocking short substrings like "a" — require meaningful overlap.
+    if (agentKey.length >= 2 && key.length >= 2) {
+      if (key === agentKey) return true;
+      // "Aisha speaking" / "this is Aisha"
+      if (key.startsWith(`${agentKey} `) || key.endsWith(` ${agentKey}`)) return true;
+    }
+  }
+
+  const businessKey = normalizeNameKey(businessName);
+  if (businessKey && key === businessKey) return true;
+  // "ChapterOne" / "Chapter One Bookstore" first token collisions
+  const businessToken = businessKey.split(/\s+/)[0] || '';
+  if (businessToken.length >= 4 && key === businessToken) return true;
+
+  return false;
+}
+
+/**
+ * STT often emits a spoken sentence instead of a title ("I have to make habits").
+ * Those must not become hold/order items even if catalogue grounding is unavailable.
+ */
+function looksLikeUnclearTitle(item) {
+  const text = clean(item, 200);
+  if (!text) return true;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length >= 5) return true;
+  const lower = text.toLowerCase();
+  if (
+    /^(i |i'd |i have |i want |i need |my name|uh,? |um,? |please |can you |do you )/i.test(
+      lower
+    )
+  ) {
+    return true;
+  }
+  // Trailing mid-thought / fragment punctuation from STT
+  if (/[—–-]\s*$/.test(text) || /,(and|but)\.?$/i.test(text)) return true;
+  return false;
+}
+
+function rejectBadCallerName(value, identity) {
+  if (!value.name) return null;
+  if (!isReservedCallerName(value.name, identity)) return null;
+  return {
+    valid: false,
+    reason: 'Need the caller\'s real name — not the agent or a placeholder.',
+    missingSlots: ['name'],
+    code: 'bad_caller_name',
+    value,
+  };
 }
 
 function stableFingerprint(action, payload) {
@@ -58,7 +148,10 @@ function whenTextIsRefinement(previous, next) {
   return b.includes(a) || a.includes(b) || true;
 }
 
-function validateServiceRequest(raw, { productCatalog } = {}) {
+function validateServiceRequest(
+  raw,
+  { productCatalog, agentName = '', businessName = '' } = {}
+) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing service request payload.' };
   }
@@ -82,6 +175,11 @@ function validateServiceRequest(raw, { productCatalog } = {}) {
   if (!value.item && !value.notes) {
     return { valid: false, reason: 'A request needs an item or concise notes.' };
   }
+
+  const identity = { agentName, businessName };
+  const badName = rejectBadCallerName(value, identity);
+  if (badName) return badName;
+
   // Retail hold/pickup: require product + caller name + when (playbook slots).
   if (type === 'hold') {
     const missing = [];
@@ -96,23 +194,41 @@ function validateServiceRequest(raw, { productCatalog } = {}) {
         value,
       };
     }
-    const catalog = normalizeProducts(productCatalog);
-    if (catalog.length && value.item) {
-      const match = findProductMatch(value.item, catalog);
-      if (!match) {
-        return {
-          valid: false,
-          reason:
-            'That title is not in the grounded catalogue — log an enquiry or special-order quote instead of a hold.',
-          missingSlots: ['catalog_item'],
-          code: 'catalog_miss',
-          value,
-        };
-      }
-      value.item = clean(match.product.name, 200);
+    if (looksLikeUnclearTitle(value.item)) {
+      return {
+        valid: false,
+        reason:
+          'Hold needs a clear catalogue title — confirm the exact book name first.',
+        missingSlots: ['catalog_item'],
+        code: 'title_unclear',
+        value,
+      };
     }
+    const catalog = normalizeProducts(productCatalog);
+    if (!catalog.length) {
+      return {
+        valid: false,
+        reason:
+          'Holds require a loaded product catalogue — log an enquiry instead.',
+        missingSlots: ['catalog_item'],
+        code: 'catalog_required',
+        value,
+      };
+    }
+    const match = findProductMatch(value.item, catalog);
+    if (!match) {
+      return {
+        valid: false,
+        reason:
+          'That title is not in the grounded catalogue — log an enquiry or special-order quote instead of a hold.',
+        missingSlots: ['catalog_item'],
+        code: 'catalog_miss',
+        value,
+      };
+    }
+    value.item = clean(match.product.name, 200);
   }
-  // Orders: require product + name, and catalogue ground when a catalogue exists.
+  // Orders: require product + name, clear title, and catalogue ground.
   if (type === 'order') {
     const missing = [];
     if (!value.item) missing.push('item');
@@ -125,30 +241,52 @@ function validateServiceRequest(raw, { productCatalog } = {}) {
         value,
       };
     }
-    const catalog = normalizeProducts(productCatalog);
-    if (catalog.length && value.item) {
-      const match = findProductMatch(value.item, catalog);
-      if (!match) {
-        return {
-          valid: false,
-          reason:
-            'That title is not in the grounded catalogue — log an enquiry or special-order quote instead of an order.',
-          missingSlots: ['catalog_item'],
-          code: 'catalog_miss',
-          value,
-        };
-      }
-      value.item = clean(match.product.name, 200);
+    if (looksLikeUnclearTitle(value.item)) {
+      return {
+        valid: false,
+        reason:
+          'Order needs a clear catalogue title — confirm the exact book name first.',
+        missingSlots: ['catalog_item'],
+        code: 'title_unclear',
+        value,
+      };
     }
+    const catalog = normalizeProducts(productCatalog);
+    if (!catalog.length) {
+      return {
+        valid: false,
+        reason:
+          'Orders require a loaded product catalogue — log an enquiry or quote instead.',
+        missingSlots: ['catalog_item'],
+        code: 'catalog_required',
+        value,
+      };
+    }
+    const match = findProductMatch(value.item, catalog);
+    if (!match) {
+      return {
+        valid: false,
+        reason:
+          'That title is not in the grounded catalogue — log an enquiry or special-order quote instead of an order.',
+        missingSlots: ['catalog_item'],
+        code: 'catalog_miss',
+        value,
+      };
+    }
+    value.item = clean(match.product.name, 200);
   }
   return { valid: true, value };
 }
 
-function validateCallerInfo(parsed) {
+function validateCallerInfo(parsed, { agentName = '', businessName = '' } = {}) {
   const value = {
     name: clean(parsed?.name, 120),
     reason: clean(parsed?.reason, 400),
   };
+  if (value.name && isReservedCallerName(value.name, { agentName, businessName })) {
+    // Keep reason-only capture; drop the bad name so we don't poison the lead.
+    value.name = '';
+  }
   return {
     valid: Boolean(value.name || value.reason),
     value,
@@ -156,7 +294,7 @@ function validateCallerInfo(parsed) {
   };
 }
 
-function validateEscalation(raw) {
+function validateEscalation(raw, { agentName = '', businessName = '' } = {}) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing escalation payload.' };
   }
@@ -175,6 +313,14 @@ function validateEscalation(raw) {
       missingSlots: ['name'],
     };
   }
+  if (isReservedCallerName(value.name, { agentName, businessName })) {
+    return {
+      valid: false,
+      reason: 'Escalation needs the caller\'s real name — not the agent or a placeholder.',
+      missingSlots: ['name'],
+      code: 'bad_caller_name',
+    };
+  }
   if (!value.teammate) {
     value.teammate = 'General queries';
   }
@@ -188,9 +334,12 @@ async function executeBrainTools({
   completedFingerprints = [],
   priorHolds = [],
   productCatalog = null,
+  agentName = '',
+  businessName = '',
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
+  const identityOpts = { productCatalog, agentName, businessName };
 
   if (Array.isArray(parsed?.errors)) {
     for (const error of parsed.errors) {
@@ -203,9 +352,7 @@ async function executeBrainTools({
   }
 
   if (parsed?.serviceRequest) {
-    const validation = validateServiceRequest(parsed.serviceRequest, {
-      productCatalog,
-    });
+    const validation = validateServiceRequest(parsed.serviceRequest, identityOpts);
     const fingerprint = validation.valid
       ? stableFingerprint('create_service_request', validation.value)
       : null;
@@ -327,7 +474,7 @@ async function executeBrainTools({
     }
   }
 
-  const callerInfo = validateCallerInfo(parsed);
+  const callerInfo = validateCallerInfo(parsed, { agentName, businessName });
   if (callerInfo.valid) {
     const fingerprint = stableFingerprint('save_caller_info', callerInfo.value);
     try {
@@ -360,7 +507,10 @@ async function executeBrainTools({
   }
 
   if (parsed?.escalate) {
-    const validation = validateEscalation(parsed.escalate);
+    const validation = validateEscalation(parsed.escalate, {
+      agentName,
+      businessName,
+    });
     const fingerprint = validation.valid
       ? stableFingerprint('escalate', validation.value)
       : null;
@@ -376,6 +526,7 @@ async function executeBrainTools({
         status: 'invalid',
         reason: validation.reason,
         missingSlots: validation.missingSlots || [],
+        code: validation.code || null,
       });
     } else if (completed.has(fingerprint)) {
       results.push({ action: 'escalate', status: 'duplicate', fingerprint });
@@ -455,8 +606,15 @@ function formatToolConfirmation(results = [], language = 'en') {
         : [];
       if (
         meaningful.code === 'catalog_miss' ||
+        meaningful.code === 'catalog_required' ||
+        meaningful.code === 'title_unclear' ||
         missing.includes('catalog_item')
       ) {
+        if (meaningful.code === 'title_unclear') {
+          if (sw) return 'Tafadhali sema jina kamili la kitabu ndio nihifadhi.';
+          if (sheng) return 'Please confirm exact title ya kitabu ndio ni-save.';
+          return 'Please confirm the exact book title so I can save that.';
+        }
         if (sw) {
           return 'Sina hiyo kwenye orodha ya sasa — naweza kuhifadhi ombi la quotation badala yake.';
         }
@@ -470,7 +628,11 @@ function formatToolConfirmation(results = [], language = 'en') {
         if (sheng) return 'Niambie jina yako na when utapita ndio ni-save hold.';
         return 'Tell me your name and when you will pick up so I can save the hold.';
       }
-      if (missing.includes('name') || /name/i.test(meaningful.reason || '')) {
+      if (
+        meaningful.code === 'bad_caller_name' ||
+        missing.includes('name') ||
+        /name/i.test(meaningful.reason || '')
+      ) {
         if (sw) return 'Niambie jina lako ndio nihifadhi ombi.';
         if (sheng) return 'Niambie jina yako ndio ni-save request.';
         return 'Tell me your name so I can save the request.';
@@ -516,10 +678,13 @@ function formatToolConfirmation(results = [], language = 'en') {
 
 module.exports = {
   REQUEST_TYPES,
+  RESERVED_CALLER_NAMES,
   stableFingerprint,
   requestIdentityFingerprint,
   findPriorHold,
   whenTextIsRefinement,
+  isReservedCallerName,
+  looksLikeUnclearTitle,
   validateServiceRequest,
   validateCallerInfo,
   validateEscalation,
