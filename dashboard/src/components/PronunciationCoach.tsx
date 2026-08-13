@@ -11,12 +11,25 @@ import {
   type MinePronunciationState,
 } from "@/app/(desk)/settings/pronunciationActions";
 import {
+  approveGeminiScanCandidateAction,
+  dismissGeminiScanCandidateAction,
+  geminiScanRecentCallsAction,
+  loadPronunciationReviewQueueAction,
+  type GeminiScanQueueState,
+  type GeminiScanState,
+} from "@/app/(desk)/settings/pronunciationGeminiScanActions";
+import {
   displayLexiconLabel,
   lexiconForStorage,
   parseTtsLexicon,
   sanitizeSayForm,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import type { PronunciationReviewCandidate } from "@/lib/pronunciationGeminiScan";
+import {
+  GEMINI_SCAN_BATCH_OPTIONS,
+  GEMINI_SCAN_DEFAULT_BATCH,
+} from "@/lib/pronunciationGeminiScanPrompt";
 import { customTrainingLine } from "@/lib/pronunciationMine";
 import { buildPronunciationPacks } from "@/lib/pronunciationPacks";
 import {
@@ -33,6 +46,8 @@ type StudioMode = "practice" | "library" | "fix";
 
 const confirmInitial: ConfirmPronunciationState = {};
 const mineInitial: MinePronunciationState = {};
+const geminiScanInitial: GeminiScanState = {};
+const geminiQueueInitial: GeminiScanQueueState = {};
 const LEXICON_PAGE_SIZE = 6;
 
 function blobToFile(blob: Blob, name: string): File {
@@ -92,6 +107,15 @@ export function PronunciationCoach({
   const [editSay, setEditSay] = useState("");
   const [keepNote, setKeepNote] = useState<string | null>(null);
 
+  const [geminiBatch, setGeminiBatch] = useState<number>(GEMINI_SCAN_DEFAULT_BATCH);
+  const [geminiConfirmOpen, setGeminiConfirmOpen] = useState(false);
+  const [reviewQueue, setReviewQueue] = useState<PronunciationReviewCandidate[]>(
+    []
+  );
+  const [sttHints, setSttHints] = useState<PronunciationReviewCandidate[]>([]);
+  const [reviewEdits, setReviewEdits] = useState<Record<string, string>>({});
+  const [geminiNote, setGeminiNote] = useState<string | null>(null);
+
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -115,6 +139,22 @@ export function PronunciationCoach({
   const [mineState, mineAction, minePending] = useActionState(
     minePronunciationFromCallsAction,
     mineInitial
+  );
+  const [geminiState, geminiAction, geminiPending] = useActionState(
+    geminiScanRecentCallsAction,
+    geminiScanInitial
+  );
+  const [approveState, approveAction, approvePending] = useActionState(
+    approveGeminiScanCandidateAction,
+    geminiQueueInitial
+  );
+  const [dismissState, dismissAction, dismissPending] = useActionState(
+    dismissGeminiScanCandidateAction,
+    geminiQueueInitial
+  );
+  const [loadQueueState, loadQueueAction] = useActionState(
+    loadPronunciationReviewQueueAction,
+    geminiQueueInitial
   );
 
   const lexiconJson = useMemo(
@@ -154,6 +194,56 @@ export function PronunciationCoach({
       }
     }
   }, [mineState]);
+
+  useEffect(() => {
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    loadQueueAction(fd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (loadQueueState.ok) {
+      setReviewQueue(loadQueueState.queue || []);
+      setSttHints(loadQueueState.sttHints || []);
+    }
+  }, [loadQueueState]);
+
+  useEffect(() => {
+    if (geminiState.needsConfirm) {
+      setGeminiConfirmOpen(true);
+      setGeminiNote(geminiState.message || null);
+      return;
+    }
+    if (geminiState.ok) {
+      setGeminiConfirmOpen(false);
+      setGeminiNote(geminiState.message || null);
+      if (Array.isArray(geminiState.queue)) {
+        const pending = geminiState.queue.filter((c) => c.status === "pending");
+        setReviewQueue(
+          pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION")
+        );
+        setSttHints(pending.filter((c) => c.type === "LIKELY_MISHEARD"));
+      }
+    } else if (geminiState.error) {
+      setGeminiNote(geminiState.error);
+    }
+  }, [geminiState]);
+
+  useEffect(() => {
+    const state = approveState.ok ? approveState : dismissState.ok ? dismissState : null;
+    if (!state) {
+      if (approveState.error) setGeminiNote(approveState.error);
+      if (dismissState.error) setGeminiNote(dismissState.error);
+      return;
+    }
+    setReviewQueue(state.queue || []);
+    setSttHints(state.sttHints || []);
+    if (state.message) setGeminiNote(state.message);
+    if (state.lexicon) {
+      setLexicon(parseTtsLexicon(state.lexicon));
+    }
+  }, [approveState, dismissState]);
 
   useEffect(() => {
     if (quickState.ok && quickState.lexicon) {
@@ -452,6 +542,57 @@ export function PronunciationCoach({
     fd.set("id", tenantId);
     fd.set("current_lexicon", lexiconJson);
     mineAction(fd);
+  }
+
+  function runGeminiScan(confirmed: boolean) {
+    setGeminiNote(null);
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("current_lexicon", lexiconJson);
+    fd.set("batch_size", String(geminiBatch));
+    if (confirmed) fd.set("confirmed", "1");
+    geminiAction(fd);
+  }
+
+  function approveCandidate(c: PronunciationReviewCandidate) {
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("candidate_id", c.id);
+    fd.set("current_lexicon", lexiconJson);
+    const edited = (reviewEdits[c.id] ?? c.suggested_form).trim();
+    if (edited) fd.set("edited_say", edited);
+    approveAction(fd);
+  }
+
+  function dismissCandidate(
+    c: PronunciationReviewCandidate,
+    mode: "rejected" | "snoozed"
+  ) {
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("candidate_id", c.id);
+    fd.set("mode", mode);
+    dismissAction(fd);
+  }
+
+  function recordCandidateInstead(c: PronunciationReviewCandidate) {
+    const line = customTrainingLine({
+      phrase: c.word_or_phrase,
+      reason: `AI-suggested (record real audio — more reliable than “${c.suggested_form}”)`,
+      idPrefix: "gemini-record",
+    });
+    if (!line) {
+      setGeminiNote("Could not queue that phrase for recording.");
+      return;
+    }
+    setExtraItems((prev) =>
+      prev.some((p) => p.id === line.id) ? prev : [...prev, line]
+    );
+    setMode("practice");
+    setActiveId(line.id);
+    setGeminiNote(
+      "Queued in Practice — record real audio rather than trusting the AI phonetic guess."
+    );
   }
 
   function submitQuickAdd(modeAdd: "record" | "save") {
@@ -1038,13 +1179,14 @@ export function PronunciationCoach({
               <div>
                 <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
                 <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                  Scans recent agent lines for hard names and profile places — skips common filler. Queues them for Practice.
+                  Heuristic scan of agent transcripts for hard names and profile places.
+                  Queues them for Practice — does not change live pronunciation by itself.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={scanCalls}
-                disabled={minePending}
+                disabled={minePending || geminiPending}
                 className="rounded-xl border border-[var(--accent)]/40 px-4 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
               >
                 {minePending ? "Scanning…" : "Scan recent calls"}
@@ -1062,6 +1204,223 @@ export function PronunciationCoach({
                 .
               </p>
             ) : null}
+
+            <div className="mt-4 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--sand-0,#faf9f7)] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-medium text-[var(--ink)]">Gemini Scan</h3>
+                  <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
+                    AI listens to call recordings and drafts fixes for review. Nothing
+                    reaches the live lexicon until you approve.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs text-[var(--ink-soft)]" htmlFor="gemini-batch">
+                    Last
+                  </label>
+                  <select
+                    id="gemini-batch"
+                    value={geminiBatch}
+                    onChange={(e) => setGeminiBatch(Number(e.target.value))}
+                    disabled={geminiPending}
+                    className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm"
+                  >
+                    {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n} calls
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => runGeminiScan(false)}
+                    disabled={geminiPending || minePending}
+                    className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+                  >
+                    {geminiPending
+                      ? `Listening to up to ${geminiBatch}…`
+                      : "Gemini Scan"}
+                  </button>
+                </div>
+              </div>
+
+              {geminiConfirmOpen ? (
+                <div
+                  className="rounded-lg border border-[var(--warn)]/40 bg-white px-3 py-3 text-sm"
+                  role="alertdialog"
+                  aria-label="Confirm Gemini Scan cost"
+                >
+                  <p className="text-[var(--ink)]">
+                    {geminiState.message ||
+                      `Gemini will review up to ${geminiBatch} recordings (paid API).`}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => runGeminiScan(true)}
+                      disabled={geminiPending}
+                      className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                    >
+                      Confirm scan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGeminiConfirmOpen(false);
+                        setGeminiNote(null);
+                      }}
+                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {geminiNote ? (
+                <p
+                  className={`text-xs ${
+                    geminiState.error || approveState.error || dismissState.error
+                      ? "text-[var(--warn)]"
+                      : "text-[var(--ink-soft)]"
+                  }`}
+                  role="status"
+                >
+                  {geminiNote}
+                </p>
+              ) : null}
+
+              {reviewQueue.length > 0 ? (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">
+                    Review queue — agent mispronunciations
+                  </h4>
+                  <ul className="space-y-3" aria-label="Gemini pronunciation review queue">
+                    {reviewQueue.map((c) => (
+                      <li
+                        key={c.id}
+                        className="rounded-lg border border-[var(--line)] bg-white px-3 py-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--accent-deep)]">
+                            AI-suggested
+                          </span>
+                          <span className="rounded bg-[var(--sand-1,#f0eee9)] px-1.5 py-0.5 text-[10px] font-medium uppercase text-[var(--ink-soft)]">
+                            {c.confidence} confidence
+                          </span>
+                          <span className="text-sm font-medium text-[var(--ink)]">
+                            {c.word_or_phrase}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                          {c.reasoning}
+                        </p>
+                        <label className="mt-2 block text-xs text-[var(--ink-soft)]">
+                          Say like (AI draft — edit before approve)
+                          <input
+                            value={reviewEdits[c.id] ?? c.suggested_form}
+                            onChange={(e) =>
+                              setReviewEdits((prev) => ({
+                                ...prev,
+                                [c.id]: e.target.value,
+                              }))
+                            }
+                            className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-1.5 text-sm"
+                          />
+                        </label>
+                        <p className="mt-1 text-[11px] text-[var(--ink-soft)]">
+                          Prefer recording real audio over trusting this phonetic guess.
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => approveCandidate(c)}
+                            disabled={approvePending || dismissPending}
+                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => recordCandidateInstead(c)}
+                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Record real audio instead
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => dismissCandidate(c, "rejected")}
+                            disabled={approvePending || dismissPending}
+                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => dismissCandidate(c, "snoozed")}
+                            disabled={approvePending || dismissPending}
+                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs"
+                          >
+                            Snooze
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {sttHints.length > 0 ? (
+                <div className="space-y-2 border-t border-[var(--line)] pt-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">
+                    STT — likely misheard
+                  </h4>
+                  <p className="text-[11px] text-[var(--ink-soft)]">
+                    These are input/transcription hints, not TTS lexicon fixes. Not yet
+                    actionable for Soniox <code className="text-[10px]">context.terms</code>{" "}
+                    wiring from this queue — dismiss or snooze so they do not resurface.
+                  </p>
+                  <ul className="space-y-2">
+                    {sttHints.map((c) => (
+                      <li
+                        key={c.id}
+                        className="rounded-lg border border-dashed border-[var(--line)] bg-white px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded bg-[var(--sand-1,#f0eee9)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--ink-soft)]">
+                            STT hint
+                          </span>
+                          <span className="text-[10px] uppercase text-[var(--ink-soft)]">
+                            {c.confidence}
+                          </span>
+                          <span className="text-sm font-medium">{c.word_or_phrase}</span>
+                          <span className="text-xs text-[var(--ink-soft)]">
+                            → {c.suggested_form}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-[var(--ink-soft)]">{c.reasoning}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => dismissCandidate(c, "rejected")}
+                            className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs"
+                          >
+                            Dismiss
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => dismissCandidate(c, "snoozed")}
+                            className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs"
+                          >
+                            Snooze
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
