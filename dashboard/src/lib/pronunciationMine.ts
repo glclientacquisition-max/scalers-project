@@ -1,5 +1,6 @@
 /**
  * Mine hard names from recent agent transcripts for pronunciation training.
+ * Prefers profile names/places and multi-word proper nouns; skips weak English filler.
  */
 
 import {
@@ -13,6 +14,7 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 
+/** Words that look Title Case in transcripts but should never become training targets. */
 const EXTRA_SKIP = new Set(
   [
     ...BLOCKED_MATCH_TOKENS,
@@ -42,25 +44,415 @@ const EXTRA_SKIP = new Set(
     "you've",
     "reached",
     "speaking",
+    "just",
+    "money",
+    "habari",
+    "jambo",
+    "sasa",
+    "okay",
+    "alright",
+    "right",
+    "sure",
+    "fine",
+    "well",
+    "also",
+    "then",
+    "here",
+    "there",
+    "about",
+    "after",
+    "before",
+    "again",
+    "still",
+    "really",
+    "actually",
+    "maybe",
+    "sorry",
+    "excuse",
+    "moment",
+    "seconds",
+    "minutes",
+    "hours",
+    "number",
+    "phone",
+    "email",
+    "whatsapp",
+    "order",
+    "orders",
+    "price",
+    "prices",
+    "available",
+    "open",
+    "closed",
+    "hours",
+    "service",
+    "services",
+    "question",
+    "questions",
+    "anything",
+    "else",
+    "need",
+    "want",
+    "like",
+    "know",
+    "think",
+    "look",
+    "looking",
+    "coming",
+    "going",
+    "would",
+    "could",
+    "should",
+    "will",
+    "shall",
+    "have",
+    "has",
+    "had",
+    "been",
+    "being",
+    "does",
+    "did",
+    "done",
+    "make",
+    "made",
+    "get",
+    "got",
+    "give",
+    "put",
+    "see",
+    "hear",
+    "heard",
+    "said",
+    "say",
+    "tell",
+    "ask",
+    "asked",
+    "call",
+    "called",
+    "calling",
+    "back",
+    "soon",
+    "later",
+    "today",
+    "tomorrow",
+    "yesterday",
+    "week",
+    "month",
+    "year",
+    "first",
+    "last",
+    "next",
+    "other",
+    "another",
+    "some",
+    "any",
+    "all",
+    "every",
+    "each",
+    "both",
+    "few",
+    "many",
+    "much",
+    "more",
+    "most",
+    "same",
+    "such",
+    "only",
+    "own",
+    "other",
+    "into",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "twice",
+    "very",
+    "too",
+    "so",
+    "than",
+    "too",
+    "very",
+    "just",
+    "even",
+    "still",
+    "already",
+    "yet",
+    "now",
+    "then",
+    "here",
+    "there",
+    "where",
+    "when",
+    "why",
+    "how",
+    "what",
+    "who",
+    "which",
+    "whose",
+    "whom",
+    "this",
+    "that",
+    "these",
+    "those",
+    "english",
+    "swahili",
+    "kenya",
+    "kenyan",
+    "africa",
+    "african",
+    "customer",
+    "customers",
+    "client",
+    "clients",
+    "sir",
+    "madam",
+    "miss",
+    "mister",
+    "brother",
+    "sister",
+    "friend",
+    "friends",
   ].map((w) => w.toLowerCase())
 );
+
+/**
+ * Common English (and light Sheng fillers) that Title Case ASR invents.
+ * Never treat these as proper-name signals for mining.
+ */
+const WEAK_SINGLE_ENGLISH = new Set(
+  [
+    "just",
+    "money",
+    "good",
+    "great",
+    "time",
+    "take",
+    "name",
+    "help",
+    "please",
+    "thanks",
+    "thank",
+    "hello",
+    "welcome",
+    "speaking",
+    "reached",
+    "follow",
+    "shortly",
+    "delivery",
+    "shipping",
+    "order",
+    "price",
+    "open",
+    "closed",
+    "available",
+    "service",
+    "question",
+    "moment",
+    "number",
+    "phone",
+    "email",
+    "today",
+    "tomorrow",
+    "morning",
+    "evening",
+    "afternoon",
+    "night",
+    "weekend",
+    "weekday",
+    "cashier",
+    "manager",
+    "assistant",
+    "reception",
+    "receptionist",
+    "bookstore",
+    "library",
+    "market",
+    "mall",
+    "street",
+    "road",
+    "avenue",
+    "building",
+    "floor",
+    "shop",
+    "store",
+    "office",
+    "centre",
+    "center",
+    "place",
+    "area",
+    "side",
+    "way",
+    "near",
+    "opposite",
+    "beside",
+    "across",
+    "inside",
+    "outside",
+    "chapter",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "check",
+    "checking",
+    "hold",
+    "holding",
+    "while",
+    "wait",
+    "waiting",
+    "confirm",
+    "confirming",
+    "transfer",
+    "connect",
+    "connecting",
+    "forward",
+    "details",
+    "information",
+    "option",
+    "options",
+    "payment",
+    "payments",
+    "receipt",
+    "invoice",
+    "stock",
+    "item",
+    "items",
+    "product",
+    "products",
+    "brand",
+    "brands",
+    "copy",
+    "copies",
+    "edition",
+    "author",
+    "title",
+    "titles",
+    "novel",
+    "novels",
+    "school",
+    "schools",
+    "college",
+    "university",
+    "station",
+    "terminal",
+    "bus",
+    "matatu",
+    "taxi",
+    "uber",
+    "bolt",
+    "parking",
+    "entrance",
+    "exit",
+    "gate",
+    "main",
+    "new",
+    "old",
+    "best",
+    "better",
+    "free",
+    "full",
+    "half",
+    "ready",
+    "busy",
+    "able",
+    "happy",
+    "glad",
+    "sure",
+    "fine",
+    "okay",
+    "alright",
+    "right",
+    "correct",
+    "wrong",
+    "problem",
+    "issue",
+    "issues",
+    "sorry",
+    "excuse",
+    "pardon",
+    "repeat",
+    "again",
+    "slowly",
+    "clearly",
+    "louder",
+    "line",
+    "lines",
+    "queue",
+    "appointment",
+    "booking",
+    "reservation",
+    "visit",
+    "visiting",
+    "coming",
+    "going",
+    "leaving",
+    "arrive",
+    "arrival",
+    "collect",
+    "collection",
+    "pickup",
+    "drop",
+    "dropoff",
+    "habari",
+    "jambo",
+    "sasa",
+    "asante",
+    "karibu",
+    "sawa",
+    "poa",
+    "ndio",
+    "hapana",
+    "bwana",
+    "dada",
+    "kiongozi",
+  ].map((w) => w.toLowerCase())
+);
+
+function isWeakToken(word: string): boolean {
+  const lower = word.trim().toLowerCase().replace(/[^a-z'’-]/g, "");
+  if (!lower) return true;
+  return (
+    EXTRA_SKIP.has(lower) ||
+    WEAK_SINGLE_ENGLISH.has(lower) ||
+    BLOCKED_MATCH_TOKENS.has(lower)
+  );
+}
+
+/**
+ * Strong proper-name / hard-place signal — not merely "Title Case English".
+ * camelCase brands, non-ASCII, or uncommon tokens (Kenyan names, etc.).
+ */
+function wordLooksHard(word: string): boolean {
+  const w = word.trim();
+  if (w.length < 3) return false;
+  if (isWeakToken(w)) return false;
+  if (/[^\x00-\x7F]/.test(w)) return true;
+  if (/[a-z][A-Z]/.test(w)) return true; // ChapterOne
+  // Uncommon Title Case token ≥4 letters — likely a person/place name
+  if (/^[A-Z][a-zA-Z'’]{3,}$/.test(w)) return true;
+  return false;
+}
 
 function looksHardChunk(text: string): boolean {
   const t = text.trim();
   if (t.length < 3 || t.length > 48) return false;
   const lower = t.toLowerCase();
-  if (EXTRA_SKIP.has(lower)) return false;
+  if (EXTRA_SKIP.has(lower) || WEAK_SINGLE_ENGLISH.has(lower)) return false;
   if (/^\d+$/.test(t)) return false;
   if (/[^\x00-\x7F]/.test(t)) return true;
   if (/[a-z][A-Z]/.test(t)) return true;
-  if (/^[A-Z][a-z]{2,}/.test(t) && !EXTRA_SKIP.has(lower)) return true;
-  if (t.split(/\s+/).length >= 2) {
-    const words = t.split(/\s+/);
-    // Reject phrases made only of common words ("Thank You", "How Can")
-    if (words.every((w) => EXTRA_SKIP.has(w.toLowerCase()))) return false;
-    return true;
+
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length === 1) {
+    // Alone: only mine if it looks like a proper / hard name — not "Just"/"Money"
+    return wordLooksHard(words[0]);
   }
-  return false;
+
+  // Multi-word: require at least one strong proper-name signal
+  if (words.every((w) => isWeakToken(w))) return false;
+  return words.some((w) => wordLooksHard(w));
 }
 
 /** Extract candidate hard phrases from agent transcript text. */
@@ -118,6 +510,11 @@ export function collectKnownPronunciationHints(input: {
         first.match(/\b([A-Z][a-zA-Z'’]+(?:\s+[A-Z][a-zA-Z'’]+){0,3})\b/) ||
         null;
       if (streetRun) push(streetRun[1]);
+      // Also push individual hard tokens from the street line (Muindi, Mbingu)
+      for (const part of first.split(/\s+/)) {
+        const cleaned = part.replace(/[^a-zA-Z'’-]/g, "");
+        if (cleaned.length >= 4 && wordLooksHard(cleaned)) push(cleaned);
+      }
     }
     const landmark = String(loc.landmark || "")
       .trim()
@@ -148,6 +545,65 @@ function countHintInLines(hint: string, lines: string[]): number {
     if (hay.includes(needle)) count += 1;
   }
   return count;
+}
+
+type MineRow = {
+  label: string;
+  count: number;
+  boosted: boolean;
+  score: number;
+};
+
+function scoreRow(row: Omit<MineRow, "score">): number {
+  const words = row.label.split(/\s+/).filter(Boolean);
+  let score = row.count * 10;
+  if (row.boosted) score += 100;
+  if (words.length >= 2) score += 25;
+  if (/[a-z][A-Z]/.test(row.label)) score += 35;
+  if (/[^\x00-\x7F]/.test(row.label)) score += 20;
+  if (words.length === 1 && WEAK_SINGLE_ENGLISH.has(row.label.toLowerCase())) {
+    score -= 80;
+  }
+  // Prefer longer proper phrases slightly
+  score += Math.min(15, row.label.length);
+  return score;
+}
+
+/** Drop shorter phrases that are fully contained in a stronger longer phrase. */
+function collapseOverlaps(rows: MineRow[]): MineRow[] {
+  const sorted = [...rows].sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.label.length - a.label.length ||
+      Number(b.boosted) - Number(a.boosted)
+  );
+  const kept: MineRow[] = [];
+  for (const row of sorted) {
+    const key = row.label.toLowerCase();
+    const covered = kept.some((k) => {
+      const kk = k.label.toLowerCase();
+      if (kk === key) return true;
+      // Prefer longer: "muindi mbingu" covers "muindi"
+      if (kk.includes(key) && k.score >= row.score - 15) return true;
+      // Prefer boosted shorter profile name over noisy longer Title Case run
+      if (key.includes(kk) && row.boosted && !k.boosted && row.score > k.score) {
+        return false;
+      }
+      return false;
+    });
+    if (covered) continue;
+    // If this longer phrase contains a kept shorter boosted name, replace when stronger
+    const weakerIdx = kept.findIndex((k) => {
+      const kk = k.label.toLowerCase();
+      return key.includes(kk) && key !== kk && row.score > k.score + 10;
+    });
+    if (weakerIdx >= 0 && !kept[weakerIdx].boosted) {
+      kept.splice(weakerIdx, 1, row);
+      continue;
+    }
+    kept.push(row);
+  }
+  return kept;
 }
 
 export function mineSuggestionsFromAgentLines(opts: {
@@ -185,8 +641,34 @@ export function mineSuggestionsFromAgentLines(opts: {
     }
   }
 
-  const ranked = [...counts.values()].sort(
+  const scored: MineRow[] = [...counts.values()]
+    .map((row) => ({ ...row, score: scoreRow(row) }))
+    .filter((row) => {
+      const words = row.label.split(/\s+/);
+      const lower = row.label.toLowerCase();
+      if (EXTRA_SKIP.has(lower) || WEAK_SINGLE_ENGLISH.has(lower)) return false;
+      // Unboosted single English-ish tokens need a real signal
+      if (!row.boosted && words.length === 1) {
+        if (!wordLooksHard(row.label)) return false;
+        // Require repetition unless camelCase / non-ASCII
+        if (
+          row.count < 2 &&
+          !/[a-z][A-Z]/.test(row.label) &&
+          !/[^\x00-\x7F]/.test(row.label)
+        ) {
+          return false;
+        }
+      }
+      // Unboosted multi-word common phrases need ≥2 hits or a hard token
+      if (!row.boosted && words.length >= 2) {
+        if (!words.some((w) => wordLooksHard(w)) && row.count < 2) return false;
+      }
+      return row.score >= 20;
+    });
+
+  const ranked = collapseOverlaps(scored).sort(
     (a, b) =>
+      b.score - a.score ||
       Number(b.boosted) - Number(a.boosted) ||
       b.count - a.count ||
       b.label.length - a.label.length
@@ -219,7 +701,10 @@ export function mineSuggestionsFromAgentLines(opts: {
           : "Spotted on a recent call — train if it sounded wrong.",
       targets: [{ label: row.label, match }],
       match,
-      priority: (row.boosted ? 70 : 60) + Math.min(20, row.count * 3),
+      priority: Math.min(
+        95,
+        (row.boosted ? 72 : 58) + Math.min(22, Math.round(row.score / 8))
+      ),
     });
     if (suggestions.length >= limit) break;
   }

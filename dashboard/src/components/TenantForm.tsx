@@ -1940,7 +1940,6 @@ export function TenantForm({
             tenantId={tenant.id}
             businessName={businessName}
             agentName={agentName}
-            sonioxVoiceId={sonioxVoiceId}
             locationNotes={locationNotes}
             locations={locations}
             team={team}

@@ -6,6 +6,7 @@ import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { TenantForm } from "@/components/TenantForm";
+import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import {
   businessSettingsHref,
@@ -272,26 +273,7 @@ export function BusinessSettingsShell({
               ) : null}
 
               {tab === "test" ? (
-                <section className="rounded-2xl border border-[#0096FF]/30 bg-[#0096FF]/5 p-4 sm:p-6 sm:p-8">
-                  <h2 className="font-display tracking-tight text-[#005ccc] text-[clamp(1.25rem,4vw,1.5rem)]">
-                    Test line
-                  </h2>
-                  {pendingDid ? (
-                    <p className="mt-3 text-sm text-ink-soft">Number pending.</p>
-                  ) : (
-                    <div className="mt-6">
-                      <p className="text-sm text-ink-soft">
-                        Call your receptionist from this device.
-                      </p>
-                      <a
-                        href={`tel:${tenant.sautikit_virtual_number}`}
-                        className="mt-4 flex min-h-16 w-full items-center justify-center rounded-2xl bg-[#0096FF] px-4 py-5 text-center font-display text-[clamp(1.25rem,5vw,1.875rem)] font-semibold tracking-tight text-white shadow-sm transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 [overflow-wrap:anywhere]"
-                      >
-                        {tenant.sautikit_virtual_number}
-                      </a>
-                    </div>
-                  )}
-                </section>
+                <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />
               ) : null}
             </div>
           </div>

@@ -15,8 +15,8 @@ function clampSpeed(n) {
   return Math.min(1.3, Math.max(0.7, Number(n)));
 }
 
-/** Slightly under 1.0 often sounds clearer on Kenyan mobile calls. */
-const TTS_SPEED = clampSpeed(process.env.SONIOX_TTS_SPEED || 0.95);
+/** Slightly over 1.0 keeps Kenya EN calls snappy without sounding rushed. */
+const TTS_SPEED = clampSpeed(process.env.SONIOX_TTS_SPEED || 1.08);
 
 /** Optional slower Swahili pacing (falls back to SONIOX_TTS_SPEED). */
 function speedForLanguage(lang) {

@@ -34,7 +34,7 @@ Open-ended “learn every word from my recording” produced entries like:
 
 1. **Trained pronunciations** — see every live `say` form; **Renew** (re-record), **Edit say** (typed tweak), or **Remove**. Labels are stored with the lexicon so Renew always re-trains the real name (never the phonetic spelling).
 2. **Heard something wrong?** — type the word/sentence → **Queue to record** (best) or **Save typed spelling** (requires a say-like form).
-3. **From recent calls** — **Scan recent calls** mines hard names from agent transcripts (Title Case + profile name hints for lowercase ASR) into the queue.
+3. **From recent calls** — **Scan recent calls** mines hard names from agent transcripts (Title Case + profile name hints for lowercase ASR) into the queue. Weak single English/Sheng fillers (`Just`, `Money`, `Habari`) are skipped; profile hits and multi-word places/names rank first.
 4. **Training queue** — Greeting / Location / Team packs plus custom / mined / renew items.
 
 ## Guardrails

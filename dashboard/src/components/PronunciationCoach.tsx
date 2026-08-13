@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
   confirmPronunciationRecording,
@@ -17,14 +18,12 @@ import {
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
 import { customTrainingLine } from "@/lib/pronunciationMine";
-import {
-  buildPronunciationPacks,
-  previewSpokenLine,
-} from "@/lib/pronunciationPacks";
+import { buildPronunciationPacks } from "@/lib/pronunciationPacks";
 import {
   isPronunciationCovered,
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
+import { businessSettingsHref } from "@/lib/businessSettingsNav";
 
 type CoachItem = PronunciationSuggestion & {
   status: "todo" | "done" | "skipped";
@@ -44,7 +43,6 @@ export function PronunciationCoach({
   tenantId,
   businessName,
   agentName,
-  sonioxVoiceId,
   locations,
   team,
   initialLexicon,
@@ -54,7 +52,6 @@ export function PronunciationCoach({
   tenantId: string;
   businessName: string;
   agentName: string;
-  sonioxVoiceId?: string | null;
   locationNotes?: string;
   locations: Array<{
     label: string;
@@ -94,9 +91,6 @@ export function PronunciationCoach({
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
   const [editSay, setEditSay] = useState("");
   const [keepNote, setKeepNote] = useState<string | null>(null);
-  const [phonePreviewLoading, setPhonePreviewLoading] = useState(false);
-  const [phonePreviewError, setPhonePreviewError] = useState<string | null>(null);
-  const [phonePreviewUrl, setPhonePreviewUrl] = useState<string | null>(null);
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -215,63 +209,6 @@ export function PronunciationCoach({
     items.find((i) => i.id === activeId && i.status === "todo") ||
     todoItems[0] ||
     null;
-
-  const greetingPreview = useMemo(() => {
-    const sample =
-      agentName && businessName
-        ? `Hello, you've reached ${businessName}, this is ${agentName} speaking. How can I help?`
-        : businessName
-          ? `Thank you for calling ${businessName}.`
-          : "";
-    if (!sample) return "";
-    return previewSpokenLine(sample, lexicon);
-  }, [businessName, agentName, lexicon]);
-
-  useEffect(() => {
-    return () => {
-      if (phonePreviewUrl) URL.revokeObjectURL(phonePreviewUrl);
-    };
-  }, [phonePreviewUrl]);
-
-  async function playPhonePreview() {
-    if (!greetingPreview) return;
-    setPhonePreviewLoading(true);
-    setPhonePreviewError(null);
-    if (phonePreviewUrl) {
-      URL.revokeObjectURL(phonePreviewUrl);
-      setPhonePreviewUrl(null);
-    }
-    try {
-      const res = await fetch("/api/pronunciation/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: greetingPreview,
-          lexicon: lexiconForStorage(lexicon),
-          voiceId: sonioxVoiceId || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(
-          errJson && typeof errJson.error === "string"
-            ? errJson.error
-            : `Preview failed (${res.status})`
-        );
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setPhonePreviewUrl(url);
-      const audio = new Audio(url);
-      await audio.play();
-    } catch (err) {
-      setPhonePreviewError(
-        err instanceof Error ? err.message : "Could not play phone preview."
-      );
-    } finally {
-      setPhonePreviewLoading(false);
-    }
-  }
 
   useEffect(() => {
     if (active && active.id !== activeId) setActiveId(active.id);
@@ -585,52 +522,38 @@ export function PronunciationCoach({
         <input type="hidden" name="tts_lexicon" value={lexiconJson} />
       )}
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          {omitLexiconField ? (
-            <h3
-              id="pronunciation-coach-heading"
-              className="text-sm font-medium text-[var(--ink)]"
+      <div className="min-w-0">
+        {omitLexiconField ? (
+          <h3
+            id="pronunciation-coach-heading"
+            className="text-sm font-medium text-[var(--ink)]"
+          >
+            Practice lines
+          </h3>
+        ) : (
+          <h2
+            id="pronunciation-coach-heading"
+            className="font-display text-2xl tracking-tight text-[var(--ink)]"
+          >
+            Pronunciation Overrides
+          </h2>
+        )}
+        {cleanNote ? (
+          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
+            {cleanNote}
+          </p>
+        ) : null}
+        {omitLexiconField ? (
+          <p className="mt-1 text-xs text-[var(--ink-soft)]">
+            After you save overrides, hear the full greeting on{" "}
+            <Link
+              href={businessSettingsHref("test")}
+              className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
             >
-              Practice lines
-            </h3>
-          ) : (
-            <h2
-              id="pronunciation-coach-heading"
-              className="font-display text-2xl tracking-tight text-[var(--ink)]"
-            >
-              Pronunciation Overrides
-            </h2>
-          )}
-          {cleanNote ? (
-            <p className="mt-2 text-xs text-[var(--ok)]" role="status">
-              {cleanNote}
-            </p>
-          ) : null}
-        </div>
-        {greetingPreview ? (
-          <div className="max-w-sm text-right text-xs leading-relaxed text-[var(--ink-soft)]">
-            <span className="font-medium text-[var(--ink)]">Greeting preview</span>
-            <p className="mt-1">{greetingPreview}</p>
-            <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => playPhonePreview()}
-                disabled={phonePreviewLoading}
-                className="rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
-              >
-                {phonePreviewLoading ? "Generating…" : "Play phone preview"}
-              </button>
-              {phonePreviewUrl ? (
-                <audio src={phonePreviewUrl} controls className="max-w-full" />
-              ) : null}
-            </div>
-            {phonePreviewError ? (
-              <p className="mt-1 text-[var(--warn)]" role="alert">
-                {phonePreviewError}
-              </p>
-            ) : null}
-          </div>
+              Test
+            </Link>
+            .
+          </p>
         ) : null}
       </div>
 
@@ -1115,7 +1038,7 @@ export function PronunciationCoach({
               <div>
                 <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
                 <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                  Finds hard names from recent agent lines and your profile places. Queues them for Practice.
+                  Scans recent agent lines for hard names and profile places — skips common filler. Queues them for Practice.
                 </p>
               </div>
               <button
