@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  startTransition,
+} from "react";
 import {
   confirmPronunciationRecording,
   minePronunciationFromCallsAction,
@@ -134,7 +141,7 @@ export function PronunciationCoach({
       const fd = new FormData();
       fd.set("id", tenantId);
       fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(cleaned)));
-      persistAction(fd);
+      startTransition(() => persistAction(fd));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -353,7 +360,7 @@ export function PronunciationCoach({
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(next)));
-    persistAction(fd);
+    startTransition(() => persistAction(fd));
   }
 
   function saveEditedSay(match: string) {
@@ -371,7 +378,7 @@ export function PronunciationCoach({
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("tts_lexicon", JSON.stringify(lexiconForStorage(next)));
-    persistAction(fd);
+    startTransition(() => persistAction(fd));
   }
 
   function renewEntry(entry: TtsLexiconEntry) {
@@ -428,7 +435,7 @@ export function PronunciationCoach({
   }
 
   function keepRecording() {
-    if (!active || !audioBlob) return;
+    if (!active || !audioBlob || confirmPending) return;
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("prompt", active.prompt);
@@ -444,14 +451,14 @@ export function PronunciationCoach({
         `pronunciation-${active.id.replace(/[^a-z0-9-]/gi, "")}.webm`
       )
     );
-    confirmAction(fd);
+    startTransition(() => confirmAction(fd));
   }
 
   function scanCalls() {
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("current_lexicon", lexiconJson);
-    mineAction(fd);
+    startTransition(() => mineAction(fd));
   }
 
   function submitQuickAdd(modeAdd: "record" | "save") {
@@ -475,7 +482,7 @@ export function PronunciationCoach({
     fd.set("phrase", phrase);
     fd.set("say", addSay.trim());
     fd.set("current_lexicon", lexiconJson);
-    quickAction(fd);
+    startTransition(() => quickAction(fd));
   }
 
   const doneCount = items.filter((i) => i.status === "done").length;
