@@ -16,6 +16,7 @@ import {
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
+import { audioBlobFromPreviewResponse } from "@/lib/previewAudio";
 
 /**
  * Business Settings → Test
@@ -96,15 +97,7 @@ export function TestLinePanel({
           voiceId: sonioxVoiceId || undefined,
         }),
       });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(
-          errJson && typeof errJson.error === "string"
-            ? errJson.error
-            : `Preview failed (${res.status})`
-        );
-      }
-      const blob = await res.blob();
+      const blob = await audioBlobFromPreviewResponse(res);
       const url = URL.createObjectURL(blob);
       setPhonePreviewUrl(url);
       await new Audio(url).play();
