@@ -2054,12 +2054,14 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
     let teamDirectory = [];
+    let notifyChannels = null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
       teamDirectory = profile.teamDirectory || [];
+      notifyChannels = profile.notifyChannels || null;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
     }
@@ -2104,6 +2106,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       ownerEmail,
       body,
       lead,
+      channels: notifyChannels,
       subject: `Escalation for ${teammateLabel(teammate)}${businessName ? ` — ${businessName}` : ''}`,
     });
 
@@ -2205,11 +2208,13 @@ async function maybeSendWhatsAppNotification(callSid) {
     let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
     let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
+    let notifyChannels = null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
+      notifyChannels = profile.notifyChannels || null;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
@@ -2222,7 +2227,12 @@ async function maybeSendWhatsAppNotification(callSid) {
       recordingUrl: call.recording_url,
     };
 
-    const result = await dispatchAlert({ to: ownerNumber, email: ownerEmail, lead });
+    const result = await dispatchAlert({
+      to: ownerNumber,
+      email: ownerEmail,
+      lead,
+      channels: notifyChannels,
+    });
     if (!result.channel) {
       console.warn(`[${callSid}] Owner notify skipped (${result.reason || 'unknown'}). Lead ready:`, {
         name: call.name,
@@ -2257,11 +2267,13 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
+  let notifyChannels = null;
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
+    notifyChannels = profile.notifyChannels || null;
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for request notify failed:`,
@@ -2303,6 +2315,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     email: ownerEmail,
     body,
     lead,
+    channels: notifyChannels,
     subject: `${typeLabel} — ${businessName}`,
   });
   if (result.channel) {

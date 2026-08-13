@@ -41,6 +41,8 @@ Helpers: `deriveEscalationStage()`, `shapeEscalationNotifyOutcome()`.
 3. **Email** — Resend → tenant `alert_email`
 4. **Desk note** — always saved; soft success if 1–3 miss
 
+Owner prefs live on `tenants.notify_channels` (`{sms,whatsapp,email}`) and are edited in Business Settings → Agent Persona → **Notify channels**. Desk greys channels that are not platform-live yet (WhatsApp automated alerts = coming soon). Voice dispatch skips disabled prefs.
+
 Boot + `/healthz` expose SMS `configured` vs **`verified`** (live balance probe). Env present ≠ working key.
 
 ---
