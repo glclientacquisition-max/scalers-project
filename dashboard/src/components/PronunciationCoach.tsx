@@ -12,6 +12,7 @@ import {
 } from "@/app/(desk)/settings/pronunciationActions";
 import {
   approveGeminiScanCandidateAction,
+  batchApproveHighConfidenceGeminiAction,
   dismissGeminiScanCandidateAction,
   geminiScanRecentCallsAction,
   loadPronunciationReviewQueueAction,
@@ -148,6 +149,10 @@ export function PronunciationCoach({
     approveGeminiScanCandidateAction,
     geminiQueueInitial
   );
+  const [batchState, batchAction, batchPending] = useActionState(
+    batchApproveHighConfidenceGeminiAction,
+    geminiQueueInitial
+  );
   const [dismissState, dismissAction, dismissPending] = useActionState(
     dismissGeminiScanCandidateAction,
     geminiQueueInitial
@@ -218,6 +223,9 @@ export function PronunciationCoach({
     if (geminiState.ok) {
       setGeminiConfirmOpen(false);
       setGeminiNote(geminiState.message || null);
+      if (geminiState.lexicon) {
+        setLexicon(parseTtsLexicon(geminiState.lexicon));
+      }
       if (Array.isArray(geminiState.queue)) {
         const pending = geminiState.queue.filter((c) => c.status === "pending");
         setReviewQueue(
@@ -231,9 +239,16 @@ export function PronunciationCoach({
   }, [geminiState]);
 
   useEffect(() => {
-    const state = approveState.ok ? approveState : dismissState.ok ? dismissState : null;
+    const state = approveState.ok
+      ? approveState
+      : batchState.ok
+        ? batchState
+        : dismissState.ok
+          ? dismissState
+          : null;
     if (!state) {
       if (approveState.error) setGeminiNote(approveState.error);
+      if (batchState.error) setGeminiNote(batchState.error);
       if (dismissState.error) setGeminiNote(dismissState.error);
       return;
     }
@@ -243,7 +258,7 @@ export function PronunciationCoach({
     if (state.lexicon) {
       setLexicon(parseTtsLexicon(state.lexicon));
     }
-  }, [approveState, dismissState]);
+  }, [approveState, batchState, dismissState]);
 
   useEffect(() => {
     if (quickState.ok && quickState.lexicon) {
@@ -1210,8 +1225,9 @@ export function PronunciationCoach({
                 <div>
                   <h3 className="font-medium text-[var(--ink)]">Gemini Scan</h3>
                   <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                    AI listens to call recordings and drafts fixes for review. Nothing
-                    reaches the live lexicon until you approve.
+                    AI listens to call recordings. High-confidence fixes for names
+                    already in your profile apply automatically; everything else waits
+                    for your review.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1292,9 +1308,28 @@ export function PronunciationCoach({
 
               {reviewQueue.length > 0 ? (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">
-                    Review queue — agent mispronunciations
-                  </h4>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">
+                      Review queue — agent mispronunciations
+                    </h4>
+                    {reviewQueue.some((c) => c.confidence === "high") ? (
+                      <button
+                        type="button"
+                        disabled={batchPending || approvePending || dismissPending}
+                        onClick={() => {
+                          const fd = new FormData();
+                          fd.set("id", tenantId);
+                          fd.set("current_lexicon", lexiconJson);
+                          batchAction(fd);
+                        }}
+                        className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                      >
+                        {batchPending
+                          ? "Applying…"
+                          : "Apply all high-confidence"}
+                      </button>
+                    ) : null}
+                  </div>
                   <ul className="space-y-3" aria-label="Gemini pronunciation review queue">
                     {reviewQueue.map((c) => (
                       <li

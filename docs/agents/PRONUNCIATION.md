@@ -35,18 +35,21 @@ Open-ended “learn every word from my recording” produced entries like:
 1. **Trained pronunciations** — see every live `say` form; **Renew** (re-record), **Edit say** (typed tweak), or **Remove**. Labels are stored with the lexicon so Renew always re-trains the real name (never the phonetic spelling).
 2. **Heard something wrong?** — type the word/sentence → **Queue to record** (best) or **Save typed spelling** (requires a say-like form).
 3. **From recent calls** — **Scan recent calls** mines hard names from agent transcripts (Title Case + profile name hints for lowercase ASR) into the queue. Weak single English/Sheng fillers (`Just`, `Money`, `Habari`) are skipped; profile hits and multi-word places/names rank first.
-4. **Gemini Scan** — listens to recent **call recordings** with Gemini and drafts Fix-queue candidates (`AGENT_MISPRONUNCIATION` / `LIKELY_MISHEARD`). Drafts are **pending review only**.
+4. **Gemini Scan** — listens to recent **call recordings** with Gemini.
 5. **Training queue** — Greeting / Location / Team packs plus custom / mined / renew items.
 
-## Gemini Scan review gate (do not “helpfully” remove)
+## Gemini Scan apply policy
 
-Gemini Scan is a **drafting** tool, not an auto-trainer:
+Lexicon writes still require `approved_by` + `approved_at` (enforced in `assertApprovedForLexiconWrite`).
 
-- Suggestions land in `tenants.pronunciation_review_queue` with `source: "gemini_scan"` and `status: "pending"`.
-- They **must not** write `tts_lexicon` until a human Approve sets `approved_by` + `approved_at` (enforced in `assertApprovedForLexiconWrite` / `candidateToLexiconEntry`).
-- There is **no** auto-approve / high-confidence bypass — not even behind an env flag.
+| Path | What happens |
+| --- | --- |
+| **Safe auto-apply** | After AI listen: **high-confidence** `AGENT_MISPRONUNCIATION` that match **profile names/places** (business, agent, team, locations) are stamped with the signed-in owner and written to `tts_lexicon`. |
+| **Batch approve** | Owner clicks **Apply all high-confidence** for remaining speech fixes (explicit stamp). |
+| **Single Approve** | Owner reviews / edits say-as, then Approves. |
+| **Never auto** | Free-form guesses, medium/low confidence, blocked commons, `LIKELY_MISHEARD` (STT hints only). |
+
 - Reject / Snooze records a dismissal key so the same call+word does not resurface.
-- `LIKELY_MISHEARD` is an STT hint — never a TTS lexicon write.
 - Heuristic **Scan recent calls** remains a separate candidate source feeding Practice.
 
 Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / log columns.
