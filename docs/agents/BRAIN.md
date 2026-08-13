@@ -24,6 +24,8 @@ Use for prompts, conversation policy, tools, live knowledge, hours/bulletin logi
 
 Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain tools change (`save_caller_info`, escalate, end_call). Prefer extracting to `src/conversation/` over growing the monolith.
 
+**MVP product job:** Onboard a business → the DID answers unanswered calls efficiently (greet, hours/location/FAQ, message/hold/escalate, notify). Full-assist resolution remains the north star (`docs/BUSINESS_INTELLIGENCE_ROADMAP.md`) but does not block MVP. Gate: `docs/MVP_SHIP_AND_TEST.md` + `npm run test:mvp`.
+
 ## Do not touch
 
 - `src/speech/**`, media PCM / barge-in / Soniox wiring (Voice)
@@ -70,7 +72,8 @@ Core runtime modules:
 
 ## Test / verify
 
-- Escalation smoke: `node scripts/smoke-escalation-scenarios.js` (when relevant)
+- **MVP ship gate:** `npm run test:mvp` (Brain + knowledge + retail/escalation/MVP smokes). Live DID pack: `docs/MVP_SHIP_AND_TEST.md`
+- Escalation smoke: `npm run smoke:escalation` (or `node scripts/smoke-escalation-scenarios.js`)
 - Brain outcomes: `npm run test:brain`
 - Manual: change settings → compile → place a test call; confirm CONTEXT HEADER / ground truth behavior
 - Do not require `npm run test:voice` unless you touched media path (you shouldn’t)

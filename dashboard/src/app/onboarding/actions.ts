@@ -49,6 +49,7 @@ export async function completeOnboardingAction(
   const directions = String(formData.get("directions") || "").trim();
   const tone = parseAgentTone(String(formData.get("tone") || ""));
   const handoffMode = parseHandoffMode(formData.get("handoff_mode"));
+  const agentNameInput = String(formData.get("agent_name") || "").trim();
 
   if (servicesPricing.length < 12) {
     return {
@@ -66,7 +67,7 @@ export async function completeOnboardingAction(
   const businessLocations = [
     {
       label: "Main",
-      address: hoursLocation.slice(0, 200),
+      address: landmark || hoursLocation.slice(0, 200),
       landmark,
       directions,
       coverage_notes: "",
@@ -78,6 +79,10 @@ export async function completeOnboardingAction(
     servicesPricing,
     hoursLocation,
     landmark,
+    businessName: tenant.business_name,
+    whatsapp: tenant.whatsapp_notification_number,
+    alertEmail: tenant.alert_email,
+    agentName: agentNameInput,
   });
   const servicesOffered =
     formatServicesForCompiler(seed.servicesCatalog, servicesPricing) ||
@@ -97,12 +102,14 @@ export async function completeOnboardingAction(
     servicesOffered,
     businessHours: hoursLocation,
     agentTone: tone,
+    agentName: seed.agentName,
     vertical,
     handoffMode,
     locationsText,
     policiesText,
     faqs: seed.faqs,
     unknownAnswerFallback: seed.unknownAnswerFallback || undefined,
+    teamDirectory: seed.teamDirectory,
   });
 
   if (!prompt || prompt.length < 80) {
@@ -111,7 +118,16 @@ export async function completeOnboardingAction(
 
   // Guard: compiled prompt must not look like the signup default.
   if (tenantNeedsOnboarding({ business_name: tenant.business_name, llm_system_prompt: prompt })) {
-    prompt = compilePromptLocally(tenant.business_name, answers);
+    prompt = compilePromptLocally(tenant.business_name, answers, {
+      agentName: seed.agentName,
+      faqs: seed.faqs,
+      unknownAnswerFallback: seed.unknownAnswerFallback || undefined,
+      teamDirectory: seed.teamDirectory,
+      vertical,
+      handoffMode,
+      locationsText,
+      policiesText,
+    });
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -124,12 +140,21 @@ export async function completeOnboardingAction(
     services_catalog: seed.servicesCatalog,
     business_hours: hoursLocation,
     agent_tone: tone,
+    agent_name: seed.agentName,
     vertical,
     handoff_mode: handoffMode,
     business_locations: businessLocations,
     faqs: seed.faqs,
     llm_system_prompt: prompt,
+    agent_tools: seed.agentTools,
+    after_hours_mode: seed.afterHoursMode,
   };
+  if (seed.hoursSchedule) {
+    patch.hours_schedule = seed.hoursSchedule;
+  }
+  if (seed.teamDirectory.length) {
+    patch.team_directory = seed.teamDirectory;
+  }
   if (seed.businessPolicies) {
     patch.business_policies = seed.businessPolicies;
   }

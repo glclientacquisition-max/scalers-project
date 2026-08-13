@@ -53,6 +53,7 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
   const [directions, setDirections] = useState("");
   const [tone, setTone] = useState<OnboardingTone | "">("");
   const [handoffMode, setHandoffMode] = useState<HandoffMode>("callback");
+  const [agentName, setAgentName] = useState("Receptionist");
   const [state, formAction, pending] = useActionState(completeOnboardingAction, initial);
   const [visible, setVisible] = useState(true);
 
@@ -133,13 +134,14 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
         <input type="hidden" name="directions" value={directions} />
         <input type="hidden" name="tone" value={tone} />
         <input type="hidden" name="handoff_mode" value={handoffMode} />
+        <input type="hidden" name="agent_name" value={agentName} />
 
         {step === 0 ? (
           <div>
             <h2 className="font-display text-2xl text-[var(--ink)]">Business type</h2>
             <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-              We train your receptionist for how {businessName} actually works. Start with
-              retail if you sell products.
+              Goal: when callers miss you, {businessName} answers live — hours, location,
+              FAQs, and messages to your WhatsApp. Start with retail if you sell products.
             </p>
             <div className="mt-5 space-y-3">
               {VERTICAL_OPTIONS.map((opt) => {
@@ -194,7 +196,7 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
           <div>
             <h2 className="font-display text-2xl text-[var(--ink)]">Hours & location</h2>
             <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-              When are you open, and how should callers find you?
+              Clear times let the line say open or closed honestly when callers miss you.
             </p>
             <textarea
               autoFocus
@@ -202,7 +204,7 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
               onChange={(e) => setHoursLocation(e.target.value)}
               rows={5}
               placeholder={
-                "e.g. Mon–Sat 8:00am–6:00pm EAT. Closed Sundays.\nWestlands, Nairobi. We cover nearby estates."
+                "Monday – Saturday: 9:00 AM – 7:00 PM. Sunday: Closed.\nWestlands, Nairobi."
               }
               className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
             />
@@ -236,10 +238,23 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
         {step === 3 ? (
           <div className="space-y-8">
             <div>
-              <h2 className="font-display text-2xl text-[var(--ink)]">Tone of voice</h2>
+              <h2 className="font-display text-2xl text-[var(--ink)]">Receptionist name & tone</h2>
               <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-                How should callers feel when they reach your AI receptionist?
+                How should callers feel when they reach your line?
               </p>
+              <label
+                className="mt-5 block text-sm font-medium text-[var(--ink)]"
+                htmlFor="agent_name_field"
+              >
+                Receptionist name
+              </label>
+              <input
+                id="agent_name_field"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="Receptionist"
+                className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)]"
+              />
               <div className="mt-5 space-y-3">
                 {TONE_OPTIONS.map((opt) => {
                   const selected = tone === opt.id;
@@ -269,7 +284,8 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
             <div>
               <h3 className="text-sm font-medium text-[var(--ink)]">When a human is needed</h3>
               <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                You can change this later in Business settings.
+                Messages and escalations go to the WhatsApp you used at signup. You can
+                change this later in Settings.
               </p>
               <div className="mt-3 space-y-3">
                 {HANDOFF_OPTIONS.map((opt) => {

@@ -6,6 +6,9 @@ import {
   type ServiceItem,
 } from "@/lib/servicesCatalog";
 import { clampFaq, FAQ_MAX, FAQ_STARTERS } from "@/lib/faqs";
+import type { HoursSchedule } from "@/lib/hoursSchedule";
+import { parseHoursNotesToSchedule } from "@/lib/ingest/extract";
+import type { TeamMember } from "@/lib/onboarding";
 
 /** Retail-focused golden FAQs seeded at onboarding (owner can edit in Train). */
 export const RETAIL_FAQ_STARTERS: FaqEntry[] = [
@@ -57,6 +60,52 @@ export function retailUnknownFallback(): string {
   return "I don't have that exact detail — I can note it for the team or log a hold/enquiry for you.";
 }
 
+/**
+ * Turn onboarding hours prose into a structured EAT schedule so open/closed
+ * works on live calls (MVP: answer unanswered lines honestly).
+ */
+export function hoursScheduleFromOnboardingText(
+  hoursLocation: string,
+  locationHint = ""
+): HoursSchedule | null {
+  const text = String(hoursLocation || "").trim();
+  if (!text) return null;
+  const parsed = parseHoursNotesToSchedule(text, locationHint);
+  if (parsed) return parsed;
+
+  const range = text.match(
+    /(\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?)\s*[-–—to]+\s*(\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?)/i
+  );
+  if (!range) return null;
+
+  // Normalize bare time ranges to Mon–Sat so open/closed works after onboarding.
+  const normalized = `Monday – Saturday: ${range[1]} – ${range[2]}. Sunday: Closed.`;
+  return parseHoursNotesToSchedule(normalized, locationHint);
+}
+
+/** Owner catch-all so “talk to a human” can notify after onboarding. */
+export function seedOwnerCatchAllTeam(opts: {
+  businessName?: string;
+  whatsapp?: string | null;
+  email?: string | null;
+}): TeamMember[] {
+  const phone = String(opts.whatsapp || "").trim();
+  const email = String(opts.email || "").trim();
+  if (!phone && !email) return [];
+  return [
+    {
+      name: String(opts.businessName || "Owner").trim().slice(0, 80) || "Owner",
+      role: "General queries",
+      phone,
+      email,
+    },
+  ];
+}
+
+export function defaultAgentNameForBusiness(_businessName: string): string {
+  return "Receptionist";
+}
+
 /** Build a short services catalog from free-text onboarding (or retail defaults). */
 export function seedServicesFromOnboardingText(
   servicesPricing: string,
@@ -103,20 +152,29 @@ export function buildRetailOnboardingSeed(opts: {
   servicesPricing: string;
   hoursLocation: string;
   landmark?: string;
+  businessName?: string;
+  whatsapp?: string | null;
+  alertEmail?: string | null;
+  agentName?: string | null;
 }): {
   servicesCatalog: ServiceItem[];
   faqs: FaqEntry[];
   businessPolicies: BusinessPolicies | null;
   unknownAnswerFallback: string | null;
+  hoursSchedule: HoursSchedule | null;
+  teamDirectory: TeamMember[];
+  agentName: string;
+  agentTools: { escalate: boolean; end_call: boolean };
+  afterHoursMode: "serve" | "message";
 } {
   const vertical = String(opts.vertical || "general");
+  const landmark = String(opts.landmark || "").trim();
   const faqs = seedFaqsForVertical(vertical).map((f) => {
-    // Personalize location FAQ when we have hours/landmark text.
     if (
       /where are you located/i.test(f.question) &&
-      (opts.landmark || opts.hoursLocation)
+      (landmark || opts.hoursLocation)
     ) {
-      const bits = [opts.landmark, opts.hoursLocation]
+      const bits = [landmark, opts.hoursLocation]
         .map((s) => String(s || "").trim())
         .filter(Boolean);
       if (bits.length) {
@@ -135,6 +193,15 @@ export function buildRetailOnboardingSeed(opts: {
     return f;
   });
 
+  const hoursSchedule = hoursScheduleFromOnboardingText(
+    opts.hoursLocation,
+    landmark
+  );
+
+  const agentName =
+    String(opts.agentName || "").trim() ||
+    defaultAgentNameForBusiness(opts.businessName || "");
+
   return {
     servicesCatalog: seedServicesFromOnboardingText(
       opts.servicesPricing,
@@ -144,5 +211,14 @@ export function buildRetailOnboardingSeed(opts: {
     businessPolicies: vertical === "retail" ? retailStarterPolicies() : null,
     unknownAnswerFallback:
       vertical === "retail" ? retailUnknownFallback() : null,
+    hoursSchedule,
+    teamDirectory: seedOwnerCatchAllTeam({
+      businessName: opts.businessName,
+      whatsapp: opts.whatsapp,
+      email: opts.alertEmail,
+    }),
+    agentName,
+    agentTools: { escalate: true, end_call: true },
+    afterHoursMode: "serve",
   };
 }
