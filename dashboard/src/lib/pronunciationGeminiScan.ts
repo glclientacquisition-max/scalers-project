@@ -1,6 +1,9 @@
 /**
  * Gemini Scan — listen to call recordings and draft Fix-queue candidates.
- * Never writes live tts_lexicon; human approve is mandatory.
+ *
+ * Safe auto-apply: high-confidence AGENT_MISPRONUNCIATION that match known
+ * profile names (business / agent / team / places) may write tts_lexicon when
+ * stamped with the signed-in owner's id. Free-form guesses stay pending.
  */
 
 import {
@@ -56,11 +59,13 @@ export type PronunciationReviewCandidate = {
   call_id: string;
   status: GeminiScanCandidateStatus;
   created_at: string;
-  /** Set only by a real human approve action — required before lexicon write. */
+  /** Owner user id (or batch/auto stamp) — required before lexicon write. */
   approved_by?: string | null;
   approved_at?: string | null;
   /** Edited say-as before approve (AGENT_MISPRONUNCIATION only). */
   edited_say?: string | null;
+  /** True when applied via profile auto-apply or batch approve. */
+  auto_applied?: boolean;
 };
 
 export type PronunciationScanDismissal = {
@@ -263,6 +268,7 @@ export function parseReviewQueue(raw: unknown): PronunciationReviewCandidate[] {
       approved_at:
         row.approved_at == null ? null : String(row.approved_at),
       edited_say: row.edited_say == null ? null : String(row.edited_say),
+      auto_applied: Boolean(row.auto_applied),
     });
   }
   return out.slice(0, QUEUE_MAX);
@@ -321,8 +327,8 @@ export function parseScanLogs(raw: unknown): PronunciationGeminiScanLog[] {
 }
 
 /**
- * Hard product rule: gemini_scan candidates cannot enter the live lexicon
- * unless a human approve action set approved_by + approved_at.
+ * Lexicon write gate: AGENT_MISPRONUNCIATION only, with approved_by + approved_at.
+ * Stamps come from owner Approve, batch approve, or safe profile auto-apply.
  */
 export function assertApprovedForLexiconWrite(
   candidate: PronunciationReviewCandidate
@@ -340,17 +346,94 @@ export function assertApprovedForLexiconWrite(
   if (candidate.status !== "approved") {
     return {
       ok: false,
-      error: "Candidate must be approved by a human before lexicon write.",
+      error: "Candidate must be approved before lexicon write.",
     };
   }
   if (!candidate.approved_by || !candidate.approved_at) {
     return {
       ok: false,
-      error:
-        "Missing approved_by/approved_at — gemini_scan suggestions cannot auto-apply.",
+      error: "Missing approved_by/approved_at — cannot write lexicon.",
     };
   }
   return { ok: true };
+}
+
+export function normalizePhraseKey(phrase: string): string {
+  return String(phrase || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** True when the phrase is (or tightly matches) a known profile name/place. */
+export function matchesProfileHint(
+  phrase: string,
+  profileHints: string[]
+): boolean {
+  const key = normalizePhraseKey(phrase);
+  if (key.length < 2) return false;
+  for (const hint of profileHints || []) {
+    const h = normalizePhraseKey(hint);
+    if (!h) continue;
+    if (key === h) return true;
+    // "Muindi Mbingu" vs "Muindi Mbingu Street"
+    if (h.startsWith(key + " ") || key.startsWith(h + " ")) return true;
+    // Single token overlap only for longer proper names (≥5 chars)
+    const keyParts = key.split(" ").filter((p) => p.length >= 5);
+    const hintParts = new Set(h.split(" ").filter((p) => p.length >= 5));
+    if (keyParts.length && keyParts.every((p) => hintParts.has(p))) return true;
+  }
+  return false;
+}
+
+/**
+ * Safe auto-apply eligibility: high-confidence speech fix for a known
+ * profile name/place — never free-form / blocked commons / STT hints.
+ */
+export function canAutoApplyProfileCandidate(
+  candidate: PronunciationReviewCandidate,
+  profileHints: string[]
+): boolean {
+  if (candidate.source !== "gemini_scan") return false;
+  if (candidate.type !== "AGENT_MISPRONUNCIATION") return false;
+  if (candidate.status !== "pending") return false;
+  if (candidate.confidence !== "high") return false;
+  const match = matchPatternFromPhrase(candidate.word_or_phrase);
+  if (!match || isBlockedMatch(match)) return false;
+  if (!sanitizeSayForm(candidate.suggested_form || "")) return false;
+  return matchesProfileHint(candidate.word_or_phrase, profileHints);
+}
+
+export function stampCandidateApproved(
+  candidate: PronunciationReviewCandidate,
+  opts: { approvedBy: string; autoApplied?: boolean; editedSay?: string | null }
+): PronunciationReviewCandidate {
+  return {
+    ...candidate,
+    status: "approved",
+    approved_by: opts.approvedBy,
+    approved_at: new Date().toISOString(),
+    auto_applied: Boolean(opts.autoApplied),
+    edited_say:
+      opts.editedSay != null ? opts.editedSay : candidate.edited_say ?? null,
+  };
+}
+
+export function partitionAutoApplyCandidates(
+  candidates: PronunciationReviewCandidate[],
+  profileHints: string[]
+): {
+  autoApply: PronunciationReviewCandidate[];
+  pending: PronunciationReviewCandidate[];
+} {
+  const autoApply: PronunciationReviewCandidate[] = [];
+  const pending: PronunciationReviewCandidate[] = [];
+  for (const c of candidates) {
+    if (canAutoApplyProfileCandidate(c, profileHints)) autoApply.push(c);
+    else pending.push(c);
+  }
+  return { autoApply, pending };
 }
 
 export function candidateToLexiconEntry(

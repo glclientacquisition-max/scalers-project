@@ -12,6 +12,7 @@ import {
 } from "@/app/(desk)/settings/pronunciationActions";
 import {
   approveGeminiScanCandidateAction,
+  batchApproveHighConfidenceGeminiAction,
   dismissGeminiScanCandidateAction,
   geminiScanRecentCallsAction,
   loadPronunciationReviewQueueAction,
@@ -154,6 +155,10 @@ export function PronunciationCoach({
     approveGeminiScanCandidateAction,
     geminiQueueInitial
   );
+  const [batchState, batchAction, batchPending] = useActionState(
+    batchApproveHighConfidenceGeminiAction,
+    geminiQueueInitial
+  );
   const [dismissState, dismissAction, dismissPending] = useActionState(
     dismissGeminiScanCandidateAction,
     geminiQueueInitial
@@ -224,6 +229,9 @@ export function PronunciationCoach({
     if (geminiState.ok) {
       setGeminiConfirmOpen(false);
       setGeminiNote(geminiState.message || null);
+      if (geminiState.lexicon) {
+        setLexicon(parseTtsLexicon(geminiState.lexicon));
+      }
       if (Array.isArray(geminiState.queue)) {
         const pending = geminiState.queue.filter((c) => c.status === "pending");
         setReviewQueue(
@@ -237,9 +245,16 @@ export function PronunciationCoach({
   }, [geminiState]);
 
   useEffect(() => {
-    const state = approveState.ok ? approveState : dismissState.ok ? dismissState : null;
+    const state = approveState.ok
+      ? approveState
+      : batchState.ok
+        ? batchState
+        : dismissState.ok
+          ? dismissState
+          : null;
     if (!state) {
       if (approveState.error) setGeminiNote(approveState.error);
+      if (batchState.error) setGeminiNote(batchState.error);
       if (dismissState.error) setGeminiNote(dismissState.error);
       return;
     }
@@ -249,7 +264,7 @@ export function PronunciationCoach({
     if (state.lexicon) {
       setLexicon(parseTtsLexicon(state.lexicon));
     }
-  }, [approveState, dismissState]);
+  }, [approveState, batchState, dismissState]);
 
   useEffect(() => {
     if (quickState.ok && quickState.lexicon) {
@@ -1106,12 +1121,30 @@ export function PronunciationCoach({
         <div className="space-y-8">
           {/* 1) Needs review — decisions first */}
           <div className="space-y-3">
-            <div>
-              <h3 className="font-medium text-[var(--ink)]">Needs review</h3>
-              <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                AI drafts and hearing hints wait here. Nothing changes live speech until
-                you act — <span className="font-medium">Record</span> is best.
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-medium text-[var(--ink)]">Needs review</h3>
+                <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
+                  Profile-name fixes may already have auto-applied after AI listen.
+                  Remaining drafts wait here — <span className="font-medium">Record</span>{" "}
+                  is best for unfamiliar words.
+                </p>
+              </div>
+              {reviewQueue.some((c) => c.confidence === "high") ? (
+                <button
+                  type="button"
+                  disabled={batchPending || approvePending || dismissPending}
+                  onClick={() => {
+                    const fd = new FormData();
+                    fd.set("id", tenantId);
+                    fd.set("current_lexicon", lexiconJson);
+                    batchAction(fd);
+                  }}
+                  className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                >
+                  {batchPending ? "Applying…" : "Apply all high-confidence"}
+                </button>
+              ) : null}
             </div>
 
             {geminiNote ? (
@@ -1347,8 +1380,8 @@ export function PronunciationCoach({
             <div>
               <h3 className="font-medium text-[var(--ink)]">Find more</h3>
               <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                Quick scan reads transcripts. AI listen reviews recordings and drafts
-                items above — never auto-applies.
+                Quick scan reads transcripts. AI listen reviews recordings —
+                high-confidence profile names apply automatically; the rest land above.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">

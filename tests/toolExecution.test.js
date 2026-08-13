@@ -221,6 +221,52 @@ describe('validated tool execution', () => {
     );
   });
 
+  it('rejects orders for titles missing from the grounded catalogue', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"order","name":"Jane","item":"I have to make habits"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      productCatalog: [{ name: 'Rich Dad Poor Dad', category: 'Finance' }],
+      handlers: {
+        createServiceRequest: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.equal(execution.results[0].code, 'catalog_miss');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /enquiry or quote/i);
+  });
+
+  it('grounds matching catalogue titles on orders', async () => {
+    let saved = null;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"order","name":"Sam","item":"rich dad"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      productCatalog: [
+        { name: 'Rich Dad Poor Dad', aliases: ['rich dad'] },
+        { name: 'Think and Grow Rich' },
+      ],
+      handlers: {
+        createServiceRequest: async (request) => {
+          saved = request;
+          return { id: 'req_3', request_type: request.type };
+        },
+      },
+    });
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.equal(saved.type, 'order');
+    assert.equal(saved.item, 'Rich Dad Poor Dad');
+  });
+
   it('rejects orders missing a caller name', async () => {
     let calls = 0;
     const parsed = parseGeminiResponse(

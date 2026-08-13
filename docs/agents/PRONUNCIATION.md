@@ -37,12 +37,12 @@ Open-ended “learn every word from my recording” produced entries like:
 | Step | Where | What |
 | --- | --- | --- |
 | 1 | **Practice** | Run Greeting / Location / Team packs. **Use this take** saves to live lexicon. |
-| 2 | **Fix → Needs review** | Clear AI drafts first. Primary: **Record**. Secondary: **Approve spelling**. Reject/Snooze under More. |
+| 2 | **Fix → Needs review** | Clear remaining AI drafts. Primary: **Record**. Secondary: **Approve spelling** / **Apply all high-confidence**. Reject/Snooze under More. |
 | 3 | **Fix → Add a fix** | Type the bad name → **Record & train**. Typed spelling is a fallback (“Or save a spelling…”). |
-| 4 | **Fix → Find more** | **Quick scan** = transcripts → Practice. **AI listen** = Gemini on recordings → Needs review (never auto-applies). |
+| 4 | **Fix → Find more** | **Quick scan** = transcripts → Practice. **AI listen** = Gemini on recordings; high-confidence **profile names** auto-apply, everything else → Needs review. |
 | 5 | **Test** | **Play phone preview** (same Soniox path as calls), then tap the live DID. |
 
-**Do not** train common English (`where`, `city`, …). **Do** prefer real audio over AI phonetic guesses.
+**Do not** train common English (`where`, `city`, …). **Do** prefer real audio over AI phonetic guesses for unfamiliar words.
 
 ### Tabs (unchanged product shape)
 
@@ -50,15 +50,18 @@ Open-ended “learn every word from my recording” produced entries like:
 2. **Practice** — packs + mined / renew / record-from-review items.
 3. **Fix** — Needs review → Add a fix → Find more (Quick scan + AI listen).
 
-## Gemini Scan review gate (do not “helpfully” remove)
+## Gemini Scan apply policy
 
-Gemini Scan is a **drafting** tool, not an auto-trainer:
+Lexicon writes still require `approved_by` + `approved_at` (enforced in `assertApprovedForLexiconWrite`).
 
-- Suggestions land in `tenants.pronunciation_review_queue` with `source: "gemini_scan"` and `status: "pending"`.
-- They **must not** write `tts_lexicon` until a human Approve sets `approved_by` + `approved_at` (enforced in `assertApprovedForLexiconWrite` / `candidateToLexiconEntry`).
-- There is **no** auto-approve / high-confidence bypass — not even behind an env flag.
+| Path | What happens |
+| --- | --- |
+| **Safe auto-apply** | After AI listen: **high-confidence** `AGENT_MISPRONUNCIATION` that match **profile names/places** (business, agent, team, locations) are stamped with the signed-in owner and written to `tts_lexicon`. |
+| **Batch approve** | Owner clicks **Apply all high-confidence** for remaining speech fixes (explicit stamp). |
+| **Single Approve** | Owner reviews / edits say-as, then Approves. |
+| **Never auto** | Free-form guesses, medium/low confidence, blocked commons, `LIKELY_MISHEARD` (STT hints only). |
+
 - Reject / Snooze records a dismissal key so the same call+word does not resurface.
-- `LIKELY_MISHEARD` is an STT hint — never a TTS lexicon write.
 - Heuristic **Scan recent calls** remains a separate candidate source feeding Practice.
 
 Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / log columns.

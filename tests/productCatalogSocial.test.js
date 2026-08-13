@@ -101,10 +101,12 @@ describe('product catalogue + social handles', () => {
       { name: 'Harry Potter Series', category: 'Children', price: '1200' },
       { name: 'Diary of a Wimpy Kid Series', category: 'Children', price: '' },
       { name: 'Rich Dad Poor Dad', category: 'Financial Education', price: '900' },
+      { name: 'Outwitting the Devil', category: 'Financial Education', price: '' },
     ];
     const overview = formatProductsOverview(catalog);
-    assert.match(overview, /4 titles on file/);
+    assert.match(overview, /5 titles on file/);
     assert.match(overview, /TARGETED PRODUCT MATCHES/);
+    assert.match(overview, /RECOMMEND RULE/);
 
     const kids = selectProductsForTurn({
       catalog,
@@ -113,6 +115,21 @@ describe('product catalogue + social handles', () => {
     });
     assert.ok(kids.some((p) => /Harry Potter/i.test(p.name)));
     assert.ok(kids.every((p) => /Children/i.test(p.category)));
+
+    const philosophy = selectProductsForTurn({
+      catalog,
+      queryText: 'Can you recommend a philosophy book?',
+      intent: 'product_inquiry',
+    });
+    assert.equal(philosophy.length, 0);
+    const miss = formatTargetedProductsForPrompt(philosophy, {
+      totalCatalogSize: catalog.length,
+      queryText: 'Can you recommend a philosophy book?',
+      catalog,
+    });
+    assert.match(miss, /CATEGORY MISS/i);
+    assert.match(miss, /philosophy/i);
+    assert.doesNotMatch(miss, /Outwitting the Devil/);
 
     const money = selectProductsForTurn({
       catalog,
@@ -123,7 +140,7 @@ describe('product catalogue + social handles', () => {
       },
     });
     assert.equal(money[0].name, 'The Smart Money Tribe');
-    const block = formatTargetedProductsForPrompt(money, { totalCatalogSize: 4 });
+    const block = formatTargetedProductsForPrompt(money, { totalCatalogSize: 5 });
     assert.match(block, /TARGETED PRODUCT MATCHES/);
     assert.match(block, /Price: unknown/);
   });
