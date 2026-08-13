@@ -1038,7 +1038,7 @@ export function PronunciationCoach({
               <div>
                 <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
                 <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                  Finds hard names from recent agent lines and your profile places. Queues them for Practice.
+                  Scans recent agent lines for hard names and profile places — skips common filler. Queues them for Practice.
                 </p>
               </div>
               <button

@@ -123,4 +123,45 @@ describe("call mining", () => {
     });
     assert.ok(!suggestions.some((s) => /^aisha$/i.test(s.targets[0].label)));
   });
+
+  it("rejects weak filler singles that polluted earlier scans", () => {
+    const suggestions = mineSuggestionsFromAgentLines({
+      lines: [
+        "Just a moment please.",
+        "The money is ready.",
+        "Habari, how can I help you today?",
+        "Good morning and thank you for calling.",
+        "We are on Muindi Mbingu Street.",
+        "We are on Muindi Mbingu Street again.",
+      ],
+      existingLexicon: [],
+      knownHints: ["Muindi Mbingu Street"],
+      limit: 8,
+    });
+    const labels = suggestions.map((s) => s.targets[0].label.toLowerCase());
+    assert.ok(
+      !labels.some((l) =>
+        /^(just|money|habari|good|morning|thank|please|moment)$/.test(l)
+      ),
+      `unexpected weak labels: ${labels.join(", ")}`
+    );
+    assert.ok(
+      labels.some((l) => /muindi/.test(l)),
+      `expected Muindi hit, got ${labels.join(", ")}`
+    );
+  });
+
+  it("does not mine one-off weak Title Case English words", () => {
+    const suggestions = mineSuggestionsFromAgentLines({
+      lines: ["Please Hold While I Check That For You."],
+      existingLexicon: [],
+      knownHints: [],
+      limit: 6,
+    });
+    assert.equal(
+      suggestions.length,
+      0,
+      `expected empty mine, got ${JSON.stringify(suggestions.map((s) => s.targets[0].label))}`
+    );
+  });
 });
