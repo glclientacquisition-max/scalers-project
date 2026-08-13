@@ -85,6 +85,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
+import { audioBlobFromPreviewResponse } from "@/lib/previewAudio";
 import {
   ExpandTextarea,
   ToolSwitch,
@@ -539,15 +540,7 @@ export function TenantForm({
           voiceId: sonioxVoiceId || undefined,
         }),
       });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(
-          errJson && typeof errJson.error === "string"
-            ? errJson.error
-            : `Preview failed (${res.status})`
-        );
-      }
-      const blob = await res.blob();
+      const blob = await audioBlobFromPreviewResponse(res);
       const url = URL.createObjectURL(blob);
       setVoiceSampleUrl(url);
       await new Audio(url).play();

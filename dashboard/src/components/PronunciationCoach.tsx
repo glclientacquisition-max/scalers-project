@@ -216,9 +216,8 @@ export function PronunciationCoach({
   useEffect(() => {
     const fd = new FormData();
     fd.set("id", tenantId);
-    loadQueueAction(fd);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+    startTransition(() => loadQueueAction(fd));
+  }, [tenantId, loadQueueAction]);
 
   useEffect(() => {
     if (loadQueueState.ok) {
@@ -579,7 +578,7 @@ export function PronunciationCoach({
     fd.set("current_lexicon", lexiconJson);
     fd.set("batch_size", String(geminiBatch));
     if (confirmed) fd.set("confirmed", "1");
-    geminiAction(fd);
+    startTransition(() => geminiAction(fd));
   }
 
   function approveCandidate(c: PronunciationReviewCandidate) {
@@ -589,7 +588,7 @@ export function PronunciationCoach({
     fd.set("current_lexicon", lexiconJson);
     const edited = (reviewEdits[c.id] ?? c.suggested_form).trim();
     if (edited) fd.set("edited_say", edited);
-    approveAction(fd);
+    startTransition(() => approveAction(fd));
   }
 
   function dismissCandidate(
@@ -600,7 +599,7 @@ export function PronunciationCoach({
     fd.set("id", tenantId);
     fd.set("candidate_id", c.id);
     fd.set("mode", mode);
-    dismissAction(fd);
+    startTransition(() => dismissAction(fd));
   }
 
   function recordCandidateInstead(c: PronunciationReviewCandidate) {
@@ -1145,7 +1144,7 @@ export function PronunciationCoach({
                     const fd = new FormData();
                     fd.set("id", tenantId);
                     fd.set("current_lexicon", lexiconJson);
-                    batchAction(fd);
+                    startTransition(() => batchAction(fd));
                   }}
                   className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
                 >
