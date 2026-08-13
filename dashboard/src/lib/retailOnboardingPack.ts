@@ -102,7 +102,8 @@ export function seedOwnerCatchAllTeam(opts: {
   ];
 }
 
-export function defaultAgentNameForBusiness(_businessName: string): string {
+export function defaultAgentNameForBusiness(_businessName?: string): string {
+  void _businessName;
   return "Receptionist";
 }
 
