@@ -2,8 +2,8 @@
 /**
  * Smoke: TTS speaking pace (tempo), not call latency.
  *
- * 1) Confirms default speedForLanguage('en') === 1.08 when env unset
- * 2) If SONIOX_API_KEY is set, synthesizes the same line at 0.95 and 1.08
+ * 1) Confirms default speedForLanguage('en') === 1.02 when env unset
+ * 2) If SONIOX_API_KEY is set, synthesizes the same line at 0.95 and 1.02
  *    and checks the faster setting produces shorter PCM duration
  *
  * Usage: node scripts/smoke-tts-pace.js
@@ -82,12 +82,12 @@ async function main() {
 
   // Module may have loaded with env already set — report effective defaults.
   const effectiveEn = speedForLanguage('en');
-  const envSpeed = process.env.SONIOX_TTS_SPEED || '(unset → code default 1.08)';
+  const envSpeed = process.env.SONIOX_TTS_SPEED || '(unset → code default 1.02)';
   console.log(`SONIOX_TTS_SPEED env: ${envSpeed}`);
   console.log(`speedForLanguage(en): ${effectiveEn}`);
 
-  if (!process.env.SONIOX_TTS_SPEED && effectiveEn !== 1.08) {
-    console.error('FAIL: expected default EN speed 1.08');
+  if (!process.env.SONIOX_TTS_SPEED && effectiveEn !== 1.02) {
+    console.error('FAIL: expected default EN speed 1.02');
     process.exit(1);
   }
   console.log('PASS: default/effective EN speed wiring looks good');
@@ -108,7 +108,7 @@ async function main() {
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const slow = 0.95;
-  const fast = 1.08;
+  const fast = 1.02;
 
   console.log(`Synthesizing at speed=${slow} …`);
   const pcmSlow = await synthesize(TEXT, slow);
@@ -146,7 +146,7 @@ async function main() {
     )
   );
 
-  // Expect ~0.95/1.08 ≈ 0.88 duration ratio; allow noise/jitter.
+  // Expect ~0.95/1.02 ≈ 0.93 duration ratio; allow noise/jitter.
   if (!(msFast < msSlow * 0.97)) {
     console.error(
       `FAIL: speed ${fast} was not meaningfully shorter than ${slow} (${Math.round(msFast)} vs ${Math.round(msSlow)} ms)`

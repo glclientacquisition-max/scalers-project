@@ -144,15 +144,15 @@ test('SW speed env override', () => {
   else process.env.SONIOX_TTS_SPEED_SW = prev;
 });
 
-test('default speaking tempo is 1.08 when SONIOX_TTS_SPEED unset', () => {
+test('default speaking tempo is 1.02 when SONIOX_TTS_SPEED unset', () => {
   const { spawnSync } = require('child_process');
   const script = `
     delete process.env.SONIOX_TTS_SPEED;
     delete process.env.SONIOX_TTS_SPEED_EN;
     delete process.env.SONIOX_TTS_SPEED_SW;
     const { speedForLanguage } = require('./src/speech/sonioxTts');
-    if (speedForLanguage('en') !== 1.08) process.exit(2);
-    if (speedForLanguage('sw') !== 1.08) process.exit(3);
+    if (speedForLanguage('en') !== 1.02) process.exit(2);
+    if (speedForLanguage('sw') !== 1.02) process.exit(3);
   `;
   const r = spawnSync(process.execPath, ['-e', script], {
     cwd: path.join(__dirname, '..'),
@@ -162,7 +162,7 @@ test('default speaking tempo is 1.08 when SONIOX_TTS_SPEED unset', () => {
   assert.strictEqual(
     r.status,
     0,
-    `default TTS speed should be 1.08 (status=${r.status} stderr=${r.stderr})`
+    `default TTS speed should be 1.02 (status=${r.status} stderr=${r.stderr})`
   );
 });
 
