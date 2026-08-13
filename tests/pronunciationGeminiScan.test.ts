@@ -7,13 +7,17 @@ import { describe, it } from "node:test";
 
 import {
   assertApprovedForLexiconWrite,
+  canAutoApplyProfileCandidate,
   candidateToLexiconEntry,
   dismissalKey,
   extractJsonArrayText,
   issuesToCandidates,
+  matchesProfileHint,
   mergeReviewQueue,
   parseGeminiScanIssues,
+  partitionAutoApplyCandidates,
   scanCallsWithGemini,
+  stampCandidateApproved,
   type PronunciationReviewCandidate,
 } from "../dashboard/src/lib/pronunciationGeminiScan.ts";
 
@@ -74,7 +78,7 @@ describe("parseGeminiScanIssues", () => {
   });
 });
 
-describe("review gate — never auto-apply gemini_scan", () => {
+describe("review gate + safe profile auto-apply", () => {
   it("blocks lexicon write without approved_by/approved_at", () => {
     const pending: PronunciationReviewCandidate = {
       id: "gemini_scan:c1:AGENT_MISPRONUNCIATION:aisha",
@@ -123,6 +127,62 @@ describe("review gate — never auto-apply gemini_scan", () => {
     };
     assert.equal(assertApprovedForLexiconWrite(stt).ok, false);
     assert.equal(candidateToLexiconEntry(stt), null);
+  });
+
+  it("auto-applies only high-confidence profile-name speech fixes", () => {
+    const hints = [
+      "ChapterOne Bookstore",
+      "Aisha",
+      "Muindi Mbingu Street",
+      "Harrison Maina",
+    ];
+    assert.equal(matchesProfileHint("Aisha", hints), true);
+    assert.equal(matchesProfileHint("Muindi Mbingu", hints), true);
+    assert.equal(matchesProfileHint("Random Brand", hints), false);
+
+    const aisha: PronunciationReviewCandidate = {
+      id: "g1",
+      source: "gemini_scan",
+      type: "AGENT_MISPRONUNCIATION",
+      word_or_phrase: "Aisha",
+      suggested_form: "Eye-sha",
+      confidence: "high",
+      reasoning: "ok",
+      timestamp_seconds: 1,
+      call_id: "c1",
+      status: "pending",
+      created_at: new Date().toISOString(),
+    };
+    const random: PronunciationReviewCandidate = {
+      ...aisha,
+      id: "g2",
+      word_or_phrase: "Random Brand",
+      suggested_form: "Ran-dom",
+    };
+    const medium: PronunciationReviewCandidate = {
+      ...aisha,
+      id: "g3",
+      confidence: "medium",
+    };
+
+    assert.equal(canAutoApplyProfileCandidate(aisha, hints), true);
+    assert.equal(canAutoApplyProfileCandidate(random, hints), false);
+    assert.equal(canAutoApplyProfileCandidate(medium, hints), false);
+
+    const { autoApply, pending } = partitionAutoApplyCandidates(
+      [aisha, random, medium],
+      hints
+    );
+    assert.equal(autoApply.length, 1);
+    assert.equal(pending.length, 2);
+
+    const stamped = stampCandidateApproved(aisha, {
+      approvedBy: "owner-1",
+      autoApplied: true,
+    });
+    assert.equal(stamped.auto_applied, true);
+    assert.equal(assertApprovedForLexiconWrite(stamped).ok, true);
+    assert.ok(candidateToLexiconEntry(stamped));
   });
 });
 
