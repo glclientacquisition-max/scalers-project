@@ -72,20 +72,26 @@ Subscribe at least: `call.completed`, `recording.ready`.
 
 Safaricom / Airtel call-forwarding should already divert missed/busy/after-hours to the SautiKit DID.
 
-## 4. Owner alerts (WhatsApp primary → email fallback)
+## 4. Owner alerts (SMS → WhatsApp → email)
 
-**Primary (scale):** WhatsApp via SautiKit
+Channel order in `src/notifications/dispatch.js`: **TextSMS** (private-beta primary) → **WhatsApp** (SautiKit) → **email** (Resend). Desk note soft-success if nothing delivers.
+
+**Private beta primary:** TextSMS.co.ke
+
+1. Set `TEXTSMS_API_KEY` + `TEXTSMS_PARTNER_ID` + `TEXTSMS_SHORTCODE` on Railway
+2. Per business: owner notify number (`tenants.whatsapp_notification_number`) + Team Directory phones (escalation SMS)
+3. Redeploy voice server — boot log should show `✓ SMS notify ready via TextSMS`
+
+**Secondary:** WhatsApp via SautiKit (when WA sender is ready)
 
 1. Set `SAUTIKIT_API_KEY` + `SAUTIKIT_WHATSAPP_NUMBER_ID` (or `CONNECTION_ID`)
 2. Optional template: `SAUTIKIT_WHATSAPP_TEMPLATE` / `_LANG`
-3. Per business: owner alert WhatsApp number + Team Directory phones in Settings
-4. Redeploy the voice server
 
-**Fallback:** email via Resend (when WhatsApp is not ready or a send fails)
+**Fallback:** email via Resend
 
 1. Set `RESEND_API_KEY` + `ALERT_EMAIL_FROM`
 2. Optional env default: `OWNER_ALERT_EMAIL`
-3. Per business: Alert email in Settings (`tenants.alert_email`)
+3. Per business: `tenants.alert_email`
 
 Telegram is not used.
 
