@@ -1,0 +1,195 @@
+{
+  "description": "Shared tenant-agnostic TTS normalization listen fixture. Universal cases test prepareForTts/spokenForms for any business; lexicon_control cases confirm brand-name handling (swap per tenant).",
+  "datePriorityNote": "Agent transcripts (748 lines, all tenants): 0 calendar dates (12th August, 12/08/2026), 0 slash dates; weekday/relative (tomorrow, Thursday) and clock times (9:00 AM) are common. Dates stay in the fixture for pipeline regression but are deprioritized for listen fixes until live calls need them.",
+  "cases": [
+    {
+      "id": "01-price-bundle",
+      "group": "universal",
+      "category": "price",
+      "text": "3 items at KSH 1000",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "3 items at one thousand shillings",
+      "source": "bulletin pattern (3 for KSH 1000) — genericized"
+    },
+    {
+      "id": "02-price-amount",
+      "group": "universal",
+      "category": "price",
+      "text": "KSh 2,450",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "two thousand four hundred fifty shillings"
+    },
+    {
+      "id": "03-price-decimal",
+      "group": "universal",
+      "category": "price-decimal",
+      "text": "KSh 1,200.50",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "one thousand two hundred shillings"
+    },
+    {
+      "id": "04-price-range",
+      "group": "universal",
+      "category": "price-range",
+      "text": "KSh 500–800",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five hundred shillings–800"
+    },
+    {
+      "id": "05-phone-spaced-local",
+      "group": "universal",
+      "category": "phone",
+      "text": "0740 442 943",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "0740 442 943",
+      "source": "spaced Kenyan mobile — seen in live agent lines"
+    },
+    {
+      "id": "06-phone-spaced-mobile",
+      "group": "universal",
+      "category": "phone",
+      "text": "0712 345 678",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "0712 345 678"
+    },
+    {
+      "id": "07-phone-e164",
+      "group": "universal",
+      "category": "phone",
+      "text": "+254 712 345 678",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "2 5 4 7 1 2 3 4 5 6 7 8"
+    },
+    {
+      "id": "08-time-am-pm-range",
+      "group": "universal",
+      "category": "time",
+      "text": "9:00 AM to 7:00 PM",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "9 A M to 7 P M",
+      "source": "FAQ hours pattern — genericized"
+    },
+    {
+      "id": "09-time-24h",
+      "group": "universal",
+      "category": "time-24h",
+      "text": "14:30",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "14:30"
+    },
+    {
+      "id": "10-hours-line",
+      "group": "universal",
+      "category": "hours",
+      "text": "Mon-Sat: 09:00-19:00 EAT",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Monday to Saturday: 09:00-19:00 EAT"
+    },
+    {
+      "id": "11-date-ordinal",
+      "group": "universal",
+      "category": "date",
+      "text": "12th August",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "12th August",
+      "deprioritized": true
+    },
+    {
+      "id": "12-date-full",
+      "group": "universal",
+      "category": "date",
+      "text": "August 12th, 2026",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "August 12th, 2026",
+      "deprioritized": true
+    },
+    {
+      "id": "13-date-numeric",
+      "group": "universal",
+      "category": "date",
+      "text": "12/08/2026",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "12/08/2026",
+      "deprioritized": true
+    },
+    {
+      "id": "14-percent",
+      "group": "universal",
+      "category": "percent",
+      "text": "15%",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "15%"
+    },
+    {
+      "id": "15-quantity-plural",
+      "group": "universal",
+      "category": "quantity",
+      "text": "3 books",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "3 books"
+    },
+    {
+      "id": "16-quantity-singular",
+      "group": "universal",
+      "category": "quantity",
+      "text": "1 book",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "1 book"
+    },
+    {
+      "id": "17-ordinal-floor",
+      "group": "universal",
+      "category": "ordinal",
+      "text": "Shop No. M4 on the 3rd floor",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Shop No. M4 on the 3rd floor",
+      "source": "shop/ordinal pattern — genericized"
+    },
+    {
+      "id": "18-url-domain",
+      "group": "universal",
+      "category": "url",
+      "text": "examplebusiness.co.ke",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "examplebusiness.co.ke"
+    },
+    {
+      "id": "19-lexicon-brand",
+      "group": "lexicon_control",
+      "category": "lexicon-brand",
+      "text": "Manga books are available today.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Man-gah books are available today.",
+      "source": "ChapterOne bulletin pattern — tenant lexicon example; swap brand for other tenants"
+    },
+    {
+      "id": "20-lexicon-greeting",
+      "group": "lexicon_control",
+      "category": "lexicon-greeting",
+      "text": "Hello, you've reached ChapterOne Bookstore, this is Aisha speaking.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Hello, you've reached Chapter One Bookstore, this is Eye-sha speaking.",
+      "source": "ChapterOne greeting — tenant lexicon example; swap business/agent for other tenants"
+    }
+  ]
+}
