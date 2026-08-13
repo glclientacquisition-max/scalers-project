@@ -236,6 +236,29 @@ function pickContextualAck(userText, lang) {
   return asked ? 'Alright.' : 'Mm-hmm.';
 }
 
+/**
+ * Immediate progress line for action turns (order/save/escalate) so the caller
+ * hears feedback while Gemini + tools run. Not a success claim — confirmation
+ * still comes from the backend after tools finish.
+ * @param {string} action
+ * @param {string} [lang]
+ */
+function pickActionProgress(action, lang) {
+  const a = String(action || '').toUpperCase();
+  const sw = lang === 'sw' || lang === 'sheng';
+  if (sw) {
+    if (a === 'ESCALATE' || a === 'TRANSFER') return 'Sawa, ninashughulikia.';
+    if (a === 'CREATE_REQUEST') return 'Sawa, ninaokoa hiyo.';
+    if (a === 'CAPTURE') return 'Sawa.';
+    return 'Sawa, ninashughulikia.';
+  }
+  if (a === 'ESCALATE') return 'Okay, let me get the team on that.';
+  if (a === 'TRANSFER') return 'Okay, let me connect you.';
+  if (a === 'CREATE_REQUEST') return 'Okay, let me save that.';
+  if (a === 'CAPTURE') return 'Okay.';
+  return "Okay, I'm on it.";
+}
+
 const PURE_NOISE = new Set([
   'ok',
   'okay',
@@ -343,6 +366,7 @@ module.exports = {
   fallbackGreeting,
   generateDynamicGreeting,
   pickContextualAck,
+  pickActionProgress,
   cleanSpokenLine,
   greetingLooksValid,
   isNonSubstantiveTurn,
