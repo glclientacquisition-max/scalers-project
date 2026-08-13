@@ -317,6 +317,28 @@ async function markEscalationSent(callSid) {
   return Boolean(data);
 }
 
+/**
+ * Merge structured Brain summary fields into calls.summary JSON.
+ */
+async function mergeCallSummaryMeta({ callSid, patch = {} } = {}) {
+  if (!callSid || !patch || typeof patch !== 'object') return null;
+  const existing = await getCall(callSid);
+  if (!existing) return null;
+  const meta = parseSummary(existing.summary);
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    meta[key] = value;
+  }
+  const { data, error } = await supabase
+    .from('calls')
+    .update({ summary: serializeSummary(meta) })
+    .eq('sautikit_call_sid', callSid)
+    .select('id, summary')
+    .maybeSingle();
+  throwIfError('mergeCallSummaryMeta', error);
+  return data || null;
+}
+
 async function uploadRecordingBuffer({
   callSid,
   recordingSid,
@@ -1082,6 +1104,7 @@ module.exports = {
   upsertContact,
   createServiceRequest,
   updateServiceRequest,
+  mergeCallSummaryMeta,
   RECORDINGS_BUCKET,
   shapeCall,
 };

@@ -68,6 +68,13 @@ const scenarios = [
     expectMatch: null,
     expectName: null,
   },
+  {
+    name: 'Ask for manager — General queries catch-all',
+    team: ceoAndGeneral,
+    ask: 'the manager',
+    expectMatch: 'fallback',
+    expectName: 'Desk',
+  },
 ];
 
 let failed = 0;

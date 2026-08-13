@@ -84,8 +84,47 @@ describe('product catalogue + social handles', () => {
     assert.match(text, /SERVICES \(what you offer/);
     assert.match(text, /PRODUCT CATALOGUE/);
     assert.match(text, /Atomic Habits/);
+    assert.match(text, /TARGETED PRODUCT MATCHES|titles on file/i);
     assert.match(text, /PHONES, SOCIAL & WEB/);
     assert.match(text, /@bookstorechapterone/);
     assert.doesNotMatch(text, /SERVICES CATALOG:/);
+  });
+
+  it('selects targeted catalogue matches for the caller turn', () => {
+    const {
+      selectProductsForTurn,
+      formatTargetedProductsForPrompt,
+      formatProductsOverview,
+    } = require('../src/conversation/productCatalog');
+    const catalog = [
+      { name: 'The Smart Money Tribe', category: 'Financial Education', price: '' },
+      { name: 'Harry Potter Series', category: 'Children', price: '1200' },
+      { name: 'Diary of a Wimpy Kid Series', category: 'Children', price: '' },
+      { name: 'Rich Dad Poor Dad', category: 'Financial Education', price: '900' },
+    ];
+    const overview = formatProductsOverview(catalog);
+    assert.match(overview, /4 titles on file/);
+    assert.match(overview, /TARGETED PRODUCT MATCHES/);
+
+    const kids = selectProductsForTurn({
+      catalog,
+      queryText: "I'd like to order children books",
+      intent: 'order',
+    });
+    assert.ok(kids.some((p) => /Harry Potter/i.test(p.name)));
+    assert.ok(kids.every((p) => /Children/i.test(p.category)));
+
+    const money = selectProductsForTurn({
+      catalog,
+      queryText: 'How much is the smart money tribe?',
+      intent: 'price',
+      entities: {
+        product: { value: 'The Smart Money Tribe', confirmed: true },
+      },
+    });
+    assert.equal(money[0].name, 'The Smart Money Tribe');
+    const block = formatTargetedProductsForPrompt(money, { totalCatalogSize: 4 });
+    assert.match(block, /TARGETED PRODUCT MATCHES/);
+    assert.match(block, /Price: unknown/);
   });
 });

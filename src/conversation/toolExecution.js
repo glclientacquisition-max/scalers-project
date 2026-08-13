@@ -153,6 +153,16 @@ function validateEscalation(raw) {
   if (!value.reason) {
     return { valid: false, reason: 'Escalation requires a reason.' };
   }
+  if (!value.name) {
+    return {
+      valid: false,
+      reason: 'Escalation needs the caller name before notifying the team.',
+      missingSlots: ['name'],
+    };
+  }
+  if (!value.teammate) {
+    value.teammate = 'General queries';
+  }
   return { valid: true, value };
 }
 
@@ -346,7 +356,12 @@ async function executeBrainTools({
         reason: 'Escalation is not available.',
       });
     } else if (!validation.valid) {
-      results.push({ action: 'escalate', status: 'invalid', reason: validation.reason });
+      results.push({
+        action: 'escalate',
+        status: 'invalid',
+        reason: validation.reason,
+        missingSlots: validation.missingSlots || [],
+      });
     } else if (completed.has(fingerprint)) {
       results.push({ action: 'escalate', status: 'duplicate', fingerprint });
     } else {
@@ -359,6 +374,7 @@ async function executeBrainTools({
                 status: 'succeeded',
                 fingerprint,
                 channel: outcome.channel || null,
+                soft: Boolean(outcome.soft),
               }
             : {
                 action: 'escalate',
@@ -454,9 +470,24 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
 
   if (meaningful.status === 'succeeded') {
+    if (meaningful.soft) {
+      if (sw) return 'Sawa — nimewaandikia timu; watakufuatilia.';
+      if (sheng) return 'Poa — nime-note kwa team; watakufuatilia.';
+      return "Done — I've noted that for the team to follow up.";
+    }
     if (sw) return 'Sawa — nimeituma kwa timu.';
     if (sheng) return 'Poa — nimeituma kwa team.';
     return "Done — I've sent it to the team.";
+  }
+  if (meaningful.status === 'invalid') {
+    const missing = Array.isArray(meaningful.missingSlots)
+      ? meaningful.missingSlots
+      : [];
+    if (missing.includes('name') || /name/i.test(meaningful.reason || '')) {
+      if (sw) return 'Niambie jina lako ndio niwasiliane na timu.';
+      if (sheng) return 'Niambie jina yako ndio ni-reach team.';
+      return 'Tell me your name so I can reach the team for you.';
+    }
   }
   if (meaningful.status === 'duplicate') {
     if (sw) return 'Ombi hilo tayari lilitumwa.';

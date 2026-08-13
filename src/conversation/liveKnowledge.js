@@ -197,11 +197,11 @@ function buildLiveGroundTruth(profile = {}) {
     parts.push('', 'SERVICE NOTES:', extras);
   }
 
-  const { formatProductsBlock } = require('./productCatalog');
+  const { formatProductsOverview } = require('./productCatalog');
   parts.push(
     '',
-    'PRODUCT CATALOGUE (individual items — prices/stock from here only):',
-    formatProductsBlock(products)
+    'PRODUCT CATALOGUE (individual items — prices/stock from here / TARGETED PRODUCT MATCHES only):',
+    formatProductsOverview(products)
   );
 
   if (socialHandlesHaveContent(social)) {

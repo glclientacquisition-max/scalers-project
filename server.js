@@ -49,6 +49,12 @@ const {
   formatToolConfirmation,
 } = require('./src/conversation/toolExecution');
 const { deriveCallResolution } = require('./src/conversation/callResolution');
+const { deriveCallSummary } = require('./src/conversation/callSummary');
+const {
+  selectProductsForTurn,
+  formatTargetedProductsForPrompt,
+  normalizeProducts,
+} = require('./src/conversation/productCatalog');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
 const callAgentTools = new Map();
@@ -446,12 +452,32 @@ async function persistCallResolution(callSid, source = 'call') {
   if (!brainState) return null;
   try {
     const derived = deriveCallResolution({ brainState });
+    const summary = deriveCallSummary({ brainState });
     const saved = await db.setCallResolution({
       callSid,
       resolution: derived.resolution,
-      primaryIntent: derived.primaryIntent,
+      primaryIntent: derived.primaryIntent || summary.primaryIntent,
       resolutionNote: derived.resolutionNote,
     });
+    try {
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: {
+          text: summary.text,
+          brain_summary: summary.text,
+          primary_intent: derived.primaryIntent || summary.primaryIntent,
+          products: summary.products,
+          actions: summary.actions,
+          instructions: summary.instructions,
+          language: summary.language,
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `[${source}] mergeCallSummaryMeta failed:`,
+        err?.message || err
+      );
+    }
     if (saved) {
       console.log(
         `[${source}] call resolution ${callSid} → ${derived.resolution}` +
@@ -1166,10 +1192,20 @@ mediaWss.on('connection', (ws, req) => {
     transcriptLog.push(`Caller: ${clean}`);
     messages.push({ role: 'user', content: clean });
 
+    const turnMatches = selectProductsForTurn({
+      catalog: brainProfile.productCatalog,
+      queryText: clean,
+      entities: brainState.entities,
+      intent: brainState.intent,
+    });
+    const catalogSize = normalizeProducts(brainProfile.productCatalog).length;
     const turnSystemPrompt = [
       systemPrompt,
       formatAuthorityPolicy(capabilities),
       formatBrainStateForPrompt(brainState),
+      formatTargetedProductsForPrompt(turnMatches, {
+        totalCatalogSize: catalogSize,
+      }),
       languageDirective(callLanguage),
     ].join('\n\n');
 
@@ -1868,11 +1904,19 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         ownerEmail: ownerEmail || null,
         teammatePhone: teammate?.phone || null,
       });
+      // Desk already has the escalation note via saveEscalation — treat as soft success
+      // so the caller hears a follow-up promise instead of a hard failure.
       const refreshed = await db.getCall(callSid);
       if (refreshed?.name && refreshed?.reason) {
         await maybeSendWhatsAppNotification(callSid);
       }
-      return { ok: false, reason: 'No working escalation channel.' };
+      await db.markEscalationSent(callSid);
+      return {
+        ok: true,
+        soft: true,
+        channel: 'desk_note',
+        reason: 'No live WA/email channel; escalation saved on the call for the desk.',
+      };
     }
 
     for (const s of sent) {
@@ -2126,10 +2170,20 @@ wss.on('connection', (ws) => {
           state: brainState,
           decision,
         });
+        const turnMatches = selectProductsForTurn({
+          catalog: brainProfile.productCatalog,
+          queryText: data.voicePrompt,
+          entities: brainState.entities,
+          intent: brainState.intent,
+        });
+        const catalogSize = normalizeProducts(brainProfile.productCatalog).length;
         const turnPrompt = [
           systemPrompt,
           formatAuthorityPolicy(capabilities),
           formatBrainStateForPrompt(brainState),
+          formatTargetedProductsForPrompt(turnMatches, {
+            totalCatalogSize: catalogSize,
+          }),
           languageDirective(callLanguage),
         ].join('\n\n');
 
