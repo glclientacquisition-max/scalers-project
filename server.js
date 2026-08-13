@@ -78,6 +78,7 @@ const {
   generateDynamicGreeting,
   pickContextualAck,
   pickActionProgress,
+  pickClarifyProgress,
   shouldSkipCallerTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -1027,7 +1028,24 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   async function speakText(text, opts = {}) {
-    if (!tts || !text) return;
+    if (!text) return;
+    // Greeting / early turns can race tenantWarm → TTS session create.
+    if (!tts && ttsReadyPromise) {
+      try {
+        await Promise.race([
+          ttsReadyPromise,
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!tts) {
+      console.warn(
+        `[ws/media][${sidLabel()}] speakText skipped — TTS unavailable: ${String(text).slice(0, 80)}`
+      );
+      return;
+    }
     // Starting intentional playback clears a prior barge latch.
     bargeInActive = false;
     speaking = true;
@@ -1256,20 +1274,47 @@ mediaWss.on('connection', (ws, req) => {
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
         nextBestAction.action
       );
+      // Human handoff with missing name uses ASK_CLARIFICATION — still speak now so
+      // the caller never waits silently on Gemini (live miss: HD_02bda14e6547).
+      const handoffNameAsk =
+        nextBestAction.action === 'ASK_CLARIFICATION' &&
+        (brainState.intent === 'human' || Boolean(brainState.handoff?.requested)) &&
+        (nextBestAction.slot === 'name' ||
+          (Array.isArray(brainState.goal?.missingSlots) &&
+            brainState.goal.missingSlots.includes('name')));
+      const needsImmediateProgress = actionMayExecute || handoffNameAsk;
+      let spokeThisTurn = false;
+      let progressAlreadySpoken = false;
 
-      // Action turns disable streaming and wait on Gemini+tools — speak progress
-      // immediately so orders/escalations are not dead air ("let me save that").
+      // Action / handoff-clarify turns disable streaming and wait on Gemini+tools —
+      // speak progress immediately so orders/escalations are not dead air.
       /** @type {Promise<void>} */
       let actionProgressSpeak = Promise.resolve();
-      if (actionMayExecute && tts && !bargeInActive) {
-        const progressLine = pickActionProgress(nextBestAction.action, callLanguage);
+      if (needsImmediateProgress && tts && !bargeInActive) {
+        const progressLine = handoffNameAsk
+          ? pickClarifyProgress({
+              action: nextBestAction.action,
+              slot: nextBestAction.slot || 'name',
+              intent: brainState.intent,
+              language: callLanguage,
+            })
+          : pickActionProgress(nextBestAction.action, callLanguage);
         clearFillerTimer();
         turnTiming.markFiller();
         console.log(
           `[ws/media][${sidLabel()}] action-progress action=${nextBestAction.action}` +
+            `${handoffNameAsk ? ' handoffNameAsk=1' : ''}` +
             ` lang=${callLanguage}: ${progressLine}`
         );
-        actionProgressSpeak = speakText(progressLine).catch(() => {});
+        // Persist progress in the desk transcript — callers hear this line.
+        transcriptLog.push(`Agent: ${progressLine}`);
+        progressAlreadySpoken = true;
+        spokeThisTurn = true;
+        actionProgressSpeak = speakText(progressLine)
+          .then(() => {
+            spokeThisTurn = true;
+          })
+          .catch(() => {});
       }
 
       // VOICE_FILLER=auto (default): adaptive ack only if first spoken audio is slow.
@@ -1280,7 +1325,7 @@ mediaWss.on('connection', (ws, req) => {
         Boolean(tts) &&
         fillerMode !== 'off' &&
         !fillerUsedThisCall &&
-        !actionMayExecute;
+        !needsImmediateProgress;
       const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 400);
       const fillerText =
         fillerMode === 'ack' || fillerMode === 'auto'
@@ -1308,7 +1353,7 @@ mediaWss.on('connection', (ws, req) => {
       const streamOn =
         Boolean(process.env.GEMINI_API_KEY) &&
         Boolean(tts) &&
-        !actionMayExecute &&
+        !needsImmediateProgress &&
         (process.env.VOICE_LLM_STREAM || 'on').toLowerCase() !== 'off';
 
       let speakSession = null;
@@ -1381,6 +1426,7 @@ mediaWss.on('connection', (ws, req) => {
         const text = String(chunk || '').trim();
         if (!text || !tts) return;
         firstSpokenChunk = true;
+        spokeThisTurn = true;
         turnTiming.markFirstSpokenChunk();
         stopFillerForReply();
         if (bargeInActive) return;
@@ -1433,6 +1479,7 @@ mediaWss.on('connection', (ws, req) => {
           transcriptLog.push(`Agent: ${result.spokenText}`);
           turnTiming.markFirstSpokenChunk();
           await speakText(result.spokenText);
+          spokeThisTurn = true;
         }
       } else if (streamOn) {
         turnTiming.markLlmStart();
@@ -1477,6 +1524,7 @@ mediaWss.on('connection', (ws, req) => {
           }
           const reply = result?.spokenText || spokenChunks.join(' ') || AI_FALLBACK_LINE;
           transcriptLog.push(`Agent: ${reply}`);
+          if (spokenChunks.length) spokeThisTurn = true;
         } else if (!bargeInActive) {
           // Stream produced no flushable chunks (or TTS never opened) — speak full reply.
           if (speakSessionReady) {
@@ -1491,6 +1539,7 @@ mediaWss.on('connection', (ws, req) => {
           transcriptLog.push(`Agent: ${reply}`);
           turnTiming.markFirstSpokenChunk();
           await speakText(reply);
+          spokeThisTurn = true;
           turnOutcome = 'stream_fallback_full';
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
@@ -1523,10 +1572,16 @@ mediaWss.on('connection', (ws, req) => {
         }
         // Finish "let me save that" before the tool confirmation so they don't overlap.
         await actionProgressSpeak;
-        if (reply) {
+        // Handoff name-ask already spoke the required question — skip duplicate model prose.
+        const skipDuplicateAsk =
+          handoffNameAsk &&
+          progressAlreadySpoken &&
+          !result?.actionConfirmation;
+        if (reply && !skipDuplicateAsk) {
           transcriptLog.push(`Agent: ${reply}`);
           turnTiming.markFirstSpokenChunk();
           await speakText(reply);
+          spokeThisTurn = true;
         }
       }
 
@@ -1534,6 +1589,29 @@ mediaWss.on('connection', (ws, req) => {
         await actionProgressSpeak;
         transcriptLog.push(`Agent: ${result.actionConfirmation}`);
         await speakText(result.actionConfirmation);
+        spokeThisTurn = true;
+      }
+
+      // Hard guarantee: every completed caller turn must produce agent audio.
+      if (!spokeThisTurn && !bargeInActive && tts) {
+        const guarantee = handoffNameAsk
+          ? pickClarifyProgress({
+              action: nextBestAction.action,
+              slot: nextBestAction.slot || 'name',
+              intent: brainState.intent,
+              language: callLanguage,
+            })
+          : actionMayExecute
+            ? pickActionProgress(nextBestAction.action, callLanguage)
+            : AI_FALLBACK_LINE;
+        console.warn(
+          `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}`
+        );
+        transcriptLog.push(`Agent: ${guarantee}`);
+        turnTiming.markFirstSpokenChunk();
+        await speakText(guarantee);
+        spokeThisTurn = true;
+        turnOutcome = 'speech_guarantee';
       }
 
       if (result?.shouldEndCall && !bargeInActive) {

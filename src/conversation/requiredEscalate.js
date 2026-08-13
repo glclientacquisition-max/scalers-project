@@ -34,9 +34,11 @@ function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
     ).trim() || 'Caller requested a human';
 
   const reasonLower = reason.toLowerCase();
-  const teammate = /\b(manager|boss|owner|supervisor)\b/.test(reasonLower)
-    ? 'manager'
-    : 'General queries';
+  let teammate = 'General queries';
+  if (/\bfloor\s*manager\b/.test(reasonLower)) teammate = 'Floor Manager';
+  else if (/\b(manager|boss|owner|supervisor)\b/.test(reasonLower)) {
+    teammate = 'manager';
+  }
 
   next.escalate = {
     teammate,
@@ -51,17 +53,37 @@ function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
  */
 function formatEscalateActionDirective(state = {}) {
   const action = String(state.resolution?.nextBestAction || '');
-  if (action !== 'ESCALATE') return '';
   const name = String(
     state.caller?.name || entityValue(state.entities?.name) || ''
   ).trim();
-  if (!name) return '';
-  return [
-    'REQUIRED ACTION THIS TURN (do not read aloud):',
-    `Caller name is known (${name}). Append the escalate ###TOOL### marker now.`,
-    'Do not only share a WhatsApp or phone number — the escalate tool must fire so the team is notified.',
-    'Spoken line: say only that you will try to send the request to the team.',
-  ].join('\n');
+  const intent = String(state.intent || '');
+  const handoffRequested = Boolean(state.handoff?.requested);
+
+  if (action === 'ESCALATE' && name) {
+    return [
+      'REQUIRED ACTION THIS TURN (do not read aloud):',
+      `Caller name is known (${name}). Append the escalate ###TOOL### marker now.`,
+      'Do not only share a WhatsApp or phone number — the escalate tool must fire so the team is notified.',
+      'Spoken line: say only that you will try to send the request to the team.',
+    ].join('\n');
+  }
+
+  // Human asked for, name still missing — speak the ask; do not claim notify yet.
+  if (
+    (action === 'ASK_CLARIFICATION' || action === 'ESCALATE') &&
+    (intent === 'human' || handoffRequested) &&
+    !name
+  ) {
+    return [
+      'REQUIRED ACTION THIS TURN:',
+      'Caller asked for a human / manager but name is missing.',
+      'Ask only for their name in one short sentence.',
+      'Do NOT append escalate until the name is known.',
+      'Do not invent that you already notified anyone.',
+    ].join('\n');
+  }
+
+  return '';
 }
 
 module.exports = {

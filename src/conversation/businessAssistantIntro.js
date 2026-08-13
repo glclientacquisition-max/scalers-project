@@ -61,6 +61,25 @@ function asServiceArray(raw) {
 }
 
 /**
+ * Filter desk/meta catalogue labels that must never be spoken on the phone.
+ * Esgar had rows like "What they offer (confirmed):" and "When asked…".
+ */
+function isSpeakableOfferingName(name) {
+  const text = String(name || '').replace(/\s+/g, ' ').trim();
+  if (!text || text.length < 3 || text.length > 48) return false;
+  if (/[:→]/.test(text)) return false;
+  if (
+    /\b(confirmed|confidence|when asked|receptionist|routing|sku|how much|how the)\b/i.test(
+      text
+    )
+  ) {
+    return false;
+  }
+  if (/^(products?\s*&\s*pricing|what they offer)\b/i.test(text)) return false;
+  return true;
+}
+
+/**
  * One short spoken clause about what the business offers.
  * Grounded only in services catalog / services notes — never invents.
  * @returns {string} e.g. "We help with books, special orders, and delivery." or ""
@@ -72,7 +91,7 @@ function summarizeOfferingForIntro(opts = {}) {
 
   const fromCatalog = asServiceArray(opts.servicesCatalog)
     .map((row) => String(row?.name || '').trim())
-    .filter((name) => name && name.length <= 48)
+    .filter((name) => isSpeakableOfferingName(name))
     .slice(0, 3);
 
   if (fromCatalog.length) {

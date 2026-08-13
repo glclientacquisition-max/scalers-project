@@ -67,4 +67,29 @@ describe('required escalate injection', () => {
     assert.match(block, /Brian/);
     assert.match(block, /escalate/i);
   });
+
+  it('formats ask-for-name directive when human handoff lacks a name', () => {
+    const block = formatEscalateActionDirective({
+      resolution: { nextBestAction: 'ASK_CLARIFICATION' },
+      intent: 'human',
+      handoff: { requested: true },
+      caller: { name: null },
+    });
+    assert.match(block, /name is missing/i);
+    assert.match(block, /Do NOT append escalate/i);
+  });
+
+  it('maps floor manager reason to Floor Manager teammate', () => {
+    const parsed = ensureRequiredEscalate(
+      { escalate: null },
+      {
+        resolution: { nextBestAction: 'ESCALATE' },
+        caller: { name: 'Brian' },
+        handoff: { reason: 'Caller wants Floor Manager' },
+        goal: { description: 'speak to Floor Manager' },
+      },
+      { escalate: true }
+    );
+    assert.equal(parsed.escalate.teammate, 'Floor Manager');
+  });
 });

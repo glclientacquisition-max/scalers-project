@@ -166,7 +166,7 @@ test('echo of agent line does not barge', () => {
   assert.strictEqual(d.barge, false);
   assert.strictEqual(d.reason, 'echo');
 });
-test('content barge while LLM thinking', () => {
+test('explicit interrupt barge while LLM thinking', () => {
   const d = evaluateBargeIn({
     text: 'Actually wait',
     speaking: false,
@@ -177,6 +177,25 @@ test('content barge while LLM thinking', () => {
   });
   assert.strictEqual(d.barge, true);
   assert.strictEqual(d.reason, 'interrupt_llm');
+});
+test('continuation during LLM thinking does not barge (prevents silence)', () => {
+  const d = evaluateBargeIn({
+    text: 'I want to talk to him',
+    speaking: false,
+    turnBusy: true,
+    speakStartedAt: 0,
+    lastAgentText: 'How can I help?',
+    isBackchannel,
+  });
+  assert.strictEqual(d.barge, false);
+  assert.strictEqual(d.reason, 'thinking_continuation');
+});
+test('mid-thought floor-manager ask is incomplete', () => {
+  assert.strictEqual(
+    utteranceLooksIncomplete('you can tell him that I\'m'),
+    true
+  );
+  assert.strictEqual(utteranceLooksIncomplete('Ningetaka kuongea na Floor Manager'), false);
 });
 
 console.log('helpers');
