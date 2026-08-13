@@ -92,12 +92,16 @@ async function main() {
   }
   console.log('PASS: default/effective EN speed wiring looks good');
 
+  // Voice: SONIOX_VOICE is not required / ignored — curated default is used.
+  const { resolveSonioxVoice } = require('../src/speech/sonioxVoice');
+  console.log(`voice (curated default): ${resolveSonioxVoice()}`);
+
   if (!isSonioxTtsConfigured()) {
     console.log(
       'SKIP live audio: SONIOX_API_KEY not set — cannot measure PCM duration.'
     );
     console.log(
-      'Add SONIOX_API_KEY (and SONIOX_VOICE if needed) then re-run for A/B tempo proof.'
+      'Add SONIOX_API_KEY only, then re-run for A/B tempo proof (no SONIOX_VOICE needed).'
     );
     process.exit(0);
   }
