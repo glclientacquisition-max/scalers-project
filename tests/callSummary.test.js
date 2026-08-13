@@ -57,4 +57,22 @@ describe('deriveCallSummary', () => {
     assert.ok(summary.instructions.some((i) => /5:00 PM/i.test(i)));
     assert.equal(summary.callerName, 'Brian');
   });
+
+  it('ignores STT name/goal fragments and prefers human when handoff was requested', () => {
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'I want to speak to the manager',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    state.intent = 'general_enquiry';
+    state.handoff.requested = true;
+    state.caller.name = "I'd like to discuss—";
+    state.goal.description = 'uh-huh';
+
+    const summary = deriveCallSummary({ brainState: state });
+    assert.equal(summary.primaryIntent, 'human');
+    assert.equal(summary.callerName, null);
+    assert.doesNotMatch(summary.text, /uh-huh/i);
+    assert.doesNotMatch(summary.text, /I'd like to discuss/i);
+  });
 });

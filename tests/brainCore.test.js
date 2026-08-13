@@ -135,4 +135,41 @@ describe('Brain state and next-best-action', () => {
     });
     assert.equal(opening.intent, 'hours');
   });
+
+  it('keeps meaningful intent across backchannels and ignores name fragments', () => {
+    const {
+      extractConversationEntities,
+    } = require('../src/conversation/entityExtraction');
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'Can you recommend a philosophy book?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(state.intent, 'product_inquiry');
+    assert.match(state.goal.description || '', /philosophy/i);
+
+    state = observeCallerTurn(state, {
+      text: 'uh-huh',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(state.intent, 'product_inquiry');
+
+    let human = observeCallerTurn(createBrainState(), {
+      text: 'I want to speak to the manager',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    human = observeCallerTurn(human, {
+      text: "I'd like to discuss—",
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities("I'd like to discuss—", {
+        intent: 'human',
+        state: human,
+      }),
+    });
+    assert.equal(human.intent, 'human');
+    assert.equal(human.caller.name, null);
+  });
 });

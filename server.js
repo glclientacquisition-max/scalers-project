@@ -55,6 +55,10 @@ const {
   formatTargetedProductsForPrompt,
   normalizeProducts,
 } = require('./src/conversation/productCatalog');
+const {
+  ensureRequiredEscalate,
+  formatEscalateActionDirective,
+} = require('./src/conversation/requiredEscalate');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
 const callAgentTools = new Map();
@@ -1203,11 +1207,16 @@ mediaWss.on('connection', (ws, req) => {
       systemPrompt,
       formatAuthorityPolicy(capabilities),
       formatBrainStateForPrompt(brainState),
+      formatEscalateActionDirective(brainState),
       formatTargetedProductsForPrompt(turnMatches, {
         totalCatalogSize: catalogSize,
+        queryText: clean,
+        catalog: brainProfile.productCatalog,
       }),
       languageDirective(callLanguage),
-    ].join('\n\n');
+    ]
+      .filter(Boolean)
+      .join('\n\n');
 
     try {
       // VOICE_FILLER=auto (default): adaptive ack only if first spoken audio is slow.
@@ -2181,11 +2190,16 @@ wss.on('connection', (ws) => {
           systemPrompt,
           formatAuthorityPolicy(capabilities),
           formatBrainStateForPrompt(brainState),
+          formatEscalateActionDirective(brainState),
           formatTargetedProductsForPrompt(turnMatches, {
             totalCatalogSize: catalogSize,
+            queryText: data.voicePrompt,
+            catalog: brainProfile.productCatalog,
           }),
           languageDirective(callLanguage),
-        ].join('\n\n');
+        ]
+          .filter(Boolean)
+          .join('\n\n');
 
         const reply = await runGeminiTurn(messages, callSid, turnPrompt);
         const replyText = [reply.spokenText, reply.actionConfirmation]
@@ -2324,8 +2338,9 @@ async function applyGeminiTools(callSid, parsed) {
     );
   const state = callBrainStates.get(callSid) || createBrainState();
   const groundedProfile = callTenantProfiles.get(callSid) || {};
+  const enforcedParsed = ensureRequiredEscalate(parsed, state, capabilities);
   const execution = await executeBrainTools({
-    parsed,
+    parsed: enforcedParsed,
     capabilities,
     completedFingerprints: state.actions.completedFingerprints,
     priorHolds: state.actions.openHolds || [],

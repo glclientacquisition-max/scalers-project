@@ -112,7 +112,7 @@ function validateServiceRequest(raw, { productCatalog } = {}) {
       value.item = clean(match.product.name, 200);
     }
   }
-  // Orders: require product + name (when optional).
+  // Orders: require product + name, and catalogue ground when a catalogue exists.
   if (type === 'order') {
     const missing = [];
     if (!value.item) missing.push('item');
@@ -124,6 +124,21 @@ function validateServiceRequest(raw, { productCatalog } = {}) {
         missingSlots: missing,
         value,
       };
+    }
+    const catalog = normalizeProducts(productCatalog);
+    if (catalog.length && value.item) {
+      const match = findProductMatch(value.item, catalog);
+      if (!match) {
+        return {
+          valid: false,
+          reason:
+            'That title is not in the grounded catalogue — log an enquiry or special-order quote instead of an order.',
+          missingSlots: ['catalog_item'],
+          code: 'catalog_miss',
+          value,
+        };
+      }
+      value.item = clean(match.product.name, 200);
     }
   }
   return { valid: true, value };

@@ -1,7 +1,7 @@
 // Structured, call-local Brain state.
 // This is conversation memory, not tenant knowledge or long-term customer memory.
 
-const { entityValue } = require('./entityExtraction');
+const { entityValue, isBackchannelOrFragment } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt } = require('./goalModel');
 const {
   isRepairSignal,
@@ -9,6 +9,21 @@ const {
   markRepairProgress,
   formatRepairForPrompt,
 } = require('./conversationRepair');
+
+const MEANINGFUL_INTENTS = new Set([
+  'hours',
+  'location',
+  'price',
+  'availability',
+  'policy',
+  'hold',
+  'order',
+  'booking',
+  'cancellation',
+  'human',
+  'complaint',
+  'product_inquiry',
+]);
 
 const GOAL_BY_INTENT = Object.freeze({
   hours: 'learn_business_hours',
@@ -71,7 +86,7 @@ function inferIntent(text) {
     return 'booking';
   }
   if (
-    /\b(recommend|suggestion|which book|what book|do you sell|mnauza|children'?s? books?|genre)\b/.test(
+    /\b(recommend|suggestion|which book|what book|do you sell|mnauza|children'?s? books?|genre|philosophy)\b/.test(
       value
     )
   ) {
@@ -154,12 +169,16 @@ function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
   const text = String(input.text || '').trim();
   const inferredIntent = inferIntent(text);
+  const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
   const preserveActiveIntent =
     inferredIntent === 'general_enquiry' &&
-    next.goal.status === 'active' &&
+    previousWasMeaningful &&
     next.intent !== 'unknown' &&
-    next.intent !== 'general_enquiry' &&
-    next.goal.missingSlots.length > 0;
+    (next.goal.status === 'active' || next.handoff?.requested) &&
+    (next.goal.missingSlots.length > 0 ||
+      next.handoff?.requested ||
+      isBackchannelOrFragment(text) ||
+      text.split(/\s+/).length <= 3);
   const intent = String(
     input.intent || (preserveActiveIntent ? next.intent : inferredIntent)
   );
@@ -196,12 +215,16 @@ function observeCallerTurn(state, input = {}) {
 
   next.intent = intent;
   next.goal.primary = GOAL_BY_INTENT[intent] || 'resolve_enquiry';
+  const usableGoalText = text && !isBackchannelOrFragment(text) ? text : '';
   if (
-    !next.goal.description ||
-    next.goal.status === 'unknown' ||
-    (previousIntent !== 'unknown' && previousIntent !== intent)
+    usableGoalText &&
+    (!next.goal.description ||
+      next.goal.status === 'unknown' ||
+      (previousIntent !== 'unknown' &&
+        previousIntent !== intent &&
+        !isBackchannelOrFragment(next.goal.description || '')))
   ) {
-    next.goal.description = text || next.goal.description;
+    next.goal.description = usableGoalText;
   }
   next.goal.status = 'active';
   next.handoff.requested = intent === 'human';

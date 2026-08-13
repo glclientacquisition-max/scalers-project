@@ -2,13 +2,28 @@
 // Gemini already sees STT text mid-call; post-call we persist structured desk fields.
 
 const { normalizePrimaryIntent } = require('./callResolution');
-const { entityValue } = require('./entityExtraction');
+const {
+  entityValue,
+  isBackchannelOrFragment,
+  isPlausibleCallerName,
+} = require('./entityExtraction');
 
 function clean(value, max = 280) {
   return String(value == null ? '' : value)
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, max);
+}
+
+function safeCallerName(state) {
+  const raw = clean(state.caller?.name || entityValue(state.entities?.name), 80);
+  return isPlausibleCallerName(raw) ? raw : null;
+}
+
+function safeGoalDescription(raw) {
+  const goal = clean(raw, 160);
+  if (!goal || isBackchannelOrFragment(goal)) return '';
+  return goal;
 }
 
 /**
@@ -26,10 +41,16 @@ function deriveCallSummary(opts = {}) {
       ? state.actions.lastResults
       : [];
 
-  const primaryIntent =
+  let primaryIntent =
     normalizePrimaryIntent(state.intent) ||
     normalizePrimaryIntent(opts.primaryIntent) ||
     null;
+  if (
+    (state.handoff?.requested || state.handoff?.required) &&
+    (!primaryIntent || primaryIntent === 'general_enquiry')
+  ) {
+    primaryIntent = 'human';
+  }
 
   const products = [
     entityValue(state.entities?.product),
@@ -57,8 +78,8 @@ function deriveCallSummary(opts = {}) {
     }
   }
 
-  const name = clean(state.caller?.name || entityValue(state.entities?.name), 80);
-  const goal = clean(state.goal?.description || '', 160);
+  const name = safeCallerName(state);
+  const goal = safeGoalDescription(state.goal?.description || '');
   const bits = [];
   if (primaryIntent) bits.push(`Intent: ${primaryIntent}`);
   if (name) bits.push(`Caller: ${name}`);
