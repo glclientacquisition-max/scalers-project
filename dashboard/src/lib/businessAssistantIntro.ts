@@ -1,7 +1,11 @@
 /**
  * Desk mirror of src/conversation/businessAssistantIntro.js
- * Keep rules in sync: brand-first, agent named, short grounded offering, English-default first open.
+ * Keep rules in sync: brand-first, agent named, short grounded offering,
+ * English/Kiswahili invite, English-default first open.
  */
+
+/** Spoken once on open — keep short; match language after the caller speaks. */
+export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
 
 export type BusinessAssistantIntroOpts = {
   businessName?: string | null;
@@ -134,22 +138,23 @@ export function composeBusinessAssistantIntro(
   const identityThanks = `Thank you for calling ${businessName}, this is ${agentName} speaking.`;
   const identity = variant === 1 ? identityThanks : identityPrimary;
   const withOffer = offering ? `${identity} ${offering}` : identity;
+  const withLang = `${withOffer} ${LANGUAGE_INVITE}`;
 
   if (closureNotice) {
     const follow =
       afterHoursMode === "message"
         ? "I can still take a message. May I have your name?"
         : "Even so, I can still help. How can I assist?";
-    return `${withOffer} ${closureNotice} ${follow}`;
+    return `${withLang} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === "message") {
-    return `${withOffer} We're closed right now, but I can take a message.`;
+    return `${withLang} We're closed right now, but I can take a message.`;
   }
 
   if (closed) {
-    return `${withOffer} We're closed now, but I can still help. How can I assist?`;
+    return `${withLang} We're closed now, but I can still help. How can I assist?`;
   }
 
-  return `${withOffer} How can I help?`;
+  return `${withLang} How can I help?`;
 }

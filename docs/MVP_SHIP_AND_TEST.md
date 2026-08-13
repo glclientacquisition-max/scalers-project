@@ -23,11 +23,12 @@ How the line opens every unanswered call:
 1. **Brand first** — business name in the first sentence  
 2. **Agent named** — “this is {agent} speaking”  
 3. **Offering (short)** — one grounded clause from services on file; never invent  
-4. **English-default first open** — no random Kiswahili opener before the caller speaks (language match starts on their turn)  
-5. **One invite** — “How can I help?” (or message/closed honesty)  
-6. **Same line in Desk Test** — Settings → Test preview uses the same composer as live voice  
+4. **Language invite** — “You can speak in English or Kiswahili.”  
+5. **English-default first open** — no random Kiswahili opener before the caller speaks (language match starts on their turn)  
+6. **One invite** — “How can I help?” (or message/closed honesty)  
+7. **Same line in Desk Test** — Settings → Test preview uses the same composer as live voice  
 
-Example: *“Hello, you've reached ChapterOne Bookstore, this is Aisha speaking. We help with special orders / sourcing and delivery. How can I help?”*
+Example: *“Hello, you've reached ChapterOne Bookstore, this is Aisha speaking. We help with special orders / sourcing and delivery. You can speak in English or Kiswahili. How can I help?”*
 
 Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `dashboard/src/lib/businessAssistantIntro.ts` (Desk).
 

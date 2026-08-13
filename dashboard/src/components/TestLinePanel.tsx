@@ -124,9 +124,9 @@ export function TestLinePanel({
           Test
         </h2>
         <p className="text-sm text-[var(--ink-soft)]">
-          Hear how your assistant introduces the business — brand, agent, and a
-          short line about what you offer — with your current voice and
-          pronunciations.
+          Hear how your assistant introduces the business — brand, agent, what
+          you offer, and that callers can use English or Kiswahili — with your
+          current voice and pronunciations.
         </p>
       </header>
 

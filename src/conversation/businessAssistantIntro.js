@@ -5,11 +5,16 @@
  * 1. Brand first — business name is the hero signal in the first sentence.
  * 2. Agent named — callers know who is speaking.
  * 3. Offering in one short clause — grounded in services on file (never invent).
- * 4. English-default on first open — do not lottery-open in Kiswahili before
+ * 4. Language invite — tell callers they can use English or Kiswahili.
+ * 5. English-default on first open — do not lottery-open in Kiswahili before
  *    the caller has spoken (prevents sticky language flip).
- * 5. One invite — how can I help (or message/closed honesty).
- * 6. Closed honesty — state closed/bulletin briefly, then still help or take a message.
+ * 6. One invite — how can I help (or message/closed honesty).
+ * 7. Closed honesty — state closed/bulletin briefly, then still help or take a message.
  */
+
+/** Spoken once on open — keep short; match language after the caller speaks. */
+const LANGUAGE_INVITE =
+  'You can speak in English or Kiswahili.';
 
 function eatTimeOfDay(date = new Date()) {
   const hour = (date.getUTCHours() + 3) % 24; // Africa/Nairobi ≈ UTC+3
@@ -153,24 +158,25 @@ function composeBusinessAssistantIntro(opts = {}) {
   const identityThanks = `Thank you for calling ${businessName}, this is ${agentName} speaking.`;
   const identity = variant === 1 ? identityThanks : identityPrimary;
   const withOffer = offering ? `${identity} ${offering}` : identity;
+  const withLang = `${withOffer} ${LANGUAGE_INVITE}`;
 
   if (closureNotice) {
     const follow =
       afterHoursMode === 'message'
         ? 'I can still take a message. May I have your name?'
         : 'Even so, I can still help. How can I assist?';
-    return `${withOffer} ${closureNotice} ${follow}`;
+    return `${withLang} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === 'message') {
-    return `${withOffer} We're closed right now, but I can take a message.`;
+    return `${withLang} We're closed right now, but I can take a message.`;
   }
 
   if (closed) {
-    return `${withOffer} We're closed now, but I can still help. How can I assist?`;
+    return `${withLang} We're closed now, but I can still help. How can I assist?`;
   }
 
-  return `${withOffer} How can I help?`;
+  return `${withLang} How can I help?`;
 }
 
 /**
@@ -212,6 +218,7 @@ function introLooksValid(line, businessName, agentName) {
 module.exports = {
   eatTimeOfDay,
   englishDayOpener,
+  LANGUAGE_INVITE,
   summarizeOfferingForIntro,
   composeBusinessAssistantIntro,
   previewBusinessAssistantIntro,

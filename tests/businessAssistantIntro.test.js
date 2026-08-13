@@ -21,9 +21,25 @@ describe('business assistant introduction', () => {
     });
     assert.match(line, /you've reached ChapterOne Bookstore/i);
     assert.match(line, /this is Aisha speaking/i);
+    assert.match(line, /English or Kiswahili/i);
     assert.match(line, /How can I help/i);
     assert.doesNotMatch(line, /^\s*Habari/i);
     assert.ok(introLooksValid(line, 'ChapterOne Bookstore', 'Aisha'));
+  });
+
+  it('tells the caller they can use English or Kiswahili', () => {
+    const { LANGUAGE_INVITE } = require('../src/conversation/businessAssistantIntro');
+    const line = composeBusinessAssistantIntro({
+      businessName: 'ChapterOne Bookstore',
+      agentName: 'Aisha',
+      isOpen: true,
+      now: afternoon,
+      variant: 0,
+    });
+    assert.equal(LANGUAGE_INVITE, 'You can speak in English or Kiswahili.');
+    assert.match(line, /You can speak in English or Kiswahili\./);
+    assert.ok(line.indexOf('Aisha') < line.indexOf('English or Kiswahili'));
+    assert.ok(line.indexOf('English or Kiswahili') < line.indexOf('How can I help'));
   });
 
   it('adds a short grounded offering from the services catalog', () => {
