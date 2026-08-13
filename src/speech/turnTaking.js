@@ -86,6 +86,17 @@ function utteranceLooksIncomplete(text) {
   if (/,\s*(and|but|so|or)?$/i.test(core)) return true;
   // "my name is" / "jina langu ni" without the name yet.
   if (/\b(my name is|i am|i'm|jina langu ni|ninaitwa)\s*$/i.test(core)) return true;
+  // Mid-thought cutoffs common on live Kenyan calls (HD_02bda14e6547).
+  if (
+    /\b(i want to|i'd like to|i would like to|ningetaka|naomba|can you tell|you can tell)\s*$/i.test(
+      core
+    )
+  ) {
+    return true;
+  }
+  if (/\b(that i'm|that i am|tell him that|tell her that)\s*$/i.test(core)) {
+    return true;
+  }
   return false;
 }
 
@@ -226,8 +237,14 @@ function evaluateBargeIn(opts) {
     return { barge: true, reason: 'interrupt_tts' };
   }
 
-  // LLM thinking / tool work with no audio yet — allow snappier cancel.
-  if (clean.length < minChars && !INTERRUPT_CUES.test(clean)) {
+  // LLM thinking / tool work with no audio yet.
+  // Only cancel on explicit interrupt cues. Late STT finals from the *same*
+  // caller utterance (early flush → continuation) must queue, not barge —
+  // otherwise Gemini is aborted and the caller hears silence (HD_02bda14e6547).
+  if (!INTERRUPT_CUES.test(clean)) {
+    return { barge: false, reason: 'thinking_continuation' };
+  }
+  if (clean.length < minChars) {
     return { barge: false, reason: 'weak_thinking_interrupt' };
   }
   return { barge: true, reason: 'interrupt_llm' };

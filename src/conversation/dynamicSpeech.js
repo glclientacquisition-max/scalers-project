@@ -176,6 +176,35 @@ function pickActionProgress(action, lang) {
   return "Okay, I'm on it.";
 }
 
+/**
+ * Immediate spoken line while Gemini thinks on clarification / handoff turns.
+ * Prevents dead air when the caller asked for a human but name is still missing
+ * (ASK_CLARIFICATION — streaming path used to wait silently on the model).
+ *
+ * @param {{ action?: string, slot?: string, intent?: string, language?: string }} opts
+ * @returns {string}
+ */
+function pickClarifyProgress(opts = {}) {
+  const action = String(opts.action || '').toUpperCase();
+  const slot = String(opts.slot || '').toLowerCase();
+  const intent = String(opts.intent || '').toLowerCase();
+  const lang = opts.language || 'en';
+  const sw = lang === 'sw' || lang === 'sheng';
+  const handoff =
+    intent === 'human' || action === 'ESCALATE' || action === 'TRANSFER';
+
+  if (handoff && (slot === 'name' || !slot)) {
+    if (sw) return 'Sawa — niambie jina lako ndio niwasiliane nao.';
+    return 'Okay — may I have your name so I can reach them?';
+  }
+  if (slot === 'name') {
+    if (sw) return 'Sawa — niambie jina lako.';
+    return 'Okay — may I have your name?';
+  }
+  if (sw) return 'Sawa, nimekuelewa.';
+  return 'Okay, one moment.';
+}
+
 const PURE_NOISE = new Set([
   'ok',
   'okay',
@@ -284,6 +313,7 @@ module.exports = {
   generateDynamicGreeting,
   pickContextualAck,
   pickActionProgress,
+  pickClarifyProgress,
   cleanSpokenLine,
   greetingLooksValid,
   isNonSubstantiveTurn,

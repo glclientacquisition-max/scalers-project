@@ -56,6 +56,17 @@ describe('business assistant introduction', () => {
     assert.match(offering, /We help with/i);
     assert.match(offering, /special orders/i);
 
+    const filtered = summarizeOfferingForIntro({
+      servicesCatalog: [
+        { name: 'What they offer (confirmed):' },
+        { name: 'Products & Pricing' },
+        { name: 'Stationery, toners, printers' },
+        { name: 'When asked "how much for X?"' },
+      ],
+    });
+    assert.match(filtered, /stationery/i);
+    assert.doesNotMatch(filtered, /confirmed|when asked|products & pricing/i);
+
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',
       agentName: 'Aisha',
