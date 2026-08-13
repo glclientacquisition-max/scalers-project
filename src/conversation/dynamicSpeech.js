@@ -1,119 +1,32 @@
 // Dynamic spoken lines — instant varied greeting; optional Gemini rewrite.
 
 const { isInterruptOnlyUtterance } = require('../speech/turnTaking');
+const {
+  eatTimeOfDay,
+  composeBusinessAssistantIntro,
+  introLooksValid,
+} = require('./businessAssistantIntro');
 
 /**
- * Nairobi/EAT time-of-day bucket for natural openers.
- * @returns {'morning'|'afternoon'|'evening'}
- */
-function eatTimeOfDay(date = new Date()) {
-  const hour = (date.getUTCHours() + 3) % 24; // Africa/Nairobi ≈ UTC+3
-  if (hour < 12) return 'morning';
-  if (hour < 17) return 'afternoon';
-  return 'evening';
-}
-
-/**
- * Instant greeting — business name + agent name, varies by time / open status.
+ * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
  * Prefer this for first-audio latency (no Gemini wait on the critical path).
  * @param {string} businessName
- * @param {{ agentName?: string, isOpen?: boolean | null }} [opts]
+ * @param {{ agentName?: string, isOpen?: boolean | null, afterHoursMode?: string, closureNotice?: string, now?: Date, variant?: number }} [opts]
  */
 function fallbackGreeting(businessName, opts = {}) {
-  const name = (businessName || process.env.BUSINESS_NAME || 'the business').trim();
-  const agent = String(opts.agentName || 'Receptionist').trim() || 'Receptionist';
-  const tod = eatTimeOfDay();
-  const closed = opts.isOpen === false;
-  const afterHoursMode =
-    String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
-      ? 'message'
-      : 'serve';
-  const closureNotice = String(opts.closureNotice || '').trim();
-
-  // Today's update says closed — state the fact, then keep the call moving.
-  if (closureNotice) {
-    let short =
-      closureNotice.length > 90
-        ? `${closureNotice.slice(0, 87).trim()}...`
-        : closureNotice;
-    if (!/[.!?…]$/.test(short)) short = `${short}.`;
-    const follow =
-      afterHoursMode === 'message'
-        ? 'I can still take a message. May I have your name?'
-        : 'Even so, I can still help. How can I assist?';
-    const options = {
-      morning: [
-        `Good morning, you've reached ${name}, this is ${agent}. ${short} ${follow}`,
-        `Habari ya asubuhi, ${name}, ${agent} speaking. ${short} ${follow}`,
-      ],
-      afternoon: [
-        `Hello, you've reached ${name}, this is ${agent}. ${short} ${follow}`,
-        `Habari, ${name}, ${agent} speaking. ${short} ${follow}`,
-      ],
-      evening: [
-        `Good evening, you've reached ${name}, this is ${agent}. ${short} ${follow}`,
-        `Habari ya jioni, ${name}, ${agent} speaking. ${short} ${follow}`,
-      ],
-    };
-    const list = options[tod] || options.afternoon;
-    return list[Math.floor(Math.random() * list.length)];
-  }
-
-  if (closed && afterHoursMode === 'message') {
-    const closedOptions = {
-      morning: [
-        `Good morning, you've reached ${name}, this is ${agent}. We're closed right now, but I can take a message.`,
-        `Habari ya asubuhi, ${name}, ${agent} speaking. We're closed, but I can note your request.`,
-      ],
-      afternoon: [
-        `Hello, you've reached ${name}, this is ${agent}. We're closed right now, but I can take a message.`,
-        `Habari, ${name}, ${agent} speaking. We're closed, but I can note your request for the team.`,
-      ],
-      evening: [
-        `Good evening, you've reached ${name}, this is ${agent}. We're closed right now, but I can take a message.`,
-        `Habari ya jioni, ${name}, ${agent} speaking. We're closed, but I can note your request.`,
-      ],
-    };
-    const list = closedOptions[tod] || closedOptions.afternoon;
-    return list[Math.floor(Math.random() * list.length)];
-  }
-
-  if (closed) {
-    // Default: still serve after hours — be honest about closed status, then help.
-    const serveClosed = {
-      morning: [
-        `Good morning, you've reached ${name}, this is ${agent}. We're closed now, but I can still help. How can I assist?`,
-        `Habari ya asubuhi, ${name}, ${agent} speaking. We're closed, but I can still help you.`,
-      ],
-      afternoon: [
-        `Hello, you've reached ${name}, this is ${agent}. We're closed right now, but I can still help. What do you need?`,
-        `Habari, ${name}, ${agent} speaking. We're closed, but I can still answer you.`,
-      ],
-      evening: [
-        `Good evening, you've reached ${name}, this is ${agent}. We're closed now, but I can still help. How can I assist?`,
-        `Habari ya jioni, ${name}, ${agent} speaking. We're closed, but I can still help you.`,
-      ],
-    };
-    const list = serveClosed[tod] || serveClosed.afternoon;
-    return list[Math.floor(Math.random() * list.length)];
-  }
-
-  const options = {
-    morning: [
-      `Good morning, you've reached ${name}, this is ${agent} speaking. How can I help?`,
-      `Habari ya asubuhi, you've reached ${name}, this is ${agent}. How can I help?`,
-    ],
-    afternoon: [
-      `Hello, you've reached ${name}, this is ${agent} speaking. How can I help you today?`,
-      `Habari, you've reached ${name}, this is ${agent}. How can I help?`,
-    ],
-    evening: [
-      `Good evening, you've reached ${name}, this is ${agent} speaking. How can I help?`,
-      `Habari ya jioni, you've reached ${name}, this is ${agent}. How can I help?`,
-    ],
-  };
-  const list = options[tod] || options.afternoon;
-  return list[Math.floor(Math.random() * list.length)];
+  return composeBusinessAssistantIntro({
+    businessName,
+    agentName: opts.agentName,
+    offeringLine: opts.offeringLine,
+    servicesCatalog: opts.servicesCatalog,
+    servicesOffered: opts.servicesOffered || opts.servicesNotes,
+    servicesNotes: opts.servicesNotes,
+    isOpen: opts.isOpen,
+    afterHoursMode: opts.afterHoursMode,
+    closureNotice: opts.closureNotice,
+    now: opts.now,
+    variant: opts.variant,
+  });
 }
 
 function cleanSpokenLine(text) {
@@ -125,20 +38,7 @@ function cleanSpokenLine(text) {
 }
 
 function greetingLooksValid(line, businessName, agentName) {
-  const text = cleanSpokenLine(line);
-  if (!text || text.length > 240) return false;
-  const name = String(businessName || '').trim();
-  if (!name || /^the business$/i.test(name)) return true;
-  if (/\bthe business\b/i.test(text) && !/\bthe business\b/i.test(name)) return false;
-  const nameToken = name.split(/\s+/)[0];
-  if (nameToken && nameToken.length >= 3) {
-    if (!text.toLowerCase().includes(nameToken.toLowerCase())) return false;
-  }
-  const agent = String(agentName || '').trim();
-  if (agent && agent.length >= 2 && !/^receptionist$/i.test(agent)) {
-    if (!text.toLowerCase().includes(agent.toLowerCase())) return false;
-  }
-  return true;
+  return introLooksValid(cleanSpokenLine(line), businessName, agentName);
 }
 
 /**
@@ -163,11 +63,18 @@ async function generateDynamicGreeting(opts) {
       ? 'message'
       : 'serve';
   const closureNotice = String(opts.closureNotice || '').trim();
+  const offeringOpts = {
+    offeringLine: opts.offeringLine,
+    servicesCatalog: opts.servicesCatalog,
+    servicesOffered: opts.servicesOffered || opts.servicesNotes,
+    servicesNotes: opts.servicesNotes,
+  };
   const instant = fallbackGreeting(businessName, {
     agentName,
     isOpen,
     afterHoursMode,
     closureNotice,
+    ...offeringOpts,
   });
   if (mode !== 'gemini') return instant;
 
@@ -193,21 +100,31 @@ async function generateDynamicGreeting(opts) {
           ? 'The business is OPEN now.'
           : 'Open/closed status is unknown; do not claim the shop is closed.';
 
-  const maxWords = closureNotice ? 36 : 20;
+  const { summarizeOfferingForIntro } = require('./businessAssistantIntro');
+  const offering = summarizeOfferingForIntro(offeringOpts);
+  const offeringRule = offering
+    ? `After your name, include this exact offering clause (do not invent more): "${offering}"`
+    : 'Do not invent what the business offers; skip any offering line if unknown.';
+
+  const maxWords = closureNotice ? 44 : offering ? 38 : 28;
   const instruction = `You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
 Write ONE short spoken greeting to open the call (max ${maxWords} words).
+BRAND FIRST: lead with the business — e.g. "you've reached ${businessName}" or "thank you for calling ${businessName}".
 You MUST include the exact business name "${businessName}".
 You MUST introduce yourself as ${agentName} (e.g. "this is ${agentName} speaking").
+${offeringRule}
+You MUST tell the caller they can speak in English or Kiswahili (one short sentence).
 It is ${tod} in Nairobi. ${openLine}
-Sound warm and natural. English or light Kiswahili mix is fine.
-No quotes, no markdown, never say "the business" as a placeholder.`;
+Use clear English for this first greeting (the caller has not spoken yet — do not open with Habari).
+Sound warm and natural. No quotes, no markdown, never say "the business" as a placeholder.
+End by inviting how you can help (or taking a message if closed in message mode).`;
 
   const task = opts
     .generateText({
       callSid: opts.callSid || 'greeting',
       systemInstruction: instruction,
       userText: `Greet the caller for ${businessName} as ${agentName}.`,
-      temperature: 0.85,
+      temperature: 0.7,
       maxOutputTokens: 60,
       thinkingLevel: 'MINIMAL',
     })

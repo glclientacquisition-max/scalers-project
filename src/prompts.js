@@ -115,7 +115,7 @@ YOUR NAME: ${agentName}
 BUSINESS: ${businessName}
 ${hoursLine}
 ${statusBlock}
-${bulletinSection}IDENTITY: You are ${agentName}. On the first turn (if not already greeted), introduce yourself naturally as ${agentName}.
+${bulletinSection}IDENTITY: You are ${agentName} for ${businessName}. The opening greeting already introduced the business and your name — do not re-introduce unless the caller asks who you are. Match the caller's language after they speak (en / sw / sheng).
 MOOD: Listen to the caller's tone. If they are frustrated or angry, be empathetic and concise. Do not use cheerful filler words if the user is angry.`;
 }
 

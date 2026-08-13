@@ -41,8 +41,9 @@ export default async function OnboardingPage() {
           Set up {tenant.business_name}
         </h1>
         <p className="mt-2 text-sm text-ink-soft leading-relaxed">
-          In a few steps your line can answer callers who miss you — greet them, share
-          hours and location, take a message, and notify you on WhatsApp.
+          In a few steps your line can answer callers who miss you — greet them by
+          your business name, share hours and location, take a message, and notify
+          you on WhatsApp.
         </p>
         <OnboardingWizard businessName={tenant.business_name} />
       </div>
