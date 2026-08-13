@@ -46,9 +46,19 @@ export function TestLinePanel({
     const sample = previewBusinessAssistantIntro({
       businessName,
       agentName,
+      servicesCatalog: Array.isArray(tenant.services_catalog)
+        ? tenant.services_catalog
+        : [],
+      servicesOffered: tenant.services_offered,
     });
     return previewSpokenLine(sample, lexicon);
-  }, [businessName, agentName, lexicon]);
+  }, [
+    businessName,
+    agentName,
+    lexicon,
+    tenant.services_catalog,
+    tenant.services_offered,
+  ]);
 
   const voiceLabel = displaySonioxVoiceLabel(
     sonioxVoiceLabel,
@@ -114,8 +124,9 @@ export function TestLinePanel({
           Test
         </h2>
         <p className="text-sm text-[var(--ink-soft)]">
-          Hear how your assistant introduces the business — brand first, then the
-          agent name — with your current voice and pronunciations.
+          Hear how your assistant introduces the business — brand, agent, and a
+          short line about what you offer — with your current voice and
+          pronunciations.
         </p>
       </header>
 

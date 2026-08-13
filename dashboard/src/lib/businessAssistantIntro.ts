@@ -1,11 +1,15 @@
 /**
  * Desk mirror of src/conversation/businessAssistantIntro.js
- * Keep rules in sync: brand-first, agent named, English-default first open.
+ * Keep rules in sync: brand-first, agent named, short grounded offering, English-default first open.
  */
 
 export type BusinessAssistantIntroOpts = {
   businessName?: string | null;
   agentName?: string | null;
+  offeringLine?: string | null;
+  servicesCatalog?: Array<{ name?: string | null }> | null;
+  servicesOffered?: string | null;
+  servicesNotes?: string | null;
   isOpen?: boolean | null;
   afterHoursMode?: string | null;
   closureNotice?: string | null;
@@ -44,6 +48,61 @@ function shortenNotice(notice: unknown, max = 90): string {
   return short;
 }
 
+function formatOfferingClause(raw: string): string {
+  let text = String(raw || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  if (text.length > 96) text = `${text.slice(0, 93).trim()}...`;
+  if (!/[.!?…]$/.test(text)) text = `${text}.`;
+  if (!/^(we |our )/i.test(text) && text.length < 70) {
+    text = `We help with ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+    if (!/[.!?…]$/.test(text)) text = `${text}.`;
+  }
+  return text;
+}
+
+/** One short spoken clause from catalog / notes — never invent. */
+export function summarizeOfferingForIntro(
+  opts: Pick<
+    BusinessAssistantIntroOpts,
+    "offeringLine" | "servicesCatalog" | "servicesOffered" | "servicesNotes"
+  > = {}
+): string {
+  if (opts.offeringLine != null && String(opts.offeringLine).trim()) {
+    return formatOfferingClause(String(opts.offeringLine).trim());
+  }
+
+  const fromCatalog = (Array.isArray(opts.servicesCatalog)
+    ? opts.servicesCatalog
+    : []
+  )
+    .map((row) => String(row?.name || "").trim())
+    .filter((name) => name && name.length <= 48)
+    .slice(0, 3);
+
+  if (fromCatalog.length) {
+    let list: string;
+    if (fromCatalog.length === 1) list = fromCatalog[0];
+    else if (fromCatalog.length === 2)
+      list = `${fromCatalog[0]} and ${fromCatalog[1]}`;
+    else list = `${fromCatalog[0]}, ${fromCatalog[1]}, and ${fromCatalog[2]}`;
+    const clause = /^(we |our )/i.test(list)
+      ? list
+      : `We help with ${list.toLowerCase()}.`;
+    return formatOfferingClause(clause);
+  }
+
+  const notes = String(opts.servicesOffered || opts.servicesNotes || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!notes) return "";
+  const first = notes.split(/(?<=[.!?])\s+|\n/)[0] || notes;
+  if (first.length < 8 || first.length > 90) return "";
+  if ((first.match(/,/g) || []).length >= 4) return "";
+  return formatOfferingClause(first);
+}
+
 /** Deterministic Test/Settings preview (primary English brand-first line). */
 export function previewBusinessAssistantIntro(
   opts: BusinessAssistantIntroOpts = {}
@@ -68,27 +127,29 @@ export function composeBusinessAssistantIntro(
       : "serve";
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
+  const offering = summarizeOfferingForIntro(opts);
   const variant = opts.variant === 1 ? 1 : 0;
 
   const identityPrimary = `${opener}, you've reached ${businessName}, this is ${agentName} speaking.`;
   const identityThanks = `Thank you for calling ${businessName}, this is ${agentName} speaking.`;
   const identity = variant === 1 ? identityThanks : identityPrimary;
+  const withOffer = offering ? `${identity} ${offering}` : identity;
 
   if (closureNotice) {
     const follow =
       afterHoursMode === "message"
         ? "I can still take a message. May I have your name?"
         : "Even so, I can still help. How can I assist?";
-    return `${identity} ${closureNotice} ${follow}`;
+    return `${withOffer} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === "message") {
-    return `${identity} We're closed right now, but I can take a message.`;
+    return `${withOffer} We're closed right now, but I can take a message.`;
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. How can I assist?`;
+    return `${withOffer} We're closed now, but I can still help. How can I assist?`;
   }
 
-  return `${identity} How can I help?`;
+  return `${withOffer} How can I help?`;
 }

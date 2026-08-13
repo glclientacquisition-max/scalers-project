@@ -26,6 +26,53 @@ describe('business assistant introduction', () => {
     assert.ok(introLooksValid(line, 'ChapterOne Bookstore', 'Aisha'));
   });
 
+  it('adds a short grounded offering from the services catalog', () => {
+    const {
+      summarizeOfferingForIntro,
+    } = require('../src/conversation/businessAssistantIntro');
+    const offering = summarizeOfferingForIntro({
+      servicesCatalog: [
+        { name: 'Special orders / sourcing' },
+        { name: 'Delivery' },
+        { name: 'In-store sales' },
+      ],
+    });
+    assert.match(offering, /We help with/i);
+    assert.match(offering, /special orders/i);
+
+    const line = composeBusinessAssistantIntro({
+      businessName: 'ChapterOne Bookstore',
+      agentName: 'Aisha',
+      servicesCatalog: [
+        { name: 'Special orders / sourcing' },
+        { name: 'Delivery' },
+      ],
+      isOpen: true,
+      now: afternoon,
+      variant: 0,
+    });
+    assert.match(line, /you've reached ChapterOne Bookstore/i);
+    assert.match(line, /We help with/i);
+    assert.match(line, /delivery/i);
+    assert.match(line, /How can I help/i);
+    // Brand still leads — offering is not the first signal.
+    assert.ok(line.indexOf('ChapterOne') < line.indexOf('We help with'));
+  });
+
+  it('does not invent an offering when none is on file', () => {
+    const line = composeBusinessAssistantIntro({
+      businessName: 'ChapterOne Bookstore',
+      agentName: 'Aisha',
+      servicesCatalog: [],
+      servicesOffered: '',
+      isOpen: true,
+      now: afternoon,
+      variant: 0,
+    });
+    assert.doesNotMatch(line, /We help with/i);
+    assert.match(line, /How can I help/i);
+  });
+
   it('uses Good morning for EAT morning', () => {
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',

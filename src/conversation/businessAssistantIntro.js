@@ -4,10 +4,11 @@
  * Top-level rules (MVP unanswered-call path):
  * 1. Brand first — business name is the hero signal in the first sentence.
  * 2. Agent named — callers know who is speaking.
- * 3. English-default on first open — do not lottery-open in Kiswahili before
+ * 3. Offering in one short clause — grounded in services on file (never invent).
+ * 4. English-default on first open — do not lottery-open in Kiswahili before
  *    the caller has spoken (prevents sticky language flip).
- * 4. One job — invite the caller need; no promo, stats, or policy dump.
- * 5. Closed honesty — state closed/bulletin briefly, then still help or take a message.
+ * 5. One invite — how can I help (or message/closed honesty).
+ * 6. Closed honesty — state closed/bulletin briefly, then still help or take a message.
  */
 
 function eatTimeOfDay(date = new Date()) {
@@ -40,12 +41,84 @@ function englishDayOpener(tod) {
   return 'Hello';
 }
 
+function asServiceArray(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * One short spoken clause about what the business offers.
+ * Grounded only in services catalog / services notes — never invents.
+ * @returns {string} e.g. "We help with books, special orders, and delivery." or ""
+ */
+function summarizeOfferingForIntro(opts = {}) {
+  if (opts.offeringLine != null && String(opts.offeringLine).trim()) {
+    return formatOfferingClause(String(opts.offeringLine).trim());
+  }
+
+  const fromCatalog = asServiceArray(opts.servicesCatalog)
+    .map((row) => String(row?.name || '').trim())
+    .filter((name) => name && name.length <= 48)
+    .slice(0, 3);
+
+  if (fromCatalog.length) {
+    let list;
+    if (fromCatalog.length === 1) list = fromCatalog[0];
+    else if (fromCatalog.length === 2) list = `${fromCatalog[0]} and ${fromCatalog[1]}`;
+    else list = `${fromCatalog[0]}, ${fromCatalog[1]}, and ${fromCatalog[2]}`;
+    // Soften catalog labels that already start with verbs.
+    const clause = /^(we |our )/i.test(list)
+      ? list
+      : `We help with ${list.toLowerCase()}.`;
+    return formatOfferingClause(clause);
+  }
+
+  const notes = String(opts.servicesOffered || opts.servicesNotes || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!notes) return '';
+  // First sentence / line only — keep the opener short.
+  const first = notes.split(/(?<=[.!?])\s+|\n/)[0] || notes;
+  if (first.length < 8 || first.length > 90) return '';
+  // Skip if it looks like a full pricing dump.
+  if ((first.match(/,/g) || []).length >= 4) return '';
+  return formatOfferingClause(first);
+}
+
+function formatOfferingClause(raw) {
+  let text = String(raw || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  if (text.length > 96) text = `${text.slice(0, 93).trim()}...`;
+  if (!/[.!?…]$/.test(text)) text = `${text}.`;
+  // Prefer "We help with…" / already complete sentences.
+  if (!/^(we |our )/i.test(text) && text.length < 70) {
+    text = `We help with ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+    if (!/[.!?…]$/.test(text)) text = `${text}.`;
+  }
+  return text;
+}
+
 /**
  * Compose the spoken introduction for a live unanswered-call answer.
  *
  * @param {{
  *   businessName?: string,
  *   agentName?: string,
+ *   offeringLine?: string,
+ *   servicesCatalog?: Array|{name?: string}|string,
+ *   servicesOffered?: string,
+ *   servicesNotes?: string,
  *   isOpen?: boolean|null,
  *   afterHoursMode?: string,
  *   closureNotice?: string,
@@ -68,6 +141,7 @@ function composeBusinessAssistantIntro(opts = {}) {
       : 'serve';
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
+  const offering = summarizeOfferingForIntro(opts);
 
   // Variant 0 = primary brand-first line; 1 = thank-you alternate (still English).
   const variant =
@@ -78,24 +152,25 @@ function composeBusinessAssistantIntro(opts = {}) {
   const identityPrimary = `${opener}, you've reached ${businessName}, this is ${agentName} speaking.`;
   const identityThanks = `Thank you for calling ${businessName}, this is ${agentName} speaking.`;
   const identity = variant === 1 ? identityThanks : identityPrimary;
+  const withOffer = offering ? `${identity} ${offering}` : identity;
 
   if (closureNotice) {
     const follow =
       afterHoursMode === 'message'
         ? 'I can still take a message. May I have your name?'
         : 'Even so, I can still help. How can I assist?';
-    return `${identity} ${closureNotice} ${follow}`;
+    return `${withOffer} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === 'message') {
-    return `${identity} We're closed right now, but I can take a message.`;
+    return `${withOffer} We're closed right now, but I can take a message.`;
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. How can I assist?`;
+    return `${withOffer} We're closed now, but I can still help. How can I assist?`;
   }
 
-  return `${identity} How can I help?`;
+  return `${withOffer} How can I help?`;
 }
 
 /**
@@ -137,6 +212,7 @@ function introLooksValid(line, businessName, agentName) {
 module.exports = {
   eatTimeOfDay,
   englishDayOpener,
+  summarizeOfferingForIntro,
   composeBusinessAssistantIntro,
   previewBusinessAssistantIntro,
   introLooksValid,

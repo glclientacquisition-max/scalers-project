@@ -1751,6 +1751,8 @@ mediaWss.on('connection', (ws, req) => {
       greetingLine = await generateDynamicGreeting({
         businessName,
         agentName,
+        servicesCatalog: brainProfile.servicesCatalog,
+        servicesOffered: brainProfile.servicesOffered,
         isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
         afterHoursMode,
         closureNotice,
@@ -1770,6 +1772,8 @@ mediaWss.on('connection', (ws, req) => {
       try {
         const fallback = buildGreeting(businessName, {
           agentName,
+          servicesCatalog: brainProfile.servicesCatalog,
+          servicesOffered: brainProfile.servicesOffered,
           isOpen: openStatus === 'unknown' ? null : openStatus === 'open',
           afterHoursMode,
           closureNotice,
