@@ -40,7 +40,7 @@ export type GeminiScanRawIssue = {
   word_or_phrase: string;
   timestamp_seconds?: number | null;
   confidence: GeminiScanConfidence;
-  suggested_fix: string;
+  suggested_form: string;
   reasoning: string;
 };
 
@@ -166,7 +166,10 @@ export function parseGeminiScanIssues(raw: string): {
       continue;
     }
     const word = String(row.word_or_phrase || "").trim();
-    const suggested = String(row.suggested_form || "").trim();
+    // Accept prompt field name + common typo from model output.
+    const suggested = String(
+      row.suggested_form || row.suggested_fix || ""
+    ).trim();
     const confidence = String(row.confidence || "")
       .trim()
       .toLowerCase();

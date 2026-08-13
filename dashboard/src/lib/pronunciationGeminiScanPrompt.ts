@@ -13,7 +13,7 @@ For each issue found, output a JSON object with:
 - word_or_phrase: the exact word/phrase in question
 - timestamp_seconds: approximate location in the call
 - confidence: "high" | "medium" | "low"
-- suggested_fix: for AGENT_MISPRONUNCIATION, a suggested phonetic respelling in the SAME STYLE as the approved Library examples provided; for LIKELY_MISHEARD, the likely correct word/phrase.
+- suggested_form: for AGENT_MISPRONUNCIATION, a suggested phonetic respelling in the SAME STYLE as the approved Library examples provided; for LIKELY_MISHEARD, the likely correct word/phrase.
 - reasoning: one short sentence explaining why you flagged this.
 Only flag things you are reasonably confident about. Do not flag every unfamiliar word — only ones that sound genuinely wrong or caused a downstream misunderstanding. Return an empty array if nothing is found.
 Respond ONLY with a JSON array, no other text.`;
