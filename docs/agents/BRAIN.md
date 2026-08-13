@@ -70,7 +70,8 @@ Core runtime modules:
 
 ## Test / verify
 
-- Escalation smoke: `node scripts/smoke-escalation-scenarios.js` (when relevant)
+- **MVP ship gate:** `npm run test:mvp` (Brain + knowledge + retail/escalation/MVP smokes). Live DID pack: `docs/MVP_SHIP_AND_TEST.md`
+- Escalation smoke: `npm run smoke:escalation` (or `node scripts/smoke-escalation-scenarios.js`)
 - Brain outcomes: `npm run test:brain`
 - Manual: change settings → compile → place a test call; confirm CONTEXT HEADER / ground truth behavior
 - Do not require `npm run test:voice` unless you touched media path (you shouldn’t)
