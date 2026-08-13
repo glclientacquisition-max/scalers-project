@@ -51,6 +51,9 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 5. Barge-in must cancel TTS + clear queued playback; avoid false cancels on backchannels / echo.
 6. Spoken agent lines that play to the caller should land in the transcript.
 7. Keep `db.js` orchestration surface stable (`upsertCall`, `appendTranscript`, `attachRecording`, `chargeCallToWallet`, …).
+8. Greeting must await TTS ready (`ttsReadyPromise`) — never call `speakText` while `tts` is still null.
+9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air.
+10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
 
 ## Env knobs (Voice)
 

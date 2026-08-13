@@ -60,8 +60,26 @@ assert.match(
 
 assert.match(
   source,
-  /Drop filler PCM via generation bump only/,
-  'filler stop must not cancel the prefetched reply TTS stream'
+  /cancel ONLY the filler stream/,
+  'filler stop must cancel only the filler stream id, not the reply prefetch'
+);
+
+assert.match(
+  source,
+  /action-progress action=/,
+  'action turns must speak a progress line before Gemini+tools dead air'
+);
+
+assert.match(
+  source,
+  /ttsReadyPromise/,
+  'greeting must wait for TTS ready to avoid silent answer'
+);
+
+assert.match(
+  source,
+  /activeOutboundStreamId/,
+  'outbound PCM must be gated by active Soniox stream id'
 );
 
 assert.match(

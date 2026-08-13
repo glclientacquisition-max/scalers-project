@@ -77,6 +77,7 @@ const {
 const {
   generateDynamicGreeting,
   pickContextualAck,
+  pickActionProgress,
   shouldSkipCallerTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
@@ -907,6 +908,15 @@ mediaWss.on('connection', (ws, req) => {
   let callLanguageState = createLanguageState();
   let brainProfile = {};
   let fillerUsedThisCall = false;
+  /** Soniox stream id for the in-flight thinking-ack (cancel this only — keep reply prefetch). */
+  let fillerStreamId = null;
+  /** Only PCM from this stream id is forwarded (drops orphan filler / cancelled audio). */
+  let activeOutboundStreamId = null;
+  /** Resolves when TTS session is assigned and connected (or null if unavailable). */
+  let resolveTtsReady = null;
+  const ttsReadyPromise = new Promise((resolve) => {
+    resolveTtsReady = resolve;
+  });
   /** @type {ReturnType<typeof createVoiceTurnTiming>|null} */
   let activeTurnTiming = null;
   /** Rolling interim hypothesis while agent is busy (for barge-in). */
@@ -1035,17 +1045,38 @@ mediaWss.on('connection', (ws, req) => {
         ` original=${JSON.stringify(prepared.original)}` +
         ` spoken=${JSON.stringify(prepared.text)}`
     );
+    let session = null;
     try {
-      await tts.speak(prepared.text, {
+      // beginSpeak so we can track/cancel this stream without killing a reply prefetch.
+      session = await tts.beginSpeak({
         language: prepared.language,
         callLanguage,
         alreadyPrepared: true,
       });
+      activeOutboundStreamId = session.streamId;
+      if (opts.isFiller) fillerStreamId = session.streamId;
+      const pushed = session.pushText(prepared.text);
+      if (!pushed.pushed) {
+        session.cancel();
+        return;
+      }
+      await session.end();
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
+      try {
+        session?.cancel();
+      } catch {
+        /* ignore */
+      }
     } finally {
+      if (opts.isFiller && fillerStreamId && session?.streamId === fillerStreamId) {
+        fillerStreamId = null;
+      }
       if (activePlaybackGeneration === gen) {
         speaking = false;
+        if (activeOutboundStreamId === session?.streamId) {
+          activeOutboundStreamId = null;
+        }
         releaseQueuedCallerSpeech();
       }
     }
@@ -1057,6 +1088,8 @@ mediaWss.on('connection', (ws, req) => {
     playbackGeneration += 1;
     speaking = false;
     interimBargeText = '';
+    fillerStreamId = null;
+    activeOutboundStreamId = null;
     console.log(`[ws/media][${sidLabel()}] barge-in cancel (${reason})`);
     if (tts) {
       try {
@@ -1219,11 +1252,34 @@ mediaWss.on('connection', (ws, req) => {
       .join('\n\n');
 
     try {
+      const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
+        nextBestAction.action
+      );
+
+      // Action turns disable streaming and wait on Gemini+tools — speak progress
+      // immediately so orders/escalations are not dead air ("let me save that").
+      /** @type {Promise<void>} */
+      let actionProgressSpeak = Promise.resolve();
+      if (actionMayExecute && tts && !bargeInActive) {
+        const progressLine = pickActionProgress(nextBestAction.action, callLanguage);
+        clearFillerTimer();
+        turnTiming.markFiller();
+        console.log(
+          `[ws/media][${sidLabel()}] action-progress action=${nextBestAction.action}` +
+            ` lang=${callLanguage}: ${progressLine}`
+        );
+        actionProgressSpeak = speakText(progressLine).catch(() => {});
+      }
+
       // VOICE_FILLER=auto (default): adaptive ack only if first spoken audio is slow.
       // ack → always schedule a tiny backchannel; off → silence; custom → fixed phrase.
+      // Skip when we already spoke an action-progress line for this turn.
       const fillerMode = (process.env.VOICE_FILLER || 'auto').toLowerCase();
       const useFiller =
-        Boolean(tts) && fillerMode !== 'off' && !fillerUsedThisCall;
+        Boolean(tts) &&
+        fillerMode !== 'off' &&
+        !fillerUsedThisCall &&
+        !actionMayExecute;
       const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 400);
       const fillerText =
         fillerMode === 'ack' || fillerMode === 'auto'
@@ -1243,14 +1299,11 @@ mediaWss.on('connection', (ws, req) => {
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
             );
-            speakText(fillerText).catch(() => {});
+            speakText(fillerText, { isFiller: true }).catch(() => {});
           }
         }, fillerDelayMs);
       }
 
-      const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
-        nextBestAction.action
-      );
       const streamOn =
         Boolean(process.env.GEMINI_API_KEY) &&
         Boolean(tts) &&
@@ -1289,10 +1342,22 @@ mediaWss.on('connection', (ws, req) => {
         clearFillerTimer();
         if (!fillerStarted) return;
         fillerStarted = false;
-        // Drop filler PCM via generation bump only — do NOT tts.cancel() here,
-        // or we kill the prefetched reply stream on the same Soniox socket.
+        // Drop filler PCM via generation bump + cancel ONLY the filler stream.
+        // Do NOT tts.cancel() with no id — that kills the prefetched reply stream.
         playbackGeneration += 1;
         speaking = false;
+        const cancelId = fillerStreamId;
+        fillerStreamId = null;
+        if (activeOutboundStreamId && cancelId && activeOutboundStreamId === cancelId) {
+          activeOutboundStreamId = null;
+        }
+        if (tts && cancelId) {
+          try {
+            tts.cancel(cancelId);
+          } catch {
+            /* ignore */
+          }
+        }
         clearMediaPlayback(ws);
         console.log(`[ws/media][${sidLabel()}] filler cancelled for reply audio`);
       }
@@ -1336,6 +1401,7 @@ mediaWss.on('connection', (ws, req) => {
           activePlaybackGeneration = ++playbackGeneration;
           streamPlaybackGen = activePlaybackGeneration;
         }
+        activeOutboundStreamId = session.streamId;
 
         session.pushText(text);
         spokenChunks.push(text);
@@ -1362,6 +1428,7 @@ mediaWss.on('connection', (ws, req) => {
           speakSession = null;
         }
         if (!bargeInActive) {
+          await actionProgressSpeak;
           transcriptLog.push(`Agent: ${result.spokenText}`);
           turnTiming.markFirstSpokenChunk();
           await speakText(result.spokenText);
@@ -1453,6 +1520,8 @@ mediaWss.on('connection', (ws, req) => {
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
+        // Finish "let me save that" before the tool confirmation so they don't overlap.
+        await actionProgressSpeak;
         if (reply) {
           transcriptLog.push(`Agent: ${reply}`);
           turnTiming.markFirstSpokenChunk();
@@ -1461,6 +1530,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       if (result?.actionConfirmation && !bargeInActive) {
+        await actionProgressSpeak;
         transcriptLog.push(`Agent: ${result.actionConfirmation}`);
         await speakText(result.actionConfirmation);
       }
@@ -1614,33 +1684,48 @@ mediaWss.on('connection', (ws, req) => {
 
   if (isSonioxTtsConfigured()) {
     tenantWarm
-      .then(() => {
+      .then(async () => {
         try {
           tts = createSonioxTtsSession({
             callSid: sidLabel(),
             voiceId: tenantSonioxVoiceId,
-            onAudio: (pcm) => {
+            onAudio: (pcm, meta = {}) => {
               // Drop outbound audio after barge-in cancel / superseded playback generation.
               if (!speaking) return;
               if (activePlaybackGeneration !== playbackGeneration) return;
+              // Drop orphan filler / cancelled-stream PCM that arrives late.
+              if (
+                activeOutboundStreamId &&
+                meta.streamId &&
+                meta.streamId !== activeOutboundStreamId
+              ) {
+                return;
+              }
               if (activeTurnTiming) activeTurnTiming.markFirstPcm();
               if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
             },
           });
-          tts.ready.catch((err) => {
+          try {
+            await tts.ready;
+            resolveTtsReady(tts);
+          } catch (err) {
             console.error(`[ws/media] Soniox TTS failed to start:`, err?.message || err);
             tts = null;
-          });
+            resolveTtsReady(null);
+          }
         } catch (err) {
           console.error(`[ws/media] Soniox TTS init error:`, err?.message || err);
           tts = null;
+          resolveTtsReady(null);
         }
       })
       .catch((err) => {
         console.error(`[ws/media] Soniox TTS tenant warm failed:`, err?.message || err);
+        resolveTtsReady(null);
       });
   } else {
     console.warn('[ws/media] SONIOX_API_KEY missing — skipping TTS for this call');
+    resolveTtsReady(null);
   }
 
   // Greet once media + TTS + tenant prompt are ready.
@@ -1650,7 +1735,15 @@ mediaWss.on('connection', (ws, req) => {
     greetingStarted = true;
     try {
       await ensureTenantPrompt();
-      if (tts) await tts.ready;
+      // Wait until TTS is assigned + connected — avoid silent greetings when
+      // speakText raced ahead of tenantWarm.then(() => createSonioxTtsSession).
+      const readyTts = await ttsReadyPromise;
+      if (!readyTts) {
+        console.warn(
+          `[ws/media][${sidLabel()}] greeting skipped — TTS not ready`
+        );
+        return;
+      }
 
       // Instant local greeting by default (correct business name, no Gemini wait).
       // Set VOICE_GREETING_MODE=gemini only if you want an LLM-written opener.
