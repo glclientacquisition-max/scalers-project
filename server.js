@@ -99,6 +99,7 @@ const {
   dispatchEscalationAlert,
   whatsAppSenderReady,
   emailFallbackReady,
+  smsSenderReady,
 } = require('./src/notifications/dispatch');
 const {
   resolveEscalation,
@@ -2000,6 +2001,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         name: lead.name,
         phone: lead.callerNumber,
         reason: lead.reason,
+        smsSender: smsSenderReady(),
         whatsappSender: whatsAppSenderReady(),
         emailFallback: emailFallbackReady(),
         ownerNumber: ownerNumber || null,
@@ -2017,7 +2019,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         ok: true,
         soft: true,
         channel: 'desk_note',
-        reason: 'No live WA/email channel; escalation saved on the call for the desk.',
+        reason: 'No live SMS/WA/email channel; escalation saved on the call for the desk.',
       };
     }
 
@@ -2086,6 +2088,7 @@ async function maybeSendWhatsAppNotification(callSid) {
         recording: call.recording_url,
         ownerNumber: ownerNumber || null,
         ownerEmail: ownerEmail || null,
+        smsSender: smsSenderReady(),
         whatsappSender: whatsAppSenderReady(),
         emailFallback: emailFallbackReady(),
       });
@@ -2729,12 +2732,21 @@ server.listen(PORT, () => {
   } else {
     console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
   }
+  if (smsSenderReady()) {
+    console.log(
+      `✓ SMS notify ready via TextSMS (shortcode=${process.env.TEXTSMS_SHORTCODE}) — primary for leads + escalation`
+    );
+  } else {
+    console.log(
+      `ℹ SMS notify not set (TEXTSMS_API_KEY + TEXTSMS_PARTNER_ID + TEXTSMS_SHORTCODE)`
+    );
+  }
   if (whatsAppSenderReady()) {
-    console.log(`✓ WhatsApp notify ready (preferred for leads + escalation)`);
+    console.log(`✓ WhatsApp notify ready (secondary when SMS unavailable)`);
   } else if (process.env.SAUTIKIT_API_KEY) {
     console.log(`ℹ SAUTIKIT_API_KEY present — set SAUTIKIT_WHATSAPP_NUMBER_ID (or CONNECTION_ID) to enable WhatsApp alerts`);
   } else {
-    console.log(`ℹ WhatsApp notify not configured — will use email fallback if set`);
+    console.log(`ℹ WhatsApp notify not configured`);
   }
   if (emailFallbackReady()) {
     console.log(`✓ Email alert fallback ready (from ${process.env.ALERT_EMAIL_FROM})`);

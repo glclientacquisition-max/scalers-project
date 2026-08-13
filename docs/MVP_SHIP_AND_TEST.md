@@ -102,7 +102,7 @@ Private beta claim: **the DID answers**, FAQs work, verified message/enquiry/hol
 | Voice | Greeting always heard; order/escalate hears a short progress line (no long dead air). Deploy includes voice dead-air fix `#141`. |
 | Request integrity | No `order`/`hold` with STT sentences, missing catalogue, or agent/business as caller name (tool gates). |
 | Live pack | Pass **1, 2, 6, 7, 9** every time; target ≥8/10 overall. |
-| Notify | At least one real WhatsApp/email from a saved enquiry or escalate. |
+| Notify | At least one real **SMS** (TextSMS) / WhatsApp / email from a saved enquiry or escalate. Private beta primary: `TEXTSMS_*` on Railway. |
 | Trust | Zero false “Done — I've saved/sent” without a desk row. |
 
 **Private beta NO-GO:** silent answer, garbled order rows (`I have to make habits`), caller_name = agent name, escalate claimed but not delivered.
