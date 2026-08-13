@@ -119,15 +119,10 @@ export function TestLinePanel({
 
   return (
     <div className="mx-auto max-w-xl space-y-10">
-      <header className="space-y-2">
+      <header>
         <h2 className="font-display text-[clamp(1.5rem,4vw,2rem)] tracking-tight text-[var(--ink)]">
           Test
         </h2>
-        <p className="text-sm text-[var(--ink-soft)]">
-          Hear how your assistant introduces the business — brand, agent, what
-          you offer, and that callers can use English or Kiswahili — with your
-          current voice and pronunciations.
-        </p>
       </header>
 
       <section className="space-y-4" aria-labelledby="test-preview-heading">
@@ -198,7 +193,7 @@ export function TestLinePanel({
         </h3>
         {pendingDid || !did ? (
           <p className="text-sm text-[var(--ink-soft)]">
-            Number pending — finish setup before calling.
+            Number pending. Finish setup before calling.
           </p>
         ) : (
           <a

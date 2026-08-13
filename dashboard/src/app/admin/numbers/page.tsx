@@ -26,9 +26,6 @@ export default async function AdminNumbersPage() {
         <h2 className="font-display text-2xl tracking-tight">Number pool</h2>
         <SautikitSyncButton />
       </div>
-      <p className="mt-1 text-sm text-[var(--ink-soft)] max-w-2xl">
-        Spare SautiKit numbers for businesses. Available or assigned to one business. Never both.
-      </p>
       <div className="mt-6 space-y-6">
         <BuyNumberPanel />
         <DidPoolManager pool={pool} pendingBusinesses={pendingBusinesses} />

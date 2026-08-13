@@ -17,10 +17,6 @@ export default async function AdminBusinessesPage() {
   return (
     <div>
       <h2 className="font-display text-2xl tracking-tight">Businesses</h2>
-      <p className="mt-1 text-sm text-[var(--ink-soft)] max-w-2xl">
-        Every workspace on the platform. Assign or release phone numbers, or remove a business and
-        free its DID for reuse.
-      </p>
       <div className="mt-6">
         <AdminBusinessesPanel
           businesses={overview.businesses}

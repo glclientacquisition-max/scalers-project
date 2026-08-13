@@ -43,7 +43,7 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
   return (
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line/70 pt-4">
       <p className="text-sm text-ink-soft">
-        {from}–{to} of {total}
+        {from}-{to} of {total}
       </p>
       <div className="flex items-center gap-2">
         {page > 1 ? (

@@ -12,9 +12,6 @@ const initial: OnDemandUsageState = {};
 export function OnDemandUsagePanel({
   tenantId,
   enabled: initialEnabled,
-  isBeta,
-  walletBalanceKes,
-  lowThresholdKes,
 }: {
   tenantId: string;
   enabled: boolean;
@@ -34,10 +31,6 @@ export function OnDemandUsagePanel({
     if (state.ok) router.refresh();
   }, [state.ok, router]);
 
-  const prepaidEmpty = !isBeta && walletBalanceKes <= 0;
-  const prepaidLow =
-    !isBeta && walletBalanceKes > 0 && walletBalanceKes < lowThresholdKes;
-
   return (
     <section className="rounded-2xl border border-line bg-surface p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -46,26 +39,6 @@ export function OnDemandUsagePanel({
           {enabled ? "On" : "Off"}
         </span>
       </div>
-
-      <p className="mt-2 text-sm text-ink-soft">
-        {isBeta
-          ? "Set your preference now. Applies automatically when prepaid billing is active."
-          : "Keep answering after prepaid hits zero."}
-      </p>
-
-      {!isBeta ? (
-        <p className="mt-2 text-sm text-ink-soft">
-          Prepaid:{" "}
-          <span
-            className={
-              prepaidEmpty || prepaidLow ? "font-medium text-warn" : "font-medium text-ink"
-            }
-          >
-            KES {walletBalanceKes.toLocaleString("en-KE")}
-          </span>
-          {prepaidEmpty ? " · empty" : prepaidLow ? ` · under KES ${lowThresholdKes.toLocaleString("en-KE")}` : null}
-        </p>
-      ) : null}
 
       <form action={formAction} className="mt-4 space-y-4">
         <input type="hidden" name="tenant_id" value={tenantId} />
@@ -93,7 +66,7 @@ export function OnDemandUsagePanel({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-[#0096FF]/45 hover:text-[#005ccc] disabled:opacity-60"
+          className="rounded-xl bg-[#0096FF] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0088e8] disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save"}
         </button>

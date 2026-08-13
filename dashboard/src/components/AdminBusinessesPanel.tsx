@@ -241,7 +241,7 @@ export function AdminBusinessesPanel({
       {filtered.length > PAGE_SIZE ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--ink-soft)]">
-            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of{" "}
+            {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} of{" "}
             {filtered.length}
           </p>
           <div className="flex gap-2">

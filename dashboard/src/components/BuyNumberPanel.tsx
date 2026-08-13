@@ -76,16 +76,12 @@ export function BuyNumberPanel() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl tracking-tight">Buy from SautiKit</h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)] max-w-xl leading-relaxed">
-            Claims a number on your platform wallet, points voice webhooks at Railway, and drops
-            it into the pool as Available.
-          </p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           disabled={loading || pending}
-          className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm hover:border-[var(--accent)] disabled:opacity-60"
+          className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline disabled:opacity-60"
         >
           Refresh list
         </button>
@@ -110,28 +106,7 @@ export function BuyNumberPanel() {
           <p className="mt-4 text-xs text-[var(--ink-soft)]">
             Showing up to 40 available numbers from SautiKit.
           </p>
-          <ul className="mt-3 space-y-2 sm:hidden">
-            {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((row) => (
-              <li
-                key={row.inventory_id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] px-3 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium">{row.e164}</p>
-                  <p className="text-xs text-[var(--ink-soft)]">{row.monthly}</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={Boolean(buyingId) || !buyConfigured}
-                  onClick={() => void buy(row.inventory_id, row.e164)}
-                  className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                >
-                  {buyingId === row.inventory_id ? "Buying…" : "Buy"}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 hidden overflow-x-auto sm:block">
+          <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="text-[var(--ink-soft)]">
                 <tr className="border-b border-[var(--line)]/70">

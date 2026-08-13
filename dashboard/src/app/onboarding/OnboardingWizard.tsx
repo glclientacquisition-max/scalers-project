@@ -15,6 +15,7 @@ import {
   HANDOFF_OPTIONS,
   type HandoffMode,
 } from "@/lib/handoffMode";
+import { compactTextareaExpandHandlers } from "@/components/settingsUi";
 
 const STEPS = [
   "Business type",
@@ -44,7 +45,7 @@ const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
 
 const initial: OnboardingState = {};
 
-export function OnboardingWizard({ businessName }: { businessName: string }) {
+export function OnboardingWizard() {
   const [step, setStep] = useState(0);
   const [vertical, setVertical] = useState<BusinessVertical | "">("retail");
   const [servicesPricing, setServicesPricing] = useState("");
@@ -139,10 +140,6 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
         {step === 0 ? (
           <div>
             <h2 className="font-display text-2xl text-[var(--ink)]">Business type</h2>
-            <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-              Goal: when callers miss you, {businessName} answers live — hours, location,
-              FAQs, and messages to your WhatsApp. Start with retail if you sell products.
-            </p>
             <div className="mt-5 space-y-3">
               {VERTICAL_OPTIONS.map((opt) => {
                 const selected = vertical === opt.id;
@@ -159,9 +156,6 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
                     ].join(" ")}
                   >
                     <span className="font-medium text-[var(--ink)]">{opt.label}</span>
-                    <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                      {opt.blurb}
-                    </span>
                   </button>
                 );
               })}
@@ -174,14 +168,12 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
             <h2 className="font-display text-2xl text-[var(--ink)]">
               {vertical === "retail" ? "Products & pricing" : "Services & pricing"}
             </h2>
-            <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-              What does {businessName} offer, and how should the receptionist talk about price?
-            </p>
             <textarea
               autoFocus
               value={servicesPricing}
               onChange={(e) => setServicesPricing(e.target.value)}
-              rows={8}
+              rows={2}
+              {...compactTextareaExpandHandlers}
               placeholder={
                 vertical === "retail"
                   ? "e.g. Phone accessories, chargers, and screen protectors.\nPricing: chargers from 500 KES. We can hold items with a name until evening. M-Pesa and cash."
@@ -195,16 +187,14 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
         {step === 2 ? (
           <div>
             <h2 className="font-display text-2xl text-[var(--ink)]">Hours & location</h2>
-            <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-              Clear times let the line say open or closed honestly when callers miss you.
-            </p>
             <textarea
               autoFocus
               value={hoursLocation}
               onChange={(e) => setHoursLocation(e.target.value)}
-              rows={5}
+              rows={2}
+              {...compactTextareaExpandHandlers}
               placeholder={
-                "Monday – Saturday: 9:00 AM – 7:00 PM. Sunday: Closed.\nWestlands, Nairobi."
+                "Monday to Saturday: 9:00 AM to 7:00 PM. Sunday: Closed.\nWestlands, Nairobi."
               }
               className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
             />
@@ -228,8 +218,9 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
               id="directions"
               value={directions}
               onChange={(e) => setDirections(e.target.value)}
-              rows={3}
-              placeholder="From Waiyaki Way, turn at the Shell — we are on the left."
+              rows={2}
+              {...compactTextareaExpandHandlers}
+              placeholder="From Waiyaki Way, turn at the Shell. We are on the left."
               className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
             />
           </div>
@@ -239,9 +230,6 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
           <div className="space-y-8">
             <div>
               <h2 className="font-display text-2xl text-[var(--ink)]">Receptionist name & tone</h2>
-              <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-                How should callers feel when they reach your line?
-              </p>
               <label
                 className="mt-5 block text-sm font-medium text-[var(--ink)]"
                 htmlFor="agent_name_field"
@@ -273,9 +261,6 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
                       <span className="font-medium text-[var(--ink)]">
                         {TONE_LABELS[opt.id]}
                       </span>
-                      <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                        {opt.blurb}
-                      </span>
                     </button>
                   );
                 })}
@@ -283,10 +268,6 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
             </div>
             <div>
               <h3 className="text-sm font-medium text-[var(--ink)]">When a human is needed</h3>
-              <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                Messages and escalations go to the WhatsApp you used at signup. You can
-                change this later in Settings.
-              </p>
               <div className="mt-3 space-y-3">
                 {HANDOFF_OPTIONS.map((opt) => {
                   const selected = handoffMode === opt.id;
@@ -303,9 +284,6 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
                       ].join(" ")}
                     >
                       <span className="font-medium text-[var(--ink)]">{opt.label}</span>
-                      <span className="mt-1 block text-sm text-[var(--ink-soft)]">
-                        {opt.blurb}
-                      </span>
                     </button>
                   );
                 })}
@@ -349,7 +327,7 @@ export function OnboardingWizard({ businessName }: { businessName: string }) {
               disabled={!canAdvance() || pending}
               className="rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-50"
             >
-              {pending ? "Opening your line…" : "Finish setup — answer missed calls"}
+              {pending ? "Opening your line…" : "Finish setup"}
             </button>
           )}
         </div>

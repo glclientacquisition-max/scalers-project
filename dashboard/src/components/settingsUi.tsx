@@ -117,6 +117,19 @@ export function ToolSwitch({
   );
 }
 
+export const settingsGhostButtonClass =
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
+
+/** Default rows={2}; expands on focus for long paste without vertical sprawl. */
+export const compactTextareaExpandHandlers = {
+  onFocus: (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    e.currentTarget.rows = 4;
+  },
+  onBlur: (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    e.currentTarget.rows = 2;
+  },
+};
+
 export function ExpandTextarea({
   id,
   value,

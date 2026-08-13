@@ -110,9 +110,7 @@ export default async function WalletPage() {
               KES {usage.walletBalanceKes.toLocaleString("en-KE")}
             </p>
             <p className="mt-2 text-sm text-ink-soft">
-              {usage.isBeta
-                ? "Metered automatically. No charges during beta."
-                : "Covers line fee and call minutes"}
+              {usage.isBeta ? "Metered. No charges during beta." : "Line fee and call minutes"}
             </p>
           </div>
           <dl className="grid min-w-[12rem] gap-4 sm:grid-cols-2">

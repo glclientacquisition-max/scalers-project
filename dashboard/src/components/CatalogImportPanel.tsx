@@ -14,6 +14,7 @@ import {
 import {
   settingsFieldClass,
   settingsRadioCardClass,
+  compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
 
 const fieldClass = settingsFieldClass;
@@ -160,7 +161,8 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   name="paste"
                   value={paste}
                   onChange={(e) => setPaste(e.target.value)}
-                  rows={7}
+                  rows={2}
+                  {...compactTextareaExpandHandlers}
                   placeholder={
                     mode === "csv"
                       ? "name,price,category,in_stock,sku\nAtomic Habits,2500 KES,Self-help,yes,\nRich Dad Poor Dad,1800 KES,Finance,yes,"

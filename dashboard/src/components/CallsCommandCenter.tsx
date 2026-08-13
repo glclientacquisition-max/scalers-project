@@ -4,6 +4,7 @@ import {
   STATUS_FILTERS,
   type StatusFilterId,
 } from "@/lib/callsTriage";
+import { settingsGhostButtonClass } from "@/components/settingsUi";
 
 export function CallsToolbar({
   active,
@@ -45,7 +46,7 @@ export function CallsToolbar({
           />
           <button
             type="submit"
-            className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
+            className={settingsGhostButtonClass}
           >
             Search
           </button>

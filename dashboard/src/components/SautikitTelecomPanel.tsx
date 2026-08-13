@@ -20,8 +20,8 @@ function DiagnosticsBlock() {
         Starts with eyJ: {d.startsWithEyJ ? "yes" : "no"}
         {d.label ? ` · label “${d.label}”` : ""}
       </p>
-      <p>Scopes: {d.scopes.length ? d.scopes.join(", ") : "—"}</p>
-      <p>Workspace: {d.workspaceId || "—"}</p>
+      <p>Scopes: {d.scopes.length ? d.scopes.join(", ") : "n/a"}</p>
+      <p>Workspace: {d.workspaceId || "n/a"}</p>
       {d.issues.length ? (
         <ul className="mt-2 list-disc pl-4 text-[var(--warn)]">
           {d.issues.map((issue) => (

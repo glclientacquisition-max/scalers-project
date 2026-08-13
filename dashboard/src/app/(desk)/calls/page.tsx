@@ -48,9 +48,6 @@ function EmptyCalls({
     return (
       <div className="mt-6 border-y border-line py-10 text-center">
         <p className="font-display text-xl tracking-tight text-ink">No matches</p>
-        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-          Nothing matched &ldquo;{q}&rdquo; in this filter.
-        </p>
         <Link
           href={callsHref({ status: statusFilter })}
           className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
@@ -73,9 +70,6 @@ function EmptyCalls({
     return (
       <div className="mt-6 border-y border-line py-10 text-center">
         <p className="font-display text-xl tracking-tight text-ink">No {label}</p>
-        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-          Nothing in this follow-up bucket right now.
-        </p>
         <Link
           href={callsHref({ status: "all" })}
           className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
@@ -90,14 +84,11 @@ function EmptyCalls({
     return (
       <div className="mt-6 border-y border-[#0096FF]/30 bg-[#0096FF]/5 py-10 text-center">
         <p className="font-display text-xl tracking-tight text-ink">Number being assigned</p>
-        <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-          Train the business profile now. Once the number is live, test calls land here.
-        </p>
         <Link
           href="/settings#train"
           className="mt-5 inline-flex rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:shadow-focus"
         >
-          Train receptionist
+          Train assistant
         </Link>
       </div>
     );
@@ -107,7 +98,7 @@ function EmptyCalls({
     <div className="mt-6 border-y border-line py-10 text-center text-ink-soft">
       <p className="font-display text-xl tracking-tight text-ink">No calls yet</p>
       <p className="mx-auto mt-2 max-w-md text-sm">
-        Place a test call to{" "}
+        Call{" "}
         <a
           href={`tel:${did}`}
           className="font-medium text-[#005ccc] underline focus-visible:outline-none focus-visible:shadow-focus"
@@ -337,59 +328,7 @@ export default async function CallsPage({
         />
       ) : (
         <>
-          <ul className="mt-6 space-y-3 md:hidden">
-            {leads.map((lead) => {
-              const message = followUpWhatsAppMessage({
-                businessName,
-                name: lead.name,
-                reason: lead.reason,
-              });
-              return (
-                <li
-                  key={`m-${lead.call.id}`}
-                  className={[
-                    "min-w-0 rounded-2xl border border-line bg-surface p-4",
-                    lead.urgent ? "border-warn/40 bg-warn-soft/40" : "",
-                  ].join(" ")}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-xs text-ink-soft">{formatCallWhen(lead.call.created_at)}</p>
-                      <p className="mt-1 font-medium text-ink [overflow-wrap:anywhere]">
-                        {lead.name || "Unknown"}
-                      </p>
-                      <div className="mt-1"><StatusBadges lead={lead} /></div>
-                    </div>
-                    <Link
-                      href={`/calls/${lead.call.id}?from=${activeFilter}`}
-                      className="inline-flex min-h-11 items-center font-medium text-[#0096FF] hover:text-[#005ccc]"
-                    >
-                      Open
-                    </Link>
-                  </div>
-                  <p className="mt-2 text-sm text-ink-soft [overflow-wrap:anywhere]">
-                    {lead.reason || "No reason yet"}
-                  </p>
-                  <div className="mt-3 min-w-0">
-                    <WhatsAppLink number={lead.call.caller_number} message={message} />
-                  </div>
-                  {leadStatusReady ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <LeadStatusToggle callId={lead.call.id} initial={lead.leadStatus} />
-                      {lead.leadStatus !== "resolved" ? (
-                        <MarkLeadDoneButton callId={lead.call.id} />
-                      ) : null}
-                      {lead.leadStatus !== "archived" ? (
-                        <MarkLeadArchiveButton callId={lead.call.id} />
-                      ) : null}
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-
-          <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-line bg-surface md:block">
+          <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b border-line bg-surface-muted/70 text-ink-soft">
                 <tr>
@@ -441,10 +380,10 @@ export default async function CallsPage({
                               initial={lead.leadStatus}
                             />
                             {lead.leadStatus !== "resolved" ? (
-                              <MarkLeadDoneButton callId={lead.call.id} />
+                              <MarkLeadDoneButton callId={lead.call.id} variant="icon" />
                             ) : null}
                             {lead.leadStatus !== "archived" ? (
-                              <MarkLeadArchiveButton callId={lead.call.id} />
+                              <MarkLeadArchiveButton callId={lead.call.id} variant="icon" />
                             ) : null}
                           </div>
                         ) : (

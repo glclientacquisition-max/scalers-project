@@ -30,7 +30,7 @@ function planConsequence(mode: BillingMode): string {
   if (mode === "soft") {
     return "Prepaid: wallet is debited for calls and line fees. Calls still connect at zero balance.";
   }
-  return "Prepaid: wallet is debited. Inbound block at zero balance is not wired yet — treat like soft for now.";
+  return "Prepaid: wallet is debited. Inbound block at zero balance is not wired yet. Treat like soft for now.";
 }
 
 function defaultModeNote(mode: BillingMode, row?: AdminWalletRow | null): string {
@@ -222,7 +222,7 @@ export function AdminWalletsPanel({
       const balance = modeTarget.wallet_balance_kes;
       const balanceLine =
         balance <= 0
-          ? `\n\nWallet is KES ${balance.toLocaleString("en-KE")} — they will be overdrawn / low once charging starts.`
+          ? `\n\nWallet is KES ${balance.toLocaleString("en-KE")}. They will be overdrawn or low once charging starts.`
           : `\n\nCurrent balance KES ${balance.toLocaleString("en-KE")}.`;
       const confirmed = window.confirm(
         `Graduate ${modeTarget.business_name} from free beta to ${planLabel(mode)}?\n\n` +
@@ -483,7 +483,7 @@ export function AdminWalletsPanel({
             <p className="mt-2 text-sm text-[var(--warn)]">
               Graduating off beta starts real charges. You will be asked to confirm before save.
               {modeTarget.wallet_balance_kes <= 0
-                ? ` Balance is KES ${modeTarget.wallet_balance_kes.toLocaleString("en-KE")} — top up first if you do not want them overdrawn.`
+                ? ` Balance is KES ${modeTarget.wallet_balance_kes.toLocaleString("en-KE")}. Top up first if you do not want them overdrawn.`
                 : null}
             </p>
           ) : null}
@@ -505,9 +505,9 @@ export function AdminWalletsPanel({
                 }}
                 className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
               >
-                <option value="off">Beta (free) — meter only</option>
-                <option value="soft">Prepaid (soft) — debit, do not block</option>
-                <option value="hard">Prepaid (hard) — debit; block later</option>
+                <option value="off">Beta (free), meter only</option>
+                <option value="soft">Prepaid (soft), debit, do not block</option>
+                <option value="hard">Prepaid (hard), debit; block later</option>
               </select>
             </label>
             <label className="text-sm">

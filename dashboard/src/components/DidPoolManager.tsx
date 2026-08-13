@@ -39,10 +39,6 @@ export function DidPoolManager({
     <div className="space-y-8">
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <h2 className="font-display text-2xl tracking-tight">Add number to pool</h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)] leading-relaxed">
-          Pre-buy in SautiKit, point voice + events webhooks at Railway, then add here.{" "}
-          <span className="font-medium text-[var(--ink)]">{available} available</span> now.
-        </p>
         <form
           className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
           onSubmit={(e) => {
@@ -182,9 +178,9 @@ export function DidPoolManager({
                   </td>
                   <td className="px-4 py-3">
                     {row.tenants?.business_name ||
-                      (row.tenant_id ? "Linked business" : "—")}
+                      (row.tenant_id ? "Linked business" : "n/a")}
                   </td>
-                  <td className="px-4 py-3 text-[var(--ink-soft)]">{row.notes || "—"}</td>
+                  <td className="px-4 py-3 text-[var(--ink-soft)]">{row.notes || "n/a"}</td>
                 </tr>
               ))
             )}
