@@ -22,37 +22,60 @@ const GOAL_BY_INTENT = Object.freeze({
   cancellation: 'cancel_or_change_request',
   human: 'speak_to_human',
   complaint: 'resolve_problem',
+  product_inquiry: 'find_product',
   general_enquiry: 'resolve_enquiry',
 });
 
 function inferIntent(text) {
   const value = String(text || '').trim().toLowerCase();
   if (!value) return 'unknown';
-  if (/\b(open|closed|hours|mnafungua|mnafunga|mpaka saa)\b/.test(value)) {
+  // Human / complaint before other patterns so "talk to the manager" wins.
+  if (
+    /\b(human|person|owner|manager|boss|agent|speak to|talk to|kuongea na|let me speak)\b/.test(
+      value
+    )
+  ) {
+    return 'human';
+  }
+  // Hours: opening/closing phrasing (avoid treating "book" noun as booking).
+  if (
+    /\b(open|closed|opening|closing|hours|working\s*hours|mnafungua|mnafunga|mpaka saa|what time.*(open|close)|when.*(open|close))\b/.test(
+      value
+    )
+  ) {
     return 'hours';
   }
   if (/\b(where|location|directions?|address|landmark|mko wapi|uko wapi)\b/.test(value)) {
     return 'location';
   }
-  if (/\b(how much|price|cost|bei|gharama)\b/.test(value)) return 'price';
+  if (/\b(how much|price|cost|bei|gharama|pesa gani)\b/.test(value)) return 'price';
   if (/\b(in stock|available|availability|do you have|stock|bado iko)\b/.test(value)) {
     return 'availability';
   }
-  if (/\b(return|refund|exchange|warranty|policy|payment|deposit|delivery)\b/.test(value)) {
+  if (/\b(return|refund|exchange|warranty|policy|payment|deposit|delivery|shipping)\b/.test(value)) {
     return 'policy';
   }
   if (/\b(hold|reserve|pickup|pick up|weka|nitapita|nitakuja)\b/.test(value)) {
     return 'hold';
   }
-  if (/\b(order|buy|purchase|nataka kununua)\b/.test(value)) {
+  if (/\b(order|buy|purchase|nataka kununua|ninaorder)\b/.test(value)) {
     return 'order';
   }
-  if (/\b(book|booking|appointment|reservation|schedule|miadi)\b/.test(value)) {
+  if (/\b(cancel|reschedule|change my|move my)\b/.test(value)) return 'cancellation';
+  // Appointment-style booking only — not the noun "book" / "books".
+  if (
+    /\b(booking|appointment|reservation|schedule|miadi|book (a |an )?(visit|appointment|slot|time|call)|book me)\b/.test(
+      value
+    )
+  ) {
     return 'booking';
   }
-  if (/\b(cancel|reschedule|change my|move my)\b/.test(value)) return 'cancellation';
-  if (/\b(human|person|owner|manager|boss|agent|speak to|talk to|kuongea na)\b/.test(value)) {
-    return 'human';
+  if (
+    /\b(recommend|suggestion|which book|what book|do you sell|mnauza|children'?s? books?|genre)\b/.test(
+      value
+    )
+  ) {
+    return 'product_inquiry';
   }
   if (/\b(complain|complaint|angry|upset|problem|wrong|bad service|not happy)\b/.test(value)) {
     return 'complaint';
@@ -251,6 +274,18 @@ function recordActionResults(state, results = []) {
     ...(result.requestType
       ? { requestType: String(result.requestType) }
       : {}),
+    ...(result.value && typeof result.value === 'object'
+      ? {
+          value: {
+            type: result.value.type || null,
+            item: result.value.item || null,
+            whenText: result.value.whenText || result.value.when_text || null,
+            notes: result.value.notes || null,
+            name: result.value.name || null,
+          },
+        }
+      : {}),
+    ...(result.soft ? { soft: true } : {}),
   }));
   if (!Array.isArray(next.actions.openHolds)) next.actions.openHolds = [];
   for (const result of safeResults) {

@@ -242,6 +242,40 @@ describe('validated tool execution', () => {
     assert.match(formatToolConfirmation(execution.results, 'en'), /name/i);
   });
 
+  it('rejects escalation without a caller name', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"escalate":{"teammate":"manager","reason":"wants manager"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        escalate: async () => ({ ok: true, channel: 'whatsapp' }),
+      },
+    });
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.deepEqual(execution.results[0].missingSlots, ['name']);
+    assert.match(formatToolConfirmation(execution.results, 'en'), /your name/i);
+  });
+
+  it('confirms soft escalation when desk note is saved', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"escalate":{"teammate":"manager","name":"Brian","reason":"wants manager"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        escalate: async () => ({ ok: true, soft: true, channel: 'desk_note' }),
+      },
+    });
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.match(
+      formatToolConfirmation(execution.results, 'en'),
+      /noted that for the team/i
+    );
+  });
+
   it('does not confirm escalation without a working channel', async () => {
     const parsed = parseGeminiResponse(
       'I will try to send that. ###TOOL###{"escalate":{"teammate":"Manager","name":"Ali","reason":"Caller requested manager"}}###ENDTOOL###'

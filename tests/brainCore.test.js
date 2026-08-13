@@ -112,4 +112,27 @@ describe('Brain state and next-best-action', () => {
     assert.match(block, /product=HP printer/);
     assert.match(block, /NEXT BEST ACTION: ANSWER/);
   });
+
+  it('does not treat the noun book as an appointment booking', () => {
+    const recommend = observeCallerTurn(createBrainState(), {
+      text: 'I recommend a book for me',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(recommend.intent, 'product_inquiry');
+
+    const orderKids = observeCallerTurn(createBrainState(), {
+      text: "I'd like to order children books",
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(orderKids.intent, 'order');
+
+    const opening = observeCallerTurn(createBrainState(), {
+      text: 'At what time are you opening tomorrow?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(opening.intent, 'hours');
+  });
 });

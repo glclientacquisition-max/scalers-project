@@ -147,6 +147,29 @@ async function dispatchEscalationAlert({
     }
   }
 
+  // Always attempt owner email as a second channel when WA already succeeded to one phone,
+  // if email is configured and nothing email-related was sent yet.
+  if (
+    sent.length &&
+    !sent.some((s) => s.channel === 'email') &&
+    emailFallbackReady() &&
+    ownerEmail
+  ) {
+    try {
+      const mail = await sendEmailFallback({
+        to: ownerEmail,
+        body,
+        lead,
+        subject: subject || `Escalation${lead.businessName ? ` — ${lead.businessName}` : ''}`,
+      });
+      if (mail.channel) {
+        sent.push({ channel: 'email', role: 'owner', to: mail.to, result: mail.result });
+      }
+    } catch (err) {
+      console.warn(`[notify] owner email secondary failed:`, err?.message || err);
+    }
+  }
+
   return sent;
 }
 

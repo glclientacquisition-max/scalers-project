@@ -104,6 +104,18 @@ function resolveEscalation(teamDirectory, query) {
 
   // Keyword overlap (billing, refunds, manager, sales, etc.)
   const tokens = roleSeekTokens(requested);
+  // Manager/boss/owner language → prefer General queries / ownerish before random partials.
+  if (
+    /\b(manager|boss|owner|supervisor|director|ceo|md)\b/i.test(requested) ||
+    tokens.some((t) =>
+      ['manager', 'boss', 'owner', 'supervisor', 'director', 'ceo'].includes(t)
+    )
+  ) {
+    const general = findGeneralQueriesTeammate(team);
+    if (general) {
+      return { teammate: general, match: 'fallback', requested };
+    }
+  }
   if (tokens.length) {
     let best = null;
     let bestScore = 0;
