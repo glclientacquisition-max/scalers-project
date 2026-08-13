@@ -29,10 +29,11 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 
 1. **Strict shell split:** owners → `(desk)` (Calls / Settings / Wallet); ops → `/admin/*`. Never merge navs.
 2. Brand-first marketing: Scalers must read as the hero identity on the landing first viewport.
-3. Follow repo frontend design rules (one composition, no hero cards/overlays, expressive type, atmospheric background — avoid purple-on-white / cream-serif-terracotta clichés).
-4. Mobile + desktop both load cleanly.
-5. Auth: owner sessions use Supabase SSR + RLS; never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
-6. Onboarding redirect for blank/default prompts stays intact unless Platform/Brain agree to change the gate.
+3. Follow repo frontend design rules (one composition, no hero cards/overlays, expressive type, atmospheric background; avoid purple-on-white / cream-serif-terracotta clichés).
+4. **Platform design mandate (always on):** Follow `.cursor/rules/scalers-design-ux.mdc` on every UI change: zero fluff copy, no em/en dashes in UI text, dense tables over stacked cards, split-pane detail views, primary CTA in `#0096FF`, sticky global Save top-right, muted secondary actions, Tailwind-only utilities, `textarea rows={2}`, focus rings `focus:ring-[#0096FF]`.
+5. Mobile + desktop both load cleanly.
+6. Auth: owner sessions use Supabase SSR + RLS; never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
+7. Onboarding redirect for blank/default prompts stays intact unless Platform/Brain agree to change the gate.
 
 ## Test / verify
 
@@ -47,8 +48,9 @@ Spot-check: `/`, `/signup`, `/onboarding`, `/calls`, `/settings` as owner; confi
 
 ```
 You are the Scalers Desk UI/UX lane agent.
-Follow docs/agents/DESK_UX.md and .cursor/rules/desk-ux.mdc.
+Follow docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
 Only change dashboard owner/marketing UX.
+Apply the platform design mandate on every change.
 Preserve owner vs Super Admin shell split and Auth/RLS boundaries.
 Do not change voice engine, wallet ledger rules, or prompt policy semantics.
 Run dashboard lint/build before finishing.

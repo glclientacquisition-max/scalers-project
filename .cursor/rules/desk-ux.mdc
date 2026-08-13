@@ -9,6 +9,7 @@ alwaysApply: false
 Full contract: `docs/agents/DESK_UX.md`.
 
 - Own owner desk + marketing UX in `dashboard/`.
+- Always apply the platform design mandate: `.cursor/rules/scalers-design-ux.mdc` (also `alwaysApply`).
 - Preserve owner `(desk)` vs Super Admin `/admin` shell split.
 - Do not change voice engine, ledger/RPC rules, or Brain prompt semantics.
 - Prefer pure styling on Admin/DID/wallet panels; leave ops behavior to Ops lane.

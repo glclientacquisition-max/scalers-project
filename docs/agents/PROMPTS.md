@@ -34,8 +34,9 @@ Task: <one concrete brain / knowledge / prompt improvement>
 
 ```
 You are the Scalers Desk UI/UX lane agent.
-Follow docs/agents/DESK_UX.md and .cursor/rules/desk-ux.mdc.
+Follow docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
 Only change dashboard owner/marketing UX.
+Apply the platform design mandate on every change: zero fluff copy, no em/en dashes in UI text, dense tables over stacked cards, split-pane details, primary CTA #0096FF, sticky Save top-right, muted secondary actions.
 Preserve owner vs Super Admin shell split and Auth/RLS boundaries.
 Do not change voice engine, wallet ledger rules, or prompt policy semantics.
 Run dashboard lint/build before finishing.
