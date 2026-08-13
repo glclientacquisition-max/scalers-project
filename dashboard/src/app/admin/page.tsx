@@ -71,9 +71,6 @@ export default async function AdminOverviewPage() {
 
       <section className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
         <h2 className="font-display text-2xl tracking-tight">Needs attention</h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Businesses waiting for a phone number or marked inactive.
-        </p>
         {overview.attention.length === 0 ? (
           <p className="mt-6 text-sm text-[var(--ink-soft)]">Nothing waiting. Pool and businesses look healthy.</p>
         ) : (

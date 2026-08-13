@@ -19,10 +19,6 @@ export default async function AdminVoicesPage() {
         <h1 className="font-display text-4xl tracking-tight text-[var(--ink)]">
           Voices
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)] leading-relaxed">
-          Control which Soniox cloned voices workspaces can pick, and the
-          descriptions owners see. Owners name each voice for their own desk.
-        </p>
       </div>
       {loadError ? (
         <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">

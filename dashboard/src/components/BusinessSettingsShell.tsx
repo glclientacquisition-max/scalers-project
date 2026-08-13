@@ -33,60 +33,12 @@ const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
   { id: "pronunciation", label: "Pronunciation" },
 ];
 
-type NavItem =
-  | { kind: "tab"; id: BusinessSettingsTab; label: string; href: string }
-  | { kind: "panel"; id: SettingsPanel; label: string; href: string };
-
-function allNavItems(): NavItem[] {
-  return [
-    {
-      kind: "tab",
-      id: "updates",
-      label: "Updates",
-      href: businessSettingsHref("updates"),
-    },
-    {
-      kind: "tab",
-      id: "catalog",
-      label: "Catalog",
-      href: businessSettingsHref("catalog"),
-    },
-    ...TRAIN_PANELS.map((sub) => ({
-      kind: "panel" as const,
-      id: sub.id,
-      label: sub.label,
-      href: businessSettingsHref("train", sub.id),
-    })),
-    {
-      kind: "tab",
-      id: "import",
-      label: "Import",
-      href: businessSettingsHref("import"),
-    },
-    {
-      kind: "tab",
-      id: "test",
-      label: "Test",
-      href: businessSettingsHref("test"),
-    },
-  ];
-}
-
 function navLinkClass(active: boolean) {
   return [
     "block rounded-lg px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
     active
       ? "bg-[#0096FF]/10 text-[#005ccc]"
       : "text-ink-soft hover:bg-surface hover:text-ink",
-  ].join(" ");
-}
-
-function chipNavClass(active: boolean) {
-  return [
-    "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
-    active
-      ? "border-transparent bg-[#0096FF]/10 text-[#005ccc] ring-1 ring-[#0096FF]"
-      : "border-line bg-surface text-ink-soft hover:border-[#0096FF]/40 hover:text-ink",
   ].join(" ");
 }
 
@@ -110,15 +62,6 @@ function BusinessLine({ tenant }: { tenant: TenantRow }) {
   );
 }
 
-function itemActive(
-  item: NavItem,
-  tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel
-): boolean {
-  if (item.kind === "tab") return tab === item.id;
-  return tab === "train" && trainPanel === item.id;
-}
-
 function SettingsSidebar({
   tab,
   trainPanel,
@@ -126,80 +69,56 @@ function SettingsSidebar({
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
 }) {
-  const items = allNavItems();
-
   return (
-    <>
-      {/* Progressive disclosure: horizontal chips below lg */}
-      <nav aria-label="Business sections" className="min-w-0 lg:hidden">
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
-          {items.map((item) => {
-            const active = itemActive(item, tab, trainPanel);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={chipNavClass(active)}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Full sidebar from lg up */}
-      <nav aria-label="Business sections" className="hidden shrink-0 lg:block lg:w-56">
-        <ul className="space-y-1 rounded-2xl border border-line bg-surface p-2">
-          {PRIMARY_NAV.slice(0, 2).map((item) => (
-            <li key={item.id}>
-              <Link
-                href={businessSettingsHref(item.id)}
-                aria-current={tab === item.id ? "page" : undefined}
-                className={navLinkClass(tab === item.id)}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
-
-          <li>
-            <p className="pointer-events-none mt-4 mb-2 select-none px-3 text-xs font-bold uppercase tracking-wider text-ink-soft">
-              Train
-            </p>
-            <ul className="space-y-0.5">
-              {TRAIN_PANELS.map((sub) => {
-                const subActive = tab === "train" && trainPanel === sub.id;
-                return (
-                  <li key={sub.id}>
-                    <Link
-                      href={businessSettingsHref("train", sub.id)}
-                      aria-current={subActive ? "page" : undefined}
-                      className={navLinkClass(subActive)}
-                    >
-                      {sub.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+    <nav aria-label="Business sections" className="min-w-0 shrink-0 lg:w-56">
+      <ul className="space-y-1 rounded-2xl border border-line bg-surface p-2">
+        {PRIMARY_NAV.slice(0, 2).map((item) => (
+          <li key={item.id}>
+            <Link
+              href={businessSettingsHref(item.id)}
+              aria-current={tab === item.id ? "page" : undefined}
+              className={navLinkClass(tab === item.id)}
+            >
+              {item.label}
+            </Link>
           </li>
+        ))}
 
-          {PRIMARY_NAV.slice(2).map((item) => (
-            <li key={item.id}>
-              <Link
-                href={businessSettingsHref(item.id)}
-                aria-current={tab === item.id ? "page" : undefined}
-                className={navLinkClass(tab === item.id)}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-    </>
+        <li>
+          <p className="pointer-events-none mt-4 mb-2 select-none px-3 text-xs font-bold uppercase tracking-wider text-gray-500">
+            Train
+          </p>
+          <ul className="space-y-0.5">
+            {TRAIN_PANELS.map((sub) => {
+              const subActive = tab === "train" && trainPanel === sub.id;
+              return (
+                <li key={sub.id}>
+                  <Link
+                    href={businessSettingsHref("train", sub.id)}
+                    aria-current={subActive ? "page" : undefined}
+                    className={navLinkClass(subActive)}
+                  >
+                    {sub.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </li>
+
+        {PRIMARY_NAV.slice(2).map((item) => (
+          <li key={item.id}>
+            <Link
+              href={businessSettingsHref(item.id)}
+              aria-current={tab === item.id ? "page" : undefined}
+              className={navLinkClass(tab === item.id)}
+            >
+              {item.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 

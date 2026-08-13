@@ -606,7 +606,7 @@ export function PronunciationCoach({
   function recordCandidateInstead(c: PronunciationReviewCandidate) {
     const line = customTrainingLine({
       phrase: c.word_or_phrase,
-      reason: `AI-suggested (record real audio — more reliable than “${c.suggested_form}”)`,
+      reason: `AI-suggested (record real audio; more reliable than “${c.suggested_form}”)`,
       idPrefix: "gemini-record",
     });
     if (!line) {
@@ -619,7 +619,7 @@ export function PronunciationCoach({
     setMode("practice");
     setActiveId(line.id);
     setGeminiNote(
-      "Queued in Practice — record real audio rather than trusting the AI phonetic guess."
+      "Queued in Practice. Record real audio rather than trusting the AI phonetic guess."
     );
   }
 
@@ -766,10 +766,6 @@ export function PronunciationCoach({
           {!todoItems.length && !active ? (
             <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
               <p className="text-sm font-medium text-[var(--ink)]">Nothing left to practice</p>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]">
-                Core names are covered. Fix something you heard wrong, or renew a
-                word in Library.
-              </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -781,7 +777,7 @@ export function PronunciationCoach({
                 <button
                   type="button"
                   onClick={() => setMode("library")}
-                  className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)]"
+                  className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
                 >
                   Open library
                 </button>
@@ -979,15 +975,9 @@ export function PronunciationCoach({
 
       {mode === "library" ? (
         <div className="space-y-4">
-          <p className="text-sm text-[var(--ink-soft)]">
-            Words already trained for the phone. Renew to re-record, edit the say-as, or remove.
-          </p>
           {lexicon.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
               <p className="text-sm font-medium text-[var(--ink)]">Nothing trained yet</p>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]">
-                Practice core packs, or fix a word you heard wrong.
-              </p>
               <button
                 type="button"
                 onClick={() => setMode("practice")}
@@ -1077,7 +1067,7 @@ export function PronunciationCoach({
               {lexicon.length > LEXICON_PAGE_SIZE ? (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-[var(--ink-soft)]">
-                    {safeLexiconPage * LEXICON_PAGE_SIZE + 1}–
+                    {safeLexiconPage * LEXICON_PAGE_SIZE + 1}-
                     {Math.min(lexicon.length, (safeLexiconPage + 1) * LEXICON_PAGE_SIZE)}{" "}
                     of {lexicon.length}
                   </p>
@@ -1131,11 +1121,6 @@ export function PronunciationCoach({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 className="font-medium text-[var(--ink)]">Needs review</h3>
-                <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                  Profile-name fixes may already have auto-applied after AI listen.
-                  Remaining drafts wait here — <span className="font-medium">Record</span>{" "}
-                  is best for unfamiliar words.
-                </p>
               </div>
               {reviewQueue.some((c) => c.confidence === "high") ? (
                 <button
@@ -1217,7 +1202,7 @@ export function PronunciationCoach({
                         </label>
                       ) : (
                         <p className="mt-1 text-[11px] text-[var(--ink-soft)]">
-                          Not a phone-speech fix — dismiss so it doesn’t keep coming back.
+                          Not a phone-speech fix. Dismiss so it does not keep coming back.
                         </p>
                       )}
 
@@ -1291,9 +1276,6 @@ export function PronunciationCoach({
           <div className="space-y-3 border-t border-[var(--line)] pt-6">
             <div>
               <h3 className="font-medium text-[var(--ink)]">Add a fix</h3>
-              <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                Type the name or place that sounded wrong, then record how it should sound.
-              </p>
             </div>
             <div>
               <label
@@ -1370,7 +1352,7 @@ export function PronunciationCoach({
             ) : null}
             {quickState.ok && !quickState.error ? (
               <p className="text-xs text-[var(--ok)]" role="status">
-                Saved. Next call will use it — confirm on{" "}
+                Saved. Next call will use it. Confirm on{" "}
                 <Link
                   href={businessSettingsHref("test")}
                   className="font-medium underline-offset-2 hover:underline"
@@ -1386,10 +1368,6 @@ export function PronunciationCoach({
           <div className="space-y-3 border-t border-[var(--line)] pt-6">
             <div>
               <h3 className="font-medium text-[var(--ink)]">Find more</h3>
-              <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                Quick scan reads transcripts. AI listen reviews recordings —
-                high-confidence profile names apply automatically; the rest land above.
-              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button

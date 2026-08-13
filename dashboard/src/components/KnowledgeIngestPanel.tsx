@@ -14,6 +14,7 @@ import {
 import {
   settingsFieldClass,
   settingsRadioCardClass,
+  compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
 
 const fieldClass = settingsFieldClass;
@@ -144,14 +145,6 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
         <h2 className="font-display text-2xl tracking-tight text-[var(--ink)]">
           Import knowledge
         </h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          Paste a menu, FAQ list, or short overview. We suggest services, FAQs,
-          hours, location, and policies.
-        </p>
-        <p className="mt-2 text-xs text-[var(--ink-soft)]">
-          Tip: for shops, paste a full overview. Location, hours, and delivery map
-          into Train (not as fake services). Review under Train after adding.
-        </p>
       </div>
 
       {!draft ? (
@@ -202,7 +195,8 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   name="paste"
                   value={paste}
                   onChange={(e) => setPaste(e.target.value)}
-                  rows={7}
+                  rows={2}
+                  {...compactTextareaExpandHandlers}
                   placeholder={
                     "ChapterOne Bookstore, Nairobi CBD\nMon-Sat 9am-7pm\nSame-day Nairobi delivery\n\nOr a menu:\nHome cleaning - from 2,500 KES\n\nQ: Do you cover Westlands?\nA: Yes, same-day when booked before noon."
                   }
@@ -232,9 +226,6 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   placeholder="https://yourbusiness.co.ke/services"
                   className={`${fieldClass} mt-0`}
                 />
-                <p className="text-xs text-[var(--ink-soft)]">
-                  Public pages only. If the scan is thin, paste the text instead.
-                </p>
                 <div className="flex justify-end self-end">
                   <button
                     type="submit"

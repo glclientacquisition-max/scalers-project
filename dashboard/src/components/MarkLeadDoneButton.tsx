@@ -64,10 +64,6 @@ export function MarkLeadActionButton({
   const label = action === "archived" ? "Archive" : "Mark done";
   const busyLabel = action === "archived" ? "Archiving" : "Saving";
   const successLabel = action === "archived" ? "Archived" : "Done";
-  const hoverClass =
-    action === "archived"
-      ? "hover:border-ink-soft hover:text-ink"
-      : "hover:border-ok hover:text-ok";
 
   if (done && variant === "icon") {
     return (
@@ -122,8 +118,7 @@ export function MarkLeadActionButton({
           variant === "icon"
             ? iconButtonClass
             : [
-                "rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-soft transition focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-50",
-                hoverClass,
+                "text-xs font-medium text-ink-soft underline-offset-2 transition hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50",
               ].join(" ")
         }
       >

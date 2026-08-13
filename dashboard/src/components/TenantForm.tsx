@@ -90,6 +90,7 @@ import {
   ToolSwitch,
   TrashIcon,
   settingsChipClass,
+  compactTextareaExpandHandlers,
   settingsDenseFieldClass,
   settingsFieldClass,
   settingsStickyHeaderClass,
@@ -247,7 +248,7 @@ function CatalogPager({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-canvas px-3 py-3">
       <p className="text-xs text-ink-soft">
-        {from}–{to} of {total} {noun}
+        {from}-{to} of {total} {noun}
         {total === 1 ? "" : "s"}
       </p>
       <div className="flex items-center gap-2">
@@ -900,7 +901,7 @@ export function TenantForm({
             <p className="text-sm text-ink-soft">No contacts yet.</p>
           ) : (
             <>
-            <div className="space-y-3 md:hidden">
+            <div className="hidden space-y-3 md:hidden">
               {socialHandles.channels.map((channel, index) => (
                 <div
                   key={`social-m-${index}`}
@@ -955,7 +956,7 @@ export function TenantForm({
                 </div>
               ))}
             </div>
-            <div className="hidden overflow-hidden rounded-xl border border-line md:block">
+            <div className="overflow-hidden rounded-xl border border-line">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
@@ -1089,7 +1090,8 @@ export function TenantForm({
                   setBulkServicesText(e.target.value);
                   if (bulkServicesError) setBulkServicesError(null);
                 }}
-                rows={4}
+                rows={2}
+                {...compactTextareaExpandHandlers}
                 placeholder={
                   "Home cleaning - from 2,500 KES\nPlumbing\nElectrical - quote after visit"
                 }
@@ -1143,7 +1145,7 @@ export function TenantForm({
             </div>
           ) : null}
 
-          <div className="space-y-3 md:hidden">
+          <div className="hidden space-y-3 md:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
               return (
@@ -1192,7 +1194,7 @@ export function TenantForm({
             />
           </div>
 
-          <div className="hidden overflow-hidden rounded-xl border border-line md:block">
+          <div className="overflow-hidden rounded-xl border border-line">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
@@ -1349,7 +1351,8 @@ export function TenantForm({
                   setBulkProductsText(e.target.value);
                   if (bulkProductsError) setBulkProductsError(null);
                 }}
-                rows={4}
+                rows={2}
+                {...compactTextareaExpandHandlers}
                 placeholder={
                   "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
                 }
@@ -1379,7 +1382,7 @@ export function TenantForm({
             <p className="text-sm text-[var(--ink-soft)]">No products yet.</p>
           ) : (
             <>
-            <div className="space-y-3 md:hidden">
+            <div className="hidden space-y-3 md:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                 return (
@@ -1423,7 +1426,7 @@ export function TenantForm({
                 onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
               />
             </div>
-            <div className="hidden overflow-hidden rounded-xl border border-line md:block">
+            <div className="overflow-hidden rounded-xl border border-line">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
@@ -1806,9 +1809,6 @@ export function TenantForm({
         <div className="space-y-2">
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
-            <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-              Call sound. Save &amp; train after changing.
-            </p>
           </div>
           {voiceOptions.length > 1 ? (
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Phone voice profile">

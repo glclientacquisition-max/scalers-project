@@ -55,11 +55,6 @@ export function AdminVoicesManager({
         <h2 className="font-display text-2xl tracking-tight">
           {editingId ? "Edit voice" : "Add Soniox voice"}
         </h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)] leading-relaxed">
-          Clone a voice in Soniox, paste its UUID here, and write the description
-          owners see when choosing a phone voice. Owners still name the voice for
-          their own workspace.
-        </p>
         <form
           className="mt-4 space-y-3"
           onSubmit={(e) => {
@@ -126,7 +121,7 @@ export function AdminVoicesManager({
               <button
                 type="button"
                 onClick={resetForm}
-                className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--ink)]"
+                className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
               >
                 Cancel
               </button>
