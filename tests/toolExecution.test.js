@@ -22,6 +22,7 @@ describe('validated tool execution', () => {
     const execution = await executeBrainTools({
       parsed,
       capabilities,
+      productCatalog: [{ name: 'HP printer' }],
       handlers: {
         createServiceRequest: async (request) => {
           calls += 1;
@@ -47,6 +48,7 @@ describe('validated tool execution', () => {
     const execution = await executeBrainTools({
       parsed,
       capabilities,
+      productCatalog: [{ name: 'charger' }],
       handlers: {
         createServiceRequest: async () => null,
       },
@@ -64,9 +66,11 @@ describe('validated tool execution', () => {
     const parsed = parseGeminiResponse(
       '###TOOL###{"create_service_request":{"type":"hold","name":"Sam","item":"charger","when_text":"evening"}}###ENDTOOL###'
     );
+    const catalog = [{ name: 'charger' }];
     const first = await executeBrainTools({
       parsed,
       capabilities,
+      productCatalog: catalog,
       handlers: {
         createServiceRequest: async () => ({ id: 'req_1', request_type: 'hold' }),
       },
@@ -75,6 +79,7 @@ describe('validated tool execution', () => {
     const second = await executeBrainTools({
       parsed,
       capabilities,
+      productCatalog: catalog,
       completedFingerprints: [fingerprint],
       handlers: {
         createServiceRequest: async () => {
@@ -221,7 +226,7 @@ describe('validated tool execution', () => {
     );
   });
 
-  it('rejects orders for titles missing from the grounded catalogue', async () => {
+  it('rejects garbled STT sentences as order titles (private beta trust gate)', async () => {
     let calls = 0;
     const parsed = parseGeminiResponse(
       '###TOOL###{"create_service_request":{"type":"order","name":"Jane","item":"I have to make habits"}}###ENDTOOL###'
@@ -239,8 +244,90 @@ describe('validated tool execution', () => {
     });
     assert.equal(calls, 0);
     assert.equal(execution.results[0].status, 'invalid');
+    assert.equal(execution.results[0].code, 'title_unclear');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /exact book title/i);
+  });
+
+  it('rejects orders for titles missing from the grounded catalogue', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"order","name":"Jane","item":"Zorkonian Chronicles"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      productCatalog: [{ name: 'Rich Dad Poor Dad', category: 'Finance' }],
+      handlers: {
+        createServiceRequest: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].status, 'invalid');
     assert.equal(execution.results[0].code, 'catalog_miss');
     assert.match(formatToolConfirmation(execution.results, 'en'), /enquiry or quote/i);
+  });
+
+  it('rejects orders that use the agent name as the caller name', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"order","name":"Aisha","item":"King Series"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      agentName: 'Aisha',
+      businessName: 'ChapterOne Bookstore',
+      productCatalog: [{ name: 'King Series' }],
+      handlers: {
+        createServiceRequest: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.equal(execution.results[0].code, 'bad_caller_name');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /your name/i);
+  });
+
+  it('rejects holds when no product catalogue is loaded', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_service_request":{"type":"hold","name":"Jane","item":"King Series","when_text":"tomorrow"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      productCatalog: [],
+      handlers: {
+        createServiceRequest: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].code, 'catalog_required');
+  });
+
+  it('rejects escalation when the caller name is the agent', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"escalate":{"teammate":"manager","name":"Aisha","reason":"wants manager"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      agentName: 'Aisha',
+      handlers: {
+        escalate: async () => ({ ok: true, channel: 'whatsapp' }),
+      },
+    });
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.equal(execution.results[0].code, 'bad_caller_name');
   });
 
   it('grounds matching catalogue titles on orders', async () => {

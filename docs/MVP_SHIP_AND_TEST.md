@@ -93,6 +93,32 @@ Call the business DID. Log SID, pass/fail, class `K|U|A|P|V|O`.
 
 ---
 
+## 5b. Private beta GO (ChapterOne beachhead)
+
+Private beta claim: **the DID answers**, FAQs work, verified message/enquiry/hold/escalate notify the owner — **never** invent stock/price or save garbage leads.
+
+| Gate | Required |
+| --- | --- |
+| Voice | Greeting always heard; order/escalate hears a short progress line (no long dead air). Deploy includes voice dead-air fix `#141`. |
+| Request integrity | No `order`/`hold` with STT sentences, missing catalogue, or agent/business as caller name (tool gates). |
+| Live pack | Pass **1, 2, 6, 7, 9** every time; target ≥8/10 overall. |
+| Notify | At least one real WhatsApp/email from a saved enquiry or escalate. |
+| Trust | Zero false “Done — I've saved/sent” without a desk row. |
+
+**Private beta NO-GO:** silent answer, garbled order rows (`I have to make habits`), caller_name = agent name, escalate claimed but not delivered.
+
+**Out of private-beta claim:** perfect catalog sales, live transfer, pronunciation perfection, recording QA (nice-to-have; do not block if the five gates above pass).
+
+Operator checklist before inviting testers:
+
+1. Railway voice on latest `main` (confirm greeting + `action-progress` in logs).  
+2. `npm run test:mvp` green.  
+3. Run live pack rows 1–2, 5–7, 9; log SIDs.  
+4. Confirm owner WhatsApp for one save.  
+5. Invite testers with scripted FAQ + “leave a message” + “speak to manager” — not “stress-test every book title.”
+
+---
+
 ## 6. Failure classes (observe → fix)
 
 | Class | Meaning | Lane |
