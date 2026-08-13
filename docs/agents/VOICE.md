@@ -60,7 +60,7 @@ See `.env.example` — key ones:
 
 See `.env.example` — key ones:
 
-- `SONIOX_API_KEY`, `SONIOX_SAMPLE_RATE` (curated voices in `dashboard/src/data/soniox-voices.json`; per-tenant pick in `tenants.soniox_voice_id`)
+- `SONIOX_API_KEY`, `SONIOX_SAMPLE_RATE` (curated voices: voice engine `src/data/soniox-voices.json`, desk mirror `dashboard/src/data/soniox-voices.json`; per-tenant pick in `tenants.soniox_voice_id`)
 - `SONIOX_STT_CONTEXT` (per-tenant vocabulary; default on), `SONIOX_STT_CONTEXT_MAX_TERMS`
 - `VOICE_GREETING_MODE`, `VOICE_FILLER`, `VOICE_FILLER_DELAY_MS`
 - `VOICE_LLM_STREAM`, `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`

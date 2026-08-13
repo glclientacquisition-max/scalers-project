@@ -112,7 +112,7 @@ async function ensureSonioxVoiceReady(opts = {}) {
 
   const voices = listCuratedVoices();
   if (!voices.length) {
-    log('⚠ No curated Soniox voices in config/soniox-voices.json');
+    log('⚠ No curated Soniox voices in src/data/soniox-voices.json');
     return { ok: false, error: 'empty catalog' };
   }
 
