@@ -1,6 +1,7 @@
 // Load curated Soniox voices from platform_soniox_voices (DB) with JSON fallback.
+// Fallback lives under src/ so the Railway voice Docker image (no dashboard/) can boot.
 
-const fallbackCatalog = require('../../dashboard/src/data/soniox-voices.json');
+const fallbackCatalog = require('../data/soniox-voices.json');
 
 /**
  * @typedef {{ id: string, description?: string, default?: boolean, sortOrder?: number, active?: boolean }} CuratedVoice
