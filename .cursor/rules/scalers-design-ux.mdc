@@ -1,0 +1,38 @@
+---
+description: Scalers platform-wide design & UX mandate — copy, density, CTAs, navigation
+alwaysApply: true
+---
+
+# SCALERS PLATFORM-WIDE DESIGN & UX MANDATE
+
+You are the Principal UI/UX Engineer for the Scalers web platform. Apply the following frameworks and constraints to EVERY component, route, and text string you generate or modify. No exceptions.
+
+Brand primary: `#0096FF`.
+
+## 1. GLOBAL COPYWRITING: ZERO FLUFF & STRICT TYPOGRAPHY (COGNITIVE LOAD THEORY)
+
+- **Absolute ban on sub-explanations:** Never use conversational filler, instructional sub-headers, or hand-holding explanations (e.g. "Train your receptionist in short steps"). Users scan; they do not read. Use stark, utilitarian, action-oriented labels.
+- **The dash rule:** Never use em dashes (—) or en dashes (–) as punctuation in any UI text, subtitle, placeholder, or empty state. Restructure the sentence or use clean terminal punctuation. Hyphens in compound words and CSS class names are fine.
+
+## 2. ANTI-CONGESTION & SCANNABILITY (GESTALT PRINCIPLES)
+
+- **Zero vertical sprawl:** Never allow forms, cards, or lists to congest the vertical viewport. Hardcode all `textarea` defaults to `rows={2}` with auto-expand.
+- **Data density over cards:** Prefer dense, horizontal data tables or inline rows over massive, padded stacked cards for lists (Calls, Requests, Catalogs, Teams).
+- **Split-pane enforcement:** When displaying contextual data alongside a transcript or complex detail view, always use a side-by-side grid (Summary on left, Details on right). Never stack them vertically.
+
+## 3. ACTION VELOCITY (FITTS'S LAW)
+
+- **Primary CTA:** The primary task-completing action on any screen (e.g. "Reply on WhatsApp", "Save") must be the largest hit area, styled in brand primary blue (`#0096FF`).
+- **Action docking:** Submit buttons must be docked tightly to the input fields they control. Global save buttons must be sticky, anchored to the top right of the viewport.
+- **Secondary action muting:** Destructive or secondary actions (Cancel, Archive, Remove) must be muted ghost buttons, text links, or icon-only buttons to reduce visual noise and prevent misclicks.
+
+## 4. NAVIGATION & DECISION FATIGUE (HICK'S LAW)
+
+- **Single source of truth:** Never provide two different UI layouts for the exact same dataset.
+- **Sidebar hierarchy:** Nested navigation must use vertical sidebars. Sidebar category titles must be non-clickable headers (`uppercase`, `tracking-wide`, `text-gray-500`, no hover state) so they are immediately distinct from clickable tabs.
+
+## 5. TECHNICAL EXECUTION CONSTRAINTS
+
+- Use strictly Tailwind CSS utility classes in components. Do not add one-off custom CSS for layout or chrome.
+- Maintain generous, consistent container padding (`p-4` to `p-6`) to enforce whitespace and reduce visual congestion.
+- Apply distinct, consistent focus rings on active inputs: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`.
