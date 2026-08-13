@@ -652,6 +652,12 @@ function formatToolConfirmation(results = [], language = 'en') {
       if (sheng) return 'Poa — nime-note kwa team; watakufuatilia.';
       return "Done — I've noted that for the team to follow up.";
     }
+    const channel = String(meaningful.channel || '').toLowerCase();
+    if (/\bsms\b/.test(channel)) {
+      if (sw) return 'Sawa — nimewatumia SMS timu.';
+      if (sheng) return 'Poa — nime-SMS team.';
+      return "Done — I've texted the team.";
+    }
     if (sw) return 'Sawa — nimeituma kwa timu.';
     if (sheng) return 'Poa — nimeituma kwa team.';
     return "Done — I've sent it to the team.";

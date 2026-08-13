@@ -103,10 +103,17 @@ const {
   smsSenderReady,
 } = require('./src/notifications/dispatch');
 const {
+  probeSmsCredentials,
+  getSmsStatus,
+} = require('./src/notifications/sms');
+const {
   resolveEscalation,
   buildEscalationText,
   teammateLabel,
 } = require('./src/conversation/escalation');
+const {
+  shapeEscalationNotifyOutcome,
+} = require('./src/conversation/escalationFeature');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -161,6 +168,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/healthz', (_req, res) => {
+  const sms = getSmsStatus();
   res.status(200).json({
     ok: true,
     soniox: {
@@ -173,7 +181,29 @@ app.get('/healthz', (_req, res) => {
         default: v.default,
       })),
     },
+    notify: {
+      sms: {
+        configured: sms.configured,
+        verified: sms.verified,
+        shortcode: sms.shortcode,
+        code: sms.code,
+        description: sms.description,
+        balance: sms.balance,
+        checkedAt: sms.checkedAt,
+      },
+      whatsapp: whatsAppSenderReady(),
+      email: emailFallbackReady(),
+    },
   });
+});
+
+/** Ops: force a TextSMS balance probe (no SMS charged). */
+app.get('/internal/sms/status', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const status = await probeSmsCredentials({ force: true });
+  return res.status(200).json({ ok: Boolean(status.verified), sms: status });
 });
 
 app.get('/api/voices', async (_req, res) => {
@@ -2084,6 +2114,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         phone: lead.callerNumber,
         reason: lead.reason,
         smsSender: smsSenderReady(),
+        smsStatus: getSmsStatus(),
         whatsappSender: whatsAppSenderReady(),
         emailFallback: emailFallbackReady(),
         ownerNumber: ownerNumber || null,
@@ -2097,11 +2128,22 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         await maybeSendWhatsAppNotification(callSid);
       }
       await db.markEscalationSent(callSid);
-      return {
+      const softOutcome = shapeEscalationNotifyOutcome({
         ok: true,
         soft: true,
         channel: 'desk_note',
         reason: 'No live SMS/WA/email channel; escalation saved on the call for the desk.',
+      });
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: { escalation_notify: softOutcome },
+      });
+      return {
+        ok: true,
+        soft: true,
+        channel: 'desk_note',
+        sent: [{ channel: 'desk_note', role: 'desk', to: null }],
+        reason: softOutcome.reason,
       };
     }
 
@@ -2116,13 +2158,32 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     await db.markEscalationSent(callSid);
     await db.markWhatsappSent(callSid);
+    const liveOutcome = shapeEscalationNotifyOutcome({
+      ok: true,
+      soft: false,
+      sent,
+      channel: sent.map((item) => item.channel).filter(Boolean).join(',') || 'alert',
+    });
+    await db.mergeCallSummaryMeta({
+      callSid,
+      patch: { escalation_notify: liveOutcome },
+    });
     return {
       ok: true,
-      channel: sent.map((item) => item.channel).filter(Boolean).join(',') || 'alert',
+      soft: false,
+      channel: liveOutcome.channels.map((c) => c.channel).join(',') || 'alert',
+      sent,
     };
   } catch (err) {
     console.error(`[${callSid}] Escalation notification failed:`, err?.message || err);
-    return { ok: false, reason: err?.message || String(err) };
+    const failed = shapeEscalationNotifyOutcome({
+      ok: false,
+      reason: err?.message || String(err),
+    });
+    await db
+      .mergeCallSummaryMeta({ callSid, patch: { escalation_notify: failed } })
+      .catch(() => {});
+    return { ok: false, reason: failed.reason };
   } finally {
     escalationNotifyInProgress.delete(callSid);
   }
@@ -2815,9 +2876,23 @@ server.listen(PORT, () => {
     console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
   }
   if (smsSenderReady()) {
-    console.log(
-      `✓ SMS notify ready via TextSMS (shortcode=${process.env.TEXTSMS_SHORTCODE}) — primary for leads + escalation`
-    );
+    probeSmsCredentials({ force: true })
+      .then((status) => {
+        if (status.verified) {
+          console.log(
+            `✓ SMS notify verified via TextSMS (shortcode=${status.shortcode}` +
+              `${status.balance != null ? ` balance=${status.balance}` : ''}) — primary for leads + escalation`
+          );
+        } else {
+          console.warn(
+            `⚠ SMS env set but TextSMS probe failed code=${status.code} ${status.description || ''}` +
+              ` — fix TEXTSMS_API_KEY / PARTNER_ID / SHORTCODE (escalation falls back to WA/email/desk)`
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn(`⚠ SMS probe error: ${err?.message || err}`);
+      });
   } else {
     console.log(
       `ℹ SMS notify not set (TEXTSMS_API_KEY + TEXTSMS_PARTNER_ID + TEXTSMS_SHORTCODE)`

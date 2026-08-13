@@ -57,6 +57,7 @@ function shapeCall(row) {
     escalation_sent: Boolean(meta.escalation_sent),
     escalated_to: meta.escalated_to || null,
     escalate_reason: meta.escalate_reason || null,
+    escalation_notify: meta.escalation_notify || null,
     duration_seconds: row.duration_seconds ?? null,
     ai_processing_minutes: row.ai_processing_minutes ?? null,
     created_at: row.created_at,

@@ -6,6 +6,8 @@ const {
   isSmsConfigured,
   normalizeSmsTo,
   sendSms,
+  probeSmsCredentials,
+  getSmsStatus,
 } = require('../src/notifications/sms');
 const {
   dispatchAlert,
@@ -65,6 +67,41 @@ describe('sendSms + dispatch', () => {
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
     }
+  });
+
+  it('probeSmsCredentials marks verified on balance 200', async () => {
+    mock.method(global, 'fetch', async (url) => {
+      assert.match(String(url), /getbalance/);
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            'response-code': 200,
+            'response-description': 'Success',
+            credit: 120,
+          }),
+      };
+    });
+    const status = await probeSmsCredentials({ force: true });
+    assert.equal(status.verified, true);
+    assert.equal(status.balance, 120);
+    assert.equal(getSmsStatus().verified, true);
+  });
+
+  it('probeSmsCredentials marks unverified on 1006', async () => {
+    mock.method(global, 'fetch', async () => ({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          'response-code': 1006,
+          'response-description': 'Invalid credentials',
+        }),
+    }));
+    const status = await probeSmsCredentials({ force: true });
+    assert.equal(status.verified, false);
+    assert.equal(status.code, 1006);
   });
 
   it('posts to TextSMS and accepts respose-code 200', async () => {
