@@ -31,6 +31,10 @@ import {
   GEMINI_SCAN_BATCH_OPTIONS,
   GEMINI_SCAN_DEFAULT_BATCH,
 } from "@/lib/pronunciationGeminiScanPrompt";
+import {
+  buildUnifiedFixReviewRows,
+  fixTabHint,
+} from "@/lib/pronunciationFixUi";
 import { customTrainingLine } from "@/lib/pronunciationMine";
 import { buildPronunciationPacks } from "@/lib/pronunciationPacks";
 import {
@@ -116,6 +120,8 @@ export function PronunciationCoach({
   const [sttHints, setSttHints] = useState<PronunciationReviewCandidate[]>([]);
   const [reviewEdits, setReviewEdits] = useState<Record<string, string>>({});
   const [geminiNote, setGeminiNote] = useState<string | null>(null);
+  const [showTypedSave, setShowTypedSave] = useState(false);
+  const [openMoreId, setOpenMoreId] = useState<string | null>(null);
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -650,6 +656,11 @@ export function PronunciationCoach({
     : items.filter((i) => i.status === "todo").slice(0, 5);
   const hiddenQueueCount = items.length - queueList.length;
 
+  const fixReviewRows = useMemo(
+    () => buildUnifiedFixReviewRows({ speech: reviewQueue, hearing: sttHints }),
+    [reviewQueue, sttHints]
+  );
+
   const modes: Array<{ id: StudioMode; label: string; hint: string }> = [
     {
       id: "practice",
@@ -664,7 +675,7 @@ export function PronunciationCoach({
     {
       id: "fix",
       label: "Fix",
-      hint: "Heard wrong",
+      hint: fixTabHint(fixReviewRows.length),
     },
   ];
 
@@ -1107,40 +1118,218 @@ export function PronunciationCoach({
       ) : null}
 
       {mode === "fix" ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
+          {/* 1) Needs review — decisions first */}
           <div className="space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-medium text-[var(--ink)]">Needs review</h3>
+                <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
+                  Profile-name fixes may already have auto-applied after AI listen.
+                  Remaining drafts wait here — <span className="font-medium">Record</span>{" "}
+                  is best for unfamiliar words.
+                </p>
+              </div>
+              {reviewQueue.some((c) => c.confidence === "high") ? (
+                <button
+                  type="button"
+                  disabled={batchPending || approvePending || dismissPending}
+                  onClick={() => {
+                    const fd = new FormData();
+                    fd.set("id", tenantId);
+                    fd.set("current_lexicon", lexiconJson);
+                    batchAction(fd);
+                  }}
+                  className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                >
+                  {batchPending ? "Applying…" : "Apply all high-confidence"}
+                </button>
+              ) : null}
+            </div>
+
+            {geminiNote ? (
+              <p
+                className={`text-xs ${
+                  geminiState.error || approveState.error || dismissState.error
+                    ? "text-[var(--warn)]"
+                    : "text-[var(--ink-soft)]"
+                }`}
+                role="status"
+              >
+                {geminiNote}
+              </p>
+            ) : null}
+
+            {fixReviewRows.length === 0 ? (
+              <p className="text-sm text-[var(--ink-soft)]" role="status">
+                Nothing waiting. Add a fix below, or find more from recent calls.
+              </p>
+            ) : (
+              <ul
+                className="divide-y divide-[var(--line)] border-y border-[var(--line)]"
+                aria-label="Pronunciation review queue"
+              >
+                {fixReviewRows.map((row) => {
+                  const c = row.candidate;
+                  const moreOpen = openMoreId === row.id;
+                  return (
+                    <li key={row.id} className="py-3">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                          {row.kindLabel}
+                        </span>
+                        <span className="text-[11px] text-[var(--ink-soft)]">
+                          {row.confidence}
+                        </span>
+                        <span className="text-sm font-medium text-[var(--ink)]">
+                          {row.phrase}
+                        </span>
+                        {row.kind === "hearing" ? (
+                          <span className="text-xs text-[var(--ink-soft)]">
+                            → {row.suggested}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                        {row.reasoning}
+                      </p>
+
+                      {row.canApproveSpelling ? (
+                        <label className="mt-2 block text-xs text-[var(--ink-soft)]">
+                          Say like
+                          <input
+                            value={reviewEdits[c.id] ?? c.suggested_form}
+                            onChange={(e) =>
+                              setReviewEdits((prev) => ({
+                                ...prev,
+                                [c.id]: e.target.value,
+                              }))
+                            }
+                            className="mt-1 w-full max-w-md rounded-lg border border-[var(--line)] px-2 py-1.5 text-sm"
+                          />
+                        </label>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-[var(--ink-soft)]">
+                          Not a phone-speech fix — dismiss so it doesn’t keep coming back.
+                        </p>
+                      )}
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {row.primaryAction === "record" ? (
+                          <button
+                            type="button"
+                            onClick={() => recordCandidateInstead(c)}
+                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white"
+                          >
+                            Record
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => dismissCandidate(c, "rejected")}
+                            disabled={dismissPending}
+                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                          >
+                            Dismiss
+                          </button>
+                        )}
+                        {row.canApproveSpelling ? (
+                          <button
+                            type="button"
+                            onClick={() => approveCandidate(c)}
+                            disabled={approvePending || dismissPending}
+                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                          >
+                            Approve spelling
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenMoreId(moreOpen ? null : row.id)
+                          }
+                          className="text-xs font-medium text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                        >
+                          More
+                        </button>
+                      </div>
+                      {moreOpen ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => dismissCandidate(c, "rejected")}
+                            disabled={dismissPending}
+                            className="text-xs text-[var(--ink-soft)] underline-offset-2 hover:underline disabled:opacity-60"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => dismissCandidate(c, "snoozed")}
+                            disabled={dismissPending}
+                            className="text-xs text-[var(--ink-soft)] underline-offset-2 hover:underline disabled:opacity-60"
+                          >
+                            Snooze
+                          </button>
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* 2) Add a fix */}
+          <div className="space-y-3 border-t border-[var(--line)] pt-6">
             <div>
-              <h3 className="font-medium text-[var(--ink)]">Heard something wrong?</h3>
+              <h3 className="font-medium text-[var(--ink)]">Add a fix</h3>
               <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                Type the word or a short sentence. Record it for the best fix, or
-                save a typed “say like” spelling for a quick patch.
+                Type the name or place that sounded wrong, then record how it should sound.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
-                  htmlFor="pron-add-phrase"
-                >
-                  Word or sentence
-                </label>
-                <input
-                  id="pron-add-phrase"
-                  value={addPhrase}
-                  onChange={(e) => {
-                    setAddPhrase(e.target.value);
-                    setAddError(null);
-                  }}
-                  placeholder="Muindi Mbingu / White Paper Books"
-                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-                />
-              </div>
-              <div>
+            <div>
+              <label
+                className="block text-xs font-medium text-[var(--ink-soft)]"
+                htmlFor="pron-add-phrase"
+              >
+                Word or sentence
+              </label>
+              <input
+                id="pron-add-phrase"
+                value={addPhrase}
+                onChange={(e) => {
+                  setAddPhrase(e.target.value);
+                  setAddError(null);
+                }}
+                placeholder="Muindi Mbingu"
+                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => submitQuickAdd("record")}
+                disabled={!addPhrase.trim()}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
+              >
+                Record &amp; train
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTypedSave((v) => !v)}
+                className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:underline"
+              >
+                {showTypedSave ? "Hide typed spelling" : "Or save a spelling…"}
+              </button>
+            </div>
+            {showTypedSave ? (
+              <div className="max-w-lg space-y-2">
                 <label
                   className="block text-xs font-medium text-[var(--ink-soft)]"
                   htmlFor="pron-add-say"
                 >
-                  Say like (for typed save)
+                  Say like
                 </label>
                 <input
                   id="pron-add-say"
@@ -1150,28 +1339,18 @@ export function PronunciationCoach({
                     setAddError(null);
                   }}
                   placeholder="Moo-in-dee Mbeen-goo"
-                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
                 />
+                <button
+                  type="button"
+                  onClick={() => submitQuickAdd("save")}
+                  disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
+                  className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-60"
+                >
+                  {quickPending ? "Saving…" : "Save spelling"}
+                </button>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => submitQuickAdd("record")}
-                disabled={!addPhrase.trim()}
-                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
-              >
-                Record it
-              </button>
-              <button
-                type="button"
-                onClick={() => submitQuickAdd("save")}
-                disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
-                className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
-              >
-                {quickPending ? "Saving…" : "Save typed spelling"}
-              </button>
-            </div>
+            ) : null}
             {addError ? (
               <p className="text-xs text-[var(--warn)]" role="alert">
                 {addError}
@@ -1184,278 +1363,105 @@ export function PronunciationCoach({
             ) : null}
             {quickState.ok && !quickState.error ? (
               <p className="text-xs text-[var(--ok)]" role="status">
-                Saved. Next call will use it.
+                Saved. Next call will use it — confirm on{" "}
+                <Link
+                  href={businessSettingsHref("test")}
+                  className="font-medium underline-offset-2 hover:underline"
+                >
+                  Test
+                </Link>
+                .
               </p>
             ) : null}
           </div>
 
-          <div className="space-y-3 border-t border-[var(--line)] pt-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="font-medium text-[var(--ink)]">From recent calls</h3>
-                <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                  Heuristic scan of agent transcripts for hard names and profile places.
-                  Queues them for Practice — does not change live pronunciation by itself.
-                </p>
-              </div>
+          {/* 3) Find more */}
+          <div className="space-y-3 border-t border-[var(--line)] pt-6">
+            <div>
+              <h3 className="font-medium text-[var(--ink)]">Find more</h3>
+              <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
+                Quick scan reads transcripts. AI listen reviews recordings —
+                high-confidence profile names apply automatically; the rest land above.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={scanCalls}
                 disabled={minePending || geminiPending}
-                className="rounded-xl border border-[var(--accent)]/40 px-4 py-2 text-sm font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
               >
-                {minePending ? "Scanning…" : "Scan recent calls"}
+                {minePending ? "Scanning…" : "Quick scan"}
+              </button>
+              <select
+                id="gemini-batch"
+                aria-label="Calls for AI listen"
+                value={geminiBatch}
+                onChange={(e) => setGeminiBatch(Number(e.target.value))}
+                disabled={geminiPending}
+                className="rounded-xl border border-[var(--line)] bg-white px-2 py-2 text-sm"
+              >
+                {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    Last {n}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => runGeminiScan(false)}
+                disabled={geminiPending || minePending}
+                className="rounded-xl border border-[var(--ink)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+              >
+                {geminiPending ? "Listening…" : "AI listen"}
               </button>
             </div>
+
+            {geminiConfirmOpen ? (
+              <div
+                className="rounded-xl border border-[var(--warn)]/40 px-3 py-3 text-sm"
+                role="alertdialog"
+                aria-label="Confirm AI listen cost"
+              >
+                <p className="text-[var(--ink)]">
+                  {geminiState.message ||
+                    `AI will listen to up to ${geminiBatch} recordings (paid).`}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => runGeminiScan(true)}
+                    disabled={geminiPending}
+                    className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGeminiConfirmOpen(false);
+                      setGeminiNote(null);
+                    }}
+                    className="rounded-lg px-3 py-1.5 text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             {mineState.error ? (
               <p className="text-xs text-[var(--warn)]">{mineState.error}</p>
             ) : null}
             {mineState.ok ? (
               <p className="text-xs text-[var(--ink-soft)]" role="status">
-                Scanned {mineState.scannedLines ?? 0} agent lines
+                Quick scan: {mineState.scannedLines ?? 0} lines
                 {mineState.suggestions?.length
-                  ? ` · added ${mineState.suggestions.length} to Practice`
-                  : " · nothing new to train"}
+                  ? ` · ${mineState.suggestions.length} sent to Practice`
+                  : " · nothing new"}
                 .
               </p>
             ) : null}
-
-            <div className="mt-4 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--sand-0,#faf9f7)] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-medium text-[var(--ink)]">Gemini Scan</h3>
-                  <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
-                    AI listens to call recordings. High-confidence fixes for names
-                    already in your profile apply automatically; everything else waits
-                    for your review.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs text-[var(--ink-soft)]" htmlFor="gemini-batch">
-                    Last
-                  </label>
-                  <select
-                    id="gemini-batch"
-                    value={geminiBatch}
-                    onChange={(e) => setGeminiBatch(Number(e.target.value))}
-                    disabled={geminiPending}
-                    className="rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-sm"
-                  >
-                    {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
-                      <option key={n} value={n}>
-                        {n} calls
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => runGeminiScan(false)}
-                    disabled={geminiPending || minePending}
-                    className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
-                  >
-                    {geminiPending
-                      ? `Listening to up to ${geminiBatch}…`
-                      : "Gemini Scan"}
-                  </button>
-                </div>
-              </div>
-
-              {geminiConfirmOpen ? (
-                <div
-                  className="rounded-lg border border-[var(--warn)]/40 bg-white px-3 py-3 text-sm"
-                  role="alertdialog"
-                  aria-label="Confirm Gemini Scan cost"
-                >
-                  <p className="text-[var(--ink)]">
-                    {geminiState.message ||
-                      `Gemini will review up to ${geminiBatch} recordings (paid API).`}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => runGeminiScan(true)}
-                      disabled={geminiPending}
-                      className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
-                    >
-                      Confirm scan
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGeminiConfirmOpen(false);
-                        setGeminiNote(null);
-                      }}
-                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              {geminiNote ? (
-                <p
-                  className={`text-xs ${
-                    geminiState.error || approveState.error || dismissState.error
-                      ? "text-[var(--warn)]"
-                      : "text-[var(--ink-soft)]"
-                  }`}
-                  role="status"
-                >
-                  {geminiNote}
-                </p>
-              ) : null}
-
-              {reviewQueue.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">
-                      Review queue — agent mispronunciations
-                    </h4>
-                    {reviewQueue.some((c) => c.confidence === "high") ? (
-                      <button
-                        type="button"
-                        disabled={batchPending || approvePending || dismissPending}
-                        onClick={() => {
-                          const fd = new FormData();
-                          fd.set("id", tenantId);
-                          fd.set("current_lexicon", lexiconJson);
-                          batchAction(fd);
-                        }}
-                        className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
-                      >
-                        {batchPending
-                          ? "Applying…"
-                          : "Apply all high-confidence"}
-                      </button>
-                    ) : null}
-                  </div>
-                  <ul className="space-y-3" aria-label="Gemini pronunciation review queue">
-                    {reviewQueue.map((c) => (
-                      <li
-                        key={c.id}
-                        className="rounded-lg border border-[var(--line)] bg-white px-3 py-3"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--accent-deep)]">
-                            AI-suggested
-                          </span>
-                          <span className="rounded bg-[var(--sand-1,#f0eee9)] px-1.5 py-0.5 text-[10px] font-medium uppercase text-[var(--ink-soft)]">
-                            {c.confidence} confidence
-                          </span>
-                          <span className="text-sm font-medium text-[var(--ink)]">
-                            {c.word_or_phrase}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                          {c.reasoning}
-                        </p>
-                        <label className="mt-2 block text-xs text-[var(--ink-soft)]">
-                          Say like (AI draft — edit before approve)
-                          <input
-                            value={reviewEdits[c.id] ?? c.suggested_form}
-                            onChange={(e) =>
-                              setReviewEdits((prev) => ({
-                                ...prev,
-                                [c.id]: e.target.value,
-                              }))
-                            }
-                            className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-1.5 text-sm"
-                          />
-                        </label>
-                        <p className="mt-1 text-[11px] text-[var(--ink-soft)]">
-                          Prefer recording real audio over trusting this phonetic guess.
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => approveCandidate(c)}
-                            disabled={approvePending || dismissPending}
-                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => recordCandidateInstead(c)}
-                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium"
-                          >
-                            Record real audio instead
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => dismissCandidate(c, "rejected")}
-                            disabled={approvePending || dismissPending}
-                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => dismissCandidate(c, "snoozed")}
-                            disabled={approvePending || dismissPending}
-                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs"
-                          >
-                            Snooze
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {sttHints.length > 0 ? (
-                <div className="space-y-2 border-t border-[var(--line)] pt-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">
-                    STT — likely misheard
-                  </h4>
-                  <p className="text-[11px] text-[var(--ink-soft)]">
-                    These are input/transcription hints, not TTS lexicon fixes. Not yet
-                    actionable for Soniox <code className="text-[10px]">context.terms</code>{" "}
-                    wiring from this queue — dismiss or snooze so they do not resurface.
-                  </p>
-                  <ul className="space-y-2">
-                    {sttHints.map((c) => (
-                      <li
-                        key={c.id}
-                        className="rounded-lg border border-dashed border-[var(--line)] bg-white px-3 py-2"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded bg-[var(--sand-1,#f0eee9)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--ink-soft)]">
-                            STT hint
-                          </span>
-                          <span className="text-[10px] uppercase text-[var(--ink-soft)]">
-                            {c.confidence}
-                          </span>
-                          <span className="text-sm font-medium">{c.word_or_phrase}</span>
-                          <span className="text-xs text-[var(--ink-soft)]">
-                            → {c.suggested_form}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-[var(--ink-soft)]">{c.reasoning}</p>
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => dismissCandidate(c, "rejected")}
-                            className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs"
-                          >
-                            Dismiss
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => dismissCandidate(c, "snoozed")}
-                            className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs"
-                          >
-                            Snooze
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
           </div>
         </div>
       ) : null}
