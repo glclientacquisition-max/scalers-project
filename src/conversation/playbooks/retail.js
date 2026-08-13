@@ -78,7 +78,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['product', 'name'],
     optionalSlots: ['quantity', 'when'],
     completion:
-      'Confirm product (+ qty if given) and name, append create_service_request type=order with name + item. Do not fire order without name and item.',
+      'Confirm product (+ qty if given) and name, append create_service_request type=order with name + item only when the item is in PRODUCT CATALOGUE. If the title is not listed (or STT garbled a title), do not save a clean order — confirm the exact title once or log an enquiry/special-order quote instead.',
     tool: 'create_service_request:order',
     patterns: [
       /\b(order|buy|purchase|nataka kununua|ninaorder|deliver(y)?)\b/i,
@@ -90,7 +90,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['product'],
     optionalSlots: [],
     completion:
-      'Answer from catalog only. If not listed, use UNKNOWN REQUEST LINE and offer to log an enquiry — never invent products.',
+      'Answer from TARGETED PRODUCT MATCHES / catalog only. For genre asks, recommend only matching-category titles from that block. If TARGETED is empty for that genre, admit none are listed — never invent titles or switch categories. If a specific title is not listed, use UNKNOWN REQUEST LINE and offer to log an enquiry.',
     tool: null,
     patterns: [
       /\b(do you sell|do you offer|mnauza|mna(uza|fanya)|what do you (sell|have)|products?|catalog)\b/i,
@@ -114,7 +114,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['name', 'reason'],
     optionalSlots: [],
     completion:
-      'Follow HANDOFF MODE. Capture name + reason (save_caller_info). If escalate enabled, escalate. Do not claim a live transfer unless handoff mode is live_transfer and transfer actually happens.',
+      'Follow HANDOFF MODE. Capture name + reason (save_caller_info). When escalate is enabled and the caller name is known, you MUST append the escalate tool marker in that turn — do not only share a WhatsApp/phone number. Do not claim a live transfer unless handoff mode is live_transfer and transfer actually happens.',
     tool: 'escalate',
     patterns: [
       /\b(human|person|someone|owner|manager|boss|agent|speak to|talk to|nipe|nataka kuongea na)\b/i,
@@ -219,6 +219,7 @@ function formatRetailPlaybookForPrompt(opts = {}) {
     '- For hold_or_pickup / order_enquiry: only fire create_service_request after required slots are known.',
     '- For hold_or_pickup: if refining pickup time on the same title+name, append create_service_request again with the fuller when_text — backend updates the same hold (do not create a second hold).',
     '- Never invent products, prices, stock, or policies. Missing price/policy → admit unknown.',
+    '- For product_inquiry recommendations: only titles in TARGETED PRODUCT MATCHES; empty genre match → admit none listed.',
     '- After a clear completion (answered or request logged), confirm briefly and goodbye.'
   );
 

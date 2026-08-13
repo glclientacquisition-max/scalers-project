@@ -78,6 +78,80 @@ function tokenize(value) {
     .filter((t) => t.length >= 3 && !['the', 'and', 'for', 'with', 'book', 'books'].includes(t));
 }
 
+/** Genre / category asks that must not fall back to unrelated sample titles. */
+const CATEGORY_SYNONYMS = Object.freeze([
+  { label: 'philosophy', tokens: ['philosophy', 'philosophical'] },
+  { label: 'children', tokens: ['children', 'childrens', 'kids', 'kid', 'child'] },
+  { label: 'financial education', tokens: ['finance', 'financial', 'money', 'wealth', 'investing'] },
+  { label: 'self-help', tokens: ['self help', 'self-help', 'motivation'] },
+  { label: 'fiction', tokens: ['fiction', 'novel', 'novels'] },
+  { label: 'biography', tokens: ['biography', 'biographies', 'memoir', 'memoirs'] },
+  { label: 'religion', tokens: ['religion', 'religious', 'faith', 'christian', 'islamic'] },
+  { label: 'business', tokens: ['business', 'entrepreneur', 'entrepreneurship'] },
+  { label: 'romance', tokens: ['romance', 'romantic'] },
+  { label: 'history', tokens: ['history', 'historical'] },
+  { label: 'science', tokens: ['science', 'scientific', 'physics', 'biology'] },
+  { label: 'education', tokens: ['education', 'educational', 'textbook', 'textbooks', 'school'] },
+]);
+
+/**
+ * Detect a requested book category/genre from caller text + known catalogue categories.
+ * @returns {{ label: string, catalogCategories: string[] }|null}
+ */
+function detectRequestedCategory(queryText, products = []) {
+  const query = normalizeMatchText(queryText);
+  if (!query) return null;
+
+  const catalogCategories = [
+    ...new Set(
+      normalizeProducts(products)
+        .map((p) => p.category)
+        .filter(Boolean)
+    ),
+  ];
+
+  for (const category of catalogCategories) {
+    const cat = normalizeMatchText(category);
+    if (cat && query.includes(cat)) {
+      return { label: category, catalogCategories: [category] };
+    }
+  }
+
+  for (const synonym of CATEGORY_SYNONYMS) {
+    if (!synonym.tokens.some((token) => query.includes(normalizeMatchText(token)))) {
+      continue;
+    }
+    const matchedCatalog = catalogCategories.filter((category) => {
+      const cat = normalizeMatchText(category);
+      return (
+        cat.includes(normalizeMatchText(synonym.label)) ||
+        synonym.tokens.some((token) => cat.includes(normalizeMatchText(token)))
+      );
+    });
+    return {
+      label: synonym.label,
+      catalogCategories: matchedCatalog,
+    };
+  }
+
+  return null;
+}
+
+function productMatchesRequestedCategory(product, requested) {
+  if (!requested) return true;
+  const category = normalizeMatchText(product.category);
+  if (!category) return false;
+  if (
+    requested.catalogCategories.some(
+      (c) => normalizeMatchText(c) === category
+    )
+  ) {
+    return true;
+  }
+  const label = normalizeMatchText(requested.label);
+  return Boolean(label && (category.includes(label) || label.includes(category)));
+}
+
 function formatProductLine(p, index) {
   const bits = [`${index}. ${p.name}`];
   if (p.category) bits.push(`Category: ${p.category}`);
@@ -121,6 +195,9 @@ function formatProductsOverview(products) {
   }
   lines.push(
     'PRICE RULE: Speak a money amount only when Price is a concrete value on a matched title. If Price is unknown, admit you do not have the exact price and offer a quote/enquiry — never guess KSh amounts.'
+  );
+  lines.push(
+    'RECOMMEND RULE: Only recommend titles from TARGETED PRODUCT MATCHES for this turn. If that block is empty for a genre/category ask, admit none are listed — never invent titles or borrow Sample titles from another category.'
   );
   return lines.join('\n');
 }
@@ -215,9 +292,15 @@ function selectProductsForTurn({
     'product_inquiry',
     'general_enquiry',
   ].includes(intentKey);
+  const requestedCategory = detectRequestedCategory(queryText, products);
+  const categoryScoped = Boolean(requestedCategory && !subject);
 
   const scored = [];
   for (const product of products) {
+    if (categoryScoped && !productMatchesRequestedCategory(product, requestedCategory)) {
+      continue;
+    }
+
     const name = normalizeMatchText(product.name);
     const category = normalizeMatchText(product.category);
     const aliasHay = product.aliases.map(normalizeMatchText).join(' ');
@@ -249,12 +332,22 @@ function selectProductsForTurn({
       productish &&
       category &&
       (query.includes(category) ||
-        (category.includes('children') && /\b(child|kids?|children)\b/.test(query)))
+        (category.includes('children') && /\b(child|kids?|children)\b/.test(query)) ||
+        (requestedCategory && productMatchesRequestedCategory(product, requestedCategory)))
     ) {
       score += 80;
     }
 
+    if (categoryScoped && productMatchesRequestedCategory(product, requestedCategory)) {
+      score += 50;
+    }
+
     if (score > 0) scored.push({ product, score });
+  }
+
+  // Category ask with zero scored matches in that category → empty (do not leak other genres).
+  if (categoryScoped && !scored.length) {
+    return [];
   }
 
   scored.sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name));
@@ -270,18 +363,32 @@ function selectProductsForTurn({
   return out;
 }
 
-function formatTargetedProductsForPrompt(products, { totalCatalogSize = 0 } = {}) {
+function formatTargetedProductsForPrompt(
+  products,
+  { totalCatalogSize = 0, queryText = '', catalog = null } = {}
+) {
   const rows = normalizeProducts(products);
+  const requestedCategory = detectRequestedCategory(
+    queryText,
+    catalog || products
+  );
   if (!rows.length) {
-    return [
+    const lines = [
       'TARGETED PRODUCT MATCHES (this turn): (none matched)',
       'If the caller named a title not listed here, say it is not in the grounded sample and offer an enquiry/special-order quote — never invent price or stock.',
-    ].join('\n');
+    ];
+    if (requestedCategory) {
+      lines.push(
+        `CATEGORY MISS: No titles are listed under "${requestedCategory.label}". Admit that genre is not in the catalogue — do NOT recommend Sample titles or any other category.`
+      );
+    }
+    return lines.join('\n');
   }
   const lines = [
     'TARGETED PRODUCT MATCHES (this turn — authoritative for these titles):',
     ...rows.map((p, i) => formatProductLine(p, i + 1)),
     'PRICE RULE: Speak money only from Price above. Unknown Price → admit unknown; offer quote/enquiry.',
+    'RECOMMEND RULE: Recommend only from this list. Do not invent titles or switch to another category.',
   ];
   if (totalCatalogSize > rows.length) {
     lines.push(
@@ -297,6 +404,7 @@ module.exports = {
   formatProductsOverview,
   formatTargetedProductsForPrompt,
   selectProductsForTurn,
+  detectRequestedCategory,
   LIVE_INJECT_MAX,
   TARGETED_INJECT_MAX,
   OVERVIEW_SAMPLE_MAX,

@@ -67,7 +67,80 @@ function extractName(text) {
   const value = match[1]
     .replace(/\s+(?:and|na|calling|looking|nataka)\b.*$/i, '')
     .trim();
-  return value.length >= 2 ? value : null;
+  return isPlausibleCallerName(value) ? value : null;
+}
+
+const NAME_BLOCKLIST = new Set([
+  'yes',
+  'no',
+  'okay',
+  'ok',
+  'sawa',
+  'ndiyo',
+  'hapana',
+  'uh',
+  'uhhuh',
+  'uh-huh',
+  'mm',
+  'mmm',
+  'hmm',
+  'hm',
+  'hello',
+  'hi',
+  'hey',
+  'please',
+  'thanks',
+  'thank',
+  'callings',
+  'calling',
+  'manager',
+  'someone',
+  'human',
+]);
+
+function isBackchannelOrFragment(text) {
+  const value = String(text || '').trim();
+  if (!value) return true;
+  const lower = value.toLowerCase().replace(/[?.!,]+$/g, '').trim();
+  const compact = lower.replace(/[\s'-]+/g, '');
+  if (
+    /^(yes|no|yeah|yep|nah|okay|ok|sawa|ndiyo|hapana|uh|uhhuh|mm+|hmm+|hello|hi|hey|thanks|thank you|asante|poa|sure|right|alright|continue|go on)$/i.test(
+      lower
+    )
+  ) {
+    return true;
+  }
+  if (NAME_BLOCKLIST.has(compact) || NAME_BLOCKLIST.has(lower)) return true;
+  // Cut-off STT fragments without a complete thought.
+  if (/[—–]\s*$/.test(value) || /…\s*$/.test(value)) return true;
+  if (
+    /^(i('d| would)? like to|i want to|i need to|i have to)\b/i.test(lower) &&
+    lower.split(/\s+/).length <= 6
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isPlausibleCallerName(value) {
+  const name = String(value || '').trim();
+  if (!name || name.length < 2 || name.length > 40) return false;
+  if (isBackchannelOrFragment(name)) return false;
+  const lower = name.toLowerCase();
+  if (
+    /\b(i('d| would)? like to|i want to|i need to|i have to|discuss|talk about|speak to|tell me|can you|could you)\b/i.test(
+      lower
+    )
+  ) {
+    return false;
+  }
+  const words = name.split(/\s+/);
+  if (words.length > 3) return false;
+  if (/\d/.test(name)) return false;
+  if (!/^[\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}$/u.test(name)) {
+    return false;
+  }
+  return true;
 }
 
 function extractPhone(text) {
@@ -141,7 +214,7 @@ function shortSlotAnswer(text) {
   if (!value || value.length > 100) return null;
   const words = value.split(/\s+/);
   if (words.length > 6) return null;
-  if (/^(yes|no|okay|ok|sawa|ndiyo|hapana)$/i.test(value)) return null;
+  if (isBackchannelOrFragment(value)) return null;
   return value.replace(/[?.!,]+$/g, '').trim() || null;
 }
 
@@ -177,7 +250,12 @@ function extractConversationEntities(
 
   const firstMissing = state?.goal?.missingSlots?.[0];
   const shortAnswer = shortSlotAnswer(text);
-  if (!entities.name && firstMissing === 'name' && shortAnswer) {
+  if (
+    !entities.name &&
+    firstMissing === 'name' &&
+    shortAnswer &&
+    isPlausibleCallerName(shortAnswer)
+  ) {
     entities.name = entity(shortAnswer, 'contextual_slot_answer', 0.8, false);
   }
   if (
@@ -220,5 +298,7 @@ module.exports = {
   extractBranch,
   extractConversationEntities,
   shortSlotAnswer,
+  isBackchannelOrFragment,
+  isPlausibleCallerName,
   entityValue,
 };
