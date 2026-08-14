@@ -30,7 +30,16 @@ Local: `cd dashboard && npm install && npm run dev` (see [`dashboard/README.md`]
 
 ## Architecture
 
-**[docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md](docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md)**
+- **Current state:** [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md)
+- **System diagram:** [`docs/architecture/SYSTEM_ARCHITECTURE.md`](docs/architecture/SYSTEM_ARCHITECTURE.md)
+- **Migration blueprint (historical + target):** [`docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md`](docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md)
+
+## Governance
+
+- **Engineering principles:** [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md)
+- **Development workflow:** [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md)
+- **Source of truth:** [`docs/governance/SOURCE_OF_TRUTH.md`](docs/governance/SOURCE_OF_TRUTH.md)
+- **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 
 ## Agent lanes
 

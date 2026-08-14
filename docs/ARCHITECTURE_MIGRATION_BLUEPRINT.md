@@ -1,8 +1,9 @@
 # B2B AI Voice SaaS — Architecture & Migration Blueprint
 
-> **Status:** Approved direction for production migration  
-> **Codebase baseline:** `main` (Twilio ConversationRelay + Gemini + SQLite)  
-> **Target:** Hybrid custom stack (SautiKit + Soniox + Gemini/GPT-4o-mini + Supabase)
+> **Status:** Migration blueprint — **historical + target reference**  
+> **Current production stack (2026-08-14):** SautiKit + Soniox + Gemini + Supabase — see [`docs/architecture/CURRENT_STATE.md`](./architecture/CURRENT_STATE.md)  
+> **Historical baseline (pre-Aug 2026):** Twilio ConversationRelay + Gemini + SQLite  
+> **Target (remaining work):** Modular `server.js` split, optional GPT-4o-mini, full provider flags
 
 ---
 
@@ -10,19 +11,19 @@
 
 An automated, sub-second latency AI receptionist platform built specifically for the East African B2B market. The system intercepts missed, busy, or after-hours calls using localized telephony (**SautiKit**) and engages customers in real-time, human-like voice conversations (**English, Swahili, Sheng**) before logging actionable data to a client dashboard.
 
-**What changes vs today**
+**Migration status (2026-08-14)**
 
-| Concern | Phase 1 (current) | Production target |
-| --- | --- | --- |
-| Telephony | Twilio + ConversationRelay (text in/out) | SautiKit Stream (raw PCM duplex WebSocket) |
-| Orchestration | Twilio-managed STT/TTS + our WS text loop | Custom Node.js media orchestrator |
-| Speech | Twilio / Google TTS via ConversationRelay | Soniox realtime STT + TTS |
-| Intelligence | Gemini (`gemini-3.6-flash`) | Gemini / GPT-4o-mini (fillers + RAG) |
-| Persistence | Local SQLite (`db/calls.db`) → **Supabase** | Supabase PostgreSQL + Storage |
-| Notifications | Twilio WhatsApp | SautiKit WhatsApp (or Twilio bridge during cutover) |
-| Hosting | Single Express process | Voice engine (Railway/Render/DO) + Next.js dashboard (Vercel) |
+| Concern | Historical (pre-migration) | Current (`main`) | Remaining target |
+| --- | --- | --- | --- |
+| Telephony | Twilio + ConversationRelay | **SautiKit Stream** (PCM `/ws/media`) | Remove legacy `/ws/relay` |
+| Orchestration | Twilio text WS loop | **`server.js` monolith** | Modular `src/telephony/`, `src/orchestrator/` |
+| Speech | Twilio / Google via ConversationRelay | **Soniox STT + TTS** | — |
+| Intelligence | Gemini | **Gemini** | Optional GPT-4o-mini; RAG TBD |
+| Persistence | SQLite | **Supabase** | CLI migrations (future) |
+| Notifications | Twilio WhatsApp | **TextSMS → SautiKit WA → email** | — |
+| Hosting | Single Express | **Railway voice + Vercel desk** | Staging env TBD |
 
-> **Phase 1 status:** SQLite removed. App persists via `src/db.js` + `src/lib/supabaseClient.js` to `tenants` / `calls` / `transcripts` and uploads recordings to the `call-recordings` bucket.
+> **Done:** SQLite removed. Supabase persistence via `src/db.js`. SautiKit telephony active. Legacy `/ws/relay` still present but unused.
 
 ---
 
