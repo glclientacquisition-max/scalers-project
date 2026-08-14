@@ -102,7 +102,7 @@ export function seedOwnerCatchAllTeam(opts: {
   ];
 }
 
-export function defaultAgentNameForBusiness(_businessName: string): string {
+export function defaultAgentNameForBusiness(): string {
   return "Receptionist";
 }
 
@@ -200,7 +200,7 @@ export function buildRetailOnboardingSeed(opts: {
 
   const agentName =
     String(opts.agentName || "").trim() ||
-    defaultAgentNameForBusiness(opts.businessName || "");
+    defaultAgentNameForBusiness();
 
   return {
     servicesCatalog: seedServicesFromOnboardingText(
