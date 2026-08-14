@@ -11,6 +11,8 @@ function parseGeminiResponse(responseText) {
     reason: null,
     escalate: null,
     serviceRequest: null,
+    appointment: null,
+    appointmentUpdate: null,
     errors: [],
   };
   let spoken = String(responseText || '');
@@ -64,6 +66,57 @@ function parseGeminiResponse(responseText) {
           ].filter(Boolean);
           if (bits.length) output.reason = bits.join(' — ');
         }
+      }
+      if (parsed.create_appointment) {
+        const appt = parsed.create_appointment;
+        output.appointment = {
+          serviceName: String(
+            appt.service_name || appt.service || appt.item || ''
+          ).trim(),
+          name: String(appt.name || '').trim(),
+          phone: String(appt.phone || '').trim(),
+          whenText: String(
+            appt.when_text || appt.when || appt.time_window || ''
+          ).trim(),
+          landmark: String(
+            appt.landmark || appt.address_landmark || appt.address || ''
+          ).trim(),
+          notes: String(appt.notes || appt.reason || '').trim(),
+          windowStart: String(appt.window_start || '').trim(),
+          windowEnd: String(appt.window_end || '').trim(),
+        };
+        if (!output.name && output.appointment.name) {
+          output.name = output.appointment.name;
+        }
+        if (!output.reason) {
+          const bits = [
+            'visit',
+            output.appointment.serviceName,
+            output.appointment.whenText,
+            output.appointment.landmark,
+          ].filter(Boolean);
+          if (bits.length) output.reason = bits.join(' — ');
+        }
+      }
+      if (parsed.update_appointment) {
+        const appt = parsed.update_appointment;
+        output.appointmentUpdate = {
+          appointmentId: String(appt.id || appt.appointment_id || '').trim(),
+          status: String(appt.status || '').trim(),
+          whenText: String(
+            appt.when_text || appt.when || appt.time_window || ''
+          ).trim(),
+          landmark: String(
+            appt.landmark || appt.address_landmark || appt.address || ''
+          ).trim(),
+          notes: String(appt.notes || appt.reason || '').trim(),
+          serviceName: String(
+            appt.service_name || appt.service || ''
+          ).trim(),
+          phone: String(appt.phone || '').trim(),
+          windowStart: String(appt.window_start || '').trim(),
+          windowEnd: String(appt.window_end || '').trim(),
+        };
       }
     } catch (err) {
       output.errors.push({

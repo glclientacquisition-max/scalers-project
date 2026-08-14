@@ -1099,6 +1099,221 @@ async function updateServiceRequest({
   return data || null;
 }
 
+const APPOINTMENT_STATUSES = new Set([
+  'requested',
+  'confirmed',
+  'cancelled',
+  'done',
+]);
+
+/**
+ * Create a home-services visit appointment.
+ * Upserts contact and mirrors a short note into call summary when callSid given.
+ */
+async function createAppointment({
+  callSid,
+  tenantId,
+  serviceName,
+  name,
+  phone,
+  whenText,
+  landmark,
+  address,
+  notes,
+  windowStart,
+  windowEnd,
+} = {}) {
+  let resolvedTenantId = tenantId || null;
+  let callRow = null;
+  if (callSid) {
+    callRow = await getCall(callSid);
+    if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
+  }
+  if (!resolvedTenantId) return null;
+
+  const service = String(serviceName || '').trim();
+  if (!service) return null;
+
+  const callerName = String(name || callRow?.name || '').trim() || null;
+  const callerPhone =
+    String(phone || callRow?.from_number || '').trim() || null;
+  const when = String(whenText || '').trim() || null;
+  const addressLandmark =
+    String(landmark || address || '').trim() || null;
+  const noteText = String(notes || '').trim() || null;
+  const startIso = windowStart ? new Date(windowStart).toISOString() : null;
+  const endIso = windowEnd ? new Date(windowEnd).toISOString() : null;
+
+  const contact = await upsertContact({
+    tenantId: resolvedTenantId,
+    phone: callerPhone,
+    name: callerName,
+    lastReason:
+      ['visit', service, when, addressLandmark].filter(Boolean).join(' — ') ||
+      noteText,
+  });
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .insert({
+      tenant_id: resolvedTenantId,
+      contact_id: contact?.id || null,
+      call_id: callRow?.id || null,
+      service_name: service,
+      status: 'requested',
+      when_text: when,
+      window_start:
+        startIso && !Number.isNaN(Date.parse(startIso)) ? startIso : null,
+      window_end: endIso && !Number.isNaN(Date.parse(endIso)) ? endIso : null,
+      address_landmark: addressLandmark,
+      notes: noteText,
+      caller_name: callerName,
+      caller_phone: callerPhone,
+      updated_at: new Date().toISOString(),
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (error && /appointments|relation/i.test(error.message)) {
+    console.warn(
+      '[db] createAppointment skipped (apply appointments.sql):',
+      error.message
+    );
+    return null;
+  }
+  throwIfError('createAppointment', error);
+
+  if (callSid && data) {
+    const existing = await getCall(callSid);
+    if (existing) {
+      const meta = parseSummary(existing.summary);
+      meta.appointment_id = data.id;
+      meta.appointment_service = service;
+      const reasonBits = ['visit', service, when, addressLandmark].filter(
+        Boolean
+      );
+      if (!meta.reason && reasonBits.length) {
+        meta.reason = reasonBits.join(' — ');
+      }
+      if (callerName) meta.name = callerName;
+      await supabase
+        .from('calls')
+        .update({ summary: serializeSummary(meta) })
+        .eq('sautikit_call_sid', callSid);
+    }
+  }
+
+  return data || null;
+}
+
+/**
+ * Update an appointment by id, or the caller's latest open (requested/confirmed) visit.
+ */
+async function updateAppointment({
+  callSid,
+  tenantId,
+  appointmentId,
+  phone,
+  status,
+  whenText,
+  landmark,
+  address,
+  notes,
+  serviceName,
+  windowStart,
+  windowEnd,
+} = {}) {
+  let resolvedTenantId = tenantId || null;
+  let callRow = null;
+  if (callSid) {
+    callRow = await getCall(callSid);
+    if (callRow?.tenant_id) resolvedTenantId = callRow.tenant_id;
+  }
+  if (!resolvedTenantId) return null;
+
+  const nextStatus = String(status || '')
+    .trim()
+    .toLowerCase();
+  const patch = { updated_at: new Date().toISOString() };
+  if (nextStatus && APPOINTMENT_STATUSES.has(nextStatus)) {
+    patch.status = nextStatus;
+  }
+  if (whenText != null && String(whenText).trim()) {
+    patch.when_text = String(whenText).trim();
+  }
+  const addressLandmark = String(landmark || address || '').trim();
+  if (addressLandmark) patch.address_landmark = addressLandmark;
+  if (notes != null && String(notes).trim()) {
+    patch.notes = String(notes).trim();
+  }
+  if (serviceName != null && String(serviceName).trim()) {
+    patch.service_name = String(serviceName).trim();
+  }
+  if (windowStart) {
+    const startIso = new Date(windowStart).toISOString();
+    if (!Number.isNaN(Date.parse(startIso))) patch.window_start = startIso;
+  }
+  if (windowEnd) {
+    const endIso = new Date(windowEnd).toISOString();
+    if (!Number.isNaN(Date.parse(endIso))) patch.window_end = endIso;
+  }
+
+  if (Object.keys(patch).length <= 1) {
+    return null;
+  }
+
+  let targetId = String(appointmentId || '').trim() || null;
+
+  if (!targetId) {
+    const callerPhone =
+      String(phone || callRow?.from_number || '').trim() || null;
+    let findQuery = supabase
+      .from('appointments')
+      .select('id')
+      .eq('tenant_id', resolvedTenantId)
+      .in('status', ['requested', 'confirmed'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (callerPhone) {
+      findQuery = findQuery.eq('caller_phone', callerPhone);
+    } else if (callRow?.id) {
+      findQuery = findQuery.eq('call_id', callRow.id);
+    } else {
+      return null;
+    }
+    const { data: found, error: findErr } = await findQuery.maybeSingle();
+    if (findErr && /appointments|relation/i.test(findErr.message)) {
+      console.warn(
+        '[db] updateAppointment skipped (apply appointments.sql):',
+        findErr.message
+      );
+      return null;
+    }
+    throwIfError('updateAppointment(find)', findErr);
+    targetId = found?.id || null;
+  }
+
+  if (!targetId) return null;
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .update(patch)
+    .eq('id', targetId)
+    .eq('tenant_id', resolvedTenantId)
+    .select('*')
+    .maybeSingle();
+
+  if (error && /appointments|relation/i.test(error.message)) {
+    console.warn(
+      '[db] updateAppointment skipped (apply appointments.sql):',
+      error.message
+    );
+    return null;
+  }
+  throwIfError('updateAppointment', error);
+  return data || null;
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -1118,6 +1333,8 @@ module.exports = {
   upsertContact,
   createServiceRequest,
   updateServiceRequest,
+  createAppointment,
+  updateAppointment,
   mergeCallSummaryMeta,
   RECORDINGS_BUCKET,
   shapeCall,
