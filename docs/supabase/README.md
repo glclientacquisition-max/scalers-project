@@ -108,6 +108,14 @@ Use this order on a new environment or when catching up an older project. Skip f
 
 ---
 
+## Security repairs
+
+| File | Depends on | Notes |
+| --- | --- | --- |
+| [`fix_p0_rls_remove_legacy_allow_all.sql`](./fix_p0_rls_remove_legacy_allow_all.sql) | `owner_rls.sql`, `lead_status.sql` member policies already applied | **P0 (2026-08-14).** Drops legacy `Enable all access for service role only` policies on `tenants`, `calls`, `transcripts`. Applied on production ALCR. Does not revoke anon grants. |
+
+---
+
 ## Invariants (Platform)
 
 1. Scripts are additive and ordered; document new files here **and** in the SQL header (`-- Run after …`).
