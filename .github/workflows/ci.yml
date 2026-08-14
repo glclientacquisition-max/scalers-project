@@ -1,0 +1,60 @@
+# Scalers CI — Phase 3A baseline gates
+# Runs existing verified checks only. Does not include dashboard lint (pre-existing failure).
+# See docs/governance/TESTING_BASELINE.md
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  voice-and-brain:
+    name: Voice, brain, and MVP tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: test:voice
+        run: npm run test:voice
+
+      - name: test:brain
+        run: npm run test:brain
+
+      - name: test:mvp
+        run: npm run test:mvp
+
+  dashboard-build:
+    name: Dashboard production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dashboard dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Build dashboard
+        working-directory: dashboard
+        run: npm run build
