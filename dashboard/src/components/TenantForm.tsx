@@ -85,6 +85,11 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
+import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
+import {
+  parseNotifyChannels,
+  type NotifyChannels,
+} from "@/lib/notifyChannels";
 import {
   ExpandTextarea,
   ToolSwitch,
@@ -300,6 +305,9 @@ export function TenantForm({
     tenant.whatsapp_notification_number || ""
   );
   const [alertEmail, setAlertEmail] = useState(tenant.alert_email || "");
+  const [notifyChannels, setNotifyChannels] = useState<NotifyChannels>(() =>
+    parseNotifyChannels(tenant.notify_channels)
+  );
   const [servicesNotes, setServicesNotes] = useState(() =>
     extractServicesNotes(tenant.services_offered || "")
   );
@@ -746,6 +754,11 @@ export function TenantForm({
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
       <input type="hidden" name="alert_email" value={alertEmail} />
+      <input
+        type="hidden"
+        name="notify_channels"
+        value={JSON.stringify(notifyChannels)}
+      />
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />
       <input type="hidden" name="product_catalog" value={productsJson} />
@@ -844,7 +857,7 @@ export function TenantForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="owner">
-              Owner alert WhatsApp
+              Owner alert phone
             </label>
             <input
               id="owner"
@@ -853,6 +866,7 @@ export function TenantForm({
               placeholder="+2547…"
               className={`${denseFieldClass} mt-1`}
             />
+            <p className="mt-1 text-[11px] text-ink-soft">Used for SMS (and WhatsApp when live).</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="alert_email">
@@ -868,6 +882,8 @@ export function TenantForm({
             />
           </div>
         </div>
+
+        <NotifyChannelPicker value={notifyChannels} onChange={setNotifyChannels} />
 
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">

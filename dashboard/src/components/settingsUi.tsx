@@ -90,10 +90,12 @@ export function ToolSwitch({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -101,16 +103,21 @@ export function ToolSwitch({
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => {
+        if (disabled) return;
+        onChange(!checked);
+      }}
       className={[
         "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
-        checked ? "bg-[#0096FF]" : "bg-line",
+        disabled ? "cursor-not-allowed opacity-60" : "",
+        checked && !disabled ? "bg-[#0096FF]" : "bg-line",
       ].join(" ")}
     >
       <span
         className={[
           "inline-block h-5 w-5 rounded-full bg-white shadow transition",
-          checked ? "translate-x-6" : "translate-x-1",
+          checked && !disabled ? "translate-x-6" : "translate-x-1",
         ].join(" ")}
       />
     </button>

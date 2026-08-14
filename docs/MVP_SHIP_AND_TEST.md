@@ -44,8 +44,8 @@ Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `das
 | What do you offer / FAQ | From services + FAQs / policies |
 | Price / stock (retail) | Only from catalogue when loaded; else admit + enquiry |
 | Hold / order (retail) | Catalogue-grounded or enquiry — never fake |
-| Leave a message / callback | Save + WhatsApp/email notify |
-| Speak to a human | Async escalate (name required); never fake live transfer |
+| Leave a message / callback | Save + SMS → WhatsApp → email notify |
+| Speak to a human | Async escalate (name required); SMS-first notify; never fake live transfer — see `docs/ESCALATION.md` |
 | Language | en / sw / sheng match **after** the caller speaks |
 
 **Out of MVP claim (still on the long-term plan):** live transfer, calendar booking, POS sync, RAG, multi-vertical depth, “95% full assist.”
@@ -60,7 +60,7 @@ Signup (DID + notify WA)
   → Seed FAQs / policies / unknown line / hours_schedule / team catch-all
   → Compile llm_system_prompt
   → Line answers live calls (brand-first introduction)
-  → Owner gets WA/email on message / hold / escalate
+  → Owner gets SMS → WA → email on message / hold / escalate
 ```
 
 ### Config gate after onboarding
@@ -70,8 +70,9 @@ Signup (DID + notify WA)
 - [ ] Hours text **and** structured `hours_schedule` when parseable  
 - [ ] Location landmark / directions  
 - [ ] Unknown-answer fallback  
-- [ ] Notify: WhatsApp and/or alert email  
+- [ ] Notify: TextSMS verified (`/healthz.notify.sms.verified`) and/or WA and/or alert email  
 - [ ] Team catch-all (General queries) when escalate is on  
+
 - [ ] Retail: upload product catalogue in Train ASAP (blank prices OK)  
 - [ ] Recompile after Train edits  
 
