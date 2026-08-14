@@ -43,6 +43,7 @@ import {
   lexiconForStorage,
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
+import { parseNotifyChannelsField } from "@/lib/notifyChannels";
 
 export type SettingsCompileState = {
   error?: string;
@@ -75,6 +76,7 @@ export async function saveAndCompileSettings(
   const alertEmail = String(formData.get("alert_email") || "")
     .trim()
     .toLowerCase();
+  const notifyChannels = parseNotifyChannelsField(formData.get("notify_channels"));
   const servicesNotes = String(formData.get("services_notes") || "").trim();
   const servicesCatalog = parseServicesCatalogField(formData.get("services_catalog"));
   const productCatalog = parseProductCatalogField(formData.get("product_catalog"));
@@ -195,6 +197,7 @@ export async function saveAndCompileSettings(
     business_name: businessName,
     whatsapp_notification_number: notificationPhone || tenant.whatsapp_notification_number,
     alert_email: alertEmail || null,
+    notify_channels: notifyChannels,
     services_offered: servicesOffered,
     services_catalog: servicesCatalog,
     product_catalog: productCatalog,
@@ -234,6 +237,11 @@ export async function saveAndCompileSettings(
     if (/alert_email/i.test(error.message)) {
       return {
         error: `${error.message} Apply docs/supabase/alert_email.sql in Supabase.`,
+      };
+    }
+    if (/notify_channels/i.test(error.message)) {
+      return {
+        error: `${error.message} Apply docs/supabase/notify_channels.sql in Supabase.`,
       };
     }
     if (/unknown_answer_fallback/i.test(error.message)) {

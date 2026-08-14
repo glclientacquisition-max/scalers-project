@@ -16,6 +16,7 @@ const {
   buildLeadEmail,
 } = require('./email');
 const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
+const { parseNotifyChannels } = require('./notifyChannels');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -72,47 +73,56 @@ async function trySendWhatsApp({ to, body, lead }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject } = {}) {
+async function dispatchAlert({ to, email, body, lead = {}, subject, channels } = {}) {
   const text = body || buildLeadText(lead);
   const errors = [];
+  const prefs = parseNotifyChannels(channels);
 
-  try {
-    const sms = await trySendSms({ to, body: text });
-    if (sms) return sms;
-  } catch (err) {
-    errors.push(`sms:${err?.message || err}`);
-    console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
-  }
-
-  try {
-    const wa = await trySendWhatsApp({ to, body: text, lead });
-    if (wa) return wa;
-  } catch (err) {
-    errors.push(`whatsapp:${err?.message || err}`);
-    if (!emailFallbackReady()) {
-      // Keep prior behavior: rethrow when email cannot absorb the failure.
-      throw err;
+  if (prefs.sms) {
+    try {
+      const sms = await trySendSms({ to, body: text });
+      if (sms) return sms;
+    } catch (err) {
+      errors.push(`sms:${err?.message || err}`);
+      console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
     }
-    console.warn(
-      `[notify] WhatsApp send failed (${err?.message || err}); falling back to email`
-    );
   }
 
-  const mail = await sendEmailFallback({
-    to: email,
-    body: text,
-    lead,
-    subject,
-  });
-  if (mail.channel) return mail;
+  if (prefs.whatsapp) {
+    try {
+      const wa = await trySendWhatsApp({ to, body: text, lead });
+      if (wa) return wa;
+    } catch (err) {
+      errors.push(`whatsapp:${err?.message || err}`);
+      if (!prefs.email || !emailFallbackReady()) {
+        // Keep prior behavior: rethrow when email cannot absorb the failure.
+        throw err;
+      }
+      console.warn(
+        `[notify] WhatsApp send failed (${err?.message || err}); falling back to email`
+      );
+    }
+  }
 
-  if (!smsSenderReady() && !whatsAppSenderReady()) {
-    return { channel: null, reason: 'no_notify_channel_configured', errors };
+  if (prefs.email) {
+    const mail = await sendEmailFallback({
+      to: email,
+      body: text,
+      lead,
+      subject,
+    });
+    if (mail.channel) return mail;
+
+    if (!smsSenderReady() && !whatsAppSenderReady()) {
+      return { channel: null, reason: 'no_notify_channel_configured', errors };
+    }
+    if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
+      return { channel: null, reason: mail.reason || 'no_destination_number', errors };
+    }
+    return { channel: null, reason: 'send_failed', errors };
   }
-  if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
-    return { channel: null, reason: mail.reason || 'no_destination_number', errors };
-  }
-  return { channel: null, reason: 'send_failed', errors };
+
+  return { channel: null, reason: 'channels_disabled_by_tenant', errors };
 }
 
 /**
@@ -125,16 +135,18 @@ async function dispatchEscalationAlert({
   body,
   lead = {},
   subject,
+  channels,
 } = {}) {
   const sent = [];
   const text = body || buildLeadText(lead);
+  const prefs = parseNotifyChannels(channels);
 
   const ownerDestSms = normalizeSmsTo(ownerPhone);
   const teammateDestSms = normalizeSmsTo(teammatePhone);
   const ownerDistinctSms =
     ownerDestSms && (!teammateDestSms || ownerDestSms !== teammateDestSms);
 
-  if (smsSenderReady() && teammateDestSms) {
+  if (prefs.sms && smsSenderReady() && teammateDestSms) {
     try {
       const result = await sendSms({ to: teammateDestSms, body: text });
       sent.push({ channel: 'sms', role: 'teammate', to: teammateDestSms, result });
@@ -143,7 +155,7 @@ async function dispatchEscalationAlert({
     }
   }
 
-  if (smsSenderReady() && ownerDistinctSms) {
+  if (prefs.sms && smsSenderReady() && ownerDistinctSms) {
     try {
       const result = await sendSms({ to: ownerDestSms, body: text });
       sent.push({ channel: 'sms', role: 'owner', to: ownerDestSms, result });
@@ -154,7 +166,7 @@ async function dispatchEscalationAlert({
 
   // If SMS already delivered to someone, skip WhatsApp duplicate (WA can layer later).
   // If SMS missed everyone, fall through to WhatsApp then email.
-  if (!sent.length && whatsAppSenderReady()) {
+  if (prefs.whatsapp && !sent.length && whatsAppSenderReady()) {
     if (teammatePhone) {
       try {
         const result = await sendOwnerWhatsApp({
@@ -191,7 +203,7 @@ async function dispatchEscalationAlert({
     }
   }
 
-  if (!sent.length) {
+  if (prefs.email && !sent.length) {
     const mail = await sendEmailFallback({
       to: ownerEmail,
       body: text,
@@ -205,6 +217,7 @@ async function dispatchEscalationAlert({
 
   // Optional second channel: owner email when a phone channel already succeeded.
   if (
+    prefs.email &&
     sent.length &&
     !sent.some((s) => s.channel === 'email') &&
     emailFallbackReady() &&

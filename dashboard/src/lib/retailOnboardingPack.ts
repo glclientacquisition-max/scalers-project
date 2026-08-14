@@ -9,6 +9,12 @@ import { clampFaq, FAQ_MAX, FAQ_STARTERS } from "@/lib/faqs";
 import type { HoursSchedule } from "@/lib/hoursSchedule";
 import { parseHoursNotesToSchedule } from "@/lib/ingest/extract";
 import type { TeamMember } from "@/lib/onboarding";
+import {
+  homeDefaultServices,
+  homeStarterPolicies,
+  homeUnknownFallback,
+  seedHomeFaqs,
+} from "@/lib/homeServicesOnboardingPack";
 
 /** Retail-focused golden FAQs seeded at onboarding (owner can edit in Train). */
 export const RETAIL_FAQ_STARTERS: FaqEntry[] = [
@@ -106,13 +112,14 @@ export function defaultAgentNameForBusiness(): string {
   return "Receptionist";
 }
 
-/** Build a short services catalog from free-text onboarding (or retail defaults). */
+/** Build a short services catalog from free-text onboarding (or vertical defaults). */
 export function seedServicesFromOnboardingText(
   servicesPricing: string,
   vertical: string
 ): ServiceItem[] {
   const parsed = parseBulkServices(servicesPricing).slice(0, 12);
   if (parsed.length) return parsed;
+  if (vertical === "home_services") return homeDefaultServices();
   if (vertical !== "retail") return [];
   return [
     {
@@ -143,8 +150,13 @@ export function seedServicesFromOnboardingText(
 }
 
 export function seedFaqsForVertical(vertical: string): FaqEntry[] {
-  const base = vertical === "retail" ? RETAIL_FAQ_STARTERS : FAQ_STARTERS;
-  return base.map(clampFaq).slice(0, FAQ_MAX);
+  if (vertical === "retail") {
+    return RETAIL_FAQ_STARTERS.map(clampFaq).slice(0, FAQ_MAX);
+  }
+  if (vertical === "home_services") {
+    return seedHomeFaqs();
+  }
+  return FAQ_STARTERS.map(clampFaq).slice(0, FAQ_MAX);
 }
 
 export function buildRetailOnboardingSeed(opts: {
@@ -171,7 +183,7 @@ export function buildRetailOnboardingSeed(opts: {
   const landmark = String(opts.landmark || "").trim();
   const faqs = seedFaqsForVertical(vertical).map((f) => {
     if (
-      /where are you located/i.test(f.question) &&
+      /where are you located|come to my location/i.test(f.question) &&
       (landmark || opts.hoursLocation)
     ) {
       const bits = [landmark, opts.hoursLocation]
@@ -202,15 +214,24 @@ export function buildRetailOnboardingSeed(opts: {
     String(opts.agentName || "").trim() ||
     defaultAgentNameForBusiness();
 
+  let businessPolicies: BusinessPolicies | null = null;
+  let unknownAnswerFallback: string | null = null;
+  if (vertical === "retail") {
+    businessPolicies = retailStarterPolicies();
+    unknownAnswerFallback = retailUnknownFallback();
+  } else if (vertical === "home_services") {
+    businessPolicies = homeStarterPolicies();
+    unknownAnswerFallback = homeUnknownFallback();
+  }
+
   return {
     servicesCatalog: seedServicesFromOnboardingText(
       opts.servicesPricing,
       vertical
     ),
     faqs,
-    businessPolicies: vertical === "retail" ? retailStarterPolicies() : null,
-    unknownAnswerFallback:
-      vertical === "retail" ? retailUnknownFallback() : null,
+    businessPolicies,
+    unknownAnswerFallback,
     hoursSchedule,
     teamDirectory: seedOwnerCatchAllTeam({
       businessName: opts.businessName,

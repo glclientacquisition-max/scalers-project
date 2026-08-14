@@ -8,6 +8,8 @@ const {
 
 const capabilities = {
   createServiceRequest: true,
+  createAppointment: true,
+  updateAppointment: true,
   saveCallerInfo: true,
   escalate: true,
   endCall: true,
@@ -391,6 +393,28 @@ describe('validated tool execution', () => {
     assert.match(formatToolConfirmation(execution.results, 'en'), /your name/i);
   });
 
+  it('rejects incomplete visit bookings without writing a row', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        createAppointment: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].action, 'create_appointment');
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.deepEqual(execution.results[0].missingSlots, ['when_text', 'landmark']);
+    assert.match(formatToolConfirmation(execution.results, 'en'), /landmark/i);
+  });
+
   it('confirms soft escalation when desk note is saved', async () => {
     const parsed = parseGeminiResponse(
       '###TOOL###{"escalate":{"teammate":"manager","name":"Brian","reason":"wants manager"}}###ENDTOOL###'
@@ -407,6 +431,49 @@ describe('validated tool execution', () => {
       formatToolConfirmation(execution.results, 'en'),
       /noted that for the team/i
     );
+  });
+
+  it('confirms a visit only after backend success', async () => {
+    const parsed = parseGeminiResponse(
+      'Let me save that. ###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"tomorrow 3pm","landmark":"near Sarit"}}###ENDTOOL### ###ENDCALL###'
+    );
+    let calls = 0;
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        createAppointment: async (appointment) => {
+          calls += 1;
+          return {
+            id: 'appt_1',
+            service_name: appointment.serviceName,
+            status: 'requested',
+          };
+        },
+      },
+    });
+    assert.equal(calls, 1);
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.equal(execution.shouldEndCall, true);
+    assert.match(formatToolConfirmation(execution.results, 'en'), /visit request/i);
+  });
+
+  it('confirms cancelling a visit after backend update', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"update_appointment":{"status":"cancelled"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        updateAppointment: async () => ({
+          id: 'appt_1',
+          status: 'cancelled',
+        }),
+      },
+    });
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /cancelled/i);
   });
 
   it('does not confirm escalation without a working channel', async () => {

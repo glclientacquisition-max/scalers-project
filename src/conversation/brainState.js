@@ -344,7 +344,10 @@ function recordActionResults(state, results = []) {
       if (result.name) next.caller.name = String(result.name);
     }
     if (
-      (result.action === 'create_service_request' || result.action === 'escalate') &&
+      (result.action === 'create_service_request' ||
+        result.action === 'create_appointment' ||
+        result.action === 'update_appointment' ||
+        result.action === 'escalate') &&
       (result.status === 'succeeded' || result.status === 'updated')
     ) {
       next.resolution.status = 'resolved';

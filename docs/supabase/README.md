@@ -54,6 +54,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | # | File | Depends on | Notes |
 | --- | --- | --- | --- |
 | 11 | [`alert_email.sql`](./alert_email.sql) | `tenants` | Email fallback when WhatsApp unavailable |
+| 11a | [`notify_channels.sql`](./notify_channels.sql) | `alert_email.sql` | Owner notify channel prefs (`sms`, `whatsapp`, `email`) |
 | 12 | [`tts_lexicon.sql`](./tts_lexicon.sql) | `tenants` | Per-tenant TTS pronunciation overrides (Train pronunciation coach) |
 | 12b | [`pronunciation_gemini_scan.sql`](./pronunciation_gemini_scan.sql) | `tts_lexicon.sql` | Gemini Scan review queue + dismissals + run logs (never auto-applies to `tts_lexicon`) |
 | 13 | [`soniox_voice_id.sql`](./soniox_voice_id.sql) | `tenants` + `platform_soniox_voices` | Per-tenant voice pick/label + Super Admin curated Soniox catalog |
@@ -97,6 +98,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 20 | [`business_operating_model.sql`](./business_operating_model.sql) | `services_catalog.sql` era | `vertical`, `handoff_mode`, `business_locations`, `business_policies` |
 | 21 | [`contacts_and_requests.sql`](./contacts_and_requests.sql) | `business_operating_model.sql` | `contacts` + `service_requests` + RLS |
 | 22 | [`product_catalog_and_social.sql`](./product_catalog_and_social.sql) | `business_operating_model.sql` | `product_catalog` + `social_handles` (products separate from services) |
+| 23 | [`appointments.sql`](./appointments.sql) | `contacts_and_requests.sql` | Home-services visit bookings (`requested\|confirmed\|cancelled\|done`) + RLS |
 
 ---
 

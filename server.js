@@ -103,10 +103,17 @@ const {
   smsSenderReady,
 } = require('./src/notifications/dispatch');
 const {
+  probeSmsCredentials,
+  getSmsStatus,
+} = require('./src/notifications/sms');
+const {
   resolveEscalation,
   buildEscalationText,
   teammateLabel,
 } = require('./src/conversation/escalation');
+const {
+  shapeEscalationNotifyOutcome,
+} = require('./src/conversation/escalationFeature');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -161,6 +168,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/healthz', (_req, res) => {
+  const sms = getSmsStatus();
   res.status(200).json({
     ok: true,
     soniox: {
@@ -173,7 +181,29 @@ app.get('/healthz', (_req, res) => {
         default: v.default,
       })),
     },
+    notify: {
+      sms: {
+        configured: sms.configured,
+        verified: sms.verified,
+        shortcode: sms.shortcode,
+        code: sms.code,
+        description: sms.description,
+        balance: sms.balance,
+        checkedAt: sms.checkedAt,
+      },
+      whatsapp: whatsAppSenderReady(),
+      email: emailFallbackReady(),
+    },
   });
+});
+
+/** Ops: force a TextSMS balance probe (no SMS charged). */
+app.get('/internal/sms/status', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const status = await probeSmsCredentials({ force: true });
+  return res.status(200).json({ ok: Boolean(status.verified), sms: status });
 });
 
 app.get('/api/voices', async (_req, res) => {
@@ -978,6 +1008,8 @@ mediaWss.on('connection', (ws, req) => {
             { ...profile, agentTools: parsedTools },
             {
               createServiceRequest: true,
+              createAppointment: true,
+              updateAppointment: true,
               notifyCallback: true,
               // Current media runtime has no transfer executor.
               liveTransfer: false,
@@ -1204,7 +1236,7 @@ mediaWss.on('connection', (ws, req) => {
       callBrainCapabilities.get(callKey) ||
       buildBrainCapabilities(
         { agentTools: callAgentTools.get(callKey) || parseAgentTools(null) },
-        { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+        { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
       );
     const previousBrainState =
       callBrainStates.get(callKey) || createBrainState(brainProfile);
@@ -2024,12 +2056,14 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
     let teamDirectory = [];
+    let notifyChannels = null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
       teamDirectory = profile.teamDirectory || [];
+      notifyChannels = profile.notifyChannels || null;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
     }
@@ -2074,6 +2108,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       ownerEmail,
       body,
       lead,
+      channels: notifyChannels,
       subject: `Escalation for ${teammateLabel(teammate)}${businessName ? ` — ${businessName}` : ''}`,
     });
 
@@ -2084,6 +2119,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         phone: lead.callerNumber,
         reason: lead.reason,
         smsSender: smsSenderReady(),
+        smsStatus: getSmsStatus(),
         whatsappSender: whatsAppSenderReady(),
         emailFallback: emailFallbackReady(),
         ownerNumber: ownerNumber || null,
@@ -2097,11 +2133,22 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         await maybeSendWhatsAppNotification(callSid);
       }
       await db.markEscalationSent(callSid);
-      return {
+      const softOutcome = shapeEscalationNotifyOutcome({
         ok: true,
         soft: true,
         channel: 'desk_note',
         reason: 'No live SMS/WA/email channel; escalation saved on the call for the desk.',
+      });
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: { escalation_notify: softOutcome },
+      });
+      return {
+        ok: true,
+        soft: true,
+        channel: 'desk_note',
+        sent: [{ channel: 'desk_note', role: 'desk', to: null }],
+        reason: softOutcome.reason,
       };
     }
 
@@ -2116,13 +2163,32 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     await db.markEscalationSent(callSid);
     await db.markWhatsappSent(callSid);
+    const liveOutcome = shapeEscalationNotifyOutcome({
+      ok: true,
+      soft: false,
+      sent,
+      channel: sent.map((item) => item.channel).filter(Boolean).join(',') || 'alert',
+    });
+    await db.mergeCallSummaryMeta({
+      callSid,
+      patch: { escalation_notify: liveOutcome },
+    });
     return {
       ok: true,
-      channel: sent.map((item) => item.channel).filter(Boolean).join(',') || 'alert',
+      soft: false,
+      channel: liveOutcome.channels.map((c) => c.channel).join(',') || 'alert',
+      sent,
     };
   } catch (err) {
     console.error(`[${callSid}] Escalation notification failed:`, err?.message || err);
-    return { ok: false, reason: err?.message || String(err) };
+    const failed = shapeEscalationNotifyOutcome({
+      ok: false,
+      reason: err?.message || String(err),
+    });
+    await db
+      .mergeCallSummaryMeta({ callSid, patch: { escalation_notify: failed } })
+      .catch(() => {});
+    return { ok: false, reason: failed.reason };
   } finally {
     escalationNotifyInProgress.delete(callSid);
   }
@@ -2144,11 +2210,13 @@ async function maybeSendWhatsAppNotification(callSid) {
     let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
     let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
+    let notifyChannels = null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
+      notifyChannels = profile.notifyChannels || null;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
@@ -2161,7 +2229,12 @@ async function maybeSendWhatsAppNotification(callSid) {
       recordingUrl: call.recording_url,
     };
 
-    const result = await dispatchAlert({ to: ownerNumber, email: ownerEmail, lead });
+    const result = await dispatchAlert({
+      to: ownerNumber,
+      email: ownerEmail,
+      lead,
+      channels: notifyChannels,
+    });
     if (!result.channel) {
       console.warn(`[${callSid}] Owner notify skipped (${result.reason || 'unknown'}). Lead ready:`, {
         name: call.name,
@@ -2196,11 +2269,13 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
+  let notifyChannels = null;
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
+    notifyChannels = profile.notifyChannels || null;
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for request notify failed:`,
@@ -2242,6 +2317,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     email: ownerEmail,
     body,
     lead,
+    channels: notifyChannels,
     subject: `${typeLabel} — ${businessName}`,
   });
   if (result.channel) {
@@ -2252,6 +2328,78 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   } else {
     console.warn(
       `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
+    );
+  }
+}
+
+/** Visit booking alert for home-services appointments. */
+async function maybeSendAppointmentNotification(callSid, appointment, kind = 'created') {
+  if (!appointment) return;
+  let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
+  let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
+  let businessName = process.env.BUSINESS_NAME || 'your business';
+  let notifyChannels = null;
+  try {
+    const profile = await db.getTenantProfile({ callSid });
+    ownerNumber = profile.whatsappNumber || ownerNumber;
+    ownerEmail = profile.alertEmail || ownerEmail;
+    businessName = profile.businessName || businessName;
+    notifyChannels = profile.notifyChannels || null;
+  } catch (err) {
+    console.warn(
+      `[${callSid}] tenant lookup for appointment notify failed:`,
+      err?.message || err
+    );
+  }
+
+  const status = String(appointment.status || 'requested').toLowerCase();
+  const title =
+    kind === 'updated'
+      ? status === 'cancelled'
+        ? 'VISIT CANCELLED'
+        : 'VISIT UPDATED'
+      : 'VISIT REQUEST';
+
+  const lines = [
+    `${title} — ${businessName}`,
+    appointment.service_name ? `Service: ${appointment.service_name}` : null,
+    appointment.when_text ? `When: ${appointment.when_text}` : null,
+    appointment.address_landmark
+      ? `Where: ${appointment.address_landmark}`
+      : null,
+    appointment.caller_name ? `Caller: ${appointment.caller_name}` : null,
+    appointment.caller_phone ? `Phone: ${appointment.caller_phone}` : null,
+    appointment.notes ? `Notes: ${appointment.notes}` : null,
+    `Status: ${status}`,
+    'Open Appointments in Scalers desk to confirm or cancel.',
+  ].filter(Boolean);
+
+  const body = lines.join('\n');
+  const lead = {
+    businessName,
+    name: appointment.caller_name || 'Caller',
+    reason: `${title}: ${[appointment.service_name, appointment.when_text]
+      .filter(Boolean)
+      .join(' — ')}`,
+    callerNumber: appointment.caller_phone,
+  };
+
+  const result = await dispatchAlert({
+    to: ownerNumber,
+    email: ownerEmail,
+    body,
+    lead,
+    subject: `${title} — ${businessName}`,
+    channels: notifyChannels,
+  });
+  if (result.channel) {
+    console.log(
+      `[${callSid}] Appointment notify (${kind}/${status}) via ${result.channel}` +
+        (result.to ? ` → ${result.to}` : '')
+    );
+  } else {
+    console.warn(
+      `[${callSid}] Appointment notify skipped (${result.reason || 'unknown'})`
     );
   }
 }
@@ -2297,7 +2445,7 @@ wss.on('connection', (ws) => {
             callSid,
             buildBrainCapabilities(
               { ...profile, agentTools: parsedTools },
-              { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+              { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
             )
           );
           messages = [{ role: 'system', content: systemPrompt }];
@@ -2324,7 +2472,7 @@ wss.on('connection', (ws) => {
           callBrainCapabilities.get(callSid) ||
           buildBrainCapabilities(
             { agentTools: callAgentTools.get(callSid) || parseAgentTools(null) },
-            { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+            { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
           );
         const previousBrainState =
           callBrainStates.get(callSid) || createBrainState(brainProfile);
@@ -2512,7 +2660,7 @@ async function applyGeminiTools(callSid, parsed) {
     callBrainCapabilities.get(callSid) ||
     buildBrainCapabilities(
       { agentTools: tools },
-      { createServiceRequest: true, notifyCallback: true, liveTransfer: false }
+      { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
     );
   const state = callBrainStates.get(callSid) || createBrainState();
   const groundedProfile = callTenantProfiles.get(callSid) || {};
@@ -2563,6 +2711,51 @@ async function applyGeminiTools(callSid, parsed) {
           console.log(
             `[${callSid}] service_request updated id=${updated.id} type=${updated.request_type} when=${updated.when_text || ''}`
           );
+        }
+        return updated;
+      },
+      createAppointment: async (appointment) => {
+        const created = await db.createAppointment({
+          callSid,
+          serviceName: appointment.serviceName,
+          name: appointment.name || parsed.name,
+          phone: appointment.phone,
+          whenText: appointment.whenText,
+          landmark: appointment.landmark,
+          notes: appointment.notes || parsed.reason,
+          windowStart: appointment.windowStart,
+          windowEnd: appointment.windowEnd,
+        });
+        if (created) {
+          console.log(
+            `[${callSid}] appointment created id=${created.id} service=${created.service_name}`
+          );
+          maybeSendAppointmentNotification(callSid, created, 'created').catch((err) => {
+            console.error(`[${callSid}] appointment notify error:`, err?.message || err);
+          });
+        }
+        return created;
+      },
+      updateAppointment: async (appointment) => {
+        const updated = await db.updateAppointment({
+          callSid,
+          appointmentId: appointment.appointmentId,
+          phone: appointment.phone,
+          status: appointment.status,
+          whenText: appointment.whenText,
+          landmark: appointment.landmark,
+          notes: appointment.notes,
+          serviceName: appointment.serviceName,
+          windowStart: appointment.windowStart,
+          windowEnd: appointment.windowEnd,
+        });
+        if (updated) {
+          console.log(
+            `[${callSid}] appointment updated id=${updated.id} status=${updated.status}`
+          );
+          maybeSendAppointmentNotification(callSid, updated, 'updated').catch((err) => {
+            console.error(`[${callSid}] appointment update notify error:`, err?.message || err);
+          });
         }
         return updated;
       },
@@ -2815,9 +3008,23 @@ server.listen(PORT, () => {
     console.log(`ℹ SONIOX_API_KEY not set — PCM will be logged only`);
   }
   if (smsSenderReady()) {
-    console.log(
-      `✓ SMS notify ready via TextSMS (shortcode=${process.env.TEXTSMS_SHORTCODE}) — primary for leads + escalation`
-    );
+    probeSmsCredentials({ force: true })
+      .then((status) => {
+        if (status.verified) {
+          console.log(
+            `✓ SMS notify verified via TextSMS (shortcode=${status.shortcode}` +
+              `${status.balance != null ? ` balance=${status.balance}` : ''}) — primary for leads + escalation`
+          );
+        } else {
+          console.warn(
+            `⚠ SMS env set but TextSMS probe failed code=${status.code} ${status.description || ''}` +
+              ` — fix TEXTSMS_API_KEY / PARTNER_ID / SHORTCODE (escalation falls back to WA/email/desk)`
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn(`⚠ SMS probe error: ${err?.message || err}`);
+      });
   } else {
     console.log(
       `ℹ SMS notify not set (TEXTSMS_API_KEY + TEXTSMS_PARTNER_ID + TEXTSMS_SHORTCODE)`
