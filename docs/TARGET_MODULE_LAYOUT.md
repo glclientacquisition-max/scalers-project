@@ -1,9 +1,12 @@
-# Target module skeleton (Phase 2+)
+# Target module skeleton (future — not current layout)
+
+> **Current state:** See [`docs/architecture/CURRENT_STATE.md`](./architecture/CURRENT_STATE.md).  
+> Voice logic remains concentrated in `server.js` (~2,841 LOC). Partial extraction exists: `src/speech/`, `src/conversation/`, `src/sautikit/webhook.js`.
 
 This tree is the **intended** production layout from
 [`ARCHITECTURE_MIGRATION_BLUEPRINT.md`](./ARCHITECTURE_MIGRATION_BLUEPRINT.md).
 
-**Phase 1 done:** `src/lib/supabaseClient.js` + `src/db.js` replace SQLite.
+**Done:** `src/lib/supabaseClient.js` + `src/db.js` replace SQLite. `src/speech/*` and `src/conversation/*` extracted.
 
 ```
 src/
@@ -30,13 +33,13 @@ src/
     whatsapp.js
 ```
 
-## Provider flags (planned)
+## Provider flags (planned — not implemented in `server.js`)
 
 | Flag | Values | Notes |
 | --- | --- | --- |
-| `TELEPHONY_PROVIDER` | `twilio` \| `sautikit` | Default `twilio` until Phase 4–5 |
-| `WHATSAPP_PROVIDER` | `twilio` \| `sautikit` | Twilio until messaging cutover |
-| `LLM_PROVIDER` | `gemini` \| `openai` | Default `gemini` |
+| `TELEPHONY_PROVIDER` | `twilio` \| `sautikit` | **Current:** SautiKit only (no flag). Legacy `/ws/relay` remains. |
+| `WHATSAPP_PROVIDER` | `twilio` \| `sautikit` | **Current:** dispatch chain in `src/notifications/dispatch.js` |
+| `LLM_PROVIDER` | `gemini` \| `openai` | **Current:** Gemini hardcoded |
 
 ## Stable DB surface
 
