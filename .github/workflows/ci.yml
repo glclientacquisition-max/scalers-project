@@ -1,5 +1,4 @@
-# Scalers CI — Phase 3A baseline gates
-# Runs existing verified checks only. Does not include dashboard lint (pre-existing failure).
+# Scalers CI — voice/brain/MVP tests + dashboard lint and build
 # See docs/governance/TESTING_BASELINE.md
 
 name: CI
@@ -54,6 +53,10 @@ jobs:
       - name: Install dashboard dependencies
         working-directory: dashboard
         run: npm ci
+
+      - name: Lint dashboard
+        working-directory: dashboard
+        run: npm run lint
 
       - name: Build dashboard
         working-directory: dashboard
