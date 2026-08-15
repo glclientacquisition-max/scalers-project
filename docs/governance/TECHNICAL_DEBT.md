@@ -1,6 +1,6 @@
 # Technical debt register
 
-**Status:** Governance baseline (2026-08-14)  
+**Status:** Governance baseline (updated Phase 3F, 2026-08-15)  
 **Source:** Discovery audit + codebase evidence. Items are **not** fixed in Phase 2.
 
 Status: `OPEN` unless noted.
@@ -23,11 +23,12 @@ Status: `OPEN` unless noted.
 
 | Field | Detail |
 | --- | --- |
-| **Problem** | Manual SQL apply with no in-repo record of which scripts ran on production |
-| **Evidence** | 31 scripts in `docs/supabase/`; no migration version table; `src/db.js` column fallback selects |
-| **Impact** | Schema drift, silent feature degradation, failed SQL applies |
-| **Recommended action** | Live Supabase audit; document applied tier; future CLI migrations |
-| **Status** | OPEN |
+| **Problem** | Manual SQL apply with incomplete per-script record on production |
+| **Evidence** | 35 scripts in `docs/supabase/`; CLI ledger has 24 rows; bulk manual era UNKNOWN |
+| **Impact** | Schema drift, silent feature degradation |
+| **Mitigation (Phase 3E–3F)** | Staging full rebuild from Git **PASS**; drift policy + hardened ledger |
+| **Recommended action** | Read-only production catalog audit; backfill ledger; staging-vs-prod diff before SQL releases |
+| **Status** | OPEN (severity reduced — reproducibility proven on staging) |
 
 ---
 
@@ -111,21 +112,22 @@ Status: `OPEN` unless noted.
 
 | Field | Detail |
 | --- | --- |
-| **Problem** | `retailOnboardingPack.ts` unused `_businessName` |
-| **Evidence** | `npm run lint` exit 1 |
-| **Impact** | Blocks lint CI |
-| **Recommended action** | `fix/*` PR |
-| **Status** | OPEN |
+| **Problem** | Lint errors blocking CI |
+| **Evidence** | Was `retailOnboardingPack.ts` unused var; now warning only in `PronunciationCoach.tsx` |
+| **Impact** | Low — build passes |
+| **Recommended action** | Clean warning in chore PR |
+| **Status** | OPEN (downgraded — errors resolved) |
 
 ### TD-P2-5: No staging environment
 
 | Field | Detail |
 | --- | --- |
 | **Problem** | Staging topology not documented |
-| **Evidence** | No staging config in repo |
-| **Impact** | Production-only validation for voice |
-| **Recommended action** | Define dev/staging/prod in `ENVIRONMENTS.md` |
-| **Status** | OPEN |
+| **Evidence** | Phase 3E created `scalers-staging` (`sgcdncjxauhsbunobmob`); rebuilt from Git |
+| **Impact** | Was production-only validation |
+| **Resolution** | `ENVIRONMENTS.md`, `ENVIRONMENT_CONTRACT.md`, `STAGING_REBUILD_EXECUTION_REPORT.md` |
+| **Remaining gap** | Dedicated staging voice/desk deploy URLs not standardized in repo |
+| **Status** | **MITIGATED** (DB staging active; deploy topology partial) |
 
 ### TD-P2-6: Stale remote branches
 
