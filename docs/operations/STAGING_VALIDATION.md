@@ -75,4 +75,5 @@ STAGING_DATABASE_URL='postgresql://...' npm run verify:staging-schema:catalog
 
 - [`RELEASE_GATE.md`](./RELEASE_GATE.md)
 - [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md)
+- [`STAGING_TO_PRODUCTION.md`](./STAGING_TO_PRODUCTION.md)
 - [`../database/SCHEMA_DRIFT_AUTOMATION.md`](../database/SCHEMA_DRIFT_AUTOMATION.md)
