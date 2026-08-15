@@ -32,7 +32,7 @@ No `STAGING_DATABASE_URL` required. Uses `SUPABASE_URL` + service_role.
 
 ### Catalog mode (`--catalog`)
 
-Requires `STAGING_DATABASE_URL` (postgres connection string).
+Requires `STAGING_DATABASE_URL` (postgres connection string). In GitHub Actions, prefer the Supabase **connection pooler** host (port **6543**); direct `db.<ref>.supabase.co` may resolve to IPv6 and fail with `ENETUNREACH` on runners. The verify script sets `dns.setDefaultResultOrder('ipv4first')` before connect.
 
 | Check | SQL source |
 | --- | --- |

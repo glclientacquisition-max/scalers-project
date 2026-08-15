@@ -36,7 +36,7 @@ PR → CI (unit tests, lint, build)
 | --- | --- |
 | `STAGING_SUPABASE_URL` | `https://sgcdncjxauhsbunobmob.supabase.co` |
 | `STAGING_SUPABASE_SERVICE_ROLE_KEY` | Staging service role — **never production** |
-| `STAGING_DATABASE_URL` | Optional — postgres URL for full catalog verify |
+| `STAGING_DATABASE_URL` | Optional — postgres URL for full catalog verify. Prefer **Supabase pooler** URI (port **6543**) in GitHub Actions; direct `db.*.supabase.co` can fail with IPv6 `ENETUNREACH` on runners. |
 
 **Safety:** Workflow refuses URLs containing production ref `fjxcdccgyhnvnnlnovcl`.
 
