@@ -1,7 +1,8 @@
 # Migration ledger
 
-**Status:** Authoritative index as of 2026-08-14  
-**Production:** ALCR (`fjxcdccgyhnvnnlnovcl`)
+**Status:** Authoritative index (hardened Phase 3F, 2026-08-15)  
+**Production:** ALCR (`fjxcdccgyhnvnnlnovcl`)  
+**Staging:** `scalers-staging` (`sgcdncjxauhsbunobmob`)
 
 Scalers uses a **dual migration model**:
 
@@ -138,3 +139,90 @@ Referenced in `foundation_bootstrap.provenance.md`, `schema.sql`, `DEPLOYMENT.md
 | `fix_p0_rls_remove_legacy_allow_all.sql` | YES (2026-08-14) | NO |
 
 Post-P0 member-only RLS is encoded in `foundation_bootstrap.sql`.
+
+---
+
+## Ledger entry template (required for new changes)
+
+Every database change merged to `main` must add a row to the **Change registry** below (or update an existing row). Use **UNKNOWN** when evidence does not exist. Do not fabricate dates.
+
+| Field | Description |
+| --- | --- |
+| **ID** | `LEDGER-YYYY-MM-DD-<slug>` or script filename |
+| **What** | Tables, columns, RPCs, policies, grants affected |
+| **Why** | Feature, bugfix, or security repair |
+| **Where** | Path under `docs/supabase/` |
+| **Introduced commit** | Git SHA on `main` (after merge) |
+| **Staging applied** | `YES` / `NO` / `UNKNOWN` |
+| **Staging applied date** | ISO date if evidenced; else `UNKNOWN` |
+| **Production applied** | `YES` / `NO` / `UNKNOWN` |
+| **Production applied date** | ISO date if evidenced; else `UNKNOWN` |
+| **In CLI ledger** | `YES` (version) / `NO` / `N/A` |
+| **Verification** | Tests, smoke, manual checks performed |
+
+### Process
+
+1. Author SQL in `docs/supabase/<name>.sql` with `-- Run after:` header.
+2. Update [`README.md`](./README.md) and [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md) if order changes.
+3. Add ledger row before or with merge PR.
+4. After staging apply: set `staging_applied = YES`, date, verification notes.
+5. After production apply (human-approved): set `production_applied = YES`, date, executor.
+
+---
+
+## Change registry
+
+### Foundation and governance
+
+| ID | What | Why | Where | Introduced commit | Staging | Production | CLI | Verification |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| LEDGER-FOUNDATION | Bootstrap `tenants`/`calls`/`transcripts` shape | Phase 3D-5 reproducibility | `foundation_bootstrap.sql` | `c0985f0` | YES (2026-08-15 full rebuild) | N/A (already exists) | N/A | Staging column counts; RLS policy count |
+| LEDGER-P0-RLS | Drop legacy allow-all RLS policies | P0 tenant isolation | `fix_p0_rls_remove_legacy_allow_all.sql` | `92af666` (#154) | YES (2026-08-15) | YES (2026-08-14) | NO | Production manual apply; staging greenfield no-op |
+
+### Feature scripts (manual path)
+
+| ID | What | Why | Where | Introduced commit | Staging | Production | CLI | Verification |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| LEDGER-NOTIFY-CH | `tenants.notify_channels` jsonb | Owner notify prefs | `notify_channels.sql` | `7af0fcb` (#155) | YES (2026-08-15) | YES (inferred pre-3E) | `20260813210755` | Staging rebuild; production CLI row |
+| LEDGER-APPOINTMENTS | `appointments` table + RLS | Home-services bookings | `appointments.sql` | `7af0fcb` (#155) | YES (2026-08-15) | YES (inferred pre-3E) | `20260812083631` | Staging insert smoke |
+| LEDGER-SIGNUP-FIX | Drop 1-arg prompt; 2-arg canonical | Fix signup `42725` | `voice_languages.sql`, `did_number_pool.sql` | `f61c11f` (#158) | YES (2026-08-15) | UNKNOWN | NO | Staging signup PASS |
+
+### Staging-only / proposed (not in standard Git apply)
+
+| ID | What | Why | Where | Staging | Production | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| LEDGER-STAGING-NOTIFY-GRANT | `GRANT UPDATE (notify_channels)` | Desk persistence test | Ad-hoc SQL (Phase 3E) | YES (2026-08-15) | NO | Reproduces production gap; proposed production fix |
+| LEDGER-STAGING-STORAGE | Bucket `call-recordings` | Voice recordings | Manual / Dashboard | YES (2026-08-15) | YES (2026-08-06) | Policies UNKNOWN on both |
+
+### Bulk manual scripts (pre-CLI era)
+
+The following scripts are **INFERRED** applied on production (live schema matches Git intent) but lack per-script apply dates:
+
+`multi_tenant_onboarding.sql`, `owner_rls.sql`, tiers 2–9 per README, wallet chain, `agent_tools.sql`, BI scripts.
+
+| Staging (full rebuild) | Production (per script) |
+| --- | --- |
+| YES (2026-08-15, Phase 3E) | UNKNOWN (bulk); CLI ledger covers 24 post-adoption changes |
+
+---
+
+## Answering ledger questions
+
+| Question | Where to look |
+| --- | --- |
+| What changed? | Change registry **What** column; file header |
+| When? | **Staging/Production applied date**; CLI version timestamp |
+| Why? | **Why** column; linked PR |
+| Where? | **Where** path; `README.md` tier |
+| Applied to staging? | **Staging** column |
+| Applied to production? | **Production** column; CLI ledger |
+| Introducing commit? | **Introduced commit** |
+| Verification? | **Verification** column; `STAGING_REBUILD_EXECUTION_REPORT.md` |
+
+---
+
+## Related documents
+
+- [`DATABASE_EVOLUTION.md`](../database/DATABASE_EVOLUTION.md)
+- [`DATABASE_APPLY_ORDER.md`](../database/DATABASE_APPLY_ORDER.md)
+- [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../operations/STAGING_REBUILD_EXECUTION_REPORT.md)

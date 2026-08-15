@@ -10,8 +10,8 @@
 | Environment | Voice | Desk | Database | Status |
 | --- | --- | --- | --- | --- |
 | **Development** | Local `npm start` + tunnel | Local `npm run dev` | Supabase project (dev) | **ACTIVE** |
-| **Staging** | — | — | — | **UNKNOWN** |
-| **Production** | Railway (referenced) | Vercel (referenced) | Supabase (assumed) | **INFERENCE** |
+| **Staging** | Staging deploy (optional) | Vercel preview | `sgcdncjxauhsbunobmob` (`scalers-staging`) | **ACTIVE** (Phase 3E) |
+| **Production** | Railway (referenced) | Vercel (referenced) | ALCR `fjxcdccgyhnvnnlnovcl` | **ACTIVE** |
 
 **Governance gap:** Staging is not defined in the repository. Do not assume a staging environment exists.
 
@@ -64,24 +64,27 @@ npm ci && npm run dev
 
 ## Staging
 
-**STATUS: UNKNOWN**
+**Status:** Updated Phase 3F (2026-08-15)
 
-No staging-specific configuration exists in:
+Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) for safety rules.
 
-- `railway.toml`, `render.yaml`, `vercel.json`
-- Environment documentation prior to this file
-- CI preview workflow (no CI)
-
-**Recommended future definition:**
+| Field | Value |
+| --- | --- |
+| Name | `scalers-staging` |
+| Project ref | `sgcdncjxauhsbunobmob` |
+| URL | `https://sgcdncjxauhsbunobmob.supabase.co` |
+| Region | `eu-west-2` |
+| Rebuilt from Git | YES (Phase 3E, manual SQL path) |
+| Evidence | [`STAGING_REBUILD_EXECUTION_REPORT.md`](./STAGING_REBUILD_EXECUTION_REPORT.md) |
 
 | Component | Staging target |
 | --- | --- |
-| Supabase | Separate project (not production data) |
-| Voice | Railway preview service or dedicated staging deploy |
+| Supabase | `sgcdncjxauhsbunobmob` (no production data) |
+| Voice | Dedicated staging Railway deploy or local+tunnel (not yet standardized in repo) |
 | Desk | Vercel preview with staging env vars |
 | SautiKit | Test DID(s) pointing at staging voice URL |
 
-Until defined, validate voice changes via local tunnel + test DID or explicit human-approved production smoke.
+Validate database changes on staging before production. Never use production credentials for staging tests.
 
 ---
 
@@ -125,11 +128,11 @@ Until defined, validate voice changes via local tunnel + test DID or explicit hu
 
 | Integration | Dev | Staging | Prod |
 | --- | --- | --- | --- |
-| SautiKit | Test keys / tunnel | UNKNOWN | Production keys |
-| Soniox | API key | UNKNOWN | API key |
-| Gemini | API key | UNKNOWN | API key |
-| TextSMS | Optional | UNKNOWN | Production |
-| Supabase | Dev project | UNKNOWN | Production project |
+| SautiKit | Test keys / tunnel | Test/staging keys | Production keys |
+| Soniox | API key | Staging key | API key |
+| Gemini | API key | Staging key | API key |
+| TextSMS | Optional | Staging/test | Production |
+| Supabase | Dev or staging project | `sgcdncjxauhsbunobmob` | ALCR `fjxcdccgyhnvnnlnovcl` |
 
 ---
 
@@ -137,4 +140,5 @@ Until defined, validate voice changes via local tunnel + test DID or explicit hu
 
 - [`DEPLOYMENT.md`](./DEPLOYMENT.md)
 - [`../governance/HISTORY_GAPS.md`](../governance/HISTORY_GAPS.md)
-- [`../governance/TECHNICAL_DEBT.md`](../governance/TECHNICAL_DEBT.md) (TD-P2-5)
+- [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md)
+- [`RELEASE_GATE.md`](./RELEASE_GATE.md)

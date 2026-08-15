@@ -1,7 +1,7 @@
 # Database governance
 
-**Status:** Current-state documentation (2026-08-14)  
-**Model:** Manual SQL scripts — **not** Supabase CLI migrations.
+**Status:** Current-state documentation (updated Phase 3F, 2026-08-15)  
+**Model:** Manual SQL scripts — **not** Supabase CLI migrations for greenfield.
 
 Do not change the SQL model in this governance phase.
 
@@ -9,7 +9,7 @@ Do not change the SQL model in this governance phase.
 
 ## Overview
 
-Scalers uses **Supabase PostgreSQL** as the system of record. Schema evolution is managed through **31 hand-authored SQL files** in `docs/supabase/` with a documented apply order in `docs/supabase/README.md`.
+Scalers uses **Supabase PostgreSQL** as the system of record. Schema evolution is managed through **35 hand-authored SQL files** in `docs/supabase/` with documented apply order in `docs/supabase/README.md` and [`DATABASE_APPLY_ORDER.md`](./DATABASE_APPLY_ORDER.md).
 
 There is **no** `supabase/migrations/` folder in this repository.
 
@@ -19,9 +19,12 @@ There is **no** `supabase/migrations/` folder in this repository.
 
 | Artifact | Location | Role |
 | --- | --- | --- |
-| SQL apply scripts (31 files) | `docs/supabase/*.sql` | Authoritative **intent** for schema changes |
+| SQL apply scripts (35 files) | `docs/supabase/*.sql` | Authoritative **intent** for schema changes |
 | Apply order index | `docs/supabase/README.md` | Dependency tiers and numbering |
-| Schema reference | `docs/supabase/schema.sql` | Introspected 2026-08-06 — **reference only, do not apply** |
+| Executable apply sequence | `docs/database/DATABASE_APPLY_ORDER.md` | Greenfield/staging rebuild (Phase 3F) |
+| Evolution model | `docs/database/DATABASE_EVOLUTION.md` | Where new DB changes live |
+| Migration ledger | `docs/supabase/MIGRATION_LEDGER.md` | Change registry + CLI history |
+| Foundation bootstrap | `docs/supabase/foundation_bootstrap.sql` | Greenfield only — not production apply |
 | Voice DB API | `src/db.js` | Application contract over live schema |
 | Product/billing docs | `docs/ONE_WALLET_BILLING.md`, etc. | Business rules for RPC behavior |
 
@@ -32,8 +35,8 @@ There is **no** `supabase/migrations/` folder in this repository.
 | Item | Status |
 | --- | --- |
 | Live Supabase project state | External |
-| Record of which scripts applied on production | **UNKNOWN** |
-| Migration version table | Not in repo |
+| Record of which scripts applied on production | **PARTIAL** — CLI ledger (24 rows) + security repair dates; bulk manual era UNKNOWN |
+| Migration version table | On production only (`supabase_migrations.schema_migrations`); not in repo |
 | Supabase CLI config | Not in repo |
 
 ---
@@ -108,9 +111,12 @@ Stable voice API surface documented in `docs/agents/PLATFORM.md` and [`../govern
 
 | Question | Answer |
 | --- | --- |
-| Can a new environment be built from Git? | **Partially** — apply all scripts in order on empty Supabase project with base tables |
-| Is production state reproducible from Git alone? | **No** — without knowing applied tier |
+| Can a new environment be built from Git? | **YES** — proven on staging Phase 3E (manual path) |
+| Is production state reproducible from Git alone? | **PARTIAL** — schema intent complete; apply history incomplete |
 | Are migrations authoritative? | **Scripts in Git are authoritative for intent**; live DB is authoritative for reality |
+| Automated bootstrap | **NO** — manual SQL Editor sequence required |
+
+See [`../operations/STAGING_REBUILD_EXECUTION_REPORT.md`](../operations/STAGING_REBUILD_EXECUTION_REPORT.md).
 
 ---
 

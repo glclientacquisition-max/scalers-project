@@ -50,14 +50,16 @@ These are not proof of formal releases. First governed release should be tagged 
 
 ## Staging
 
-**STATUS: UNKNOWN** — No staging environment is documented in the repository.
+**STATUS: ACTIVE** (database)
 
-Until staging exists:
+Staging Supabase project `sgcdncjxauhsbunobmob` was rebuilt from Git in Phase 3E. Use it for all pre-production SQL validation.
 
-- Use preview deploys (Vercel preview URLs, Railway PR environments if configured) with **non-production** Supabase project.
-- Do not treat lint/build pass alone as sufficient for voice behavior changes — live call validation required.
+| Check | Command |
+| --- | --- |
+| DB smoke | `npm run smoke:db` (staging credentials) |
+| Full gate | [`RELEASE_GATE.md`](../operations/RELEASE_GATE.md) |
 
-Document staging topology in [`../operations/ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md) when established.
+Dedicated staging voice/desk deploy URLs are not yet standardized in repo. See [`ENVIRONMENT_CONTRACT.md`](../operations/ENVIRONMENT_CONTRACT.md).
 
 ---
 
