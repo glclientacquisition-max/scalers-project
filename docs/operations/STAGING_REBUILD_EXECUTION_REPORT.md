@@ -200,10 +200,10 @@ grant update (notify_channels) on public.tenants to authenticated;
 
 | Item | Status |
 |---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` in cloud agent secrets | **MISSING** |
-| `node scripts/smoke-db.js` | **NOT RUN** |
+| Staging URL | `https://sgcdncjxauhsbunobmob.supabase.co` |
+| `node scripts/smoke-db.js` | **PASS** (2026-08-15) |
 
-**BLOCKER:** Add `STAGING_SUPABASE_URL` + `STAGING_SUPABASE_SERVICE_ROLE_KEY` (or scoped staging equivalents) to cloud agent secrets to run application-path smoke.
+**OBSERVED:** `upsertCall`, `saveCallerInfo`, `appendTranscript`, `uploadRecordingBuffer` → `call-recordings`, `attachRecording`, `getCall`, `markWhatsappSent` all succeeded on staging tenant `5ff8bb87-e59c-44ba-a614-c15c85859aff`.
 
 ### Auth signup / Desk E2E
 
@@ -240,14 +240,12 @@ grant update (notify_channels) on public.tenants to authenticated;
 | Schema matches production bootstrap | **PASS** |
 | Unit tests | **PASS** |
 | Auth signup provisioning (greenfield) | **PASS** (after #158) |
-| Application DB smoke (`smoke-db.js`) | **BLOCKED** (missing staging service_role secret) |
-| Desk E2E | **PENDING** (service_role secret) |
+| Application DB smoke (`smoke-db.js`) | **PASS** |
+| Desk E2E | **PENDING** (optional manual) |
 
-**Overall Phase 3E:** **PASS WITH ONE REMAINING CONDITION**
+**Overall Phase 3E:** **PASS**
 
-Greenfield database reconstruction and signup provisioning are **proven on staging**. Remaining gap:
-
-1. **Secrets required:** staging `SUPABASE_SERVICE_ROLE_KEY` for `smoke-db.js` and Desk server admin paths.
+Greenfield database reconstruction, signup provisioning (#158), and application `smoke-db.js` path are **proven on staging** (`sgcdncjxauhsbunobmob`).
 
 **Greenfield replay note:** Fresh applies from current `main` include the #158 signup fix in `voice_languages.sql` + `did_number_pool.sql`. Existing staging was patched via migration `fix_default_tenant_llm_prompt_overload`.
 
