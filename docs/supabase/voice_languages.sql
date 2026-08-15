@@ -31,6 +31,10 @@ comment on column public.tenants.voice_language_other is
   'Reserved for future local-language support';
 
 -- Default prompt mentions automatic EN/SW/Sheng.
+-- Drop the 1-arg overload from multi_tenant_onboarding.sql so greenfield signup
+-- does not hit Postgres 42725 when did_number_pool calls default_tenant_llm_prompt(text).
+drop function if exists public.default_tenant_llm_prompt(text);
+
 create or replace function public.default_tenant_llm_prompt(
   p_business_name text,
   p_languages text[] default array['en', 'sw', 'sheng']::text[]
