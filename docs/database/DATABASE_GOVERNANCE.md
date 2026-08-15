@@ -72,9 +72,9 @@ Full detail: [`../supabase/README.md`](../supabase/README.md).
 
 ## `schema.sql` role
 
-- Introspected live shape notes for `tenants`, `calls`, `transcripts`, and related tables.
+- Older introspected live shape notes for `tenants`, `calls`, `transcripts`, and related tables.
 - Header: **REFERENCE ONLY — not an apply migration**.
-- Use for onboarding and `src/db.js` mapping — not for provisioning new environments alone.
+- For greenfield provisioning, use [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) instead.
 
 ---
 

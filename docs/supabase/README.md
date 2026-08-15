@@ -16,13 +16,21 @@ For product notes on wallet/DID, see also:
 
 | File | Role |
 | --- | --- |
-| [`schema.sql`](./schema.sql) | Introspected live shape notes for `tenants` / `calls` / `transcripts` / related tables. Base tables are assumed to already exist on the project. |
+| [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) | **Production-authoritative / historically-unverified.** Reconstructed foundation CREATE for `tenants`, `calls`, `transcripts` + RLS/grants/trigger snapshot. For staging/greenfield only — **do not apply to ALCR production.** See [`foundation_bootstrap.provenance.md`](./foundation_bootstrap.provenance.md). |
+| [`schema.sql`](./schema.sql) | Older introspected live shape notes (2026-08-06). Superseded for bootstrap by `foundation_bootstrap.sql`. |
+| [`MIGRATION_LEDGER.md`](./MIGRATION_LEDGER.md) | Dual migration model, CLI ledger, column lineage index. |
 
 ---
 
 ## Fresh / catch-up apply order
 
 Use this order on a new environment or when catching up an older project. Skip files already applied. Within a tier, numbered steps are ordered; same-tier siblings can run in the listed sequence.
+
+### 0. Foundation (greenfield only)
+
+| # | File | Depends on | Notes |
+| --- | --- | --- | --- |
+| 0 | [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) | `auth.users`, `uuid-ossp` | Creates `tenants` / `calls` / `transcripts` at current production shape. Then run tier 1+ (additive scripts no-op). |
 
 ### 1. Membership + RLS
 
