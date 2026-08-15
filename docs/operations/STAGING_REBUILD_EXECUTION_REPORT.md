@@ -169,3 +169,93 @@ grant update (notify_channels) on public.tenants to authenticated;
 | Application smoke (Step 3) | **PENDING** |
 
 **Overall Step 2:** **YELLOW → PASS for database reconstruction** — manual path reproduces required schema. Application/env validation remains for Step 3.
+
+---
+
+## Step 3 — Application validation (2026-08-15)
+
+**Target verified:** `sgcdncjxauhsbunobmob` only. Production not touched.
+
+### Unit / build tests (no DB credentials required)
+
+| Test | Result |
+|---|---|
+| `npm run test:voice` | **PASS** |
+| `npm run test:mvp` | **PASS** |
+| `dashboard` `npm run lint` | **PASS** (1 pre-existing warning) |
+| `dashboard` `npm run build` | **PASS** |
+
+### Staging DB smoke (via MCP `execute_sql` — service_role path proxy)
+
+| Capability | Result | Evidence |
+|---|---|---|
+| Tenant insert | **PASS** | Smoke tenant `5ff8bb87-e59c-44ba-a614-c15c85859aff` |
+| Call + transcript insert | **PASS** | Call `ee3c906c-…`, 2 transcript rows |
+| `charge_call_to_wallet` RPC | **PASS** | Returned `(f,0,0,f)` (beta billing off) |
+| Storage object in `call-recordings` | **PASS** | `storage.objects` row created |
+| Contacts + appointments insert | **PASS** | Appointment `112719e9-…` status `requested` |
+| `assign_did_from_pool` | **PASS** | Returns assigned/current DID |
+
+### `scripts/smoke-db.js` (application service_role path)
+
+| Item | Status |
+|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` in cloud agent secrets | **MISSING** |
+| `node scripts/smoke-db.js` | **NOT RUN** |
+
+**BLOCKER:** Add `STAGING_SUPABASE_URL` + `STAGING_SUPABASE_SERVICE_ROLE_KEY` (or scoped staging equivalents) to cloud agent secrets to run application-path smoke.
+
+### Auth signup / Desk E2E
+
+| Test | Result |
+|---|---|
+| `POST /auth/v1/signup` with onboarding metadata | **FAIL** |
+| `auth.users` rows after signup attempts | **0** |
+
+**OBSERVED:** API error `Database error saving new user`.
+
+**ROOT CAUSE (FACT):** Ambiguous `default_tenant_llm_prompt` overload after applying both `multi_tenant_onboarding.sql` (1-arg) and `voice_languages.sql` (2-arg with default). Final `handle_new_user_tenant()` from `did_number_pool.sql` calls:
+
+```sql
+public.default_tenant_llm_prompt(v_business_name)
+```
+
+Postgres error `42725: function public.default_tenant_llm_prompt(text) is not unique`.
+
+**INFERENCE:** This breaks Auth signup on any greenfield DB that follows README apply order. Production ALCR may have been provisioned before `voice_languages.sql` added the 2-arg overload, or via a different apply history.
+
+**PROPOSED FIX (repository defect — not applied in this phase):**
+
+- Drop the 1-arg `default_tenant_llm_prompt(text)` overload after `voice_languages.sql`, **or**
+- Change `handle_new_user_tenant()` to call the 2-arg form explicitly: `default_tenant_llm_prompt(v_business_name, v_langs)`
+
+**Desk manual acceptance:** **BLOCKED** by signup failure + missing service_role secret.
+
+### `notify_channels` grant (staging fix already applied in Step 2H)
+
+| Check | Result |
+|---|---|
+| `has_column_privilege(..., UPDATE)` | `true` on staging |
+| Owner JWT persistence test | **NOT RUN** (signup blocked) |
+
+---
+
+## Phase 3E final verdict
+
+| Layer | Status |
+|---|---|
+| Database reconstruction from Git | **PASS** |
+| Schema matches production bootstrap | **PASS** |
+| Unit tests | **PASS** |
+| Application DB smoke (`smoke-db.js`) | **BLOCKED** (missing staging service_role secret) |
+| Auth signup provisioning | **FAIL** (repository SQL defect) |
+| Desk E2E | **BLOCKED** (signup + secrets) |
+
+**Overall Phase 3E:** **READY WITH CONDITIONS**
+
+Reproducibility is **proven at the database layer**. Two conditions block full application validation:
+
+1. **Repository fix required:** resolve `default_tenant_llm_prompt` ambiguity for greenfield signup.
+2. **Secrets required:** staging `SUPABASE_SERVICE_ROLE_KEY` for `smoke-db.js` and Desk server paths.
+
+Production ALCR was not modified during this phase.
