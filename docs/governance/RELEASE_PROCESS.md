@@ -59,7 +59,7 @@ Staging Supabase project `sgcdncjxauhsbunobmob` was rebuilt from Git in Phase 3E
 | DB smoke | `npm run smoke:db` (staging credentials) |
 | Full gate | [`RELEASE_GATE.md`](../operations/RELEASE_GATE.md) |
 
-Dedicated staging voice/desk deploy URLs are not yet standardized in repo. See [`ENVIRONMENT_CONTRACT.md`](../operations/ENVIRONMENT_CONTRACT.md).
+Dedicated staging voice/desk URLs: see [`ENVIRONMENTS.md`](../operations/ENVIRONMENTS.md). Promotion runbook: [`STAGING_TO_PRODUCTION.md`](../operations/STAGING_TO_PRODUCTION.md).
 
 ---
 
