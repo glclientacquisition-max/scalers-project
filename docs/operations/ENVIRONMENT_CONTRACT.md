@@ -1,6 +1,6 @@
 # Environment contract
 
-**Status:** Canonical (updated Phase 3G, 2026-08-15)  
+**Status:** Canonical (updated Phase 3G, 2026-08-15)
 **Purpose:** Make it difficult to accidentally point local or staging work at production.
 
 ---
