@@ -107,8 +107,23 @@ async function checkCatalogPg(manifest) {
     return;
   }
 
+  // GitHub Actions runners often lack IPv6 egress; Supabase direct DB host is AAAA+ A.
+  const dns = require('dns');
+  if (typeof dns.setDefaultResultOrder === 'function') {
+    dns.setDefaultResultOrder('ipv4first');
+  }
+
   const client = new pg.Client({ connectionString: conn, ssl: { rejectUnauthorized: false } });
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (err) {
+    if (err.code === 'ENETUNREACH' && err.address?.includes(':')) {
+      fail(
+        'catalog postgres connect failed (IPv6 unreachable). Use Supabase pooler URI (port 6543) or direct host with IPv4 egress.'
+      );
+    }
+    throw err;
+  }
 
   try {
     for (const [table, expected] of Object.entries(manifest.foundation_column_counts)) {
