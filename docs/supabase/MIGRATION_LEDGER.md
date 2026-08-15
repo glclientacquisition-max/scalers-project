@@ -206,6 +206,49 @@ The following scripts are **INFERRED** applied on production (live schema matche
 
 ---
 
+## Production ledger backfill (Phase 3G)
+
+**Method:** Evidence from `supabase_migrations.schema_migrations` on ALCR (recorded Phase 3F). **No production SQL executed in Phase 3G.**
+
+CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UTC). Per-script dates for pre-CLI manual applies remain **UNKNOWN**.
+
+| CLI version | Name | Production applied | Inferred date (UTC) | Git script |
+| --- | --- | --- | --- | --- |
+| 20260807225947 | daily_bulletin | YES | 2026-08-07 | `daily_bulletin.sql` |
+| 20260808005039 | escalation_enabled | YES | 2026-08-08 | `escalation_enabled.sql` (legacy) |
+| 20260808053931 | alert_email | YES | 2026-08-08 | `alert_email.sql` |
+| 20260808080322 | one_wallet_billing | YES | 2026-08-08 | `one_wallet_billing.sql` |
+| 20260808103634 | wallet_security_beta_part1 | YES | 2026-08-08 | `wallet_security_beta.sql` |
+| 20260808103644 | wallet_security_beta_part2_rpcs | YES | 2026-08-08 | `wallet_security_beta.sql` |
+| 20260808103657 | wallet_security_beta_part3_grants | YES | 2026-08-08 | `wallet_security_beta.sql` |
+| 20260808112824 | agent_tools | YES | 2026-08-08 | `agent_tools.sql` |
+| 20260811044451 | business_operating_model | YES | 2026-08-11 | `business_operating_model.sql` |
+| 20260811044502 | contacts_and_requests | YES | 2026-08-11 | `contacts_and_requests.sql` |
+| 20260811061942 | fix_charge_call_wallet_ambiguous | YES | 2026-08-11 | `fix_charge_call_wallet_ambiguous.sql` |
+| 20260811072236 | lead_status_archive | YES | 2026-08-11 | `lead_status_archive.sql` |
+| 20260811072353 | wallet_soft_spend_limit | YES | 2026-08-11 | `wallet_soft_spend_limit.sql` |
+| 20260811073319 | wallet_on_demand_alerts | YES | 2026-08-11 | `wallet_on_demand_alerts.sql` |
+| 20260811073341 | wallet_on_demand_alerts_fns | YES | 2026-08-11 | `wallet_on_demand_alerts.sql` |
+| 20260811073356 | wallet_claim_alerts_and_ondemand_rpc | YES | 2026-08-11 | `wallet_on_demand_alerts.sql` |
+| 20260811102735 | add_tenants_tts_lexicon | YES | 2026-08-11 | `tts_lexicon.sql` |
+| 20260811122648 | grant_owner_update_tts_lexicon | YES | 2026-08-11 | `tts_lexicon.sql` |
+| 20260811142321 | product_catalog_and_social | YES | 2026-08-11 | `product_catalog_and_social.sql` |
+| 20260812025507 | call_resolution | YES | 2026-08-12 | `call_resolution.sql` |
+| 20260812083631 | appointments | YES | 2026-08-12 | `appointments.sql` |
+| 20260812141513 | soniox_voice_catalog | YES | 2026-08-12 | `soniox_voice_id.sql` |
+| 20260813073840 | pronunciation_gemini_scan | YES | 2026-08-13 | `pronunciation_gemini_scan.sql` |
+| 20260813210755 | notify_channels | YES | 2026-08-13 | `notify_channels.sql` |
+
+**Manual production applies (evidenced, not in CLI ledger):**
+
+| Script | Production | Date | Evidence |
+| --- | --- | --- | --- |
+| `fix_p0_rls_remove_legacy_allow_all.sql` | YES | 2026-08-14 | Phase 3F ledger / PR #154 |
+| `grant_notify_channels_update.sql` | **NO** | — | Prepared Phase 3G; see `PRODUCTION_CHANGE_NOTIFY_CHANNELS.md` |
+| Pre-CLI bulk manual scripts | INFERRED YES | UNKNOWN | Live schema matches Git; no per-script dates |
+
+---
+
 ## Answering ledger questions
 
 | Question | Where to look |

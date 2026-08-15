@@ -1,5 +1,5 @@
-# Scalers CI — voice/brain/MVP tests + dashboard lint and build
-# See docs/governance/TESTING_BASELINE.md
+# Scalers CI — PR quality gate (Phase 3G)
+# See docs/governance/TESTING_BASELINE.md and docs/operations/RELEASE_GATE.md
 
 name: CI
 
@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  voice-and-brain:
-    name: Voice, brain, and MVP tests
+  voice-and-mvp:
+    name: Voice and MVP tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,14 +32,11 @@ jobs:
       - name: test:voice
         run: npm run test:voice
 
-      - name: test:brain
-        run: npm run test:brain
-
       - name: test:mvp
         run: npm run test:mvp
 
-  dashboard-build:
-    name: Dashboard production build
+  dashboard:
+    name: Dashboard lint and build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

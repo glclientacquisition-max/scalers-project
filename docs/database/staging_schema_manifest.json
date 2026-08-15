@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "updated": "2026-08-15",
+  "source": "Phase 3E staging rebuild + Phase 3G catalog introspection (sgcdncjxauhsbunobmob)",
+  "public_tables": [
+    "appointments",
+    "calls",
+    "contacts",
+    "ops_audit_log",
+    "platform_soniox_voices",
+    "sautikit_did_pool",
+    "service_requests",
+    "tenant_members",
+    "tenants",
+    "transcripts",
+    "wallet_ledger"
+  ],
+  "foundation_column_counts": {
+    "tenants": 49,
+    "calls": 15,
+    "transcripts": 6
+  },
+  "required_tenant_columns": [
+    "id",
+    "business_name",
+    "notify_channels",
+    "wallet_balance_kes",
+    "tts_lexicon",
+    "soniox_voice_id"
+  ],
+  "extensions": {
+    "uuid-ossp": "1.1",
+    "pgcrypto": "1.3"
+  },
+  "rls_enabled_tables": [
+    "appointments",
+    "calls",
+    "contacts",
+    "ops_audit_log",
+    "platform_soniox_voices",
+    "service_requests",
+    "tenant_members",
+    "tenants",
+    "transcripts",
+    "wallet_ledger"
+  ],
+  "rls_disabled_tables": ["sautikit_did_pool"],
+  "min_public_policies": 13,
+  "required_functions": [
+    "current_user_tenant_ids()",
+    "handle_new_user_tenant()",
+    "default_tenant_llm_prompt(text,text[])",
+    "assign_did_from_pool(uuid)",
+    "charge_call_to_wallet(uuid,numeric,numeric)",
+    "tenants_protect_wallet_columns()"
+  ],
+  "storage_buckets": [
+    {
+      "name": "call-recordings",
+      "public": false
+    }
+  ],
+  "staging_only": {
+    "notify_channels_authenticated_update_grant": true,
+    "notes": "Production lacks this grant; staging test fix applied Phase 3E. Not a Git-vs-staging failure."
+  }
+}

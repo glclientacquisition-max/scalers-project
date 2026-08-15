@@ -1,6 +1,6 @@
 # Environment contract
 
-**Status:** Canonical (Phase 3F, 2026-08-15)  
+**Status:** Canonical (updated Phase 3G, 2026-08-15)
 **Purpose:** Make it difficult to accidentally point local or staging work at production.
 
 ---
@@ -83,6 +83,7 @@
 | --- | --- | --- | --- |
 | Command | `cd dashboard && npm run dev` | Vercel preview or staging project | Vercel production |
 | Root | `dashboard/` | Same | Same |
+| URL | `http://localhost:3000` | **UNKNOWN** (no dedicated staging URL in repo) | **INFERENCE:** `https://scalers-project.vercel.app` |
 | Auth | Supabase Auth | Staging Supabase project | Production Supabase project |
 | Dev bypass | `DASHBOARD_OPEN=true` allowed | **Disable** | **Disable** |
 
@@ -95,6 +96,8 @@
 | Runtime | Node.js | Docker (Railway) | Docker (Railway) |
 | Entry | `server.js` | Same | Same |
 | Dockerfile | Repo root | Same | Same |
+| URL | Tunnel + `localhost:PORT` | **UNKNOWN** (no dedicated staging service in repo) | **INFERENCE:** `https://scalers-project-production.up.railway.app` |
+| Health | `GET /healthz` | Same | Same |
 
 ---
 

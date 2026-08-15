@@ -98,36 +98,16 @@ Map each difference to:
 
 ---
 
-## Automation proposal (not deployed)
+## Automation (Phase 3G)
 
-**PROPOSED:** GitHub Action or scheduled job:
+Implemented: [`SCHEMA_DRIFT_AUTOMATION.md`](./SCHEMA_DRIFT_AUTOMATION.md)
 
-1. Connect to **staging** with read-only credentials (service_role acceptable for catalog queries; no data SELECT).
-2. Connect to **production** only if explicit read-only audit role exists — **currently NOT configured**.
-3. Export catalogs to artifacts.
-4. Fail on unexpected `public` table/column/policy diff.
-5. Post summary to PR or Slack.
+- `npm run verify:staging-schema` — staging vs manifest (read-only)
+- Post-merge: `.github/workflows/staging-validate.yml`
 
-### Why not deployed in Phase 3F
+**PROPOSED (not deployed):** production comparison requires read-only audit role.
 
-| Risk | Mitigation needed |
-| --- | --- |
-| Production credentials in CI | Dedicated read-only DB role |
-| False positives from D0 gaps | Baseline allowlist file |
-| Accidental write | Read-only connection string + query allowlist |
-| Agent auto-remediation | **Forbidden** — human triage only |
-
-**Recommendation:** Implement automation after:
-
-1. Production read-only audit role created (Platform).
-2. D0 allowlist committed to `docs/database/drift_allowlist.json`.
-3. Staging-only CI diff first (Git expected schema vs staging).
-
----
-
-## Staging-only CI diff (safer first step)
-
-**PROPOSED Phase 3G:**
+## Staging-only CI diff (implemented Phase 3G)
 
 ```
 Git intent (script parse or manifest)
