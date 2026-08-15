@@ -98,9 +98,16 @@ Map each difference to:
 
 ---
 
-## Automation proposal (not deployed)
+## Automation (Phase 3G)
 
-**PROPOSED:** GitHub Action or scheduled job:
+Implemented: [`SCHEMA_DRIFT_AUTOMATION.md`](./SCHEMA_DRIFT_AUTOMATION.md)
+
+- `npm run verify:staging-schema` — staging vs manifest (read-only)
+- Post-merge: `.github/workflows/staging-validate.yml`
+
+**PROPOSED (not deployed):** production comparison requires read-only audit role.
+
+---
 
 1. Connect to **staging** with read-only credentials (service_role acceptable for catalog queries; no data SELECT).
 2. Connect to **production** only if explicit read-only audit role exists — **currently NOT configured**.

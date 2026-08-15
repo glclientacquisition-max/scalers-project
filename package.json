@@ -27,9 +27,15 @@
     "test:notify": "node --test tests/textsmsNotify.test.js",
     "test:mvp": "npm run test:brain && npm run test:knowledge && npm run smoke:retail && npm run smoke:home && npm run smoke:escalation && npm run smoke:mvp && npm run test:notify",
     "smoke:db": "node scripts/smoke-db.js",
+    "verify:staging-schema": "node scripts/verify-staging-schema.js",
+    "verify:staging-schema:catalog": "node scripts/verify-staging-schema.js --catalog",
+    "release:candidate": "bash scripts/release-candidate.sh",
     "tunnel": "node scripts/tunnel.js",
     "tunnel:localtunnel": "node scripts/tunnel.js",
     "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh"
+  },
+  "devDependencies": {
+    "pg": "^8.13.1"
   },
   "dependencies": {
     "@google/genai": "^2.13.0",

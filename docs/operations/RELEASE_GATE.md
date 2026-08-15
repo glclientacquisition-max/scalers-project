@@ -181,12 +181,14 @@ All database changes must be applied and verified on staging before production a
 
 ## Automation status
 
-| Gate | Automated today | PROPOSED |
+| Gate | Automated today | Notes |
 | --- | --- | --- |
-| test:voice | No (CI partial) | GitHub Actions on PR |
-| test:mvp | No | GitHub Actions on PR |
-| smoke:db | No (needs secrets) | Staging secrets in CI |
-| Desk lint/build | Partial (#153 lint) | Add build job |
+| test:voice | **YES** — `ci.yml` on PR | |
+| test:mvp | **YES** — `ci.yml` on PR | |
+| Desk lint/build | **YES** — `ci.yml` on PR | |
+| Release candidate (code) | **YES** — `npm run release:candidate` | Local or scriptable |
+| smoke:db | **YES** — `staging-validate.yml` | Requires GitHub secrets |
+| Schema verify | **YES** — `staging-validate.yml` | Staging only |
 | Ledger | Manual | PR template checkbox |
 | Prod approval | Manual | Required indefinitely |
 
