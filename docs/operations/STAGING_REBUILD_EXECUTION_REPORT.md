@@ -207,29 +207,21 @@ grant update (notify_channels) on public.tenants to authenticated;
 
 ### Auth signup / Desk E2E
 
-| Test | Result |
-|---|---|
-| `POST /auth/v1/signup` with onboarding metadata | **FAIL** |
-| `auth.users` rows after signup attempts | **0** |
+| Test | Result (pre-#158) | Result (post-#158 on staging) |
+|---|---|---|
+| `POST /auth/v1/signup` with onboarding metadata | **FAIL** (`42725`) | **PASS** |
+| `auth.users` + `tenant_members` provisioned | **0** | **1** owner row |
 
-**OBSERVED:** API error `Database error saving new user`.
+**ROOT CAUSE (FACT, resolved in #158):** Ambiguous `default_tenant_llm_prompt` overload after README apply order.
 
-**ROOT CAUSE (FACT):** Ambiguous `default_tenant_llm_prompt` overload after applying both `multi_tenant_onboarding.sql` (1-arg) and `voice_languages.sql` (2-arg with default). Final `handle_new_user_tenant()` from `did_number_pool.sql` calls:
+**FIX (merged `main` @ `f61c11f`):**
 
-```sql
-public.default_tenant_llm_prompt(v_business_name)
-```
+- `voice_languages.sql` drops 1-arg overload before creating 2-arg canonical function
+- `did_number_pool.sql` calls `default_tenant_llm_prompt(v_business_name, v_langs)` and inserts `voice_languages`
 
-Postgres error `42725: function public.default_tenant_llm_prompt(text) is not unique`.
+**OBSERVED on staging after fix:** User signup provisioned tenant `Signup Fix Test` with pool DID `+254709221536` and `voice_languages` `{en,sw,sheng}`.
 
-**INFERENCE:** This breaks Auth signup on any greenfield DB that follows README apply order. Production ALCR may have been provisioned before `voice_languages.sql` added the 2-arg overload, or via a different apply history.
-
-**PROPOSED FIX (repository defect — not applied in this phase):**
-
-- Drop the 1-arg `default_tenant_llm_prompt(text)` overload after `voice_languages.sql`, **or**
-- Change `handle_new_user_tenant()` to call the 2-arg form explicitly: `default_tenant_llm_prompt(v_business_name, v_langs)`
-
-**Desk manual acceptance:** **BLOCKED** by signup failure + missing service_role secret.
+**Desk manual acceptance:** **PENDING** — requires staging `SUPABASE_SERVICE_ROLE_KEY` in cloud agent secrets for server paths.
 
 ### `notify_channels` grant (staging fix already applied in Step 2H)
 
@@ -240,22 +232,23 @@ Postgres error `42725: function public.default_tenant_llm_prompt(text) is not un
 
 ---
 
-## Phase 3E final verdict
+## Phase 3E final verdict (updated after #158)
 
 | Layer | Status |
 |---|---|
 | Database reconstruction from Git | **PASS** |
 | Schema matches production bootstrap | **PASS** |
 | Unit tests | **PASS** |
+| Auth signup provisioning (greenfield) | **PASS** (after #158) |
 | Application DB smoke (`smoke-db.js`) | **BLOCKED** (missing staging service_role secret) |
-| Auth signup provisioning | **FAIL** (repository SQL defect) |
-| Desk E2E | **BLOCKED** (signup + secrets) |
+| Desk E2E | **PENDING** (service_role secret) |
 
-**Overall Phase 3E:** **READY WITH CONDITIONS**
+**Overall Phase 3E:** **PASS WITH ONE REMAINING CONDITION**
 
-Reproducibility is **proven at the database layer**. Two conditions block full application validation:
+Greenfield database reconstruction and signup provisioning are **proven on staging**. Remaining gap:
 
-1. **Repository fix required:** resolve `default_tenant_llm_prompt` ambiguity for greenfield signup.
-2. **Secrets required:** staging `SUPABASE_SERVICE_ROLE_KEY` for `smoke-db.js` and Desk server paths.
+1. **Secrets required:** staging `SUPABASE_SERVICE_ROLE_KEY` for `smoke-db.js` and Desk server admin paths.
+
+**Greenfield replay note:** Fresh applies from current `main` include the #158 signup fix in `voice_languages.sql` + `did_number_pool.sql`. Existing staging was patched via migration `fix_default_tenant_llm_prompt_overload`.
 
 Production ALCR was not modified during this phase.
