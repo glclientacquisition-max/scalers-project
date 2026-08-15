@@ -80,11 +80,13 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | Component | Staging target |
 | --- | --- |
 | Supabase | `sgcdncjxauhsbunobmob` (no production data) |
-| Voice | Dedicated staging Railway deploy or local+tunnel (not yet standardized in repo) |
-| Desk | Vercel preview with staging env vars |
+| Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`) |
+| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`) |
 | SautiKit | Test DID(s) pointing at staging voice URL |
 
 Validate database changes on staging before production. Never use production credentials for staging tests.
+
+**Promote to production:** [`STAGING_TO_PRODUCTION.md`](./STAGING_TO_PRODUCTION.md)
 
 ---
 

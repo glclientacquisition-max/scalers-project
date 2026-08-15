@@ -83,7 +83,7 @@
 | --- | --- | --- | --- |
 | Command | `cd dashboard && npm run dev` | Vercel preview or staging project | Vercel production |
 | Root | `dashboard/` | Same | Same |
-| URL | `http://localhost:3000` | **UNKNOWN** (no dedicated staging URL in repo) | **INFERENCE:** `https://scalers-project.vercel.app` |
+| URL | `http://localhost:3000` | `https://scalers-staging.vercel.app` | **INFERENCE:** `https://scalers-project.vercel.app` |
 | Auth | Supabase Auth | Staging Supabase project | Production Supabase project |
 | Dev bypass | `DASHBOARD_OPEN=true` allowed | **Disable** | **Disable** |
 
@@ -96,7 +96,7 @@
 | Runtime | Node.js | Docker (Railway) | Docker (Railway) |
 | Entry | `server.js` | Same | Same |
 | Dockerfile | Repo root | Same | Same |
-| URL | Tunnel + `localhost:PORT` | **UNKNOWN** (no dedicated staging service in repo) | **INFERENCE:** `https://scalers-project-production.up.railway.app` |
+| URL | Tunnel + `localhost:PORT` | `https://scalers-staging-staging.up.railway.app` | **INFERENCE:** `https://scalers-project-production.up.railway.app` |
 | Health | `GET /healthz` | Same | Same |
 
 ---
