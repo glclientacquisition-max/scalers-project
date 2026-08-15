@@ -172,10 +172,21 @@ TenantForm (notify_channels JSON field)
 | **Evidence** | `PHASE_3G_COMPLETION_REPORT.md` |
 | **Production impact** | None directly |
 | **Staging impact** | No automated smoke/schema on merge |
-| **Proposed fix** | Configure `STAGING_SUPABASE_URL` + `STAGING_SUPABASE_SERVICE_ROLE_KEY` in GitHub |
+| **Proposed fix** | Configure `STAGING_SUPABASE_URL` + `STAGING_SUPABASE_SERVICE_ROLE_KEY` in GitHub (same values as operator-provided staging keys — confirmed unchanged 2026-08-15) |
 | **Production change required** | **NO** |
 | **Rollback** | Remove secrets |
 | **Validation** | Green staging workflow on push to `main` |
+
+**Local validation (2026-08-15):** Operator confirmed staging keys unchanged. `.env` points at `sgcdncjxauhsbunobmob` (not ALCR). `npm run smoke:db` **PASS**. `npm run verify:staging-schema` **PASS**.
+
+**GitHub secrets to set (repository settings → Secrets → Actions):**
+
+| Secret | Value |
+| --- | --- |
+| `STAGING_SUPABASE_URL` | `https://sgcdncjxauhsbunobmob.supabase.co` |
+| `STAGING_SUPABASE_SERVICE_ROLE_KEY` | Same service_role key provided for staging (unchanged) |
+
+Optional: `STAGING_DATABASE_URL` for full catalog mode in CI.
 
 ---
 
