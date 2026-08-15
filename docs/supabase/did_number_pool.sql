@@ -138,6 +138,7 @@ declare
   v_business_name text;
   v_notify_phone text;
   v_tenant_id uuid;
+  v_langs text[] := array['en', 'sw', 'sheng']::text[];
 begin
   v_business_name := nullif(trim(coalesce(NEW.raw_user_meta_data->>'business_name', '')), '');
   v_notify_phone := nullif(trim(coalesce(
@@ -159,6 +160,8 @@ begin
     sautikit_virtual_number,
     whatsapp_notification_number,
     llm_system_prompt,
+    voice_languages,
+    voice_language_other,
     is_active,
     owner_user_id,
     telecom_wallet_balance_kes,
@@ -167,7 +170,9 @@ begin
     v_business_name,
     'pending:' || NEW.id::text,
     v_notify_phone,
-    public.default_tenant_llm_prompt(v_business_name),
+    public.default_tenant_llm_prompt(v_business_name, v_langs),
+    v_langs,
+    null,
     true,
     NEW.id,
     0,
