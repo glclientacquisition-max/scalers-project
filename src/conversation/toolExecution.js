@@ -1,6 +1,10 @@
 // Validate and execute model-proposed actions, returning backend-confirmed outcomes.
 
 const { findProductMatch, normalizeProducts } = require('./productCatalog');
+const {
+  evaluateAppointmentHours,
+  formatRequestedWhenLabel,
+} = require('./appointmentHours');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -327,7 +331,7 @@ function validateEscalation(raw, { agentName = '', businessName = '' } = {}) {
   return { valid: true, value };
 }
 
-function validateCreateAppointment(raw) {
+function validateCreateAppointment(raw, { hoursSchedule = null, now = new Date() } = {}) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing appointment payload.' };
   }
@@ -357,7 +361,22 @@ function validateCreateAppointment(raw) {
       value,
     };
   }
-  return { valid: true, value };
+  const hours = evaluateAppointmentHours({
+    whenText: value.whenText,
+    schedule: hoursSchedule,
+    now,
+  });
+  if (!hours.valid) {
+    return {
+      valid: false,
+      reason: hours.code,
+      code: hours.code,
+      missingSlots: ['when_text'],
+      hours,
+      value,
+    };
+  }
+  return { valid: true, value, hours };
 }
 
 const APPOINTMENT_UPDATE_STATUSES = new Set([
@@ -406,6 +425,8 @@ async function executeBrainTools({
   productCatalog = null,
   agentName = '',
   businessName = '',
+  hoursSchedule = null,
+  now = new Date(),
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
@@ -545,7 +566,10 @@ async function executeBrainTools({
   }
 
   if (parsed?.appointment) {
-    const validation = validateCreateAppointment(parsed.appointment);
+    const validation = validateCreateAppointment(parsed.appointment, {
+      hoursSchedule,
+      now,
+    });
     const fingerprint = validation.valid
       ? stableFingerprint('create_appointment', validation.value)
       : null;
@@ -560,7 +584,10 @@ async function executeBrainTools({
         action: 'create_appointment',
         status: 'invalid',
         reason: validation.reason,
+        code: validation.code || null,
         missingSlots: validation.missingSlots || [],
+        hours: validation.hours || null,
+        value: validation.value || null,
       });
     } else if (completed.has(fingerprint)) {
       results.push({
@@ -579,6 +606,7 @@ async function executeBrainTools({
                 fingerprint,
                 id: created.id || null,
                 value: validation.value,
+                hours: validation.hours || null,
                 record: created,
               }
             : {
@@ -773,9 +801,20 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
   if (meaningful.action === 'create_appointment') {
     if (meaningful.status === 'succeeded') {
-      if (sw) return 'Sawa — nimehifadhi ombi la ziara.';
-      if (sheng) return 'Poa — nime-save visit request.';
-      return "Done — I've logged your visit request.";
+      const whenLabel = formatRequestedWhenLabel(meaningful.hours);
+      if (sw) {
+        return whenLabel
+          ? `Sawa — nimehifadhi ombi la ziara ${whenLabel}.`
+          : 'Sawa — nimehifadhi ombi la ziara.';
+      }
+      if (sheng) {
+        return whenLabel
+          ? `Poa — nime-save visit request ${whenLabel}.`
+          : 'Poa — nime-save visit request.';
+      }
+      return whenLabel
+        ? `I've logged your visit request for ${whenLabel}.`
+        : "I've logged your visit request.";
     }
     if (meaningful.status === 'duplicate') {
       if (sw) return 'Ombi la ziara tayari limehifadhiwa.';
@@ -783,6 +822,49 @@ function formatToolConfirmation(results = [], language = 'en') {
       return 'That visit request is already saved.';
     }
     if (meaningful.status === 'invalid') {
+      const code = String(meaningful.code || '');
+      const hours = meaningful.hours || {};
+      if (code === 'closed_day') {
+        const closedDay = hours.weekdayLong || 'that day';
+        const next = hours.nextOpen?.label;
+        if (sw) {
+          return next
+            ? `Tuko closed siku ya ${closedDay}. ${next} ingefaa?`
+            : `Tuko closed siku ya ${closedDay}. Niambie siku ya kazi.`;
+        }
+        if (sheng) {
+          return next
+            ? `Tuko closed ${closedDay}. ${next} ingework?`
+            : `Tuko closed ${closedDay}. Niambie siku ya kazi.`;
+        }
+        return next
+          ? `We're closed on ${closedDay}s. Would ${next} during business hours work?`
+          : `We're closed on ${closedDay}s. What day during business hours works?`;
+      }
+      if (code === 'outside_hours') {
+        const until = hours.closeLabel || 'close';
+        if (sw) {
+          return `Tuko open hadi ${until}. Huo muda uko nje ya masaa. Ungependa muda kabla ya ${until}?`;
+        }
+        if (sheng) {
+          return `Tuko open hadi ${until}. Hiyo time iko nje ya hours. Time kabla ya ${until}?`;
+        }
+        return `We're open until ${until}. That time is outside our hours. Would you like a time before ${until}?`;
+      }
+      if (code === 'currently_closed') {
+        if (sw) {
+          return 'Tuko closed sasa. Naweza kuchukua ombi la ziara wakati wa kazi.';
+        }
+        if (sheng) {
+          return 'Tuko closed saa hii. Naweza take visit request wakati wa normal hours.';
+        }
+        return "We're closed right now. I can still take a visit during normal business hours.";
+      }
+      if (code === 'unparsed_when') {
+        if (sw) return 'Niambie siku na saa unayopendelea.';
+        if (sheng) return 'Niambie day na time unataka.';
+        return 'What day and time would you prefer?';
+      }
       const missing = Array.isArray(meaningful.missingSlots)
         ? meaningful.missingSlots
         : [];

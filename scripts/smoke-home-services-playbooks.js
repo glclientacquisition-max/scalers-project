@@ -7,6 +7,11 @@ const {
   canCompleteHomeIntent,
 } = require('../src/conversation/playbooks/homeServices');
 const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
+const {
+  executeBrainTools,
+  formatToolConfirmation,
+} = require('../src/conversation/toolExecution');
+const { defaultHoursSchedule } = require('../src/conversation/businessHours');
 
 /** @type {Array<{ name: string, utter: string, intent: string, slots?: object, missing?: string[], complete?: boolean, toolRaw?: string }>} */
 const scenarios = [
@@ -94,3 +99,81 @@ if (failed) {
   process.exit(1);
 }
 console.log(`\n${scenarios.length} home-services scenarios passed`);
+
+const hoursSchedule = defaultHoursSchedule();
+const nowTue11Eat = new Date(Date.UTC(2026, 7, 18, 8, 0, 0));
+const capabilities = {
+  createAppointment: true,
+  updateAppointment: true,
+  createServiceRequest: true,
+  saveCallerInfo: true,
+  escalate: true,
+  endCall: true,
+};
+
+async function smokeHours() {
+  let sundayInserts = 0;
+  const sunday = await executeBrainTools({
+    parsed: parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Sunday 9 PM","landmark":"Westlands"}}###ENDTOOL###'
+    ),
+    capabilities,
+    hoursSchedule,
+    now: nowTue11Eat,
+    handlers: {
+      createAppointment: async () => {
+        sundayInserts += 1;
+        return { id: 'nope', status: 'requested' };
+      },
+    },
+  });
+  const sundaySpoken = formatToolConfirmation(sunday.results, 'en');
+  const sundayOk =
+    sundayInserts === 0 &&
+    sunday.results[0]?.code === 'closed_day' &&
+    !/done/i.test(sundaySpoken) &&
+    !/logged your visit request/i.test(sundaySpoken);
+  console.log(`${sundayOk ? '✓' : '✗'} Hours smoke: Sunday 21:00 not persisted`);
+  if (!sundayOk) {
+    console.log({ sundayInserts, result: sunday.results[0], sundaySpoken });
+    process.exit(1);
+  }
+
+  const tuePayloads = [];
+  const tuesday = await executeBrainTools({
+    parsed: parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'
+    ),
+    capabilities,
+    hoursSchedule,
+    now: nowTue11Eat,
+    handlers: {
+      createAppointment: async (appointment) => {
+        tuePayloads.push(appointment);
+        return {
+          id: 'appt_ok',
+          service_name: appointment.serviceName,
+          status: 'requested',
+        };
+      },
+    },
+  });
+  const tueSpoken = formatToolConfirmation(tuesday.results, 'en');
+  const tueOk =
+    tuePayloads.length === 1 &&
+    tuesday.results[0]?.status === 'succeeded' &&
+    tuesday.results[0]?.record?.status === 'requested' &&
+    /logged your visit request/i.test(tueSpoken) &&
+    !/done/i.test(tueSpoken) &&
+    !/confirmed/i.test(tueSpoken);
+  console.log(`${tueOk ? '✓' : '✗'} Hours smoke: Tuesday 10:00 persisted as requested`);
+  if (!tueOk) {
+    console.log({ tuePayloads, result: tuesday.results[0], tueSpoken });
+    process.exit(1);
+  }
+}
+
+smokeHours().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
