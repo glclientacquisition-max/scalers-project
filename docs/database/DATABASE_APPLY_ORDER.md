@@ -225,13 +225,12 @@ This document is the **executable** apply sequence for greenfield / full staging
 
 | Item | Detail |
 | --- | --- |
-| Issue | `foundation_bootstrap.sql` §6 documents missing `UPDATE (notify_channels)` grant |
-| Production | **FACT:** absent (verified 2026-08-14) |
-| Staging | Test fix applied in Phase 3E (not in standard Git apply path) |
-| Proposed production fix | Separate ledger entry + explicit approval |
+| Issue | `foundation_bootstrap.sql` §6 previously omitted `UPDATE (notify_channels)` |
+| Production | **APPLIED** 2026-08-16 (`LEDGER-PROD-NOTIFY-GRANT`, CLI `20260816180900`) |
+| Staging | Present since Phase 3E; Git path is now `notify_channels.sql` |
+| Report | [`PHASE_3H_A3_APPLY_REPORT.md`](../operations/PHASE_3H_A3_APPLY_REPORT.md) |
 
 ```sql
--- PROPOSED — not part of greenfield bootstrap
 grant update (notify_channels) on public.tenants to authenticated;
 ```
 

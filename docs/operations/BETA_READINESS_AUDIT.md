@@ -1,5 +1,7 @@
 # Beta readiness audit
 
+**Update 2026-08-16:** Production `notify_channels` UPDATE grant applied (`LEDGER-PROD-NOTIFY-GRANT`). See [`PHASE_3H_A3_APPLY_REPORT.md`](./PHASE_3H_A3_APPLY_REPORT.md).
+
 **Date:** 2026-08-15 (Phase 3G)  
 **Method:** Codebase + documentation review — no new features implemented  
 **MVP scope:** Kenyan home-services / retail voice receptionist with owner desk
@@ -104,7 +106,7 @@ Scalers MVP core loops exist and are test-covered at unit/smoke level. Staging d
 | Tenant isolation (RLS) | **READY** | — | Post-P0 fix |
 | Auth (Supabase) | **READY** | — | |
 | service_role boundaries | **READY** | — | Wallet RPCs locked |
-| notify_channels grant | **GAP** | P1 | Production pending fix prepared |
+| notify_channels grant | **CLOSED** | P1 | Applied 2026-08-16 |
 | Storage policies | **UNKNOWN** | P1 | Model documented |
 | Legacy Super Admin cookie | **GAP** | P2 | TD-P2-1 |
 | Verbose logging / PII | **GAP** | P1 | TD-P1-4 |

@@ -1,9 +1,9 @@
 # Phase 3H beta readiness plan
 
 **Date:** 2026-08-15  
-**Status:** PLAN ONLY — no implementation until reviewed  
-**Production ALCR:** No changes in this phase  
-**Source audits:** Phase 3G `BETA_READINESS_AUDIT.md`, governance docs, codebase trace
+**Status:** IN PROGRESS (execution started 2026-08-16)  
+**Production ALCR:** Grant A3 applied 2026-08-16. No other production SQL in this phase.  
+**Apply report:** [`PHASE_3H_A3_APPLY_REPORT.md`](./PHASE_3H_A3_APPLY_REPORT.md)
 
 ---
 
@@ -432,21 +432,21 @@ Only three categories. **No implementation until this plan is approved.**
 
 ### A. Beta blockers (do first)
 
-| Order | Item | Type | Production SQL? |
+| Order | Item | Type | Status |
 | --- | --- | --- | --- |
-| A1 | Configure staging GitHub secrets | Ops | No |
-| A2 | Run full E2E matrix on staging (incl. live call) | Validation | No |
-| A3 | Approve + apply `grant_notify_channels_update.sql` | DB grant | **Yes** (human) |
-| A4 | Desk notify save E2E on production post-grant | Validation | No |
-| A5 | Live-call beta checklist (3+ calls, voice/brain scores) | Validation | No |
+| A1 | Configure staging GitHub secrets | Ops | **DONE** (CI green) |
+| A2 | Run full E2E matrix on staging (incl. live call) | Validation | Open |
+| A3 | Approve + apply `grant_notify_channels_update.sql` | DB grant | **DONE** 2026-08-16 |
+| A4 | Desk notify save E2E on production post-grant | Validation | Open |
+| A5 | Live-call beta checklist (3+ calls, voice/brain scores) | Validation | Open |
 
 ### B. Reliability
 
-| Order | Item | Type |
-| --- | --- | --- |
-| B1 | Redact verbose logging (P1-5) | Code |
-| B2 | Seed staging DID pool for signup tests | Ops/staging SQL |
-| B3 | Document staging voice/desk deploy URLs | Docs/ops |
+| Order | Item | Type | Status |
+| --- | --- | --- | --- |
+| B1 | Redact verbose logging (P1-5) | Code | **DONE** #165 |
+| B2 | Seed staging DID pool for signup tests | Ops/staging SQL | Open |
+| B3 | Document staging voice/desk deploy URLs | Docs/ops | **DONE** `STAGING_TO_PRODUCTION.md` |
 
 ### C. Customer value (after A stable)
 
@@ -476,7 +476,7 @@ Phase 3H is **complete** when:
 4. ≥ 1 live test call on staging with `voice-timing` logs captured.
 5. Voice + brain baseline evaluation scores recorded (not optimized yet).
 6. Latency budget table filled with at least one measured row.
-7. `grant_notify_channels_update.sql` applied to production **or** explicit waiver with owner workaround documented.
+7. `grant_notify_channels_update.sql` applied to production **YES** 2026-08-16. A4 desk save still required.
 8. Logging redaction PR scoped (may land Phase 3H+1).
 9. First `docs/features/<feature>.md` created only when a feature is approved.
 

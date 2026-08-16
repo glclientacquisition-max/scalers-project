@@ -134,7 +134,7 @@ If the feature needs app code that depends on the schema, merge the PR after sta
 5. Deploy production apps if code was waiting on schema.
 6. Production smoke for the specific feature.
 
-**Pending production example:** `docs/supabase/production_pending/grant_notify_channels_update.sql` — see [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](./PRODUCTION_CHANGE_NOTIFY_CHANNELS.md).
+**Pending production example (storage only):** `docs/supabase/production_pending/storage_call_recordings_policies.sql` remains unapplied. Notify grant is applied. See [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](./PRODUCTION_CHANGE_NOTIFY_CHANNELS.md).
 
 ### Rollback
 
