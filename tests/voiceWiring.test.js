@@ -112,4 +112,46 @@ assert.match(
   'media path must build per-tenant Soniox STT context'
 );
 
+assert.match(
+  source,
+  /summarizeHeaders/,
+  'HTTP and WS upgrade logs must use summarizeHeaders (no raw header dumps)'
+);
+
+assert.match(
+  source,
+  /summarizeBody/,
+  'voice webhooks must log summarizeBody instead of raw JSON bodies'
+);
+
+assert.match(
+  source,
+  /createWsPayloadSampler/,
+  'media WS JSON frames must be sampled, not dumped in full'
+);
+
+assert.doesNotMatch(
+  source,
+  /RAW BODY:/,
+  'must not log raw webhook bodies'
+);
+
+assert.doesNotMatch(
+  source,
+  /VOICE EVENT PAYLOAD/,
+  'must not log full voice event payloads'
+);
+
+assert.doesNotMatch(
+  source,
+  /WS INCOMING PAYLOAD/,
+  'must not log full inbound WS JSON payloads'
+);
+
+assert.doesNotMatch(
+  source,
+  /JSON\.stringify\(req\.headers/,
+  'must not JSON.stringify full request headers'
+);
+
 console.log('Voice runtime wiring checks passed.');
