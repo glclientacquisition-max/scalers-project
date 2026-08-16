@@ -94,6 +94,11 @@ const {
 const { createVoiceTurnTiming } = require('./src/speech/voiceTiming');
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
+const {
+  summarizeHeaders,
+  summarizeBody,
+  createWsPayloadSampler,
+} = require('./src/sautikit/safeLog');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
   dispatchAlert,
@@ -160,10 +165,12 @@ app.use(
   })
 );
 
-// Diagnostic middleware — log every inbound HTTP request (Localtunnel / SautiKit debug).
+// Diagnostic middleware — inbound HTTP summary (no raw headers; TD-P1-4).
 app.use((req, res, next) => {
-  console.log(`\n[${new Date().toISOString()}] INCOMING REQUEST: ${req.method} ${req.url}`);
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log(
+    `[${new Date().toISOString()}] ${req.method} ${req.url}`,
+    summarizeHeaders(req.headers)
+  );
   next();
 });
 
@@ -597,9 +604,8 @@ async function handleVoiceIncoming(req, res) {
       swapped: corrected.swapped,
       callSessionState: callSessionState || '(initial)',
       host: req.headers.host,
-      bodyKeys: Object.keys(req.body || {}),
+      body: summarizeBody(req.body),
     });
-    console.log('[voice/incoming] RAW BODY:', JSON.stringify(req.body, null, 2));
 
     // SautiKit re-invokes the voice URL on StreamStarted / Completed / etc.
     // Returning another Stream document re-forks and errors — send empty XML.
@@ -698,7 +704,7 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
 
   try {
     const body = req.body || {};
-    console.log('[VOICE EVENT PAYLOAD]', JSON.stringify(body, null, 2));
+    console.log('[voice/events] payload', summarizeBody(body));
 
     const kind =
       req.headers['x-sautikit-event-kind'] ||
@@ -890,7 +896,8 @@ mediaWss.on('connection', (ws, req) => {
   console.log(
     `[ws/media] connected from ${req.socket.remoteAddress} proto=${ws.protocol || '(none)'} url=${req.url} callSid=${sessionCallSid || 'unknown'}`
   );
-  console.log('[ws/media] upgrade headers:', JSON.stringify(req.headers, null, 2));
+  console.log('[ws/media] upgrade', summarizeHeaders(req.headers));
+  const sampleWsPayload = createWsPayloadSampler(3);
 
   try {
     if (req.socket) {
@@ -1907,7 +1914,10 @@ mediaWss.on('connection', (ws, req) => {
         if (looksLikeJsonText(asText)) {
           try {
             const parsed = JSON.parse(asText);
-            console.log('[WS INCOMING PAYLOAD]', JSON.stringify(parsed, null, 2));
+            const wsSample = sampleWsPayload(parsed);
+            if (wsSample) {
+              console.log('[ws/media] payload sample', wsSample);
+            }
 
             const meta = parsed.metadata || parsed;
             const maybeSid =
@@ -1927,13 +1937,13 @@ mediaWss.on('connection', (ws, req) => {
           } catch (parseErr) {
             console.log(
               '[ws/media] text frame (non-JSON):',
-              asText.slice(0, 200),
+              asText.slice(0, 80),
               '| parseError=',
               parseErr?.message || parseErr
             );
           }
-        } else {
-          console.log('[ws/media] text frame:', asText.slice(0, 500));
+        } else if (textFrames <= 3) {
+          console.log('[ws/media] text frame sample:', asText.slice(0, 80));
         }
         return;
       }

@@ -69,10 +69,10 @@ Status: `OPEN` unless noted.
 | Field | Detail |
 | --- | --- |
 | **Problem** | Full HTTP headers and raw webhook bodies logged |
-| **Evidence** | `server.js:157–161`, `572`, `671` |
+| **Evidence** | Was `server.js` inbound middleware, `/voice/incoming`, `/voice/events`, `/ws/media` upgrade + JSON frames |
 | **Impact** | PII/credential exposure in log sinks |
 | **Recommended action** | Redact logging in dedicated PR (behavior change — needs approval) |
-| **Status** | OPEN |
+| **Status** | REMEDIATED (2026-08-16) — `src/sautikit/safeLog.js` summaries; secrets/PII redacted; WS payloads sampled |
 
 ---
 
