@@ -339,9 +339,8 @@ grant update (
   pronunciation_gemini_scan_logs
 ) on public.tenants to authenticated;
 
--- Production gap (verified 2026-08-14): notify_channels lacks authenticated UPDATE grant.
--- Add when fixing Desk notify-channel persistence:
--- grant update (notify_channels) on public.tenants to authenticated;
+-- Desk owner notify prefs (applied production 2026-08-16, LEDGER-PROD-NOTIFY-GRANT).
+grant update (notify_channels) on public.tenants to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 7) Trigger (production-verified wallet column guard)

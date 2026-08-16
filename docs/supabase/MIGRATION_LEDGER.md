@@ -8,7 +8,7 @@ Scalers uses a **dual migration model**:
 
 1. **Foundation tables** — predate documented migration system; bootstrap via [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) (production-introspected, historically unverified).
 2. **Manual SQL scripts** — `docs/supabase/*.sql` applied via SQL Editor (primary governance model).
-3. **Supabase CLI migrations** — partial adoption from 2026-08-07; recorded in `supabase_migrations.schema_migrations` on production (24 rows).
+3. **Supabase CLI migrations** — partial adoption from 2026-08-07; recorded in `supabase_migrations.schema_migrations` on production (25 rows).
 
 ---
 
@@ -184,6 +184,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 | ID | What | Why | Where | Introduced commit | Staging | Production | CLI | Verification |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | LEDGER-NOTIFY-CH | `tenants.notify_channels` jsonb | Owner notify prefs | `notify_channels.sql` | `7af0fcb` (#155) | YES (2026-08-15) | YES (inferred pre-3E) | `20260813210755` | Staging rebuild; production CLI row |
+| LEDGER-PROD-NOTIFY-GRANT | `GRANT UPDATE (notify_channels)` | Desk owner notify persistence | `notify_channels.sql` + `production_pending/grant_notify_channels_update.sql` | Phase 3H A3 | YES (2026-08-15) | YES (2026-08-16) | `20260816180900` | `has_column_privilege` true; wallet UPDATE still false |
 | LEDGER-APPOINTMENTS | `appointments` table + RLS | Home-services bookings | `appointments.sql` | `7af0fcb` (#155) | YES (2026-08-15) | YES (inferred pre-3E) | `20260812083631` | Staging insert smoke |
 | LEDGER-SIGNUP-FIX | Drop 1-arg prompt; 2-arg canonical | Fix signup `42725` | `voice_languages.sql`, `did_number_pool.sql` | `f61c11f` (#158) | YES (2026-08-15) | UNKNOWN | NO | Staging signup PASS |
 
@@ -191,7 +192,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 
 | ID | What | Why | Where | Staging | Production | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEDGER-STAGING-NOTIFY-GRANT | `GRANT UPDATE (notify_channels)` | Desk persistence test | Ad-hoc SQL (Phase 3E) | YES (2026-08-15) | NO | Reproduces production gap; proposed production fix |
+| LEDGER-STAGING-NOTIFY-GRANT | `GRANT UPDATE (notify_channels)` | Desk persistence test | Now in `notify_channels.sql` | YES (2026-08-15) | YES (2026-08-16) | Superseded by `LEDGER-PROD-NOTIFY-GRANT` |
 | LEDGER-STAGING-STORAGE | Bucket `call-recordings` | Voice recordings | Manual / Dashboard | YES (2026-08-15) | YES (2026-08-06) | Policies UNKNOWN on both |
 
 ### Bulk manual scripts (pre-CLI era)
@@ -202,7 +203,7 @@ The following scripts are **INFERRED** applied on production (live schema matche
 
 | Staging (full rebuild) | Production (per script) |
 | --- | --- |
-| YES (2026-08-15, Phase 3E) | UNKNOWN (bulk); CLI ledger covers 24 post-adoption changes |
+| YES (2026-08-15, Phase 3E) | UNKNOWN (bulk); CLI ledger covers 25 post-adoption changes |
 
 ---
 
@@ -238,13 +239,13 @@ CLI version timestamps are **INFERRED** from version string `YYYYMMDDHHMMSS` (UT
 | 20260812141513 | soniox_voice_catalog | YES | 2026-08-12 | `soniox_voice_id.sql` |
 | 20260813073840 | pronunciation_gemini_scan | YES | 2026-08-13 | `pronunciation_gemini_scan.sql` |
 | 20260813210755 | notify_channels | YES | 2026-08-13 | `notify_channels.sql` |
+| 20260816180900 | grant_notify_channels_update | YES | 2026-08-16 | `production_pending/grant_notify_channels_update.sql` |
 
 **Manual production applies (evidenced, not in CLI ledger):**
 
 | Script | Production | Date | Evidence |
 | --- | --- | --- | --- |
 | `fix_p0_rls_remove_legacy_allow_all.sql` | YES | 2026-08-14 | Phase 3F ledger / PR #154 |
-| `grant_notify_channels_update.sql` | **NO** | — | Prepared Phase 3G; see `PRODUCTION_CHANGE_NOTIFY_CHANNELS.md` |
 | Pre-CLI bulk manual scripts | INFERRED YES | UNKNOWN | Live schema matches Git; no per-script dates |
 
 ---

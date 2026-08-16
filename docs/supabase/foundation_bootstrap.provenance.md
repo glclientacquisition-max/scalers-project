@@ -62,7 +62,7 @@ No row-level queries. No production mutations.
 
 | Item | Status |
 | --- | --- |
-| `tenants.notify_channels` authenticated UPDATE grant | Missing in production; commented fix in bootstrap |
+| `tenants.notify_channels` authenticated UPDATE grant | **APPLIED** 2026-08-16 (`LEDGER-PROD-NOTIFY-GRANT`; included in bootstrap for greenfield) |
 | Secondary indexes (`calls.tenant_id`, `calls.created_at`, `transcripts.call_id`) | Not present in production; not included |
 | `storage.buckets` `call-recordings` | Created 2026-08-06; provenance UNKNOWN; not in this file |
 | Legacy `"Enable all access for service role only"` RLS | Absent post-P0; must not be reintroduced |

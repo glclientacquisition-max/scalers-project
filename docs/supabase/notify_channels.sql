@@ -6,3 +6,7 @@ alter table public.tenants
 
 comment on column public.tenants.notify_channels is
   'Owner notify prefs: {sms, whatsapp, email} booleans. Platform still greys channels that are not live yet.';
+
+-- Desk settings save patches this column with the owner JWT.
+-- RLS: tenants_update_member. Idempotent if already granted.
+grant update (notify_channels) on public.tenants to authenticated;
