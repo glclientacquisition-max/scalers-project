@@ -206,4 +206,6 @@ module.exports = {
   openClosedStatus,
   formatScheduleSummary,
   formatHoursForCompiler,
+  timeToMinutes,
+  DAY_KEYS,
 };

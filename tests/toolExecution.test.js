@@ -5,6 +5,7 @@ const {
   executeBrainTools,
   formatToolConfirmation,
 } = require('../src/conversation/toolExecution');
+const { defaultHoursSchedule } = require('../src/conversation/businessHours');
 
 const capabilities = {
   createServiceRequest: true,
@@ -441,6 +442,8 @@ describe('validated tool execution', () => {
     const execution = await executeBrainTools({
       parsed,
       capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 8, 0, 0)),
       handlers: {
         createAppointment: async (appointment) => {
           calls += 1;
@@ -455,7 +458,158 @@ describe('validated tool execution', () => {
     assert.equal(calls, 1);
     assert.equal(execution.results[0].status, 'succeeded');
     assert.equal(execution.shouldEndCall, true);
-    assert.match(formatToolConfirmation(execution.results, 'en'), /visit request/i);
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.match(spoken, /visit request/i);
+    assert.equal(/done/i.test(spoken), false);
+    assert.equal(/confirmed/i.test(spoken), false);
+  });
+
+  it('does not persist a Sunday visit (closed_day)', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Sunday 9 PM","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 8, 0, 0)),
+      handlers: {
+        createAppointment: async () => {
+          calls += 1;
+          return { id: 'should_not', status: 'requested' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.equal(execution.results[0].code, 'closed_day');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.match(spoken, /closed on Sunday/i);
+    assert.equal(/done/i.test(spoken), false);
+    assert.equal(/logged your visit request/i.test(spoken), false);
+  });
+
+  it('does not persist a weekday visit after close (outside_hours)', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 9 PM","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 8, 0, 0)),
+      handlers: {
+        createAppointment: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].code, 'outside_hours');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.match(spoken, /outside our hours/i);
+    assert.equal(/done/i.test(spoken), false);
+  });
+
+  it('does not persist unparsed when_text', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"sometime next week","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 8, 0, 0)),
+      handlers: {
+        createAppointment: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].code, 'unparsed_when');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /day and time/i);
+  });
+
+  it('does not persist now while currently closed', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"now","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 18, 0, 0)),
+      handlers: {
+        createAppointment: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].code, 'currently_closed');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.match(spoken, /closed right now/i);
+    assert.equal(/done/i.test(spoken), false);
+  });
+
+  it('persists a Tuesday 10 AM visit as requested once', async () => {
+    const payloads = [];
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 16, 18, 0, 0)),
+      handlers: {
+        createAppointment: async (appointment) => {
+          payloads.push(appointment);
+          return {
+            id: 'appt_ok',
+            service_name: appointment.serviceName,
+            status: 'requested',
+          };
+        },
+      },
+    });
+    assert.equal(payloads.length, 1);
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.equal(execution.results[0].record.status, 'requested');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.match(spoken, /logged your visit request/i);
+    assert.match(spoken, /Tuesday/i);
+    assert.equal(/done/i.test(spoken), false);
+    assert.equal(/confirmed/i.test(spoken), false);
+  });
+
+  it('does not claim success when createAppointment throws', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 8, 0, 0)),
+      handlers: {
+        createAppointment: async () => {
+          throw new Error('db down');
+        },
+      },
+    });
+    assert.equal(execution.results[0].status, 'failed');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.match(spoken, /couldn't save/i);
+    assert.equal(/done/i.test(spoken), false);
   });
 
   it('confirms cancelling a visit after backend update', async () => {
