@@ -1561,7 +1561,12 @@ mediaWss.on('connection', (ws, req) => {
             }
             speakSession = null;
           }
-          const reply = result?.spokenText || spokenChunks.join(' ') || AI_FALLBACK_LINE;
+          const reply =
+            result?.spokenText ||
+            spokenChunks.join(' ') ||
+            spokenTextWithoutToolFallback({
+              actionConfirmation: result?.actionConfirmation,
+            });
           transcriptLog.push(`Agent: ${reply}`);
           if (spokenChunks.length) spokeThisTurn = true;
         } else if (!bargeInActive) {
@@ -1574,7 +1579,10 @@ mediaWss.on('connection', (ws, req) => {
               /* ignore */
             }
           }
-          const reply = result?.spokenText || AI_FALLBACK_LINE;
+          const reply = spokenTextWithoutToolFallback({
+            spoken: result?.spokenText,
+            actionConfirmation: result?.actionConfirmation,
+          });
           transcriptLog.push(`Agent: ${reply}`);
           turnTiming.markFirstSpokenChunk();
           await speakText(reply);
@@ -2589,6 +2597,42 @@ wss.on('connection', (ws) => {
 const AI_FALLBACK_LINE =
   "Sorry, I'm having a technical issue and couldn't complete that. Please try again.";
 
+const OUTCOME_TOOL_ACTIONS = new Set([
+  'create_service_request',
+  'create_appointment',
+  'update_appointment',
+  'escalate',
+  'tool_request',
+]);
+
+function spokenTextWithoutToolFallback({ spoken = '', actionConfirmation = '' } = {}) {
+  const text = String(spoken || '').trim();
+  if (text) return text;
+  return actionConfirmation ? '' : AI_FALLBACK_LINE;
+}
+
+async function safeApplyGeminiTools(callSid, parsed) {
+  try {
+    return await applyGeminiTools(callSid, parsed);
+  } catch (err) {
+    console.error(
+      `[${callSid}] applyGeminiTools failed:`,
+      err?.message || err,
+      err?.stack
+    );
+    return {
+      results: [
+        {
+          action: 'tool_request',
+          status: 'failed',
+          reason: String(err?.message || err).slice(0, 300),
+        },
+      ],
+      shouldEndCall: false,
+    };
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -2884,13 +2928,15 @@ async function runGeminiTurnStreaming(
   }
 
   const parsed = parseGeminiResponse(fullText || buffer.getRaw());
-  const spokenText =
-    buffer.getSpokenEmitted() || parsed.spokenText || AI_FALLBACK_LINE;
-  const execution = await applyGeminiTools(callSid, parsed);
+  const execution = await safeApplyGeminiTools(callSid, parsed);
   const actionConfirmation = formatToolConfirmation(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
+  const spokenText = spokenTextWithoutToolFallback({
+    spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+    actionConfirmation,
+  });
 
   messages.push({
     role: 'assistant',
@@ -2952,19 +2998,22 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
   const outputText = extractGeminiText(response);
   const parsed = parseGeminiResponse(outputText);
-  const execution = await applyGeminiTools(callSid, parsed);
+  const execution = await safeApplyGeminiTools(callSid, parsed);
+  const actionConfirmation = formatToolConfirmation(
+    execution.results,
+    callBrainStates.get(callSid)?.language?.current || 'en'
+  );
   const hasOutcomeAction = execution.results.some((result) =>
-    ['create_service_request', 'escalate', 'tool_request'].includes(result.action)
+    OUTCOME_TOOL_ACTIONS.has(result.action)
   );
   // Action-capable turns use the deterministic backend confirmation. This prevents
   // model prose from claiming success before execution has actually completed.
   const spokenText = hasOutcomeAction
     ? ''
-    : parsed.spokenText || AI_FALLBACK_LINE;
-  const actionConfirmation = formatToolConfirmation(
-    execution.results,
-    callBrainStates.get(callSid)?.language?.current || 'en'
-  );
+    : spokenTextWithoutToolFallback({
+        spoken: parsed.spokenText,
+        actionConfirmation,
+      });
 
   messages.push({
     role: 'assistant',
