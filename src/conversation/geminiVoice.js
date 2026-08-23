@@ -31,25 +31,93 @@ function extractThoughtSignature(response) {
   return '';
 }
 
+function cloneGeminiPart(part) {
+  if (!part || typeof part !== 'object') return null;
+  const cloned = {};
+  if (typeof part.text === 'string') cloned.text = part.text;
+  if (part.thought === true) cloned.thought = true;
+  const signature = part.thoughtSignature || part.thought_signature;
+  if (signature) cloned.thoughtSignature = String(signature);
+  if (!cloned.text && !cloned.thoughtSignature && !cloned.thought) return null;
+  return cloned;
+}
+
+function extractGeminiParts(response) {
+  const parts = response?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return [];
+  return parts.map(cloneGeminiPart).filter(Boolean);
+}
+
+/**
+ * Stream chunks may split text and put the thought signature on a later
+ * empty part. Keep signed / thought parts intact. Do not merge them.
+ */
+function appendGeminiStreamParts(acc, chunk) {
+  const next = Array.isArray(acc) ? acc.slice() : [];
+  for (const part of extractGeminiParts(chunk)) {
+    const last = next[next.length - 1];
+    const canMerge =
+      last &&
+      last.thought !== true &&
+      part.thought !== true &&
+      !last.thoughtSignature &&
+      !part.thoughtSignature &&
+      typeof last.text === 'string' &&
+      typeof part.text === 'string';
+    if (canMerge) last.text += part.text;
+    else next.push(part);
+  }
+  return next;
+}
+
+function modelPartsForHistory({ geminiParts, text, thoughtSignature } = {}) {
+  if (Array.isArray(geminiParts) && geminiParts.length) {
+    return geminiParts.map(cloneGeminiPart).filter(Boolean);
+  }
+  const part = { text: String(text || '') };
+  if (thoughtSignature) part.thoughtSignature = String(thoughtSignature);
+  return part.text || part.thoughtSignature ? [part] : [];
+}
+
 /**
  * Build Gemini contents from in-memory chat messages.
  * Instant/local greetings have no thought signature — sending them as model
  * turns makes Gemini 3 MINIMAL return 400 and the caller hears silence.
+ * Replay model parts as received. Do not glue a signature onto merged text.
  */
 function buildGeminiContents(messages, windowSize = CONTEXT_WINDOW) {
   const recentMessages = Array.isArray(messages) ? messages.slice(-windowSize) : [];
-  return recentMessages
-    .filter((message) => message && message.role !== 'system' && !message.local)
-    .map((message) => {
+  const contents = [];
+  for (const message of recentMessages) {
+    if (!message || message.role === 'system' || message.local) continue;
+    const role = message.role === 'assistant' ? 'model' : 'user';
+    let parts;
+    if (role === 'model' && Array.isArray(message.geminiParts) && message.geminiParts.length) {
+      parts = message.geminiParts.map(cloneGeminiPart).filter(Boolean);
+    } else {
       const part = { text: String(message.content || '') };
-      if (message.role === 'assistant' && message.thoughtSignature) {
+      if (role === 'model' && message.thoughtSignature) {
         part.thoughtSignature = message.thoughtSignature;
       }
-      return {
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [part],
-      };
-    });
+      parts = [part];
+    }
+    if (!parts.length) continue;
+    const prev = contents[contents.length - 1];
+    if (
+      prev &&
+      prev.role === 'user' &&
+      role === 'user' &&
+      prev.parts.length === 1 &&
+      parts.length === 1 &&
+      typeof prev.parts[0].text === 'string' &&
+      typeof parts[0].text === 'string'
+    ) {
+      prev.parts[0].text = `${prev.parts[0].text} ${parts[0].text}`.trim();
+      continue;
+    }
+    contents.push({ role, parts });
+  }
+  return contents;
 }
 
 function withTimeout(promise, ms, label = 'operation') {
@@ -108,6 +176,9 @@ module.exports = {
   geminiTurnTimeoutMs,
   extractGeminiText,
   extractThoughtSignature,
+  extractGeminiParts,
+  appendGeminiStreamParts,
+  modelPartsForHistory,
   buildGeminiContents,
   withTimeout,
   isTimeoutError,

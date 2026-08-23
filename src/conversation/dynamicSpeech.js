@@ -201,30 +201,8 @@ function pickClarifyProgress(opts = {}) {
     if (sw) return 'Sawa. Niambie jina lako.';
     return 'Okay. May I have your name?';
   }
-  if (
-    slot === 'service' ||
-    slot === 'subject' ||
-    slot === 'product' ||
-    slot === 'requesteditem' ||
-    slot === 'catalog_item'
-  ) {
-    if (sw) return 'Sawa. Unahitaji huduma gani?';
-    return 'Okay. Which service do you need?';
-  }
-  if (slot === 'when' || slot === 'when_text' || slot === 'when_or_reference') {
-    if (sw) return 'Sawa. Siku na saa gani?';
-    return 'Okay. What day and time works?';
-  }
-  if (slot === 'branch' || slot === 'landmark' || slot === 'location') {
-    if (sw) return 'Sawa. Tutakuja wapi?';
-    return 'Okay. Where should we come?';
-  }
-  if (intent === 'booking') {
-    if (sw) return 'Sawa. Naweza kupanga. Huduma gani?';
-    return 'Okay. I can book that. Which service?';
-  }
   if (sw) return 'Sawa, nimekuelewa.';
-  return 'Okay. How can I help?';
+  return 'Okay, one moment.';
 }
 
 const PURE_NOISE = new Set([
