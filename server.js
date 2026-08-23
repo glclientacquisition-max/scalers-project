@@ -4,6 +4,8 @@
 // Twilio has been removed from the telephony path.
 
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
 const http = require('http');
@@ -183,10 +185,36 @@ app.use((req, res, next) => {
   next();
 });
 
+const PROCESS_STARTED_AT = new Date().toISOString();
+
+function resolveVoiceGitSha() {
+  const fromEnv = String(
+    process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_SHA || ''
+  ).trim();
+  if (fromEnv) return fromEnv;
+  try {
+    return (
+      fs.readFileSync(path.join(__dirname, 'scripts', '.deploy-sha'), 'utf8').trim() || null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function resolveVoiceGitBranch() {
+  const branch = String(
+    process.env.RAILWAY_GIT_BRANCH || process.env.GIT_BRANCH || ''
+  ).trim();
+  return branch || null;
+}
+
 app.get('/healthz', (_req, res) => {
   const sms = getSmsStatus();
   res.status(200).json({
     ok: true,
+    gitSha: resolveVoiceGitSha(),
+    gitBranch: resolveVoiceGitBranch(),
+    startedAt: PROCESS_STARTED_AT,
     soniox: {
       stt: isSonioxConfigured(),
       tts: isSonioxTtsConfigured(),
@@ -1318,31 +1346,37 @@ mediaWss.on('connection', (ws, req) => {
       .filter(Boolean)
       .join('\n\n');
 
+    let spokeThisTurn = false;
+    let progressAlreadySpoken = false;
     try {
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
         nextBestAction.action
       );
-      // Human handoff with missing name uses ASK_CLARIFICATION — still speak now so
-      // the caller never waits silently on Gemini (live miss: HD_02bda14e6547).
+      // ASK_CLARIFICATION used to wait on Gemini. Booking turns then spoke the
+      // technical fallback (live miss: HD_c60a7a0eb699). Speak the slot now.
+      const clarifyAsk = nextBestAction.action === 'ASK_CLARIFICATION';
       const handoffNameAsk =
-        nextBestAction.action === 'ASK_CLARIFICATION' &&
+        clarifyAsk &&
         (brainState.intent === 'human' || Boolean(brainState.handoff?.requested)) &&
         (nextBestAction.slot === 'name' ||
           (Array.isArray(brainState.goal?.missingSlots) &&
             brainState.goal.missingSlots.includes('name')));
-      const needsImmediateProgress = actionMayExecute || handoffNameAsk;
-      let spokeThisTurn = false;
-      let progressAlreadySpoken = false;
+      const needsImmediateProgress = actionMayExecute || clarifyAsk;
 
-      // Action / handoff-clarify turns disable streaming and wait on Gemini+tools —
-      // speak progress immediately so orders/escalations are not dead air.
+      // Action / clarify turns disable streaming and wait on Gemini+tools.
+      // Speak progress immediately so booking/handoff turns are not dead air.
       /** @type {Promise<void>} */
       let actionProgressSpeak = Promise.resolve();
       if (needsImmediateProgress && tts && !bargeInActive) {
-        const progressLine = handoffNameAsk
+        const progressLine = clarifyAsk
           ? pickClarifyProgress({
               action: nextBestAction.action,
-              slot: nextBestAction.slot || 'name',
+              slot:
+                nextBestAction.slot ||
+                (Array.isArray(brainState.goal?.missingSlots)
+                  ? brainState.goal.missingSlots[0]
+                  : '') ||
+                '',
               intent: brainState.intent,
               language: callLanguage,
             })
@@ -1351,6 +1385,7 @@ mediaWss.on('connection', (ws, req) => {
         turnTiming.markFiller();
         console.log(
           `[ws/media][${sidLabel()}] action-progress action=${nextBestAction.action}` +
+            `${clarifyAsk ? ` clarifyAsk=1 slot=${nextBestAction.slot || ''}` : ''}` +
             `${handoffNameAsk ? ' handoffNameAsk=1' : ''}` +
             ` lang=${callLanguage}: ${progressLine}`
         );
@@ -1657,12 +1692,18 @@ mediaWss.on('connection', (ws, req) => {
         }
         // Finish "let me save that" before the tool confirmation so they don't overlap.
         await actionProgressSpeak;
-        // Handoff name-ask already spoke the required question — skip duplicate model prose.
+        // Handoff name-ask already spoke the required question. Skip Gemini
+        // failure lines when any clarify/action progress already played.
         const skipDuplicateAsk =
           handoffNameAsk &&
           progressAlreadySpoken &&
           !result?.actionConfirmation;
-        if (reply && !skipDuplicateAsk) {
+        const skipFailedModelAfterProgress =
+          progressAlreadySpoken &&
+          (Boolean(result?.timedOut) ||
+            Boolean(result?.llmFailed) ||
+            reply === AI_FALLBACK_LINE);
+        if (reply && !skipDuplicateAsk && !skipFailedModelAfterProgress) {
           transcriptLog.push(`Agent: ${reply}`);
           turnTiming.markFirstSpokenChunk();
           await speakText(reply);
@@ -1679,10 +1720,15 @@ mediaWss.on('connection', (ws, req) => {
 
       // Hard guarantee: every completed caller turn must produce agent audio.
       if (!spokeThisTurn && !bargeInActive && tts) {
-        const guarantee = handoffNameAsk
+        const guarantee = clarifyAsk
           ? pickClarifyProgress({
               action: nextBestAction.action,
-              slot: nextBestAction.slot || 'name',
+              slot:
+                nextBestAction.slot ||
+                (Array.isArray(brainState.goal?.missingSlots)
+                  ? brainState.goal.missingSlots[0]
+                  : '') ||
+                '',
               intent: brainState.intent,
               language: callLanguage,
             })
@@ -1715,7 +1761,7 @@ mediaWss.on('connection', (ws, req) => {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
       turnTiming.log({ outcome: 'error' });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-      if (!bargeInActive) {
+      if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
         // Persist exactly what the caller hears so dashboard transcripts expose
         // failures instead of ending after the caller's last line.
         transcriptLog.push(`Agent: ${AI_FALLBACK_LINE}`);

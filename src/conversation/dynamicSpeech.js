@@ -194,15 +194,37 @@ function pickClarifyProgress(opts = {}) {
     intent === 'human' || action === 'ESCALATE' || action === 'TRANSFER';
 
   if (handoff && (slot === 'name' || !slot)) {
-    if (sw) return 'Sawa — niambie jina lako ndio niwasiliane nao.';
-    return 'Okay — may I have your name so I can reach them?';
+    if (sw) return 'Sawa. Niambie jina lako ndio niwasiliane nao.';
+    return 'Okay. May I have your name so I can reach them?';
   }
   if (slot === 'name') {
-    if (sw) return 'Sawa — niambie jina lako.';
-    return 'Okay — may I have your name?';
+    if (sw) return 'Sawa. Niambie jina lako.';
+    return 'Okay. May I have your name?';
+  }
+  if (
+    slot === 'service' ||
+    slot === 'subject' ||
+    slot === 'product' ||
+    slot === 'requesteditem' ||
+    slot === 'catalog_item'
+  ) {
+    if (sw) return 'Sawa. Unahitaji huduma gani?';
+    return 'Okay. Which service do you need?';
+  }
+  if (slot === 'when' || slot === 'when_text' || slot === 'when_or_reference') {
+    if (sw) return 'Sawa. Siku na saa gani?';
+    return 'Okay. What day and time works?';
+  }
+  if (slot === 'branch' || slot === 'landmark' || slot === 'location') {
+    if (sw) return 'Sawa. Tutakuja wapi?';
+    return 'Okay. Where should we come?';
+  }
+  if (intent === 'booking') {
+    if (sw) return 'Sawa. Naweza kupanga. Huduma gani?';
+    return 'Okay. I can book that. Which service?';
   }
   if (sw) return 'Sawa, nimekuelewa.';
-  return 'Okay, one moment.';
+  return 'Okay. How can I help?';
 }
 
 const PURE_NOISE = new Set([
