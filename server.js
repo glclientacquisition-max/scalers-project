@@ -51,6 +51,14 @@ const {
 const { deriveCallResolution } = require('./src/conversation/callResolution');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
+  extractGeminiText,
+  extractThoughtSignature,
+  buildGeminiContents,
+  geminiTurnTimeoutMs,
+  withTimeout,
+  isTimeoutError,
+} = require('./src/conversation/geminiVoice');
+const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
   normalizeProducts,
@@ -1891,7 +1899,7 @@ mediaWss.on('connection', (ws, req) => {
 
       await speakText(greetingLine);
       transcriptLog.push(`Agent: ${greetingLine}`);
-      messages.push({ role: 'assistant', content: greetingLine });
+      messages.push({ role: 'assistant', content: greetingLine, local: true });
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
       try {
@@ -1904,7 +1912,7 @@ mediaWss.on('connection', (ws, req) => {
           closureNotice,
         });
         await speakText(fallback);
-        messages.push({ role: 'assistant', content: fallback });
+        messages.push({ role: 'assistant', content: fallback, local: true });
       } catch {
         /* ignore */
       }
@@ -2422,8 +2430,6 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
   }
 }
 
-const CONTEXT_WINDOW = 16;
-
 wss.on('connection', (ws) => {
   let callSid = null;
   let systemPrompt = buildSystemPrompt();
@@ -2644,17 +2650,6 @@ function isRetryableGeminiError(err) {
   return msg.includes('503') || msg.includes('429') || msg.includes('unavailable') || msg.includes('overloaded');
 }
 
-function extractGeminiText(response) {
-  if (typeof response?.text === 'string') return response.text;
-  if (Array.isArray(response?.candidates?.[0]?.content?.parts)) {
-    return response.candidates[0].content.parts
-      .filter((part) => part && !part.thought && typeof part.text === 'string')
-      .map((part) => part.text)
-      .join('');
-  }
-  return '';
-}
-
 /**
  * Lightweight one-shot Gemini text (greetings / helpers). No chat history.
  */
@@ -2680,16 +2675,6 @@ async function generateGeminiText({
   const text = extractGeminiText(response).trim();
   console.log(`[${callSid}] Gemini one-shot text chars=${text.length}`);
   return text;
-}
-
-function buildGeminiContents(messages) {
-  const recentMessages = messages.slice(-CONTEXT_WINDOW);
-  return recentMessages
-    .filter((message) => message.role !== 'system')
-    .map((message) => ({
-      role: message.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: message.content }],
-    }));
 }
 
 function geminiVoiceConfig(systemPrompt) {
@@ -2874,37 +2859,50 @@ async function runGeminiTurnStreaming(
   const buffer = createSpokenStreamBuffer();
   let fullText = '';
   let streamFailed = false;
+  let thoughtSignature = '';
+  const timeoutMs = geminiTurnTimeoutMs();
 
   try {
     console.log(
-      `[${callSid}] Calling Gemini stream (model: ${model}, messages: ${messages.length})`
+      `[${callSid}] Calling Gemini stream (model: ${model}, messages: ${messages.length}, timeoutMs=${timeoutMs})`
     );
-    const stream = await getGeminiClient().models.generateContentStream({
-      model,
-      contents,
-      config: geminiVoiceConfig(systemPrompt),
-    });
+    await withTimeout(
+      (async () => {
+        const stream = await getGeminiClient().models.generateContentStream({
+          model,
+          contents,
+          config: geminiVoiceConfig(systemPrompt),
+        });
 
-    for await (const chunk of stream) {
-      if (shouldAbort?.()) {
-        console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
-        break;
-      }
-      const delta = extractGeminiText(chunk);
-      if (!delta) continue;
-      fullText += delta;
-      const pieces = buffer.push(delta);
-      for (const piece of pieces) {
-        if (shouldAbort?.()) break;
-        if (typeof onSpokenChunk === 'function') {
-          await onSpokenChunk(piece);
+        for await (const chunk of stream) {
+          if (shouldAbort?.()) {
+            console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
+            break;
+          }
+          thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
+          const delta = extractGeminiText(chunk);
+          if (!delta) continue;
+          fullText += delta;
+          const pieces = buffer.push(delta);
+          for (const piece of pieces) {
+            if (shouldAbort?.()) break;
+            if (typeof onSpokenChunk === 'function') {
+              await onSpokenChunk(piece);
+            }
+          }
         }
-      }
-    }
+      })(),
+      timeoutMs,
+      'Gemini stream'
+    );
     console.log(
       `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
     );
   } catch (err) {
+    if (isTimeoutError(err) && !fullText) {
+      console.error(`[${callSid}] Gemini stream timed out after ${timeoutMs}ms`);
+      return { spokenText: AI_FALLBACK_LINE, shouldEndCall: false, timedOut: true };
+    }
     streamFailed = true;
     console.error(
       `[${callSid}] Gemini stream failed, falling back to generateContent:`,
@@ -2941,6 +2939,7 @@ async function runGeminiTurnStreaming(
   messages.push({
     role: 'assistant',
     content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    thoughtSignature: thoughtSignature || undefined,
   });
   return {
     spokenText,
@@ -2967,11 +2966,15 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
         `[${callSid}] Calling Gemini API (model: ${model}, messages: ${messages.length}, attempt: ${attempt}/${maxAttempts})`
       );
 
-      response = await getGeminiClient().models.generateContent({
-        model,
-        contents,
-        config: geminiVoiceConfig(systemPrompt),
-      });
+      response = await withTimeout(
+        getGeminiClient().models.generateContent({
+          model,
+          contents,
+          config: geminiVoiceConfig(systemPrompt),
+        }),
+        geminiTurnTimeoutMs(),
+        'Gemini generateContent'
+      );
       console.log(`[${callSid}] Gemini response received`);
       lastErr = null;
       break;
@@ -3018,6 +3021,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
   messages.push({
     role: 'assistant',
     content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    thoughtSignature: extractThoughtSignature(response) || undefined,
   });
 
   return {

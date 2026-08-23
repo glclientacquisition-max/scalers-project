@@ -78,6 +78,18 @@ assert.match(
 
 assert.match(
   source,
+  /local:\s*true/,
+  'instant greeting must be marked local so it is not sent as an unsigned Gemini model turn'
+);
+
+assert.match(
+  source,
+  /geminiTurnTimeoutMs/,
+  'Gemini voice turns must use a hang timeout so the caller is not left silent'
+);
+
+assert.match(
+  source,
   /activeOutboundStreamId/,
   'outbound PCM must be gated by active Soniox stream id'
 );
