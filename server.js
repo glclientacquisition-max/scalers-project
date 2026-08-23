@@ -2980,7 +2980,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
       break;
     } catch (err) {
       lastErr = err;
-      const retryable = isRetryableGeminiError(err);
+      const retryable = !isTimeoutError(err) && isRetryableGeminiError(err);
       console.error(
         `[${callSid}] Gemini API call failed:`,
         `status=${err?.status || 'N/A'}`,
