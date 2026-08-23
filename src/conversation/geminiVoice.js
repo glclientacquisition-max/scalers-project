@@ -70,6 +70,38 @@ function isTimeoutError(err) {
   return /timed out after/i.test(String(err?.message || err || ''));
 }
 
+/**
+ * After a streamed Gemini turn, decide whether prefetch TTS already spoke
+ * and what (if anything) still needs speakText. Empty successful model
+ * output must not become a technical fallback — the turn guarantee can
+ * ask the next slot instead. Timeout / LLM failure speaks fallback once.
+ */
+function resolvePrefetchedStreamSpeech({
+  spokenChunks = '',
+  spokenText = '',
+  actionConfirmation = '',
+  timedOut = false,
+  llmFailed = false,
+  fallbackLine = '',
+} = {}) {
+  const chunks = String(spokenChunks || '').trim();
+  if (chunks) {
+    return { alreadySpoken: true, reply: chunks, speakNow: false };
+  }
+  const spoken = String(spokenText || '').trim();
+  if (spoken) {
+    return { alreadySpoken: false, reply: spoken, speakNow: true };
+  }
+  if (String(actionConfirmation || '').trim()) {
+    return { alreadySpoken: false, reply: '', speakNow: false };
+  }
+  if (timedOut || llmFailed) {
+    const fallback = String(fallbackLine || '').trim();
+    return { alreadySpoken: false, reply: fallback, speakNow: Boolean(fallback) };
+  }
+  return { alreadySpoken: false, reply: '', speakNow: false };
+}
+
 module.exports = {
   CONTEXT_WINDOW,
   DEFAULT_TURN_TIMEOUT_MS,
@@ -79,4 +111,5 @@ module.exports = {
   buildGeminiContents,
   withTimeout,
   isTimeoutError,
+  resolvePrefetchedStreamSpeech,
 };
