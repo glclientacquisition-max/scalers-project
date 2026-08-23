@@ -72,6 +72,24 @@ assert.match(
 
 assert.match(
   source,
+  /const clarifyAsk = nextBestAction\.action === 'ASK_CLARIFICATION'/,
+  'booking and other clarify turns must speak progress before Gemini'
+);
+
+assert.match(
+  source,
+  /skipFailedModelAfterProgress/,
+  'Gemini timeout after a progress line must not also speak the technical fallback'
+);
+
+assert.match(
+  source,
+  /gitSha: resolveVoiceGitSha\(\)/,
+  'healthz must expose gitSha so staging Voice can be verified without merging to main'
+);
+
+assert.match(
+  source,
   /ttsReadyPromise/,
   'greeting must wait for TTS ready to avoid silent answer'
 );

@@ -9,14 +9,16 @@
 
 ```
 PR → CI (unit tests, lint, build)
+  ↓ if Voice: staging-voice-deploy.yml on the PR branch
+  ↓ confirm staging /healthz.gitSha matches the PR commit
+  ↓ DID test on staging Voice
   ↓ merge to main
-  ↓ deploy staging (Railway/Vercel — existing infra)
-  ↓ staging validation workflow
-  ↓ smoke:db + schema verify
-  ↓ feature smoke / manual acceptance
+  ↓ staging-validate.yml (DB smoke)
   ↓ release candidate approval
   ↓ production (human-approved SQL + deploy)
 ```
+
+Desk still gets Vercel preview URLs per PR. Voice does not. Run **Deploy staging Voice** from the PR branch (`confirm_target=staging`) before any DID test. Do not merge to `main` to make Railway pick up a Voice fix.
 
 ---
 
@@ -26,7 +28,8 @@ PR → CI (unit tests, lint, build)
 | --- | --- | --- |
 | Every PR | `ci.yml` | No |
 | Push to `main` | `staging-validate.yml` | Staging Supabase (warns if missing) |
-| Manual | `workflow_dispatch` on staging workflow | Staging Supabase |
+| Manual | `workflow_dispatch` on staging-validate | Staging Supabase |
+| Manual | `staging-voice-deploy.yml` on a PR branch | Railway staging token + IDs |
 
 ---
 
@@ -37,8 +40,12 @@ PR → CI (unit tests, lint, build)
 | `STAGING_SUPABASE_URL` | `https://sgcdncjxauhsbunobmob.supabase.co` |
 | `STAGING_SUPABASE_SERVICE_ROLE_KEY` | Staging service role — **never production** |
 | `STAGING_DATABASE_URL` | Optional — postgres URL for full catalog verify. Prefer **Supabase pooler** URI (port **6543**) in GitHub Actions; direct `db.*.supabase.co` can fail with IPv6 `ENETUNREACH` on runners. |
+| `RAILWAY_TOKEN` | Railway token used only by `staging-voice-deploy.yml` |
+| `RAILWAY_STAGING_PROJECT_ID` | Staging Voice project id |
+| `RAILWAY_STAGING_SERVICE_ID` | Staging Voice service id |
+| `RAILWAY_STAGING_ENVIRONMENT_ID` | Staging environment id. Workflow refuses any name other than `staging`. |
 
-**Safety:** Workflow refuses URLs containing production ref `fjxcdccgyhnvnnlnovcl`.
+**Safety:** Workflow refuses URLs containing production ref `fjxcdccgyhnvnnlnovcl`. Voice deploy also refuses a Railway environment whose name is not `staging` and refuses a `SUPABASE_URL` that points at ALCR.
 
 ---
 

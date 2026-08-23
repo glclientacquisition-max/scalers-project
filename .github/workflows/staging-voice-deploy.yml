@@ -1,0 +1,184 @@
+# Deploy THIS git commit to Railway staging Voice.
+# Desk previews are not Voice. Railway does not build PR branches by default.
+# Do not merge to main to get a DID test.
+#
+# GitHub → Actions → Deploy staging Voice → Run workflow from the PR branch.
+# Type `staging` in confirm_target. Then check /healthz.gitSha before calling.
+
+name: Deploy staging Voice
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Type staging to deploy this commit to Railway staging Voice only
+        required: true
+        type: string
+
+concurrency:
+  group: staging-voice-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging-voice:
+    name: Deploy this commit to staging Voice
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require explicit staging confirmation
+        run: |
+          if [ "${{ inputs.confirm_target }}" != "staging" ]; then
+            echo "Refusing: confirm_target must be exactly staging"
+            exit 1
+          fi
+
+      - name: Check Railway staging secrets
+        id: secrets
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_STAGING_PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID }}
+          RAILWAY_STAGING_SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
+          RAILWAY_STAGING_ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+        run: |
+          missing=0
+          for name in RAILWAY_TOKEN RAILWAY_STAGING_PROJECT_ID RAILWAY_STAGING_SERVICE_ID RAILWAY_STAGING_ENVIRONMENT_ID; do
+            eval "value=\${$name}"
+            if [ -z "$value" ]; then
+              echo "::error::$name is not set. Add it under repo Settings → Secrets. Do not merge to main to test Voice."
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+
+      - name: Guard Railway target is staging and not ALCR
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID }}
+          SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
+          ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+        run: |
+          set -euo pipefail
+          GQL=https://backboard.railway.com/graphql/v2
+          RESP=$(curl -sS "$GQL" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: scalers-staging-voice-deploy" \
+            -d "{\"query\":\"query(\$id: String!) { environment(id: \$id) { id name } }\",\"variables\":{\"id\":\"$ENVIRONMENT_ID\"}}")
+          echo "$RESP" | python3 -c '
+          import json, sys
+          body = json.load(sys.stdin)
+          if body.get("errors"):
+              raise SystemExit("Railway environment lookup failed: " + json.dumps(body["errors"]))
+          name = ((body.get("data") or {}).get("environment") or {}).get("name") or ""
+          print("railway_environment=" + name)
+          if name.strip().lower() != "staging":
+              raise SystemExit("Refusing: Railway environment name is %r, expected staging" % name)
+          '
+
+          VARS=$(curl -sS "$GQL" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: scalers-staging-voice-deploy" \
+            -d "{\"query\":\"query(\$projectId: String!, \$environmentId: String!, \$serviceId: String) { variables(projectId: \$projectId, environmentId: \$environmentId, serviceId: \$serviceId) }\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"environmentId\":\"$ENVIRONMENT_ID\",\"serviceId\":\"$SERVICE_ID\"}}")
+          echo "$VARS" | python3 -c '
+          import json, sys
+          body = json.load(sys.stdin)
+          if body.get("errors"):
+              raise SystemExit("Railway variables lookup failed: " + json.dumps(body["errors"]))
+          variables = (body.get("data") or {}).get("variables") or {}
+          if isinstance(variables, list):
+              mapped = {}
+              for item in variables:
+                  if isinstance(item, dict) and item.get("name"):
+                      mapped[item["name"]] = item.get("value") or ""
+              variables = mapped
+          if not isinstance(variables, dict):
+              raise SystemExit("Unexpected Railway variables shape")
+          url = str(variables.get("SUPABASE_URL") or "")
+          print("supabase_url_host_present=" + str(bool(url)))
+          if "fjxcdccgyhnvnnlnovcl" in url:
+              raise SystemExit("Refusing: target SUPABASE_URL points at production ALCR")
+          if url and "sgcdncjxauhsbunobmob" not in url:
+              raise SystemExit("Refusing: target SUPABASE_URL is not staging sgcdncjxauhsbunobmob")
+          '
+
+      - name: Stamp this commit for /healthz.gitSha
+        run: printf '%s\n' "${GITHUB_SHA}" > scripts/.deploy-sha
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy this checkout to staging Voice
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID }}
+          SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
+          ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+        run: |
+          set -euo pipefail
+          GQL=https://backboard.railway.com/graphql/v2
+          DEPLOYED=0
+          RESP=$(curl -sS "$GQL" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: scalers-staging-voice-deploy" \
+            -d "{\"query\":\"mutation(\$serviceId: String!, \$environmentId: String!, \$commitSha: String) { serviceInstanceDeployV2(serviceId: \$serviceId, environmentId: \$environmentId, commitSha: \$commitSha) }\",\"variables\":{\"serviceId\":\"$SERVICE_ID\",\"environmentId\":\"$ENVIRONMENT_ID\",\"commitSha\":\"$GITHUB_SHA\"}}") || true
+          echo "$RESP"
+          DID=$(echo "$RESP" | python3 -c 'import json,sys
+          try:
+            body=json.load(sys.stdin)
+            print((body.get("data") or {}).get("serviceInstanceDeployV2") or "")
+          except Exception:
+            print("")')
+          if [ -n "$DID" ]; then
+            echo "Triggered Railway GitHub deploy $DID for $GITHUB_SHA"
+            DEPLOYED=1
+          else
+            echo "GraphQL commit deploy unavailable. Uploading this checkout with railway up."
+            railway up --ci --detach \
+              --project "$PROJECT_ID" \
+              --environment staging \
+              --service "$SERVICE_ID"
+            DEPLOYED=1
+          fi
+          if [ "$DEPLOYED" -ne 1 ]; then
+            echo "Railway staging deploy did not start"
+            exit 1
+          fi
+
+      - name: Wait until staging /healthz.gitSha matches this commit
+        env:
+          STAGING_VOICE_URL: ${{ vars.STAGING_VOICE_URL }}
+        run: |
+          set -euo pipefail
+          URL="${STAGING_VOICE_URL:-https://scalers-staging-staging.up.railway.app}"
+          WANT="${GITHUB_SHA}"
+          SHORT="${GITHUB_SHA:0:7}"
+          echo "Waiting for $URL/healthz gitSha=$SHORT"
+          for i in $(seq 1 40); do
+            BODY=$(curl -sS "$URL/healthz" || true)
+            echo "[$i] $BODY"
+            MATCH=$(echo "$BODY" | python3 -c '
+          import json, sys
+          want = """'"$WANT"'"""
+          short = """'"$SHORT"'"""
+          try:
+              body = json.load(sys.stdin)
+          except Exception:
+              print("0")
+              raise SystemExit(0)
+          sha = str(body.get("gitSha") or "")
+          print("1" if sha and (sha == want or sha.startswith(short)) else "0")
+          ')
+            if [ "$MATCH" = "1" ]; then
+              echo "Staging Voice is running $SHORT"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for staging /healthz.gitSha to match $SHORT"
+          echo "Do not call the DID until gitSha matches. Re-run this workflow after checking Railway logs."
+          exit 1

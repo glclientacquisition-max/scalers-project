@@ -1,6 +1,9 @@
 # Environment secrets
 .env
 
+# Written by staging-voice-deploy.yml before railway up
+scripts/.deploy-sha
+
 # Node dependencies
 node_modules/
 

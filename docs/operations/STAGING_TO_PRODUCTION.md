@@ -41,7 +41,11 @@ Change on branch
       ↓
 PR → CI green
       ↓
-Test on STAGING (Desk + Voice + Supabase sgcdncjxauhsbunobmob)
+If Voice: staging-voice-deploy.yml on the PR branch
+      ↓
+Confirm staging /healthz.gitSha, then DID test
+      ↓
+Test Desk on Vercel preview or scalers-staging.vercel.app
       ↓
 Merge to main
       ↓
@@ -66,7 +70,9 @@ Use when the change is application code only (UI, voice logic, prompts in repo).
 - [ ] `npm run test:mvp` — pass
 - [ ] `cd dashboard && npm run lint && npm run build` — pass
 - [ ] Feature tested on **staging Desk** (`scalers-staging.vercel.app`)
-- [ ] If voice-impacting: test call on **staging Voice** + staging test DID
+- [ ] If voice-impacting: deploy the **PR commit** to Railway staging first. Do not merge to `main` to get a Voice test. Run `.github/workflows/staging-voice-deploy.yml` (`workflow_dispatch` on the PR branch). Then `GET https://scalers-staging-staging.up.railway.app/healthz` and confirm `gitSha` matches the PR commit. Only then call the staging test DID.
+
+Desk preview URLs are not Voice. Railway staging does not auto-build PR branches. `main` is the promotion vehicle, not the test vehicle.
 
 ### Merge
 
@@ -164,7 +170,7 @@ After env changes: **redeploy** the affected Vercel/Railway service.
 | You changed… | Staging action | Production action |
 | --- | --- | --- |
 | React / Next.js desk UI | Test on `scalers-staging.vercel.app` | Deploy `scalers-project` Vercel |
-| `server.js` / voice lane | Test on staging Railway + test DID | Deploy production Railway |
+| `server.js` / voice lane | Deploy PR commit via `staging-voice-deploy.yml`, confirm `/healthz.gitSha`, then test DID | Deploy production Railway |
 | New SQL script | Apply on `sgcdncjxauhsbunobmob` | Approved apply on ALCR |
 | Grant / RLS only | SQL on staging | Approved SQL on ALCR |
 | GitHub Actions / docs only | CI on PR | Merge; no app deploy unless needed |
@@ -181,7 +187,7 @@ Copy before any production step:
 [ ] Staging Supabase ref is sgcdncjxauhsbunobmob (not ALCR)
 [ ] Production Supabase ref is fjxcdccgyhnvnnlnovcl
 [ ] Staging feature tested on scalers-staging.vercel.app
-[ ] If voice: staging /healthz ok + test DID (not production DID)
+[ ] If voice: staging /healthz ok, `gitSha` matches the tested commit, test DID (not production DID)
 [ ] main merge + staging-validate green (if code merge)
 [ ] Production deploy targets scalers-project Vercel + production Railway
 [ ] Production smoke completed after deploy

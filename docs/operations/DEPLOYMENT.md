@@ -45,8 +45,10 @@ HEALTHCHECK → GET /healthz
 
 ```bash
 curl -sS https://YOUR-VOICE-HOST/healthz
-# {"ok":true,"soniox":{...}}
+# {"ok":true,"gitSha":"<commit>","startedAt":"...","soniox":{...}}
 ```
+
+`gitSha` is `RAILWAY_GIT_COMMIT_SHA`, `GIT_SHA`, or `scripts/.deploy-sha`. Use it to confirm staging Voice is running the PR commit before a DID test. To put a branch on staging without merging to `main`, run `.github/workflows/staging-voice-deploy.yml`.
 
 ### SautiKit configuration (external)
 
