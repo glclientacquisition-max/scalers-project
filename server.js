@@ -55,6 +55,9 @@ const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
   extractGeminiText,
   extractThoughtSignature,
+  extractGeminiParts,
+  appendGeminiStreamParts,
+  modelPartsForHistory,
   buildGeminiContents,
   geminiTurnTimeoutMs,
   withTimeout,
@@ -1352,31 +1355,25 @@ mediaWss.on('connection', (ws, req) => {
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
         nextBestAction.action
       );
-      // ASK_CLARIFICATION used to wait on Gemini. Booking turns then spoke the
-      // technical fallback (live miss: HD_c60a7a0eb699). Speak the slot now.
-      const clarifyAsk = nextBestAction.action === 'ASK_CLARIFICATION';
+      // Human handoff with missing name uses ASK_CLARIFICATION. Speak now so
+      // the caller never waits silently on Gemini (live miss: HD_02bda14e6547).
       const handoffNameAsk =
-        clarifyAsk &&
+        nextBestAction.action === 'ASK_CLARIFICATION' &&
         (brainState.intent === 'human' || Boolean(brainState.handoff?.requested)) &&
         (nextBestAction.slot === 'name' ||
           (Array.isArray(brainState.goal?.missingSlots) &&
             brainState.goal.missingSlots.includes('name')));
-      const needsImmediateProgress = actionMayExecute || clarifyAsk;
+      const needsImmediateProgress = actionMayExecute || handoffNameAsk;
 
-      // Action / clarify turns disable streaming and wait on Gemini+tools.
-      // Speak progress immediately so booking/handoff turns are not dead air.
+      // Action / handoff-clarify turns disable streaming and wait on Gemini+tools.
+      // Speak progress immediately so orders/escalations are not dead air.
       /** @type {Promise<void>} */
       let actionProgressSpeak = Promise.resolve();
       if (needsImmediateProgress && tts && !bargeInActive) {
-        const progressLine = clarifyAsk
+        const progressLine = handoffNameAsk
           ? pickClarifyProgress({
               action: nextBestAction.action,
-              slot:
-                nextBestAction.slot ||
-                (Array.isArray(brainState.goal?.missingSlots)
-                  ? brainState.goal.missingSlots[0]
-                  : '') ||
-                '',
+              slot: nextBestAction.slot || 'name',
               intent: brainState.intent,
               language: callLanguage,
             })
@@ -1385,7 +1382,6 @@ mediaWss.on('connection', (ws, req) => {
         turnTiming.markFiller();
         console.log(
           `[ws/media][${sidLabel()}] action-progress action=${nextBestAction.action}` +
-            `${clarifyAsk ? ` clarifyAsk=1 slot=${nextBestAction.slot || ''}` : ''}` +
             `${handoffNameAsk ? ' handoffNameAsk=1' : ''}` +
             ` lang=${callLanguage}: ${progressLine}`
         );
@@ -1692,18 +1688,12 @@ mediaWss.on('connection', (ws, req) => {
         }
         // Finish "let me save that" before the tool confirmation so they don't overlap.
         await actionProgressSpeak;
-        // Handoff name-ask already spoke the required question. Skip Gemini
-        // failure lines when any clarify/action progress already played.
+        // Handoff name-ask already spoke the required question — skip duplicate model prose.
         const skipDuplicateAsk =
           handoffNameAsk &&
           progressAlreadySpoken &&
           !result?.actionConfirmation;
-        const skipFailedModelAfterProgress =
-          progressAlreadySpoken &&
-          (Boolean(result?.timedOut) ||
-            Boolean(result?.llmFailed) ||
-            reply === AI_FALLBACK_LINE);
-        if (reply && !skipDuplicateAsk && !skipFailedModelAfterProgress) {
+        if (reply && !skipDuplicateAsk) {
           transcriptLog.push(`Agent: ${reply}`);
           turnTiming.markFirstSpokenChunk();
           await speakText(reply);
@@ -1720,15 +1710,10 @@ mediaWss.on('connection', (ws, req) => {
 
       // Hard guarantee: every completed caller turn must produce agent audio.
       if (!spokeThisTurn && !bargeInActive && tts) {
-        const guarantee = clarifyAsk
+        const guarantee = handoffNameAsk
           ? pickClarifyProgress({
               action: nextBestAction.action,
-              slot:
-                nextBestAction.slot ||
-                (Array.isArray(brainState.goal?.missingSlots)
-                  ? brainState.goal.missingSlots[0]
-                  : '') ||
-                '',
+              slot: nextBestAction.slot || 'name',
               intent: brainState.intent,
               language: callLanguage,
             })
@@ -2938,6 +2923,7 @@ async function runGeminiTurnStreaming(
   let fullText = '';
   let streamFailed = false;
   let thoughtSignature = '';
+  let modelParts = [];
   const timeoutMs = geminiTurnTimeoutMs();
 
   try {
@@ -2957,6 +2943,7 @@ async function runGeminiTurnStreaming(
             console.log(`[${callSid}] Gemini stream aborted (barge-in)`);
             break;
           }
+          modelParts = appendGeminiStreamParts(modelParts, chunk);
           thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
           const delta = extractGeminiText(chunk);
           if (!delta) continue;
@@ -2977,20 +2964,17 @@ async function runGeminiTurnStreaming(
       `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
     );
   } catch (err) {
-    if (isTimeoutError(err) && !fullText) {
-      console.error(`[${callSid}] Gemini stream timed out after ${timeoutMs}ms`);
-      return {
-        spokenText: AI_FALLBACK_LINE,
-        shouldEndCall: false,
-        timedOut: true,
-        llmFailed: true,
-      };
+    if (isTimeoutError(err) && fullText) {
+      console.warn(
+        `[${callSid}] Gemini stream timed out after ${timeoutMs}ms with partial text chars=${fullText.length}`
+      );
+    } else {
+      streamFailed = true;
+      console.error(
+        `[${callSid}] Gemini stream failed, falling back to generateContent:`,
+        err?.message || err
+      );
     }
-    streamFailed = true;
-    console.error(
-      `[${callSid}] Gemini stream failed, falling back to generateContent:`,
-      err?.message || err
-    );
   }
 
   if (streamFailed && !fullText) {
@@ -3019,9 +3003,15 @@ async function runGeminiTurnStreaming(
     actionConfirmation,
   });
 
+  const geminiParts = modelPartsForHistory({
+    geminiParts: modelParts,
+    text: fullText || buffer.getRaw(),
+    thoughtSignature,
+  });
   messages.push({
     role: 'assistant',
     content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
+    geminiParts,
     thoughtSignature: thoughtSignature || undefined,
   });
   return {
@@ -3106,10 +3096,16 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
         actionConfirmation,
       });
 
+  const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
     role: 'assistant',
     content: [spokenText, actionConfirmation].filter(Boolean).join(' '),
-    thoughtSignature: extractThoughtSignature(response) || undefined,
+    geminiParts: modelPartsForHistory({
+      geminiParts: extractGeminiParts(response),
+      text: outputText,
+      thoughtSignature,
+    }),
+    thoughtSignature,
   });
 
   return {

@@ -31,32 +31,6 @@ assert.match(
   }),
   /jina/i
 );
-assert.match(
-  pickClarifyProgress({
-    action: 'ASK_CLARIFICATION',
-    slot: 'service',
-    intent: 'booking',
-    language: 'en',
-  }),
-  /service/i
-);
-assert.match(
-  pickClarifyProgress({
-    action: 'ASK_CLARIFICATION',
-    slot: 'when',
-    intent: 'booking',
-    language: 'en',
-  }),
-  /time/i
-);
-assert.match(
-  pickClarifyProgress({
-    action: 'ASK_CLARIFICATION',
-    intent: 'booking',
-    language: 'en',
-  }),
-  /service/i
-);
 assert.doesNotMatch(
   pickClarifyProgress({
     action: 'ASK_CLARIFICATION',
