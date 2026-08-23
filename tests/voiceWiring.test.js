@@ -90,6 +90,12 @@ assert.match(
 
 assert.match(
   source,
+  /resolvePrefetchedStreamSpeech/,
+  'prefetched TTS with no chunks must speak fallback once, not also hit the guarantee'
+);
+
+assert.match(
+  source,
   /activeOutboundStreamId/,
   'outbound PCM must be gated by active Soniox stream id'
 );

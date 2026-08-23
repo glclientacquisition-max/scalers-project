@@ -57,6 +57,7 @@ const {
   geminiTurnTimeoutMs,
   withTimeout,
   isTimeoutError,
+  resolvePrefetchedStreamSpeech,
 } = require('./src/conversation/geminiVoice');
 const {
   selectProductsForTurn,
@@ -1555,28 +1556,46 @@ mediaWss.on('connection', (ws, req) => {
             if (activeTurnTiming === turnTiming) activeTurnTiming = null;
             return;
           }
-          try {
-            await speakSession.end();
-          } catch (err) {
-            console.error(
-              `[ws/media][${sidLabel()}] TTS stream end failed:`,
-              err?.message || err
-            );
-          } finally {
-            if (activePlaybackGeneration === streamPlaybackGen) {
-              speaking = false;
-              releaseQueuedCallerSpeech();
+          const planned = resolvePrefetchedStreamSpeech({
+            spokenChunks: spokenChunks.join(' '),
+            spokenText: result?.spokenText,
+            actionConfirmation: result?.actionConfirmation,
+            timedOut: result?.timedOut,
+            llmFailed: result?.llmFailed,
+            fallbackLine: AI_FALLBACK_LINE,
+          });
+          if (planned.alreadySpoken) {
+            try {
+              await speakSession.end();
+            } catch (err) {
+              console.error(
+                `[ws/media][${sidLabel()}] TTS stream end failed:`,
+                err?.message || err
+              );
+            } finally {
+              if (activePlaybackGeneration === streamPlaybackGen) {
+                speaking = false;
+                releaseQueuedCallerSpeech();
+              }
+              speakSession = null;
+            }
+            if (planned.reply) transcriptLog.push(`Agent: ${planned.reply}`);
+            spokeThisTurn = true;
+          } else {
+            try {
+              speakSession.cancel();
+            } catch {
+              /* ignore */
             }
             speakSession = null;
+            if (planned.speakNow && planned.reply && !bargeInActive) {
+              transcriptLog.push(`Agent: ${planned.reply}`);
+              turnTiming.markFirstSpokenChunk();
+              await speakText(planned.reply);
+              spokeThisTurn = true;
+              turnOutcome = result?.timedOut ? 'stream_timeout' : 'stream_fallback_full';
+            }
           }
-          const reply =
-            result?.spokenText ||
-            spokenChunks.join(' ') ||
-            spokenTextWithoutToolFallback({
-              actionConfirmation: result?.actionConfirmation,
-            });
-          transcriptLog.push(`Agent: ${reply}`);
-          if (spokenChunks.length) spokeThisTurn = true;
         } else if (!bargeInActive) {
           // Stream produced no flushable chunks (or TTS never opened) — speak full reply.
           if (speakSessionReady) {
@@ -1587,15 +1606,21 @@ mediaWss.on('connection', (ws, req) => {
               /* ignore */
             }
           }
-          const reply = spokenTextWithoutToolFallback({
-            spoken: result?.spokenText,
+          const planned = resolvePrefetchedStreamSpeech({
+            spokenChunks: '',
+            spokenText: result?.spokenText,
             actionConfirmation: result?.actionConfirmation,
+            timedOut: result?.timedOut,
+            llmFailed: result?.llmFailed,
+            fallbackLine: AI_FALLBACK_LINE,
           });
-          transcriptLog.push(`Agent: ${reply}`);
-          turnTiming.markFirstSpokenChunk();
-          await speakText(reply);
-          spokeThisTurn = true;
-          turnOutcome = 'stream_fallback_full';
+          if (planned.speakNow && planned.reply) {
+            transcriptLog.push(`Agent: ${planned.reply}`);
+            turnTiming.markFirstSpokenChunk();
+            await speakText(planned.reply);
+            spokeThisTurn = true;
+            turnOutcome = result?.timedOut ? 'stream_timeout' : 'stream_fallback_full';
+          }
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
           bargeInActive = false;
@@ -1616,7 +1641,12 @@ mediaWss.on('connection', (ws, req) => {
           speakSession = null;
         }
         const reply =
-          result?.spokenText || (result?.actionConfirmation ? '' : AI_FALLBACK_LINE);
+          result?.spokenText ||
+          (result?.actionConfirmation
+            ? ''
+            : result?.timedOut || result?.llmFailed
+              ? AI_FALLBACK_LINE
+              : '');
         if (bargeInActive) {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
           discardUnspokenAssistant(reply);
@@ -2614,7 +2644,9 @@ const OUTCOME_TOOL_ACTIONS = new Set([
 function spokenTextWithoutToolFallback({ spoken = '', actionConfirmation = '' } = {}) {
   const text = String(spoken || '').trim();
   if (text) return text;
-  return actionConfirmation ? '' : AI_FALLBACK_LINE;
+  // Empty model text is not a technical failure. Tool confirmations speak later;
+  // the turn guarantee asks the next slot if nothing else was spoken.
+  return actionConfirmation ? '' : '';
 }
 
 async function safeApplyGeminiTools(callSid, parsed) {
@@ -2682,7 +2714,7 @@ function geminiVoiceConfig(systemPrompt) {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     // Slightly lower temp + shorter cap → faster, more consistent phone lines.
     temperature: Number(process.env.GEMINI_VOICE_TEMPERATURE || 0.35),
-    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 120),
+    maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 256),
     // MINIMAL keeps voice latency down; set GEMINI_THINKING_LEVEL=LOW if needed.
     thinkingConfig: {
       thinkingLevel: process.env.GEMINI_THINKING_LEVEL || 'MINIMAL',
@@ -2901,7 +2933,12 @@ async function runGeminiTurnStreaming(
   } catch (err) {
     if (isTimeoutError(err) && !fullText) {
       console.error(`[${callSid}] Gemini stream timed out after ${timeoutMs}ms`);
-      return { spokenText: AI_FALLBACK_LINE, shouldEndCall: false, timedOut: true };
+      return {
+        spokenText: AI_FALLBACK_LINE,
+        shouldEndCall: false,
+        timedOut: true,
+        llmFailed: true,
+      };
     }
     streamFailed = true;
     console.error(
@@ -2996,7 +3033,12 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
 
   if (lastErr || !response) {
     // Keep the call open so the caller can try again after a transient outage.
-    return { spokenText: AI_FALLBACK_LINE, shouldEndCall: false };
+    return {
+      spokenText: AI_FALLBACK_LINE,
+      shouldEndCall: false,
+      llmFailed: true,
+      timedOut: isTimeoutError(lastErr),
+    };
   }
 
   const outputText = extractGeminiText(response);

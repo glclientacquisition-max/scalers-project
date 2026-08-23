@@ -7,6 +7,7 @@ const {
   geminiTurnTimeoutMs,
   withTimeout,
   isTimeoutError,
+  resolvePrefetchedStreamSpeech,
 } = require('../src/conversation/geminiVoice');
 
 describe('extractGeminiText', () => {
@@ -92,6 +93,43 @@ describe('withTimeout', () => {
   it('recognizes timeout errors', () => {
     assert.equal(isTimeoutError(new Error('Gemini stream timed out after 8000ms')), true);
     assert.equal(isTimeoutError(new Error('503 unavailable')), false);
+  });
+});
+
+describe('resolvePrefetchedStreamSpeech', () => {
+  const fallback = "Sorry, I'm having a technical issue and couldn't complete that. Please try again.";
+
+  it('does not speak again when stream chunks already played', () => {
+    const out = resolvePrefetchedStreamSpeech({
+      spokenChunks: 'Which service do you need?',
+      spokenText: 'Which service do you need?',
+      fallbackLine: fallback,
+    });
+    assert.equal(out.alreadySpoken, true);
+    assert.equal(out.speakNow, false);
+  });
+
+  it('speaks a timeout fallback once when prefetch opened with no chunks', () => {
+    const out = resolvePrefetchedStreamSpeech({
+      spokenChunks: '',
+      spokenText: fallback,
+      timedOut: true,
+      llmFailed: true,
+      fallbackLine: fallback,
+    });
+    assert.equal(out.alreadySpoken, false);
+    assert.equal(out.speakNow, true);
+    assert.equal(out.reply, fallback);
+  });
+
+  it('leaves empty successful output for the turn guarantee', () => {
+    const out = resolvePrefetchedStreamSpeech({
+      spokenChunks: '',
+      spokenText: '',
+      fallbackLine: fallback,
+    });
+    assert.equal(out.speakNow, false);
+    assert.equal(out.reply, '');
   });
 });
 
