@@ -8,6 +8,8 @@ const {
   geminiTurnTimeoutMs,
   withTimeout,
   isTimeoutError,
+  classifyGeminiError,
+  isRetryableGeminiError,
   resolvePrefetchedStreamSpeech,
 } = require('../src/conversation/geminiVoice');
 
@@ -179,6 +181,31 @@ describe('resolvePrefetchedStreamSpeech', () => {
     });
     assert.equal(out.speakNow, false);
     assert.equal(out.reply, '');
+  });
+});
+
+describe('classifyGeminiError', () => {
+  it('does not retry billing or denied projects', () => {
+    const billing = classifyGeminiError({
+      status: 429,
+      message: 'Your prepayment credits are depleted. Please go to AI Studio',
+    });
+    assert.equal(billing.retryable, false);
+    assert.equal(billing.kind, 'billing');
+    assert.equal(
+      isRetryableGeminiError({
+        status: 403,
+        message: 'Your project has been denied access',
+      }),
+      false
+    );
+  });
+
+  it('retries overload 429s', () => {
+    assert.equal(
+      isRetryableGeminiError({ status: 429, message: 'RESOURCE_EXHAUSTED overloaded' }),
+      true
+    );
   });
 });
 

@@ -138,6 +138,47 @@ function isTimeoutError(err) {
   return /timed out after/i.test(String(err?.message || err || ''));
 }
 
+function classifyGeminiError(err) {
+  const status = Number(err?.status || err?.code || 0);
+  const msg = String(err?.message || err || '').toLowerCase();
+  if (
+    status === 403 ||
+    msg.includes('denied access') ||
+    msg.includes('permission_denied')
+  ) {
+    return { retryable: false, kind: 'denied' };
+  }
+  if (
+    msg.includes('credits are depleted') ||
+    msg.includes('prepayment') ||
+    msg.includes('prepay') ||
+    (status === 429 && msg.includes('billing'))
+  ) {
+    return { retryable: false, kind: 'billing' };
+  }
+  if (
+    status === 429 ||
+    msg.includes('429') ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('overloaded')
+  ) {
+    return { retryable: true, kind: 'rate_limit' };
+  }
+  if (
+    status === 500 ||
+    status === 503 ||
+    msg.includes('503') ||
+    msg.includes('unavailable')
+  ) {
+    return { retryable: true, kind: 'unavailable' };
+  }
+  return { retryable: false, kind: 'error' };
+}
+
+function isRetryableGeminiError(err) {
+  return classifyGeminiError(err).retryable === true;
+}
+
 /**
  * After a streamed Gemini turn, decide whether prefetch TTS already spoke
  * and what (if anything) still needs speakText. Empty successful model
@@ -182,5 +223,7 @@ module.exports = {
   buildGeminiContents,
   withTimeout,
   isTimeoutError,
+  classifyGeminiError,
+  isRetryableGeminiError,
   resolvePrefetchedStreamSpeech,
 };

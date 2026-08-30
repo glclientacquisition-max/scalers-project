@@ -4,6 +4,9 @@ const {
   pickActionProgress,
   pickClarifyProgress,
   pickContextualAck,
+  pickLlmRecoveryLine,
+  pickLlmRecoverySaved,
+  looksLikeCallerName,
 } = require('../src/conversation/dynamicSpeech');
 
 assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay, let me save that.');
@@ -40,5 +43,12 @@ assert.doesNotMatch(
   }),
   /[—–]/
 );
+assert.match(pickLlmRecoveryLine({ language: 'en' }), /name/i);
+assert.match(pickLlmRecoveryLine({ language: 'en' }), /team/i);
+assert.doesNotMatch(pickLlmRecoveryLine({ language: 'en' }), /technical issue/i);
+assert.doesNotMatch(pickLlmRecoveryLine({ language: 'en' }), /[—–]/);
+assert.match(pickLlmRecoverySaved({ language: 'en' }), /name/i);
+assert.equal(looksLikeCallerName('Ann Wanjiku'), true);
+assert.equal(looksLikeCallerName('Carpet cleaning'), false);
 
 console.log('actionProgress tests passed.');
