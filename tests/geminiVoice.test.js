@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   extractGeminiText,
   extractThoughtSignature,
+  appendGeminiStreamParts,
   buildGeminiContents,
   geminiTurnTimeoutMs,
   withTimeout,
@@ -69,6 +70,54 @@ describe('buildGeminiContents', () => {
     ]);
     assert.equal(contents[1].role, 'model');
     assert.equal(contents[1].parts[0].thoughtSignature, 'sig-abc');
+  });
+
+  it('replays stored model parts without merging a signed part into text', () => {
+    const contents = buildGeminiContents([
+      { role: 'user', content: 'book tomorrow' },
+      {
+        role: 'assistant',
+        content: 'Which service?',
+        geminiParts: [
+          { thought: true, text: 'reason', thoughtSignature: 'sig-thought' },
+          { text: 'Which service?' },
+          { text: '', thoughtSignature: 'sig-final' },
+        ],
+      },
+      { role: 'user', content: 'Carpet cleaning.' },
+    ]);
+    assert.deepEqual(contents[1].parts, [
+      { thought: true, text: 'reason', thoughtSignature: 'sig-thought' },
+      { text: 'Which service?' },
+      { text: '', thoughtSignature: 'sig-final' },
+    ]);
+    assert.equal(contents[2].parts[0].text, 'Carpet cleaning.');
+  });
+
+  it('merges consecutive user turns after a failed Gemini attempt', () => {
+    const contents = buildGeminiContents([
+      { role: 'user', content: 'book tomorrow' },
+      { role: 'user', content: 'carpet cleaning' },
+    ]);
+    assert.deepEqual(contents, [
+      { role: 'user', parts: [{ text: 'book tomorrow carpet cleaning' }] },
+    ]);
+  });
+});
+
+describe('appendGeminiStreamParts', () => {
+  it('keeps an empty signed trailer part', () => {
+    let parts = [];
+    parts = appendGeminiStreamParts(parts, {
+      candidates: [{ content: { parts: [{ text: 'Which service?' }] } }],
+    });
+    parts = appendGeminiStreamParts(parts, {
+      candidates: [{ content: { parts: [{ text: '', thoughtSignature: 'sig-end' }] } }],
+    });
+    assert.deepEqual(parts, [
+      { text: 'Which service?' },
+      { text: '', thoughtSignature: 'sig-end' },
+    ]);
   });
 });
 

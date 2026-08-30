@@ -52,7 +52,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 6. Spoken agent lines that play to the caller should land in the transcript.
 7. Keep `db.js` orchestration surface stable (`upsertCall`, `appendTranscript`, `attachRecording`, `chargeCallToWallet`, …).
 8. Greeting must await TTS ready (`ttsReadyPromise`) — never call `speakText` while `tts` is still null.
-9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) and `ASK_CLARIFICATION` speak an immediate progress line before Gemini+tools. If that line already played, do not also speak the technical fallback.
+9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air.
 10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
 
 ## Env knobs (Voice)
@@ -81,6 +81,8 @@ Runs: TTS normalize → spoken stream buffer → turn-taking → wiring.
 For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (see `docs/WEBHOOK_TUNNEL.md`).
 
 Staging DID tests require the PR commit on Railway staging first. Run `.github/workflows/staging-voice-deploy.yml`, then confirm `GET /healthz` `gitSha`. Do not merge to `main` to get a Voice test.
+
+Gemini 3 Flash turns must replay model `parts` (including thought signatures) on the next request. Do not flatten signed parts into one text part, and do not speak a canned booking line to hide a failed Gemini turn.
 
 ## Chat starter (paste into new Voice chats)
 
