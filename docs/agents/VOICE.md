@@ -82,7 +82,7 @@ For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (se
 
 Staging DID tests require the PR commit on Railway staging first. Run `.github/workflows/staging-voice-deploy.yml`, then confirm `GET /healthz` `gitSha`. Do not merge to `main` to get a Voice test.
 
-Gemini 3 Flash turns must replay model `parts` (including thought signatures) on the next request. Do not flatten signed parts into one text part, and do not speak a canned booking line to hide a failed Gemini turn.
+Gemini 3 Flash turns must replay model `parts` (including thought signatures) on the next request. Do not flatten signed parts into one text part, and do not speak a canned booking line to hide a failed Gemini turn. If Gemini is down (403/429 billing), ask for a name and take a callback. Do not invent a booking. Do not retry depleted credits.
 
 ## Chat starter (paste into new Voice chats)
 

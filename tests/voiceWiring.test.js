@@ -18,8 +18,8 @@ assert.match(
 
 assert.match(
   source,
-  /transcriptLog\.push\(`Agent: \$\{AI_FALLBACK_LINE\}`\);\s*await speakText\(AI_FALLBACK_LINE\);/,
-  'spoken technical fallbacks must also be persisted in the transcript'
+  /resolveLlmRecoverySpeech/,
+  'Gemini failure must speak a callback recovery line and persist it'
 );
 
 assert.match(

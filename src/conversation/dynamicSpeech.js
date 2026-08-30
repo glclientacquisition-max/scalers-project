@@ -205,6 +205,42 @@ function pickClarifyProgress(opts = {}) {
   return 'Okay, one moment.';
 }
 
+/**
+ * Spoken line when Gemini is down. Ask for a callback name.
+ * Do not invent a booking. Do not say "technical issue, try again."
+ */
+function pickLlmRecoveryLine(opts = {}) {
+  const lang = opts.language || 'en';
+  const sw = lang === 'sw' || lang === 'sheng';
+  if (opts.alreadyOffered) {
+    if (sw) return 'Bado siwezi kumaliza. Niambie jina lako. Tutakupigia.';
+    return 'I still cannot finish that. May I have your name? We will call you back.';
+  }
+  if (sw) return 'Siwezi kumaliza hiyo kwenye simu hii. Niambie jina lako. Timu itakupigia.';
+  return 'I cannot finish that on this line. May I have your name? The team will reach you.';
+}
+
+function pickLlmRecoverySaved(opts = {}) {
+  const lang = opts.language || 'en';
+  const sw = lang === 'sw' || lang === 'sheng';
+  if (sw) return 'Sawa. Nimechukua jina. Timu itakupigia.';
+  return 'Okay. I have your name. The team will reach you.';
+}
+
+function looksLikeCallerName(text) {
+  const t = normalizeCallerText(text);
+  if (!t || PURE_NOISE.has(t) || CONFIRM_ANSWERS.has(t)) return false;
+  if (
+    /\b(book|booking|carpet|couch|mattress|tomorrow|today|clean|appointment|huduma)\b/.test(
+      t
+    )
+  ) {
+    return false;
+  }
+  const words = t.split(' ').filter(Boolean);
+  return words.length >= 1 && words.length <= 3 && t.length <= 40;
+}
+
 const PURE_NOISE = new Set([
   'ok',
   'okay',
@@ -314,6 +350,9 @@ module.exports = {
   pickContextualAck,
   pickActionProgress,
   pickClarifyProgress,
+  pickLlmRecoveryLine,
+  pickLlmRecoverySaved,
+  looksLikeCallerName,
   cleanSpokenLine,
   greetingLooksValid,
   isNonSubstantiveTurn,
