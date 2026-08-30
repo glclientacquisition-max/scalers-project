@@ -32,7 +32,8 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 | [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md) | Permanent engineering rules |
 | [`docs/agents/AGENT_ARCHITECTURE.md`](docs/agents/AGENT_ARCHITECTURE.md) | AI agent stack on live calls |
 | [`docs/database/DATABASE_GOVERNANCE.md`](docs/database/DATABASE_GOVERNANCE.md) | Manual SQL model |
-| [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](docs/frontend/FRONTEND_RECONNAISSANCE.md) | Desk Frontend 2.0 recon (no UI until constitution) |
+| [`docs/frontend/FRONTEND_CONSTITUTION.md`](docs/frontend/FRONTEND_CONSTITUTION.md) | Desk Frontend 2.0 UX authority (no UI until design system) |
+| [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](docs/frontend/FRONTEND_RECONNAISSANCE.md) | Desk Frontend 2.0 recon |
 
 ---
 
