@@ -53,8 +53,8 @@ Boot + `/healthz` expose SMS `configured` vs **`verified`** (live balance probe)
 | --- | --- |
 | Human asked, name missing | Immediate ask for name (`pickClarifyProgress`) |
 | Escalate running | Progress: “Okay, let me get the team on that.” |
-| SMS/WA/email delivered | “Done — I've texted/sent it to the team.” |
-| Desk-only soft success | “Done — I've noted that for the team to follow up.” |
+| SMS/WA/email delivered | “Okay, I've texted/sent it to the team.” |
+| Desk-only soft success | “Okay, I've noted that for the team to follow up.” |
 | Invalid / missing name on tool | “Tell me your name so I can reach the team…” |
 
 Never claim a live transfer unless a transfer executor actually runs.

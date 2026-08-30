@@ -177,6 +177,13 @@ function pickActionProgress(action, lang) {
 }
 
 /**
+ * Mid-call name ask used by human handoff and Gemini-down recovery.
+ * One person: same sentence, not a new register.
+ */
+const REACH_THEM_NAME_ASK_EN = 'May I have your name so I can reach them?';
+const REACH_THEM_NAME_ASK_SW = 'Niambie jina lako ndio niwasiliane nao.';
+
+/**
  * Immediate spoken line while Gemini thinks on clarification / handoff turns.
  * Prevents dead air when the caller asked for a human but name is still missing
  * (ASK_CLARIFICATION — streaming path used to wait silently on the model).
@@ -194,37 +201,39 @@ function pickClarifyProgress(opts = {}) {
     intent === 'human' || action === 'ESCALATE' || action === 'TRANSFER';
 
   if (handoff && (slot === 'name' || !slot)) {
-    if (sw) return 'Sawa. Niambie jina lako ndio niwasiliane nao.';
-    return 'Okay. May I have your name so I can reach them?';
+    if (sw) return `Sawa. ${REACH_THEM_NAME_ASK_SW}`;
+    return `Okay. ${REACH_THEM_NAME_ASK_EN}`;
   }
   if (slot === 'name') {
     if (sw) return 'Sawa. Niambie jina lako.';
     return 'Okay. May I have your name?';
   }
   if (sw) return 'Sawa, nimekuelewa.';
-  return 'Okay, one moment.';
+  return 'Okay.';
 }
 
 /**
- * Spoken line when Gemini is down. Ask for a callback name.
- * Do not invent a booking. Do not say "technical issue, try again."
+ * Spoken line when Gemini is down. Same family as greeting / closed-message /
+ * handoff: Okay opener, contractions, first person, honesty then still help.
+ * Reuses the handoff name ask. Do not invent a booking. Do not say
+ * "technical issue", "on this line", or "cannot".
  */
 function pickLlmRecoveryLine(opts = {}) {
   const lang = opts.language || 'en';
   const sw = lang === 'sw' || lang === 'sheng';
   if (opts.alreadyOffered) {
-    if (sw) return 'Bado siwezi kumaliza. Niambie jina lako. Tutakupigia.';
-    return 'I still cannot finish that. May I have your name? We will call you back.';
+    if (sw) return `Sawa, bado siwezi kumaliza. ${REACH_THEM_NAME_ASK_SW}`;
+    return `Okay, I still can't finish that. ${REACH_THEM_NAME_ASK_EN}`;
   }
-  if (sw) return 'Siwezi kumaliza hiyo kwenye simu hii. Niambie jina lako. Timu itakupigia.';
-  return 'I cannot finish that on this line. May I have your name? The team will reach you.';
+  if (sw) return `Sawa, siwezi kumaliza hiyo sasa hivi. ${REACH_THEM_NAME_ASK_SW}`;
+  return `Okay, I can't finish that just now. ${REACH_THEM_NAME_ASK_EN}`;
 }
 
 function pickLlmRecoverySaved(opts = {}) {
   const lang = opts.language || 'en';
   const sw = lang === 'sw' || lang === 'sheng';
-  if (sw) return 'Sawa. Nimechukua jina. Timu itakupigia.';
-  return 'Okay. I have your name. The team will reach you.';
+  if (sw) return 'Sawa, nimechukua jina lako. Nitawaambia timu wakupigie.';
+  return "Okay, I have your name. I'll have the team reach you.";
 }
 
 function looksLikeCallerName(text) {

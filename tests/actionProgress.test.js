@@ -43,11 +43,38 @@ assert.doesNotMatch(
   }),
   /[—–]/
 );
-assert.match(pickLlmRecoveryLine({ language: 'en' }), /name/i);
-assert.match(pickLlmRecoveryLine({ language: 'en' }), /team/i);
-assert.doesNotMatch(pickLlmRecoveryLine({ language: 'en' }), /technical issue/i);
-assert.doesNotMatch(pickLlmRecoveryLine({ language: 'en' }), /[—–]/);
-assert.match(pickLlmRecoverySaved({ language: 'en' }), /name/i);
+const recoveryEn = pickLlmRecoveryLine({ language: 'en' });
+const recoveryEnAgain = pickLlmRecoveryLine({ language: 'en', alreadyOffered: true });
+const recoverySavedEn = pickLlmRecoverySaved({ language: 'en' });
+const handoffNameEn = pickClarifyProgress({
+  action: 'ASK_CLARIFICATION',
+  slot: 'name',
+  intent: 'human',
+  language: 'en',
+});
+assert.strictEqual(
+  recoveryEn,
+  "Okay, I can't finish that just now. May I have your name so I can reach them?"
+);
+assert.strictEqual(
+  recoveryEnAgain,
+  "Okay, I still can't finish that. May I have your name so I can reach them?"
+);
+assert.ok(
+  recoveryEn.includes(handoffNameEn.replace(/^Okay\.\s*/, '')),
+  'recovery must reuse the handoff name ask'
+);
+assert.doesNotMatch(recoveryEn, /cannot|on this line|technical issue/i);
+assert.doesNotMatch(recoveryEnAgain, /cannot|on this line|we will call you back/i);
+assert.doesNotMatch(recoveryEn, /[—–]/);
+assert.ok(recoveryEn.split(/\s+/).length <= 25);
+assert.ok(recoveryEnAgain.split(/\s+/).length <= 25);
+assert.strictEqual(
+  recoverySavedEn,
+  "Okay, I have your name. I'll have the team reach you."
+);
+assert.match(pickLlmRecoveryLine({ language: 'sw' }), /jina/i);
+assert.doesNotMatch(pickLlmRecoveryLine({ language: 'sw' }), /simu hii/i);
 assert.equal(looksLikeCallerName('Ann Wanjiku'), true);
 assert.equal(looksLikeCallerName('Carpet cleaning'), false);
 

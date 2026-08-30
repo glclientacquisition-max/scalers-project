@@ -132,7 +132,7 @@ async function smokeHours() {
     sundayInserts === 0 &&
     sunday.results[0]?.code === 'closed_day' &&
     !/done/i.test(sundaySpoken) &&
-    !/logged your visit request/i.test(sundaySpoken);
+    !/saved your visit request/i.test(sundaySpoken);
   console.log(`${sundayOk ? '✓' : '✗'} Hours smoke: Sunday 21:00 not persisted`);
   if (!sundayOk) {
     console.log({ sundayInserts, result: sunday.results[0], sundaySpoken });
@@ -163,7 +163,7 @@ async function smokeHours() {
     tuePayloads.length === 1 &&
     tuesday.results[0]?.status === 'succeeded' &&
     tuesday.results[0]?.record?.status === 'requested' &&
-    /logged your visit request/i.test(tueSpoken) &&
+    /saved your visit request/i.test(tueSpoken) &&
     !/done/i.test(tueSpoken) &&
     !/confirmed/i.test(tueSpoken);
   console.log(`${tueOk ? '✓' : '✗'} Hours smoke: Tuesday 10:00 persisted as requested`);
