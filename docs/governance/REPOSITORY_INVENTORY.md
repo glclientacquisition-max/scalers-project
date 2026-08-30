@@ -72,6 +72,7 @@ Classification: **CORE** · **ACTIVE** · **LEGACY** · **EXPERIMENTAL** · **DU
 | Path | Purpose | Status |
 | --- | --- | --- |
 | `.cursor/rules/*.mdc` | Lane + design mandate rules | CORE |
+| `.cursor/mcp.json` | Cursor Railway hosted MCP | CORE |
 
 ---
 

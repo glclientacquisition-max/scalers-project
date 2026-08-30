@@ -16,6 +16,7 @@ Use for database migrations, auth membership, environment/deploy, and any change
 | `dashboard/src/app/api/login/**`, `api/logout/**`, `api/tenant/**` | Auth/session APIs |
 | `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md`, `TARGET_MODULE_LAYOUT.md`, `PRODUCTION_CUTOVER.md` | Platform architecture docs |
 | `Dockerfile`, `railway.toml`, `render.yaml`, root `.env.example` structure | Deploy / env skeleton |
+| `.cursor/mcp.json` | Cursor Railway MCP (Voice deploy tooling) |
 | `AGENTS.md`, `docs/agents/**` | Lane contracts (meta) |
 | `scripts/smoke-db.js` | DB smoke |
 
@@ -38,6 +39,12 @@ Also owns: merge conflicts on shared files; defining new stable function signatu
 5. Tenant isolation via `tenant_members`; no cross-tenant leaks in owner policies.
 6. Prefer expanding `src/db.js` behind old names over breaking `server.js` call sites.
 7. Deploy split stays: voice on Railway/Render; desk on Vercel (`dashboard` root).
+
+## Cursor Railway plugin
+
+Voice deploys are operated from Cursor with the Railway marketplace plugin (`/add-plugin railway`) plus project MCP in `.cursor/mcp.json` (`https://mcp.railway.com`).
+
+Connect Railway in **Cursor desktop** (OAuth). Cloud Agents cannot complete that login. After the account is connected, use Railway tools for staging and production Voice instead of guessing dashboard steps.
 
 ## Test / verify
 
