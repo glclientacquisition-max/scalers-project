@@ -18,7 +18,7 @@ export function CallAudioPlayer({ src }: { src: string }) {
   }
 
   return (
-    <div className="sticky bottom-0 z-20 -mx-4 mt-8 border-t border-[var(--line)] bg-[var(--card)]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:rounded-t-2xl sm:px-6">
+    <div className="sticky bottom-0 z-20 -mx-4 mt-8 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:rounded-t-2xl sm:px-6">
       <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <audio
           ref={audioRef}
@@ -38,10 +38,10 @@ export function CallAudioPlayer({ src }: { src: string }) {
               onClick={() => applySpeed(s)}
               aria-pressed={speed === s}
               className={[
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition",
+                "rounded-full border px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
                 speed === s
-                  ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                  : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]/60",
+                  ? "border-[#0096FF] bg-[#0096FF] text-white"
+                  : "border-line text-ink-soft hover:border-[#0096FF]/60",
               ].join(" ")}
             >
               {s}x

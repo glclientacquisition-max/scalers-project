@@ -51,12 +51,8 @@ async function saveBulletin(
     .eq("id", tenantId);
 
   if (error) {
-    if (/daily_bulletin/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/daily_bulletin.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    console.error("[settings.bulletin]", error.message);
+    return { error: "Could not save." };
   }
   revalidatePath("/settings");
   return {};

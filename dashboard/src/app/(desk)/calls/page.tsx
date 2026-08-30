@@ -292,12 +292,7 @@ export default async function CallsPage({
   if (error) {
     return (
       <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Could not load calls: {error.message}
-        {/row-level security|permission denied|rls/i.test(error.message) ? (
-          <p className="mt-2 text-sm text-ink-soft">
-            Apply docs/supabase/owner_rls.sql in Supabase if you have not yet.
-          </p>
-        ) : null}
+        Calls could not be loaded.
       </div>
     );
   }
@@ -312,8 +307,7 @@ export default async function CallsPage({
     <div>
       {!leadStatusReady ? (
         <p className="mb-6 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-ink-soft">
-          Lead statuses need a one-time database update. Apply{" "}
-          <code>docs/supabase/lead_status.sql</code> in Supabase.
+          Lead statuses are not available.
         </p>
       ) : (
         <CallsToolbar active={activeFilter} counts={statusCounts} q={q} />

@@ -105,7 +105,7 @@ export function MarkLeadActionButton({
               setError(
                 res.error ||
                   (action === "archived"
-                    ? "Could not archive. Apply docs/supabase/lead_status_archive.sql if needed."
+                    ? "Could not archive."
                     : "Could not mark done.")
               );
               return;

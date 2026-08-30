@@ -224,80 +224,8 @@ export async function saveAndCompileSettings(
   const { error } = await workspace.client.from("tenants").update(patch).eq("id", tenant.id);
 
   if (error) {
-    if (/product_catalog|social_handles/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/product_catalog_and_social.sql in Supabase.`,
-      };
-    }
-    if (/vertical|handoff_mode|business_locations|business_policies/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/business_operating_model.sql in Supabase.`,
-      };
-    }
-    if (/alert_email/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/alert_email.sql in Supabase.`,
-      };
-    }
-    if (/notify_channels/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/notify_channels.sql in Supabase.`,
-      };
-    }
-    if (/unknown_answer_fallback/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/employee_training.sql in Supabase.`,
-      };
-    }
-    if (/services_catalog/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/services_catalog.sql in Supabase.`,
-      };
-    }
-    if (/hours_schedule/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/hours_schedule.sql in Supabase.`,
-      };
-    }
-    if (/after_hours_mode/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/after_hours_mode.sql in Supabase.`,
-      };
-    }
-    if (/agent_tools/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/agent_tools.sql in Supabase.`,
-      };
-    }
-    if (/soniox_voice_id|soniox_voice_label/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/soniox_voice_id.sql in Supabase.`,
-      };
-    }
-    if (/tts_lexicon/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
-      };
-    }
-    if (/agent_name|team_directory|faqs/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/knowledge_acquisition_phase1.sql in Supabase.`,
-      };
-    }
-    const missingCol = /business_hours|services_offered|agent_tone|column/i.test(
-      error.message
-    );
-    if (missingCol) {
-      return {
-        error: `${error.message} Apply docs/supabase/tenant_business_profile.sql in Supabase.`,
-      };
-    }
-    if (/row-level security|permission denied|rls/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/owner_rls.sql if needed.`,
-      };
-    }
-    return { error: error.message };
+    console.error("[settings.save]", error.message);
+    return { error: "Could not save." };
   }
 
   await getAuthUser();

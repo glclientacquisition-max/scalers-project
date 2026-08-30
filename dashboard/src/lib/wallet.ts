@@ -105,7 +105,7 @@ export function resolveSoftSpendLimitStatus(opts: {
 export function softSpendLimitMessage(status: SoftSpendLimitStatus): string | null {
   if (!status.enabled || !status.limitKes) return null;
   if (status.thresholdReached >= 100) {
-    return `Soft limit reached (KES ${status.limitKes.toLocaleString("en-KE")} this month). Calls still work — raise or turn off the limit if you want.`;
+    return `Soft limit reached (KES ${status.limitKes.toLocaleString("en-KE")} this month). Calls still work. Raise or turn off the limit if you want.`;
   }
   if (status.thresholdReached >= 80) {
     return `Approaching your soft limit (${Math.round(status.percent)}% of KES ${status.limitKes.toLocaleString("en-KE")}).`;

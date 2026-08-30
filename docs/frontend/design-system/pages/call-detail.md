@@ -19,8 +19,8 @@ Caller/receptionist bubbles, urgent treatment, `LeadStatusToggle`, recording pla
 
 ## Debt (do not invent a new detail page)
 
-- Primary “Reply on WhatsApp” is green fill. Canonical: blue fill, green glyph (`TriageLeadCard`).
+- Primary “Reply on WhatsApp” is blue fill with a green glyph (`TriageLeadCard` recipe). Consumed in Phase 5.
 - Caller number appears in the header and again in a Caller card. Fine to leave; do not add a third copy.
-- `←` in the back link is a character, not an em dash. Leave or swap to “Back” in a copy pass.
+- Back link label is “Back”. Destination still honors `?from=`.
 
 Transcript stays the main reading surface. Do not move it under the summary on desktop.

@@ -154,7 +154,7 @@ export async function screenPronunciationSuggestionsAction(
       suggestions: local.length ? local : parseSuggestionList([]),
       error:
         err instanceof Error
-          ? `AI screen unavailable — showing basic lines. ${err.message}`
+          ? "Screen unavailable. Showing basic lines."
           : undefined,
     };
   }
@@ -268,18 +268,8 @@ export async function confirmPronunciationRecording(
     .eq("id", tenant.id);
 
   if (error) {
-    if (/tts_lexicon/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
-      };
-    }
-    if (/row-level security|permission denied|rls/i.test(error.message)) {
-      return {
-        error:
-          "Couldn’t save pronunciation for this workspace. Refresh and try again — if it keeps failing, support needs to grant owner update on tts_lexicon.",
-      };
-    }
-    return { error: error.message };
+    console.error("[settings.pronunciation]", error.message);
+    return { error: "Could not save." };
   }
 
   return {
@@ -330,12 +320,8 @@ export async function persistPronunciationLexicon(
     .eq("id", tenant.id);
 
   if (error) {
-    if (/tts_lexicon/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    console.error("[settings.pronunciation]", error.message);
+    return { error: "Could not save." };
   }
 
   return {

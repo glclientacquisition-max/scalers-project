@@ -24,7 +24,7 @@ export const settingsActionClass =
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
-    "w-full text-left rounded-xl border px-4 py-3 transition",
+    "w-full text-left rounded-xl border px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
     selected
       ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
       : "border-line bg-white hover:border-[#0096FF]/40",
@@ -33,7 +33,7 @@ export function settingsRadioCardClass(selected: boolean) {
 
 export function settingsChipClass(selected: boolean) {
   return [
-    "inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium transition",
+    "inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
     selected
       ? "border-transparent bg-[#0096FF]/10 text-[#005ccc] ring-1 ring-[#0096FF]"
       : "border-line bg-white text-ink hover:border-[#0096FF]/40",
@@ -77,7 +77,7 @@ export function TrashButton({
       onClick={onClick}
       aria-label={label}
       className={[
-        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn",
+        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
         className,
       ].join(" ")}
     >

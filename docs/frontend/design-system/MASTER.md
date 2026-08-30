@@ -158,8 +158,7 @@ Pages must not add a second page gutter. Appointments currently does (`px-4 py-1
 | Secondary | `settingsActionClass` or Calls empty-state: `inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] hover:border-[#0096FF]` | |
 | Ghost | `settingsGhostButtonClass` | Calls Search |
 | Destructive / mute | `MarkLeadArchiveButton` icon: `text-ink-soft hover:bg-surface-muted`; `TrashButton` hover `text-warn` | Not a red filled button |
-| WhatsApp **canonical** | Blue fill, green glyph (`TriageLeadCard`) | Constitution |
-| WhatsApp **current detail** | `bg-[#25D366]` full button | Debt. Phase 5 or Home reuse of `TriageLeadCard` |
+| WhatsApp | Blue fill, green glyph (`TriageLeadCard`, call detail) | Constitution. Green is glyph/channel identity only. |
 
 One primary per screen.
 
@@ -167,11 +166,13 @@ One primary per screen.
 
 ## 5. Focus
 
-**Constitution / mandate target:** `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`
+**Canonical desk field (Phase 5):** `outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40`
 
-**Shipped settings fields:** `outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40`
+**Canonical desk control:** `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40`
 
-Until Phase 5, **copy `settingsFieldClass`**. Do not invent a third ring. Do not ship `outline-none` without a ring or `shadow-focus`.
+Primary filled CTAs may add `focus-visible:ring-offset-2` (Home, Save, call-detail WhatsApp). Do not invent a third ring color.
+
+Never ship `outline-none` without a ring or `shadow-focus`. Copy `settingsFieldClass` for fields.
 
 ---
 
@@ -271,7 +272,7 @@ Extracted from what the good screens already do, plus constitution:
 - Primary actions `min-h-11` or larger (`min-h-12` / `min-h-14`)
 - Contrast: ink on canvas/surface; white on `#0096FF`
 
-Gaps (Phase 5): many auth/onboarding inputs lack the ring; icon Done/Archive have labels (good) but `h-9` hit area is under 44px.
+Gaps remaining: icon Done/Archive have labels (good) but `h-9` hit area is under 44px. Pronunciation Coach has many secondary controls; inputs now use the field ring.
 
 ---
 
@@ -308,12 +309,12 @@ Do not create these unless a later phase proves a source and a job:
 
 | Debt | Source | Phase |
 | --- | --- | --- |
-| Requests/Appointments are cards | those pages | 4 |
-| Appointments double padding + fluff + em dash | `appointments/page.tsx` | 4 |
-| Related call → `/calls` not `/calls/{id}` | appointments | 4 |
-| Token dialect `text-[var(--ink)]` | auth, onboarding, admin | 5 |
-| Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 |
-| Focus ring `/40` vs mandate solid | `settingsUi` vs constitution | 5 |
+| Requests/Appointments are cards | those pages | 4 (consumed) |
+| Appointments double padding + fluff + em dash | `appointments/page.tsx` | 4 (consumed) |
+| Related call → `/calls` not `/calls/{id}` | appointments | 4 (consumed) |
+| Token dialect `text-[var(--ink)]` on Owner Desk | auth, onboarding, settings panels | 5 (consumed). Admin/landing kept. |
+| Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 (consumed). Blue fill, green glyph. |
+| Focus ring `/40` vs mandate solid | `settingsUi` vs constitution | 5 (consumed). Canonical desk ring is `/40`. |
 
 ---
 

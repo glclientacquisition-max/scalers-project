@@ -42,7 +42,7 @@ export function CallsToolbar({
             type="search"
             defaultValue={q}
             placeholder="Search name, number, reason"
-            className="min-h-11 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-[#0096FF] focus-visible:shadow-focus"
+            className="min-h-11 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
           />
           <button
             type="submit"

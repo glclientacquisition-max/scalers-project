@@ -54,8 +54,8 @@ export function DeskNav() {
               aria-current={active ? "page" : undefined}
               className={
                 active
-                  ? "font-semibold text-accent"
-                  : "font-medium text-ink hover:text-accent"
+                  ? "rounded-md font-semibold text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+                  : "rounded-md font-medium text-ink hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
               }
             >
               {item.label}
@@ -63,7 +63,10 @@ export function DeskNav() {
           );
         })}
         <form action="/api/logout" method="post">
-          <button type="submit" className="min-h-11 text-ink-soft hover:text-warn">
+          <button
+            type="submit"
+            className="min-h-11 rounded-md text-ink-soft hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+          >
             Sign out
           </button>
         </form>
@@ -75,7 +78,7 @@ export function DeskNav() {
           aria-expanded={open}
           aria-controls="desk-mobile-nav"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
         >
           {open ? "Close" : "Menu"}
         </button>
@@ -103,7 +106,7 @@ export function DeskNav() {
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={[
-                      "rounded-lg px-3 py-3 text-sm font-medium min-h-11 flex items-center",
+                      "rounded-lg px-3 py-3 text-sm font-medium min-h-11 flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
                       active
                         ? "bg-accent-soft text-accent-deep"
                         : "text-ink hover:bg-surface-muted",
@@ -116,7 +119,7 @@ export function DeskNav() {
               <form action="/api/logout" method="post" className="mt-1">
                 <button
                   type="submit"
-                  className="flex min-h-11 w-full items-center rounded-lg px-3 py-3 text-left text-sm text-ink-soft hover:bg-surface-muted hover:text-warn"
+                  className="flex min-h-11 w-full items-center rounded-lg px-3 py-3 text-left text-sm text-ink-soft hover:bg-surface-muted hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
                 >
                   Sign out
                 </button>

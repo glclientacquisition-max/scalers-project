@@ -35,23 +35,14 @@ export async function updateLeadStatus(
     .eq("tenant_id", tenant.id);
 
   if (error) {
+    console.error("[calls.updateLeadStatus]", error.message);
     if (/archived|lead_status.*check|check.*lead_status/i.test(error.message)) {
-      return {
-        error:
-          "Archive needs a one-time database update. Apply docs/supabase/lead_status_archive.sql in Supabase.",
-      };
+      return { error: "Could not archive." };
     }
     if (/lead_status|column/i.test(error.message)) {
-      return {
-        error: "Lead statuses are not set up yet. Apply docs/supabase/lead_status.sql in Supabase.",
-      };
+      return { error: "Lead statuses are not available." };
     }
-    if (/row-level security|permission denied|rls/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/lead_status.sql (owner update policy).`,
-      };
-    }
-    return { error: error.message };
+    return { error: "Could not update." };
   }
 
   revalidatePath("/home");

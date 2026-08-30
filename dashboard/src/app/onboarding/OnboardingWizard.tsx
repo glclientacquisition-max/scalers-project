@@ -45,6 +45,20 @@ const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
 
 const initial: OnboardingState = {};
 
+const fieldClass =
+  "w-full rounded-xl border border-line bg-white px-4 py-3 text-ink outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+
+const choiceClass = (selected: boolean) =>
+  [
+    "w-full text-left rounded-xl border px-4 py-4 transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
+    selected
+      ? "border-[#0096FF] bg-accent-soft shadow-[inset_0_0_0_1px_#0096FF]"
+      : "border-line bg-white hover:border-[#0096FF]/50",
+  ].join(" ");
+
+const primaryButtonClass =
+  "min-h-12 rounded-xl bg-[#0096FF] px-5 py-3 text-white font-medium transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50";
+
 export function OnboardingWizard() {
   const [step, setStep] = useState(0);
   const [vertical, setVertical] = useState<BusinessVertical | "">("retail");
@@ -92,10 +106,10 @@ export function OnboardingWizard() {
                 className={[
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium transition-colors duration-300",
                   done
-                    ? "bg-[var(--accent)] text-white"
+                    ? "bg-[#0096FF] text-white"
                     : active
-                      ? "bg-[var(--accent-deep)] text-white"
-                      : "bg-white border border-[var(--line)] text-[var(--ink-soft)]",
+                      ? "bg-[#005ccc] text-white"
+                      : "bg-white border border-line text-ink-soft",
                 ].join(" ")}
               >
                 {i + 1}
@@ -103,7 +117,7 @@ export function OnboardingWizard() {
               <span
                 className={[
                   "hidden sm:block text-sm transition-opacity duration-300",
-                  active ? "text-[var(--ink)] font-medium" : "text-[var(--ink-soft)]",
+                  active ? "text-ink font-medium" : "text-ink-soft",
                 ].join(" ")}
               >
                 {label}
@@ -112,7 +126,7 @@ export function OnboardingWizard() {
                 <span
                   className={[
                     "mx-1 h-px flex-1 transition-colors duration-500",
-                    done ? "bg-[var(--accent)]" : "bg-[var(--line)]",
+                    done ? "bg-[#0096FF]" : "bg-line",
                   ].join(" ")}
                 />
               ) : null}
@@ -124,7 +138,7 @@ export function OnboardingWizard() {
       <form
         action={formAction}
         className={[
-          "rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 sm:p-8 shadow-[0_20px_50px_-35px_rgba(28,36,33,0.45)] transition-all duration-300",
+          "rounded-2xl border border-line bg-surface p-6 sm:p-8 shadow-lift transition-all duration-300",
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
         ].join(" ")}
       >
@@ -139,7 +153,7 @@ export function OnboardingWizard() {
 
         {step === 0 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">Business type</h2>
+            <h2 className="font-display text-2xl text-ink">Business type</h2>
             <div className="mt-5 space-y-3">
               {VERTICAL_OPTIONS.map((opt) => {
                 const selected = vertical === opt.id;
@@ -148,14 +162,9 @@ export function OnboardingWizard() {
                     key={opt.id}
                     type="button"
                     onClick={() => setVertical(opt.id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
-                      selected
-                        ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
-                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                    ].join(" ")}
+                    className={choiceClass(selected)}
                   >
-                    <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                    <span className="font-medium text-ink">{opt.label}</span>
                   </button>
                 );
               })}
@@ -165,7 +174,7 @@ export function OnboardingWizard() {
 
         {step === 1 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">
+            <h2 className="font-display text-2xl text-ink">
               {vertical === "retail" ? "Products & pricing" : "Services & pricing"}
             </h2>
             <textarea
@@ -179,14 +188,14 @@ export function OnboardingWizard() {
                   ? "e.g. Phone accessories, chargers, and screen protectors.\nPricing: chargers from 500 KES. We can hold items with a name until evening. M-Pesa and cash."
                   : "e.g. Plumbing repairs, electrical fixes, and deep cleaning across Nairobi.\nPricing: we quote after understanding the job. Call-out from KES 1,500. M-Pesa and cash."
               }
-              className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+              className={`mt-5 ${fieldClass} leading-relaxed`}
             />
           </div>
         ) : null}
 
         {step === 2 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">Hours & location</h2>
+            <h2 className="font-display text-2xl text-ink">Hours & location</h2>
             <textarea
               autoFocus
               value={hoursLocation}
@@ -196,9 +205,9 @@ export function OnboardingWizard() {
               placeholder={
                 "Monday to Saturday: 9:00 AM to 7:00 PM. Sunday: Closed.\nWestlands, Nairobi."
               }
-              className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+              className={`mt-5 ${fieldClass} leading-relaxed`}
             />
-            <label className="mt-4 block text-sm font-medium text-[var(--ink)]" htmlFor="landmark">
+            <label className="mt-4 block text-sm font-medium text-ink" htmlFor="landmark">
               Landmark (optional)
             </label>
             <input
@@ -206,10 +215,10 @@ export function OnboardingWizard() {
               value={landmark}
               onChange={(e) => setLandmark(e.target.value)}
               placeholder="Opposite Naivas, next to the Shell"
-              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)]"
+              className={`mt-2 ${fieldClass}`}
             />
             <label
-              className="mt-4 block text-sm font-medium text-[var(--ink)]"
+              className="mt-4 block text-sm font-medium text-ink"
               htmlFor="directions"
             >
               Spoken directions (optional)
@@ -221,7 +230,7 @@ export function OnboardingWizard() {
               rows={2}
               {...compactTextareaExpandHandlers}
               placeholder="From Waiyaki Way, turn at the Shell. We are on the left."
-              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+              className={`mt-2 ${fieldClass} leading-relaxed`}
             />
           </div>
         ) : null}
@@ -229,9 +238,9 @@ export function OnboardingWizard() {
         {step === 3 ? (
           <div className="space-y-8">
             <div>
-              <h2 className="font-display text-2xl text-[var(--ink)]">Receptionist name & tone</h2>
+              <h2 className="font-display text-2xl text-ink">Receptionist name & tone</h2>
               <label
-                className="mt-5 block text-sm font-medium text-[var(--ink)]"
+                className="mt-5 block text-sm font-medium text-ink"
                 htmlFor="agent_name_field"
               >
                 Receptionist name
@@ -241,7 +250,7 @@ export function OnboardingWizard() {
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
                 placeholder="Receptionist"
-                className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)]"
+                className={`mt-2 ${fieldClass}`}
               />
               <div className="mt-5 space-y-3">
                 {TONE_OPTIONS.map((opt) => {
@@ -251,14 +260,9 @@ export function OnboardingWizard() {
                       key={opt.id}
                       type="button"
                       onClick={() => setTone(opt.id)}
-                      className={[
-                        "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
-                        selected
-                          ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
-                          : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                      ].join(" ")}
+                      className={choiceClass(selected)}
                     >
-                      <span className="font-medium text-[var(--ink)]">
+                      <span className="font-medium text-ink">
                         {TONE_LABELS[opt.id]}
                       </span>
                     </button>
@@ -267,7 +271,7 @@ export function OnboardingWizard() {
               </div>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">When a human is needed</h3>
+              <h3 className="text-sm font-medium text-ink">When a human is needed</h3>
               <div className="mt-3 space-y-3">
                 {HANDOFF_OPTIONS.map((opt) => {
                   const selected = handoffMode === opt.id;
@@ -276,14 +280,9 @@ export function OnboardingWizard() {
                       key={opt.id}
                       type="button"
                       onClick={() => setHandoffMode(opt.id)}
-                      className={[
-                        "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
-                        selected
-                          ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
-                          : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                      ].join(" ")}
+                      className={choiceClass(selected)}
                     >
-                      <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                      <span className="font-medium text-ink">{opt.label}</span>
                     </button>
                   );
                 })}
@@ -293,7 +292,7 @@ export function OnboardingWizard() {
         ) : null}
 
         {state.error ? (
-          <p className="mt-5 text-sm text-[var(--warn)]" role="alert">
+          <p className="mt-5 text-sm text-warn" role="alert">
             {state.error}
           </p>
         ) : null}
@@ -304,7 +303,7 @@ export function OnboardingWizard() {
               type="button"
               onClick={() => goTo(step - 1)}
               disabled={pending}
-              className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)] disabled:opacity-50"
+              className="text-sm text-ink-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50"
             >
               Back
             </button>
@@ -317,7 +316,7 @@ export function OnboardingWizard() {
               type="button"
               disabled={!canAdvance()}
               onClick={() => goTo(step + 1)}
-              className="rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-50"
+              className={primaryButtonClass}
             >
               Continue
             </button>
@@ -325,9 +324,9 @@ export function OnboardingWizard() {
             <button
               type="submit"
               disabled={!canAdvance() || pending}
-              className="rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-50"
+              className={primaryButtonClass}
             >
-              {pending ? "Opening your line…" : "Finish setup"}
+              {pending ? "Saving" : "Finish setup"}
             </button>
           )}
         </div>

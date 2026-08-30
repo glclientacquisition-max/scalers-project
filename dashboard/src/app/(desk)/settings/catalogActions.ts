@@ -135,7 +135,7 @@ export async function previewCatalogImportAction(
         ok: true,
         products: products.slice(0, PRODUCT_CATALOG_MAX),
         message: capped
-          ? `Found ${products.length} products — keeping the first ${PRODUCT_CATALOG_MAX}. Review below, then add.`
+          ? `Found ${products.length} products. Keeping the first ${PRODUCT_CATALOG_MAX}. Review below, then add.`
           : `Found ${products.length} products. Review below, then add.`,
       };
     }
@@ -232,12 +232,8 @@ export async function applyCatalogImportAction(
     .eq("id", tenant.id);
 
   if (error) {
-    if (/product_catalog|social_handles/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/product_catalog_and_social.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    console.error("[settings.catalog]", error.message);
+    return { error: "Could not save." };
   }
 
   revalidatePath("/settings");
