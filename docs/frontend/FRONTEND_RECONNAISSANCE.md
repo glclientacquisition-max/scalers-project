@@ -473,4 +473,4 @@ No other blockers. Token migration, list density, deep links, and Home layout ar
 
 ## Next step
 
-Phase 1 constitution: [`FRONTEND_CONSTITUTION.md`](./FRONTEND_CONSTITUTION.md). Still no UI. Phase 2 is the design system. Do not start Phase 2 in the constitution change.
+Phase 2 design system: [`design-system/MASTER.md`](./design-system/MASTER.md). Still no UI. Phase 3 is Home.

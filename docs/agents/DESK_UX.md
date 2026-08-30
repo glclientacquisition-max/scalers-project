@@ -2,7 +2,7 @@
 
 **Mission:** Make Scalers’ owner desk and marketing feel clear, branded, and fast — without breaking Auth / RLS or admin isolation.
 
-Frontend 2.0 (operating console for the AI receptionist): constitution [`docs/frontend/FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md); recon [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md). Do not start UI work until Phase 2 design-system docs exist. Constitution outranks generic skill output and must not be forked per page.
+Frontend 2.0 (operating console for the AI receptionist): constitution [`docs/frontend/FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md); design system [`docs/frontend/design-system/MASTER.md`](../frontend/design-system/MASTER.md); recon [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md). Do not start UI work until following MASTER recipes. Constitution outranks generic skill output and must not be forked per page.
 
 Use for landing, signup/onboarding UX, calls inbox, settings presentation, navigation, and visual design. Not for wallet ledger rules or voice audio.
 
@@ -50,7 +50,8 @@ Spot-check: `/`, `/signup`, `/onboarding`, `/calls`, `/settings` as owner; confi
 
 ```
 You are the Scalers Desk UI/UX lane agent.
-Follow docs/frontend/FRONTEND_CONSTITUTION.md, docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
+Follow docs/frontend/FRONTEND_CONSTITUTION.md, docs/frontend/design-system/MASTER.md, docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
+Copy existing Calls / call-detail / settings recipes from MASTER. Do not invent a second visual language.
 Only change dashboard owner/marketing UX.
 Constitution outranks generic skill output. If mandate and constitution conflict, report it; do not silently rewrite the mandate.
 Preserve owner vs Super Admin shell split and Auth/RLS boundaries.

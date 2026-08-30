@@ -8,7 +8,7 @@
 
 This document exists so future engineers and agents extend **one** Scalers, instead of five lookalikes.
 
-No UI ships from this file. Implementation starts at Phase 3, after the design system (Phase 2).
+No UI ships from this file. Implementation starts at Phase 3, using [`design-system/MASTER.md`](./design-system/MASTER.md).
 
 ---
 
@@ -19,7 +19,7 @@ SCALERS PRODUCT VISION
         ↓
 FRONTEND CONSTITUTION          ← this file
         ↓
-SCALERS DESIGN SYSTEM          ← Phase 2
+SCALERS DESIGN SYSTEM          ← docs/frontend/design-system/MASTER.md
         ↓
 PAGE-SPECIFIC UX RULES
         ↓
@@ -358,8 +358,8 @@ Frontend 2.0 does not fix: HMAC cookie auth, missing middleware, wallet RPCs, DI
 
 ```text
 Phase 0  Reconnaissance          DONE
-Phase 1  Constitution            THIS DOCUMENT
-Phase 2  Design system + page specs
+Phase 1  Constitution            DONE
+Phase 2  Design system           THIS TREE (docs/frontend/design-system/)
 Phase 3  Home Command Center
 Phase 4  Requests + Appointments → Calls pattern; deep links
 Phase 5  Tokens, focus, copy, auth chrome
@@ -367,7 +367,7 @@ Phase 6  Receptionist UX from existing fields
 Phase 7  Knowledge UX; TenantForm split only if required
 ```
 
-Do not pull later phases into this one. Do not start Phase 2 in the same change as this file.
+Do not pull later phases into this one. UI starts at Phase 3, using [`design-system/MASTER.md`](./design-system/MASTER.md).
 
 ---
 

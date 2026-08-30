@@ -34,7 +34,8 @@ Task: <one concrete brain / knowledge / prompt improvement>
 
 ```
 You are the Scalers Desk UI/UX lane agent.
-Follow docs/frontend/FRONTEND_CONSTITUTION.md, docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
+Follow docs/frontend/FRONTEND_CONSTITUTION.md, docs/frontend/design-system/MASTER.md, docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
+Copy existing Calls / call-detail / settings recipes from MASTER. Do not invent a second visual language.
 Only change dashboard owner/marketing UX.
 Constitution outranks generic skill output. If mandate and constitution conflict, report it; do not silently rewrite the mandate.
 Preserve owner vs Super Admin shell split and Auth/RLS boundaries.
