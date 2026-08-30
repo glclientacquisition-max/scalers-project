@@ -7,7 +7,8 @@ alwaysApply: false
 # Desk UI/UX lane
 
 Full contract: `docs/agents/DESK_UX.md`.
-Frontend 2.0 recon (no UI until constitution): `docs/frontend/FRONTEND_RECONNAISSANCE.md`.
+Frontend 2.0 constitution (highest desk UX authority): `docs/frontend/FRONTEND_CONSTITUTION.md`.
+Recon: `docs/frontend/FRONTEND_RECONNAISSANCE.md`. No UI until Phase 2 design-system docs.
 
 - Own owner desk + marketing UX in `dashboard/`.
 - Always apply the platform design mandate: `.cursor/rules/scalers-design-ux.mdc` (also `alwaysApply`).

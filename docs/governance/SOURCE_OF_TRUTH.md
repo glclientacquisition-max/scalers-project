@@ -161,4 +161,5 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 - [`REPOSITORY_INVENTORY.md`](./REPOSITORY_INVENTORY.md)
 - [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md)
 - [`../agents/AGENT_ARCHITECTURE.md`](../agents/AGENT_ARCHITECTURE.md)
+- [`../frontend/FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md)
 - [`../frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md)

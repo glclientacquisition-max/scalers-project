@@ -1,6 +1,7 @@
 # Scalers frontend reconnaissance
 
 **Status:** Phase 0 of Frontend 2.0. Documentation only. No UI changes.  
+**Successor:** Phase 1 constitution is [`FRONTEND_CONSTITUTION.md`](./FRONTEND_CONSTITUTION.md).  
 **Date:** 2026-08-30  
 **Branch base:** `main` @ `0d7ea1b`  
 **Lane:** Desk UI/UX (`docs/agents/DESK_UX.md`)  
@@ -472,4 +473,4 @@ No other blockers. Token migration, list density, deep links, and Home layout ar
 
 ## Next step
 
-Phase 1: write `docs/frontend/FRONTEND_CONSTITUTION.md` from this recon + `.cursor/rules/scalers-design-ux.mdc`. Still no UI.
+Phase 1 constitution: [`FRONTEND_CONSTITUTION.md`](./FRONTEND_CONSTITUTION.md). Still no UI. Phase 2 is the design system. Do not start Phase 2 in the constitution change.
