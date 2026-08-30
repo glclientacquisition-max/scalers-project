@@ -128,6 +128,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
 | --- | --- | --- | --- | --- | --- |
 | Voice deploy | Docker on Railway | `Dockerfile`, `railway.toml` | Health `/healthz` | `render.yaml` | CORE |
+| Cursor Railway MCP | Hosted MCP | `.cursor/mcp.json` | `https://mcp.railway.com` | Marketplace `/add-plugin railway` | CORE |
 | Desk deploy | Vercel Next.js | `dashboard/vercel.json` | README: root dir `dashboard` | None | CORE |
 | Voice public URL (desk → voice) | Env | `VOICE_PUBLIC_BASE_URL` | `voicePublicBase.js`, `sautikit.ts` | Hardcoded Railway default | CORE (env) |
 | Referenced prod URLs | Code defaults | `scalers-project-production.up.railway.app`, `scalers-project.vercel.app` | `voicePublicBase.js`, `layout.tsx` | **UNKNOWN** if still current | UNKNOWN |
