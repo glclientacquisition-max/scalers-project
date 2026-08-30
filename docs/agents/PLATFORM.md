@@ -16,7 +16,6 @@ Use for database migrations, auth membership, environment/deploy, and any change
 | `dashboard/src/app/api/login/**`, `api/logout/**`, `api/tenant/**` | Auth/session APIs |
 | `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md`, `TARGET_MODULE_LAYOUT.md`, `PRODUCTION_CUTOVER.md` | Platform architecture docs |
 | `Dockerfile`, `railway.toml`, `render.yaml`, root `.env.example` structure | Deploy / env skeleton |
-| `.cursor/mcp.json` | Cursor Railway MCP (Voice deploy tooling) |
 | `AGENTS.md`, `docs/agents/**` | Lane contracts (meta) |
 | `scripts/smoke-db.js` | DB smoke |
 
@@ -42,9 +41,9 @@ Also owns: merge conflicts on shared files; defining new stable function signatu
 
 ## Cursor Railway plugin
 
-Voice deploys are operated from Cursor with the Railway marketplace plugin (`/add-plugin railway`) plus project MCP in `.cursor/mcp.json` (`https://mcp.railway.com`).
+Voice deploys are operated from Cursor with the Railway marketplace plugin (`/add-plugin railway`). That plugin owns the hosted MCP. Do not add a second `railway` entry in `.cursor/mcp.json` or user MCP settings. A duplicate entry shows **Plugin Managed** with **Delete user config** and hides Connect.
 
-Connect Railway in **Cursor desktop** (OAuth). Cloud Agents cannot complete that login. After the account is connected, use Railway tools for staging and production Voice instead of guessing dashboard steps.
+To connect: on [cursor.com/agents](https://cursor.com/agents), open **+** then **MCP servers**. If the Railway modal appears, click **Delete user config**, close it, and use **Connect** / **Authenticate** on the `railway` row. Allow popups for `cursor.com` and `railway.com`. Start a new Cloud Agent after OAuth. This running agent cannot complete that login.
 
 ## Test / verify
 
