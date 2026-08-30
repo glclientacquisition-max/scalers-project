@@ -25,7 +25,7 @@ function WhatsAppGlyph({ className }: { className?: string }) {
 }
 
 const primaryActionClass =
-  "inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 sm:min-h-11 sm:flex-initial sm:min-w-[9.5rem]";
+  "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 sm:min-h-11 sm:w-auto sm:min-w-[9.5rem]";
 
 /**
  * Home new-lead row: identity, captured reason, when, outcome, one primary action.
@@ -77,7 +77,7 @@ export function TriageLeadCard({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-1 sm:justify-end">
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
           {waHref ? (
             <a
               href={waHref}
@@ -94,16 +94,18 @@ export function TriageLeadCard({
               Open
             </Link>
           )}
-          <MarkLeadArchiveButton callId={lead.call.id} variant="icon" />
-          <MarkLeadDoneButton callId={lead.call.id} variant="icon" />
-          {waHref ? (
-            <Link
-              href={detailHref}
-              className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-[#0096FF] transition hover:text-[#005ccc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-            >
-              Open
-            </Link>
-          ) : null}
+          <div className="flex items-center justify-end gap-1">
+            <MarkLeadArchiveButton callId={lead.call.id} variant="icon" />
+            <MarkLeadDoneButton callId={lead.call.id} variant="icon" />
+            {waHref ? (
+              <Link
+                href={detailHref}
+                className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-[#0096FF] transition hover:text-[#005ccc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              >
+                Open
+              </Link>
+            ) : null}
+          </div>
         </div>
       </article>
     </li>
