@@ -4,6 +4,7 @@ import {
   MarkLeadDoneButton,
 } from "@/components/MarkLeadDoneButton";
 import { waMeHref } from "@/components/WhatsAppLink";
+import { callResolutionLabel } from "@/lib/supabase";
 import {
   followUpWhatsAppMessage,
   formatCallWhen,
@@ -23,23 +24,12 @@ function WhatsAppGlyph({ className }: { className?: string }) {
   );
 }
 
-function OpenGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-      className={className}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M8 7h9v9" />
-    </svg>
-  );
-}
+const primaryActionClass =
+  "inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 sm:min-h-11 sm:flex-initial sm:min-w-[9.5rem]";
 
 /**
- * Overview / inbox lead row: one primary WhatsApp hit target, muted secondary actions.
+ * Home new-lead row: identity, captured reason, when, outcome, one primary action.
+ * Lives inside a divided list. Investigation stays on /calls/[id].
  */
 export function TriageLeadCard({
   lead,
@@ -57,60 +47,65 @@ export function TriageLeadCard({
   });
   const waHref = waMeHref(lead.call.caller_number, message);
   const displayName = lead.name?.trim() || "Unknown caller";
-  const phone = lead.call.caller_number?.trim() || "No number";
+  const phone = lead.call.caller_number?.trim() || "";
+  const reason = lead.reason?.trim() || "";
   const detailHref = openHref ?? `/calls/${lead.call.id}?from=new`;
+  const outcome =
+    lead.resolution && lead.resolution !== "unknown"
+      ? callResolutionLabel(lead.resolution)
+      : null;
 
   return (
-    <li
-      className={[
-        "rounded-2xl border bg-surface px-5 py-5",
-        lead.urgent ? "border-warn/45" : "border-line",
-      ].join(" ")}
-    >
-      <div className="space-y-1">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-          {formatCallWhen(lead.call.created_at)}
-          {lead.urgent ? (
-            <span className="ml-2 normal-case tracking-normal text-warn">Urgent</span>
+    <li className={lead.urgent ? "bg-warn-soft/60" : undefined}>
+      <article className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[11px] text-ink-soft">
+            {formatCallWhen(lead.call.created_at)}
+            {lead.urgent ? (
+              <span className="ml-2 font-sans text-xs font-medium text-warn">Urgent</span>
+            ) : null}
+          </p>
+          <h3 className="mt-0.5 truncate text-base font-semibold text-ink">{displayName}</h3>
+          {phone ? (
+            <p className="mt-0.5 truncate font-mono text-xs text-ink-soft">{phone}</p>
           ) : null}
-        </p>
-        <p className="truncate text-lg font-semibold text-ink">{displayName}</p>
-        <p className="line-clamp-2 text-sm leading-relaxed text-ink-soft">
-          {lead.reason?.trim() || "No reason captured"}
-        </p>
-      </div>
+          {reason ? (
+            <p className="mt-1 line-clamp-1 text-sm text-ink">{reason}</p>
+          ) : null}
+          {outcome ? (
+            <p className="mt-0.5 text-xs text-ink-soft">{outcome}</p>
+          ) : null}
+        </div>
 
-      {waHref ? (
-        <a
-          href={waHref}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-5 flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-[#0096FF] px-4 py-3.5 text-center text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
-        >
-          <span className="inline-flex items-center gap-2 text-base font-semibold">
-            <WhatsAppGlyph className="h-5 w-5 shrink-0" />
-            Reply on WhatsApp
-          </span>
-          <span className="text-sm font-medium text-white/90">{phone}</span>
-        </a>
-      ) : (
-        <p className="mt-5 rounded-xl border border-line bg-surface-muted/50 px-4 py-3 text-center text-sm font-medium text-ink-soft">
-          {phone}
-        </p>
-      )}
-
-      <div className="mt-4 flex items-center justify-end gap-1 border-t border-line/80 pt-3">
-        <MarkLeadArchiveButton callId={lead.call.id} variant="icon" />
-        <MarkLeadDoneButton callId={lead.call.id} variant="icon" />
-        <Link
-          href={detailHref}
-          aria-label="Open call"
-          title="Open call"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
-        >
-          <OpenGlyph className="h-4 w-4" />
-        </Link>
-      </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1 sm:justify-end">
+          {waHref ? (
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Reply to ${displayName} on WhatsApp`}
+              className={primaryActionClass}
+            >
+              <WhatsAppGlyph className="h-4 w-4 shrink-0" />
+              WhatsApp
+            </a>
+          ) : (
+            <Link href={detailHref} className={primaryActionClass}>
+              Open
+            </Link>
+          )}
+          <MarkLeadArchiveButton callId={lead.call.id} variant="icon" />
+          <MarkLeadDoneButton callId={lead.call.id} variant="icon" />
+          {waHref ? (
+            <Link
+              href={detailHref}
+              className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-[#0096FF] transition hover:text-[#005ccc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+            >
+              Open
+            </Link>
+          ) : null}
+        </div>
+      </article>
     </li>
   );
 }
