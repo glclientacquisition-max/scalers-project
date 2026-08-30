@@ -64,6 +64,7 @@ test('buildLiveGroundTruth includes custom unknown request line', () => {
 test('CONVERSATION_RULES require admit-unknown behavior', () => {
   assert.match(CONVERSATION_RULES, /UNKNOWN ANSWERS/);
   assert.match(CONVERSATION_RULES, /do not have that detail/i);
+  assert.match(CONVERSATION_RULES, /same person after the greeting/i);
 });
 
 test('buildSystemPrompt surfaces unknown policy via live ground truth', () => {

@@ -40,7 +40,7 @@ describe('validated tool execution', () => {
     assert.equal(execution.shouldEndCall, true);
     assert.equal(
       formatToolConfirmation(execution.results, 'en'),
-      "Done — I've saved your request."
+      "Okay, I've saved your request."
     );
   });
 
@@ -487,7 +487,7 @@ describe('validated tool execution', () => {
     const spoken = formatToolConfirmation(execution.results, 'en');
     assert.match(spoken, /closed on Sunday/i);
     assert.equal(/done/i.test(spoken), false);
-    assert.equal(/logged your visit request/i.test(spoken), false);
+    assert.equal(/saved your visit request/i.test(spoken), false);
   });
 
   it('does not persist a weekday visit after close (outside_hours)', async () => {
@@ -585,7 +585,7 @@ describe('validated tool execution', () => {
     assert.equal(execution.results[0].status, 'succeeded');
     assert.equal(execution.results[0].record.status, 'requested');
     const spoken = formatToolConfirmation(execution.results, 'en');
-    assert.match(spoken, /logged your visit request/i);
+    assert.match(spoken, /saved your visit request/i);
     assert.match(spoken, /Tuesday/i);
     assert.equal(/done/i.test(spoken), false);
     assert.equal(/confirmed/i.test(spoken), false);

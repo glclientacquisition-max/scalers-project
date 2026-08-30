@@ -804,17 +804,17 @@ function formatToolConfirmation(results = [], language = 'en') {
       const whenLabel = formatRequestedWhenLabel(meaningful.hours);
       if (sw) {
         return whenLabel
-          ? `Sawa — nimehifadhi ombi la ziara ${whenLabel}.`
-          : 'Sawa — nimehifadhi ombi la ziara.';
+          ? `Sawa, nimehifadhi ombi la ziara ${whenLabel}.`
+          : 'Sawa, nimehifadhi ombi la ziara.';
       }
       if (sheng) {
         return whenLabel
-          ? `Poa — nime-save visit request ${whenLabel}.`
-          : 'Poa — nime-save visit request.';
+          ? `Poa, nime-save visit request ${whenLabel}.`
+          : 'Poa, nime-save visit request.';
       }
       return whenLabel
-        ? `I've logged your visit request for ${whenLabel}.`
-        : "I've logged your visit request.";
+        ? `Okay, I've saved your visit request for ${whenLabel}.`
+        : "Okay, I've saved your visit request.";
     }
     if (meaningful.status === 'duplicate') {
       if (sw) return 'Ombi la ziara tayari limehifadhiwa.';
@@ -894,13 +894,13 @@ function formatToolConfirmation(results = [], language = 'en') {
     if (meaningful.status === 'succeeded') {
       const st = String(meaningful.appointmentStatus || '').toLowerCase();
       if (st === 'cancelled') {
-        if (sw) return 'Sawa — nimeghairi ziara hiyo.';
-        if (sheng) return 'Poa — nime-cancel hiyo visit.';
-        return "Done — I've cancelled that visit.";
+        if (sw) return 'Sawa, nimeghairi ziara hiyo.';
+        if (sheng) return 'Poa, nime-cancel hiyo visit.';
+        return "Okay, I've cancelled that visit.";
       }
-      if (sw) return 'Sawa — nimebadilisha ratiba ya ziara.';
-      if (sheng) return 'Poa — nime-update visit schedule.';
-      return "Done — I've updated that visit.";
+      if (sw) return 'Sawa, nimebadilisha ratiba ya ziara.';
+      if (sheng) return 'Poa, nime-update visit schedule.';
+      return "Okay, I've updated that visit.";
     }
     if (meaningful.status === 'duplicate') {
       if (sw) return 'Badiliko hilo tayari limetumwa.';
@@ -919,13 +919,13 @@ function formatToolConfirmation(results = [], language = 'en') {
   if (meaningful.action === 'create_service_request') {
     if (meaningful.status === 'succeeded' || meaningful.status === 'updated') {
       if (meaningful.status === 'updated') {
-        if (sw) return 'Sawa — nimesasisha hold yako.';
-        if (sheng) return 'Poa — nime-update hold yako.';
-        return "Done — I've updated your hold.";
+        if (sw) return 'Sawa, nimesasisha hold yako.';
+        if (sheng) return 'Poa, nime-update hold yako.';
+        return "Okay, I've updated your hold.";
       }
-      if (sw) return 'Sawa — nimehifadhi ombi lako.';
-      if (sheng) return 'Poa — nime-save request yako.';
-      return "Done — I've saved your request.";
+      if (sw) return 'Sawa, nimehifadhi ombi lako.';
+      if (sheng) return 'Poa, nime-save request yako.';
+      return "Okay, I've saved your request.";
     }
     if (meaningful.status === 'duplicate') {
       if (sw) return 'Ombi hilo tayari limehifadhiwa.';
@@ -948,12 +948,12 @@ function formatToolConfirmation(results = [], language = 'en') {
           return 'Please confirm the exact book title so I can save that.';
         }
         if (sw) {
-          return 'Sina hiyo kwenye orodha ya sasa — naweza kuhifadhi ombi la quotation badala yake.';
+          return 'Sina hiyo kwenye orodha ya sasa. Naweza kuhifadhi ombi la quotation badala yake.';
         }
         if (sheng) {
-          return 'Siko na hiyo kwa catalogue sasa — naweza save enquiry/quote badala yake.';
+          return 'Siko na hiyo kwa catalogue sasa. Naweza save enquiry/quote badala yake.';
         }
-        return "I don't see that title in our current catalogue — I can log an enquiry or quote request instead.";
+        return "I don't see that title in our current catalogue. I can log an enquiry or quote request instead.";
       }
       if (missing.includes('when_text') || /when_text/i.test(meaningful.reason || '')) {
         if (sw) return 'Niambie jina lako na wakati utakapopita ndio nihifadhi hold.';
@@ -980,19 +980,19 @@ function formatToolConfirmation(results = [], language = 'en') {
 
   if (meaningful.status === 'succeeded') {
     if (meaningful.soft) {
-      if (sw) return 'Sawa — nimewaandikia timu; watakufuatilia.';
-      if (sheng) return 'Poa — nime-note kwa team; watakufuatilia.';
-      return "Done — I've noted that for the team to follow up.";
+      if (sw) return 'Sawa, nimewaandikia timu; watakufuatilia.';
+      if (sheng) return 'Poa, nime-note kwa team; watakufuatilia.';
+      return "Okay, I've noted that for the team to follow up.";
     }
     const channel = String(meaningful.channel || '').toLowerCase();
     if (/\bsms\b/.test(channel)) {
-      if (sw) return 'Sawa — nimewatumia SMS timu.';
-      if (sheng) return 'Poa — nime-SMS team.';
-      return "Done — I've texted the team.";
+      if (sw) return 'Sawa, nimewatumia SMS timu.';
+      if (sheng) return 'Poa, nime-SMS team.';
+      return "Okay, I've texted the team.";
     }
-    if (sw) return 'Sawa — nimeituma kwa timu.';
-    if (sheng) return 'Poa — nimeituma kwa team.';
-    return "Done — I've sent it to the team.";
+    if (sw) return 'Sawa, nimeituma kwa timu.';
+    if (sheng) return 'Poa, nimeituma kwa team.';
+    return "Okay, I've sent it to the team.";
   }
   if (meaningful.status === 'invalid') {
     const missing = Array.isArray(meaningful.missingSlots)

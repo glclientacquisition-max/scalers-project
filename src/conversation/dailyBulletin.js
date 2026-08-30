@@ -159,7 +159,7 @@ SPEAKING RULES FOR BULLETIN:
 - Do not say the word "bulletin". Do not say "until tonight" / clock times from the internal expiry.
 - Do not offer something a bulletin says is unavailable.
 - After stating a closure / interruption fact, NEVER go silent. In the SAME turn, say you can still help (or take a message) and ask one short next question (what they need).
-- Example shape: "<fact in natural words>. Even so, I can still help — what do you need?"`;
+- Example shape: "<fact in natural words>. Even so, I can still help. What do you need?"`;
 }
 
 module.exports = {

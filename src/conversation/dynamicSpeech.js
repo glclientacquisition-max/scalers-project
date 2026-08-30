@@ -209,7 +209,7 @@ function pickClarifyProgress(opts = {}) {
     return 'Okay. May I have your name?';
   }
   if (sw) return 'Sawa, nimekuelewa.';
-  return 'Okay, one moment.';
+  return 'Okay.';
 }
 
 /**
