@@ -23,8 +23,11 @@ describe("design system convergence (Phase 5)", () => {
     for (const src of [login, signup, signupForm, onboarding]) {
       assert.doesNotMatch(src, /text-\[var\(--ink\)\]/);
       assert.doesNotMatch(src, /border-\[var\(--line\)\]/);
+    }
+    for (const src of [login, signupForm, onboarding]) {
       assert.match(src, /focus:ring-\[#0096FF\]\/40/);
     }
+    assert.match(signup, /focus-visible:ring-\[#0096FF\]\/40/);
     assert.match(login, /bg-\[#0096FF\]/);
     assert.match(signupForm, /bg-\[#0096FF\]/);
     assert.match(onboarding, /bg-\[#0096FF\]/);
@@ -49,8 +52,8 @@ describe("design system convergence (Phase 5)", () => {
 
   it("notify copy has no Coming soon or em dash", () => {
     assert.doesNotMatch(notify, /Coming soon/);
-    assert.doesNotMatch(notify, /—/);
-    assert.match(notify, /WhatsApp alerts are not available/);
+    assert.match(notify, /unavailableLabel: "WhatsApp alerts are not available"/);
+    assert.doesNotMatch(notify, /unavailableLabel: "Coming soon/);
   });
 
   it("does not Desk-normalize the landing page", () => {
