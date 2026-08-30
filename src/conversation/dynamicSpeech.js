@@ -236,6 +236,21 @@ function pickLlmRecoverySaved(opts = {}) {
   return "Okay, I have your name. I'll have the team reach you.";
 }
 
+/**
+ * Escalation payload after Gemini-down recovery captures a name.
+ * Empty teammate routes to directory fallback / owner. Do not invent a booking.
+ */
+const LLM_RECOVERY_REASON =
+  'Caller needs a callback. Live line could not finish.';
+
+function llmRecoveryEscalation(name) {
+  return {
+    teammate: '',
+    name: String(name || '').replace(/\s+/g, ' ').trim(),
+    reason: LLM_RECOVERY_REASON,
+  };
+}
+
 function looksLikeCallerName(text) {
   const t = normalizeCallerText(text);
   if (!t || PURE_NOISE.has(t) || CONFIRM_ANSWERS.has(t)) return false;
@@ -361,6 +376,7 @@ module.exports = {
   pickClarifyProgress,
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
+  llmRecoveryEscalation,
   looksLikeCallerName,
   cleanSpokenLine,
   greetingLooksValid,

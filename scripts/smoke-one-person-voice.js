@@ -10,6 +10,7 @@ const {
   pickContextualAck,
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
+  llmRecoveryEscalation,
 } = require('../src/conversation/dynamicSpeech');
 const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
 const {
@@ -159,6 +160,12 @@ function smokeGeminiRules() {
 }
 
 function smokeRecoveryStillMatches() {
+  const payload = llmRecoveryEscalation('Alvin');
+  assert.equal(payload.name, 'Alvin');
+  assert.match(payload.reason, /callback/i);
+  assert.equal(payload.teammate, '');
+  console.log('✓ recovery name enters escalation as a callback');
+
   const handoff = pickClarifyProgress({
     action: 'ASK_CLARIFICATION',
     slot: 'name',

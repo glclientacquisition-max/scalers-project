@@ -56,6 +56,7 @@ Boot + `/healthz` expose SMS `configured` vs **`verified`** (live balance probe)
 | SMS/WA/email delivered | “Okay, I've texted/sent it to the team.” |
 | Desk-only soft success | “Okay, I've noted that for the team to follow up.” |
 | Invalid / missing name on tool | “Tell me your name so I can reach the team…” |
+| Gemini down, name captured | Same escalate notify. Reason: caller needs a callback. Live line could not finish. |
 
 Never claim a live transfer unless a transfer executor actually runs.
 

@@ -96,6 +96,7 @@ const {
   pickClarifyProgress,
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
+  llmRecoveryEscalation,
   looksLikeCallerName,
   shouldSkipCallerTurn,
 } = require('./src/conversation/dynamicSpeech');
@@ -1269,14 +1270,19 @@ mediaWss.on('connection', (ws, req) => {
 
   async function resolveLlmRecoverySpeech(userText = '') {
     if (llmRecoveryOffered && looksLikeCallerName(userText)) {
-      const name = String(userText || '').replace(/\s+/g, ' ').trim();
+      const escalation = llmRecoveryEscalation(userText);
       try {
         await db.saveCallerInfo({
           callSid: sidLabel(),
-          name,
-          reason: 'Live line could not complete. Team to follow up.',
+          name: escalation.name,
+          reason: escalation.reason,
         });
-        maybeSendWhatsAppNotification(sidLabel());
+        maybeSendEscalationNotification(sidLabel(), escalation).catch((err) => {
+          console.error(
+            `[ws/media][${sidLabel()}] llm recovery escalate failed:`,
+            err?.message || err
+          );
+        });
       } catch (err) {
         console.error(
           `[ws/media][${sidLabel()}] llm recovery save failed:`,

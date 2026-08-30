@@ -183,6 +183,7 @@ function buildEscalationText({
   businessName,
   teammate,
   callerName,
+  name,
   reason,
   callerNumber,
   recordingUrl,
@@ -190,13 +191,14 @@ function buildEscalationText({
   match,
 } = {}) {
   const who = teammateLabel(teammate);
+  const displayName = String(callerName || name || '').trim();
   const isFallback = match === 'fallback' && requested;
   const lines = [
     isFallback
       ? `Escalation for ${who}${businessName ? ` — ${businessName}` : ''} (fallback)`
       : `Escalation for ${who}${businessName ? ` — ${businessName}` : ''}`,
     ``,
-    `Caller: ${callerName || '—'}`,
+    `Caller: ${displayName || '—'}`,
     `Phone: ${callerNumber || '—'}`,
     `Reason: ${reason || '—'}`,
   ];

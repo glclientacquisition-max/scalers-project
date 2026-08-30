@@ -6,6 +6,7 @@ const {
   pickContextualAck,
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
+  llmRecoveryEscalation,
   looksLikeCallerName,
 } = require('../src/conversation/dynamicSpeech');
 
@@ -77,5 +78,10 @@ assert.match(pickLlmRecoveryLine({ language: 'sw' }), /jina/i);
 assert.doesNotMatch(pickLlmRecoveryLine({ language: 'sw' }), /simu hii/i);
 assert.equal(looksLikeCallerName('Ann Wanjiku'), true);
 assert.equal(looksLikeCallerName('Carpet cleaning'), false);
+const recoveryEscalate = llmRecoveryEscalation('Alvin');
+assert.equal(recoveryEscalate.name, 'Alvin');
+assert.match(recoveryEscalate.reason, /callback/i);
+assert.doesNotMatch(recoveryEscalate.reason, /booking|carpet|technical issue/i);
+assert.equal(recoveryEscalate.teammate, '');
 
 console.log('actionProgress tests passed.');

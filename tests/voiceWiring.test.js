@@ -24,6 +24,21 @@ assert.match(
 
 assert.match(
   source,
+  /looksLikeCallerName\(userText\)[\s\S]{0,500}maybeSendEscalationNotification\(sidLabel\(\),\s*escalation\)/,
+  'Gemini-down name capture must enter the escalation notify path'
+);
+
+assert.doesNotMatch(
+  source.slice(
+    source.indexOf('async function resolveLlmRecoverySpeech'),
+    source.indexOf('async function runCallerTurn')
+  ),
+  /maybeSendWhatsAppNotification\(sidLabel\(\)\)/,
+  'recovery must not send a second owner-lead notify beside escalation'
+);
+
+assert.match(
+  source,
   /classifyFinalDuringAgentSpeech/,
   'media path must classify finals heard during TTS (echo drop vs queue)'
 );

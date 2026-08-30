@@ -111,4 +111,17 @@ if (failed) {
   console.error(`\n${failed} scenario(s) failed`);
   process.exit(1);
 }
+const leadShaped = buildEscalationText({
+  businessName: 'Done and Dusted Cleaning Services',
+  teammate: { name: 'Wanjiku', role: 'CEO', phone: '0711000000' },
+  name: 'Alvin',
+  reason: 'Caller needs a callback. Live line could not finish.',
+  callerNumber: '+254700000001',
+});
+if (!/Caller: Alvin/.test(leadShaped) || !/callback/i.test(leadShaped)) {
+  console.error('FAIL recovery escalate body missing caller name');
+  process.exit(1);
+}
+console.log('OK   recovery escalate body includes caller name and callback reason');
+
 console.log(`\nAll ${scenarios.length} scenarios passed`);
