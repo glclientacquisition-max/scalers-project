@@ -1,21 +1,16 @@
 # Appointments `/appointments`
 
 **Job:** Manage visit bookings.  
-**Visual:** Same as Calls. Current page is not a source.
+**Visual:** Same collection language as Calls.
 
 See [`MASTER.md`](../MASTER.md) and [`calls.md`](./calls.md).
 
-## Now (do not copy)
+## Now (Phase 4)
 
-Double padding (`px-4 py-10` inside desk main), fluff subtitle, em dash in the row title, chip filters, cards, “Related calls” → `/calls`.
+No extra page gutter, no subtitle, no em dash. Status tabs with tenant-wide counts (`requested` / `confirmed` / `done` / `cancelled`). Table on `md+`; compact divided rows below. Related call is `/calls/{id}` when `call_id` exists; omitted otherwise. `AppointmentStatusToggle` kept. Empty: Calls recipe, no vertical-setup essay. Tokens: `text-ink`, `bg-surface`, `border-line`.
 
-## Phase 4
+Search is not offered (no existing search query).
 
-- Drop extra page gutter; use the shell only
-- Toolbar + table (When, Caller, Service, When/Where, Status)
-- `AppointmentStatusToggle` stays the domain control
-- Related call: `/calls/{id}` when `call_id` exists
-- Copy: no subtitle, no em dash
-- Empty: Calls recipe. Do not teach vertical setup in a paragraph
+## Later
 
-Do not change appointment schema or home-services playbooks.
+Do not change appointment schema or home-services playbooks. Do not add appointments to Home.

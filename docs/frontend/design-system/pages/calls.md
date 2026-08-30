@@ -15,8 +15,7 @@ See [`MASTER.md`](../MASTER.md) §§6.1–6.4.
 
 ## Allowed later fixes (not a redesign)
 
-- Empty-state hrefs: `?tab=train` and `?tab=test` (not `#`)
 - Title “Inbox” vs nav “Calls”: leave unless product asks
 - Search field may pick up `settingsFieldClass` focus in Phase 5
 
-Preserve filters, `toLead`, WhatsApp on the number, muted icon Done/Archive.
+Empty-state settings links use `?tab=train` and `?tab=test` (Phase 4).

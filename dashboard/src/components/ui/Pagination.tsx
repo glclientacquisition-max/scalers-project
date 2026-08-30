@@ -49,7 +49,7 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
         {page > 1 ? (
           <Link
             href={buildHref(href, page - 1, params)}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:border-accent"
+            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
           >
             Previous
           </Link>
@@ -64,7 +64,7 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
         {page < totalPages ? (
           <Link
             href={buildHref(href, page + 1, params)}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:border-accent"
+            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
           >
             Next
           </Link>

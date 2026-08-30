@@ -34,12 +34,7 @@ export async function updateServiceRequestStatus(
     .eq("tenant_id", tenant.id);
 
   if (error) {
-    if (/service_requests|relation/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/contacts_and_requests.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return { error: "Could not update." };
   }
 
   revalidatePath("/requests");
