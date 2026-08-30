@@ -154,7 +154,7 @@ Pages must not add a second page gutter. Appointments currently does (`px-4 py-1
 
 | Rank | Extracted recipe | Notes |
 | --- | --- | --- |
-| Primary | `inline-flex min-h-12 items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-base font-semibold text-white hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2` | Home “Process Pending Leads”; settings Save is the same fill, `min-h-14` |
+| Primary | `inline-flex min-h-12 items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-base font-semibold text-white hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2` | Home next action; settings Save is the same fill, `min-h-14` |
 | Secondary | `settingsActionClass` or Calls empty-state: `inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] hover:border-[#0096FF]` | |
 | Ghost | `settingsGhostButtonClass` | Calls Search |
 | Destructive / mute | `MarkLeadArchiveButton` icon: `text-ink-soft hover:bg-surface-muted`; `TrashButton` hover `text-warn` | Not a red filled button |
@@ -313,11 +313,8 @@ Do not create these unless a later phase proves a source and a job:
 | Related call → `/calls` not `/calls/{id}` | appointments | 4 |
 | `/settings#train` / `#test` | `calls/page.tsx` | 4 |
 | Token dialect `text-[var(--ink)]` | auth, onboarding, appointments, admin | 5 |
-| Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 or 3 if Home reuses blue card |
+| Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 |
 | Focus ring `/40` vs mandate solid | `settingsUi` vs constitution | 5 |
-| Home unused fetches; no command center | `home/page.tsx` | 3 |
-| `assessMvpAnswerReadiness` unused | lib | 3 evaluate |
-| `TriageLeadCard` unused | component | 3 evaluate |
 
 ---
 

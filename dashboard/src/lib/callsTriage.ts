@@ -129,7 +129,7 @@ export function followUpWhatsAppMessage(opts: {
   if (opts.reason?.trim()) {
     return `Hi ${who}, this is ${biz}. Thanks for calling about ${opts.reason.trim().replace(/\.$/, "")}. How can we help you next?`;
   }
-  return `Hi ${who}, this is ${biz}. Thanks for calling — how can we help you?`;
+  return `Hi ${who}, this is ${biz}. Thanks for calling. How can we help you?`;
 }
 
 export function walletKes(tenant: {
