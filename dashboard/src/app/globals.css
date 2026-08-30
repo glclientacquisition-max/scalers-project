@@ -29,6 +29,7 @@
 
   /* Desk sticky chrome (brand + nav). Keep settings sticky below this. */
   --desk-header-h: 4.25rem;
+  --desk-bottom-nav-h: 0px;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -38,6 +39,12 @@
 @media (min-width: 640px) {
   :root {
     --desk-header-h: 4.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --desk-bottom-nav-h: calc(3.25rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
