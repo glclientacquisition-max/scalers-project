@@ -1,20 +1,16 @@
 # Requests `/requests`
 
 **Job:** Process service requests.  
-**Visual:** Become the Calls collection pattern. Do not keep stacked cards.
+**Visual:** Calls collection pattern.
 
 See [`MASTER.md`](../MASTER.md) and [`calls.md`](./calls.md).
 
-## Now
+## Now (Phase 4)
 
-Two tab rows (status, type), Open count from **current rows**, `<ul>` of padded cards, WhatsApp + Open call.
+Title + status tabs with tenant-wide head counts (scoped by type when a type is selected). Type as a second tab row (domain filter, same visual language). Dense table on `md+`; compact divided rows below. Pagination at 25. Empty: Calls recipe. Errors do not mention SQL. WhatsApp stays a channel glyph on the number. Open goes to `/calls/{id}` when `call_id` exists. `RequestStatusToggle` kept as the domain control.
 
-## Phase 4
+Search is not offered. The list query has no search parameter; a search field would imply a capability that does not exist.
 
-- One toolbar: status tabs with **tenant-wide** counts (head queries like Calls), optional type filter
-- Table columns aligned to the domain: When, Caller, Type, Item, Status, Open
-- Reuse `Pagination` if the query is ranged; today `limit(100)` is acceptable until it hurts
-- Empty: Calls empty recipe, no subtitle essay
-- Primary row action stays WhatsApp / Open call; status via `RequestStatusToggle` (keep domain behavior)
+## Later
 
-Do not change request RPCs or statuses. Ops/Brain own those.
+Do not add request rows to Home until product asks. Do not change request RPCs or statuses.

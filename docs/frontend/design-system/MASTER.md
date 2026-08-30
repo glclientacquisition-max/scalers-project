@@ -186,7 +186,7 @@ Copy `CallsToolbar`:
 3. Tab links: `min-h-11 border-b-2 px-3 text-sm font-medium`. Active: `border-[#0096FF] text-[#005ccc]`. Idle: `border-transparent text-ink-soft`.
 4. Counts in `tabular-nums`.
 
-Requests already has a weaker version of this (status + type as two tab rows). Appointments uses chips. Phase 4: both become this toolbar.
+Requests and Appointments use this toolbar (Phase 4). Requests keeps a second type-tab row because type is a real domain filter.
 
 ### 6.2 Table
 
@@ -203,7 +203,7 @@ From `/calls`:
 
 From `EmptyCalls`: `mt-6 border-y border-line py-10 text-center`. Title `font-display text-xl tracking-tight text-ink`. Optional one secondary or primary link. No illustration, no marketing paragraph.
 
-Pending-number variant: `border-[#0096FF]/30 bg-[#0096FF]/5` plus primary “Train assistant”. Deep link must be `?tab=train`, not `#train` (current href is debt).
+Pending-number variant: `border-[#0096FF]/30 bg-[#0096FF]/5` plus primary “Train assistant”. Deep link is `?tab=train`.
 
 ### 6.4 Pagination
 
@@ -311,8 +311,7 @@ Do not create these unless a later phase proves a source and a job:
 | Requests/Appointments are cards | those pages | 4 |
 | Appointments double padding + fluff + em dash | `appointments/page.tsx` | 4 |
 | Related call → `/calls` not `/calls/{id}` | appointments | 4 |
-| `/settings#train` / `#test` | `calls/page.tsx` | 4 |
-| Token dialect `text-[var(--ink)]` | auth, onboarding, appointments, admin | 5 |
+| Token dialect `text-[var(--ink)]` | auth, onboarding, admin | 5 |
 | Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 |
 | Focus ring `/40` vs mandate solid | `settingsUi` vs constitution | 5 |
 

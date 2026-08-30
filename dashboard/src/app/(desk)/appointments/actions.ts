@@ -36,12 +36,7 @@ export async function updateAppointmentStatus(
     .eq("tenant_id", tenant.id);
 
   if (error) {
-    if (/appointments|relation/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/appointments.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return { error: "Could not update." };
   }
 
   revalidatePath("/appointments");
