@@ -87,50 +87,68 @@ export function DeskMobileNav() {
     };
   }, [moreOpen]);
 
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      const sheet = document.getElementById("desk-more-nav");
+      const toggle = document.getElementById("desk-more-toggle");
+      if (sheet?.contains(target) || toggle?.contains(target)) return;
+      setMoreOpen(false);
+    };
+    const timer = window.setTimeout(() => {
+      document.addEventListener("pointerdown", onPointerDown);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [moreOpen]);
+
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 md:hidden">
+    <>
       {moreOpen ? (
-        <button
-          type="button"
-          aria-label="Close menu"
-          className="fixed inset-0 z-40 bg-black/40"
-          onClick={() => setMoreOpen(false)}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-40 bg-black/40 md:hidden"
         />
       ) : null}
 
-      <div
-        id="desk-more-nav"
-        hidden={!moreOpen}
-        className="relative z-50 border-t border-line bg-surface px-4 py-2"
-      >
-        <nav aria-label="More" className="flex flex-col">
-          {DESK_MOBILE_MORE.map((item) => {
-            const active = isDeskHrefActive(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={[
-                  `flex min-h-12 items-center rounded-lg px-3 text-sm font-medium ${FOCUS}`,
-                  active
-                    ? "bg-accent-soft text-accent-deep"
-                    : "text-ink hover:bg-surface-muted",
-                ].join(" ")}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-          <SignOutButton
-            className={`flex min-h-12 w-full items-center rounded-lg px-3 text-left text-sm text-ink-soft hover:bg-surface-muted hover:text-warn ${FOCUS}`}
-          />
-        </nav>
-      </div>
+      {moreOpen ? (
+        <div
+          id="desk-more-nav"
+          className="fixed inset-x-0 bottom-[calc(3rem+env(safe-area-inset-bottom,0px))] z-[60] border-t border-line bg-surface px-4 py-2 text-ink md:hidden"
+        >
+          <nav aria-label="More" className="flex flex-col">
+            {DESK_MOBILE_MORE.map((item) => {
+              const active = isDeskHrefActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={[
+                    `flex min-h-12 items-center rounded-lg px-3 text-sm font-medium ${FOCUS}`,
+                    active
+                      ? "bg-accent-soft text-accent-deep"
+                      : "text-ink hover:bg-surface-muted",
+                  ].join(" ")}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+            <SignOutButton
+              className={`flex min-h-12 w-full items-center rounded-lg px-3 text-left text-sm text-ink-soft hover:bg-surface-muted hover:text-warn ${FOCUS}`}
+            />
+          </nav>
+        </div>
+      ) : null}
 
       <nav
         aria-label="Workspace"
-        className="relative z-50 border-t border-line bg-surface pb-[env(safe-area-inset-bottom,0px)]"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface pb-[env(safe-area-inset-bottom,0px)] md:hidden"
       >
         <div className="mx-auto flex max-w-desk">
           {DESK_MOBILE_PRIMARY.map((item) => {
@@ -153,6 +171,7 @@ export function DeskMobileNav() {
           })}
           <button
             type="button"
+            id="desk-more-toggle"
             aria-expanded={moreOpen}
             aria-controls="desk-more-nav"
             onClick={() => setMoreOpen((v) => !v)}
@@ -167,6 +186,6 @@ export function DeskMobileNav() {
           </button>
         </div>
       </nav>
-    </div>
+    </>
   );
 }

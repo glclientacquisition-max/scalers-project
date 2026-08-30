@@ -79,7 +79,10 @@ describe("desk navigation (Phase 6B)", () => {
     assert.match(nav, />\s*More\s*</);
     assert.match(nav, /aria-expanded=\{moreOpen\}/);
     assert.match(nav, /aria-controls="desk-more-nav"/);
-    assert.match(nav, /fixed inset-x-0 bottom-0 z-50 md:hidden/);
+    assert.match(nav, /fixed inset-x-0 bottom-0 z-50/);
+    assert.match(nav, /md:hidden/);
+    assert.match(nav, /\{moreOpen \? \(/);
+    assert.doesNotMatch(nav, /hidden=\{!moreOpen\}/);
     assert.doesNotMatch(nav, /\{open \? "Close" : "Menu"\}/);
     assert.match(layout, /<DeskNav \/>/);
     assert.match(layout, /<DeskMobileNav \/>/);
