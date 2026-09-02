@@ -325,7 +325,7 @@ export function suggestPronunciations(
     const line = makeLine({
       prompt: `Hi, this is ${agentName}. How can I help you today`,
       label: "Agent intro",
-      reason: "How the receptionist says their own name.",
+      reason: "How the assistant says their own name.",
       targets: agentTargets,
       priority: 96,
     });

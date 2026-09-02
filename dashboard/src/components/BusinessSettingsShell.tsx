@@ -23,11 +23,11 @@ const PRIMARY_NAV = [
 ];
 
 const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
-  { id: "identity", label: "Agent Persona" },
+  { id: "identity", label: "Assistant" },
   { id: "hours", label: "Hours" },
   { id: "locations", label: "Locations" },
   { id: "policies", label: "Policies" },
-  { id: "team", label: "Escalation Team" },
+  { id: "team", label: "Team" },
   { id: "faqs", label: "FAQs" },
   { id: "tools", label: "Tools & voice" },
   { id: "pronunciation", label: "Pronunciation" },

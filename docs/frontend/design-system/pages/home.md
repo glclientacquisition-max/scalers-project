@@ -5,7 +5,7 @@
 
 ## Now (Phase 3)
 
-Command Center for new call leads. Greeting, optional Updates strip (`liveBulletinItems`), 8/4 split (leads + line/next). Compact today/followed-up links, not four KPI tiles. Line live / Number pending / Needs training from DID + `assessMvpAnswerReadiness` (`ready` + first required gap, never `score`). One derived primary CTA. `TriageLeadCard` reused as a dense divided row. Wallet low only when prepaid is actually under threshold. No `max-w-3xl`. Dead `all` / `done` / `archived` / 40-lead fetches removed.
+Command Center for new call leads. Greeting, optional Updates strip (`liveBulletinItems`), 8/4 split (leads + line/next). Compact today/followed-up links, not four KPI tiles. Line live / Number pending / Needs training from DID + `assessMvpAnswerReadiness` (`ready` + first required gap, never `score`). When the line is live and there is no training gap, one line may say the assistant can take calls. One derived primary CTA (`Test assistant` / `Teach assistant` / process leads). `TriageLeadCard` reused as a dense divided row. Wallet low only when prepaid is actually under threshold. No `max-w-3xl`. Dead `all` / `done` / `archived` / 40-lead fetches removed.
 
 ## Later (Phase 4+)
 

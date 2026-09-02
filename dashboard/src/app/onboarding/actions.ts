@@ -113,7 +113,7 @@ export async function completeOnboardingAction(
   });
 
   if (!prompt || prompt.length < 80) {
-    return { error: "Could not build a receptionist prompt. Try again.", step: 3 };
+    return { error: "Could not finish assistant setup. Try again.", step: 3 };
   }
 
   // Guard: compiled prompt must not look like the signup default.

@@ -131,7 +131,7 @@ export async function saveAndCompileSettings(
     return { error: "Business name is required." };
   }
   if (agentName.length > 40) {
-    return { error: "Agent name should be under 40 characters." };
+    return { error: "Assistant name should be under 40 characters." };
   }
   if (
     !servicesCatalog.length &&

@@ -15,7 +15,7 @@ See [`MASTER.md`](../MASTER.md) §6.5.
 
 ## Keep
 
-Caller/receptionist bubbles, urgent treatment, `LeadStatusToggle`, recording player.
+Caller/assistant bubbles, urgent treatment, `LeadStatusToggle`, recording player.
 
 ## Debt (do not invent a new detail page)
 

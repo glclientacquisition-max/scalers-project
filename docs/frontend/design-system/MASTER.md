@@ -207,7 +207,7 @@ From `/calls`:
 
 From `EmptyCalls`: `mt-6 border-y border-line py-10 text-center`. Title `font-display text-xl tracking-tight text-ink`. Optional one secondary or primary link. No illustration, no marketing paragraph.
 
-Pending-number variant: `border-[#0096FF]/30 bg-[#0096FF]/5` plus primary “Train assistant”. Deep link is `?tab=train`.
+Pending-number variant: `border-[#0096FF]/30 bg-[#0096FF]/5` plus primary “Teach assistant”. Deep link is `?tab=train`.
 
 ### 6.4 Pagination
 

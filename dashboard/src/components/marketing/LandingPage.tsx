@@ -57,7 +57,7 @@ export function LandingPage() {
             </div>
 
             <h1 className="landing-rise landing-rise-delay-2 mt-8 font-display text-3xl leading-tight tracking-tight text-white sm:text-4xl md:text-[2.75rem]">
-              The autonomous business assistant for Kenyan SMEs.
+              The business assistant for Kenyan SMEs.
             </h1>
 
             <p className="landing-rise landing-rise-delay-3 mt-4 max-w-md text-base leading-relaxed text-sky-100/90 sm:text-lg">

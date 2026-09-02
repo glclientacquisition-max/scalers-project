@@ -513,11 +513,7 @@ export function TenantForm({
 
   useEffect(() => {
     if (state.ok) {
-      setFlash(
-        state.source === "gemini"
-          ? "Training complete. Your receptionist will use this on the next call."
-          : "Training saved (basic mode). Your receptionist will use this on the next call."
-      );
+      setFlash("Saved. Your assistant will use this on the next call.");
     }
   }, [state]);
 
@@ -808,7 +804,7 @@ export function TenantForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="agent_name">
-              Agent name
+              Assistant name
             </label>
             <input
               id="agent_name"
@@ -1898,8 +1894,8 @@ export function TenantForm({
           ) : null}
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-ink">Handoff</p>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
+          <p className="text-sm font-medium text-ink">When a human is needed</p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="When a human is needed">
             {HANDOFF_OPTIONS.map((opt) => {
               const selected = handoffMode === opt.id;
               return (

@@ -1,6 +1,7 @@
 # Scalers receptionist UX and business context model
 
 **Status:** Phase 6D of Frontend 2.0. Research and recommendation only.  
+**Owner-facing language (Phase 7):** [`BUSINESS_ASSISTANT_LANGUAGE_SYSTEM.md`](./BUSINESS_ASSISTANT_LANGUAGE_SYSTEM.md) supersedes receptionist as the product name. Architecture in this file still holds.  
 **Date:** 2026-08-30  
 **Lane:** Desk UI/UX (product architecture). Prompt policy, tools, and schema remain Brain / Platform.  
 **Authority:** [`FRONTEND_CONSTITUTION.md`](./FRONTEND_CONSTITUTION.md), [`CUSTOMER_WORK_MODEL.md`](./CUSTOMER_WORK_MODEL.md), [`NAVIGATION_RESEARCH.md`](./NAVIGATION_RESEARCH.md), [`pages/receptionist.md`](./design-system/pages/receptionist.md), [`pages/settings.md`](./design-system/pages/settings.md)  

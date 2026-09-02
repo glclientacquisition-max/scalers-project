@@ -27,7 +27,7 @@ import {
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
 
-/** WhatsApp-style transcript bubble. Caller = green/left, receptionist = grey/right. */
+/** WhatsApp-style transcript bubble. Caller = green/left, assistant = grey/right. */
 function ChatBubble({ turn }: { turn: TranscriptRow }) {
   const speaker = String(turn.speaker || "").toLowerCase();
   const isCaller = speaker === "caller";
@@ -59,7 +59,7 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
             isCaller ? "text-[#2f6b3a]" : "text-ink-soft",
           ].join(" ")}
         >
-          {isCaller ? "Caller" : "Receptionist"}
+          {isCaller ? "Caller" : "Assistant"}
         </p>
         <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.text_content}</p>
       </div>

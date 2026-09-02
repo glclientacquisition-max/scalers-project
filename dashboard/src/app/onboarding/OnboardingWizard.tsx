@@ -21,7 +21,7 @@ const STEPS = [
   "Business type",
   "Services & pricing",
   "Hours & location",
-  "Tone & handoff",
+  "Name & tone",
 ] as const;
 
 const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
@@ -31,7 +31,7 @@ const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
   },
   {
     id: "friendly",
-    blurb: "Warm and helpful, like a receptionist people enjoy talking to.",
+    blurb: "Warm and helpful.",
   },
   {
     id: "empathetic",
@@ -238,18 +238,18 @@ export function OnboardingWizard() {
         {step === 3 ? (
           <div className="space-y-8">
             <div>
-              <h2 className="font-display text-2xl text-ink">Receptionist name & tone</h2>
+              <h2 className="font-display text-2xl text-ink">Assistant name & tone</h2>
               <label
                 className="mt-5 block text-sm font-medium text-ink"
                 htmlFor="agent_name_field"
               >
-                Receptionist name
+                Assistant name
               </label>
               <input
                 id="agent_name_field"
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
-                placeholder="Receptionist"
+                placeholder="e.g. Aisha"
                 className={`mt-2 ${fieldClass}`}
               />
               <div className="mt-5 space-y-3">
