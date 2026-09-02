@@ -53,7 +53,7 @@ describe("business assistant language (Phase 7)", () => {
     assert.match(tenantForm, /Your assistant will use this on the next call/);
     assert.doesNotMatch(tenantForm, /basic mode/);
     assert.doesNotMatch(tenantForm, /Your receptionist will use/);
-    assert.match(testPanel, />Assistant</);
+    assert.match(testPanel, />\s*Assistant\s*</);
     assert.match(ingest, /Add business information/);
     assert.match(ingest, /Add to my assistant/);
     assert.match(callDetail, /"Assistant"/);
