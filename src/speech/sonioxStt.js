@@ -4,6 +4,11 @@
 const WebSocket = require('ws');
 const { sttLanguageHints } = require('../conversation/languageOptions');
 const { buildSttContext, isSttContextEnabled } = require('./sttContext');
+const { classifySonioxError } = require('./sonioxErrors');
+const {
+  noteSonioxProviderError,
+  noteSonioxProviderOk,
+} = require('./sonioxProviderHealth');
 
 const SONIOX_WS_URL =
   process.env.SONIOX_STT_URL || 'wss://stt-rt.soniox.com/transcribe-websocket';
@@ -134,12 +139,14 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
     try {
       const msg = JSON.parse(raw.toString());
       if (msg.error_code || msg.error_type) {
+        const classified = classifySonioxError(msg);
         console.error(
           `[soniox-stt][${callSid}] error:`,
           msg.error_code || msg.error_type,
           msg.message || msg.error_message || ''
         );
-        onEvent({ type: 'error', raw: msg });
+        noteSonioxProviderError('stt', classified);
+        onEvent({ type: 'error', raw: msg, classified });
         return;
       }
 
@@ -164,6 +171,7 @@ function createSonioxSttSession({ callSid, onEvent = () => {}, context = null, c
         }
         if (finals) {
           console.log(`[soniox-stt][${callSid}] FINAL: ${finals}`);
+          noteSonioxProviderOk('stt');
           onEvent({ type: 'transcript', text: finals, isFinal: true, raw: msg });
         } else if (interim) {
           console.log(`[soniox-stt][${callSid}] interim: ${interim}`);

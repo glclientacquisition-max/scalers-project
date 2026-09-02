@@ -77,7 +77,7 @@ Ship the levers that raise *average* speed and reduce variance without live A/B 
 | Greeting always instant + tenant warm before first PCM | No default-name greeting flash | Next |
 | Extract media session from `server.js` | Safer iteration on turn loop | Next |
 
-Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md).
+Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md). Silent-answer 402 incident: [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md).
 
 ### Phase 3 — Operate like a product
 

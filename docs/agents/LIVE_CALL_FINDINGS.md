@@ -1,5 +1,7 @@
 # Live call findings — Ngong Hills Hotel (2026-08-11)
 
+Later incident (assistant silent, Soniox 402 billing): [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md).
+
 Analyzed production calls on DID `+254709221536` (agent **Zara**) after Voice Phase 1–2 merges.
 
 ## Calls reviewed
