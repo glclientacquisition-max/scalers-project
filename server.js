@@ -19,6 +19,13 @@ const {
   createSonioxTtsSession,
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
+const { classifySonioxError } = require('./src/speech/sonioxErrors');
+const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
+const {
+  pickSpeechOutageLine,
+  synthesizeEmergencyPcm,
+  pcmDurationMs,
+} = require('./src/speech/emergencyTts');
 const {
   resolveSonioxVoice,
   ensureSonioxVoiceReady,
@@ -226,6 +233,7 @@ app.get('/healthz', (_req, res) => {
       stt: isSonioxConfigured(),
       tts: isSonioxTtsConfigured(),
       defaultVoice: resolveSonioxVoice(),
+      lastError: getSonioxProviderHealth(),
       curatedVoices: listCuratedVoices().map((v) => ({
         id: v.id,
         description: v.description,
@@ -985,6 +993,8 @@ mediaWss.on('connection', (ws, req) => {
   let messages = [{ role: 'system', content: systemPrompt }];
   const transcriptLog = [];
   let greetingStarted = false;
+  /** Soniox 402/fatal: speak a local fallback once, then hang up. */
+  let speechOutageStarted = false;
   let profileLoaded = false;
   let profileCallSid = null;
   /** Sticky call language: 'en' | 'sw' | 'sheng' | 'mixed' | 'unknown' */
@@ -1111,8 +1121,72 @@ mediaWss.on('connection', (ws, req) => {
     kickPendingTurn();
   }
 
+  function hangupAfterSpeechOutage(delayMs) {
+    setTimeout(() => {
+      try {
+        ws.close(1000, 'speech_outage');
+      } catch {
+        /* ignore */
+      }
+    }, Math.max(400, Number(delayMs) || 2500));
+  }
+
+  /**
+   * Play PCM that did not come from Soniox (espeak / Gemini emergency TTS).
+   */
+  async function playLocalPcm(pcm) {
+    if (!pcm || !pcm.length) return 0;
+    speaking = true;
+    speakStartedAt = Date.now();
+    activePlaybackGeneration = ++playbackGeneration;
+    const gen = activePlaybackGeneration;
+    if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+    const waitMs = pcmDurationMs(pcm, 16000) + 200;
+    await sleep(waitMs);
+    if (activePlaybackGeneration === gen) {
+      speaking = false;
+      releaseQueuedCallerSpeech();
+    }
+    return waitMs;
+  }
+
+  /**
+   * Soniox STT+TTS are billed out (402) or otherwise dead. Speak one outage
+   * line via emergency TTS so the caller is not left in silence, then hang up.
+   */
+  async function handleSpeechProviderOutage(reason) {
+    if (speechOutageStarted) return { ok: false, outage: true };
+    speechOutageStarted = true;
+    greetingStarted = true;
+    const line = pickSpeechOutageLine(callLanguage);
+    console.error(
+      `[ws/media][${sidLabel()}] speech provider outage (${reason}): speaking fallback`
+    );
+    try {
+      const pcm = await synthesizeEmergencyPcm(line, { language: callLanguage });
+      if (pcm?.length) {
+        const waitMs = await playLocalPcm(pcm);
+        transcriptLog.push(`Agent: ${line}`);
+        messages.push({ role: 'assistant', content: line, local: true });
+        hangupAfterSpeechOutage(waitMs);
+        return { ok: true, outage: true, emergency: true };
+      }
+      console.error(
+        `[ws/media][${sidLabel()}] emergency TTS produced no audio after ${reason}`
+      );
+    } catch (err) {
+      console.error(
+        `[ws/media][${sidLabel()}] emergency TTS failed:`,
+        err?.message || err
+      );
+    }
+    hangupAfterSpeechOutage(800);
+    return { ok: false, outage: true };
+  }
+
   async function speakText(text, opts = {}) {
-    if (!text) return;
+    if (!text) return { ok: false };
+    if (speechOutageStarted) return { ok: false, outage: true };
     // Greeting / early turns can race tenantWarm → TTS session create.
     if (!tts && ttsReadyPromise) {
       try {
@@ -1128,7 +1202,7 @@ mediaWss.on('connection', (ws, req) => {
       console.warn(
         `[ws/media][${sidLabel()}] speakText skipped — TTS unavailable: ${String(text).slice(0, 80)}`
       );
-      return;
+      return handleSpeechProviderOutage('tts unavailable');
     }
     // Starting intentional playback clears a prior barge latch.
     bargeInActive = false;
@@ -1161,9 +1235,10 @@ mediaWss.on('connection', (ws, req) => {
       const pushed = session.pushText(prepared.text);
       if (!pushed.pushed) {
         session.cancel();
-        return;
+        return { ok: false, empty: true };
       }
       await session.end();
+      return { ok: true };
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
       try {
@@ -1171,6 +1246,13 @@ mediaWss.on('connection', (ws, req) => {
       } catch {
         /* ignore */
       }
+      const classified = classifySonioxError(err);
+      if (classified.billing || classified.fatal) {
+        return handleSpeechProviderOutage(
+          `tts ${classified.code || classified.message}`
+        );
+      }
+      return { ok: false };
     } finally {
       if (opts.isFiller && fillerStreamId && session?.streamId === fillerStreamId) {
         fillerStreamId = null;
@@ -1180,7 +1262,7 @@ mediaWss.on('connection', (ws, req) => {
         if (activeOutboundStreamId === session?.streamId) {
           activeOutboundStreamId = null;
         }
-        releaseQueuedCallerSpeech();
+        if (!speechOutageStarted) releaseQueuedCallerSpeech();
       }
     }
   }
@@ -1839,6 +1921,16 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   function onSttEvent(evt) {
+    if (evt.type === 'error') {
+      const classified = evt.classified || classifySonioxError(evt.raw);
+      if (classified.billing || classified.fatal) {
+        void handleSpeechProviderOutage(
+          `stt ${classified.code || classified.message}`
+        );
+      }
+      return;
+    }
+
     if (evt.type === 'transcript' && evt.text) {
       const text = String(evt.text).trim();
       if (!text) return;
@@ -1976,10 +2068,12 @@ mediaWss.on('connection', (ws, req) => {
       // Wait until TTS is assigned + connected — avoid silent greetings when
       // speakText raced ahead of tenantWarm.then(() => createSonioxTtsSession).
       const readyTts = await ttsReadyPromise;
+      if (speechOutageStarted) return;
       if (!readyTts) {
         console.warn(
           `[ws/media][${sidLabel()}] greeting skipped — TTS not ready`
         );
+        await handleSpeechProviderOutage('tts not ready');
         return;
       }
 
@@ -1997,13 +2091,17 @@ mediaWss.on('connection', (ws, req) => {
         generateText: generateGeminiText,
         mode: process.env.VOICE_GREETING_MODE || 'instant',
       });
+      if (speechOutageStarted) return;
       console.log(
         `[ws/media][${sidLabel()}] greeting mode=${process.env.VOICE_GREETING_MODE || 'instant'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
       );
 
-      await speakText(greetingLine);
-      transcriptLog.push(`Agent: ${greetingLine}`);
-      messages.push({ role: 'assistant', content: greetingLine, local: true });
+      const spoken = await speakText(greetingLine);
+      if (spoken?.outage || speechOutageStarted) return;
+      if (spoken?.ok) {
+        transcriptLog.push(`Agent: ${greetingLine}`);
+        messages.push({ role: 'assistant', content: greetingLine, local: true });
+      }
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
       try {

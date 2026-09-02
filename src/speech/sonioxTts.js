@@ -6,6 +6,11 @@ const { randomUUID } = require('crypto');
 
 const { prepareForTts } = require('./ttsNormalize');
 const { resolveSonioxVoice } = require('./sonioxVoice');
+const { classifySonioxError } = require('./sonioxErrors');
+const {
+  noteSonioxProviderError,
+  noteSonioxProviderOk,
+} = require('./sonioxProviderHealth');
 
 const SONIOX_TTS_URL =
   process.env.SONIOX_TTS_URL || 'wss://tts-rt.soniox.com/tts-websocket';
@@ -54,8 +59,27 @@ function createSonioxTtsSession({
   let closed = false;
   let ws = null;
   let connectPromise = null;
+  /** Session-level billing/auth failure. Further speak() must fail fast. */
+  let providerDead = null;
   /** @type {Map<string, { resolve: Function, reject: Function, cancelled: boolean }>} */
   const active = new Map();
+
+  function failSession(classified) {
+    providerDead = classified;
+    noteSonioxProviderError('tts', classified);
+    const err = new Error(classified.message);
+    err.code = classified.code;
+    err.sonioxBilling = classified.billing;
+    for (const [id, waiter] of active) {
+      active.delete(id);
+      try {
+        waiter.reject(err);
+      } catch {
+        /* ignore */
+      }
+    }
+    return err;
+  }
 
   function ensureConnected() {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -93,23 +117,27 @@ function createSonioxTtsSession({
           const streamId = msg.stream_id;
 
           if (msg.error_code != null || msg.error_type) {
+            const classified = classifySonioxError(msg);
             console.error(
               `[soniox-tts][${callSid}] error:`,
               msg.error_code || msg.error_type,
               msg.error_message || msg.message || ''
             );
-            onEvent({ type: 'error', raw: msg });
+            onEvent({ type: 'error', raw: msg, classified });
             const waiter = streamId ? active.get(streamId) : null;
-            if (waiter) {
-              active.delete(streamId);
-              waiter.reject(
-                new Error(msg.error_message || msg.message || `TTS error ${msg.error_code}`)
-              );
+            if (classified.billing || classified.fatal || !waiter) {
+              failSession(classified);
+              return;
             }
+            active.delete(streamId);
+            const err = new Error(classified.message);
+            err.code = classified.code;
+            waiter.reject(err);
             return;
           }
 
           if (msg.audio) {
+            noteSonioxProviderOk('tts');
             const pcm = Buffer.from(msg.audio, 'base64');
             if (pcm.length) {
               onAudio(pcm, { streamId, audioEnd: Boolean(msg.audio_end) });
@@ -159,7 +187,19 @@ function createSonioxTtsSession({
    */
   async function beginSpeak(opts = {}) {
     if (closed) throw new Error('TTS session closed');
+    if (providerDead) {
+      const err = new Error(providerDead.message);
+      err.code = providerDead.code;
+      err.sonioxBilling = providerDead.billing;
+      throw err;
+    }
     await ensureConnected();
+    if (providerDead) {
+      const err = new Error(providerDead.message);
+      err.code = providerDead.code;
+      err.sonioxBilling = providerDead.billing;
+      throw err;
+    }
 
     const streamId = `tts-${randomUUID()}`;
     // Language may be refined on first push via prepareForTts.

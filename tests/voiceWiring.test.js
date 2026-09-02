@@ -96,6 +96,24 @@ assert.match(
 
 assert.match(
   source,
+  /speech provider outage/,
+  'Soniox billing/fatal TTS+STT failure must speak an emergency line instead of silence'
+);
+
+assert.match(
+  source,
+  /lastError: getSonioxProviderHealth\(\)/,
+  'healthz must expose last Soniox STT/TTS error so 402 billing is visible without log tailing'
+);
+
+assert.match(
+  source,
+  /synthesizeEmergencyPcm/,
+  'media path must import emergency TTS for Soniox 402 silence'
+);
+
+assert.match(
+  source,
   /local:\s*true/,
   'instant greeting must be marked local so it is not sent as an unsigned Gemini model turn'
 );

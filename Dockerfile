@@ -8,6 +8,11 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
+# Emergency TTS when Soniox billing is exhausted (live silence on 402).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends espeak-ng \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY server.js db.js ./
 COPY src ./src
 COPY scripts ./scripts

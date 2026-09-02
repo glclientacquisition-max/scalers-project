@@ -4,6 +4,7 @@ const { createSonioxTtsSession, SAMPLE_RATE } = require('./sonioxTts');
 const { prepareForTts } = require('./ttsNormalize');
 const { pcmToWav } = require('./wavPack');
 const { parseLexiconOverrides } = require('./pronunciationLexicon');
+const { classifySonioxError } = require('./sonioxErrors');
 
 /**
  * Synthesize preview audio with the Scalers cloned voice.
@@ -44,6 +45,14 @@ async function synthesizeTtsPreview(opts) {
       alreadyPrepared: true,
       extraLexicon,
     });
+  } catch (err) {
+    const classified = classifySonioxError(err);
+    if (classified.billing) {
+      throw new Error(
+        'Soniox billing exhausted. Add funds or enable autopay on the Soniox account.'
+      );
+    }
+    throw err;
   } finally {
     session.close();
   }
