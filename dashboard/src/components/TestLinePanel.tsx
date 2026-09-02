@@ -172,12 +172,12 @@ export function TestLinePanel({
           </>
         ) : (
           <p className="text-sm text-ink-soft">
-            Add a business name and agent name in{" "}
+            Add a business name and assistant name in{" "}
             <Link
               href={businessSettingsHref("train", "identity")}
               className="font-medium text-[#0096FF] underline-offset-2 hover:underline"
             >
-              Agent Persona
+              Assistant
             </Link>{" "}
             to preview the greeting.
           </p>

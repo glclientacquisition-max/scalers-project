@@ -253,7 +253,7 @@ export function CallFaqSuggestions({
                           className="block text-xs font-medium text-ink-soft"
                           htmlFor={answerId}
                         >
-                          What the receptionist should say
+                          What the assistant should say
                         </label>
                         <textarea
                           id={answerId}

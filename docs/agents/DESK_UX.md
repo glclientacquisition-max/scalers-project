@@ -2,7 +2,7 @@
 
 **Mission:** Make Scalers’ owner desk and marketing feel clear, branded, and fast — without breaking Auth / RLS or admin isolation.
 
-Frontend 2.0 (operating console for the AI receptionist): constitution [`docs/frontend/FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md); design system [`docs/frontend/design-system/MASTER.md`](../frontend/design-system/MASTER.md); recon [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md). Do not start UI work until following MASTER recipes. Constitution outranks generic skill output and must not be forked per page.
+Frontend 2.0 (operating console for the Business Assistant): constitution [`docs/frontend/FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md); design system [`docs/frontend/design-system/MASTER.md`](../frontend/design-system/MASTER.md); recon [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md); language [`docs/frontend/BUSINESS_ASSISTANT_LANGUAGE_SYSTEM.md`](../frontend/BUSINESS_ASSISTANT_LANGUAGE_SYSTEM.md). Do not start UI work until following MASTER recipes. Constitution outranks generic skill output and must not be forked per page.
 
 Use for landing, signup/onboarding UX, calls inbox, settings presentation, navigation, and visual design. Not for wallet ledger rules or voice audio.
 

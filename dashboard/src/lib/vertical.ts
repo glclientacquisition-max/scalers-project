@@ -27,7 +27,7 @@ export const VERTICAL_OPTIONS: {
   {
     id: "general",
     label: "Other / general",
-    blurb: "General receptionist",
+    blurb: "General business",
   },
 ];
 

@@ -89,7 +89,7 @@ function EmptyCalls({
           href={businessSettingsHref("train")}
           className="mt-5 inline-flex rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:shadow-focus"
         >
-          Train assistant
+          Teach assistant
         </Link>
       </div>
     );

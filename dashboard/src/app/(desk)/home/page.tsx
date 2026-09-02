@@ -295,6 +295,11 @@ export default async function HomeOverviewPage() {
                 {tenant.sautikit_virtual_number}
               </p>
             ) : null}
+            {line === "line_live" && !trainingGap ? (
+              <p className="mt-2 text-sm text-ink-soft">
+                Your assistant can take calls.
+              </p>
+            ) : null}
             {trainingGap ? (
               <p className="mt-2 text-sm text-ink">
                 Needs training

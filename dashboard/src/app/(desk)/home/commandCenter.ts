@@ -80,18 +80,18 @@ export function trainingGapLabel(id: string): string {
     case "did":
       return "Number";
     case "prompt":
-      return "Prompt";
+      return "Finish setup";
     case "identity":
-      return "Agent";
+      return "Assistant name";
     case "hours":
     case "hours_schedule":
-      return "Hours";
+      return "Add hours";
     case "location":
-      return "Location";
+      return "Add location";
     case "faqs_or_fallback":
-      return "FAQs";
+      return "Add FAQs";
     case "notify":
-      return "Notify";
+      return "Add notify";
     default:
       return "Setup";
   }
@@ -108,19 +108,19 @@ export function homeNextAction(input: {
     return { href: callsHref({ status: "new" }), label: "Process leads" };
   }
   if (input.line === "number_pending") {
-    return { href: businessSettingsHref("test"), label: "Test receptionist" };
+    return { href: businessSettingsHref("test"), label: "Test assistant" };
   }
   if (input.trainingGapId) {
     return {
       href: businessSettingsHref("train", trainingPanelForItem(input.trainingGapId)),
-      label: "Train receptionist",
+      label: "Teach assistant",
     };
   }
   if (input.walletLow) {
     return { href: "/wallet", label: "Add credit" };
   }
   if (input.totalCalls === 0) {
-    return { href: businessSettingsHref("test"), label: "Test receptionist" };
+    return { href: businessSettingsHref("test"), label: "Test assistant" };
   }
   return { href: "/calls", label: "Show all calls" };
 }

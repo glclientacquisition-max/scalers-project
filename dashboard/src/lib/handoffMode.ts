@@ -8,7 +8,7 @@ export const HANDOFF_OPTIONS: {
   {
     id: "callback",
     label: "WhatsApp / email callback",
-    blurb: "Notify a teammate. AI stays on the line and takes a message.",
+    blurb: "Notify a teammate. The assistant stays on the line and takes a message.",
   },
   {
     id: "live_transfer",

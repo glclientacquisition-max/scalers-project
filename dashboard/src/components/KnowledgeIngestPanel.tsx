@@ -143,7 +143,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
     <section className="space-y-4">
       <div>
         <h2 className="font-display text-2xl tracking-tight text-ink">
-          Import knowledge
+          Add business information
         </h2>
       </div>
 
@@ -686,7 +686,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               }
               className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
             >
-              {applyPending ? "Adding…" : "Add to my receptionist"}
+              {applyPending ? "Adding…" : "Add to my assistant"}
             </button>
             <button
               type="button"

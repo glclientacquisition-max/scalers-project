@@ -34,7 +34,7 @@ External skills (UI UX Pro Max, Taste, Ponytail) are **advisors**. They must not
 
 ## 2. Product vision
 
-> **Scalers is the operating console for a business's AI receptionist.**
+> **Scalers is the operating console for a business's Business Assistant.**
 
 The owner is managing a working member of the team.
 
@@ -47,7 +47,7 @@ Every owner screen must help answer, in this order:
 ```text
 WHAT NEEDS MY ATTENTION?
 WHAT HAPPENED?
-WHAT DID MY RECEPTIONIST HANDLE?
+WHAT DID MY ASSISTANT HANDLE?
 WHAT OPPORTUNITIES EXIST?
 IS EVERYTHING WORKING?
 WHAT SHOULD I DO NEXT?
@@ -169,7 +169,7 @@ One primary job per page. Do not fill empty space with unrelated widgets.
 | Call detail `/calls/[id]` | Understand and act on one interaction |
 | Requests `/requests` | Process service requests |
 | Appointments `/appointments` | Manage visit bookings |
-| Business `/settings` | Teach and configure the receptionist |
+| Business `/settings` | Teach and configure the Business Assistant |
 | Wallet `/wallet` | Balance, usage, top-up |
 | Super Admin `/admin/*` | Operate the platform (separate shell) |
 | Landing `/` | Brand and conversion. Not the desk. |
@@ -198,7 +198,7 @@ No analytics four-up that does not click through to work. No fake metrics. Every
 > **Never manufacture product state for visual completeness.**  
 > **The UI must reflect the actual system, not the desired system.**
 
-Forbidden in production UI: fake Online, fake activity, fake analytics, fake customer counts, fake receptionist performance, fake readiness, hard-coded operational numbers, optimistic status without reconciliation.
+Forbidden in production UI: fake Online, fake activity, fake analytics, fake customer counts, fake assistant performance, fake readiness, hard-coded operational numbers, optimistic status without reconciliation.
 
 If a capability has no trustworthy source:
 
@@ -225,11 +225,11 @@ Respect `prefers-reduced-motion`. Landing motion stays on landing.
 
 ---
 
-## 13. Receptionist and knowledge
+## 13. Business Assistant and knowledge
 
-Language: **your receptionist**, not "AI configuration."
+Language: **your assistant**, not "AI configuration."
 
-The owner should feel: **I am teaching my receptionist how my business works.**
+The owner should feel: **I am teaching my assistant how my business works.**
 
 Expose only what the backend supports today: identity, voice, languages, knowledge, behavior, escalation, hours, test. Do not invent controls for capabilities that do not exist.
 
