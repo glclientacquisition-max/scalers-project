@@ -8,7 +8,7 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Emergency TTS when Soniox billing is exhausted (live silence on 402).
+# Emergency TTS: clone-voice downtime clips when possible; espeak-ng last resort.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends espeak-ng \
   && rm -rf /var/lib/apt/lists/*

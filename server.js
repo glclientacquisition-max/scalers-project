@@ -27,6 +27,11 @@ const {
   pcmDurationMs,
 } = require('./src/speech/emergencyTts');
 const {
+  scheduleOutageClipWarm,
+  warmOutageClips,
+  loadOutageClip,
+} = require('./src/speech/outageClips');
+const {
   resolveSonioxVoice,
   ensureSonioxVoiceReady,
   listCuratedVoices,
@@ -1132,7 +1137,7 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   /**
-   * Play PCM that did not come from Soniox (espeak / Gemini emergency TTS).
+   * Play PCM that did not come from a live Soniox stream (clone-voice clip / espeak).
    */
   async function playLocalPcm(pcm) {
     if (!pcm || !pcm.length) return 0;
@@ -1151,16 +1156,17 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   /**
-   * Soniox STT+TTS are billed out (402) or otherwise dead. Speak one outage
-   * line via emergency TTS so the caller is not left in silence, then hang up.
+   * Soniox STT+TTS are billed out (402) or otherwise dead. Speak the clone-voice
+   * downtime recording (same voice as the greeting) and hang up.
    */
   async function handleSpeechProviderOutage(reason) {
     if (speechOutageStarted) return { ok: false, outage: true };
     speechOutageStarted = true;
     greetingStarted = true;
-    const line = pickSpeechOutageLine(callLanguage);
+    const clip = loadOutageClip(callLanguage);
+    const line = pickSpeechOutageLine(clip?.language || callLanguage);
     console.error(
-      `[ws/media][${sidLabel()}] speech provider outage (${reason}): speaking fallback`
+      `[ws/media][${sidLabel()}] speech provider outage (${reason}): speaking clone-voice downtime clip`
     );
     try {
       const pcm = await synthesizeEmergencyPcm(line, { language: callLanguage });
@@ -2033,6 +2039,8 @@ mediaWss.on('connection', (ws, req) => {
               }
               if (activeTurnTiming) activeTurnTiming.markFirstPcm();
               if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+              // Live clone-voice audio means we can record downtime clips for the next outage.
+              scheduleOutageClipWarm();
             },
           });
           try {
@@ -3277,6 +3285,18 @@ server.listen(PORT, () => {
             `✓ Soniox voice catalog loaded count=${voices.length} source=db-or-fallback`
           );
           return ensureSonioxVoiceReady({ log: console.log });
+        })
+        .then(() => warmOutageClips())
+        .then((result) => {
+          if (result?.ok) {
+            console.log(
+              `✓ Clone-voice downtime clips ready langs=${(result.warmed || []).join(',')}`
+            );
+          } else {
+            console.warn(
+              '⚠ Clone-voice downtime clips not warmed (Soniox billing or TTS down). Packaged WAV or espeak will play on outage.'
+            );
+          }
         })
         .catch((err) => {
           console.warn(
