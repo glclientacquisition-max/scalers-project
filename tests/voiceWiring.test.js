@@ -108,8 +108,20 @@ assert.match(
 
 assert.match(
   source,
-  /scheduleOutageClipWarm/,
-  'live Soniox PCM must warm clone-voice downtime clips for the next outage'
+  /outageClips: getOutageClipStatus\(\)/,
+  'healthz must expose per-voice downtime clip readiness'
+);
+
+assert.match(
+  source,
+  /noteSpeechOutage/,
+  'speech outage must notify each owner at most once per cooldown'
+);
+
+assert.match(
+  source,
+  /scheduleOutageClipWarm\(\{ voiceId: tenantSonioxVoiceId \}\)/,
+  'live Soniox PCM must warm that catalog voice downtime clip'
 );
 
 assert.match(

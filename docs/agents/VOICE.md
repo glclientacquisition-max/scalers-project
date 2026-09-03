@@ -17,6 +17,7 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `tests/voiceWiring.test.js` | Static wiring checks for runtime voice paths |
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
 | `docs/WEBHOOK_TUNNEL.md` | Local tunnel for SautiKit media |
+| `docs/agents/VOICE_DOWNTIME_AT_SCALE.md` | Multi-tenant speech-outage contract |
 
 Also OK: small imports from `src/conversation/language.js` / `dynamicSpeech.js` **only** when needed for fillers, greetings, or language sticky behavior on the media path.
 
@@ -54,7 +55,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 8. Greeting must await TTS ready (`ttsReadyPromise`) — never call `speakText` while `tts` is still null.
 9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air.
 10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
-11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Play the clone-voice downtime recording (same voice as the greeting), hang up, and surface `soniox.lastError` on `/healthz`. Warm those clips whenever live TTS works so the next outage still sounds like the same person.
+11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Play the catalog-voice downtime recording (same voice as that line's greeting), hang up, and surface `soniox.lastError` plus `soniox.outageClips` on `/healthz`. Key clips by catalog voice × language. Keep the spoken line voice-generic. Alert each owner at most once per cooldown. See [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md).
 
 ## Env knobs (Voice)
 

@@ -8,7 +8,9 @@ const {
   loadOutageClip,
   cacheClip,
   resetOutageClipCache,
+  getOutageClipStatus,
 } = require('../src/speech/outageClips');
+const { getDefaultVoiceId } = require('../src/speech/sonioxVoiceCatalog');
 
 describe('outageClips', () => {
   let dir;
@@ -51,6 +53,20 @@ describe('outageClips', () => {
     const clip = loadOutageClip('sw');
     assert.ok(clip);
     assert.equal(clip.language, 'en');
+  });
+
+  it('uses the default clone clip when the tenant voice is not in the catalog', () => {
+    const pcm = Buffer.alloc(320);
+    pcm.writeInt16LE(100, 0);
+    fs.writeFileSync(path.join(dir, 'downtime-en.wav'), pcmToWav(pcm, 16000));
+    const fallback = loadOutageClip('en', {
+      voiceId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    });
+    assert.equal(fallback.source, 'packaged');
+    assert.equal(fallback.voiceId, getDefaultVoiceId());
+    const status = getOutageClipStatus();
+    assert.equal(status.en, true);
+    assert.equal(status.defaultVoice, getDefaultVoiceId());
   });
 
   it('prefers an in-memory warmed clip over disk', () => {
