@@ -69,6 +69,21 @@ describe('outageClips', () => {
     assert.equal(status.defaultVoice, getDefaultVoiceId());
   });
 
+  it('reports clip readiness without decoding wav', () => {
+    const empty = getOutageClipStatus();
+    assert.equal(empty.en, false);
+    assert.equal(empty.sw, false);
+    assert.equal(empty.source.en, null);
+    assert.equal(empty.source.sw, null);
+    assert.equal(empty.defaultVoice, getDefaultVoiceId());
+    const pcm = Buffer.alloc(320);
+    fs.writeFileSync(path.join(dir, 'downtime-en.wav'), pcmToWav(pcm, 16000));
+    const status = getOutageClipStatus();
+    assert.equal(status.en, true);
+    assert.equal(status.sw, false);
+    assert.equal(status.source.en, 'packaged');
+  });
+
   it('prefers an in-memory warmed clip over disk', () => {
     const disk = Buffer.alloc(320);
     disk.writeInt16LE(1, 0);
