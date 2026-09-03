@@ -32,6 +32,7 @@ const {
   loadOutageClip,
   getOutageClipStatus,
 } = require('./src/speech/outageClips');
+const { noteSpeechOutage } = require('./src/speech/speechOutageNotify');
 const {
   resolveSonioxVoice,
   ensureSonioxVoiceReady,
@@ -1165,13 +1166,22 @@ mediaWss.on('connection', (ws, req) => {
     if (speechOutageStarted) return { ok: false, outage: true };
     speechOutageStarted = true;
     greetingStarted = true;
-    const clip = loadOutageClip(callLanguage);
+    const clip = loadOutageClip(callLanguage, { voiceId: tenantSonioxVoiceId });
     const line = pickSpeechOutageLine(clip?.language || callLanguage);
     console.error(
       `[ws/media][${sidLabel()}] speech provider outage (${reason}): speaking clone-voice downtime clip`
     );
+    void noteSpeechOutage({ profile: brainProfile }).catch((err) => {
+      console.warn(
+        `[ws/media][${sidLabel()}] owner outage alert failed:`,
+        err?.message || err
+      );
+    });
     try {
-      const pcm = await synthesizeEmergencyPcm(line, { language: callLanguage });
+      const pcm = await synthesizeEmergencyPcm(line, {
+        language: callLanguage,
+        voiceId: tenantSonioxVoiceId,
+      });
       if (pcm?.length) {
         const waitMs = await playLocalPcm(pcm);
         transcriptLog.push(`Agent: ${line}`);
@@ -2042,7 +2052,7 @@ mediaWss.on('connection', (ws, req) => {
               if (activeTurnTiming) activeTurnTiming.markFirstPcm();
               if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
               // Live clone-voice audio means we can record downtime clips for the next outage.
-              scheduleOutageClipWarm();
+              scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
             },
           });
           try {

@@ -13,7 +13,7 @@
     "test:wiring": "node tests/voiceWiring.test.js",
     "test:action-progress": "node tests/actionProgress.test.js",
     "test:tts-cancel": "node tests/sonioxTtsCancel.test.js",
-    "test:soniox-errors": "node --test tests/sonioxErrors.test.js tests/sonioxTtsBilling.test.js tests/pcmUtil.test.js tests/emergencyTts.test.js tests/outageClips.test.js",
+    "test:soniox-errors": "node --test tests/sonioxErrors.test.js tests/sonioxTtsBilling.test.js tests/pcmUtil.test.js tests/emergencyTts.test.js tests/outageClips.test.js tests/speechOutageNotify.test.js",
     "test:soniox-voice": "node --test tests/sonioxVoice.test.js tests/wavPack.test.js",
     "test:timing": "node tests/voiceTiming.test.js",
     "test:interim": "node tests/interimBarge.test.js",

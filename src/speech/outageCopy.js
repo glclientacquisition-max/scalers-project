@@ -1,7 +1,8 @@
 /**
  * Cautious downtime copy for when Soniox STT/TTS is down.
- * Same person as the phone greeting. English default until the caller has spoken.
- * No fluff. No em dashes.
+ * Voice-generic on purpose: one catalog voice serves many businesses.
+ * Do not bake agent_name or business_name into this line.
+ * English default until the caller has spoken. No fluff. No em dashes.
  */
 
 const OUTAGE_LINE_EN =

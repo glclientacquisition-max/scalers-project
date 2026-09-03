@@ -133,7 +133,7 @@ async function synthesizeWithGemini(text, language) {
  */
 async function synthesizeEmergencyPcm(text, opts = {}) {
   const language = opts.language || 'en';
-  const clip = loadOutageClip(language);
+  const clip = loadOutageClip(language, { voiceId: opts.voiceId });
   if (clip?.pcm?.length) {
     console.warn(
       `[emergency-tts] clone-voice clip source=${clip.source} lang=${clip.language} bytes=${clip.pcm.length}`

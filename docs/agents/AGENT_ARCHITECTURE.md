@@ -143,6 +143,7 @@ Loaded once per media session in `ensureTenantPrompt()`.
 | Required escalate omitted | Backend injects escalate | `requiredEscalate.js` |
 | Tool validation failure | Spoken error + repair | `toolExecution.js`, `conversationRepair.js` |
 | After hours | `after_hours_mode` serve vs message | `businessHours.js`, context header |
+| Soniox STT/TTS down | Catalog-voice downtime clip, hang up, one owner alert per business | `outageClips.js`, `speechOutageNotify.js`, [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md) |
 
 ---
 
