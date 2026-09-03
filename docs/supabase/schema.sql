@@ -34,6 +34,9 @@
 --   on_demand_usage_enabled boolean     (default false — wallet_on_demand_alerts.sql)
 --   wallet_low_alert_sent_at timestamptz
 --   wallet_empty_alert_sent_at timestamptz
+--   line_paid_through timestamptz       (line rental covered until; line_rental_grace.sql)
+--   line_grace_days integer             (default 3; line stays live past paid-through)
+--   line_status text                    (active | grace | suspended)
 --   telecom_wallet_balance_kes numeric  (DEPRECATED — mirrored from wallet_balance_kes)
 --   ai_wallet_balance_usd numeric       (DEPRECATED — AI bundled into KES wallet)
 --   is_active boolean

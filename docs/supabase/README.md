@@ -92,6 +92,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 18b | [`fix_charge_call_wallet_ambiguous.sql`](./fix_charge_call_wallet_ambiguous.sql) | `one_wallet_billing.sql` | Qualify `tenants.wallet_balance_kes` in `charge_call_to_wallet` early returns (OUT-param shadowing). Safe to re-run. |
 | 18c | [`wallet_soft_spend_limit.sql`](./wallet_soft_spend_limit.sql) | `wallet_security_beta.sql` | Optional owner monthly soft budget columns (legacy UI removed; columns harmless) |
 | 18d | [`wallet_on_demand_alerts.sql`](./wallet_on_demand_alerts.sql) | `wallet_security_beta.sql` (prefer after 18c) | Automatic low/empty prepaid live alerts + owner on-demand opt-in |
+| 18e | [`line_rental_grace.sql`](./line_rental_grace.sql) | `wallet_on_demand_alerts.sql` | Line paid-through, grace window (wallet may go negative), `suspend_line_for_nonpayment` |
 
 ### 8. Tool toggles (after wallet column grants)
 
