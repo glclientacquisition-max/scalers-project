@@ -57,6 +57,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
 11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Play the catalog-voice downtime recording (same voice as that line's greeting), hang up, and surface `soniox.lastError` plus `soniox.outageClips` on `/healthz`. Key clips by catalog voice × language. Keep the spoken line voice-generic. Alert each owner at most once per cooldown. See [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md).
 12. Gemini **credits depleted / denied** is a reasoning outage, not speech. STT and TTS still work. Keep the line open, ask for a name, save it, and alert the owner once per cooldown. Surface `gemini.lastError` on `/healthz`. Do not retry depleted credits on the next turn.
+13. SautiKit / DID down is a **telephony** outage. No webhook reaches Voice. Do not try to speak. Follow the bridge playbook in [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md#telephony-down-bridge-playbook): notify owner once, forward or re-point the DID, verify one test call before marking it back.
 
 ## Env knobs (Voice)
 
