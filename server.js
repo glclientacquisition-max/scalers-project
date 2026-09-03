@@ -30,6 +30,7 @@ const {
   scheduleOutageClipWarm,
   warmOutageClips,
   loadOutageClip,
+  getOutageClipStatus,
 } = require('./src/speech/outageClips');
 const {
   resolveSonioxVoice,
@@ -239,6 +240,7 @@ app.get('/healthz', (_req, res) => {
       tts: isSonioxTtsConfigured(),
       defaultVoice: resolveSonioxVoice(),
       lastError: getSonioxProviderHealth(),
+      outageClips: getOutageClipStatus(),
       curatedVoices: listCuratedVoices().map((v) => ({
         id: v.id,
         description: v.description,

@@ -11,3 +11,5 @@ SONIOX_API_KEY=... node scripts/render-outage-clips.js
 
 Runtime load order: in-memory warm cache, then `/tmp`, then these packaged files.
 Do not commit espeak or Gemini stand-ins here.
+
+Staging warmed clone-voice clips on 2026-09-03 after Soniox credits landed (EN 174764 PCM bytes, SW 215724). Those files live in the running container only until this folder is filled.
