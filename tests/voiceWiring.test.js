@@ -96,6 +96,12 @@ assert.match(
 
 assert.match(
   source,
+  /if \(state === 'completed' && hasCallSetupFields\) return false;/,
+  'SautiKit initial callback with callSessionState=Completed must still open the media stream'
+);
+
+assert.match(
+  source,
   /speaking clone-voice downtime clip/,
   'Soniox billing/fatal TTS+STT failure must speak a clone-voice downtime clip instead of silence'
 );

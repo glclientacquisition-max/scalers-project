@@ -411,13 +411,14 @@ function extractInboundCallFields(body = {}) {
     nested.callerNumber ||
     nested.from ||
     null;
-  // Prefer the number the client actually dialed when present (outbound WebRTC tests).
+  // SautiKit voice_callback "to" is our tenant DID. Some WebRTC shapes flip it.
   const toNumber =
-    body.clientDialedNumber ||
     body.destinationNumber ||
+    body.clientDialedNumber ||
     body.To ||
     body.to ||
     body.destination_number ||
+    nested.destinationNumber ||
     nested.to ||
     null;
   const callSessionState = String(
@@ -442,6 +443,18 @@ function shouldSkipMediaStream(callSessionState, body = {}) {
   const state = String(callSessionState || '').toLowerCase();
   const streamEvent = String(body.streamEvent || '').toLowerCase();
   if (!state && !streamEvent) return false;
+
+  // SautiKit VoiceProxy can deliver a first callback with callSessionState
+  // already "Completed" while the leg is still being set up. isActive /
+  // direction / duration mark it as call-set-up, not a re-invoke after a
+  // running stream. Never skip Stream on that first webhook or the carrier
+  // answers with its own downtime message and /ws/media never opens.
+  const durationSeconds = extractEventDurationSeconds(body);
+  const hasCallSetupFields =
+    body.isActive !== undefined ||
+    body.direction !== undefined ||
+    (durationSeconds != null && durationSeconds >= 0);
+  if (state === 'completed' && hasCallSetupFields) return false;
 
   // Stream already running / finished — never re-issue <Stream/>.
   const skipTokens = [
@@ -680,6 +693,9 @@ async function handleVoiceIncoming(req, res) {
 
     // SautiKit re-invokes the voice URL on StreamStarted / Completed / etc.
     // Returning another Stream document re-forks and errors — send empty XML.
+    // A first webhook whose callSessionState is already "Completed" is still
+    // call-set-up (it carries callerNumber/destinationNumber/isActive). Open
+    // the stream, persist the call, and let the later Completed event close it.
     if (shouldSkipMediaStream(callSessionState, req.body)) {
       const termination = detectCallTermination(req.body, callSessionState);
       if (termination.terminal) {
@@ -697,6 +713,8 @@ async function handleVoiceIncoming(req, res) {
         .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
     }
 
+    const preTerminal = detectCallTermination(req.body, callSessionState).terminal;
+
     try {
       await db.upsertCall({
         callSid,
@@ -704,6 +722,18 @@ async function handleVoiceIncoming(req, res) {
         toNumber,
         provider: 'sautikit',
       });
+      if (preTerminal) {
+        // The setup webhook already says Completed. Do not mark the row
+        // complete before /ws/media has a chance to write transcript/state.
+        setTimeout(() => {
+          markCallTerminalFromWebhook({
+            callSid,
+            status: 'complete',
+            durationSeconds: extractEventDurationSeconds(req.body),
+            source: 'voice/incoming-setup-terminal',
+          }).catch(() => {});
+        }, 3000);
+      }
     } catch (dbErr) {
       // Do not fail the webhook / Stream setup if DB is briefly unavailable.
       console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
