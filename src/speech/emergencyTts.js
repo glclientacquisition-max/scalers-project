@@ -1,22 +1,17 @@
 // Last-resort spoken audio when Soniox TTS is down (billing 402, auth, etc.).
-// Prefers local espeak-ng (Docker). Falls back to Gemini TTS when configured.
+// Prefers a recording of the cloned receptionist voice, then espeak-ng, then Gemini.
 // Output: mono pcm_s16le @ 16 kHz for SautiKit /ws/media.
 
 const { spawn } = require('child_process');
 const { wavBytesTo16kPcm, resampleS16le, pcmDurationMs } = require('./pcmUtil');
+const {
+  OUTAGE_LINE_EN,
+  OUTAGE_LINE_SW,
+  pickSpeechOutageLine,
+} = require('./outageCopy');
+const { loadOutageClip } = require('./outageClips');
 
 const SAMPLE_RATE = 16000;
-
-const OUTAGE_LINE_EN =
-  'Sorry, I cannot take your call right now. Please try again shortly.';
-const OUTAGE_LINE_SW =
-  'Samahani, siwezi kupokea simu sasa. Tafadhali piga tena baadaye.';
-
-function pickSpeechOutageLine(language) {
-  const lang = String(language || 'en').toLowerCase();
-  if (lang === 'sw' || lang === 'sheng') return OUTAGE_LINE_SW;
-  return OUTAGE_LINE_EN;
-}
 
 function espeakVoice(language) {
   const lang = String(language || 'en').toLowerCase();
@@ -137,11 +132,19 @@ async function synthesizeWithGemini(text, language) {
  * @returns {Promise<Buffer|null>}
  */
 async function synthesizeEmergencyPcm(text, opts = {}) {
-  const clean = String(text || '')
+  const language = opts.language || 'en';
+  const clip = loadOutageClip(language);
+  if (clip?.pcm?.length) {
+    console.warn(
+      `[emergency-tts] clone-voice clip source=${clip.source} lang=${clip.language} bytes=${clip.pcm.length}`
+    );
+    return clip.pcm;
+  }
+
+  const clean = String(text || pickSpeechOutageLine(language))
     .replace(/\s+/g, ' ')
     .trim();
   if (!clean) return null;
-  const language = opts.language || 'en';
 
   try {
     const pcm = await synthesizeWithEspeak(clean, language);

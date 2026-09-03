@@ -96,8 +96,8 @@ assert.match(
 
 assert.match(
   source,
-  /speech provider outage/,
-  'Soniox billing/fatal TTS+STT failure must speak an emergency line instead of silence'
+  /speaking clone-voice downtime clip/,
+  'Soniox billing/fatal TTS+STT failure must speak a clone-voice downtime clip instead of silence'
 );
 
 assert.match(
@@ -108,8 +108,8 @@ assert.match(
 
 assert.match(
   source,
-  /synthesizeEmergencyPcm/,
-  'media path must import emergency TTS for Soniox 402 silence'
+  /scheduleOutageClipWarm/,
+  'live Soniox PCM must warm clone-voice downtime clips for the next outage'
 );
 
 assert.match(

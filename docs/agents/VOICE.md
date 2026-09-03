@@ -54,7 +54,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 8. Greeting must await TTS ready (`ttsReadyPromise`) — never call `speakText` while `tts` is still null.
 9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air.
 10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
-11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Do not leave the caller in silence: speak one emergency line, hang up, and surface `soniox.lastError` on `/healthz`. Top up the Soniox account to restore STT/TTS.
+11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Play the clone-voice downtime recording (same voice as the greeting), hang up, and surface `soniox.lastError` on `/healthz`. Warm those clips whenever live TTS works so the next outage still sounds like the same person.
 
 ## Env knobs (Voice)
 

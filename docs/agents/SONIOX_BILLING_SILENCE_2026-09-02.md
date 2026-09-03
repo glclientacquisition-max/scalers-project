@@ -58,10 +58,12 @@ This is **not** a prompt, barge-in, or Gemini hang. Gemini-down recovery cannot 
 
 ## Ops follow-up (required to restore conversation)
 
-Code cannot refill Soniox. After merge + staging deploy:
+Checked again **2026-09-02 16:59 UTC** (and `/healthz` at 17:57 UTC): Soniox is **still 402** on staging. The API key is present and valid. The organization has no credit. Payments have not landed on this account yet.
 
-1. Add funds or enable autopay on the Soniox organization that owns `SONIOX_API_KEY`.
-2. Confirm `GET /healthz` `soniox.lastError.billingExhausted` is false after a test call.
-3. Place a DID test: greeting audible, STT finals in logs, caller can interrupt.
+Add funds or enable autopay on the Soniox organization that owns `SONIOX_API_KEY`, then:
 
-Until Soniox is funded, emergency TTS only tells the caller the line is unavailable. Hearing and cloned-voice replies stay down.
+1. Confirm `GET /healthz` `soniox.lastError.billingExhausted` is false after a test call.
+2. Place a DID test: greeting audible, STT finals in logs, caller can interrupt.
+3. After one successful TTS turn, Voice warms clone-voice downtime clips so the next outage still sounds like the same person.
+
+Until Soniox is funded, callers hear the emergency path (espeak today; clone-voice recording once clips are warmed or packaged).
