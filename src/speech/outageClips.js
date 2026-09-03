@@ -57,6 +57,32 @@ function cacheClip(lang, pcm, source) {
   return { pcm, source, language: key };
 }
 
+function clipPresent(lang) {
+  if (memory[lang]?.length) return { ready: true, source: 'memory' };
+  try {
+    if (fs.existsSync(tmpPath(lang))) return { ready: true, source: 'tmp' };
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (fs.existsSync(packagedPath(lang))) return { ready: true, source: 'packaged' };
+  } catch {
+    /* ignore */
+  }
+  return { ready: false, source: null };
+}
+
+/** Cheap /healthz snapshot. Does not decode WAV. */
+function getOutageClipStatus() {
+  const en = clipPresent('en');
+  const sw = clipPresent('sw');
+  return {
+    en: en.ready,
+    sw: sw.ready,
+    source: { en: en.source, sw: sw.source },
+  };
+}
+
 function loadOutageClip(language) {
   const preferred = outageClipLang(language);
   const order = preferred === 'sw' ? ['sw', 'en'] : ['en'];
@@ -157,6 +183,7 @@ module.exports = {
   warmOutageClips,
   scheduleOutageClipWarm,
   resetOutageClipCache,
+  getOutageClipStatus,
   packagedPath,
   tmpPath,
 };

@@ -67,3 +67,18 @@ Add funds or enable autopay on the Soniox organization that owns `SONIOX_API_KEY
 3. After one successful TTS turn, Voice warms clone-voice downtime clips so the next outage still sounds like the same person.
 
 Until Soniox is funded, callers hear the emergency path (espeak today; clone-voice recording once clips are warmed or packaged).
+
+## Billing restored (2026-09-03)
+
+Soniox credits landed. Staging Voice `ae4247f` (`https://scalers-staging-staging.up.railway.app/healthz`):
+
+- `soniox.lastError.billingExhausted`: **false**
+- Boot TTS (clone `7b197f3c-84b4-4404-986f-114e4dac1432`) succeeded:
+  - `[outage-clip] warmed clone-voice downtime clip lang=en bytes=174764`
+  - `[outage-clip] warmed clone-voice downtime clip lang=sw bytes=215724`
+  - `✓ Clone-voice downtime clips ready langs=en,sw`
+- No 402 on this process.
+
+Live DID test: call `+254709221536` (Done and Dusted / Shy). Greeting should speak in the cloned receptionist voice. STT finals should appear in Railway logs.
+
+Packaged `src/speech/pcm/downtime-{en,sw}.wav` are still not in git. Current staging process holds them in memory and `/tmp`. Next cold deploy will re-warm at boot while billing holds. Commit packaged WAVs with `SONIOX_API_KEY=... node scripts/render-outage-clips.js` so a 402-at-boot still sounds like Shy.

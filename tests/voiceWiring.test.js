@@ -108,6 +108,12 @@ assert.match(
 
 assert.match(
   source,
+  /outageClips: getOutageClipStatus\(\)/,
+  'healthz must expose clone-voice downtime clip readiness after Soniox billing recovers'
+);
+
+assert.match(
+  source,
   /scheduleOutageClipWarm/,
   'live Soniox PCM must warm clone-voice downtime clips for the next outage'
 );

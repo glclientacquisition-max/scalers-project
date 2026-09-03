@@ -8,6 +8,7 @@ const {
   loadOutageClip,
   cacheClip,
   resetOutageClipCache,
+  getOutageClipStatus,
 } = require('../src/speech/outageClips');
 
 describe('outageClips', () => {
@@ -51,6 +52,20 @@ describe('outageClips', () => {
     const clip = loadOutageClip('sw');
     assert.ok(clip);
     assert.equal(clip.language, 'en');
+  });
+
+  it('reports clip readiness without decoding wav', () => {
+    assert.deepEqual(getOutageClipStatus(), {
+      en: false,
+      sw: false,
+      source: { en: null, sw: null },
+    });
+    const pcm = Buffer.alloc(320);
+    fs.writeFileSync(path.join(dir, 'downtime-en.wav'), pcmToWav(pcm, 16000));
+    const status = getOutageClipStatus();
+    assert.equal(status.en, true);
+    assert.equal(status.sw, false);
+    assert.equal(status.source.en, 'packaged');
   });
 
   it('prefers an in-memory warmed clip over disk', () => {
