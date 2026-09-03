@@ -4,7 +4,7 @@
 **Status:** Contract for platform outages when Scalers hosts many businesses  
 **Companion:** [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md)
 
-Two different platform failures share one rule: the caller dialed one business, and the owner should not get one text per call.
+Three platform failures share one rule: the caller dialed one business, and the owner should not get one text per call.
 
 | Failure | What still works | Caller hears | Owner line |
 | --- | --- | --- | --- |
