@@ -77,8 +77,14 @@ const {
   withTimeout,
   isTimeoutError,
   isRetryableGeminiError,
+  classifyGeminiError,
   resolvePrefetchedStreamSpeech,
 } = require('./src/conversation/geminiVoice');
+const {
+  noteGeminiProviderError,
+  noteGeminiProviderOk,
+  getGeminiProviderHealth,
+} = require('./src/conversation/geminiProviderHealth');
 const {
   selectProductsForTurn,
   formatTargetedProductsForPrompt,
@@ -247,6 +253,11 @@ app.get('/healthz', (_req, res) => {
         description: v.description,
         default: v.default,
       })),
+    },
+    gemini: {
+      configured: Boolean(process.env.GEMINI_API_KEY),
+      model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+      lastError: getGeminiProviderHealth(),
     },
     notify: {
       sms: {
@@ -1368,6 +1379,15 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   async function resolveLlmRecoverySpeech(userText = '') {
+    const health = getGeminiProviderHealth();
+    if (!llmRecoveryOffered && (health.billingExhausted || health.denied)) {
+      void noteSpeechOutage({ profile: brainProfile, kind: 'llm' }).catch((err) => {
+        console.warn(
+          `[ws/media][${sidLabel()}] owner reasoning alert failed:`,
+          err?.message || err
+        );
+      });
+    }
     if (llmRecoveryOffered && looksLikeCallerName(userText)) {
       const name = String(userText || '').replace(/\s+/g, ' ').trim();
       try {
@@ -3204,9 +3224,11 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
       );
       console.log(`[${callSid}] Gemini response received`);
       lastErr = null;
+      noteGeminiProviderOk();
       break;
     } catch (err) {
       lastErr = err;
+      noteGeminiProviderError(classifyGeminiError(err), err);
       const retryable = !isTimeoutError(err) && isRetryableGeminiError(err);
       console.error(
         `[${callSid}] Gemini API call failed:`,

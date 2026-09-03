@@ -23,6 +23,33 @@ describe('speechOutageNotify', () => {
     assert.doesNotMatch(body, /billing/i);
   });
 
+  it('uses a different owner line when reasoning is down', () => {
+    const body = buildOwnerOutageBody('Aris Kenya', 'llm');
+    assert.equal(
+      body,
+      'Aris Kenya line is taking names only. Callers are asked for a name so the team can call back.'
+    );
+    assert.doesNotMatch(body, /[—–]/);
+    assert.doesNotMatch(body, /gemini/i);
+  });
+
+  it('tracks speech and reasoning cooldowns separately per tenant', async () => {
+    const sent = [];
+    setSpeechOutageDispatch(async (opts) => {
+      sent.push(opts);
+      return { channel: 'sms' };
+    });
+    const profile = { id: 'tenant-a', businessName: 'Shop A' };
+    const speech = await noteSpeechOutage({ profile, kind: 'speech' });
+    const llm = await noteSpeechOutage({ profile, kind: 'llm' });
+    const speechAgain = await noteSpeechOutage({ profile, kind: 'speech' });
+    assert.equal(speech.ok, true);
+    assert.equal(llm.ok, true);
+    assert.equal(speechAgain.reason, 'cooldown');
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1].body.includes('taking names only'), true);
+  });
+
   it('sends one owner alert per tenant then cools down', async () => {
     const sent = [];
     setSpeechOutageDispatch(async (opts) => {
