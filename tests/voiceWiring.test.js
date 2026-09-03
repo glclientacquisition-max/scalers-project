@@ -120,6 +120,18 @@ assert.match(
 
 assert.match(
   source,
+  /noteSpeechOutage\(\{ profile: brainProfile, kind: 'llm' \}\)/,
+  'Gemini credits / reasoning outage must notify each owner at most once per cooldown'
+);
+
+assert.match(
+  source,
+  /lastError: getGeminiProviderHealth\(\)/,
+  'healthz must expose last Gemini error so credits/denied is visible without log tailing'
+);
+
+assert.match(
+  source,
   /scheduleOutageClipWarm\(\{ voiceId: tenantSonioxVoiceId \}\)/,
   'live Soniox PCM must warm that catalog voice downtime clip'
 );
