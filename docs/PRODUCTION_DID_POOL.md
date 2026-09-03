@@ -40,4 +40,7 @@ on conflict (e164) do nothing;
 - Put Jirani’s live DID in the pool as `available` (backfill already marks it `assigned`).
 - Expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 - Treat a new DID as the answer to a SautiKit outage. Restore or forward the existing number. See `docs/agents/VOICE_DOWNTIME_AT_SCALE.md#telephony-down-bridge-playbook`.
+<<<<<<< HEAD
 - Release a suspended-for-nonpayment DID straight to `available`. `suspend_line_for_nonpayment` marks it `disabled` so ops can decide.
+=======
+>>>>>>> origin/main
