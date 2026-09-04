@@ -188,4 +188,30 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(trace.entities.product.value, 'HP Printer');
     assert.doesNotMatch(JSON.stringify(trace), /Jane|0712345678/);
   });
+
+  it('classifies booking with landmark as booking intent, not location', () => {
+    assert.equal(
+      inferIntent(
+        'I want to book carpet cleaning for tomorrow at 10 AM. My name is Alex, and my landmark is Barnabas.'
+      ),
+      'booking'
+    );
+    assert.equal(
+      inferIntent('book carpet cleaning tomorrow at 10 AM for Alex at Barnabas'),
+      'booking'
+    );
+    const turn = runTurn(
+      createBrainState(profile),
+      createLanguageState(),
+      'I want to book carpet cleaning for tomorrow at 10 AM. My name is Alex, and my landmark is Barnabas.'
+    );
+    assert.equal(turn.state.intent, 'booking');
+  });
+
+  it('classifies transfer and connect requests as human intent', () => {
+    const turn1 = runTurn(createBrainState(profile), createLanguageState(), 'Connect me to Alvin');
+    assert.equal(turn1.state.intent, 'human');
+    const turn2 = runTurn(createBrainState(profile), createLanguageState(), 'I want you to forward this call to Alvin');
+    assert.equal(turn2.state.intent, 'human');
+  });
 });

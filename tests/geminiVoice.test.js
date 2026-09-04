@@ -11,6 +11,7 @@ const {
   classifyGeminiError,
   isRetryableGeminiError,
   resolvePrefetchedStreamSpeech,
+  spokenTextForToolTurn,
 } = require('../src/conversation/geminiVoice');
 
 describe('extractGeminiText', () => {
@@ -144,6 +145,28 @@ describe('withTimeout', () => {
   it('recognizes timeout errors', () => {
     assert.equal(isTimeoutError(new Error('Gemini stream timed out after 8000ms')), true);
     assert.equal(isTimeoutError(new Error('503 unavailable')), false);
+  });
+});
+
+describe('spokenTextForToolTurn', () => {
+  it('drops model prose when an outcome tool ran', () => {
+    assert.equal(
+      spokenTextForToolTurn({
+        spoken: 'Let me book that for you now.',
+        toolResults: [{ action: 'create_appointment', status: 'invalid' }],
+      }),
+      ''
+    );
+  });
+
+  it('keeps model prose when no outcome tool ran', () => {
+    assert.equal(
+      spokenTextForToolTurn({
+        spoken: 'We open at 8 A M.',
+        toolResults: [],
+      }),
+      'We open at 8 A M.'
+    );
   });
 });
 

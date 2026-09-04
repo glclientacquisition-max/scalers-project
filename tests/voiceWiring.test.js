@@ -162,6 +162,12 @@ assert.match(
 
 assert.match(
   source,
+  /spokenTextForToolTurn/,
+  'Gemini turns must drop model prose after outcome tools so confirmation is backend-only'
+);
+
+assert.match(
+  source,
   /activeOutboundStreamId/,
   'outbound PCM must be gated by active Soniox stream id'
 );

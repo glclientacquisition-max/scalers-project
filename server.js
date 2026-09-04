@@ -79,6 +79,7 @@ const {
   isRetryableGeminiError,
   classifyGeminiError,
   resolvePrefetchedStreamSpeech,
+  spokenTextForToolTurn,
 } = require('./src/conversation/geminiVoice');
 const {
   noteGeminiProviderError,
@@ -2875,14 +2876,6 @@ wss.on('connection', (ws) => {
 const AI_FALLBACK_LINE =
   "Sorry, I'm having a technical issue and couldn't complete that. Please try again.";
 
-const OUTCOME_TOOL_ACTIONS = new Set([
-  'create_service_request',
-  'create_appointment',
-  'update_appointment',
-  'escalate',
-  'tool_request',
-]);
-
 function spokenTextWithoutToolFallback({ spoken = '', actionConfirmation = '' } = {}) {
   const text = String(spoken || '').trim();
   if (text) return text;
@@ -3202,9 +3195,12 @@ async function runGeminiTurnStreaming(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const spokenText = spokenTextWithoutToolFallback({
-    spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-    actionConfirmation,
+  const spokenText = spokenTextForToolTurn({
+    spoken: spokenTextWithoutToolFallback({
+      spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+      actionConfirmation,
+    }),
+    toolResults: execution.results,
   });
 
   const geminiParts = modelPartsForHistory({
@@ -3290,17 +3286,13 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const hasOutcomeAction = execution.results.some((result) =>
-    OUTCOME_TOOL_ACTIONS.has(result.action)
-  );
-  // Action-capable turns use the deterministic backend confirmation. This prevents
-  // model prose from claiming success before execution has actually completed.
-  const spokenText = hasOutcomeAction
-    ? ''
-    : spokenTextWithoutToolFallback({
-        spoken: parsed.spokenText,
-        actionConfirmation,
-      });
+  const spokenText = spokenTextForToolTurn({
+    spoken: spokenTextWithoutToolFallback({
+      spoken: parsed.spokenText,
+      actionConfirmation,
+    }),
+    toolResults: execution.results,
+  });
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
