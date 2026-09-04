@@ -185,6 +185,26 @@ function isRetryableGeminiError(err) {
  * output must not become a technical fallback — the turn guarantee can
  * ask the next slot instead. Timeout / LLM failure speaks fallback once.
  */
+const OUTCOME_TOOL_ACTIONS = new Set([
+  'create_service_request',
+  'create_appointment',
+  'update_appointment',
+  'escalate',
+  'tool_request',
+]);
+
+/**
+ * Action-capable turns use the deterministic backend confirmation.
+ * Model prose must not claim success (or object) before execution finishes.
+ */
+function spokenTextForToolTurn({ spoken = '', toolResults = [] } = {}) {
+  const hasOutcomeAction = (Array.isArray(toolResults) ? toolResults : []).some(
+    (result) => OUTCOME_TOOL_ACTIONS.has(result?.action)
+  );
+  if (hasOutcomeAction) return '';
+  return String(spoken || '').trim();
+}
+
 function resolvePrefetchedStreamSpeech({
   spokenChunks = '',
   spokenText = '',
@@ -226,4 +246,6 @@ module.exports = {
   classifyGeminiError,
   isRetryableGeminiError,
   resolvePrefetchedStreamSpeech,
+  OUTCOME_TOOL_ACTIONS,
+  spokenTextForToolTurn,
 };

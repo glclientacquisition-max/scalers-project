@@ -88,6 +88,45 @@ test('flushes remainder on finish', () => {
   assert.deepStrictEqual(buf.finish(), ['We can help tomorrow']);
 });
 
+test('never duplicates already emitted speech when tokens shift format mid-stream', () => {
+  const buf = createSpokenStreamBuffer();
+  const text =
+    'Carpet cleaning ranges from 1,500 to 2,000 shillings depending on size. What time works for you?';
+  const emitted = [];
+  for (let i = 0; i < text.length; i += 10) {
+    emitted.push(...buf.push(text.slice(i, i + 10)));
+  }
+  emitted.push(
+    ...buf.push(' ###TOOL###{"create_appointment":{"when_text":"tomorrow at 10:00 AM"}}###ENDTOOL###')
+  );
+  emitted.push(...buf.finish());
+
+  const joined = emitted.join(' ');
+  const matchCount = (joined.match(/Carpet cleaning ranges/g) || []).length;
+  assert.strictEqual(matchCount, 1, `Expected 1 occurrence of price line, got ${matchCount}`);
+});
+
+test('does not speak outcome claims or leftover prose after a tool block', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [];
+  emitted.push(
+    ...buf.push(
+      'We are closed right now, but I can set up that booking attempt for tomorrow at 10 AM.'
+    )
+  );
+  emitted.push(...buf.push(' Let me book that for you now.'));
+  emitted.push(
+    ...buf.push(
+      ' ###TOOL###{"create_appointment":{"when_text":"tomorrow at 10:00 AM"}}###ENDTOOL###'
+    )
+  );
+  emitted.push(...buf.finish());
+  const joined = emitted.join(' ');
+  assert.strictEqual((joined.match(/Let me book/g) || []).length, 0);
+  assert.strictEqual((joined.match(/booking attempt/g) || []).length, 0);
+  assert.strictEqual((joined.match(/We are closed right now/g) || []).length, 0);
+});
+
 if (process.exitCode) {
   console.error(`\nFAILED (${passed} passed)`);
 } else {

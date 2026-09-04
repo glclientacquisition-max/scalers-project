@@ -104,8 +104,51 @@ function splitSpeakableChunks(text, opts = {}) {
 }
 
 /**
+ * Model sentences that claim a booking/save before backend validation.
+ * Those must never reach TTS. formatToolConfirmation speaks the outcome.
+ */
+function isOutcomeClaim(text) {
+  return /\b(let me (book|save|send|confirm)|i('ve| have) (booked|saved|sent|confirmed)|you('re| are) booked|booking (attempt|confirmed|saved)|set up that booking|book that for you|i can (still take a visit|set up))\b/i.test(
+    String(text || '')
+  );
+}
+
+function hasCompleteToolBlock(raw) {
+  return /###TOOL###[\s\S]*?###ENDTOOL###/i.test(String(raw || ''));
+}
+
+/**
  * Incremental spoken-chunk extractor for an LLM stream.
  */
+function findPendingText(speakable, emittedSpoken) {
+  if (!emittedSpoken) return speakable.trim();
+  if (speakable.startsWith(emittedSpoken)) {
+    return speakable.slice(emittedSpoken.length).trim();
+  }
+  // Robust prefix alignment: normalize whitespace/punctuation for matching
+  // so mid-stream token merges or formatting shifts never reset emitted audio.
+  const normChar = (c) => c.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let eIdx = 0;
+  let sIdx = 0;
+  while (sIdx < speakable.length && eIdx < emittedSpoken.length) {
+    const sC = normChar(speakable[sIdx]);
+    const eC = normChar(emittedSpoken[eIdx]);
+    if (!sC) { sIdx += 1; continue; }
+    if (!eC) { eIdx += 1; continue; }
+    if (sC === eC) {
+      sIdx += 1;
+      eIdx += 1;
+    } else {
+      break;
+    }
+  }
+  const strippedEmittedLen = emittedSpoken.replace(/[^a-zA-Z0-9]/g, '').length;
+  if (!strippedEmittedLen || eIdx >= strippedEmittedLen * 0.9) {
+    return speakable.slice(sIdx).trim();
+  }
+  return '';
+}
+
 function createSpokenStreamBuffer(opts = {}) {
   let raw = '';
   let emittedSpoken = '';
@@ -122,31 +165,35 @@ function createSpokenStreamBuffer(opts = {}) {
     const final = Boolean(pushOpts.final);
     const speakable = stripMarkersForSpeech(raw, { final });
 
-    // Only consider text beyond what we already flushed (prefix-stable after strip).
-    let pending;
-    if (speakable.startsWith(emittedSpoken)) {
-      pending = speakable.slice(emittedSpoken.length).trim();
-    } else {
-      // Marker stripping shrank earlier text — recompute against full speakable.
-      pending = speakable.trim();
-      emittedSpoken = '';
+    // Backend confirmation speaks the tool outcome. Do not flush leftover
+    // model prose after a complete tool block (accept-then-object on live calls).
+    if (hasCompleteToolBlock(raw)) {
+      const pending = findPendingText(speakable, emittedSpoken);
+      if (pending) {
+        emittedSpoken = `${emittedSpoken} ${pending}`.replace(/\s+/g, ' ').trim();
+      }
+      return [];
     }
 
+    // Only consider text beyond what we already flushed.
+    // Never reset emittedSpoken to avoid duplicate speech playback.
+    const pending = findPendingText(speakable, emittedSpoken);
+    if (!pending) return [];
+
     const { chunks, rest } = splitSpeakableChunks(
-      emittedSpoken ? `${pending}` : speakable,
+      pending,
       { final, earlyFlushChars, earlyFlushWords }
     );
 
-    // When emittedSpoken is set, splitSpeakableChunks already got only pending.
     const out = [];
     for (const c of chunks) {
       const clean = c.trim();
       if (!clean) continue;
-      out.push(clean);
       emittedSpoken = `${emittedSpoken} ${clean}`.replace(/\s+/g, ' ').trim();
+      if (isOutcomeClaim(clean)) continue;
+      out.push(clean);
     }
 
-    // Keep rest un-emitted (already not in emittedSpoken).
     void rest;
     return out;
   }

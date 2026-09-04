@@ -187,7 +187,7 @@ When the caller wants a hold, pickup, order note, or concrete follow-up request 
 Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
 For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
 For type "order": ONLY append when you have name + item AND the item is in the PRODUCT CATALOGUE. If the title is missing or unclear from speech, confirm the exact catalogue title or log an enquiry/quote — never save a garbled STT phrase as an order.
-In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
+If you append any tool this turn, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome.
 When booking a home-services visit, append:
 ###TOOL###
 {"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","landmark":"<address or landmark>","notes":"<optional>"}}
@@ -197,7 +197,7 @@ To reschedule or cancel a visit, append:
 ###TOOL###
 {"update_appointment":{"status":"cancelled|requested","when_text":"<new time if rescheduling>","notes":"<optional>"}}
 ###ENDTOOL###
-Never claim booked, moved, or cancelled until the backend confirmation is spoken.
+If you append create_appointment or update_appointment, speak nothing. Never claim booked, moved, or cancelled. The backend speaks the outcome.
 ${escalateTools}
 ${endCallTools}
 Keep spoken replies to 1-2 short sentences. Do not read markers aloud.`;
@@ -239,7 +239,7 @@ When logging a hold, pickup, order, or concrete request, also append:
 Use type "hold" for hold-for-pickup, "order" for purchase intent, "enquiry" for general product asks that need owner follow-up, "callback" only when they explicitly want a call back.
 For type "hold": ONLY append the tool when you already have name + item + when_text AND the item is in the PRODUCT CATALOGUE / live ground truth. If any slot is missing, ask ONE short question. If the title is not listed, do not create a hold — offer to log an enquiry or special-order quote instead.
 For type "order": ONLY append when you have name + item AND the item is in the PRODUCT CATALOGUE. If the title is missing or unclear from speech, confirm the exact catalogue title or log an enquiry/quote — never save a garbled STT phrase as an order.
-In that response, say only that you will try to save it. Never say saved, held, ordered, booked, sent, or confirmed; the backend speaks the outcome after execution.
+If you append any tool this turn, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome.
 
 When booking a home-services visit, append:
 ###TOOL###
@@ -250,7 +250,7 @@ To reschedule or cancel a visit, append:
 ###TOOL###
 {"update_appointment":{"status":"cancelled|requested","when_text":"<new time if rescheduling>","notes":"<optional>"}}
 ###ENDTOOL###
-Never claim booked, moved, or cancelled until the backend confirmation is spoken.
+If you append create_appointment or update_appointment, speak nothing. Never claim booked, moved, or cancelled. The backend speaks the outcome.
 
 ${escalateTools}
 

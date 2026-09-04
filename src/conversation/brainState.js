@@ -41,16 +41,47 @@ const GOAL_BY_INTENT = Object.freeze({
   general_enquiry: 'resolve_enquiry',
 });
 
+function looksLikeBookingIntent(value) {
+  if (
+    /\b(booking|appointment|reservation|schedule|miadi|book me)\b/.test(value)
+  ) {
+    return true;
+  }
+  if (
+    /\b(want to book|need to book|please book|can you book|could you book|i'd like to book|i would like to book)\b/.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  if (/\bbook (a |an |the )?(visit|appointment|slot|time|call)\b/.test(value)) {
+    return true;
+  }
+  // Verb "book" plus a time window. Do not steal bookstore "which book / the book".
+  return (
+    /\bbook\b/.test(value) &&
+    /\b(tomorrow|today|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d+\s*(am|pm)|o'?clock|saa)\b/.test(
+      value
+    ) &&
+    !/\b(which book|what book|this book|that book|the book|books)\b/.test(value)
+  );
+}
+
 function inferIntent(text) {
   const value = String(text || '').trim().toLowerCase();
   if (!value) return 'unknown';
   // Human / complaint before other patterns so "talk to the manager" wins.
   if (
-    /\b(human|person|owner|manager|boss|agent|speak to|talk to|kuongea na|let me speak)\b/.test(
+    /\b(human|person|owner|manager|boss|agent|speak to|talk to|kuongea na|let me speak|connect( me)?( to)?|forward( this call)?( to)?|transfer)\b/i.test(
       value
     )
   ) {
     return 'human';
+  }
+  // Appointment-style booking: check BEFORE location so "book carpet cleaning... landmark is Barnabas"
+  // is classified as booking rather than being hijacked by "landmark" into location.
+  if (looksLikeBookingIntent(value)) {
+    return 'booking';
   }
   // Hours: opening/closing phrasing (avoid treating "book" noun as booking).
   if (
@@ -77,14 +108,6 @@ function inferIntent(text) {
     return 'order';
   }
   if (/\b(cancel|reschedule|change my|move my)\b/.test(value)) return 'cancellation';
-  // Appointment-style booking only — not the noun "book" / "books".
-  if (
-    /\b(booking|appointment|reservation|schedule|miadi|book (a |an )?(visit|appointment|slot|time|call)|book me)\b/.test(
-      value
-    )
-  ) {
-    return 'booking';
-  }
   if (
     /\b(recommend|suggestion|which book|what book|do you sell|mnauza|children'?s? books?|genre|philosophy)\b/.test(
       value

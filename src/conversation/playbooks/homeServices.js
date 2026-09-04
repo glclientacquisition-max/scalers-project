@@ -65,7 +65,7 @@ const HOME_INTENTS = [
     requiredSlots: ['service', 'name', 'when', 'landmark'],
     optionalSlots: ['notes'],
     completion:
-      'Once service + caller name + time window + landmark/address are known, append create_appointment. Never fire without all four. Speak only an attempt line; backend confirms.',
+      'Once service + caller name + time window + landmark/address are known, append create_appointment. Never fire without all four. Speak nothing on that turn. The backend confirms.',
     tool: 'create_appointment',
     patterns: [
       /\b(book|booking|appointment|schedule|visit|come (over|by|tomorrow|today)|nitakuja|njoo|tandika|install|repair|fix)\b/i,
@@ -223,7 +223,7 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
     '- For book_visit: only fire create_appointment after service + name + when + landmark are known.',
     '- For reschedule/cancel: use update_appointment; never invent that a visit was moved or cancelled.',
-    '- Never invent prices, coverage, ETAs, or claim booked until backend confirmation.',
+    '- Never invent prices, coverage, ETAs, or claim booked. If a tool fires this turn, speak nothing. The backend confirms.',
     '- After a clear completion, confirm briefly and goodbye.'
   );
 
