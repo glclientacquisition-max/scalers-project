@@ -1,7 +1,7 @@
 // Structured, call-local Brain state.
 // This is conversation memory, not tenant knowledge or long-term customer memory.
 
-const { entityValue, isBackchannelOrFragment } = require('./entityExtraction');
+const { entityValue, isBackchannelOrFragment, isHearAgainSignal } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt } = require('./goalModel');
 const {
   isRepairSignal,
@@ -91,7 +91,11 @@ function inferIntent(text) {
   ) {
     return 'hours';
   }
-  if (/\b(where|location|directions?|address|landmark|mko wapi|uko wapi)\b/.test(value)) {
+  // "Landmark is Barnabas" is a slot fill, not a where-are-you ask.
+  if (
+    !/\b(landmark|address)\s+(is|ni|:)\b/.test(value) &&
+    /\b(where|location|directions?|address|landmark|mko wapi|uko wapi)\b/.test(value)
+  ) {
     return 'location';
   }
   if (/\b(how much|price|cost|bei|gharama|pesa gani)\b/.test(value)) return 'price';
@@ -158,6 +162,7 @@ function createBrainState(profile = {}) {
       turnCount: 0,
       questionsAsked: [],
       answersReceived: [],
+      hearAgain: false,
     },
     emotion: {
       state: 'neutral',
@@ -193,15 +198,21 @@ function observeCallerTurn(state, input = {}) {
   const text = String(input.text || '').trim();
   const inferredIntent = inferIntent(text);
   const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
+  const fillingBookingLandmark =
+    next.intent === 'booking' &&
+    inferredIntent === 'location' &&
+    Array.isArray(next.goal.missingSlots) &&
+    next.goal.missingSlots.includes('landmark');
   const preserveActiveIntent =
-    inferredIntent === 'general_enquiry' &&
     previousWasMeaningful &&
     next.intent !== 'unknown' &&
     (next.goal.status === 'active' || next.handoff?.requested) &&
-    (next.goal.missingSlots.length > 0 ||
-      next.handoff?.requested ||
-      isBackchannelOrFragment(text) ||
-      text.split(/\s+/).length <= 3);
+    (fillingBookingLandmark ||
+      (inferredIntent === 'general_enquiry' &&
+        (next.goal.missingSlots.length > 0 ||
+          next.handoff?.requested ||
+          isBackchannelOrFragment(text) ||
+          text.split(/\s+/).length <= 3)));
   const intent = String(
     input.intent || (preserveActiveIntent ? next.intent : inferredIntent)
   );
@@ -210,6 +221,7 @@ function observeCallerTurn(state, input = {}) {
 
   next.conversation.turnCount += 1;
   next.conversation.stage = next.goal.status === 'unknown' ? 'discovery' : 'understanding';
+  next.conversation.hearAgain = isHearAgainSignal(text);
   if (text) next.conversation.answersReceived.push(text);
   next.conversation.answersReceived = next.conversation.answersReceived.slice(-8);
 
@@ -408,10 +420,15 @@ function formatBrainStateForPrompt(state) {
     `- Language: ${value.language.current} (detected ${value.language.detected}, confidence ${value.language.confidence})`,
     `- Repair failures: ${value.repair.failureCount}`,
     `- ${formatRepairForPrompt(value)}`,
+    value.conversation?.hearAgain
+      ? '- Hear-again: caller did not hear the last line. Repeat that question more clearly. Do not save, book, or call a tool.'
+      : '',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
     `- Resolution: ${value.resolution.status}`,
     `- NEXT BEST ACTION: ${value.resolution.nextBestAction} — ${value.resolution.reason}`,
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 module.exports = {

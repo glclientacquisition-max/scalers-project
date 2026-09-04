@@ -136,6 +136,29 @@ describe('Brain state and next-best-action', () => {
     assert.equal(opening.intent, 'hours');
   });
 
+  it('does not treat pardon as a booking name', () => {
+    const {
+      isHearAgainSignal,
+      isPlausibleCallerName,
+      extractConversationEntities,
+    } = require('../src/conversation/entityExtraction');
+    assert.equal(isHearAgainSignal('Pardon?'), true);
+    assert.equal(isHearAgainSignal('sema tena'), true);
+    assert.equal(isHearAgainSignal('Alex'), false);
+    assert.equal(isPlausibleCallerName('Pardon'), false);
+
+    const askingName = createBrainState({ vertical: 'home_services' });
+    askingName.intent = 'booking';
+    askingName.goal.status = 'active';
+    askingName.goal.missingSlots = ['name'];
+    const entities = extractConversationEntities('Pardon?', {
+      intent: 'booking',
+      state: askingName,
+      profile: { vertical: 'home_services' },
+    });
+    assert.equal(entities.name, undefined);
+  });
+
   it('keeps meaningful intent across backchannels and ignores name fragments', () => {
     const {
       extractConversationEntities,

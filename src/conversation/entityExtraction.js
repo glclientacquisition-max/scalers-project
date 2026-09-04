@@ -96,11 +96,35 @@ const NAME_BLOCKLIST = new Set([
   'manager',
   'someone',
   'human',
+  'pardon',
+  'sorry',
+  'what',
+  'huh',
+  'eh',
+  'nini',
+  'repeat',
 ]);
+
+/**
+ * Caller did not hear the last question. Not a name, slot fill, or misunderstanding.
+ * Live miss: HD_a922d3f8ab52 treated "Pardon?" as completing the booking.
+ */
+function isHearAgainSignal(text) {
+  const lower = String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  if (!lower) return false;
+  return /^(pardon( me)?|i beg your pardon|sorry|what|huh|eh|come again|say( that)? again|repeat( that)?|nini|sema tena|unasemaje|sikusikia|i (didn't|did not) (hear|catch)( that)?|what (was that|did you say)|could you (repeat|say that again)|can you repeat( that)?)$/i.test(
+    lower
+  );
+}
 
 function isBackchannelOrFragment(text) {
   const value = String(text || '').trim();
   if (!value) return true;
+  if (isHearAgainSignal(value)) return true;
   const lower = value.toLowerCase().replace(/[?.!,]+$/g, '').trim();
   const compact = lower.replace(/[\s'-]+/g, '');
   if (
@@ -125,7 +149,7 @@ function isBackchannelOrFragment(text) {
 function isPlausibleCallerName(value) {
   const name = String(value || '').trim();
   if (!name || name.length < 2 || name.length > 40) return false;
-  if (isBackchannelOrFragment(name)) return false;
+  if (isHearAgainSignal(name) || isBackchannelOrFragment(name)) return false;
   const lower = name.toLowerCase();
   if (
     /\b(i('d| would)? like to|i want to|i need to|i have to|discuss|talk about|speak to|tell me|can you|could you)\b/i.test(
@@ -146,6 +170,28 @@ function isPlausibleCallerName(value) {
 function extractPhone(text) {
   const match = /(?:\+?254|0)\s*\d(?:[\s-]*\d){8}\b/.exec(String(text || ''));
   return match ? match[0].replace(/[\s-]/g, '') : null;
+}
+
+function extractLandmark(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+  const labeled =
+    /\b(?:landmark|address)\s+(?:is|ni|:)\s+([^,.!?]+)/i.exec(raw);
+  if (labeled) {
+    const value = labeled[1].replace(/\s+(?:and|na)\b.*$/i, '').trim();
+    if (value && !extractWhen(value) && !/^\d/.test(value)) {
+      return value.slice(0, 80);
+    }
+  }
+  const near =
+    /\b(?:near|opposite|next to|karibu(?:\s+na)?)\s+([^,.!?]+)/i.exec(raw);
+  if (near) {
+    const value = near[1].trim();
+    if (value && !extractWhen(value) && !/^\d/.test(value)) {
+      return value.slice(0, 80);
+    }
+  }
+  return null;
 }
 
 function extractWhen(text) {
@@ -247,6 +293,8 @@ function extractConversationEntities(
   if (policyKey) entities.policyKey = entity(policyKey, 'caller_explicit', 0.95, true);
   const branch = extractBranch(text, profile);
   if (branch) entities.branch = entity(branch, 'tenant_location_match', 1, true);
+  const landmark = extractLandmark(text);
+  if (landmark) entities.landmark = entity(landmark, 'caller_explicit', 0.9, false);
 
   const firstMissing = state?.goal?.missingSlots?.[0];
   const shortAnswer = shortSlotAnswer(text);
@@ -274,6 +322,14 @@ function extractConversationEntities(
   if (!entities.when && firstMissing === 'when' && shortAnswer) {
     entities.when = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
   }
+  if (
+    !entities.landmark &&
+    firstMissing === 'landmark' &&
+    shortAnswer &&
+    !extractWhen(shortAnswer)
+  ) {
+    entities.landmark = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
+  }
 
   return entities;
 }
@@ -292,12 +348,14 @@ module.exports = {
   extractName,
   extractPhone,
   extractWhen,
+  extractLandmark,
   extractQuantity,
   extractBudget,
   extractPolicyKey,
   extractBranch,
   extractConversationEntities,
   shortSlotAnswer,
+  isHearAgainSignal,
   isBackchannelOrFragment,
   isPlausibleCallerName,
   entityValue,

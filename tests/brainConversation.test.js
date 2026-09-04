@@ -5,6 +5,7 @@ const {
   inferIntent,
   observeCallerTurn,
   setNextBestAction,
+  formatBrainStateForPrompt,
 } = require('../src/conversation/brainState');
 const { extractConversationEntities, entityValue } = require('../src/conversation/entityExtraction');
 const { buildBrainCapabilities } = require('../src/conversation/brainPolicy');
@@ -35,7 +36,9 @@ const capabilities = buildBrainCapabilities(profile, {
   liveTransfer: false,
 });
 
-function runTurn(state, languageState, text, lastAgentText = '') {
+function runTurn(state, languageState, text, lastAgentText = '', opts = {}) {
+  const activeProfile = opts.profile || profile;
+  const activeCapabilities = opts.capabilities || capabilities;
   const evidence = analyzeCallerLanguage(text);
   const nextLanguage = resolveLanguageState(languageState, evidence);
   const provisionalIntent = inferIntent(text);
@@ -44,7 +47,7 @@ function runTurn(state, languageState, text, lastAgentText = '') {
       ? state.intent
       : provisionalIntent;
   const entities = extractConversationEntities(text, {
-    profile,
+    profile: activeProfile,
     intent: entityIntent,
     state,
   });
@@ -52,10 +55,10 @@ function runTurn(state, languageState, text, lastAgentText = '') {
     text,
     languageState: nextLanguage,
     entities,
-    profile,
+    profile: activeProfile,
     lastAgentText,
   });
-  const decision = determineNextBestAction({ state: next, capabilities });
+  const decision = determineNextBestAction({ state: next, capabilities: activeCapabilities });
   next = setNextBestAction(next, decision);
   return { state: next, languageState: nextLanguage, decision };
 }
@@ -206,6 +209,110 @@ describe('multi-turn Brain outcomes', () => {
       'I want to book carpet cleaning for tomorrow at 10 AM. My name is Alex, and my landmark is Barnabas.'
     );
     assert.equal(turn.state.intent, 'booking');
+  });
+
+  it('does not treat a hear-again as a caller name or a save', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'I want to book carpet cleaning for tomorrow at 10 AM',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.equal(turn.state.intent, 'booking');
+    assert.ok(turn.state.goal.missingSlots.includes('name'));
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+    assert.equal(turn.decision.slot, 'name');
+
+    ({ state: turn.state, languageState: turn.languageState } = turn);
+    turn = runTurn(turn.state, turn.languageState, 'Pardon?', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.intent, 'booking');
+    assert.equal(entityValue(turn.state.entities.name), '');
+    assert.ok(turn.state.goal.missingSlots.includes('name'));
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+    assert.notEqual(turn.decision.action, 'CREATE_REQUEST');
+    assert.equal(turn.state.conversation.hearAgain, true);
+    const prompt = formatBrainStateForPrompt(turn.state);
+    assert.match(prompt, /Hear-again/);
+    assert.match(prompt, /Do not save/);
+  });
+
+  it('does not complete a booking when hear-again follows a late-night time', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'I want to book carpet cleaning for tomorrow at 10 PM',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.equal(turn.state.intent, 'booking');
+    assert.ok(entityValue(turn.state.entities.when));
+    assert.ok(turn.state.goal.missingSlots.includes('name'));
+
+    ({ state: turn.state, languageState: turn.languageState } = turn);
+    turn = runTurn(turn.state, turn.languageState, 'Pardon?', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(entityValue(turn.state.entities.name), '');
+    assert.ok(turn.state.goal.missingSlots.includes('name'));
+    assert.ok(turn.state.goal.missingSlots.includes('landmark'));
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+    assert.notEqual(turn.decision.action, 'CREATE_REQUEST');
+  });
+
+  it('does not require a landmark for retail booking', () => {
+    const turn = runTurn(
+      createBrainState(profile),
+      createLanguageState(),
+      'Book printer repair tomorrow at 10 AM. My name is Alex.'
+    );
+    assert.equal(turn.state.intent, 'booking');
+    assert.equal(turn.state.goal.missingSlots.includes('landmark'), false);
+    assert.equal(turn.decision.action, 'CREATE_REQUEST');
+  });
+
+  it('requires a landmark before home-services booking can save', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Book carpet cleaning tomorrow at 10 AM. My name is Alex.',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.equal(turn.state.intent, 'booking');
+    assert.ok(turn.state.goal.missingSlots.includes('landmark'));
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+
+    ({ state: turn.state, languageState: turn.languageState } = turn);
+    turn = runTurn(turn.state, turn.languageState, 'Landmark is Barnabas', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(entityValue(turn.state.entities.landmark), 'Barnabas');
+    assert.deepEqual(turn.state.goal.missingSlots, []);
+    assert.equal(turn.decision.action, 'CREATE_REQUEST');
   });
 
   it('classifies transfer and connect requests as human intent', () => {
