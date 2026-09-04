@@ -168,6 +168,12 @@ assert.match(
 
 assert.match(
   source,
+  /spoken chunk TTS failed/,
+  'TTS errors on streamed chunks must not fail the Gemini stream (HD_5de59f6babc7)'
+);
+
+assert.match(
+  source,
   /activeOutboundStreamId/,
   'outbound PCM must be gated by active Soniox stream id'
 );

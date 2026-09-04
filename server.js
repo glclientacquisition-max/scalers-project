@@ -3149,7 +3149,14 @@ async function runGeminiTurnStreaming(
           for (const piece of pieces) {
             if (shouldAbort?.()) break;
             if (typeof onSpokenChunk === 'function') {
-              await onSpokenChunk(piece);
+              try {
+                await onSpokenChunk(piece);
+              } catch (err) {
+                console.warn(
+                  `[${callSid}] spoken chunk TTS failed:`,
+                  err?.message || err
+                );
+              }
             }
           }
         }
@@ -3181,7 +3188,14 @@ async function runGeminiTurnStreaming(
   if (!shouldAbort?.()) {
     for (const piece of buffer.finish()) {
       if (typeof onSpokenChunk === 'function') {
-        await onSpokenChunk(piece);
+        try {
+          await onSpokenChunk(piece);
+        } catch (err) {
+          console.warn(
+            `[${callSid}] spoken chunk TTS failed:`,
+            err?.message || err
+          );
+        }
       }
     }
   } else {
