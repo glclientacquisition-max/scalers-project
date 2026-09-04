@@ -27,9 +27,17 @@ function classifySonioxError(input) {
       message
     );
 
+  // After barge-in cancel, Soniox replies 400 "Stream … not found".
+  // That is one dead stream, not a dead provider (live miss: HD_5de59f6babc7).
+  const staleStream =
+    !billing &&
+    (code === 400 || code === null) &&
+    /stream .+ not found|send a start message first/i.test(message);
+
   return {
     billing,
     fatal: billing || code === 401 || code === 403,
+    staleStream,
     code,
     type,
     message: message.slice(0, 240) || 'Soniox error',

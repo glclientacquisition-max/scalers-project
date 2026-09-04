@@ -118,17 +118,40 @@ function createSonioxTtsSession({
 
           if (msg.error_code != null || msg.error_type) {
             const classified = classifySonioxError(msg);
+            onEvent({ type: 'error', raw: msg, classified });
+            const waiter = streamId ? active.get(streamId) : null;
+            if (classified.billing || classified.fatal) {
+              console.error(
+                `[soniox-tts][${callSid}] error:`,
+                msg.error_code || msg.error_type,
+                msg.error_message || msg.message || ''
+              );
+              failSession(classified);
+              return;
+            }
+            // Cancelled / unknown stream 400 must not mark the session dead.
+            // Live miss HD_5de59f6babc7: barge-in cancel → 400 → mute for the rest of the call.
+            if (classified.staleStream || !waiter) {
+              console.warn(
+                `[soniox-tts][${callSid}] ignoring stale stream error:`,
+                msg.error_code || msg.error_type,
+                msg.error_message || msg.message || ''
+              );
+              if (waiter) {
+                active.delete(streamId);
+                try {
+                  waiter.resolve({ cancelled: true, stale: true });
+                } catch {
+                  /* ignore */
+                }
+              }
+              return;
+            }
             console.error(
               `[soniox-tts][${callSid}] error:`,
               msg.error_code || msg.error_type,
               msg.error_message || msg.message || ''
             );
-            onEvent({ type: 'error', raw: msg, classified });
-            const waiter = streamId ? active.get(streamId) : null;
-            if (classified.billing || classified.fatal || !waiter) {
-              failSession(classified);
-              return;
-            }
             active.delete(streamId);
             const err = new Error(classified.message);
             err.code = classified.code;

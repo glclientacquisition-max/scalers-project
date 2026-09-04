@@ -39,6 +39,7 @@ describe('classifySonioxError', () => {
     });
     assert.equal(c.billing, false);
     assert.equal(c.fatal, false);
+    assert.equal(c.staleStream, true);
     assert.equal(c.code, 400);
   });
 });

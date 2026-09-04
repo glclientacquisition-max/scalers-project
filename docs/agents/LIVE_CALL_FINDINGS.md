@@ -2,6 +2,8 @@
 
 Later incident (assistant silent, Soniox 402 billing): [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md).
 
+Later incident (mid-call mute after barge-in): staging `HD_5de59f6babc7` (2026-09-04). Caller overlapped the next question. Barge-in cancelled TTS. Soniox `400 Stream … not found` then marked the whole TTS session dead. Gemini still wrote the reply; the caller heard silence. Desk transcript stored the unheard line. Fix: treat that 400 as a stale stream, not a provider outage.
+
 Analyzed production calls on DID `+254709221536` (agent **Zara**) after Voice Phase 1–2 merges.
 
 ## Calls reviewed
