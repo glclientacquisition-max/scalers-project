@@ -239,6 +239,14 @@ function pickLlmRecoverySaved(opts = {}) {
 function looksLikeCallerName(text) {
   const t = normalizeCallerText(text);
   if (!t || PURE_NOISE.has(t) || CONFIRM_ANSWERS.has(t)) return false;
+  const hearAgain = t.replace(/[?'!.,]+$/g, '').trim();
+  if (
+    /^(pardon( me)?|sorry|what|huh|eh|come again|say( that)? again|repeat( that)?|nini|sema tena)$/i.test(
+      hearAgain
+    )
+  ) {
+    return false;
+  }
   if (
     /\b(book|booking|carpet|couch|mattress|tomorrow|today|clean|appointment|huduma)\b/.test(
       t
@@ -267,6 +275,11 @@ const PURE_NOISE = new Set([
   'ah',
   'oh',
   'gemini',
+  'pardon',
+  'sorry',
+  'what',
+  'huh',
+  'nini',
 ]);
 
 const CONFIRM_ANSWERS = new Set([

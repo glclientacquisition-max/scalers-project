@@ -91,7 +91,11 @@ function inferIntent(text) {
   ) {
     return 'hours';
   }
-  if (/\b(where|location|directions?|address|landmark|mko wapi|uko wapi)\b/.test(value)) {
+  // "Landmark is Barnabas" is a slot fill, not a where-are-you ask.
+  if (
+    !/\b(landmark|address)\s+(is|ni|:)\b/.test(value) &&
+    /\b(where|location|directions?|address|landmark|mko wapi|uko wapi)\b/.test(value)
+  ) {
     return 'location';
   }
   if (/\b(how much|price|cost|bei|gharama|pesa gani)\b/.test(value)) return 'price';
@@ -193,15 +197,21 @@ function observeCallerTurn(state, input = {}) {
   const text = String(input.text || '').trim();
   const inferredIntent = inferIntent(text);
   const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
+  const fillingBookingLandmark =
+    next.intent === 'booking' &&
+    inferredIntent === 'location' &&
+    Array.isArray(next.goal.missingSlots) &&
+    next.goal.missingSlots.includes('landmark');
   const preserveActiveIntent =
-    inferredIntent === 'general_enquiry' &&
     previousWasMeaningful &&
     next.intent !== 'unknown' &&
     (next.goal.status === 'active' || next.handoff?.requested) &&
-    (next.goal.missingSlots.length > 0 ||
-      next.handoff?.requested ||
-      isBackchannelOrFragment(text) ||
-      text.split(/\s+/).length <= 3);
+    (fillingBookingLandmark ||
+      (inferredIntent === 'general_enquiry' &&
+        (next.goal.missingSlots.length > 0 ||
+          next.handoff?.requested ||
+          isBackchannelOrFragment(text) ||
+          text.split(/\s+/).length <= 3)));
   const intent = String(
     input.intent || (preserveActiveIntent ? next.intent : inferredIntent)
   );

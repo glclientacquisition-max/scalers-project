@@ -40,6 +40,12 @@ function missingGoalSlots(state, profile = {}) {
       requirements.push({ slot: 'branch', anyOf: ['branch'] });
     }
   }
+  if (
+    intent === 'booking' &&
+    String(profile.vertical || '').toLowerCase() === 'home_services'
+  ) {
+    requirements.push({ slot: 'landmark', anyOf: ['landmark'] });
+  }
   return requirements
     .filter((requirement) => !hasAnyEntity(state?.entities || {}, requirement.anyOf))
     .map((requirement) => requirement.slot);
@@ -53,6 +59,7 @@ function clarificationForSlot(slot) {
     when: 'Ask for the preferred date or time.',
     when_or_reference: 'Ask for the booking time or reference that identifies it.',
     branch: 'Ask which branch or location they mean.',
+    landmark: 'Ask for a nearby landmark or address so the visit can be found.',
   };
   return hints[slot] || `Ask for ${slot}.`;
 }

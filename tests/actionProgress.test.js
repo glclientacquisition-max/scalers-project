@@ -77,5 +77,7 @@ assert.match(pickLlmRecoveryLine({ language: 'sw' }), /jina/i);
 assert.doesNotMatch(pickLlmRecoveryLine({ language: 'sw' }), /simu hii/i);
 assert.equal(looksLikeCallerName('Ann Wanjiku'), true);
 assert.equal(looksLikeCallerName('Carpet cleaning'), false);
+assert.equal(looksLikeCallerName('Pardon?'), false);
+assert.equal(looksLikeCallerName('sema tena'), false);
 
 console.log('actionProgress tests passed.');
