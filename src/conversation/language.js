@@ -93,6 +93,11 @@ const ENGLISH_MARKERS = [
   'ok',
 ];
 
+const {
+  classifyCallerUtteranceKind,
+  agentAwaitingReply,
+} = require('../speech/turnTaking');
+
 const BACKCHANNELS = new Set([
   'ok',
   'okay',
@@ -126,6 +131,20 @@ const BACKCHANNELS = new Set([
   'eeh',
   'poa',
   'gemini',
+]);
+
+const SUBSTANTIVE_KINDS = new Set([
+  'wait_stop',
+  'hear_again',
+  'actually',
+  'actually_incomplete',
+  'i_said',
+  'i_said_incomplete',
+  'no_correction',
+  'let_me_think',
+  'yes',
+  'no',
+  'speech',
 ]);
 
 function markerAppears(raw, marker) {
@@ -306,15 +325,31 @@ function ttsLanguageFor(lang) {
 
 /**
  * Short acknowledgments should not cancel TTS / Gemini mid-reply.
+ * Context-aware: "yes" after a question is an answer, not a backchannel.
+ * Interrupt cues (wait, stop, sorry) are never generic backchannels.
  * @param {string} text
+ * @param {{ lastAgentText?: string, lastAgentAskedQuestion?: boolean, awaitingAnswer?: boolean }} [opts]
  */
-function isBackchannel(text) {
+function isBackchannel(text, opts = {}) {
   const t = String(text || '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s'?-]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
   if (!t) return true;
+  const awaiting =
+    opts.awaitingAnswer === true ||
+    opts.lastAgentAskedQuestion === true ||
+    agentAwaitingReply(opts.lastAgentText);
+  const kind = classifyCallerUtteranceKind(t, {
+    lastAgentText: opts.lastAgentText,
+    lastAgentAskedQuestion: awaiting,
+  });
+  if (SUBSTANTIVE_KINDS.has(kind)) return false;
+  if (kind === 'backchannel' || kind === 'noise' || kind === 'empty' || kind === 'incomplete') {
+    return true;
+  }
+  if (kind === 'no_unprompted') return false;
   if (t.length <= 2) return true;
   if (BACKCHANNELS.has(t)) return true;
   if (t.split(' ').length === 1 && t.length <= 4) return true;
