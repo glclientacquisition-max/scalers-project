@@ -1,3 +1,4 @@
+import { isUsableWavBytes, NO_VOICE_SAMPLE_COPY } from "@/lib/previewAudio";
 import { getVoicePublicBase } from "@/lib/sautikit";
 
 export type TtsPreviewResult = {
@@ -72,6 +73,9 @@ export async function fetchTtsPreviewWav(opts: {
   }
 
   const wav = Buffer.from(await res.arrayBuffer());
+  if (!isUsableWavBytes(wav)) {
+    throw new Error(NO_VOICE_SAMPLE_COPY);
+  }
   const spokenHeader = res.headers.get("x-spoken-text");
   const language = res.headers.get("x-tts-language") || undefined;
   const voiceId = res.headers.get("x-soniox-voice") || undefined;

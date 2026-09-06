@@ -110,6 +110,11 @@ import {
   lexiconForStorage,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import {
+  isAutoplayBlock,
+  NO_VOICE_SAMPLE_COPY,
+  objectUrlFromPreviewResponse,
+} from "@/lib/previewAudio";
 import type { SettingsPanel } from "@/lib/businessSettingsNav";
 
 export type { SettingsPanel } from "@/lib/businessSettingsNav";
@@ -548,21 +553,19 @@ export function TenantForm({
           voiceId: sonioxVoiceId || undefined,
         }),
       });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(
-          errJson && typeof errJson.error === "string"
-            ? errJson.error
-            : `Preview failed (${res.status})`
-        );
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const url = await objectUrlFromPreviewResponse(res);
       setVoiceSampleUrl(url);
-      await new Audio(url).play();
+      try {
+        await new Audio(url).play();
+      } catch (playErr) {
+        if (isAutoplayBlock(playErr)) return;
+        URL.revokeObjectURL(url);
+        setVoiceSampleUrl(null);
+        throw playErr;
+      }
     } catch (err) {
       setVoiceSampleError(
-        err instanceof Error ? err.message : "Could not play voice sample."
+        err instanceof Error ? err.message : NO_VOICE_SAMPLE_COPY
       );
     } finally {
       setVoiceSampleLoading(false);
@@ -1878,8 +1881,7 @@ export function TenantForm({
           </div>
           {voiceSampleUrl ? (
             <audio src={voiceSampleUrl} controls className="max-w-full" />
-          ) : null}
-          {voiceSampleError ? (
+          ) : voiceSampleError ? (
             <p className="text-xs text-[var(--warn)]" role="alert">
               {voiceSampleError}
             </p>
