@@ -36,6 +36,30 @@ assert.match(
 
 assert.match(
   source,
+  /speakThinkingAck/,
+  'slow turns must play a cached thinking-ack when PCM is already in memory'
+);
+
+assert.match(
+  source,
+  /thinking-ack cached/,
+  'cached thinking-ack must be logged distinctly from live filler TTS'
+);
+
+assert.match(
+  source,
+  /isCancelableTtsStreamId/,
+  'filler cancel must not send Soniox cancel for cached-filler stream ids'
+);
+
+assert.match(
+  source,
+  /warmFillerAckPcm/,
+  'after greeting, common ack PCM must warm without speaking to the caller'
+);
+
+assert.match(
+  source,
   /queue overlapping final while TTS/,
   'non-echo finals during TTS must be queued for the next caller turn'
 );

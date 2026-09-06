@@ -19,6 +19,14 @@ const {
   createSonioxTtsSession,
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
+const {
+  isFillerCacheEnabled,
+  lookupFillerPcm,
+  putFillerPcm,
+  isCancelableTtsStreamId,
+  newCachedFillerStreamId,
+  warmFillerAckPcm,
+} = require('./src/speech/fillerPcmCache');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
@@ -1333,6 +1341,49 @@ mediaWss.on('connection', (ws, req) => {
     return waitMs;
   }
 
+  async function playCachedFillerPcm(pcm, { text } = {}) {
+    if (!pcm || !pcm.length) return { ok: false, empty: true };
+    const streamId = newCachedFillerStreamId();
+    bargeInActive = false;
+    speaking = true;
+    speakStartedAt = Date.now();
+    lastAgentText = String(text || '');
+    activePlaybackGeneration = ++playbackGeneration;
+    const gen = activePlaybackGeneration;
+    fillerStreamId = streamId;
+    activeOutboundStreamId = streamId;
+    if (activeTurnTiming) activeTurnTiming.markFirstPcm();
+    if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+    const waitMs = pcmDurationMs(pcm, 16000);
+    await sleep(waitMs);
+    if (activePlaybackGeneration === gen) {
+      speaking = false;
+      if (activeOutboundStreamId === streamId) activeOutboundStreamId = null;
+      if (fillerStreamId === streamId) fillerStreamId = null;
+      if (!speechOutageStarted) releaseQueuedCallerSpeech();
+    }
+    return { ok: true, cached: true };
+  }
+
+  async function speakThinkingAck(fillerText) {
+    if (!isFillerCacheEnabled()) {
+      return speakText(fillerText, { isFiller: true });
+    }
+    const found = lookupFillerPcm({
+      voiceId: tenantSonioxVoiceId,
+      text: fillerText,
+      callLanguage,
+      extraLexicon: ttsLexiconOverrides,
+    });
+    if (found.pcm) {
+      console.log(
+        `[ws/media][${sidLabel()}] thinking-ack cached lang=${callLanguage} bytes=${found.pcm.length}`
+      );
+      return playCachedFillerPcm(found.pcm, { text: fillerText });
+    }
+    return speakText(fillerText, { isFiller: true, fillerCacheKey: found.key });
+  }
+
   /**
    * Soniox STT+TTS are billed out (402) or otherwise dead. Speak the clone-voice
    * downtime recording (same voice as the greeting) and hang up.
@@ -1422,6 +1473,7 @@ mediaWss.on('connection', (ws, req) => {
         language: prepared.language,
         callLanguage,
         alreadyPrepared: true,
+        capture: Boolean(opts.isFiller && isFillerCacheEnabled()),
       });
       activeOutboundStreamId = session.streamId;
       if (opts.isFiller) fillerStreamId = session.streamId;
@@ -1430,7 +1482,15 @@ mediaWss.on('connection', (ws, req) => {
         session.cancel();
         return { ok: false, empty: true };
       }
-      await session.end();
+      const spoken = await session.end();
+      if (
+        opts.isFiller &&
+        opts.fillerCacheKey &&
+        spoken?.pcm?.length &&
+        !spoken.cancelled
+      ) {
+        putFillerPcm(opts.fillerCacheKey, spoken.pcm);
+      }
       return { ok: true };
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] TTS speak failed:`, err?.message || err);
@@ -1758,7 +1818,7 @@ mediaWss.on('connection', (ws, req) => {
             console.log(
               `[ws/media][${sidLabel()}] thinking-ack lang=${callLanguage}: ${fillerText}`
             );
-            speakText(fillerText, { isFiller: true }).catch(() => {});
+            speakThinkingAck(fillerText).catch(() => {});
           }
         }, fillerDelayMs);
       }
@@ -1810,7 +1870,7 @@ mediaWss.on('connection', (ws, req) => {
         if (activeOutboundStreamId && cancelId && activeOutboundStreamId === cancelId) {
           activeOutboundStreamId = null;
         }
-        if (tts && cancelId) {
+        if (tts && isCancelableTtsStreamId(cancelId)) {
           try {
             tts.cancel(cancelId);
           } catch {
@@ -2360,6 +2420,22 @@ mediaWss.on('connection', (ws, req) => {
       if (spoken?.ok) {
         callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
+      }
+      if (tts && isFillerCacheEnabled()) {
+        void warmFillerAckPcm({
+          tts,
+          voiceId: tenantSonioxVoiceId,
+          extraLexicon: ttsLexiconOverrides,
+          shouldAbort: () => speechOutageStarted || turnBusy || !tts,
+        })
+          .then((result) => {
+            if (result?.warmed) {
+              console.log(
+                `[ws/media][${sidLabel()}] filler pcm warmed n=${result.warmed}`
+              );
+            }
+          })
+          .catch(() => {});
       }
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);

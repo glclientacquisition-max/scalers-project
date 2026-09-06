@@ -140,7 +140,7 @@ function createSonioxTtsSession({
               if (waiter) {
                 active.delete(streamId);
                 try {
-                  waiter.resolve({ cancelled: true, stale: true });
+                  resolveWaiter(waiter, { cancelled: true, stale: true });
                 } catch {
                   /* ignore */
                 }
@@ -162,7 +162,9 @@ function createSonioxTtsSession({
           if (msg.audio) {
             noteSonioxProviderOk('tts');
             const pcm = Buffer.from(msg.audio, 'base64');
-            if (pcm.length) {
+            const audioWaiter = streamId ? active.get(streamId) : null;
+            if (pcm.length && audioWaiter?.chunks) audioWaiter.chunks.push(pcm);
+            if (pcm.length && !audioWaiter?.silent) {
               onAudio(pcm, { streamId, audioEnd: Boolean(msg.audio_end) });
             }
           }
@@ -171,7 +173,7 @@ function createSonioxTtsSession({
             const waiter = streamId ? active.get(streamId) : null;
             if (waiter) {
               active.delete(streamId);
-              waiter.resolve({ cancelled: waiter.cancelled });
+              resolveWaiter(waiter, { cancelled: waiter.cancelled });
             }
             onEvent({ type: 'terminated', streamId, raw: msg });
           }
@@ -197,6 +199,15 @@ function createSonioxTtsSession({
     return connectPromise;
   }
 
+  function snapshotPcm(waiter) {
+    if (!waiter?.chunks?.length) return null;
+    return Buffer.concat(waiter.chunks);
+  }
+
+  function resolveWaiter(waiter, extra = {}) {
+    waiter.resolve({ pcm: snapshotPcm(waiter), ...extra });
+  }
+
   function sendJson(obj) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       throw new Error('Soniox TTS socket not open');
@@ -206,7 +217,7 @@ function createSonioxTtsSession({
 
   /**
    * Open a Soniox TTS stream that accepts incremental text chunks (LLM→TTS).
-   * @param {{ language?: string, callLanguage?: string, speed?: number, alreadyPrepared?: boolean, extraLexicon?: unknown }} [opts]
+   * @param {{ language?: string, callLanguage?: string, speed?: number, alreadyPrepared?: boolean, extraLexicon?: unknown, capture?: boolean, silent?: boolean }} [opts]
    */
   async function beginSpeak(opts = {}) {
     if (closed) throw new Error('TTS session closed');
@@ -235,8 +246,15 @@ function createSonioxTtsSession({
     let configured = false;
     let ended = false;
 
+    const waiter = {
+      cancelled: false,
+      chunks: opts.capture ? [] : null,
+      silent: Boolean(opts.silent),
+    };
     const done = new Promise((resolve, reject) => {
-      active.set(streamId, { resolve, reject, cancelled: false });
+      waiter.resolve = resolve;
+      waiter.reject = reject;
+      active.set(streamId, waiter);
     });
 
     function ensureConfigured(resolvedLang) {
@@ -299,7 +317,7 @@ function createSonioxTtsSession({
         const waiter = active.get(streamId);
         if (waiter) {
           active.delete(streamId);
-          waiter.resolve({ cancelled: false, empty: true });
+          resolveWaiter(waiter, { cancelled: false, empty: true });
         }
         return { cancelled: false, empty: true };
       }
@@ -322,7 +340,7 @@ function createSonioxTtsSession({
         const waiter = active.get(streamId);
         if (waiter) {
           active.delete(streamId);
-          waiter.resolve({ cancelled: true, empty: true });
+          resolveWaiter(waiter, { cancelled: true, empty: true });
         }
         return;
       }
@@ -367,7 +385,7 @@ function createSonioxTtsSession({
         waiter.cancelled = true;
         active.delete(id);
         try {
-          waiter.resolve({ cancelled: true });
+          resolveWaiter(waiter, { cancelled: true });
         } catch {
           /* ignore */
         }
