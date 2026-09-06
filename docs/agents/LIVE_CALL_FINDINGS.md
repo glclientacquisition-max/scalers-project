@@ -64,7 +64,7 @@ Reconstructed behavior:
 
 ### P1 — Consistency / ops
 
-6. **`latency_ms` always null** + transcript rows share one timestamp → hard to prove live speed. Persist per-turn timing next.
+6. **`latency_ms` was always null** + transcript rows share one timestamp → hard to prove live speed. Media now writes `first_pcm_ms ?? first_chunk_ms` onto the first agent line after each caller turn. Prove p50 on a staging DID next.
 7. **Language sticky failures** (04:33): Swahili opener then English re-greetings in one call.
 8. **Name-ask loop** when caller answers FAQs first — Brain turn policy.
 
@@ -90,7 +90,7 @@ Reconstructed behavior:
 
 | Fix | Why |
 | --- | --- |
-| Write `latency_ms` + turn timestamps from `voice-timing` | Prove p50 first-audio on real DID calls |
+| Persist `latency_ms` from `voice-timing` on media flush | Prove p50 first-audio on real DID calls |
 | Staging checklist from these scenarios | Booking mid-sentence, barge wait/stop, SW switch |
 
 ## Success criteria for next live test

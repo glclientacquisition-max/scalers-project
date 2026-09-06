@@ -54,6 +54,30 @@ assert.match(
 
 assert.match(
   source,
+  /createCallTranscript/,
+  'media session must keep structured transcript turns for latency_ms'
+);
+
+assert.match(
+  source,
+  /callTranscript\.stampFromSummary/,
+  'voice-timing summaries must stamp the first agent line of that caller turn'
+);
+
+assert.match(
+  source,
+  /appendTranscript\(\{\s*callSid: sessionCallSid,\s*turns: callTranscript\.turns\(\)/,
+  'media close must flush structured turns, not a Caller:/Agent: blob'
+);
+
+assert.match(
+  source,
+  /function logTurnTiming/,
+  'media path must stamp latency when a turn timing log fires'
+);
+
+assert.match(
+  source,
   /llm→tts stream prefetched/,
   'reply TTS must be prefetched while Gemini starts'
 );
