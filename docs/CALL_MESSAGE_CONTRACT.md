@@ -19,7 +19,7 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 
 | Event | When it fires | Owner title | Caller text? |
 | --- | --- | --- | --- |
-| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` | No |
+| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` + Intent / Summary / Outcome when known | No |
 | `escalation` | Caller asks for a human; name + reason captured | `Escalation for {Teammate}` | No |
 | `service_request` | Hold / order / enquiry created | `HOLD / ORDER / ENQUIRY` | Yes, when shipped |
 | `appointment` | Visit requested / updated / cancelled | `VISIT REQUEST` | Yes, when shipped |
@@ -58,7 +58,7 @@ All owner bodies are plain text, ordered label rows, no vendor names, no "techni
 
 | Event | Body |
 | --- | --- |
-| Lead | `New missed-call lead — {Business}` + `Name:` / `Phone:` / `Reason:` / `Recording:` |
+| Lead | `New missed-call lead — {Business}` + `Name:` / `Phone:` / `Reason:` / `Intent:` / `Summary:` / `Outcome:` / `Recording:` |
 | Escalation | `Escalation for {Teammate} — {Business}` + `Caller:` / `Phone:` / `Reason:` |
 | Service request | `{HOLD\|ORDER\|ENQUIRY} — {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Requests in Scalers desk to mark fulfilled.` |
 | Appointment | `VISIT REQUEST — {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Appointments in Scalers desk to confirm or cancel.` |
@@ -138,3 +138,24 @@ The template is **not generic**. It carries the business name, the caller's name
 3. **Pricing:** is caller SMS bundled in the line fee, metered per text, or an add-on?
 4. **Language:** match the call language, or always English?
 5. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
+
+---
+
+## 8. Owner insight without the dashboard
+
+The owner lead text is not a label dump. When the Brain has persisted intent, summary, and resolution, the SMS carries them:
+
+```
+New missed-call lead — Done and Dusted Cleaning Services
+Name: Jane
+Phone: +254790381872
+Reason: Book carpet cleaning
+Intent: book_visit
+Summary: Intent: book_visit. Caller: Jane. Goal: carpet cleaning tomorrow.
+Outcome: Visit request saved
+Recording: https://…
+```
+
+The owner knows who called, what they wanted, and what happened without opening the desk.
+
+**Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.

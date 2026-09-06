@@ -131,10 +131,37 @@ function leadEvent({ businessName, name, reason, callerNumber, recordingUrl } = 
   };
 }
 
+/**
+ * Build an owner lead event that is actionable without opening the desk.
+ * Uses the persisted Brain summary + intent + resolution when present.
+ */
+function ownerLeadEvent(call = {}, businessName) {
+  const fields = [
+    ['Name', call.name],
+    ['Phone', call.from_number || call.caller_number],
+    ['Reason', call.reason],
+  ];
+  if (call.primary_intent) fields.push(['Intent', call.primary_intent]);
+  if (call.brain_summary) fields.push(['Summary', call.brain_summary]);
+  if (call.resolution_note) fields.push(['Outcome', call.resolution_note]);
+  return {
+    kind: EVENTS.LEAD,
+    businessName,
+    fields,
+    recordingUrl: call.recording_url,
+    caller: {
+      name: call.name,
+      phone: call.from_number || call.caller_number,
+      reason: call.reason,
+    },
+  };
+}
+
 module.exports = {
   EVENTS,
   renderEventText,
   renderEventSubject,
   renderCallerText,
   leadEvent,
+  ownerLeadEvent,
 };
