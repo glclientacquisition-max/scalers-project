@@ -7,7 +7,7 @@ See [`MASTER.md`](../MASTER.md) §§6.6–6.7.
 
 ## IA
 
-Grouped by owner job. Same `?tab=` / `?panel=` routes. No new screens.
+`/settings` is the menu. Each row is one destination. Same `?tab=` / `?panel=` routes. No new screens.
 
 ```text
 General     Updates · Assistant · Team
@@ -18,15 +18,17 @@ Line        Tools & voice · Pronunciation · Test
 
 Order is who we are, what we know, how we run, prove the line.
 
-Sticky Save on Catalog and Train panels. Updates, Import, and Test use the same sidebar without a second save.
+Mobile: list or detail, with Back to Business. Desktop: list beside the open panel.
 
-Hash `#train` is not routed. `Train` is the verb on Save, not a sidebar dump drawer.
+Sticky Save on Catalog and Train panels. Updates, Import, and Test use the same menu without a second save.
+
+Bare `/settings` is the menu. `?tab=updates` is Updates. Hash `#train` is not routed. `Train` is the verb on Save.
 
 ## Chrome
 
 Header hierarchy: uppercase “Business” eyebrow, workspace name as `h1` (Sora, clamp 1.5–2rem), Line live / Number pending as caption. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`).
 
-Sidebar: MASTER recipe plus `SETTINGS_NAV`. Section titles are non-clickable. Links have hover, active, and the canonical focus ring. `min-h-11`.
+Menu: grouped destination rows (`min-h-12`, label + chevron). Section titles are non-clickable. Hover, active, and the canonical focus ring.
 
 Panel titles use `settingsPanelHeadingClass` (`text-xl`). Do not compete with the page `h1`.
 

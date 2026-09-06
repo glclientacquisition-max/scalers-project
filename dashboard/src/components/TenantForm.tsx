@@ -731,6 +731,7 @@ export function TenantForm({
         lineDetail={
           Boolean(lineNumber) && lineNumber !== "Number pending" ? lineNumber : ""
         }
+        showBack
         action={<TenantSettingsSaveButton pending={pending} />}
       />
 

@@ -233,7 +233,7 @@ The owner should feel: **I am teaching my receptionist how my business works.**
 
 Expose only what the backend supports today: identity, voice, languages, knowledge, behavior, escalation, hours, test. Do not invent controls for capabilities that do not exist.
 
-Settings IA is grouped by owner job. Same tabs and panels. Do not flatten into one form.
+Settings is a menu of destinations. `/settings` is the list. Each row opens one screen. Same tabs and panels. Do not flatten into one form.
 
 ```text
 General     Updates · Assistant · Team
@@ -242,7 +242,7 @@ Operations  Hours · Locations · Policies
 Line        Tools & voice · Pronunciation · Test
 ```
 
-Section titles are non-clickable. `Train` remains the verb (Save & train). Do not mandate a `TenantForm` rewrite to ship visual work. Split that file only if a later phase cannot ship safely without it.
+Mobile is list or detail. Desktop keeps the list beside the panel. Section titles are non-clickable. `Train` remains the verb (Save & train). Do not mandate a `TenantForm` rewrite to ship visual work. Split that file only if a later phase cannot ship safely without it.
 
 ---
 
@@ -290,7 +290,7 @@ Do not rename to Conversations / Receptionist / Settings for style. Bookmarks an
 
 Owner and Super Admin shells stay split. Never merge those navs.
 
-Nested navigation (Business settings) uses a vertical sidebar. Section titles (`General`, `Knowledge`, `Operations`, `Line`) are non-clickable: `uppercase`, `tracking-wide`, `text-gray-500`, no hover.
+Nested navigation (Business settings) is a destination menu. Section titles (`General`, `Knowledge`, `Operations`, `Line`) are non-clickable: `uppercase`, `tracking-wide`, `text-gray-500`, no hover. Rows are label plus chevron. Mobile shows the menu or the open screen. Desktop shows both.
 
 Desk chrome today is a top bar and a mobile drawer. Do not add a second desk sidebar in Phases 3–5.
 

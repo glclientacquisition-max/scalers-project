@@ -60,13 +60,24 @@ describe("business settings craft", () => {
     assert.match(nav, /businessSettingsHref\("train"/);
   });
 
+  it("opens /settings as a destination menu, not a dumped form", () => {
+    assert.match(nav, /\| "menu"/);
+    assert.match(nav, /return "menu"/);
+    assert.match(nav, /if \(tab === "menu"\) return "\/settings"/);
+    assert.match(shell, /variant: "index" \| "rail"/);
+    assert.match(shell, /hidden min-w-0 lg:block/);
+    assert.match(shell, /SettingsChevron/);
+    assert.match(shell, /min-h-12/);
+    assert.match(ui, /SettingsBackLink/);
+    assert.match(form, /showBack/);
+  });
+
   it("defines hover, focus, and active on settings primitives", () => {
     assert.match(ui, /SettingsPageHeader/);
     assert.match(ui, /settingsPrimaryButtonClass/);
     assert.match(ui, /hover:border-\[#0096FF\]\/35/);
     assert.match(ui, /active:scale-\[0\.99\]/);
     assert.match(ui, /focus-visible:ring-\[#0096FF\]\/40/);
-    assert.match(shell, /min-h-11/);
     assert.match(shell, /active:bg-\[#0096FF\]\/\[0\.08\]/);
     assert.match(save, /active:scale-\[0\.99\]/);
     assert.match(form, /SettingsPageHeader/);
