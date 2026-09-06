@@ -13,12 +13,12 @@ import {
 import { previewSpokenLine } from "@/lib/pronunciationPacks";
 import {
   displaySonioxVoiceLabel,
+  resolveLiveCallVoiceId,
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
 import {
   assertPreviewAudioPlayable,
-  isAutoplayBlock,
   NO_VOICE_SAMPLE_COPY,
   objectUrlFromPreviewResponse,
   previewErrorCopy,
@@ -45,7 +45,10 @@ export function TestLinePanel({
   const did = String(tenant.sautikit_virtual_number || "").trim();
   const businessName = String(tenant.business_name || "").trim();
   const agentName = String(tenant.agent_name || "").trim() || "Receptionist";
-  const sonioxVoiceId = String(tenant.soniox_voice_id || "").trim();
+  const sonioxVoiceId = resolveLiveCallVoiceId(
+    tenant.soniox_voice_id,
+    curatedVoices
+  );
   const sonioxVoiceLabel = String(tenant.soniox_voice_label || "").trim();
   const lexicon = useMemo(
     () => parseTtsLexicon(tenant.tts_lexicon),
@@ -89,7 +92,7 @@ export function TestLinePanel({
     };
   }, [phonePreviewUrl]);
 
-  async function playPhonePreview() {
+  async function generatePhonePreview() {
     if (!greetingPreview) return;
     setPhonePreviewLoading(true);
     setPhonePreviewError(null);
@@ -104,25 +107,17 @@ export function TestLinePanel({
         body: JSON.stringify({
           text: greetingPreview,
           lexicon: lexiconForStorage(lexicon),
-          voiceId: sonioxVoiceId || undefined,
+          voiceId: sonioxVoiceId,
         }),
       });
-      const url = await objectUrlFromPreviewResponse(res);
+      const preview = await objectUrlFromPreviewResponse(res);
       try {
-        await assertPreviewAudioPlayable(url);
+        await assertPreviewAudioPlayable(preview.url);
       } catch (probeErr) {
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(preview.url);
         throw probeErr;
       }
-      setPhonePreviewUrl(url);
-      try {
-        await new Audio(url).play();
-      } catch (playErr) {
-        if (isAutoplayBlock(playErr)) return;
-        URL.revokeObjectURL(url);
-        setPhonePreviewUrl(null);
-        throw playErr;
-      }
+      setPhonePreviewUrl(preview.url);
     } catch (err) {
       setPhonePreviewError(previewErrorCopy(err));
     } finally {
@@ -160,16 +155,17 @@ export function TestLinePanel({
 
             <button
               type="button"
-              onClick={() => playPhonePreview()}
+              onClick={() => generatePhonePreview()}
               disabled={phonePreviewLoading}
               className={`${settingsPrimaryButtonClass} w-full sm:w-auto sm:min-w-[12rem]`}
             >
-              {phonePreviewLoading ? "Generating…" : "Play phone preview"}
+              {phonePreviewLoading ? "Generating…" : "Generate preview"}
             </button>
 
             {phonePreviewUrl ? (
               <audio
                 controls
+                preload="metadata"
                 className="w-full max-w-md"
                 onError={() => {
                   URL.revokeObjectURL(phonePreviewUrl);

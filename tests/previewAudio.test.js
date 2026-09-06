@@ -95,7 +95,10 @@ test("Hear sample mounts audio only after a usable preview blob", () => {
   assert.match(source, /onError=/);
   assert.match(source, /voice-sample-empty/);
   assert.match(source, /type="audio\/wav"/);
+  assert.match(source, /preload="metadata"/);
+  assert.match(source, /resolveLiveCallVoiceId/);
   assert.doesNotMatch(source, /createObjectURL\(blob\)/);
+  assert.doesNotMatch(source, /new Audio\([^)]+\)\.play\(/);
 });
 
 test("phone preview uses the same usable-audio gate", () => {
@@ -104,5 +107,29 @@ test("phone preview uses the same usable-audio gate", () => {
   assert.match(source, /assertPreviewAudioPlayable/);
   assert.match(source, /onError=/);
   assert.match(source, /type="audio\/wav"/);
+  assert.match(source, /preload="metadata"/);
+  assert.match(source, /resolveLiveCallVoiceId/);
+  assert.match(source, /Generate preview/);
   assert.doesNotMatch(source, /createObjectURL\(blob\)/);
+  assert.doesNotMatch(source, /new Audio\([^)]+\)\.play\(/);
+  assert.doesNotMatch(source, /autoPlay/);
+});
+
+test("preview proxy forwards the Soniox voice the engine used", () => {
+  const routePath = path.join(
+    __dirname,
+    "../dashboard/src/app/api/pronunciation/preview/route.ts"
+  );
+  const source = fs.readFileSync(routePath, "utf8");
+  assert.match(source, /X-Soniox-Voice/);
+  const voicePreview = fs.readFileSync(voicePreviewPath, "utf8");
+  assert.match(voicePreview, /resolveLiveCallVoiceId/);
+  assert.match(voicePreview, /Preview used a different voice than this line/);
+  const helper = fs.readFileSync(helperPath, "utf8");
+  assert.match(helper, /audio\.muted = true/);
+  const catalog = fs.readFileSync(
+    path.join(__dirname, "../dashboard/src/lib/sonioxVoiceCatalog.ts"),
+    "utf8"
+  );
+  assert.match(catalog, /function resolveLiveCallVoiceId/);
 });

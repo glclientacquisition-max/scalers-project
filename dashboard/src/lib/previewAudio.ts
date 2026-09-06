@@ -38,7 +38,14 @@ export async function isUsablePreviewAudioBlob(blob: Blob): Promise<boolean> {
   return hasWavMagic(head);
 }
 
-export async function objectUrlFromPreviewResponse(res: Response): Promise<string> {
+export type PreviewAudioResult = {
+  url: string;
+  voiceId?: string;
+};
+
+export async function objectUrlFromPreviewResponse(
+  res: Response
+): Promise<PreviewAudioResult> {
   if (!res.ok) {
     const errJson = await res.json().catch(() => null);
     throw new Error(
@@ -47,13 +54,14 @@ export async function objectUrlFromPreviewResponse(res: Response): Promise<strin
         : `Preview failed (${res.status})`
     );
   }
+  const voiceId = res.headers.get("x-soniox-voice") || undefined;
   const blob = await res.blob();
   if (!(await isUsablePreviewAudioBlob(blob))) {
     throw new Error(NO_VOICE_SAMPLE_COPY);
   }
   const bytes = await blob.arrayBuffer();
   const playable = new Blob([bytes], { type: "audio/wav" });
-  return URL.createObjectURL(playable);
+  return { url: URL.createObjectURL(playable), voiceId };
 }
 
 export function isAutoplayBlock(err: unknown): boolean {
@@ -85,6 +93,8 @@ export function assertPreviewAudioPlayable(url: string): Promise<void> {
       fn();
     };
     audio.preload = "metadata";
+    audio.muted = true;
+    audio.volume = 0;
     audio.onloadedmetadata = () => {
       const ok = isPlayablePreviewMetadata(audio.duration);
       finish(() => {

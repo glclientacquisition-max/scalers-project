@@ -127,6 +127,18 @@ export function displaySonioxVoiceLabel(
   return "Default phone voice";
 }
 
+/** Same id live calls use: saved tenant voice if curated, else platform default. */
+export function resolveLiveCallVoiceId(
+  tenantVoiceId: string | null | undefined,
+  catalog?: CuratedSonioxVoice[]
+): string {
+  const voices = catalog && catalog.length ? catalog : listCuratedSonioxVoicesSync();
+  const id = String(tenantVoiceId || "").trim();
+  if (id && voices.some((v) => v.id === id)) return id;
+  const marked = voices.find((v) => v.default);
+  return marked?.id || voices[0]?.id || id;
+}
+
 /** Super Admin: list all platform voices including inactive. */
 export async function listPlatformSonioxVoicesAdmin(): Promise<
   PlatformSonioxVoiceRow[]
