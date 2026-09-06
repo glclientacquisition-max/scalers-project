@@ -48,15 +48,17 @@ const LOGO_TONE: Record<NotifyChannelId, string> = {
 export function NotifyChannelPicker({
   value,
   onChange,
+  heading = "Alerts",
 }: {
   value: NotifyChannels;
   onChange: (next: NotifyChannels) => void;
+  heading?: string | null;
 }) {
   return (
     <div className="space-y-2">
-      <div>
-        <h3 className="text-sm font-medium text-ink">Notify channels</h3>
-      </div>
+      {heading ? (
+        <h3 className="text-sm font-medium text-ink">{heading}</h3>
+      ) : null}
       <ul className="space-y-2">
         {NOTIFY_CHANNEL_META.map((meta) => {
           const Logo = LOGO[meta.id];

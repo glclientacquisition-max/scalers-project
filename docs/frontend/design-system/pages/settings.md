@@ -36,6 +36,24 @@ Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a 
 
 Density stays 8. Do not double page padding or import landing-scale type, glass, or a generic settings card stack. Do not add Billing, Security, or Appearance sections that this product does not own.
 
+## Panels
+
+Inside each destination, group by owner job. Placeholders are examples, not instructions. No `e.g.` prefixes.
+
+| Screen | Blocks |
+| --- | --- |
+| Assistant | Assistant (name, tone) → Business (name, type) → Alerts (SMS, email, channels) → Public contacts |
+| Catalog | Services → Products |
+| Hours | Days → When closed |
+| Locations | Places: label, area, landmark, directions, coverage |
+| Policies | Rules → When unsure |
+| Team | People: name, handles, phone, email |
+| Tools & voice | Voice → Tools → Handoff |
+| Updates | Callers hear |
+| Import | Paste or Website, then Products |
+
+Do not invent fields. Do not change compile keys.
+
 ## Language
 
 Owner-facing: assistant, train, line. Not “compile prompt” in chrome. Not Agent Persona. Not Escalation Team.
