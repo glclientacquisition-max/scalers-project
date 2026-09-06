@@ -27,6 +27,9 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `wallet_empty` | Prepaid balance ≤ 0 | `Scalers prepaid empty` | No |
 | `outage_speech` | Soniox 402 / fatal | `Scalers line downtime` | No |
 | `outage_llm` | Gemini credits / denied | `Scalers line taking names only` | No |
+| `caller_appointment` | Visit requested | — | Yes, when shipped |
+| `caller_hold` | Hold placed | — | Yes, when shipped |
+| `caller_callback` | Callback promised | — | Yes, when shipped |
 
 One event = one owner message per call per kind. `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation marks it so the lead path does not re-send.
 
@@ -83,16 +86,20 @@ Scalers does **not** text the caller today. The only caller-facing channel is th
 
 Only on **actionable** outcomes: appointment requested, hold placed, callback promised. Not on FAQ-only calls.
 
+The template is **not generic**. It carries the business name, the caller's name when known, the specific thing captured, and the next step. No "your call was important to us".
+
 | Trigger | Caller text |
 | --- | --- |
-| Appointment requested | `{Business}: we have your visit request for {when}. We will confirm shortly.` |
-| Hold placed | `{Business}: we have held {item} for you. We will confirm shortly.` |
-| Callback promised | `{Business}: the team will call you back.` |
+| Appointment requested | `Hi {Name}, {Business} here. We have your {service} visit for {when}. We will confirm shortly.` |
+| Hold placed | `Hi {Name}, {Business} here. We have held {item} for you. We will confirm shortly.` |
+| Callback promised | `Hi {Name}, {Business} here. The team will call you back.` |
 
 **Rules**
 
 - Send from the business's Scalers DID or a shared Scalers sender ID, not the owner's personal number.
 - Include the business name so the caller knows who it is.
+- Use the caller's name when the call captured it. Skip it when it did not.
+- Name the service or item. Do not say "your request" when we know it was carpet cleaning.
 - One text per call. No follow-up marketing.
 - Opt-out line when required: `Reply STOP to opt out.`
 - Owner can turn caller texts off per workspace.

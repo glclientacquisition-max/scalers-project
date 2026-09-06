@@ -10,6 +10,9 @@ const EVENTS = Object.freeze({
   WALLET_EMPTY: 'wallet_empty',
   OUTAGE_SPEECH: 'outage_speech',
   OUTAGE_LLM: 'outage_llm',
+  CALLER_APPOINTMENT: 'caller_appointment',
+  CALLER_HOLD: 'caller_hold',
+  CALLER_CALLBACK: 'caller_callback',
 });
 
 /**
@@ -22,6 +25,8 @@ const EVENTS = Object.freeze({
  * @property {string} [recordingUrl]
  * @property {{ name?: string, phone?: string, reason?: string }} [caller]
  * @property {{ name?: string, role?: string, phone?: string }} [teammate]
+ * @property {string} [when]      Visit / hold time text for caller confirmations
+ * @property {string} [item]      Held item for caller confirmations
  */
 
 function line(label, value) {
@@ -80,6 +85,36 @@ function renderEventSubject(event) {
 }
 
 /**
+ * Render a caller confirmation. Not generic: business name, the specific
+ * thing captured, and the next step. No "your call was important".
+ * @param {NotifyEvent} event
+ * @returns {string}
+ */
+function renderCallerText(event) {
+  const business = String(event.businessName || '').trim() || 'We';
+  const name = String(event.caller?.name || '').trim();
+  const hi = name ? `Hi ${name}, ` : 'Hi, ';
+  switch (event.kind) {
+    case EVENTS.CALLER_APPOINTMENT: {
+      const when = String(event.when || '').trim();
+      const service = String(event.item || '').trim();
+      const what = service ? `your ${service} visit` : 'your visit';
+      const at = when ? ` for ${when}` : '';
+      return `${hi}${business} here. We have ${what}${at}. We will confirm shortly.`;
+    }
+    case EVENTS.CALLER_HOLD: {
+      const item = String(event.item || '').trim();
+      const what = item ? `we have held ${item} for you` : 'we have held your item';
+      return `${hi}${business} here. ${what}. We will confirm shortly.`;
+    }
+    case EVENTS.CALLER_CALLBACK:
+      return `${hi}${business} here. The team will call you back.`;
+    default:
+      return `${hi}${business} here. We have your request. We will confirm shortly.`;
+  }
+}
+
+/**
  * Build the canonical lead event from a call row.
  */
 function leadEvent({ businessName, name, reason, callerNumber, recordingUrl } = {}) {
@@ -100,5 +135,6 @@ module.exports = {
   EVENTS,
   renderEventText,
   renderEventSubject,
+  renderCallerText,
   leadEvent,
 };
