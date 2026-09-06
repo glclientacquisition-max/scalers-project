@@ -2,6 +2,9 @@
 //
 // Private-beta order: SMS (TextSMS.co.ke) → WhatsApp (SautiKit) → email (Resend).
 // Desk note soft-success remains in server.js when no channel delivers.
+//
+// Event model: `src/notifications/events.js` builds one typed event per alert.
+// This module renders it per channel and sends. Contract: docs/CALL_MESSAGE_CONTRACT.md.
 
 const {
   isWhatsAppConfigured,

@@ -163,6 +163,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
 | --- | --- | --- | --- | --- | --- |
 | Channel dispatch | Priority chain | `src/notifications/dispatch.js` | TextSMS → WhatsApp → email | Direct module calls | CORE |
+| Event model | Typed post-call alerts | `src/notifications/events.js` | One shape per alert kind | Inline strings | CORE |
 | SMS | TextSMS.co.ke | `src/notifications/sms.js` | Private-beta primary | — | CORE |
 | WhatsApp | SautiKit | `src/notifications/whatsapp.js` | Secondary channel | Twilio (historical) | CORE |
 | Email | Resend | `src/notifications/email.js` | Fallback | — | CORE |

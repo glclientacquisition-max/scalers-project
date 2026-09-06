@@ -1,8 +1,8 @@
 # Call message contract
 
-**Status:** Product contract for what Scalers texts after a call  
+**Status:** Product contract for what Scalers sends after a call  
 **Lanes:** Voice (send path), Ops & Billing (cost), Desk UI/UX (owner toggles)  
-**Companion:** [`ESCALATION.md`](../ESCALATION.md), [`VOICE_DOWNTIME_AT_SCALE.md`](./agents/VOICE_DOWNTIME_AT_SCALE.md)
+**Companion:** [`ESCALATION.md`](./ESCALATION.md), [`VOICE_DOWNTIME_AT_SCALE.md`](./agents/VOICE_DOWNTIME_AT_SCALE.md)
 
 Two recipients. Never confuse them.
 
@@ -13,30 +13,60 @@ Two recipients. Never confuse them.
 
 ---
 
-## 1. Owner messages (shipped)
+## 1. Event model
 
-All owner messages go through `src/notifications/dispatch.js` in this order: **SMS → WhatsApp → email**. Owner channel prefs live on `tenants.notify_channels`.
+Every post-call notification is one typed event. Voice builds the event; `src/notifications/events.js` renders it; `dispatch.js` sends it on the best channel.
 
-| Trigger | When | Body shape | Code |
+| Event | When it fires | Owner title | Caller text? |
 | --- | --- | --- | --- |
-| **Lead / callback** | `save_caller_info` with name + reason, or `call.completed` with both | `New missed-call lead — {Business}` + Name / Phone / Reason / Recording | `maybeSendWhatsAppNotification` |
-| **Escalation** | Caller asks for a human; name + reason captured | `Escalation for {Teammate} — {Business}` + Caller / Phone / Reason | `maybeSendEscalationNotification` |
-| **Service request** | Hold / order / enquiry created | `{HOLD\|ORDER\|ENQUIRY} — {Business}` + Item / Qty / When / Caller / Phone | `maybeSendServiceRequestNotification` |
-| **Appointment** | Visit requested / updated / cancelled | `VISIT REQUEST — {Business}` + Service / When / Where / Caller / Status | `maybeSendAppointmentNotification` |
-| **Wallet low / empty** | Prepaid balance crosses threshold | `Scalers wallet running low — {Business}` / `Scalers prepaid empty — {Business}` | `maybeNotifyWalletBalanceAlerts` |
-| **Speech outage** | Soniox 402 / fatal | `{Business} line downtime. Callers heard a short message…` | `noteSpeechOutage` |
-| **Reasoning outage** | Gemini credits / denied | `{Business} line is taking names only…` | `noteSpeechOutage` kind `llm` |
+| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` | No |
+| `escalation` | Caller asks for a human; name + reason captured | `Escalation for {Teammate}` | No |
+| `service_request` | Hold / order / enquiry created | `HOLD / ORDER / ENQUIRY` | Yes, when shipped |
+| `appointment` | Visit requested / updated / cancelled | `VISIT REQUEST` | Yes, when shipped |
+| `wallet_low` | Prepaid balance under threshold | `Scalers wallet running low` | No |
+| `wallet_empty` | Prepaid balance ≤ 0 | `Scalers prepaid empty` | No |
+| `outage_speech` | Soniox 402 / fatal | `Scalers line downtime` | No |
+| `outage_llm` | Gemini credits / denied | `Scalers line taking names only` | No |
 
-**Rules**
-
-- One message per call per kind. `whatsapp_sent` on the call row prevents a duplicate lead text.
-- Escalation and lead share the same `whatsapp_sent` flag today; an escalation marks it so the lead path does not re-send.
-- Service request and appointment do **not** set `whatsapp_sent`; a call can produce a lead text and a request text.
-- No vendor names, no "technical issue", no billing talk in the owner text.
+One event = one owner message per call per kind. `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation marks it so the lead path does not re-send.
 
 ---
 
-## 2. Caller messages (not shipped)
+## 2. Channel ladder
+
+Owner alerts use the first channel that works, in this order:
+
+| Order | Channel | Provider | When it is used |
+| --- | --- | --- | --- |
+| 1 | **SMS** | TextSMS.co.ke | Always first when configured. Works on any phone. |
+| 2 | **WhatsApp** | SautiKit | When SMS is not configured or fails. Needs `SAUTIKIT_WHATSAPP_NUMBER_ID`. |
+| 3 | **Email** | Resend | Fallback when SMS and WhatsApp miss. |
+| 4 | **Desk note** | Supabase call row | Always saved. Soft success if 1–3 miss. |
+
+Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email}`). At least one stays on.
+
+Escalation adds a **teammate** step before the owner: SMS teammate → SMS owner → WhatsApp teammate/owner → owner email.
+
+---
+
+## 3. Owner message shapes
+
+All owner bodies are plain text, ordered label rows, no vendor names, no "technical issue".
+
+| Event | Body |
+| --- | --- |
+| Lead | `New missed-call lead — {Business}` + `Name:` / `Phone:` / `Reason:` / `Recording:` |
+| Escalation | `Escalation for {Teammate} — {Business}` + `Caller:` / `Phone:` / `Reason:` |
+| Service request | `{HOLD\|ORDER\|ENQUIRY} — {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Requests in Scalers desk to mark fulfilled.` |
+| Appointment | `VISIT REQUEST — {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Appointments in Scalers desk to confirm or cancel.` |
+| Wallet low | `Scalers wallet running low — {Business}` + balance + threshold |
+| Wallet empty | `Scalers prepaid empty — {Business}` + on-demand state |
+| Speech outage | `{Business} line downtime. Callers heard a short message and were asked to call back.` |
+| Reasoning outage | `{Business} line is taking names only. Callers are asked for a name so the team can call back.` |
+
+---
+
+## 4. Caller messages (not shipped)
 
 Scalers does **not** text the caller today. The only caller-facing channel is the live call itself.
 
@@ -57,7 +87,7 @@ Only on **actionable** outcomes: appointment requested, hold placed, callback pr
 | --- | --- |
 | Appointment requested | `{Business}: we have your visit request for {when}. We will confirm shortly.` |
 | Hold placed | `{Business}: we have held {item} for you. We will confirm shortly.` |
-| Callback promised | `{Business}: {Owner/team} will call you back.` |
+| Callback promised | `{Business}: the team will call you back.` |
 
 **Rules**
 
@@ -65,16 +95,16 @@ Only on **actionable** outcomes: appointment requested, hold placed, callback pr
 - Include the business name so the caller knows who it is.
 - One text per call. No follow-up marketing.
 - Opt-out line when required: `Reply STOP to opt out.`
-- Owner can turn caller texts off per workspace (`notify_channels.caller_sms` or similar).
+- Owner can turn caller texts off per workspace.
 
 ---
 
-## 3. Angles that decide each message
+## 5. Angles that decide each message
 
 | Angle | Owner message | Caller message |
 | --- | --- | --- |
 | **Timing** | Immediate on save / call end | Immediate on action, or after owner confirms |
-| **Channel** | SMS first (works on feature phones), WhatsApp second, email fallback | SMS only at first; WhatsApp needs template approval |
+| **Channel** | SMS first, WhatsApp second, email fallback | SMS only at first; WhatsApp needs template approval |
 | **Language** | English (owner desk language) | Match the call language when known |
 | **Content** | Name, phone, reason, recording link | Business name, what was captured, next step |
 | **Cost** | Platform cost today; bundle into subscription later | Platform cost; per-text or bundle |
@@ -83,17 +113,18 @@ Only on **actionable** outcomes: appointment requested, hold placed, callback pr
 
 ---
 
-## 4. What not to do
+## 6. What not to do
 
 - Do not text the caller on every call. Only when there is an action to confirm.
 - Do not send the caller a transcript or recording link.
 - Do not let the caller text reveal internal notes (`resolution_note`, staff directory).
 - Do not charge the tenant per owner SMS without a product decision.
 - Do not send marketing to the caller. The first text is a confirmation, not a campaign.
+- Do not add a fourth owner channel without adding it to the ladder and the event model.
 
 ---
 
-## 5. Open decisions
+## 7. Open decisions
 
 1. **Caller SMS sender:** shared Scalers sender ID vs the tenant DID. Shared is simpler; tenant DID is more trusted.
 2. **When to send:** immediately on tool success, or after owner confirms in the desk?
