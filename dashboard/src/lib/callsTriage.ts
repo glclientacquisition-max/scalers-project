@@ -122,12 +122,14 @@ export function resolveStatusFilter(
 }
 
 export function callsHref(opts: {
+  purpose?: string;
   status?: StatusFilterId;
   page?: number;
   q?: string;
 } = {}): string {
   const q = new URLSearchParams();
-  if (opts.status) q.set("status", opts.status);
+  if (opts.purpose) q.set("purpose", opts.purpose);
+  else if (opts.status) q.set("status", opts.status);
   if (opts.q?.trim()) q.set("q", opts.q.trim());
   if (opts.page && opts.page > 1) q.set("page", String(opts.page));
   const qs = q.toString();

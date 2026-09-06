@@ -55,13 +55,14 @@ Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triag
 **Home dashboard**
 1. **Line chip** — Line live / Number pending / Needs training (DID + readiness). Never Online.
 2. **Needs you** — dense table of New leads, or the next useful empty state
-3. **What happened** — Today, Followed up, Wallet
-4. **One CTA** — Process pending leads, Train, or Test line
+3. **What happened** — Today, Holds, Jobs, Wallet
+4. **One CTA** — Open inbox, Train, or Test line
 
 **Inbox (`/calls`)**
-- Search + filters: All · New · Followed Up · Done · Archived
-- Bare `/calls` defaults to New when work is waiting
-- All hides Archived (recover under Archived filter)
+- Purpose stamps: Job, Hold, Human, Missed, Answered
+- Filters: Needs you · Holds · Jobs · Human · Answered · All
+- Bare `/calls` defaults to Needs you when work is waiting
+- `/requests` and `/appointments` redirect into Holds / Jobs filters
 
 **Owner affordances (Auth + RLS safe)**
 

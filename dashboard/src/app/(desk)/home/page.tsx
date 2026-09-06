@@ -117,14 +117,13 @@ export default async function HomeOverviewPage() {
       .eq("tenant_id", tenant.id)
       .eq("lead_status", status);
 
-  const [todayRes, newRes, followedRes, needsRes] = await Promise.all([
+  const [todayRes, newRes, needsRes, openHoldsRes, pendingJobsRes] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
     countEq("new"),
-    countEq("contacted"),
     client
       .from("calls")
       .select(CALL_SELECT)
@@ -132,6 +131,16 @@ export default async function HomeOverviewPage() {
       .eq("lead_status", "new")
       .order("created_at", { ascending: false })
       .limit(HOME_LEAD_LIMIT),
+    client
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("status", "open"),
+    client
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .in("status", ["requested", "confirmed"]),
   ]);
 
   const leadStatusReady = !(
@@ -140,16 +149,18 @@ export default async function HomeOverviewPage() {
 
   const todayCount = todayRes.count ?? 0;
   const newCount = leadStatusReady ? newRes.count ?? 0 : 0;
-  const followedCount = leadStatusReady ? followedRes.count ?? 0 : 0;
+  const openHolds = openHoldsRes.error ? 0 : openHoldsRes.count ?? 0;
+  const pendingJobs = pendingJobsRes.error ? 0 : pendingJobsRes.count ?? 0;
+  const waitingCount = newCount + openHolds + pendingJobs;
   const leads = leadStatusReady
     ? ((needsRes.data || []) as CallRow[]).map(toLead)
     : [];
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
-  if (newCount > 0) {
-    ctaHref = callsHref({ status: "new" });
-    ctaLabel = "Process pending leads";
+  if (waitingCount > 0) {
+    ctaHref = callsHref({ purpose: "needs" });
+    ctaLabel = "Open inbox";
   } else if (line === "needs_training") {
     ctaHref = businessSettingsHref("train");
     ctaLabel = "Train";
@@ -210,10 +221,10 @@ export default async function HomeOverviewPage() {
             </h2>
             {leadStatusReady ? (
               <Link
-                href={callsHref({ status: "new" })}
+                href={callsHref({ purpose: "needs" })}
                 className={`text-sm font-medium text-[#005CCC] ${focusRingVisible}`}
               >
-                {newCount} new
+                Inbox
               </Link>
             ) : null}
           </div>
@@ -287,7 +298,7 @@ export default async function HomeOverviewPage() {
                       </td>
                       <td className={`${tableCellClass} text-right`}>
                         <Link
-                          href={`/calls/${lead.call.id}?from=new`}
+                          href={`/calls/${lead.call.id}?from=needs`}
                           className={`font-medium text-[#005CCC] ${focusRingVisible}`}
                         >
                           Open
@@ -307,16 +318,23 @@ export default async function HomeOverviewPage() {
               <ul>
                 <li>
                   <StatLink
-                    href={callsHref()}
+                    href={callsHref({ purpose: "all" })}
                     label="Today"
                     value={String(todayCount)}
                   />
                 </li>
                 <li>
                   <StatLink
-                    href={callsHref({ status: "contacted" })}
-                    label="Followed up"
-                    value={String(followedCount)}
+                    href={callsHref({ purpose: "hold" })}
+                    label="Holds"
+                    value={String(openHolds)}
+                  />
+                </li>
+                <li>
+                  <StatLink
+                    href={callsHref({ purpose: "job" })}
+                    label="Jobs"
+                    value={String(pendingJobs)}
                   />
                 </li>
               </ul>

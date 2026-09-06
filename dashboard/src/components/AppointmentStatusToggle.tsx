@@ -7,7 +7,7 @@ import {
 } from "@/app/(desk)/appointments/actions";
 
 const OPTIONS = [
-  { id: "requested", label: "Requested" },
+  { id: "requested", label: "Pending" },
   { id: "confirmed", label: "Confirmed" },
   { id: "done", label: "Done" },
   { id: "cancelled", label: "Cancelled" },

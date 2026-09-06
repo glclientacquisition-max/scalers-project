@@ -1,142 +1,32 @@
 import Link from "next/link";
-import {
-  type CallRow,
-  type LeadStatus,
-} from "@/lib/supabase";
+import { type CallRow } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { CallsToolbar } from "@/components/CallsCommandCenter";
-import { LeadStatusToggle } from "@/components/LeadStatusToggle";
-import {
-  MarkLeadArchiveButton,
-  MarkLeadDoneButton,
-} from "@/components/MarkLeadDoneButton";
+import { InboxToolbar } from "@/components/InboxToolbar";
+import { InboxPurposeChip } from "@/components/InboxPurposeChip";
+import { InboxJobActions } from "@/components/InboxJobActions";
+import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import {
   callsHref,
   followUpWhatsAppMessage,
   formatCallWhen,
-  resolveStatusFilter,
   sanitizeSearchQuery,
   toLead,
-  type Lead,
-  type StatusFilterId,
 } from "@/lib/callsTriage";
-
-function EmptyCalls({
-  total,
-  pendingDid,
-  did,
-  statusFilter,
-  q,
-}: {
-  total: number;
-  pendingDid: boolean;
-  did: string;
-  statusFilter: StatusFilterId;
-  q: string;
-}) {
-  if (total > 0) {
-    return (
-      <div className="mt-6 border-y border-line py-10 text-center text-ink-soft">
-        No calls on this page.
-      </div>
-    );
-  }
-
-  if (q) {
-    return (
-      <div className="mt-6 border-y border-line py-10 text-center">
-        <p className="font-display text-xl tracking-tight text-ink">No matches</p>
-        <Link
-          href={callsHref({ status: statusFilter })}
-          className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
-        >
-          Clear search
-        </Link>
-      </div>
-    );
-  }
-
-  if (statusFilter !== "all") {
-    const label =
-      statusFilter === "new"
-        ? "new leads"
-        : statusFilter === "contacted"
-          ? "followed-up leads"
-          : statusFilter === "resolved"
-            ? "done leads"
-            : "archived leads";
-    return (
-      <div className="mt-6 border-y border-line py-10 text-center">
-        <p className="font-display text-xl tracking-tight text-ink">No {label}</p>
-        <Link
-          href={callsHref({ status: "all" })}
-          className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
-        >
-          Show all calls
-        </Link>
-      </div>
-    );
-  }
-
-  if (pendingDid) {
-    return (
-      <div className="mt-6 border-y border-[#0096FF]/30 bg-[#0096FF]/5 py-10 text-center">
-        <p className="font-display text-xl tracking-tight text-ink">Number being assigned</p>
-        <Link
-          href={businessSettingsHref("train")}
-          className="mt-5 inline-flex min-h-11 rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-        >
-          Train
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-6 border-y border-line py-10 text-center text-ink-soft">
-      <p className="font-display text-xl tracking-tight text-ink">No calls yet</p>
-      <p className="mx-auto mt-2 max-w-md text-sm">
-        Call{" "}
-        <a
-          href={`tel:${did}`}
-          className="font-medium text-[#005ccc] underline focus-visible:outline-none focus-visible:shadow-focus"
-        >
-          {did}
-        </a>{" "}
-        from another phone.
-      </p>
-      <Link
-        href={businessSettingsHref("test")}
-        className="mt-5 inline-flex min-h-11 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005CCC] transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-      >
-        Test line
-      </Link>
-    </div>
-  );
-}
-
-function StatusBadges({ lead }: { lead: Lead }) {
-  const showResolution =
-    lead.resolution && lead.resolution !== "unknown";
-  return (
-    <span className="inline-flex items-center gap-2">
-      {lead.notified ? <span className="text-xs text-ok">alerted</span> : null}
-      {lead.urgent ? (
-        <span className="text-xs font-medium text-warn">urgent</span>
-      ) : null}
-      {showResolution ? (
-        <span className="text-xs text-ink-soft">
-          {lead.resolution === "needs_human"
-            ? "needs human"
-            : lead.resolution}
-        </span>
-      ) : null}
-    </span>
-  );
-}
+import {
+  assembleInboxItems,
+  countInboxPurposes,
+  itemMatchesPurpose,
+  itemMatchesQuery,
+  resolvePurposeFilter,
+  type InboxHold,
+  type InboxItem,
+  type InboxJob,
+  type InboxPurposeFilterId,
+} from "@/lib/inboxPurpose";
 
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
@@ -145,18 +35,182 @@ const CALL_SELECT_LEGACY =
 const CALL_SELECT_LEAD =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
 
+const HOLD_SELECT =
+  "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id";
+const JOB_SELECT =
+  "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id";
+
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
+const INBOX_WINDOW = 150;
+
+function EmptyInbox({
+  total,
+  pendingDid,
+  did,
+  purpose,
+  q,
+}: {
+  total: number;
+  pendingDid: boolean;
+  did: string;
+  purpose: InboxPurposeFilterId;
+  q: string;
+}) {
+  if (q) {
+    return (
+      <div className="mt-8 border-y border-line py-12 text-center">
+        <p className="font-display text-2xl tracking-tight text-ink">No matches</p>
+        <Link
+          href={callsHref({ purpose })}
+          className="mt-6 inline-flex min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-[#005ccc] transition duration-150 hover:border-[#0096FF] hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        >
+          Clear search
+        </Link>
+      </div>
+    );
+  }
+
+  if (total > 0) {
+    return (
+      <div className="mt-8 border-y border-line py-12 text-center">
+        <p className="font-display text-2xl tracking-tight text-ink">Nothing in this filter</p>
+        <Link
+          href={callsHref({ purpose: "all" })}
+          className="mt-6 inline-flex min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-[#005ccc] transition duration-150 hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        >
+          Show all
+        </Link>
+      </div>
+    );
+  }
+
+  if (pendingDid) {
+    return (
+      <div className="mt-8 border-y border-[#0096FF]/30 bg-[#0096FF]/5 py-12 text-center">
+        <p className="font-display text-2xl tracking-tight text-ink">Number being assigned</p>
+        <Link
+          href={businessSettingsHref("train")}
+          className="mt-6 inline-flex min-h-11 rounded-xl bg-[#0096FF] px-5 text-sm font-semibold text-white transition duration-150 hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        >
+          Train
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 border-y border-line py-12 text-center text-ink-soft">
+      <p className="font-display text-2xl tracking-tight text-ink">Inbox is empty</p>
+      <p className="mx-auto mt-2 max-w-md text-sm">
+        Call{" "}
+        <a
+          href={`tel:${did}`}
+          className="font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-2 transition hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        >
+          {did}
+        </a>{" "}
+        from another phone.
+      </p>
+      <Link
+        href={businessSettingsHref("test")}
+        className="mt-6 inline-flex min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-[#005ccc] transition duration-150 hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+      >
+        Test line
+      </Link>
+    </div>
+  );
+}
+
+function InboxRow({
+  item,
+  businessName,
+  purpose,
+}: {
+  item: InboxItem;
+  businessName: string;
+  purpose: InboxPurposeFilterId;
+}) {
+  const message = followUpWhatsAppMessage({
+    businessName,
+    name: item.callerName,
+    reason: item.headline,
+  });
+  const openHref = item.callId
+    ? `/calls/${item.callId}?from=${purpose}`
+    : null;
+
+  return (
+    <tr
+      className={[
+        "group border-t border-line/70 transition duration-150",
+        "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.07]",
+        item.urgent ? "bg-warn-soft/50" : "",
+        item.needsYou ? "" : "opacity-[0.92]",
+      ].join(" ")}
+    >
+      <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
+        {formatCallWhen(item.createdAt)}
+      </td>
+      <td className="px-5 py-5 align-top">
+        <InboxPurposeChip purpose={item.purpose} />
+      </td>
+      <td className="px-5 py-5 align-top">
+        <p className="text-base font-semibold tracking-tight text-ink">
+          {item.callerName || item.callerPhone || "Caller"}
+        </p>
+        <p className="mt-0.5 text-sm font-medium text-ink">{item.headline}</p>
+        {item.detail ? (
+          <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
+        ) : null}
+      </td>
+      <td className="px-5 py-5 align-top">
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          {item.job ? (
+            <InboxJobActions id={item.job.id} status={item.job.status} />
+          ) : item.hold ? (
+            <RequestStatusToggle id={item.hold.id} status={item.hold.status} />
+          ) : item.callerPhone ? (
+            <WhatsAppLink
+              number={item.callerPhone}
+              message={message}
+              variant="primary"
+              label="WhatsApp"
+            />
+          ) : null}
+          {(item.hold || item.job) && item.callerPhone ? (
+            <WhatsAppLink number={item.callerPhone} message={message} compact />
+          ) : null}
+        </div>
+      </td>
+      <td className="px-5 py-5 align-top text-right">
+        {openHref ? (
+          <Link
+            href={openHref}
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-[#0096FF] transition duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+          >
+            Open
+          </Link>
+        ) : (
+          <span className="text-sm text-ink-soft">No call</span>
+        )}
+      </td>
+    </tr>
+  );
+}
 
 export default async function CallsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; status?: string; q?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    status?: string;
+    purpose?: string;
+    q?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const q = sanitizeSearchQuery(sp.q);
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -180,119 +234,46 @@ export default async function CallsPage({
     );
   }
 
-  let leadStatusReady = true;
   const client = workspace.client;
   const businessName = tenant.business_name?.trim() || "us";
 
-  const statusCountQuery = (status: LeadStatus) =>
-    client
-      .from("calls")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id)
-      .eq("lead_status", status);
-
-  const [allRes, newRes, contactedRes, resolvedRes, archivedRes] =
-    await Promise.all([
-      client
-        .from("calls")
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenant.id)
-        .neq("lead_status", "archived"),
-      statusCountQuery("new"),
-      statusCountQuery("contacted"),
-      statusCountQuery("resolved"),
-      statusCountQuery("archived"),
-    ]);
-
-  if (newRes.error && /lead_status|column/i.test(newRes.error.message)) {
-    leadStatusReady = false;
-  }
-  const archiveReady = !(
-    archivedRes.error && /lead_status|archived|check|column/i.test(archivedRes.error.message)
-  );
-
-  const newCount = leadStatusReady ? newRes.count ?? 0 : 0;
-  const statusCounts = {
-    all: leadStatusReady ? allRes.count ?? 0 : 0,
-    new: newCount,
-    contacted: leadStatusReady ? contactedRes.count ?? 0 : 0,
-    resolved: leadStatusReady ? resolvedRes.count ?? 0 : 0,
-    archived: archiveReady ? archivedRes.count ?? 0 : 0,
-  };
-  const activeFilter = leadStatusReady
-    ? resolveStatusFilter(sp.status, newCount)
-    : "all";
-
-  let listQuery = client
+  const listQuery = client
     .from("calls")
-    .select(CALL_SELECT, { count: "exact" })
-    .eq("tenant_id", tenant.id);
-
-  if (leadStatusReady && activeFilter !== "all") {
-    listQuery = listQuery.eq("lead_status", activeFilter);
-  } else if (leadStatusReady) {
-    listQuery = listQuery.neq("lead_status", "archived");
-  }
-  if (q) {
-    listQuery = listQuery.or(
-      `caller_number.ilike.%${q}%,summary.ilike.%${q}%`
-    );
-  }
-
-  const first = await listQuery
+    .select(CALL_SELECT)
+    .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false })
-    .range(from, to);
+    .limit(INBOX_WINDOW);
 
+  const first = await listQuery;
   let data = first.data as CallRow[] | null;
   let error = first.error;
-  let total = first.count ?? 0;
 
   if (error && /resolution|primary_intent|resolution_note|column/i.test(error.message)) {
-    let retryQuery = client
+    const retry = await client
       .from("calls")
-      .select(CALL_SELECT_LEAD, { count: "exact" })
-      .eq("tenant_id", tenant.id);
-    if (leadStatusReady && activeFilter !== "all") {
-      retryQuery = retryQuery.eq("lead_status", activeFilter);
-    } else if (leadStatusReady) {
-      retryQuery = retryQuery.neq("lead_status", "archived");
-    }
-    if (q) {
-      retryQuery = retryQuery.or(
-        `caller_number.ilike.%${q}%,summary.ilike.%${q}%`
-      );
-    }
-    const retry = await retryQuery
+      .select(CALL_SELECT_LEAD)
+      .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false })
-      .range(from, to);
+      .limit(INBOX_WINDOW);
     data = retry.data as CallRow[] | null;
     error = retry.error;
-    total = retry.count ?? 0;
   }
 
   if (error && /lead_status|column/i.test(error.message)) {
-    leadStatusReady = false;
-    let retryQuery = client
+    const retry = await client
       .from("calls")
-      .select(CALL_SELECT_LEGACY, { count: "exact" })
-      .eq("tenant_id", tenant.id);
-    if (q) {
-      retryQuery = retryQuery.or(
-        `caller_number.ilike.%${q}%,summary.ilike.%${q}%`
-      );
-    }
-    const retry = await retryQuery
+      .select(CALL_SELECT_LEGACY)
+      .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false })
-      .range(from, to);
+      .limit(INBOX_WINDOW);
     data = retry.data as CallRow[] | null;
     error = retry.error;
-    total = retry.count ?? 0;
   }
 
   if (error) {
     return (
       <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Could not load calls: {error.message}
+        Could not load inbox: {error.message}
         {/row-level security|permission denied|rls/i.test(error.message) ? (
           <p className="mt-2 text-sm text-ink-soft">
             Apply docs/supabase/owner_rls.sql in Supabase if you have not yet.
@@ -302,110 +283,87 @@ export default async function CallsPage({
     );
   }
 
+  const [holdsRes, jobsRes] = await Promise.all([
+    client
+      .from("service_requests")
+      .select(HOLD_SELECT)
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: false })
+      .limit(INBOX_WINDOW),
+    client
+      .from("appointments")
+      .select(JOB_SELECT)
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: false })
+      .limit(INBOX_WINDOW),
+  ]);
+
+  const holds = (holdsRes.error ? [] : holdsRes.data || []) as InboxHold[];
+  const jobs = (jobsRes.error ? [] : jobsRes.data || []) as InboxJob[];
   const leads = (data || []).map(toLead);
+  const assembled = assembleInboxItems({ leads, holds, jobs });
+
+  const searched = q
+    ? assembled.filter((item) => itemMatchesQuery(item, q))
+    : assembled;
+  const counts = countInboxPurposes(searched);
+  const activeFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
+  const filtered = searched.filter((item) => itemMatchesPurpose(item, activeFilter));
+  const total = filtered.length;
+  const from = (page - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(from, from + PAGE_SIZE);
+
   const paginationParams: Record<string, string | undefined> = {
-    status: activeFilter,
+    purpose: activeFilter,
     q: q || undefined,
   };
 
   return (
     <div>
-      {!leadStatusReady ? (
-        <p className="mb-6 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-ink-soft">
-          Lead statuses need a one-time database update. Apply{" "}
-          <code>docs/supabase/lead_status.sql</code> in Supabase.
-        </p>
-      ) : (
-        <CallsToolbar active={activeFilter} counts={statusCounts} q={q} />
-      )}
+      <InboxToolbar active={activeFilter} counts={counts} q={q} />
 
-      {leads.length === 0 ? (
-        <EmptyCalls
+      {pageRows.length === 0 ? (
+        <EmptyInbox
           total={total}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
           did={tenant.sautikit_virtual_number}
-          statusFilter={activeFilter}
+          purpose={activeFilter}
           q={q}
         />
       ) : (
         <>
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b border-line bg-surface-muted/70 text-ink-soft">
+          <div className="mt-8">
+            <DeskDataTable minWidthClass="min-w-[880px]">
+              <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                 <tr>
-                  <th className="px-4 py-3 font-medium">When</th>
-                  <th className="px-4 py-3 font-medium">Caller</th>
-                  <th className="px-4 py-3 font-medium">Lead</th>
-                  <th className="px-4 py-3 font-medium">Follow-up</th>
-                  <th className="px-4 py-3 font-medium"></th>
+                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                    When
+                  </th>
+                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                    Purpose
+                  </th>
+                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                    Work
+                  </th>
+                  <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
+                    Action
+                  </th>
+                  <th scope="col" className="px-5 py-4">
+                    <span className="sr-only">Call</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {leads.map((lead) => {
-                  const message = followUpWhatsAppMessage({
-                    businessName,
-                    name: lead.name,
-                    reason: lead.reason,
-                  });
-                  return (
-                    <tr
-                      key={lead.call.id}
-                      className={[
-                        "border-t border-line/70 transition hover:bg-surface-muted/30",
-                        lead.urgent ? "bg-warn-soft/60" : "",
-                      ].join(" ")}
-                    >
-                      <td className="whitespace-nowrap px-4 py-3.5 text-ink-soft">
-                        {formatCallWhen(lead.call.created_at)}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <WhatsAppLink
-                          number={lead.call.caller_number}
-                          message={message}
-                        />
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2 font-medium text-ink">
-                          {lead.name || "Unknown"}
-                          <StatusBadges lead={lead} />
-                        </div>
-                        <div className="mt-0.5 line-clamp-1 text-ink-soft">
-                          {lead.reason || "No reason yet"}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {leadStatusReady ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <LeadStatusToggle
-                              callId={lead.call.id}
-                              initial={lead.leadStatus}
-                            />
-                            {lead.leadStatus !== "resolved" ? (
-                              <MarkLeadDoneButton callId={lead.call.id} variant="icon" />
-                            ) : null}
-                            {lead.leadStatus !== "archived" ? (
-                              <MarkLeadArchiveButton callId={lead.call.id} variant="icon" />
-                            ) : null}
-                          </div>
-                        ) : (
-                          <span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs">
-                            {lead.call.status || "unknown"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <Link
-                          href={`/calls/${lead.call.id}?from=${activeFilter}`}
-                          className="font-medium text-[#0096FF] hover:text-[#005ccc]"
-                        >
-                          Open
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {pageRows.map((item) => (
+                  <InboxRow
+                    key={item.id}
+                    item={item}
+                    businessName={businessName}
+                    purpose={activeFilter}
+                  />
+                ))}
               </tbody>
-            </table>
+            </DeskDataTable>
           </div>
 
           <Pagination
