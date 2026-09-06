@@ -184,7 +184,10 @@ function isLetMeThinkUtterance(text) {
 }
 
 function isHearAgainUtterance(text) {
-  const t = normalizeSpeech(text);
+  const t = normalizeSpeech(text)
+    .replace(/\?+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!t) return false;
   if (HEAR_AGAIN_ONLY_RE.test(t)) return true;
   if (/^(sorry|pardon)\b/.test(t) && /\b(what|huh|again|say|repeat|didn'?t hear|did not hear)\b/.test(t)) {
