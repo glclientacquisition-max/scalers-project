@@ -1,3 +1,19 @@
+# Live transfer spike — Done and Dusted (2026-09-06)
+
+Staging DID `+254709221536` (tenant Done and Dusted Cleaning). Owner set **Connect live call**. Team dest `+254790381872`.
+
+| Call SID | Time (UTC) | Voice SHA | What happened |
+| --- | --- | --- | --- |
+| `HD_6f9424c1289a` | ~06:25 | `main` `ce1664b` | Settings saved. Dial did **not** run. Voice still old `main`, flag unset. NBA ESCALATE (“live transfer is unavailable”). SMS to Alvin. Caller was **the same number as the Dial dest**, so even on new Voice this call would skip Dial. |
+
+Staging Voice later retargeted to `cursor/live-transfer-spec-3c65` @ `18813bc`. `/healthz` shows `liveTransfer.executor=true`, `ignoreHours=true` (Sunday hours bypass). Production Voice was not retargeted.
+
+**Next spike:** call `+254709221536` from a **different** mobile than `+254790381872`. Ask for a human, give a name. Expect “stay on the line”, then Alvin’s phone rings. Logs: `live transfer queued Dial`, `live transfer action=dial`.
+
+Turn off `VOICE_LIVE_TRANSFER_IGNORE_HOURS` after the Sunday spike. Point staging source back to `main` when the experiment is done.
+
+---
+
 # Live call findings — Ngong Hills Hotel (2026-08-11)
 
 Later incident (assistant silent, Soniox 402 billing): [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md).
