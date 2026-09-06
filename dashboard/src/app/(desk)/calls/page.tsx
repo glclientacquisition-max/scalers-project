@@ -71,9 +71,17 @@ function EmptyInbox({
   }
 
   if (total > 0) {
+    const emptyLabel =
+      purpose === "hold"
+        ? "Nothing to fulfill"
+        : purpose === "job"
+          ? "No visits to confirm"
+          : purpose === "needs"
+            ? "Nothing needs you"
+            : "Nothing in this filter";
     return (
       <div className="mt-8 border-y border-line py-12 text-center">
-        <p className="font-display text-2xl tracking-tight text-ink">Nothing in this filter</p>
+        <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
         <Link
           href={callsHref({ purpose: "all" })}
           className="mt-6 inline-flex min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-[#005ccc] transition duration-150 hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
@@ -121,6 +129,14 @@ function EmptyInbox({
   );
 }
 
+function inboxTableKind(
+  purpose: InboxPurposeFilterId
+): "hold" | "job" | "mixed" {
+  if (purpose === "hold") return "hold";
+  if (purpose === "job") return "job";
+  return "mixed";
+}
+
 function InboxRow({
   item,
   businessName,
@@ -130,6 +146,7 @@ function InboxRow({
   businessName: string;
   purpose: InboxPurposeFilterId;
 }) {
+  const kind = inboxTableKind(purpose);
   const message = followUpWhatsAppMessage({
     businessName,
     name: item.callerName,
@@ -138,6 +155,10 @@ function InboxRow({
   const openHref = item.callId
     ? `/calls/${item.callId}?from=${purpose}`
     : null;
+  const openLabel = item.hold || item.job ? "Call" : "Open";
+  const needed = item.hold?.when_text?.trim() || "Anytime";
+  const visit = item.job?.when_text?.trim() || "Time TBD";
+  const place = item.job?.address_landmark?.trim() || "Ask on the call";
 
   return (
     <tr
@@ -148,21 +169,68 @@ function InboxRow({
         item.needsYou ? "" : "opacity-[0.92]",
       ].join(" ")}
     >
-      <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
-        {formatCallWhen(item.createdAt)}
-      </td>
-      <td className="px-5 py-5 align-top">
-        <InboxPurposeChip purpose={item.purpose} />
-      </td>
-      <td className="px-5 py-5 align-top">
-        <p className="text-base font-semibold tracking-tight text-ink">
-          {item.callerName || item.callerPhone || "Caller"}
-        </p>
-        <p className="mt-0.5 text-sm font-medium text-ink">{item.headline}</p>
-        {item.detail ? (
-          <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
-        ) : null}
-      </td>
+      {kind === "hold" ? (
+        <>
+          <td className="px-5 py-5 align-top">
+            <p className="text-base font-semibold tracking-tight text-ink">
+              {item.headline}
+            </p>
+            {item.hold ? (
+              <p className="mt-0.5 text-sm text-ink-soft">
+                {item.hold.request_type}
+              </p>
+            ) : null}
+          </td>
+          <td className="px-5 py-5 align-top">
+            <p className="font-medium text-ink">
+              {item.callerName || "Caller"}
+            </p>
+            {item.callerPhone ? (
+              <WhatsAppLink number={item.callerPhone} message={message} compact />
+            ) : null}
+          </td>
+          <td className="px-5 py-5 align-top text-sm text-ink-soft">{needed}</td>
+        </>
+      ) : null}
+
+      {kind === "job" ? (
+        <>
+          <td className="px-5 py-5 align-top">
+            <p className="text-base font-semibold tracking-tight text-ink">{visit}</p>
+            <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
+          </td>
+          <td className="px-5 py-5 align-top">
+            <p className="font-medium text-ink">
+              {item.callerName || "Caller"}
+            </p>
+            {item.callerPhone ? (
+              <WhatsAppLink number={item.callerPhone} message={message} compact />
+            ) : null}
+          </td>
+          <td className="px-5 py-5 align-top text-sm text-ink-soft">{place}</td>
+        </>
+      ) : null}
+
+      {kind === "mixed" ? (
+        <>
+          <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
+            {formatCallWhen(item.createdAt)}
+          </td>
+          <td className="px-5 py-5 align-top">
+            <InboxPurposeChip purpose={item.purpose} />
+          </td>
+          <td className="px-5 py-5 align-top">
+            <p className="text-base font-semibold tracking-tight text-ink">
+              {item.callerName || item.callerPhone || "Caller"}
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-ink">{item.headline}</p>
+            {item.detail ? (
+              <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
+            ) : null}
+          </td>
+        </>
+      ) : null}
+
       <td className="px-5 py-5 align-top">
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
           {item.job ? (
@@ -177,18 +245,15 @@ function InboxRow({
               label="WhatsApp"
             />
           ) : null}
-          {(item.hold || item.job) && item.callerPhone ? (
-            <WhatsAppLink number={item.callerPhone} message={message} compact />
-          ) : null}
         </div>
       </td>
       <td className="px-5 py-5 align-top text-right">
         {openHref ? (
           <Link
             href={openHref}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-[#0096FF] transition duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] transition duration-150 hover:text-[#004a99] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
           >
-            Open
+            {openLabel}
           </Link>
         ) : (
           <span className="text-sm text-ink-soft">No call</span>
@@ -336,15 +401,45 @@ export default async function CallsPage({
             <DeskDataTable minWidthClass="min-w-[880px]">
               <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                 <tr>
-                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                    When
-                  </th>
-                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                    Purpose
-                  </th>
-                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                    Work
-                  </th>
+                  {inboxTableKind(activeFilter) === "hold" ? (
+                    <>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Item
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Who
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Needed
+                      </th>
+                    </>
+                  ) : null}
+                  {inboxTableKind(activeFilter) === "job" ? (
+                    <>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Visit
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Who
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Place
+                      </th>
+                    </>
+                  ) : null}
+                  {inboxTableKind(activeFilter) === "mixed" ? (
+                    <>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        When
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Purpose
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Work
+                      </th>
+                    </>
+                  ) : null}
                   <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
                     Action
                   </th>

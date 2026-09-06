@@ -36,7 +36,7 @@ Cross-referenced. Product rules win when sources disagree.
 | Von Restorff (isolation) | von Restorff 1933 | Only the primary action is saturated blue. Archive/Cancel/Remove stay ghost or icon. | Two blue buttons in one viewport |
 | Serial position / F-pattern | Nielsen Norman Group eyetracking | First line: line status + greeting. First block: work waiting. Metrics after work. | Analytics four-up that does not click into work |
 | Progressive disclosure | Nielsen; Sweller element interactivity | `textarea rows={2}` then expand. Settings panels stay hidden until chosen. | All Train fields on one scroll |
-| Jakob’s law | Nielsen | Calls table is the inbox idiom. Requests and Appointments copy it. | Novel card masonry |
+| Jakob’s law | Nielsen | One Inbox table. Holds and Jobs change columns when that filter is isolated. | Novel card masonry |
 | Tesler’s law | Tesler | Complexity stays in compile/save, not in owner copy. | “Train your receptionist in short steps” |
 | Aesthetic-usability | Kurosu & Kashimura 1995; Tractinsky | Calm light canvas, 1px lines, no novelty chrome. | Glassmorphism, Plus Jakarta, orange CTA |
 | Peak-end rule | Kahneman | Empty and error states must still name the next action. | Dead ends and hash links that 404 the intent |
@@ -113,15 +113,15 @@ No Plus Jakarta Sans. No third family. No purple.
 
 ## 6. Information architecture
 
-Keep URLs and nav labels through the current phase: Overview, Calls, Requests, Appointments, Business, Wallet.
+Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointments` filter Inbox.
 
 | Route | Job | Layout |
 | --- | --- | --- |
-| `/home` | What needs me. What happened. Is the line working. One next action. | Command Center |
-| `/calls` | Inbox benchmark | Dense table |
+| `/home` | Map of Needs you, Holds, Jobs. Line. One next action. | Command Center. Not a second inbox. |
+| `/calls` | Purpose-stamped Inbox | Dense table. Search. Holds and Jobs change columns. |
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
-| `/requests` | Same job as Calls | Same table language |
-| `/appointments` | Same job as Calls | Same table language |
+| `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
+| `/appointments` | Confirm visits | Redirect `/calls?purpose=job` |
 | `/settings` | Configure the assistant | Destination menu. One screen. |
 | `/wallet` | Prepaid KES | Token-only from this lane |
 
