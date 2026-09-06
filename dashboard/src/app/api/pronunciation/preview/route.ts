@@ -36,6 +36,9 @@ export async function POST(request: Request) {
     if (result.language) {
       headers.set("X-Tts-Language", result.language);
     }
+    if (result.voiceId) {
+      headers.set("X-Soniox-Voice", result.voiceId);
+    }
     return new NextResponse(new Uint8Array(result.wav), { status: 200, headers });
   } catch (err) {
     const message =

@@ -1,5 +1,9 @@
 import { isUsableWavBytes, NO_VOICE_SAMPLE_COPY } from "@/lib/previewAudio";
 import { getVoicePublicBase } from "@/lib/sautikit";
+import {
+  listCuratedSonioxVoices,
+  resolveLiveCallVoiceId,
+} from "@/lib/sonioxVoiceCatalog";
 
 export type TtsPreviewResult = {
   wav: Buffer;
@@ -24,6 +28,8 @@ export async function fetchTtsPreviewWav(opts: {
 
   const base = getVoicePublicBase();
   const secret = String(process.env.VOICE_INTERNAL_SECRET || "").trim();
+  const catalog = await listCuratedSonioxVoices();
+  const voiceId = resolveLiveCallVoiceId(opts.voiceId, catalog);
   let url: string;
   try {
     url = new URL("/api/tts/preview", `${base}/`).toString();
@@ -46,7 +52,7 @@ export async function fetchTtsPreviewWav(opts: {
         lexicon: opts.lexicon,
         language: opts.language,
         callLanguage: opts.language || "en",
-        voiceId: opts.voiceId,
+        voiceId,
       }),
       cache: "no-store",
     });
@@ -78,7 +84,14 @@ export async function fetchTtsPreviewWav(opts: {
   }
   const spokenHeader = res.headers.get("x-spoken-text");
   const language = res.headers.get("x-tts-language") || undefined;
-  const voiceId = res.headers.get("x-soniox-voice") || undefined;
+  const spokenVoiceId = res.headers.get("x-soniox-voice") || undefined;
+  if (
+    voiceId &&
+    spokenVoiceId &&
+    spokenVoiceId.toLowerCase() !== voiceId.toLowerCase()
+  ) {
+    throw new Error("Preview used a different voice than this line.");
+  }
   let spokenText: string | undefined;
   if (spokenHeader) {
     try {
@@ -88,5 +101,5 @@ export async function fetchTtsPreviewWav(opts: {
     }
   }
 
-  return { wav, spokenText, language, voiceId };
+  return { wav, spokenText, language, voiceId: spokenVoiceId || voiceId };
 }

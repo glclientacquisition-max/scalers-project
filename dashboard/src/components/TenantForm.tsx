@@ -73,6 +73,7 @@ import {
   displaySonioxVoiceLabel,
   getDefaultSonioxVoiceIdSync,
   listCuratedSonioxVoicesSync,
+  resolveLiveCallVoiceId,
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import {
@@ -118,7 +119,6 @@ import {
 } from "@/lib/pronunciationLexicon";
 import {
   assertPreviewAudioPlayable,
-  isAutoplayBlock,
   NO_VOICE_SAMPLE_COPY,
   objectUrlFromPreviewResponse,
   previewErrorCopy,
@@ -538,11 +538,12 @@ export function TenantForm({
     };
   }, [voiceSampleUrl]);
 
-  async function playVoiceSample() {
+  async function generateVoiceSample() {
     const sample =
       agentName && businessName
         ? `Hello, you've reached ${businessName}, this is ${agentName} speaking. How can I help?`
         : "Hello, how can I help you today?";
+    const liveVoiceId = resolveLiveCallVoiceId(sonioxVoiceId, voiceOptions);
     setVoiceSampleLoading(true);
     setVoiceSampleError(null);
     if (voiceSampleUrl) {
@@ -556,25 +557,17 @@ export function TenantForm({
         body: JSON.stringify({
           text: sample,
           lexicon: lexiconForStorage(ttsLexicon),
-          voiceId: sonioxVoiceId || undefined,
+          voiceId: liveVoiceId,
         }),
       });
-      const url = await objectUrlFromPreviewResponse(res);
+      const preview = await objectUrlFromPreviewResponse(res);
       try {
-        await assertPreviewAudioPlayable(url);
+        await assertPreviewAudioPlayable(preview.url);
       } catch (probeErr) {
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(preview.url);
         throw probeErr;
       }
-      setVoiceSampleUrl(url);
-      try {
-        await new Audio(url).play();
-      } catch (playErr) {
-        if (isAutoplayBlock(playErr)) return;
-        URL.revokeObjectURL(url);
-        setVoiceSampleUrl(null);
-        throw playErr;
-      }
+      setVoiceSampleUrl(preview.url);
     } catch (err) {
       setVoiceSampleError(previewErrorCopy(err));
     } finally {
@@ -1827,7 +1820,7 @@ export function TenantForm({
             </div>
             <button
               type="button"
-              onClick={() => void playVoiceSample()}
+              onClick={() => void generateVoiceSample()}
               disabled={voiceSampleLoading}
               className={settingsActionClass}
             >
@@ -1837,6 +1830,7 @@ export function TenantForm({
           {voiceSampleUrl ? (
             <audio
               controls
+              preload="metadata"
               className="max-w-full"
               onError={() => {
                 URL.revokeObjectURL(voiceSampleUrl);
