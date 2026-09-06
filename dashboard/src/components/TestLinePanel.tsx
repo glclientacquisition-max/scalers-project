@@ -16,6 +16,11 @@ import {
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
+import {
+  isAutoplayBlock,
+  NO_VOICE_SAMPLE_COPY,
+  objectUrlFromPreviewResponse,
+} from "@/lib/previewAudio";
 
 /**
  * Business Settings → Test
@@ -96,21 +101,19 @@ export function TestLinePanel({
           voiceId: sonioxVoiceId || undefined,
         }),
       });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(
-          errJson && typeof errJson.error === "string"
-            ? errJson.error
-            : `Preview failed (${res.status})`
-        );
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const url = await objectUrlFromPreviewResponse(res);
       setPhonePreviewUrl(url);
-      await new Audio(url).play();
+      try {
+        await new Audio(url).play();
+      } catch (playErr) {
+        if (isAutoplayBlock(playErr)) return;
+        URL.revokeObjectURL(url);
+        setPhonePreviewUrl(null);
+        throw playErr;
+      }
     } catch (err) {
       setPhonePreviewError(
-        err instanceof Error ? err.message : "Could not play phone preview."
+        err instanceof Error ? err.message : NO_VOICE_SAMPLE_COPY
       );
     } finally {
       setPhonePreviewLoading(false);
