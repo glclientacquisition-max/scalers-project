@@ -58,9 +58,28 @@ function pcmToBrowserWav(pcm, sourceRate = 16000) {
   return pcmToWav(upsamplePcm16Mono(pcm, sourceRate, BROWSER_PREVIEW_RATE), BROWSER_PREVIEW_RATE);
 }
 
+/**
+ * Write raw WAV bytes on an Express response.
+ * Express 4 `res.send(Uint8Array)` JSON-serializes the typed array
+ * (`{"0":82,"1":73,...}`) while leaving Content-Type as audio/wav.
+ * The desk then rejects the body as not a WAV.
+ * @param {import('http').ServerResponse} res
+ * @param {Buffer|Uint8Array} wav
+ */
+function writeWavResponse(res, wav) {
+  const buf = Buffer.isBuffer(wav) ? wav : Buffer.from(wav || []);
+  if (!res.getHeader || !res.getHeader('Content-Type')) {
+    res.setHeader('Content-Type', 'audio/wav');
+  }
+  res.setHeader('Content-Length', String(buf.length));
+  res.end(buf);
+  return res;
+}
+
 module.exports = {
   pcmToWav,
   pcmToBrowserWav,
   upsamplePcm16Mono,
+  writeWavResponse,
   BROWSER_PREVIEW_RATE,
 };

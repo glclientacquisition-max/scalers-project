@@ -298,4 +298,16 @@ assert.doesNotMatch(
   'must not JSON.stringify full request headers'
 );
 
+assert.match(
+  source,
+  /writeWavResponse\(res,\s*result\.wav\)/,
+  'POST /api/tts/preview must write raw WAV bytes, not res.send a typed array'
+);
+
+assert.doesNotMatch(
+  source,
+  /res\.send\(new Uint8Array/,
+  'Express res.send(Uint8Array) JSON-serializes preview audio; use writeWavResponse'
+);
+
 console.log('Voice runtime wiring checks passed.');

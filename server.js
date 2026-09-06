@@ -40,6 +40,7 @@ const {
   refreshCuratedVoicesFromDb,
 } = require('./src/speech/sonioxVoice');
 const { synthesizeTtsPreview } = require('./src/speech/ttsPreview');
+const { writeWavResponse } = require('./src/speech/wavPack');
 const { buildSystemPrompt, buildGreeting } = require('./src/prompts');
 const { openClosedStatus } = require('./src/conversation/businessHours');
 const { bulletinClosureNotice } = require('./src/conversation/dailyBulletin');
@@ -363,10 +364,11 @@ app.post('/api/tts/preview', async (req, res) => {
     const resolvedVoice = resolveSonioxVoice(voiceId);
     res.setHeader('Content-Type', 'audio/wav');
     res.setHeader('Content-Disposition', 'inline; filename="preview.wav"');
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Spoken-Text', encodeURIComponent(result.spokenText));
     res.setHeader('X-Tts-Language', result.language);
     res.setHeader('X-Soniox-Voice', resolvedVoice);
-    return res.send(new Uint8Array(result.wav));
+    return writeWavResponse(res, result.wav);
   } catch (err) {
     console.error('[api/tts/preview] failed:', err?.message || err);
     return res.status(500).json({ error: err?.message || 'preview failed' });
