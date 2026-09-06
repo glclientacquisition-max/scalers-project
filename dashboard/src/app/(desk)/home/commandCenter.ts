@@ -108,19 +108,19 @@ export function homeNextAction(input: {
     return { href: callsHref({ status: "new" }), label: "Process leads" };
   }
   if (input.line === "number_pending") {
-    return { href: businessSettingsHref("test"), label: "Test receptionist" };
+    return { href: businessSettingsHref("test"), label: "Test assistant" };
   }
   if (input.trainingGapId) {
     return {
       href: businessSettingsHref("train", trainingPanelForItem(input.trainingGapId)),
-      label: "Train receptionist",
+      label: "Teach assistant",
     };
   }
   if (input.walletLow) {
     return { href: "/wallet", label: "Add credit" };
   }
   if (input.totalCalls === 0) {
-    return { href: businessSettingsHref("test"), label: "Test receptionist" };
+    return { href: businessSettingsHref("test"), label: "Test assistant" };
   }
   return { href: "/calls", label: "Show all calls" };
 }

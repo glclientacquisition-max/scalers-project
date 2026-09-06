@@ -25,7 +25,7 @@ function WhatsAppGlyph({ className }: { className?: string }) {
 }
 
 const primaryActionClass =
-  "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 sm:min-h-11 sm:w-auto sm:min-w-[9.5rem]";
+  "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:scale-[0.99] active:bg-[#007acc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 sm:min-h-11 sm:w-auto sm:min-w-[9.5rem]";
 
 /**
  * Home new-lead row: identity, captured reason, when, outcome, one primary action.
@@ -56,8 +56,12 @@ export function TriageLeadCard({
       : null;
 
   return (
-    <li className={lead.urgent ? "bg-warn-soft/60" : undefined}>
-      <article className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
+    <li className={lead.urgent ? "group relative bg-warn-soft/60" : "group relative"}>
+      <article className="relative flex flex-col gap-3 px-4 py-3 transition-colors duration-150 group-hover:bg-[#0096FF]/[0.04] group-focus-within:bg-[#0096FF]/[0.04] sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-transparent transition-colors duration-150 group-hover:bg-[#0096FF] group-focus-within:bg-[#0096FF]"
+        />
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[11px] text-ink-soft">
             {formatCallWhen(lead.call.created_at)}
@@ -100,7 +104,7 @@ export function TriageLeadCard({
             {waHref ? (
               <Link
                 href={detailHref}
-                className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-[#0096FF] transition hover:text-[#005ccc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-[#0096FF] transition duration-150 hover:text-[#005ccc] active:text-[#004a99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
               >
                 Open
               </Link>
