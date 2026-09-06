@@ -134,6 +134,11 @@ const { createVoiceTurnTiming } = require('./src/speech/voiceTiming');
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
+  consumeLiveTransferWebhook,
+  queuePendingLiveTransfer,
+  hasPendingLiveTransfer,
+} = require('./src/sautikit/pendingLiveTransfer');
+const {
   summarizeHeaders,
   summarizeBody,
   createWsPayloadSampler,
@@ -151,6 +156,11 @@ const {
   getSmsStatus,
 } = require('./src/notifications/sms');
 const {
+  liveTransferReady,
+  liveTransferDestination,
+  normalizeKenyaE164,
+} = require('./src/conversation/liveTransferReady');
+const {
   resolveEscalation,
   buildEscalationText,
   teammateLabel,
@@ -158,6 +168,23 @@ const {
 const {
   shapeEscalationNotifyOutcome,
 } = require('./src/conversation/escalationFeature');
+
+function capabilitiesForProfile(profile = {}, parsedTools = null) {
+  const tools = parsedTools || parseAgentTools(profile.agentTools);
+  const ready = liveTransferReady({
+    profile: { ...profile, agentTools: tools },
+  });
+  return buildBrainCapabilities(
+    { ...profile, agentTools: tools },
+    {
+      createServiceRequest: true,
+      createAppointment: true,
+      updateAppointment: true,
+      notifyCallback: true,
+      liveTransfer: ready.ready,
+    }
+  );
+}
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || null;
@@ -698,11 +725,39 @@ async function handleVoiceIncoming(req, res) {
     // call-set-up (it carries callerNumber/destinationNumber/isActive). Open
     // the stream, persist the call, and let the later Completed event close it.
     if (shouldSkipMediaStream(callSessionState, req.body)) {
+      const sid = extracted.callSid || callSid;
+      const transferXml = consumeLiveTransferWebhook({
+        callSid: sid,
+        callSessionState,
+        body: req.body,
+      });
+      if (transferXml?.xml) {
+        if (transferXml.action === 'dial' || transferXml.action === 'fallback' || transferXml.action === 'bridged') {
+          const attempt = transferXml.attempt || {};
+          db.saveTransferAttempt({
+            callSid: sid,
+            attempt: {
+              status: attempt.status,
+              mode: 'cold_dial',
+              to: attempt.to || null,
+              caller_id: attempt.callerId || null,
+              timeout_s: attempt.timeoutS || null,
+              sautikit_dial_status: transferXml.action,
+              ended_at:
+                transferXml.action === 'dial' ? null : new Date().toISOString(),
+            },
+          }).catch(() => {});
+        }
+        console.log(
+          `[voice/incoming] live transfer action=${transferXml.action} — no re-Stream`
+        );
+        return res.type('text/xml').send(transferXml.xml);
+      }
       const termination = detectCallTermination(req.body, callSessionState);
       if (termination.terminal) {
         // Fire-and-forget so we still return TwiML immediately.
         markCallTerminalFromWebhook({
-          callSid: extracted.callSid || callSid,
+          callSid: sid,
           status: termination.status,
           durationSeconds: extractEventDurationSeconds(req.body),
           source: 'voice/incoming',
@@ -1116,17 +1171,7 @@ mediaWss.on('connection', (ws, req) => {
         callBrainStates.set(sessionCallSid, createBrainState(profile));
         callBrainCapabilities.set(
           sessionCallSid,
-          buildBrainCapabilities(
-            { ...profile, agentTools: parsedTools },
-            {
-              createServiceRequest: true,
-              createAppointment: true,
-              updateAppointment: true,
-              notifyCallback: true,
-              // Current media runtime has no transfer executor.
-              liveTransfer: false,
-            }
-          )
+          capabilitiesForProfile(profile, parsedTools)
         );
       }
       greetingLine = buildGreeting(businessName, {
@@ -1468,10 +1513,7 @@ mediaWss.on('connection', (ws, req) => {
     callLanguage = callLanguageState.current;
     const capabilities =
       callBrainCapabilities.get(callKey) ||
-      buildBrainCapabilities(
-        { agentTools: callAgentTools.get(callKey) || parseAgentTools(null) },
-        { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
-      );
+      capabilitiesForProfile(brainProfile, callAgentTools.get(callKey) || parseAgentTools(null));
     const previousBrainState =
       callBrainStates.get(callKey) || createBrainState(brainProfile);
     const provisionalIntent = inferIntent(clean);
@@ -1934,6 +1976,15 @@ mediaWss.on('connection', (ws, req) => {
             /* ignore */
           }
         }, 800);
+      } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
+        console.log(`[ws/media][${sidLabel()}] live transfer — closing media for Dial`);
+        setTimeout(() => {
+          try {
+            ws.close(1000, 'live_transfer');
+          } catch {
+            /* ignore */
+          }
+        }, 1200);
       }
       turnTiming.log({ outcome: turnOutcome });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -2356,8 +2407,10 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     let businessName = process.env.BUSINESS_NAME || null;
     let teamDirectory = [];
     let notifyChannels = null;
+    let loadedProfile = null;
     try {
       const profile = await db.getTenantProfile({ callSid });
+      loadedProfile = profile;
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
@@ -2411,6 +2464,13 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       subject: `Escalation for ${teammateLabel(teammate)}${businessName ? ` — ${businessName}` : ''}`,
     });
 
+    const transferQueued = await maybeQueueLiveTransfer({
+      callSid,
+      escalate,
+      teamDirectory,
+      profile: loadedProfile || {},
+    });
+
     if (!sent.length) {
       console.warn(`[${callSid}] Escalation notify skipped (no working channel). Ready:`, {
         teammate: teammateLabel(teammate),
@@ -2445,6 +2505,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       return {
         ok: true,
         soft: true,
+        transfer: transferQueued,
         channel: 'desk_note',
         sent: [{ channel: 'desk_note', role: 'desk', to: null }],
         reason: softOutcome.reason,
@@ -2475,6 +2536,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     return {
       ok: true,
       soft: false,
+      transfer: transferQueued,
       channel: liveOutcome.channels.map((c) => c.channel).join(',') || 'alert',
       sent,
     };
@@ -2491,6 +2553,37 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
   } finally {
     escalationNotifyInProgress.delete(callSid);
   }
+}
+
+async function maybeQueueLiveTransfer({ callSid, escalate, teamDirectory, profile } = {}) {
+  const dest = liveTransferDestination(teamDirectory, escalate?.teammate);
+  const ready = liveTransferReady({ profile });
+  if (!ready.ready || !dest) return false;
+  const callerId = normalizeKenyaE164(profile?.did) || null;
+  const queued = queuePendingLiveTransfer({
+    callSid,
+    to: dest.phone,
+    callerId,
+  });
+  if (!queued) return false;
+  await db
+    .saveTransferAttempt({
+      callSid,
+      attempt: {
+        status: queued.status,
+        mode: 'cold_dial',
+        to: dest.phone,
+        caller_id: callerId,
+        timeout_s: queued.timeoutS,
+        started_at: new Date().toISOString(),
+        teammate: { name: dest.name, role: dest.role, phone: dest.phone },
+      },
+    })
+    .catch((err) => {
+      console.warn(`[${callSid}] saveTransferAttempt failed:`, err?.message || err);
+    });
+  console.log(`[${callSid}] live transfer queued Dial ${dest.phone}`);
+  return true;
 }
 
 async function maybeSendWhatsAppNotification(callSid) {
@@ -2738,13 +2831,7 @@ wss.on('connection', (ws) => {
           callAgentTools.set(callSid, parsedTools);
           callTenantProfiles.set(callSid, profile);
           callBrainStates.set(callSid, createBrainState(profile));
-          callBrainCapabilities.set(
-            callSid,
-            buildBrainCapabilities(
-              { ...profile, agentTools: parsedTools },
-              { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
-            )
-          );
+          callBrainCapabilities.set(callSid, capabilitiesForProfile(profile, parsedTools));
           messages = [{ role: 'system', content: systemPrompt }];
         } catch (err) {
           console.warn(`[${callSid}] tenant prompt load failed:`, err?.message || err);
@@ -2767,10 +2854,7 @@ wss.on('connection', (ws) => {
         callLanguage = callLanguageState.current;
         const capabilities =
           callBrainCapabilities.get(callSid) ||
-          buildBrainCapabilities(
-            { agentTools: callAgentTools.get(callSid) || parseAgentTools(null) },
-            { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
-          );
+          capabilitiesForProfile(brainProfile, callAgentTools.get(callSid) || parseAgentTools(null));
         const previousBrainState =
           callBrainStates.get(callSid) || createBrainState(brainProfile);
         const provisionalIntent = inferIntent(data.voicePrompt);
@@ -2957,10 +3041,7 @@ async function applyGeminiTools(callSid, parsed) {
   const tools = callAgentTools.get(callSid) || parseAgentTools(null);
   const capabilities =
     callBrainCapabilities.get(callSid) ||
-    buildBrainCapabilities(
-      { agentTools: tools },
-      { createServiceRequest: true, createAppointment: true, updateAppointment: true, notifyCallback: true, liveTransfer: false }
-    );
+    capabilitiesForProfile(callTenantProfiles.get(callSid) || {}, tools);
   const state = callBrainStates.get(callSid) || createBrainState();
   const groundedProfile = callTenantProfiles.get(callSid) || {};
   const enforcedParsed = ensureRequiredEscalate(parsed, state, capabilities);

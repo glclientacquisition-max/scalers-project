@@ -24,6 +24,22 @@ describe('required escalate injection', () => {
     assert.ok(parsed.escalate.reason);
   });
 
+  it('injects escalate when NBA is TRANSFER and name is known', () => {
+    const parsed = ensureRequiredEscalate(
+      { spokenText: 'Let me connect you.', escalate: null },
+      {
+        intent: 'human',
+        handoff: { requested: true, reason: 'Caller requested manager' },
+        resolution: { nextBestAction: 'TRANSFER' },
+        caller: { name: 'Kim' },
+        entities: {},
+        goal: { missingSlots: [], description: 'speak to manager' },
+      },
+      { escalate: true, liveTransfer: true }
+    );
+    assert.equal(parsed.escalate.name, 'Kim');
+  });
+
   it('does not override an existing escalate marker', () => {
     const parsed = ensureRequiredEscalate(
       {

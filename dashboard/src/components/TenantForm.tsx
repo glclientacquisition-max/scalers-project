@@ -63,8 +63,10 @@ import {
   type BusinessVertical,
 } from "@/lib/vertical";
 import {
+  firstDialableTeammate,
   HANDOFF_OPTIONS,
   parseHandoffMode,
+  teamHasDialablePhone,
   type HandoffMode,
 } from "@/lib/handoffMode";
 import {
@@ -390,6 +392,8 @@ export function TenantForm({
     const rows = normalizeTeam(tenant.team_directory);
     return rows.length ? rows : [emptyMember()];
   });
+  const liveDest = firstDialableTeammate(team);
+  const canMessageTeam = teamHasDialablePhone(team);
   const [faqs, setFaqs] = useState<FaqEntry[]>(() => {
     const rows = normalizeFaqs(tenant.faqs);
     return rows.length ? rows : [emptyFaq()];
@@ -1897,27 +1901,6 @@ export function TenantForm({
             </p>
           ) : null}
         </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-[var(--ink)]">Handoff</p>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
-            {HANDOFF_OPTIONS.map((opt) => {
-              const selected = handoffMode === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  title={opt.blurb}
-                  onClick={() => setHandoffMode(opt.id)}
-                  className={choiceChipClass(selected)}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
         <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
           {AGENT_TOOL_OPTIONS.map((opt) => {
             const on = agentTools[opt.id];
@@ -1976,6 +1959,40 @@ export function TenantForm({
       </section>
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-[var(--ink)]">When a caller needs a human</p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
+            {HANDOFF_OPTIONS.map((opt) => {
+              const selected = handoffMode === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setHandoffMode(opt.id)}
+                  className={choiceChipClass(selected)}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          {handoffMode === "live_transfer" ? (
+            <p className="text-xs text-[var(--ink-soft)]">
+              {liveDest
+                ? `Rings ${liveDest.name} during open hours.`
+                : "Add a team phone. Until then, Scalers messages the team."}
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--ink-soft)]">
+              {canMessageTeam
+                ? "SMS, WhatsApp, or email. The AI stays on the line."
+                : "Add a team phone or alert email for messages to land."}
+            </p>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-end justify-between gap-3">
           <p className="text-xs text-ink-soft">{team.length} teammate{team.length === 1 ? "" : "s"}</p>
           <button

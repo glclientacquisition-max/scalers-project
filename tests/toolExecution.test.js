@@ -651,6 +651,21 @@ describe('validated tool execution', () => {
     );
   });
 
+  it('confirms stay-on-the-line when escalate queued a live transfer', async () => {
+    const parsed = parseGeminiResponse(
+      'Okay. ###TOOL###{"escalate":{"teammate":"Owner","name":"Kim","reason":"wants owner"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      handlers: {
+        escalate: async () => ({ ok: true, transfer: true, channel: 'dial,sms' }),
+      },
+    });
+    assert.equal(execution.results[0].transfer, true);
+    assert.equal(formatToolConfirmation(execution.results, 'en'), 'Okay, stay on the line.');
+  });
+
   it('turns malformed marker JSON into a caller-safe failure', async () => {
     const parsed = parseGeminiResponse(
       'Let me do that. ###TOOL###{"create_service_request": ###ENDTOOL###'

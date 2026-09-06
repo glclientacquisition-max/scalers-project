@@ -1,6 +1,6 @@
 # Live human transfer (caller escalation to a real person)
 
-**Status:** Spec (not implemented). Runtime still hardcodes `liveTransfer: false`.  
+**Status:** Spec plus gated executor. Default `VOICE_LIVE_TRANSFER=off`. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, and the env flag all pass.  
 **Job:** When a caller needs a human *and* the business opted in, Scalers leaves the AI media stream and bridges the live call to a real teammate. If the bridge cannot run or the human does not answer, the existing async escalate path still notifies and the caller hears an honest fallback.
 
 **Related:** async notify is already shipped in [`ESCALATION.md`](./ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](./adr/ADR-0004-live-human-transfer.md).
@@ -14,7 +14,7 @@ Two different products share the word “escalation”. Do not collapse them.
 | Mode | What the caller gets | Owner setting | Runtime today |
 | --- | --- | --- | --- |
 | **Callback** (async escalate) | AI stays on the line, takes name + reason, texts/emails the teammate, confirms follow-up | `tenants.handoff_mode = callback` (default) | **Shipped** |
-| **Live transfer** | AI says it will connect, then the PSTN bridges to a teammate’s mobile. AI leaves the call | `tenants.handoff_mode = live_transfer` | **Preference only.** Executor missing |
+| **Live transfer** | AI says it will connect, then the PSTN bridges to a teammate’s mobile. AI leaves the call | `tenants.handoff_mode = live_transfer` on Escalation Team | **Gated.** Executor present; Dial only if `VOICE_LIVE_TRANSFER=on` |
 
 Live transfer is **opt-in per tenant**. Kenya shops that cannot pick up during the day keep callback. Never auto-upgrade a tenant because they filled in a team phone.
 
@@ -191,14 +191,17 @@ Resolution: keep `needs_human`. If bridged, desk can still show `needs_human` pl
 
 ---
 
-## 7. Desk UX (Desk lane, after Voice spike)
+## 7. Desk UX (Train → Escalation Team)
 
-Settings already has `handoff_mode` (`dashboard/src/lib/handoffMode.ts`) labeled “Live transfer (when available)”. After the executor exists:
+Settings already persist `handoff_mode` (`callback` | `live_transfer`). The owner control lives on **Business → Train → Escalation Team**, next to the team directory (not under Tools & voice).
 
-- Live transfer selectable only if the tenant has at least one directory row with a phone.
-- Show readiness: “Transfer will Dial {name} at {masked number} during open hours.”
-- If global flag off: keep the option visible but muted with “Not enabled on this line yet.”
-- Call detail: one row for notify channels, one row for transfer status. Split pane (summary | transcript), dense table, no extra card stack.
+- **Message teammate:** AI stays on the line; SMS / WhatsApp / email.
+- **Connect live call:** rings a directory phone during open hours; messages them if they miss it.
+
+Live transfer is selectable even without a phone, but the panel states that Scalers will message until a team phone exists. After the executor exists:
+
+- Live Dial still requires `VOICE_LIVE_TRANSFER=on` plus open hours.
+- Call detail shows `transfer_attempt.status` next to escalation notify.
 - Copy: no em/en dashes. Primary CTA remains Save (`#0096FF`).
 
 Do not add a second team editor. Directory stays the single source of destinations.

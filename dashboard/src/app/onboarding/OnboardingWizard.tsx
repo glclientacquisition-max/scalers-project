@@ -267,7 +267,7 @@ export function OnboardingWizard() {
               </div>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">When a human is needed</h3>
+              <h3 className="text-sm font-medium text-[var(--ink)]">When a caller needs a human</h3>
               <div className="mt-3 space-y-3">
                 {HANDOFF_OPTIONS.map((opt) => {
                   const selected = handoffMode === opt.id;

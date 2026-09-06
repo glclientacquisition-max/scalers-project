@@ -750,6 +750,7 @@ async function executeBrainTools({
                 fingerprint,
                 channel: outcome.channel || null,
                 soft: Boolean(outcome.soft),
+                transfer: Boolean(outcome.transfer),
               }
             : {
                 action: 'escalate',
@@ -979,6 +980,11 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
 
   if (meaningful.status === 'succeeded') {
+    if (meaningful.transfer) {
+      if (sw) return 'Sawa, baki kwenye line.';
+      if (sheng) return 'Poa, stay on the line.';
+      return 'Okay, stay on the line.';
+    }
     if (meaningful.soft) {
       if (sw) return 'Sawa, nimewaandikia timu; watakufuatilia.';
       if (sheng) return 'Poa, nime-note kwa team; watakufuatilia.';

@@ -72,6 +72,12 @@ assert.match(
 
 assert.match(
   source,
+  /consumeLiveTransferWebhook/,
+  'Stream lifecycle webhooks must be able to return Dial XML for a pending live transfer'
+);
+
+assert.match(
+  source,
   /gitSha: resolveVoiceGitSha\(\)/,
   'healthz must expose gitSha so staging Voice can be verified without merging to main'
 );

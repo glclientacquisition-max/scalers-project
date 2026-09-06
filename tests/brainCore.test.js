@@ -67,6 +67,34 @@ describe('Brain state and next-best-action', () => {
     assert.match(decision.reason, /live transfer is unavailable/i);
   });
 
+  it('authorizes TRANSFER when the executor capability is on', () => {
+    const capabilities = buildBrainCapabilities(
+      { agentTools: { escalate: true, end_call: true }, handoffMode: 'live_transfer' },
+      { liveTransfer: true }
+    );
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'I want to speak to the manager',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    state = observeCallerTurn(state, {
+      text: 'My name is Kim',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: {
+        name: {
+          value: 'Kim',
+          source: 'caller_explicit',
+          confidence: 0.95,
+          confirmed: true,
+        },
+      },
+    });
+    const decision = determineNextBestAction({ state, capabilities });
+    assert.equal(decision.action, 'TRANSFER');
+    assert.equal(authorizeAction('TRANSFER', capabilities).allowed, true);
+  });
+
   it('does not authorize a live transfer that has no executor', () => {
     const capabilities = buildBrainCapabilities(
       { agentTools: { escalate: true, end_call: true }, handoffMode: 'live_transfer' },
