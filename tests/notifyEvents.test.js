@@ -141,4 +141,22 @@ describe('notify events', () => {
     assert.match(text, /Reason: Book carpet cleaning/);
     assert.doesNotMatch(text, /Intent:/);
   });
+
+  it('owner lead event includes a deep link to the call when present', () => {
+    const event = ownerLeadEvent(
+      {
+        id: 'call-uuid-1',
+        name: 'Jane',
+        from_number: '+254790381872',
+        reason: 'Book carpet cleaning',
+        callUrl: 'https://scalers-project.vercel.app/calls/call-uuid-1',
+      },
+      'Done and Dusted'
+    );
+    const text = renderEventText(event);
+    assert.match(
+      text,
+      /Open call: https:\/\/scalers-project\.vercel\.app\/calls\/call-uuid-1/
+    );
+  });
 });
