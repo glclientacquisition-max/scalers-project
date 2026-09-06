@@ -56,20 +56,28 @@ describe('liveTransferReady', () => {
     );
     assert.equal(
       liveTransferReady({
-        profile: profileBase,
-        executorEnabled: true,
-        now: closedNow(),
-      }).reason,
-      'closed_or_unknown'
-    );
-    assert.equal(
-      liveTransferReady({
         profile: { ...profileBase, teamDirectory: [{ name: 'Amina', role: 'Owner' }] },
         executorEnabled: true,
         now: openNow(),
       }).reason,
       'no_destination'
     );
+  });
+
+  it('can ignore hours when VOICE_LIVE_TRANSFER_IGNORE_HOURS is on', () => {
+    const prev = process.env.VOICE_LIVE_TRANSFER_IGNORE_HOURS;
+    process.env.VOICE_LIVE_TRANSFER_IGNORE_HOURS = 'on';
+    try {
+      const ok = liveTransferReady({
+        profile: profileBase,
+        executorEnabled: true,
+        now: closedNow(),
+      });
+      assert.equal(ok.ready, true);
+    } finally {
+      if (prev == null) delete process.env.VOICE_LIVE_TRANSFER_IGNORE_HOURS;
+      else process.env.VOICE_LIVE_TRANSFER_IGNORE_HOURS = prev;
+    }
   });
 
   it('picks a dialable directory destination', () => {

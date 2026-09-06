@@ -78,6 +78,12 @@ assert.match(
 
 assert.match(
   source,
+  /liveTransfer: \{/,
+  'healthz must expose liveTransfer executor flags for staging Dial verification'
+);
+
+assert.match(
+  source,
   /gitSha: resolveVoiceGitSha\(\)/,
   'healthz must expose gitSha so staging Voice can be verified without merging to main'
 );

@@ -6,6 +6,12 @@ const { openClosedStatus } = require('./businessHours');
 const { normalizeTeam } = require('./liveKnowledge');
 const { resolveEscalation } = require('./escalation');
 
+function envLiveTransferIgnoreHours() {
+  return /^(1|true|on|yes)$/i.test(
+    String(process.env.VOICE_LIVE_TRANSFER_IGNORE_HOURS || '').trim()
+  );
+}
+
 function envLiveTransferExecutorEnabled() {
   return /^(1|true|on|yes)$/i.test(String(process.env.VOICE_LIVE_TRANSFER || '').trim());
 }
@@ -66,7 +72,7 @@ function liveTransferReady({ profile = {}, executorEnabled, now } = {}) {
     return { ready: false, reason: 'escalate_off' };
   }
   const open = openClosedStatus(profile.hoursSchedule, now || new Date());
-  if (open !== 'open') {
+  if (open !== 'open' && !envLiveTransferIgnoreHours()) {
     return { ready: false, reason: 'closed_or_unknown' };
   }
   if (!teamHasDialablePhone(profile.teamDirectory)) {
@@ -77,6 +83,7 @@ function liveTransferReady({ profile = {}, executorEnabled, now } = {}) {
 
 module.exports = {
   envLiveTransferExecutorEnabled,
+  envLiveTransferIgnoreHours,
   normalizeKenyaE164,
   teamHasDialablePhone,
   liveTransferDestination,

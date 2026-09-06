@@ -159,6 +159,8 @@ const {
   liveTransferReady,
   liveTransferDestination,
   normalizeKenyaE164,
+  envLiveTransferExecutorEnabled,
+  envLiveTransferIgnoreHours,
 } = require('./src/conversation/liveTransferReady');
 const {
   resolveEscalation,
@@ -299,6 +301,10 @@ app.get('/healthz', (_req, res) => {
       },
       whatsapp: whatsAppSenderReady(),
       email: emailFallbackReady(),
+    },
+    liveTransfer: {
+      executor: envLiveTransferExecutorEnabled(),
+      ignoreHours: envLiveTransferIgnoreHours(),
     },
   });
 });
@@ -2469,6 +2475,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       escalate,
       teamDirectory,
       profile: loadedProfile || {},
+      callerNumber: call.from_number,
     });
 
     if (!sent.length) {
@@ -2555,10 +2562,23 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
   }
 }
 
-async function maybeQueueLiveTransfer({ callSid, escalate, teamDirectory, profile } = {}) {
+async function maybeQueueLiveTransfer({
+  callSid,
+  escalate,
+  teamDirectory,
+  profile,
+  callerNumber,
+} = {}) {
   const dest = liveTransferDestination(teamDirectory, escalate?.teammate);
   const ready = liveTransferReady({ profile });
   if (!ready.ready || !dest) return false;
+  const callerE164 = normalizeKenyaE164(callerNumber);
+  if (callerE164 && callerE164 === dest.phone) {
+    console.warn(
+      `[${callSid}] live transfer skipped: Dial destination is the caller ${dest.phone}`
+    );
+    return false;
+  }
   const callerId = normalizeKenyaE164(profile?.did) || null;
   const queued = queuePendingLiveTransfer({
     callSid,
