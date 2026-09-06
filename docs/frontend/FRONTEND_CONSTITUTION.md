@@ -122,7 +122,7 @@ Keep URLs and nav labels through the current phase: Overview, Calls, Requests, A
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
 | `/requests` | Same job as Calls | Same table language |
 | `/appointments` | Same job as Calls | Same table language |
-| `/settings` | Train knowledge | Existing sidebar IA |
+| `/settings` | Configure the assistant | Destination menu. One screen. |
 | `/wallet` | Prepaid KES | Token-only from this lane |
 
 **Line status (no fake Online):** `Line live` / `Number pending` / `Needs training` from DID + `assessMvpAnswerReadiness`.

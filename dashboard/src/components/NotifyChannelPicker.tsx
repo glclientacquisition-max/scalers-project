@@ -48,19 +48,17 @@ const LOGO_TONE: Record<NotifyChannelId, string> = {
 export function NotifyChannelPicker({
   value,
   onChange,
+  heading = "Alerts",
 }: {
   value: NotifyChannels;
   onChange: (next: NotifyChannels) => void;
+  heading?: string | null;
 }) {
   return (
     <div className="space-y-2">
-      <div>
-        <h3 className="text-sm font-medium text-[var(--ink)]">Notify channels</h3>
-        <p className="mt-0.5 text-xs text-ink-soft">
-          Choose how the team gets escalate and lead alerts. Grey channels are not live on
-          Scalers yet.
-        </p>
-      </div>
+      {heading ? (
+        <h3 className="text-sm font-medium text-ink">{heading}</h3>
+      ) : null}
       <ul className="space-y-2">
         {NOTIFY_CHANNEL_META.map((meta) => {
           const Logo = LOGO[meta.id];
@@ -91,7 +89,7 @@ export function NotifyChannelPicker({
                   <p className="text-sm font-medium text-ink">{meta.label}</p>
                   {locked ? (
                     <span className="rounded-md bg-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                      Coming soon
+                      Unavailable
                     </span>
                   ) : null}
                 </div>

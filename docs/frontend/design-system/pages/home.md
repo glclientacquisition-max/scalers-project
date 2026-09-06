@@ -8,6 +8,8 @@
 3. **What happened** — Today’s call count and followed-up count as compact links, not a four-up dashboard.
 4. **What to do next** — One primary CTA: Process pending leads, Train, or Test line.
 
+**Chrome:** Greeting eyebrow, workspace name as `h1`, Nairobi `<time>`. One aside: activity + line + docked CTA. Lead rows use hover wash and a 2px accent.
+
 **Data (real only):** tenant row, Nairobi-day call count, `lead_status` counts, up to 8 newest `new` leads, `assessMvpAnswerReadiness`, live bulletin.
 
 **Do not:** fetch unused all/done/archived rows. Show Online. Nest `max-w-3xl` inside `max-w-desk`. Use stacked `TriageLeadCard` as the default (table first).

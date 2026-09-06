@@ -81,6 +81,29 @@ export function nairobiGreeting(): string {
   return "Good evening";
 }
 
+/** Nairobi calendar day for Home. Real date, not decorative copy. */
+export function nairobiDateLabel(now = new Date()): { iso: string; label: string } {
+  const iso = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Nairobi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  try {
+    return {
+      iso,
+      label: new Intl.DateTimeFormat("en-KE", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        timeZone: "Africa/Nairobi",
+      }).format(now),
+    };
+  } catch {
+    return { iso, label: iso };
+  }
+}
+
 /** Explicit status wins; bare /calls defaults to New when work is waiting. */
 export function resolveStatusFilter(
   raw: string | undefined,
