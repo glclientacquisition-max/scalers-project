@@ -396,7 +396,7 @@ export default async function CallsPage({
                       <td className="px-4 py-3.5 text-right">
                         <Link
                           href={`/calls/${lead.call.id}?from=${activeFilter}`}
-                          className="font-medium text-[#0096FF] hover:text-[#005ccc]"
+                          className="font-medium text-[#005CCC] hover:text-[#004a99]"
                         >
                           Open
                         </Link>

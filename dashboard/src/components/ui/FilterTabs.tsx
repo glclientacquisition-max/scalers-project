@@ -5,6 +5,7 @@ export type FilterTabItem = {
   id: string;
   label: string;
   href: string;
+  count?: number;
 };
 
 export function FilterTabs({
@@ -23,13 +24,23 @@ export function FilterTabs({
           const isActive = active === item.id;
           return (
             <li key={item.id}>
-              <Link
-                href={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={filterTabClass(isActive)}
-              >
-                {item.label}
-              </Link>
+                <Link
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={filterTabClass(isActive)}
+                >
+                  {item.label}
+                  {item.count != null ? (
+                    <span
+                      className={[
+                        "ml-2 tabular-nums text-xs",
+                        isActive ? "text-[#005CCC]" : "text-ink-soft",
+                      ].join(" ")}
+                    >
+                      {item.count}
+                    </span>
+                  ) : null}
+                </Link>
             </li>
           );
         })}

@@ -5,6 +5,7 @@ import {
   type StatusFilterId,
 } from "@/lib/callsTriage";
 import { settingsGhostButtonClass } from "@/components/settingsUi";
+import { DeskPageHeader } from "@/components/ui/DeskPageHeader";
 
 export function CallsToolbar({
   active,
@@ -23,10 +24,11 @@ export function CallsToolbar({
 }) {
   return (
     <div>
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
-        <h1 className="font-display tracking-tight text-ink text-[clamp(1.75rem,5vw,2.25rem)]">
-          Inbox
-        </h1>
+      <DeskPageHeader
+        title="Calls"
+        waiting={counts.new}
+        waitingLabel="new"
+      >
         <form
           action="/calls"
           method="get"
@@ -51,7 +53,7 @@ export function CallsToolbar({
             Search
           </button>
         </form>
-      </div>
+      </DeskPageHeader>
 
       <nav aria-label="Filter by follow-up status" className="mt-6 min-w-0 border-b border-line">
         <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">

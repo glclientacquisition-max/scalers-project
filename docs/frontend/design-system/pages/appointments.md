@@ -1,8 +1,12 @@
 # Appointments
 
 **Route:** `/appointments`  
-**Job:** Same as Calls.
+**Job:** Confirm visits. Not the voice inbox.
 
-**Layout:** Filter tabs + dense table + `Pagination`. No page-level extra `px-4 py-10` (layout already pads). No subtitle fluff. No em dash between name and service. Related call → `/calls/{id}`.
+**Layout:** `DeskPageHeader` + status `FilterTabs` + dense table + `Pagination`. Caption is requested count.
 
-**Empty:** Title + `businessSettingsHref("train")` if a next action is required.
+Columns: Visit (`when_text` or `window_start`) / Who / Place / Status. Primary verb is **Confirm**, then **Done**. Related transcript is **Call**.
+
+**Empty:** No visits to confirm. Show all if other statuses exist.
+
+**Do not:** lead with `created_at` as When. Copy Calls columns. Four equal status chips.
