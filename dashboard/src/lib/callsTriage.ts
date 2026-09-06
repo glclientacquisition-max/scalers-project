@@ -17,6 +17,7 @@ export type Lead = {
   leadStatus: LeadStatus;
   resolution: CallResolution;
   primaryIntent: string | null;
+  inboxPurpose: string | null;
 };
 
 export const STATUS_FILTERS = [
@@ -33,6 +34,10 @@ export { leadStatusLabel };
 
 export function toLead(call: CallRow): Lead {
   const meta = parseSummary(call.summary);
+  const summaryIntent =
+    typeof meta.primary_intent === "string" ? meta.primary_intent.trim() : "";
+  const summaryPurpose =
+    typeof meta.inbox_purpose === "string" ? meta.inbox_purpose.trim() : "";
   return {
     call,
     name: typeof meta.name === "string" ? meta.name : null,
@@ -41,7 +46,8 @@ export function toLead(call: CallRow): Lead {
     urgent: String(call.sentiment || "").toLowerCase() === "urgent",
     leadStatus: parseLeadStatus(call.lead_status),
     resolution: parseCallResolution(call.resolution),
-    primaryIntent: call.primary_intent?.trim() || null,
+    primaryIntent: call.primary_intent?.trim() || summaryIntent || null,
+    inboxPurpose: summaryPurpose || null,
   };
 }
 

@@ -28,7 +28,14 @@ const JOB_INTENTS = new Set([
   "cancellation",
 ]);
 
-const HOLD_INTENTS = new Set(["hold", "order", "enquiry", "callback"]);
+const HOLD_INTENTS = new Set([
+  "hold",
+  "hold_or_pickup",
+  "order",
+  "order_enquiry",
+  "enquiry",
+  "callback",
+]);
 
 const HUMAN_INTENTS = new Set([
   "human",
@@ -47,8 +54,10 @@ const ANSWER_INTENTS = new Set([
   "price_band",
   "availability",
   "policy",
+  "product_inquiry",
   "service_inquiry",
   "service_area",
+  "general_enquiry",
   "other",
 ]);
 
@@ -131,9 +140,23 @@ export function classifyInboxPurpose(opts: {
   leadStatus?: LeadStatus | null;
   hold?: InboxHold | null;
   job?: InboxJob | null;
+  inboxPurpose?: string | null;
 }): InboxPurpose {
   if (opts.job) return "job";
   if (opts.hold) return "hold";
+
+  const stamped = String(opts.inboxPurpose || "")
+    .trim()
+    .toLowerCase();
+  if (
+    stamped === "job" ||
+    stamped === "hold" ||
+    stamped === "human" ||
+    stamped === "missed" ||
+    stamped === "answered"
+  ) {
+    return stamped;
+  }
 
   const intent = String(opts.primaryIntent || "")
     .trim()
@@ -201,6 +224,7 @@ export function buildInboxItem(opts: {
     leadStatus: lead?.leadStatus,
     hold,
     job,
+    inboxPurpose: lead?.inboxPurpose,
   });
   const needsYou = inboxNeedsYou({
     purpose,

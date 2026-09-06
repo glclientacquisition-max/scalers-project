@@ -664,6 +664,7 @@ async function persistCallResolution(callSid, source = 'call') {
           text: summary.text,
           brain_summary: summary.text,
           primary_intent: derived.primaryIntent || summary.primaryIntent,
+          inbox_purpose: derived.inboxPurpose,
           products: summary.products,
           actions: summary.actions,
           instructions: summary.instructions,

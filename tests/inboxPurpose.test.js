@@ -1,64 +1,79 @@
-const { describe, it } = require("node:test");
-const assert = require("node:assert/strict");
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const { deriveInboxPurpose } = require('../src/conversation/inboxPurpose');
+const { deriveCallResolution } = require('../src/conversation/callResolution');
+const {
+  createBrainState,
+  inferIntent,
+  recordActionResults,
+} = require('../src/conversation/brainState');
 
-/**
- * Mirrors dashboard/src/lib/inboxPurpose.ts classify + needsYou.
- * Keep in lockstep when changing purpose stamps.
- */
-const JOB_INTENTS = new Set(["book_visit", "booking", "reschedule", "cancel", "cancellation"]);
-const HOLD_INTENTS = new Set(["hold", "order", "enquiry", "callback"]);
-const HUMAN_INTENTS = new Set(["human", "emergency", "complaint", "escalate", "handoff"]);
-const ANSWER_INTENTS = new Set([
-  "hours",
-  "hours_open",
-  "location",
-  "directions",
-  "price",
-  "price_band",
-  "availability",
-  "policy",
-  "service_inquiry",
-  "service_area",
-  "other",
-]);
+describe('inbox purpose intelligence', () => {
+  it('stamps a visit tool as job even when the caller first asked hours', () => {
+    let state = createBrainState({ vertical: 'home_services' });
+    state.intent = 'hours';
+    state = recordActionResults(state, [
+      {
+        action: 'create_appointment',
+        status: 'succeeded',
+        value: { serviceName: 'Plumbing', whenText: 'Tue 10', landmark: 'Sarit' },
+      },
+    ]);
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.primaryIntent, 'book_visit');
+    assert.equal(out.inboxPurpose, 'job');
+    assert.equal(out.resolution, 'resolved');
+  });
 
-function classify({ primaryIntent, resolution, leadStatus, hold, job }) {
-  if (job) return "job";
-  if (hold) return "hold";
-  const intent = String(primaryIntent || "").trim().toLowerCase();
-  if (HUMAN_INTENTS.has(intent) || resolution === "needs_human") return "human";
-  if (JOB_INTENTS.has(intent)) return "job";
-  if (HOLD_INTENTS.has(intent)) return "hold";
-  if (resolution === "abandoned" || resolution === "unresolved") return "missed";
-  if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
-  if (leadStatus === "new") return "missed";
-  return "answered";
-}
+  it('stamps a hold tool as hold', () => {
+    const purpose = deriveInboxPurpose({
+      toolResults: [
+        { action: 'create_service_request', status: 'succeeded', requestType: 'hold' },
+      ],
+    });
+    assert.equal(purpose, 'hold');
+  });
 
-describe("inbox purpose", () => {
-  it("stamps a visit row as job over hold", () => {
+  it('stamps escalate as human', () => {
     assert.equal(
-      classify({
-        hold: { id: "r1" },
-        job: { id: "a1" },
+      deriveInboxPurpose({
+        toolResults: [{ action: 'escalate', status: 'succeeded' }],
       }),
-      "job"
+      'human'
     );
   });
 
-  it("stamps an open hold from the request row", () => {
-    assert.equal(classify({ hold: { id: "r1" } }), "hold");
+  it('stamps hours as answered when resolved', () => {
+    const state = createBrainState();
+    state.intent = 'hours';
+    state.resolution.status = 'resolved';
+    assert.equal(deriveInboxPurpose({ brainState: state, resolution: 'resolved' }), 'answered');
   });
 
-  it("stamps escalate as human", () => {
-    assert.equal(classify({ resolution: "needs_human" }), "human");
+  it('stamps abandoned as missed', () => {
+    assert.equal(deriveInboxPurpose({ resolution: 'abandoned' }), 'missed');
+  });
+});
+
+describe('vertical live intent', () => {
+  it('classifies a home visit ask as booking', () => {
+    assert.equal(
+      inferIntent('Can you come tomorrow to fix my sink?', { vertical: 'home_services' }),
+      'booking'
+    );
   });
 
-  it("stamps hours as answered", () => {
-    assert.equal(classify({ primaryIntent: "hours", resolution: "resolved" }), "answered");
+  it('classifies a retail hold ask as hold', () => {
+    assert.equal(
+      inferIntent('Hold two bags I will pick up at 5', { vertical: 'retail' }),
+      'hold'
+    );
   });
 
-  it("stamps abandoned as missed", () => {
-    assert.equal(classify({ resolution: "abandoned" }), "missed");
+  it('keeps bookstore book as product inquiry', () => {
+    assert.equal(
+      inferIntent('I recommend a book for me', { vertical: 'retail' }),
+      'product_inquiry'
+    );
   });
 });

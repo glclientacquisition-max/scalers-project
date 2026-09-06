@@ -1,7 +1,8 @@
 // Deterministic call summary + intent collection from Brain state (no live audio).
 // Gemini already sees STT text mid-call; post-call we persist structured desk fields.
 
-const { normalizePrimaryIntent } = require('./callResolution');
+const { normalizePrimaryIntent } = require('./intentTaxonomy');
+const { intentFromTools } = require('./inboxPurpose');
 const {
   entityValue,
   isBackchannelOrFragment,
@@ -42,6 +43,7 @@ function deriveCallSummary(opts = {}) {
       : [];
 
   let primaryIntent =
+    intentFromTools(results, state.intent || opts.primaryIntent) ||
     normalizePrimaryIntent(state.intent) ||
     normalizePrimaryIntent(opts.primaryIntent) ||
     null;
@@ -70,6 +72,31 @@ function deriveCallSummary(opts = {}) {
       actions.push(clean([type, item, when].filter(Boolean).join(' — '), 160));
       if (when) instructions.push(clean(`Pickup/when: ${when}`, 120));
       if (result.value?.notes) instructions.push(clean(result.value.notes, 160));
+    }
+    if (
+      result.action === 'create_appointment' &&
+      (result.status === 'succeeded' || result.status === 'updated')
+    ) {
+      const service = result.value?.serviceName || result.value?.service_name || '';
+      const when = result.value?.whenText || result.value?.when_text || '';
+      const where =
+        result.value?.landmark || result.value?.address_landmark || '';
+      actions.push(
+        clean(['visit', service, when, where].filter(Boolean).join(' · '), 160)
+      );
+      if (when) instructions.push(clean(`When: ${when}`, 120));
+      if (where) instructions.push(clean(`Where: ${where}`, 120));
+    }
+    if (
+      result.action === 'update_appointment' &&
+      (result.status === 'succeeded' || result.status === 'updated')
+    ) {
+      actions.push(
+        clean(
+          `Visit ${result.appointmentStatus || result.value?.status || 'updated'}`,
+          160
+        )
+      );
     }
     if (result.action === 'escalate' && result.status === 'succeeded') {
       actions.push(

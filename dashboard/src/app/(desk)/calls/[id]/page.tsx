@@ -249,6 +249,8 @@ export default async function CallDetailPage({
     leadStatus,
     hold,
     job,
+    inboxPurpose:
+      typeof meta.inbox_purpose === "string" ? meta.inbox_purpose : null,
   });
 
   return (

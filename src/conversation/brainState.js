@@ -1,6 +1,7 @@
 // Structured, call-local Brain state.
 // This is conversation memory, not tenant knowledge or long-term customer memory.
 
+const { inferVerticalBrainIntent } = require('./playbooks');
 const { entityValue, isBackchannelOrFragment, isHearAgainSignal } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt } = require('./goalModel');
 const {
@@ -67,7 +68,7 @@ function looksLikeBookingIntent(value) {
   );
 }
 
-function inferIntent(text) {
+function inferIntent(text, profile = {}) {
   const value = String(text || '').trim().toLowerCase();
   if (!value) return 'unknown';
   // Human / complaint before other patterns so "talk to the manager" wins.
@@ -83,6 +84,8 @@ function inferIntent(text) {
   if (looksLikeBookingIntent(value)) {
     return 'booking';
   }
+  const verticalIntent = inferVerticalBrainIntent(value, profile.vertical);
+  if (verticalIntent) return verticalIntent;
   // Hours: opening/closing phrasing (avoid treating "book" noun as booking).
   if (
     /\b(open|closed|opening|closing|hours|working\s*hours|mnafungua|mnafunga|mpaka saa|what time.*(open|close)|when.*(open|close))\b/.test(
@@ -196,7 +199,9 @@ function createBrainState(profile = {}) {
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
   const text = String(input.text || '').trim();
-  const inferredIntent = inferIntent(text);
+  const inferredIntent = inferIntent(text, {
+    vertical: next.vertical || input.profile?.vertical,
+  });
   const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
   const fillingBookingLandmark =
     next.intent === 'booking' &&

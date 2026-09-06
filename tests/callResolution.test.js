@@ -21,6 +21,7 @@ describe('deriveCallResolution', () => {
     const out = deriveCallResolution({ brainState: state });
     assert.equal(out.resolution, 'resolved');
     assert.equal(out.primaryIntent, 'hold_or_pickup');
+    assert.equal(out.inboxPurpose, 'hold');
     assert.match(out.resolutionNote || '', /hold/i);
   });
 

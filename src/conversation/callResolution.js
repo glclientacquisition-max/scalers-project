@@ -1,5 +1,8 @@
 // Derive a persistable call resolution from live Brain state + tool outcomes.
 
+const { INTENT_ALIASES, normalizePrimaryIntent } = require('./intentTaxonomy');
+const { deriveInboxPurpose, intentFromTools } = require('./inboxPurpose');
+
 const RESOLUTIONS = new Set([
   'resolved',
   'needs_human',
@@ -7,34 +10,6 @@ const RESOLUTIONS = new Set([
   'unresolved',
   'unknown',
 ]);
-
-/** Map runtime intent ids onto desk-facing taxonomy. */
-const INTENT_ALIASES = Object.freeze({
-  hold: 'hold_or_pickup',
-  hold_or_pickup: 'hold_or_pickup',
-  hours: 'hours_open',
-  hours_open: 'hours_open',
-  location: 'directions',
-  directions: 'directions',
-  order: 'order_enquiry',
-  order_enquiry: 'order_enquiry',
-  price: 'price',
-  availability: 'availability',
-  policy: 'policy',
-  human: 'human',
-  product_inquiry: 'product_inquiry',
-  general_enquiry: 'general_enquiry',
-  booking: 'book_visit',
-  book_visit: 'book_visit',
-  cancellation: 'cancel',
-  cancel: 'cancel',
-  reschedule: 'reschedule',
-  service_inquiry: 'service_inquiry',
-  service_area: 'service_area',
-  price_band: 'price_band',
-  emergency: 'emergency',
-  complaint: 'complaint',
-});
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -58,12 +33,6 @@ function clean(value, max = 240) {
     .slice(0, max);
 }
 
-function normalizePrimaryIntent(raw) {
-  const key = clean(raw, 80).toLowerCase();
-  if (!key || key === 'unknown') return null;
-  return INTENT_ALIASES[key] || key;
-}
-
 /**
  * @param {{
  *   brainState?: object|null,
@@ -85,7 +54,7 @@ function deriveCallResolution(opts = {}) {
       : state.conversation?.turnCount || 0
   );
   const rawIntent = state.intent || opts.primaryIntent || '';
-  const intent = normalizePrimaryIntent(rawIntent);
+  const intent = intentFromTools(results, rawIntent);
 
   const requestOk = results.some(
     (r) =>
@@ -128,7 +97,7 @@ function deriveCallResolution(opts = {}) {
       (r) =>
         (r.action === 'create_appointment' ||
           r.action === 'update_appointment') &&
-        r.status === 'succeeded'
+        (r.status === 'succeeded' || r.status === 'updated')
     );
     if (appointmentOk) {
       const updated = results.find(
@@ -171,10 +140,18 @@ function deriveCallResolution(opts = {}) {
 
   if (!RESOLUTIONS.has(resolution)) resolution = 'unknown';
 
+  const inboxPurpose = deriveInboxPurpose({
+    brainState: state,
+    toolResults: results,
+    resolution,
+    primaryIntent: intent,
+  });
+
   return {
     resolution,
     primaryIntent: intent,
     resolutionNote: note || null,
+    inboxPurpose,
   };
 }
 
