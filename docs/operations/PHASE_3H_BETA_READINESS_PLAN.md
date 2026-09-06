@@ -255,7 +255,7 @@ Optional: `STAGING_DATABASE_URL` for full catalog mode in CI.
 
 **Desk recording empty state (Phase 3H):** Calls detail previously mounted an audio player when `recording_url` was missing or blank, which produced `0:00 / 0:00` and a browser media error. The UI now treats only a non-empty trimmed URL as a usable source. No source shows `No recording available for this call.` This does not implement call recording. Current Sauti Kit events for the tested staging calls do not populate `recording_url`. A future provider URL in that field can render the existing player without a UI redesign.
 
-**Desk Hear sample empty state (A2-9):** Settings → Tools & voice → Hear sample previously mounted `<audio>` for any blob URL, including empty or non-WAV bodies. That produced `0:00 / 0:00` and `Failed to load because no supported source was found.` The desk now mounts a player only after a WAV payload also reports a playable duration. Load failures unmount the player and show `No voice sample available.` This does not retune Soniox or change the live TTS path.
+**Desk Hear sample empty state (A2-9):** Settings → Tools & voice → Hear sample previously mounted `<audio>` for any blob URL, including empty or non-WAV bodies. That produced `0:00 / 0:00` and `Failed to load because no supported source was found.` The desk now mounts a player only after a WAV payload also reports a playable duration. Preview audio is packed as 44.1 kHz PCM `audio/wav` so the browser has a supported source. Load failures unmount the player and show `No voice sample available.` This does not retune Soniox or change the live-call PCM rate.
 
 ---
 

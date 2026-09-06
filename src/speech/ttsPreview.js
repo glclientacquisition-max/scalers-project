@@ -2,7 +2,7 @@
 
 const { createSonioxTtsSession, SAMPLE_RATE } = require('./sonioxTts');
 const { prepareForTts } = require('./ttsNormalize');
-const { pcmToWav } = require('./wavPack');
+const { pcmToBrowserWav } = require('./wavPack');
 const { parseLexiconOverrides } = require('./pronunciationLexicon');
 const { classifySonioxError } = require('./sonioxErrors');
 
@@ -62,7 +62,7 @@ async function synthesizeTtsPreview(opts) {
     throw new Error('Soniox returned no audio');
   }
 
-  const wav = pcmToWav(pcm, SAMPLE_RATE);
+  const wav = pcmToBrowserWav(pcm, SAMPLE_RATE);
   return {
     wav,
     spokenText: prepared.text,

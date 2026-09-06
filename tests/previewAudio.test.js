@@ -8,6 +8,7 @@ const { spawnSync } = require("node:child_process");
 
 const helperPath = path.join(__dirname, "../dashboard/src/lib/previewAudio.ts");
 const voicePreviewPath = path.join(__dirname, "../dashboard/src/lib/voicePreview.ts");
+const ttsPreviewPath = path.join(__dirname, "../src/speech/ttsPreview.js");
 const tenantFormPath = path.join(__dirname, "../dashboard/src/components/TenantForm.tsx");
 const testLinePath = path.join(__dirname, "../dashboard/src/components/TestLinePanel.tsx");
 
@@ -76,6 +77,16 @@ test("voice preview API rejects a non-WAV body before returning audio/wav", () =
   assert.match(source, /NO_VOICE_SAMPLE_COPY/);
 });
 
+test("desk preview object URL is typed audio/wav", () => {
+  const source = fs.readFileSync(helperPath, "utf8");
+  assert.match(source, /type: "audio\/wav"/);
+});
+
+test("voice preview packs browser-playable WAV", () => {
+  const source = fs.readFileSync(ttsPreviewPath, "utf8");
+  assert.match(source, /pcmToBrowserWav/);
+});
+
 test("Hear sample mounts audio only after a usable preview blob", () => {
   const source = fs.readFileSync(tenantFormPath, "utf8");
   assert.match(source, /objectUrlFromPreviewResponse/);
@@ -83,6 +94,7 @@ test("Hear sample mounts audio only after a usable preview blob", () => {
   assert.match(source, /Hear sample/);
   assert.match(source, /onError=/);
   assert.match(source, /voice-sample-empty/);
+  assert.match(source, /type="audio\/wav"/);
   assert.doesNotMatch(source, /createObjectURL\(blob\)/);
 });
 
@@ -91,5 +103,6 @@ test("phone preview uses the same usable-audio gate", () => {
   assert.match(source, /objectUrlFromPreviewResponse/);
   assert.match(source, /assertPreviewAudioPlayable/);
   assert.match(source, /onError=/);
+  assert.match(source, /type="audio\/wav"/);
   assert.doesNotMatch(source, /createObjectURL\(blob\)/);
 });

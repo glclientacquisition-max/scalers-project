@@ -167,7 +167,6 @@ export function TestLinePanel({
 
             {phonePreviewUrl ? (
               <audio
-                src={phonePreviewUrl}
                 controls
                 className="w-full max-w-md"
                 onError={() => {
@@ -175,7 +174,9 @@ export function TestLinePanel({
                   setPhonePreviewUrl(null);
                   setPhonePreviewError(NO_VOICE_SAMPLE_COPY);
                 }}
-              />
+              >
+                <source src={phonePreviewUrl} type="audio/wav" />
+              </audio>
             ) : phonePreviewError ? (
               <p className="text-sm text-[var(--warn)]" role="alert">
                 {phonePreviewError}

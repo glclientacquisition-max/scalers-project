@@ -1891,7 +1891,6 @@ export function TenantForm({
           </div>
           {voiceSampleUrl ? (
             <audio
-              src={voiceSampleUrl}
               controls
               className="max-w-full"
               onError={() => {
@@ -1899,7 +1898,9 @@ export function TenantForm({
                 setVoiceSampleUrl(null);
                 setVoiceSampleError(NO_VOICE_SAMPLE_COPY);
               }}
-            />
+            >
+              <source src={voiceSampleUrl} type="audio/wav" />
+            </audio>
           ) : voiceSampleError ? (
             <p className="text-xs text-[var(--warn)]" role="alert" data-testid="voice-sample-empty">
               {voiceSampleError}
