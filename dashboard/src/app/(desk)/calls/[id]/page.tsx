@@ -9,7 +9,7 @@ import {
   type TranscriptRow,
 } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { CallAudioPlayer } from "@/components/CallAudioPlayer";
+import { CallRecording } from "@/components/CallRecording";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import {
@@ -325,15 +325,11 @@ export default async function CallDetailPage({
                   {escalateReason ? `: ${escalateReason}` : ""}
                 </p>
               ) : null}
-              {!row.recording_url ? (
-                <p className="mt-3 text-sm text-ink-soft">No recording attached yet.</p>
-              ) : null}
+              <CallRecording recordingUrl={row.recording_url} variant="empty" />
             </div>
           </div>
 
-          {row.recording_url ? (
-            <CallAudioPlayer src={row.recording_url} />
-          ) : null}
+          <CallRecording recordingUrl={row.recording_url} variant="player" />
         </aside>
 
         {/* RIGHT PANE: transcript + FAQ ideas */}

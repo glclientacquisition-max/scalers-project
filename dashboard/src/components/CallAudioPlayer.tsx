@@ -1,16 +1,22 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { usableRecordingUrl } from "@/lib/recordingSource";
 
 const SPEEDS = [1, 1.5, 2] as const;
 
 /**
- * Sticky recording player — stays visible while scrolling the transcript.
- * Includes playback speed toggles for busy owners.
+ * Sticky recording player. Callers must pass a usable source.
+ * Empty or whitespace src does not mount <audio>.
  */
 export function CallAudioPlayer({ src }: { src: string }) {
+  const playable = usableRecordingUrl(src);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [speed, setSpeed] = useState<number>(1);
+
+  if (!playable) {
+    return null;
+  }
 
   function applySpeed(next: number) {
     setSpeed(next);
@@ -22,7 +28,7 @@ export function CallAudioPlayer({ src }: { src: string }) {
       <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <audio
           ref={audioRef}
-          src={src}
+          src={playable}
           controls
           preload="none"
           className="h-10 w-full min-w-0 flex-1"

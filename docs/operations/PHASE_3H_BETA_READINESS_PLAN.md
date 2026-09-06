@@ -253,6 +253,8 @@ Optional: `STAGING_DATABASE_URL` for full catalog mode in CI.
 
 **Matrix status today:** Steps 1–7, 9–22 are **testable** on staging with setup. Step 8 **passes on staging**, **fails on production** until P1-1. Steps 10–18 require **manual live call** (P1-3).
 
+**Desk recording empty state (Phase 3H):** Calls detail previously mounted an audio player when `recording_url` was missing or blank, which produced `0:00 / 0:00` and a browser media error. The UI now treats only a non-empty trimmed URL as a usable source. No source shows `No recording available for this call.` This does not implement call recording. Current Sauti Kit events for the tested staging calls do not populate `recording_url`. A future provider URL in that field can render the existing player without a UI redesign.
+
 ---
 
 ## 4. Voice evaluation framework
