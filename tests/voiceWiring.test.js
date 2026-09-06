@@ -30,14 +30,50 @@ assert.match(
 
 assert.match(
   source,
-  /filler cancelled for reply audio/,
-  'reply path must cancel thinking-ack without awaiting remote TTS terminated'
+  /createOverlapHold/,
+  'media path must hold overlapping caller finals by playback generation'
 );
 
 assert.match(
   source,
-  /queue overlapping final while TTS/,
-  'non-echo finals during TTS must be queued for the next caller turn'
+  /beginSpeech/,
+  'agent questions are staged at playback start and committed only if playback completes'
+);
+
+assert.match(
+  source,
+  /commitPlayback/,
+  'a cancelled question must not replace the last safe replay target'
+);
+
+assert.match(
+  source,
+  /caller_turn_queued/,
+  'overlap finals during TTS must be queued until playback ends'
+);
+
+assert.match(
+  source,
+  /caller_turn_released/,
+  'playback end must release the generation-tagged overlap queue'
+);
+
+assert.match(
+  source,
+  /agent_question_replay/,
+  'Sorry/Pardon must replay the committed agent question'
+);
+
+assert.match(
+  source,
+  /isReplay:\s*true/,
+  'question replay must not commit as a newly generated question'
+);
+
+assert.match(
+  source,
+  /filler cancelled for reply audio/,
+  'reply path must cancel thinking-ack without awaiting remote TTS terminated'
 );
 
 assert.match(
