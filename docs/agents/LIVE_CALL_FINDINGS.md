@@ -6,8 +6,10 @@ Staging DID `+254709221536` (tenant Done and Dusted Cleaning). Owner set **Conne
 | --- | --- | --- | --- |
 | `HD_6f9424c1289a` | ~06:25 | `main` `ce1664b` | Settings saved. Dial did **not** run. Voice still old `main`, flag unset. NBA ESCALATE (“live transfer is unavailable”). SMS to Alvin. Caller was **the same number as the Dial dest**, so even on new Voice this call would skip Dial. |
 | `HD_0a8d5911d055` | 06:38 | `4ed0654` | Caller `+254715715894` (different phone). Queued Dial `+254790381872`. SMS sent. TTS “Okay, stay on the line.” WS closed `reason=live_transfer` at 23s. **No StreamStopped on `/voice/incoming`.** Next incoming was `Completed` at 86s and was treated as call-setup (re-Stream), so Alvin never rang. Caller sat on dead air after the AI left. |
+| `HD_ae71b5349f5e` | 06:51 | `6ca12f6` | Same caller. Queued Dial, SMS, “stay on the line,” WS close at 45s. **No POST `/voice/transfer`.** Completed ~20s later; then `/voice/incoming` returned Dial XML (`action=dial`) on an already-ended call. Duration 66s. Alvin did not ring. |
+| `HD_4f14d4d55244` | 06:53 | `6ca12f6` | Repeat. Same pattern. Dial XML again on Completed (73s). Zero `/voice/transfer` hits this session. |
 
-**Fix in flight:** answer XML is Stream then Redirect to `/voice/transfer`. Staging showed StreamStopped rides `events_url` (ACK only). Redirect after Stream is how Dial gets a voice-callback body.
+**Finding:** StreamStopped does not re-hit the voice URL. Verbs after `<Stream connect="true"/>` (Redirect) also do not run. Closing the media socket leaves the PSTN on dead air until hangup, then Completed. Cold Dial via webhook XML is not executable on this SautiKit Stream path. Next spike must use REST (`POST /v1/calls` into a conference) or live call-control, not another WS-close.
 
 Staging Voice is on `cursor/live-transfer-spec-3c65`. `/healthz` shows `liveTransfer.executor=true`, `ignoreHours=true` (Sunday hours bypass). Production Voice was not retargeted.
 
