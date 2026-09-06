@@ -414,7 +414,7 @@ Trained home-services tenant: book a visit with service + time + landmark + name
 
 1. **Gap mining** — weekly top unresolved intents per tenant/vertical  
 2. **Raise FAQ/catalog ceilings** carefully; add `knowledge_documents` + chunk retrieve **at call setup only** if prompt size breaks (architecture blueprint RAG phase — not mid-turn for latency)  
-3. **Live transfer** — implement when `handoff_mode = live_transfer` and SautiKit supports bridge/transfer  
+3. **Live transfer** — specified in [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) (cold Dial after Stream stop). Implement only after the Voice staging spike; keep async escalate as default and fallback.  
 4. **Caller memory** — greet returning numbers from `contacts`  
 5. **Scenario smokes** — extend `scripts/smoke-escalation-scenarios.js` pattern to retail/home playbook scripts  
 6. **Vertical template library** — starter catalogs/FAQs/policies per vertical  
