@@ -78,6 +78,18 @@ assert.match(
 
 assert.match(
   source,
+  /buildAnswerStreamXml/,
+  'answer XML must include Stream then Redirect so Dial can run after media close'
+);
+
+assert.match(
+  source,
+  /\/voice\/transfer/,
+  'post-Stream Redirect must hit /voice/transfer to issue Dial'
+);
+
+assert.match(
+  source,
   /liveTransfer: \{/,
   'healthz must expose liveTransfer executor flags for staging Dial verification'
 );

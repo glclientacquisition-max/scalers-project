@@ -137,6 +137,8 @@ const {
   consumeLiveTransferWebhook,
   queuePendingLiveTransfer,
   hasPendingLiveTransfer,
+  buildAnswerStreamXml,
+  emptyVoiceXml,
 } = require('./src/sautikit/pendingLiveTransfer');
 const {
   summarizeHeaders,
@@ -374,17 +376,35 @@ app.post('/api/tts/preview', async (req, res) => {
  * Build the media WebSocket URL from the inbound request host so Localtunnel /
  * ngrok / production reverse proxies work without hard-coding PUBLIC_BASE_URL.
  */
-function buildMediaStreamUrl(req) {
-  const host = req.headers.host;
-  if (!host) {
-    throw new Error('Missing Host header — cannot build Stream WebSocket URL');
-  }
+function requestHost(req) {
+  return String(req.headers.host || '').trim();
+}
+
+function requestHttpProto(req) {
   const forwarded = String(req.headers['x-forwarded-proto'] || '')
     .split(',')[0]
     .trim()
     .toLowerCase();
-  const wsProto = forwarded === 'http' ? 'ws' : 'wss';
+  if (forwarded === 'http' || forwarded === 'https') return forwarded;
+  return 'https';
+}
+
+function buildMediaStreamUrl(req) {
+  const host = requestHost(req);
+  if (!host) {
+    throw new Error('Missing Host header — cannot build Stream WebSocket URL');
+  }
+  const wsProto = requestHttpProto(req) === 'http' ? 'ws' : 'wss';
   return `${wsProto}://${host}/ws/media`;
+}
+
+function buildVoiceTransferContinueUrl(req, callSid) {
+  const host = requestHost(req);
+  if (!host) {
+    throw new Error('Missing Host header — cannot build transfer Redirect URL');
+  }
+  const sid = encodeURIComponent(String(callSid || '').trim());
+  return `${requestHttpProto(req)}://${host}/voice/transfer?callSid=${sid}`;
 }
 
 /** Digits-only phone compare (+2547… vs 2547…). */
@@ -473,7 +493,9 @@ function extractInboundCallFields(body = {}) {
   };
 }
 
-function shouldSkipMediaStream(callSessionState, body = {}) {
+function shouldSkipMediaStream(callSessionState, body = {}, callSid = '') {
+  if (hasPendingLiveTransfer(callSid)) return true;
+
   const state = String(callSessionState || '').toLowerCase();
   const streamEvent = String(body.streamEvent || '').toLowerCase();
   if (!state && !streamEvent) return false;
@@ -730,30 +752,15 @@ async function handleVoiceIncoming(req, res) {
     // A first webhook whose callSessionState is already "Completed" is still
     // call-set-up (it carries callerNumber/destinationNumber/isActive). Open
     // the stream, persist the call, and let the later Completed event close it.
-    if (shouldSkipMediaStream(callSessionState, req.body)) {
-      const sid = extracted.callSid || callSid;
+    const sid = extracted.callSid || callSid;
+    if (shouldSkipMediaStream(callSessionState, req.body, sid)) {
       const transferXml = consumeLiveTransferWebhook({
         callSid: sid,
         callSessionState,
         body: req.body,
       });
       if (transferXml?.xml) {
-        if (transferXml.action === 'dial' || transferXml.action === 'fallback' || transferXml.action === 'bridged') {
-          const attempt = transferXml.attempt || {};
-          db.saveTransferAttempt({
-            callSid: sid,
-            attempt: {
-              status: attempt.status,
-              mode: 'cold_dial',
-              to: attempt.to || null,
-              caller_id: attempt.callerId || null,
-              timeout_s: attempt.timeoutS || null,
-              sautikit_dial_status: transferXml.action,
-              ended_at:
-                transferXml.action === 'dial' ? null : new Date().toISOString(),
-            },
-          }).catch(() => {});
-        }
+        persistLiveTransferAction(sid, transferXml);
         console.log(
           `[voice/incoming] live transfer action=${transferXml.action} — no re-Stream`
         );
@@ -804,11 +811,12 @@ async function handleVoiceIncoming(req, res) {
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
     // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s.
     // Pass callSid on the WS URL so /ws/media can bind the session without
-    // waiting for the first metadata frame.
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Stream url="${streamUrl}" name="ai-receptionist" track="inbound_track" connect="true" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />
-</Response>`;
+    // waiting for the first metadata frame. Redirect after Stream runs when
+    // the media socket closes (StreamStopped does not re-hit this URL).
+    const twiml = buildAnswerStreamXml({
+      streamUrl,
+      continueUrl: buildVoiceTransferContinueUrl(req, callSid),
+    });
 
     res.type('text/xml').send(twiml);
   } catch (err) {
@@ -820,6 +828,60 @@ async function handleVoiceIncoming(req, res) {
 app.post('/', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
+
+function persistLiveTransferAction(callSid, transferXml) {
+  if (!callSid || !transferXml?.xml) return;
+  if (
+    transferXml.action !== 'dial' &&
+    transferXml.action !== 'fallback' &&
+    transferXml.action !== 'bridged'
+  ) {
+    return;
+  }
+  const attempt = transferXml.attempt || {};
+  db.saveTransferAttempt({
+    callSid,
+    attempt: {
+      status: attempt.status,
+      mode: 'cold_dial',
+      to: attempt.to || null,
+      caller_id: attempt.callerId || null,
+      timeout_s: attempt.timeoutS || null,
+      sautikit_dial_status: transferXml.action,
+      ended_at: transferXml.action === 'dial' ? null : new Date().toISOString(),
+    },
+  }).catch(() => {});
+}
+
+async function handleVoiceTransferContinue(req, res) {
+  try {
+    const extracted = extractVoiceNumbers(req.body || {});
+    const callSid =
+      String(req.query?.callSid || '').trim() || extracted.callSid || '';
+    const transferXml = consumeLiveTransferWebhook({
+      callSid,
+      callSessionState: extracted.callSessionState,
+      body: req.body || {},
+      source: 'transfer_continue',
+    });
+    if (transferXml?.xml) {
+      persistLiveTransferAction(callSid, transferXml);
+      console.log(
+        `[voice/transfer] live transfer action=${transferXml.action} callSid=${callSid}`
+      );
+      return res.type('text/xml').send(transferXml.xml);
+    }
+    console.log(
+      `[voice/transfer] no pending Dial callSid=${callSid || 'none'} — empty Response`
+    );
+    return res.type('text/xml').send(emptyVoiceXml());
+  } catch (err) {
+    console.error('[voice/transfer] failed:', err?.message || err);
+    return res.type('text/xml').send(emptyVoiceXml());
+  }
+}
+
+app.post('/voice/transfer', sautikitWebhookGuard, handleVoiceTransferContinue);
 
 // ---------------------------------------------------------------------------
 // 2. Recording attach helper (provider-agnostic). Used when a recording URL
@@ -888,6 +950,17 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
     });
 
     const kindStr = String(kind).toLowerCase();
+    const streamState = String(body.callSessionState || body.streamEvent || '').toLowerCase();
+    if (
+      callSid &&
+      hasPendingLiveTransfer(callSid) &&
+      (streamState.includes('streamstop') || streamState.includes('stream-stop'))
+    ) {
+      console.log(
+        `[voice/events] StreamStopped with pending Dial callSid=${callSid} (events_url cannot return Dial; wait for /voice/transfer Redirect)`
+      );
+    }
+
     const termination = detectCallTermination(body, kind);
 
     if (kindStr.includes('recording') && callSid) {
@@ -2345,7 +2418,8 @@ mediaWss.on('connection', (ws, req) => {
       );
     }
     // Fallback: if SautiKit never posts call.completed, still leave the row finished.
-    if (sessionCallSid) {
+    // Do not close the desk row while a cold Dial is waiting on Redirect.
+    if (sessionCallSid && !hasPendingLiveTransfer(sessionCallSid)) {
       const durationSeconds = Math.max(0, Math.round(ms / 1000));
       markCallTerminalFromWebhook({
         callSid: sessionCallSid,

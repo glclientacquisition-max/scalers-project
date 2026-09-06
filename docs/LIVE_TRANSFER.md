@@ -45,8 +45,8 @@ That empty-response hook is the transfer executor’s insertion point:
 
 1. While the AI stream is up, persist a **pending Dial**.
 2. Stop the media WebSocket so the Stream ends cleanly (do not hard-hangup the PSTN caller).
-3. On the StreamStopped / StreamCompleted webhook, return **`<Dial>`** instead of empty XML.
-4. If Dial times out or is busy, the next webhook returns **`<Say>` fallback + hangup** (or re-notify). Stream is already gone, so Gemini cannot talk.
+3. Staging (`HD_0a8d5911d055`) showed StreamStopped **does not** re-POST `/voice/incoming`; it hits `events_url`, which cannot return Dial. Answer XML is therefore `<Stream connect="true"/>` then `<Redirect>` to `/voice/transfer`.
+4. `/voice/transfer` returns **`<Dial>`** when a transfer is pending. If Dial times out or is busy, the next webhook returns **`<Say>` fallback + hangup**.
 
 Warm conference (`POST /v1/calls` into a named room, AI stays until the human joins) is better UX but doubles outbound cost, needs a whisper path, and fights the current single-stream media loop. Defer to v2 after cold Dial is proven on a staging DID.
 
@@ -124,8 +124,8 @@ TRANSFER path
   3. DB: saveEscalation + transfer_attempt={ status: pending, to, timeout }
   4. Notify SMS/WA/email (existing dispatch; do not block Dial on SMS failure)
   5. Stop STT/TTS; close /ws/media without hanging up the caller leg
-  6. SautiKit POSTs StreamStopped → POST /voice/incoming
-  7. Incoming sees pending transfer → return Dial XML (callerId = tenant DID)
+  6. Answer XML Redirect to POST /voice/transfer (StreamStopped does not re-hit /voice/incoming)
+  7. /voice/transfer sees pending transfer → return Dial XML (callerId = tenant DID)
   8a. Human answers → bridged. AI is gone. status=bridged. Call completes on hangup.
   8b. Timeout/busy/fail → webhook → Say fallback → hangup. status=failed, fallback_notify.
 
@@ -226,7 +226,7 @@ Do **not** land Voice Dial, Brain prompt copy, Desk copy, and SQL in one PR. Seq
 Lab on staging DID, no product toggle:
 
 1. From a live `/ws/media` session, close the WS (or documented stream-stop) **without** dropping the caller.
-2. Confirm `/voice/incoming` receives StreamStopped/Completed.
+2. Confirm `/voice/transfer` (post-Stream Redirect) or `/voice/incoming` receives a continue webhook.
 3. Return `<Dial>` to a known mobile; confirm ring and two-way audio.
 4. Confirm timeout path can return `<Say>` + `<Hangup>`.
 5. Write findings in `docs/agents/LIVE_CALL_FINDINGS.md`.

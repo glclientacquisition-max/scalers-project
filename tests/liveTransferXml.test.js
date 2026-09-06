@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   buildDialXml,
   buildTransferFallbackXml,
+  buildAnswerStreamXml,
   queuePendingLiveTransfer,
   consumeLiveTransferWebhook,
   resetPendingLiveTransfersForTests,
@@ -64,5 +65,34 @@ describe('live transfer Dial XML', () => {
     assert.match(fail.xml, /<Say>/);
     assert.match(fail.xml, /<Hangup\/>/);
     assert.match(buildTransferFallbackXml(), /follow up/);
+  });
+
+  it('returns Dial on post-Stream Redirect continue', () => {
+    queuePendingLiveTransfer({
+      callSid: 'CA3',
+      to: '+254712345678',
+      callerId: '+254709221536',
+    });
+    const first = consumeLiveTransferWebhook({
+      callSid: 'CA3',
+      callSessionState: '',
+      body: {},
+      source: 'transfer_continue',
+    });
+    assert.equal(first.action, 'dial');
+    assert.match(first.xml, /<Dial/);
+  });
+
+  it('builds Stream then Redirect so Dial can run after WS close', () => {
+    const xml = buildAnswerStreamXml({
+      streamUrl: 'wss://example.test/ws/media?callSid=CA4',
+      continueUrl: 'https://example.test/voice/transfer?callSid=CA4',
+    });
+    assert.match(xml, /<Stream url="wss:\/\/example.test\/ws\/media\?callSid=CA4"/);
+    assert.match(xml, /connect="true"/);
+    assert.match(
+      xml,
+      /<Redirect method="POST">https:\/\/example.test\/voice\/transfer\?callSid=CA4<\/Redirect>/
+    );
   });
 });

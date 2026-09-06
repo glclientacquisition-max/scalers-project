@@ -5,10 +5,13 @@ Staging DID `+254709221536` (tenant Done and Dusted Cleaning). Owner set **Conne
 | Call SID | Time (UTC) | Voice SHA | What happened |
 | --- | --- | --- | --- |
 | `HD_6f9424c1289a` | ~06:25 | `main` `ce1664b` | Settings saved. Dial did **not** run. Voice still old `main`, flag unset. NBA ESCALATE (“live transfer is unavailable”). SMS to Alvin. Caller was **the same number as the Dial dest**, so even on new Voice this call would skip Dial. |
+| `HD_0a8d5911d055` | 06:38 | `4ed0654` | Caller `+254715715894` (different phone). Queued Dial `+254790381872`. SMS sent. TTS “Okay, stay on the line.” WS closed `reason=live_transfer` at 23s. **No StreamStopped on `/voice/incoming`.** Next incoming was `Completed` at 86s and was treated as call-setup (re-Stream), so Alvin never rang. Caller sat on dead air after the AI left. |
 
-Staging Voice later retargeted to `cursor/live-transfer-spec-3c65` @ `18813bc`. `/healthz` shows `liveTransfer.executor=true`, `ignoreHours=true` (Sunday hours bypass). Production Voice was not retargeted.
+**Fix in flight:** answer XML is Stream then Redirect to `/voice/transfer`. Staging showed StreamStopped rides `events_url` (ACK only). Redirect after Stream is how Dial gets a voice-callback body.
 
-**Next spike:** call `+254709221536` from a **different** mobile than `+254790381872`. Ask for a human, give a name. Expect “stay on the line”, then Alvin’s phone rings. Logs: `live transfer queued Dial`, `live transfer action=dial`.
+Staging Voice is on `cursor/live-transfer-spec-3c65`. `/healthz` shows `liveTransfer.executor=true`, `ignoreHours=true` (Sunday hours bypass). Production Voice was not retargeted.
+
+**Next spike:** call `+254709221536` from a **different** mobile than `+254790381872`. Ask for a human, give a name. Expect “stay on the line”, then Alvin’s phone rings. Logs: `live transfer queued Dial`, `[voice/transfer] live transfer action=dial`.
 
 Turn off `VOICE_LIVE_TRANSFER_IGNORE_HOURS` after the Sunday spike. Point staging source back to `main` when the experiment is done.
 
