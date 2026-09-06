@@ -3,14 +3,19 @@
 // Scalers must not eat that outbound cost, and must not double-charge the
 // inbound call_id (charge_call_to_wallet is idempotent per call id).
 
-const DEFAULT_RATE = 15;
+const DEFAULT_INBOUND_RATE = 0;
+const DEFAULT_OUTBOUND_RATE = 4;
+
+function envInboundRateKesPerMin() {
+  const n = Number(process.env.WALLET_RATE_KES_PER_MINUTE);
+  if (Number.isFinite(n) && n >= 0) return n;
+  return DEFAULT_INBOUND_RATE;
+}
 
 function envTransferRateKesPerMin() {
   const n = Number(process.env.WALLET_TRANSFER_RATE_KES_PER_MINUTE);
   if (Number.isFinite(n) && n >= 0) return n;
-  const inbound = Number(process.env.WALLET_RATE_KES_PER_MINUTE);
-  if (Number.isFinite(inbound) && inbound >= 0) return inbound;
-  return DEFAULT_RATE;
+  return DEFAULT_OUTBOUND_RATE;
 }
 
 function envAllowBetaOutbound() {
@@ -82,7 +87,12 @@ function planTransferLegCharges({
     ? billableMinutesFromSeconds(outboundDurationSeconds)
     : 0;
   return {
-    inbound: { minutes: inboundMinutes, ledgerKind: 'call_charge', role: 'inbound' },
+    inbound: {
+      minutes: inboundMinutes,
+      ledgerKind: 'call_charge',
+      role: 'inbound',
+      rateKesPerMin: envInboundRateKesPerMin(),
+    },
     outbound: {
       minutes: outboundMinutes,
       ledgerKind: 'call_charge',
@@ -94,6 +104,7 @@ function planTransferLegCharges({
 }
 
 module.exports = {
+  envInboundRateKesPerMin,
   envTransferRateKesPerMin,
   envAllowBetaOutbound,
   billableMinutesFromSeconds,

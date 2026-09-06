@@ -7,6 +7,27 @@ const {
 } = require('../src/billing/liveTransferLegs');
 
 describe('live transfer billing legs', () => {
+  it('uses KES 0 inbound and KES 4 outbound when env is unset', () => {
+    const prevIn = process.env.WALLET_RATE_KES_PER_MINUTE;
+    const prevOut = process.env.WALLET_TRANSFER_RATE_KES_PER_MINUTE;
+    delete process.env.WALLET_RATE_KES_PER_MINUTE;
+    delete process.env.WALLET_TRANSFER_RATE_KES_PER_MINUTE;
+    try {
+      const plan = planTransferLegCharges({
+        inboundDurationSeconds: 60,
+        outboundDurationSeconds: 60,
+        outboundStatus: 'complete',
+      });
+      assert.equal(plan.inbound.rateKesPerMin, 0);
+      assert.equal(plan.outbound.rateKesPerMin, 4);
+    } finally {
+      if (prevIn == null) delete process.env.WALLET_RATE_KES_PER_MINUTE;
+      else process.env.WALLET_RATE_KES_PER_MINUTE = prevIn;
+      if (prevOut == null) delete process.env.WALLET_TRANSFER_RATE_KES_PER_MINUTE;
+      else process.env.WALLET_TRANSFER_RATE_KES_PER_MINUTE = prevOut;
+    }
+  });
+
   it('meters inbound and outbound separately and skips unanswered outbound', () => {
     const plan = planTransferLegCharges({
       inboundDurationSeconds: 90,

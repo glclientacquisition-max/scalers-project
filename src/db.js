@@ -12,7 +12,7 @@ const { supabase } = require('./lib/supabaseClient');
 const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
-const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 15);
+const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
 
 function throwIfError(context, error) {

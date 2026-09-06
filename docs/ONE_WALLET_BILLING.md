@@ -18,14 +18,14 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 | Line lapses when client misses renewal | `line_rental_grace.sql` tracks `line_paid_through`; wallet may go negative during `line_grace_days`; only then ops suspends the DID |
 | Need audit trail | Append-only `wallet_ledger`; balance is cached on `tenants.wallet_balance_kes` |
 | Owners must not forge credits | Ledger writes only via `security definer` RPCs granted to `service_role` |
-| Rate still a product choice | Env/constants: `WALLET_RATE_KES_PER_MINUTE` (default 15), `WALLET_LINE_FEE_KES_PER_MONTH` (default 1000) |
+| Rate still a product choice | Env: inbound `WALLET_RATE_KES_PER_MINUTE` (default **0**), outbound transfer `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default **4**), line `WALLET_LINE_FEE_KES_PER_MONTH` (default 1000) |
 
 ## Rate card (client-facing)
 
 | Line item | Ledger kind | Amount |
 |---|---|---|
-| Receptionist minutes | `call_charge` | `round(minutes × rate)` KES |
-| Live transfer outbound (future) | `call_charge` on a **second** `calls` row | Same formula; rate `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (defaults to inbound rate). Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
+| Receptionist minutes (inbound) | `call_charge` | **KES 0** (`round(minutes × 0)`) |
+| Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 4 / min** (`WALLET_TRANSFER_RATE_KES_PER_MINUTE`). Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
 | Line rental | `line_rental` | Fixed KES / calendar month (UTC) |
 | Ops seed / correction | `admin_adjustment` | Signed KES |
 | Future M-Pesa | `topup` | Positive KES |
@@ -41,7 +41,9 @@ Full project order: [`docs/supabase/README.md`](./supabase/README.md) (wallet se
 
 ```bash
 WALLET_CHARGING_ENABLED=true
-WALLET_RATE_KES_PER_MINUTE=15
+WALLET_RATE_KES_PER_MINUTE=0
+WALLET_TRANSFER_RATE_KES_PER_MINUTE=4
+WALLET_LINE_FEE_KES_PER_MONTH=1000
 WALLET_LINE_FEE_KES_PER_MONTH=1000
 ```
 

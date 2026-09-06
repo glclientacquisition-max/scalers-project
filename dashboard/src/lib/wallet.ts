@@ -3,7 +3,12 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 /** Retail rate card (KES). AI usage is bundled into the per-minute rate. */
 export const WALLET_RATE_KES_PER_MINUTE = Number(
-  process.env.WALLET_RATE_KES_PER_MINUTE || process.env.NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE || 15
+  process.env.WALLET_RATE_KES_PER_MINUTE || process.env.NEXT_PUBLIC_WALLET_RATE_KES_PER_MINUTE || 0
+);
+export const WALLET_TRANSFER_RATE_KES_PER_MINUTE = Number(
+  process.env.WALLET_TRANSFER_RATE_KES_PER_MINUTE ||
+    process.env.NEXT_PUBLIC_WALLET_TRANSFER_RATE_KES_PER_MINUTE ||
+    4
 );
 export const WALLET_LINE_FEE_KES_PER_MONTH = Number(
   process.env.WALLET_LINE_FEE_KES_PER_MONTH ||

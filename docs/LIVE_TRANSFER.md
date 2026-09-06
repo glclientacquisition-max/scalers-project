@@ -67,7 +67,7 @@ Warm conference is now the **next executor**, not v2. SautiKit’s call-center p
 | F7 | Caller hears progress (“Okay, let me connect you.”) then ringback from Dial. Never silence. |
 | F8 | If Dial is not answered / busy / failed / unauthorized destination: mark transfer failed, keep the escalate notify, tell the caller they will be followed up, then hang up. Do not claim they were connected. |
 | F9 | Call detail shows transfer attempt (pending / bridged / failed / fallback_notify) plus escalate notify channels. |
-| F10 | Wallet: inbound minutes and outbound transfer minutes are **two** SautiKit CDRs and **two** `calls` rows. Charge each with `charge_call_to_wallet` (idempotent per `call_id`). Never fold outbound minutes into the inbound row. Unanswered outbound is 0 KES. Beta (`billing_enforcement=off`) does not originate outbound unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. |
+| F10 | Wallet: inbound **KES 0**/min, outbound transfer **KES 4**/min. Two SautiKit CDRs, two `calls` rows, `charge_call_to_wallet` per `call_id`. Unanswered outbound is 0 KES. Beta does not originate outbound unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. |
 | F11 | Feature flag `VOICE_LIVE_TRANSFER=off` (default) until the Stream-stop → Dial lab spike passes on staging. Tenant toggle cannot override a global off. |
 
 ### 3.2 Honesty / speech (non-negotiable)
@@ -215,13 +215,13 @@ SautiKit bills the **workspace wallet** per answered PSTN leg. Conference transf
 
 | Leg | Who is on it | SautiKit | Scalers tenant wallet |
 | --- | --- | --- | --- |
-| Inbound | Caller → business DID (AI then conference) | Inbound CDR on `HD_…` | Existing `charge_call_to_wallet` on that `calls.id` |
-| Outbound | Business DID → teammate mobile | New CDR from `POST /v1/calls` | **Separate** `calls` row + `charge_call_to_wallet` on that id |
+| Inbound | Caller → business DID (AI then conference) | Inbound CDR on `HD_…` | **KES 0** (`WALLET_RATE_KES_PER_MINUTE`, default 0). Meter duration; debit is 0. |
+| Outbound | Business DID → teammate mobile | New CDR from `POST /v1/calls` | **KES 4 / min** (`WALLET_TRANSFER_RATE_KES_PER_MINUTE`, default 4) on a separate `calls` row |
 
 Rules:
 
-1. **Do not eat outbound.** If we ring Alvin, Scalers pays SautiKit. The tenant must pay retail for that leg (`WALLET_TRANSFER_RATE_KES_PER_MINUTE`, default same as inbound `WALLET_RATE_KES_PER_MINUTE`).
-2. **Do not double-charge inbound.** `charge_call_to_wallet` is idempotent per `call_id`. First non-zero debit wins. Never add outbound seconds onto the inbound row.
+1. **Inbound is KES 0.** Receptionist minutes are metered and not billed to the tenant. SautiKit may still bill the workspace for the inbound CDR.
+2. **Outbound is KES 4 / answered minute.** If we ring Alvin, the tenant pays `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default 4) on the outbound `call_id`. Unanswered outbound stays 0.
 3. **Unanswered outbound is free** at SautiKit and must stay 0 minutes on our ledger (`no_answer` / `busy` / `failed` / `canceled`).
 4. **Beta (`billing_enforcement=off`)** meters inbound only and **must not** `POST /v1/calls` in production. Otherwise Scalers eats outbound PSTN. Lab exception: `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on` on staging only.
 5. **Hard enforcement:** do not originate if prepaid cannot cover one outbound minute. Soft still originates (wallet may go negative). Fallback is callback SMS.
