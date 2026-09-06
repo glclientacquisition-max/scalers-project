@@ -43,5 +43,6 @@ export async function updateServiceRequestStatus(
   }
 
   revalidatePath("/requests");
+  revalidatePath("/home");
   return { ok: true };
 }

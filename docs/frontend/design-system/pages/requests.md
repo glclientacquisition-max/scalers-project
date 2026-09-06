@@ -1,10 +1,12 @@
 # Requests
 
 **Route:** `/requests`  
-**Job:** Same as Calls: filter, act, WhatsApp.
+**Job:** Fulfill holds, orders, enquiries, callbacks. Not the voice inbox.
 
-**Layout:** Filter tabs + dense table + `Pagination`. Open count is tenant-wide, not the filtered page length.
+**Layout:** `DeskPageHeader` + one status `FilterTabs` + dense table + `Pagination`. Open count is tenant-wide.
 
-**Empty:** Title only. Train deep link is `businessSettingsHref("train")` if needed later.
+Columns: Item / Who / Needed / Status. Primary verb is **Done**. Related transcript is **Call**, not Open.
 
-**Do not:** stacked cards. A second KPI card language that Calls does not use.
+**Empty:** Nothing to fulfill. Show all if other statuses exist.
+
+**Do not:** copy Calls columns. A second type-filter bar. Stacked cards. KPI tiles.

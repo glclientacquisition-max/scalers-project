@@ -1,12 +1,9 @@
 import Link from "next/link";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
-  callsHref,
-  formatCallWhen,
   nairobiDateLabel,
   nairobiDayStartIso,
   nairobiGreeting,
-  toLead,
   walletKes,
 } from "@/lib/callsTriage";
 import {
@@ -16,45 +13,19 @@ import {
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { assessMvpAnswerReadiness } from "@/lib/mvpAnswerReadiness";
 import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import {
+  deskNextAction,
+  deskWorkQueues,
+  type DeskWorkCounts,
+} from "@/lib/deskWorkQueues";
 import {
   btnGhost,
   btnPrimary,
   focusRingVisible,
-  tableCellClass,
-  tableHeadCellClass,
 } from "@/components/ui/deskChrome";
-import type { CallRow } from "@/lib/supabase";
 
-const CALL_SELECT =
-  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
-
-const HOME_LEAD_LIMIT = 8;
-
-function StatLink({
-  href,
-  label,
-  value,
-}: {
-  href: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={[
-        "flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft",
-        "transition-colors duration-150 hover:bg-[#0096FF]/[0.04] hover:text-ink",
-        "active:bg-[#0096FF]/[0.08]",
-        focusRingVisible,
-      ].join(" ")}
-    >
-      <span>{label}</span>
-      <span className="tabular-nums font-medium text-ink">{value}</span>
-    </Link>
-  );
+function isMissingRelation(message: string): boolean {
+  return /relation|does not exist|service_requests|appointments/i.test(message);
 }
 
 export default async function HomeOverviewPage() {
@@ -108,54 +79,60 @@ export default async function HomeOverviewPage() {
     agentTools: tenant.agent_tools,
   });
   const line = resolveLineStatus(tenant.sautikit_virtual_number, readiness.ready);
-  const missingRequired = readiness.items.filter((item) => item.required && !item.ok);
 
-  const countEq = (status: string) =>
-    client
-      .from("calls")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id)
-      .eq("lead_status", status);
-
-  const [todayRes, newRes, followedRes, needsRes] = await Promise.all([
+  const [todayRes, newRes, followedRes, openReqRes, visitRes] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
-    countEq("new"),
-    countEq("contacted"),
     client
       .from("calls")
-      .select(CALL_SELECT)
+      .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
-      .eq("lead_status", "new")
-      .order("created_at", { ascending: false })
-      .limit(HOME_LEAD_LIMIT),
+      .eq("lead_status", "new"),
+    client
+      .from("calls")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("lead_status", "contacted"),
+    client
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("status", "open"),
+    client
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("status", "requested"),
   ]);
 
   const leadStatusReady = !(
     newRes.error && /lead_status|column/i.test(newRes.error.message)
   );
+  const requestsReady = !(
+    openReqRes.error && isMissingRelation(openReqRes.error.message)
+  );
+  const visitsReady = !(
+    visitRes.error && isMissingRelation(visitRes.error.message)
+  );
 
   const todayCount = todayRes.count ?? 0;
   const newCount = leadStatusReady ? newRes.count ?? 0 : 0;
   const followedCount = leadStatusReady ? followedRes.count ?? 0 : 0;
-  const leads = leadStatusReady
-    ? ((needsRes.data || []) as CallRow[]).map(toLead)
-    : [];
+  const openRequests = requestsReady ? openReqRes.count ?? 0 : 0;
+  const visitsToConfirm = visitsReady ? visitRes.count ?? 0 : 0;
 
-  let ctaHref = businessSettingsHref("test");
-  let ctaLabel = "Test line";
-  if (newCount > 0) {
-    ctaHref = callsHref({ status: "new" });
-    ctaLabel = "Process pending leads";
-  } else if (line === "needs_training") {
-    ctaHref = businessSettingsHref("train");
-    ctaLabel = "Train";
-  }
-
-  const showCta = !(line === "pending" && newCount === 0);
+  const counts: DeskWorkCounts = {
+    newCalls: newCount,
+    openRequests,
+    visitsToConfirm,
+  };
+  const queues = deskWorkQueues(counts);
+  const next = deskNextAction(counts, line);
+  const waiting =
+    counts.newCalls + counts.openRequests + counts.visitsToConfirm;
 
   return (
     <div className="w-full min-w-0">
@@ -191,10 +168,7 @@ export default async function HomeOverviewPage() {
                   {formatBulletinEndLabel(primaryUpdate.ends_at)}
                 </p>
               </div>
-              <Link
-                href={businessSettingsHref("updates")}
-                className={btnGhost}
-              >
+              <Link href={businessSettingsHref("updates")} className={btnGhost}>
                 Manage
               </Link>
             </div>
@@ -203,121 +177,99 @@ export default async function HomeOverviewPage() {
       ) : null}
 
       <div className="mt-6 grid items-start gap-8 lg:grid-cols-12">
-        <section className="min-w-0 lg:col-span-8" aria-label="Needs you">
+        <section className="min-w-0 lg:col-span-8" aria-labelledby="needs-you-heading">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="font-display text-xl tracking-tight text-ink">
+            <h2
+              id="needs-you-heading"
+              className="font-display text-xl tracking-tight text-ink"
+            >
               Needs you
             </h2>
-            {leadStatusReady ? (
-              <Link
-                href={callsHref({ status: "new" })}
-                className={`text-sm font-medium text-[#005CCC] ${focusRingVisible}`}
-              >
-                {newCount} new
-              </Link>
-            ) : null}
+            <p className="text-[13px] text-ink-soft">
+              <span className="tabular-nums font-medium text-ink">{waiting}</span>{" "}
+              waiting
+            </p>
           </div>
 
-          {!leadStatusReady ? (
-            <p className="mt-3 text-sm text-ink-soft">
-              Lead statuses need{" "}
-              <code className="text-xs">docs/supabase/lead_status.sql</code>.
-            </p>
-          ) : leads.length === 0 ? (
-            <div className="mt-3 border-y border-line py-8">
-              <p className="font-display text-xl tracking-tight text-ink">
-                {line === "needs_training"
-                  ? "Train the line"
-                  : line === "pending"
-                    ? "Number pending"
-                    : "Caught up"}
-              </p>
-              {missingRequired.length > 0 ? (
-                <p className="mt-2 text-sm text-ink-soft">
-                  {missingRequired
-                    .slice(0, 3)
-                    .map((item) => item.label)
-                    .join(". ")}
-                  .
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <div className="mt-3">
-              <DeskDataTable minWidthClass="min-w-[640px]">
-                <thead className="border-b border-line bg-surface-muted/70 text-ink-soft">
-                  <tr>
-                    <th className={tableHeadCellClass}>When</th>
-                    <th className={tableHeadCellClass}>Caller</th>
-                    <th className={tableHeadCellClass}>Lead</th>
-                    <th className={tableHeadCellClass} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {leads.map((lead) => (
-                    <tr
-                      key={lead.call.id}
-                      className={[
-                        "border-t border-line/70 border-l-2 border-l-transparent",
-                        "transition-colors duration-150",
-                        "hover:border-l-[#0096FF] hover:bg-[#0096FF]/[0.04]",
-                        "focus-within:border-l-[#0096FF] focus-within:bg-[#0096FF]/[0.04]",
-                        "active:bg-[#0096FF]/[0.08]",
-                        lead.urgent ? "bg-warn-soft/60" : "",
-                      ].join(" ")}
+          <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
+            {queues.map((queue, index) => (
+              <li
+                key={queue.id}
+                className={index === 0 ? undefined : "border-t border-line"}
+              >
+                <Link
+                  href={queue.href}
+                  className={[
+                    "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium",
+                    "transition-colors duration-150",
+                    "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.08]",
+                    focusRingVisible,
+                  ].join(" ")}
+                >
+                  <span className="text-ink">{queue.label}</span>
+                  <span className="flex items-center gap-3 text-ink-soft">
+                    <span>
+                      <span className="tabular-nums font-medium text-ink">
+                        {queue.count}
+                      </span>{" "}
+                      {queue.unit}
+                    </span>
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="h-4 w-4 shrink-0"
+                      aria-hidden
                     >
-                      <td className={`${tableCellClass} whitespace-nowrap text-ink-soft`}>
-                        {formatCallWhen(lead.call.created_at)}
-                      </td>
-                      <td className={tableCellClass}>
-                        <WhatsAppLink number={lead.call.caller_number} />
-                      </td>
-                      <td className={tableCellClass}>
-                        <div className="font-medium text-ink">
-                          {lead.name || "Unknown"}
-                          {lead.urgent ? (
-                            <span className="ml-2 text-xs font-medium text-warn">
-                              urgent
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-0.5 line-clamp-1 text-ink-soft">
-                          {lead.reason || "No reason yet"}
-                        </div>
-                      </td>
-                      <td className={`${tableCellClass} text-right`}>
-                        <Link
-                          href={`/calls/${lead.call.id}?from=new`}
-                          className={`font-medium text-[#005CCC] ${focusRingVisible}`}
-                        >
-                          Open
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </DeskDataTable>
-            </div>
-          )}
+                      <path
+                        d="M7.5 4.5 13 10l-5.5 5.5"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-4">
           <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-            <section aria-label="What happened" className="px-3 py-3">
+            <section aria-label="Today" className="px-3 py-3">
               <ul>
                 <li>
-                  <StatLink
-                    href={callsHref()}
-                    label="Today"
-                    value={String(todayCount)}
-                  />
+                  <Link
+                    href="/calls"
+                    className={[
+                      "flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft",
+                      "transition-colors duration-150 hover:bg-[#0096FF]/[0.04] hover:text-ink",
+                      "active:bg-[#0096FF]/[0.08]",
+                      focusRingVisible,
+                    ].join(" ")}
+                  >
+                    <span>Calls today</span>
+                    <span className="tabular-nums font-medium text-ink">
+                      {todayCount}
+                    </span>
+                  </Link>
                 </li>
                 <li>
-                  <StatLink
-                    href={callsHref({ status: "contacted" })}
-                    label="Followed up"
-                    value={String(followedCount)}
-                  />
+                  <Link
+                    href="/calls?status=contacted"
+                    className={[
+                      "flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft",
+                      "transition-colors duration-150 hover:bg-[#0096FF]/[0.04] hover:text-ink",
+                      "active:bg-[#0096FF]/[0.08]",
+                      focusRingVisible,
+                    ].join(" ")}
+                  >
+                    <span>Followed up</span>
+                    <span className="tabular-nums font-medium text-ink">
+                      {followedCount}
+                    </span>
+                  </Link>
                 </li>
               </ul>
             </section>
@@ -353,10 +305,10 @@ export default async function HomeOverviewPage() {
               ) : null}
             </section>
 
-            {showCta ? (
+            {next ? (
               <div className="border-t border-line px-4 py-4">
-                <Link href={ctaHref} className={`${btnPrimary} w-full`}>
-                  {ctaLabel}
+                <Link href={next.href} className={`${btnPrimary} w-full`}>
+                  {next.label}
                 </Link>
               </div>
             ) : null}

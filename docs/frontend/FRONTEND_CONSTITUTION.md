@@ -36,7 +36,7 @@ Cross-referenced. Product rules win when sources disagree.
 | Von Restorff (isolation) | von Restorff 1933 | Only the primary action is saturated blue. Archive/Cancel/Remove stay ghost or icon. | Two blue buttons in one viewport |
 | Serial position / F-pattern | Nielsen Norman Group eyetracking | First line: line status + greeting. First block: work waiting. Metrics after work. | Analytics four-up that does not click into work |
 | Progressive disclosure | Nielsen; Sweller element interactivity | `textarea rows={2}` then expand. Settings panels stay hidden until chosen. | All Train fields on one scroll |
-| Jakob’s law | Nielsen | Calls table is the inbox idiom. Requests and Appointments copy it. | Novel card masonry |
+| Jakob’s law | Nielsen | One table chrome. Requests and Appointments keep that chrome and change columns and verbs. | Novel card masonry |
 | Tesler’s law | Tesler | Complexity stays in compile/save, not in owner copy. | “Train your receptionist in short steps” |
 | Aesthetic-usability | Kurosu & Kashimura 1995; Tractinsky | Calm light canvas, 1px lines, no novelty chrome. | Glassmorphism, Plus Jakarta, orange CTA |
 | Peak-end rule | Kahneman | Empty and error states must still name the next action. | Dead ends and hash links that 404 the intent |
@@ -84,7 +84,7 @@ Base unit **8px**, same as IBM Carbon, Atlassian, and Material. Tailwind already
 | Role | Token | Notes |
 | --- | --- | --- |
 | Body | DM Sans `--font-sans` | 14px (`text-sm`) default in tables |
-| Display | Sora `--font-display` | `h1`–`h3` and page titles only. Desk titles `text-3xl sm:text-4xl`, not marketing clamp explosions |
+| Display | Sora `--font-display` | `h1`–`h3` and page titles only. Desk titles `clamp(1.5rem, 2.4vw, 2rem)`, not marketing explosions |
 | Meta | `text-xs uppercase tracking-wide text-ink-soft` | Non-clickable sidebar headers |
 | Primary fill | `#0096FF` | Buttons, active tab underline, focus ring |
 | Primary text on light | `#005CCC` | Links, active tab label |
@@ -117,11 +117,11 @@ Keep URLs and nav labels through the current phase: Overview, Calls, Requests, A
 
 | Route | Job | Layout |
 | --- | --- | --- |
-| `/home` | What needs me. What happened. Is the line working. One next action. | Command Center |
-| `/calls` | Inbox benchmark | Dense table |
+| `/home` | What needs me across the three lists. Line. One next action. | Map. Not a fourth inbox. |
+| `/calls` | Voice inbox | Dense table. Search. Open transcript. |
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
-| `/requests` | Same job as Calls | Same table language |
-| `/appointments` | Same job as Calls | Same table language |
+| `/requests` | Fulfill holds and orders | Same table chrome. Item / Who / Needed. Done. |
+| `/appointments` | Confirm visits | Same table chrome. Visit / Who / Place. Confirm. |
 | `/settings` | Configure the assistant | Destination menu. One screen. |
 | `/wallet` | Prepaid KES | Token-only from this lane |
 

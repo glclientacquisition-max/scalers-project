@@ -45,5 +45,6 @@ export async function updateAppointmentStatus(
   }
 
   revalidatePath("/appointments");
+  revalidatePath("/home");
   return { ok: true };
 }

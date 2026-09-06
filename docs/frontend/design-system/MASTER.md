@@ -60,7 +60,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 py-6 sm:px-6 sm:py-10`. Child 
 
 - Body: DM Sans
 - Display: Sora on `h1–h3` and `.font-display`
-- Page title: `font-display text-3xl tracking-tight text-ink sm:text-4xl`
+- Page title: `DeskPageHeader` / `clamp(1.5rem, 2.4vw, 2rem)` semibold
 - Table: `text-sm`
 - Meta: `text-xs uppercase tracking-wide text-ink-soft`
 
