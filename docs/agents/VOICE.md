@@ -19,6 +19,7 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
 | `docs/WEBHOOK_TUNNEL.md` | Local tunnel for SautiKit media |
 | `docs/agents/VOICE_DOWNTIME_AT_SCALE.md` | Multi-tenant speech-outage contract |
+| `docs/CALL_MESSAGE_CONTRACT.md` | Owner vs caller post-call message contract |
 
 Also OK: small imports from `src/conversation/language.js` / `dynamicSpeech.js` **only** when needed for fillers, greetings, or language sticky behavior on the media path.
 

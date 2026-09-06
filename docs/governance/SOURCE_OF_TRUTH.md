@@ -166,6 +166,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | SMS | TextSMS.co.ke | `src/notifications/sms.js` | Private-beta primary | — | CORE |
 | WhatsApp | SautiKit | `src/notifications/whatsapp.js` | Secondary channel | Twilio (historical) | CORE |
 | Email | Resend | `src/notifications/email.js` | Fallback | — | CORE |
+| Message contract | What owner vs caller receives | `docs/CALL_MESSAGE_CONTRACT.md` | Product contract | — | CORE |
 
 ---
 
