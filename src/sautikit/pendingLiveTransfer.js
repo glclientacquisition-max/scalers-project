@@ -1,6 +1,7 @@
-// In-memory pending cold Dial after the AI Stream stops.
+// Pending live transfer: conference hold + outbound REST (cold Dial is leftover).
 
 const pendingByCall = new Map();
+const voiceHttpBaseByCall = new Map();
 
 function escapeXml(raw) {
   return String(raw || '')
@@ -8,6 +9,33 @@ function escapeXml(raw) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function escapeXmlAttr(raw) {
+  return escapeXml(raw).replace(/'/g, '&apos;');
+}
+
+function conferenceRoomName(callSid) {
+  const raw = String(callSid || '').replace(/[^a-zA-Z0-9]/g, '');
+  const tail = (raw.slice(-16) || 'room').toLowerCase();
+  return `xfer${tail}`;
+}
+
+function rememberCallVoiceHttpBase(callSid, baseUrl) {
+  const sid = String(callSid || '').trim();
+  const base = String(baseUrl || '').replace(/\/+$/, '');
+  if (!sid || !base) return;
+  voiceHttpBaseByCall.set(sid, base);
+}
+
+function getCallVoiceHttpBase(callSid) {
+  return voiceHttpBaseByCall.get(String(callSid || '').trim()) || null;
+}
+
+function envPublicVoiceHttpBase() {
+  const raw =
+    process.env.VOICE_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || '';
+  return String(raw).replace(/\/+$/, '') || null;
 }
 
 function buildDialXml({ to, callerId, timeoutS = 30 } = {}) {
@@ -37,14 +65,9 @@ function emptyVoiceXml() {
   return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
 }
 
-function escapeXmlAttr(raw) {
-  return escapeXml(raw).replace(/'/g, '&apos;');
-}
-
 /**
- * Answer XML: hold the PSTN on Stream, then continue to Redirect when the
- * media socket closes. Staging showed StreamStopped never hits /voice/incoming
- * (it rides events_url, which cannot return Dial).
+ * Stream connect=true holds the PSTN on the fork. Verbs after Stream never ran
+ * on staging. Keep this for callback tenants (flag off).
  */
 function buildAnswerStreamXml({ streamUrl, continueUrl } = {}) {
   const url = escapeXmlAttr(streamUrl);
@@ -58,16 +81,50 @@ function buildAnswerStreamXml({ streamUrl, continueUrl } = {}) {
   );
 }
 
+/**
+ * Flag on: Stream without connect so Conference can hold the PSTN. AI still
+ * forks to /ws/media. Teammate later POST /v1/calls into the same room.
+ */
+function buildAnswerConferenceHoldXml({ streamUrl, room } = {}) {
+  const url = escapeXmlAttr(streamUrl);
+  const name = escapeXml(room);
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<Response>\n` +
+    `    <Stream url="${url}" name="ai-receptionist" track="inbound_track" connect="false" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />\n` +
+    `    <Conference startOnEnter="true" endOnExit="false" beep="false">${name}</Conference>\n` +
+    `</Response>`
+  );
+}
+
+function buildAgentJoinConferenceXml({ room } = {}) {
+  const name = escapeXml(room);
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<Response>\n` +
+    `  <Say>You have a caller on the line.</Say>\n` +
+    `  <Conference startOnEnter="true" endOnExit="true" beep="true">${name}</Conference>\n` +
+    `</Response>`
+  );
+}
+
 function transferTimeoutSeconds() {
   return Math.min(60, Math.max(10, Number(process.env.VOICE_TRANSFER_TIMEOUT_S || 30) || 30));
 }
 
-function queuePendingLiveTransfer({ callSid, to, callerId, timeoutS } = {}) {
+function queuePendingLiveTransfer({
+  callSid,
+  to,
+  callerId,
+  timeoutS,
+  room,
+  mode,
+} = {}) {
   const sid = String(callSid || '').trim();
   const dest = String(to || '').trim();
   if (!sid || !dest) return null;
   const existing = pendingByCall.get(sid);
-  if (existing && (existing.status === 'pending' || existing.status === 'dialing')) {
+  if (existing && (existing.status === 'pending' || existing.status === 'ringing' || existing.status === 'dialing')) {
     return existing;
   }
   const row = {
@@ -75,6 +132,8 @@ function queuePendingLiveTransfer({ callSid, to, callerId, timeoutS } = {}) {
     to: dest,
     callerId: String(callerId || '').trim() || null,
     timeoutS: timeoutS || transferTimeoutSeconds(),
+    room: room || conferenceRoomName(sid),
+    mode: mode === 'cold_dial' ? 'cold_dial' : 'conference',
     status: 'pending',
     queuedAt: Date.now(),
   };
@@ -82,9 +141,21 @@ function queuePendingLiveTransfer({ callSid, to, callerId, timeoutS } = {}) {
   return row;
 }
 
+function markPendingLiveTransfer(callSid, patch = {}) {
+  const sid = String(callSid || '').trim();
+  const row = pendingByCall.get(sid);
+  if (!row) return null;
+  Object.assign(row, patch);
+  pendingByCall.set(sid, row);
+  return row;
+}
+
 function hasPendingLiveTransfer(callSid) {
   const row = pendingByCall.get(String(callSid || ''));
-  return Boolean(row && (row.status === 'pending' || row.status === 'dialing'));
+  return Boolean(
+    row &&
+      (row.status === 'pending' || row.status === 'ringing' || row.status === 'dialing')
+  );
 }
 
 function getPendingLiveTransfer(callSid) {
@@ -112,13 +183,15 @@ function isCompletedEvent(blob) {
 }
 
 /**
- * Choose XML for a skip-stream webhook. Null means the caller should keep today's empty Response.
+ * Cold Dial leftover. Conference pending must not return Dial on Completed
+ * (staging returned Dial after hangup).
  */
 function consumeLiveTransferWebhook({ callSid, callSessionState, body, source } = {}) {
   const sid = String(callSid || '').trim();
   if (!sid) return null;
   const row = pendingByCall.get(sid);
   if (!row) return null;
+  if (row.mode === 'conference') return null;
   const blob = eventBlob(callSessionState, body);
   const fromContinue = source === 'redirect' || source === 'transfer_continue';
 
@@ -170,15 +243,23 @@ function consumeLiveTransferWebhook({ callSid, callSessionState, body, source } 
 
 function resetPendingLiveTransfersForTests() {
   pendingByCall.clear();
+  voiceHttpBaseByCall.clear();
 }
 
 module.exports = {
+  conferenceRoomName,
+  rememberCallVoiceHttpBase,
+  getCallVoiceHttpBase,
+  envPublicVoiceHttpBase,
   buildDialXml,
   buildTransferFallbackXml,
   buildAnswerStreamXml,
+  buildAnswerConferenceHoldXml,
+  buildAgentJoinConferenceXml,
   emptyVoiceXml,
   transferTimeoutSeconds,
   queuePendingLiveTransfer,
+  markPendingLiveTransfer,
   hasPendingLiveTransfer,
   getPendingLiveTransfer,
   clearPendingLiveTransfer,

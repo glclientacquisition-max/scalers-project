@@ -7,6 +7,9 @@ const {
   queuePendingLiveTransfer,
   consumeLiveTransferWebhook,
   resetPendingLiveTransfersForTests,
+  conferenceRoomName,
+  buildAnswerConferenceHoldXml,
+  buildAgentJoinConferenceXml,
 } = require('../src/sautikit/pendingLiveTransfer');
 
 describe('live transfer Dial XML', () => {
@@ -27,6 +30,7 @@ describe('live transfer Dial XML', () => {
       callSid: 'CA1',
       to: '+254712345678',
       callerId: '+254709221536',
+      mode: 'cold_dial',
     });
     const first = consumeLiveTransferWebhook({
       callSid: 'CA1',
@@ -50,6 +54,7 @@ describe('live transfer Dial XML', () => {
       callSid: 'CA2',
       to: '+254712345678',
       callerId: '+254709221536',
+      mode: 'cold_dial',
     });
     consumeLiveTransferWebhook({
       callSid: 'CA2',
@@ -72,6 +77,7 @@ describe('live transfer Dial XML', () => {
       callSid: 'CA3',
       to: '+254712345678',
       callerId: '+254709221536',
+      mode: 'cold_dial',
     });
     const first = consumeLiveTransferWebhook({
       callSid: 'CA3',
@@ -94,5 +100,38 @@ describe('live transfer Dial XML', () => {
       xml,
       /<Redirect method="POST">https:\/\/example.test\/voice\/transfer\?callSid=CA4<\/Redirect>/
     );
+  });
+
+  it('builds Stream without connect plus Conference hold', () => {
+    const room = conferenceRoomName('HD_6f9424c1289a');
+    const xml = buildAnswerConferenceHoldXml({
+      streamUrl: 'wss://example.test/ws/media?callSid=HD_6f9424c1289a',
+      room,
+    });
+    assert.match(xml, /connect="false"/);
+    assert.match(xml, /<Conference startOnEnter="true" endOnExit="false"/);
+    assert.match(xml, new RegExp(`>${room}</Conference>`));
+  });
+
+  it('builds agent join Conference XML', () => {
+    const xml = buildAgentJoinConferenceXml({ room: 'xfer6f9424c1289a' });
+    assert.match(xml, /<Say>You have a caller on the line\.<\/Say>/);
+    assert.match(xml, />xfer6f9424c1289a<\/Conference>/);
+  });
+
+  it('does not return Dial on Completed when pending is conference', () => {
+    queuePendingLiveTransfer({
+      callSid: 'CA5',
+      to: '+254712345678',
+      callerId: '+254709221536',
+      mode: 'conference',
+      room: 'xferca5',
+    });
+    const hit = consumeLiveTransferWebhook({
+      callSid: 'CA5',
+      callSessionState: 'Completed',
+      body: {},
+    });
+    assert.equal(hit, null);
   });
 });

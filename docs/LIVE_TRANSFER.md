@@ -1,6 +1,6 @@
 # Live human transfer (caller escalation to a real person)
 
-**Status:** Desk option exists. Cold Dial after Stream is **blocked** on current SautiKit (staging 2026-09-06). Default `VOICE_LIVE_TRANSFER=off`. Keep callback escalate until a conference REST spike rings a human. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, and the env flag all pass.  
+**Status:** Desk option exists. Cold Dial after Stream is **blocked**. Conference + `POST /v1/calls` is wired but **gated** (`VOICE_LIVE_TRANSFER=off`) until a staging spike rings a human. Default remains callback. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, billing allows outbound, and the env flag all pass.  
 **Job:** When a caller needs a human *and* the business opted in, Scalers leaves the AI media stream and bridges the live call to a real teammate. If the bridge cannot run or the human does not answer, the existing async escalate path still notifies and the caller hears an honest fallback.
 
 **Related:** async notify is already shipped in [`ESCALATION.md`](./ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](./adr/ADR-0004-live-human-transfer.md).
@@ -14,7 +14,7 @@ Two different products share the word “escalation”. Do not collapse them.
 | Mode | What the caller gets | Owner setting | Runtime today |
 | --- | --- | --- | --- |
 | **Callback** (async escalate) | AI stays on the line, takes name + reason, texts/emails the teammate, confirms follow-up | `tenants.handoff_mode = callback` (default) | **Shipped** |
-| **Live transfer** | AI says it will connect, then the PSTN bridges to a teammate’s mobile. AI leaves the call | `tenants.handoff_mode = live_transfer` on Escalation Team | **Blocked.** Cold Dial after Stream failed on staging. Next executor is conference + `POST /v1/calls` |
+| **Live transfer** | AI says it will connect, then the PSTN bridges to a teammate’s mobile | `tenants.handoff_mode = live_transfer` on Escalation Team | **Gated.** Conference hold + outbound REST. Dial after Stream failed. Flag off until Alvin rings. |
 
 Live transfer is **opt-in per tenant**. Kenya shops that cannot pick up during the day keep callback. Never auto-upgrade a tenant because they filled in a team phone.
 
@@ -48,7 +48,9 @@ That empty-response hook is the transfer executor’s insertion point:
 3. Staging (`HD_0a8d5911d055`) showed StreamStopped **does not** re-POST `/voice/incoming`; it hits `events_url`, which cannot return Dial. Answer XML is therefore `<Stream connect="true"/>` then `<Redirect>` to `/voice/transfer`.
 4. `/voice/transfer` returns **`<Dial>`** when a transfer is pending. If Dial times out or is busy, the next webhook returns **`<Say>` fallback + hangup**.
 
-Warm conference is now the **next executor**, not v2. SautiKit’s call-center pattern: hold the PSTN in a named `<Conference>`, then `POST /v1/calls` to the directory mobile with a voice callback that joins the same room. Cold Dial after Stream cannot run: StreamStopped never re-hits `/voice/incoming`, and verbs after `<Stream connect="true"/>` (Redirect) never execute. Do not close `/ws/media` for transfer until that conference path is proven.
+Warm conference is the executor. When `VOICE_LIVE_TRANSFER=on`, inbound answer is Stream **without** `connect` plus `<Conference>` on a per-call room so later verbs are not needed. Transfer then `POST /v1/calls` to the directory mobile; the outbound webhook (`/voice/transfer-agent`) joins the same room. Close `/ws/media` only after originate returns 201. If originate fails, AI stays; SMS already sent.
+
+Cold Dial after Stream cannot run: StreamStopped never re-hits `/voice/incoming`, and verbs after `<Stream connect="true"/>` (Redirect) never execute. Do not close Stream for Dial.
 
 ---
 

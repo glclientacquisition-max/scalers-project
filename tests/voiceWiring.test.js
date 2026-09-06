@@ -84,6 +84,24 @@ assert.match(
 
 assert.match(
   source,
+  /originateOutboundCall/,
+  'live transfer must POST /v1/calls so the teammate can join the conference'
+);
+
+assert.match(
+  source,
+  /\/voice\/transfer-agent/,
+  'outbound transfer leg must hit /voice/transfer-agent to join Conference'
+);
+
+assert.match(
+  source,
+  /buildAnswerConferenceHoldXml/,
+  'executor on must answer with Stream plus Conference hold'
+);
+
+assert.match(
+  source,
   /\/voice\/transfer/,
   'post-Stream Redirect must hit /voice/transfer to issue Dial'
 );

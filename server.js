@@ -136,10 +136,19 @@ const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
   consumeLiveTransferWebhook,
   queuePendingLiveTransfer,
+  markPendingLiveTransfer,
   hasPendingLiveTransfer,
+  getPendingLiveTransfer,
+  conferenceRoomName,
+  rememberCallVoiceHttpBase,
+  getCallVoiceHttpBase,
+  envPublicVoiceHttpBase,
   buildAnswerStreamXml,
+  buildAnswerConferenceHoldXml,
+  buildAgentJoinConferenceXml,
   emptyVoiceXml,
 } = require('./src/sautikit/pendingLiveTransfer');
+const { originateOutboundCall, isSautikitApiConfigured } = require('./src/sautikit/voiceApi');
 const {
   summarizeHeaders,
   summarizeBody,
@@ -307,6 +316,8 @@ app.get('/healthz', (_req, res) => {
     liveTransfer: {
       executor: envLiveTransferExecutorEnabled(),
       ignoreHours: envLiveTransferIgnoreHours(),
+      mode: 'conference',
+      sautikitApi: isSautikitApiConfigured(),
     },
   });
 });
@@ -398,13 +409,27 @@ function buildMediaStreamUrl(req) {
   return `${wsProto}://${host}/ws/media`;
 }
 
-function buildVoiceTransferContinueUrl(req, callSid) {
+function buildVoiceHttpBase(req) {
   const host = requestHost(req);
-  if (!host) {
+  if (!host) return envPublicVoiceHttpBase();
+  return `${requestHttpProto(req)}://${host}`;
+}
+
+function buildVoiceTransferContinueUrl(req, callSid) {
+  const base = buildVoiceHttpBase(req);
+  if (!base) {
     throw new Error('Missing Host header — cannot build transfer Redirect URL');
   }
   const sid = encodeURIComponent(String(callSid || '').trim());
-  return `${requestHttpProto(req)}://${host}/voice/transfer?callSid=${sid}`;
+  return `${base}/voice/transfer?callSid=${sid}`;
+}
+
+function buildVoiceTransferAgentUrl({ inboundCallSid, room, httpBase } = {}) {
+  const base = String(httpBase || envPublicVoiceHttpBase() || '').replace(/\/+$/, '');
+  if (!base) return null;
+  const inbound = encodeURIComponent(String(inboundCallSid || '').trim());
+  const roomName = encodeURIComponent(String(room || '').trim());
+  return `${base}/voice/transfer-agent?inbound=${inbound}&room=${roomName}`;
 }
 
 /** Digits-only phone compare (+2547… vs 2547…). */
@@ -809,14 +834,21 @@ async function handleVoiceIncoming(req, res) {
     }
 
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
-    // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s.
-    // Pass callSid on the WS URL so /ws/media can bind the session without
-    // waiting for the first metadata frame. Redirect after Stream runs when
-    // the media socket closes (StreamStopped does not re-hit this URL).
-    const twiml = buildAnswerStreamXml({
-      streamUrl,
-      continueUrl: buildVoiceTransferContinueUrl(req, callSid),
-    });
+    const httpBase = buildVoiceHttpBase(req);
+    if (httpBase) rememberCallVoiceHttpBase(callSid, httpBase);
+    // Flag off: Stream connect=true (today's AI path).
+    // Flag on: Stream connect=false plus Conference so POST /v1/calls can join.
+    let twiml;
+    if (envLiveTransferExecutorEnabled()) {
+      const room = conferenceRoomName(callSid);
+      twiml = buildAnswerConferenceHoldXml({ streamUrl, room });
+      console.log(`[voice/incoming] conference hold room=${room} callSid=${callSid}`);
+    } else {
+      twiml = buildAnswerStreamXml({
+        streamUrl,
+        continueUrl: buildVoiceTransferContinueUrl(req, callSid),
+      });
+    }
 
     res.type('text/xml').send(twiml);
   } catch (err) {
@@ -882,6 +914,53 @@ async function handleVoiceTransferContinue(req, res) {
 }
 
 app.post('/voice/transfer', sautikitWebhookGuard, handleVoiceTransferContinue);
+
+async function handleVoiceTransferAgent(req, res) {
+  try {
+    const extracted = extractVoiceNumbers(req.body || {});
+    const callSessionState = extracted.callSessionState;
+    const outboundSid = extracted.callSid || '';
+    const inboundSid = String(req.query?.inbound || '').trim();
+    const room =
+      String(req.query?.room || '').trim() || conferenceRoomName(inboundSid);
+    if (shouldSkipMediaStream(callSessionState, req.body || {}, outboundSid)) {
+      console.log(
+        `[voice/transfer-agent] lifecycle ${callSessionState || 'none'} outbound=${outboundSid || 'none'} — empty Response`
+      );
+      return res.type('text/xml').send(emptyVoiceXml());
+    }
+    if (inboundSid && outboundSid) {
+      const inbound = await db.getCall(inboundSid).catch(() => null);
+      db.persistOutboundTransferLeg({
+        inboundCallSid: inboundSid,
+        outboundCallSid: outboundSid,
+        tenantId: inbound?.tenant_id || null,
+        fromNumber: extracted.fromNumber || inbound?.to_number || 'unknown',
+        toNumber: extracted.toNumber || null,
+      }).catch((err) => {
+        console.warn('[voice/transfer-agent] persistOutboundTransferLeg:', err?.message || err);
+      });
+      db.saveTransferAttempt({
+        callSid: inboundSid,
+        attempt: {
+          status: 'ringing',
+          mode: 'conference',
+          outbound_call_sid: outboundSid,
+          room,
+        },
+      }).catch(() => {});
+    }
+    console.log(
+      `[voice/transfer-agent] join room=${room} inbound=${inboundSid} outbound=${outboundSid}`
+    );
+    return res.type('text/xml').send(buildAgentJoinConferenceXml({ room }));
+  } catch (err) {
+    console.error('[voice/transfer-agent] failed:', err?.message || err);
+    return res.type('text/xml').send(emptyVoiceXml());
+  }
+}
+
+app.post('/voice/transfer-agent', sautikitWebhookGuard, handleVoiceTransferAgent);
 
 // ---------------------------------------------------------------------------
 // 2. Recording attach helper (provider-agnostic). Used when a recording URL
@@ -2056,12 +2135,23 @@ mediaWss.on('connection', (ws, req) => {
           }
         }, 800);
       } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
-        // Staging spikes proved SautiKit does not continue the voice document
-        // after Stream (no Redirect, no StreamStopped on /voice/incoming).
-        // Closing media leaves dead air. Keep the AI on the line; SMS already sent.
-        console.warn(
-          `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
-        );
+        const pending = getPendingLiveTransfer(sessionCallSid);
+        if (pending?.mode === 'conference' && pending.status === 'ringing') {
+          console.log(
+            `[ws/media][${sidLabel()}] live transfer — closing Stream; caller stays in conference`
+          );
+          setTimeout(() => {
+            try {
+              ws.close(1000, 'live_transfer_conference');
+            } catch {
+              /* ignore */
+            }
+          }, 800);
+        } else {
+          console.warn(
+            `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
+          );
+        }
       }
       turnTiming.log({ outcome: turnOutcome });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -2652,29 +2742,106 @@ async function maybeQueueLiveTransfer({
     return false;
   }
   const callerId = normalizeKenyaE164(profile?.did) || null;
+  const room = conferenceRoomName(callSid);
   const queued = queuePendingLiveTransfer({
     callSid,
     to: dest.phone,
     callerId,
+    room,
+    mode: 'conference',
   });
   if (!queued) return false;
+  const httpBase = getCallVoiceHttpBase(callSid) || envPublicVoiceHttpBase();
+  const agentUrl = buildVoiceTransferAgentUrl({
+    inboundCallSid: callSid,
+    room,
+    httpBase,
+  });
   await db
     .saveTransferAttempt({
       callSid,
       attempt: {
         status: queued.status,
-        mode: 'cold_dial',
+        mode: 'conference',
         to: dest.phone,
         caller_id: callerId,
         timeout_s: queued.timeoutS,
         started_at: new Date().toISOString(),
+        room,
         teammate: { name: dest.name, role: dest.role, phone: dest.phone },
       },
     })
     .catch((err) => {
       console.warn(`[${callSid}] saveTransferAttempt failed:`, err?.message || err);
     });
-  console.log(`[${callSid}] live transfer queued Dial ${dest.phone}`);
+
+  if (!agentUrl || !callerId) {
+    console.warn(
+      `[${callSid}] live transfer conference not originated (missing ${!agentUrl ? 'public URL' : 'DID'})`
+    );
+    return false;
+  }
+
+  const originated = await originateOutboundCall({
+    from: callerId,
+    to: dest.phone,
+    voiceCallbackUrl: agentUrl,
+    clientRequestId: `xfer-${String(callSid).replace(/[^\w-]/g, '').slice(-24)}`,
+  });
+  if (!originated.ok) {
+    console.warn(
+      `[${callSid}] live transfer originate failed: ${originated.reason}`,
+      originated.status || '',
+      originated.error || ''
+    );
+    markPendingLiveTransfer(callSid, {
+      status: 'failed',
+      error: originated.reason,
+    });
+    await db
+      .saveTransferAttempt({
+        callSid,
+        attempt: { status: 'failed', error: originated.reason, mode: 'conference' },
+      })
+      .catch(() => {});
+    return false;
+  }
+
+  const outboundSid = originated.sessionId || originated.callId;
+  markPendingLiveTransfer(callSid, {
+    status: 'ringing',
+    outboundCallSid: outboundSid,
+    sautikitCallId: originated.callId,
+  });
+  const inbound = await db.getCall(callSid).catch(() => null);
+  if (outboundSid && inbound?.tenant_id) {
+    await db
+      .persistOutboundTransferLeg({
+        inboundCallSid: callSid,
+        outboundCallSid,
+        tenantId: inbound.tenant_id,
+        fromNumber: callerId,
+        toNumber: dest.phone,
+      })
+      .catch((err) => {
+        console.warn(`[${callSid}] persistOutboundTransferLeg:`, err?.message || err);
+      });
+  }
+  await db
+    .saveTransferAttempt({
+      callSid,
+      attempt: {
+        status: 'ringing',
+        mode: 'conference',
+        outbound_call_sid: outboundSid,
+        sautikit_call_id: originated.callId || null,
+        room,
+      },
+    })
+    .catch(() => {});
+  console.log(
+    `[${callSid}] live transfer originated ${dest.phone} room=${room} outbound=${outboundSid || 'pending'}`
+  );
   return true;
 }
 
