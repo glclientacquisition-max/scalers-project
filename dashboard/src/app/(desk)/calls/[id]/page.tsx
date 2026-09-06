@@ -11,6 +11,7 @@ import {
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { CallRecording } from "@/components/CallRecording";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
+import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import {
   MarkLeadArchiveButton,
@@ -21,8 +22,12 @@ import {
   callsHref,
   followUpWhatsAppMessage,
   formatCallWhen,
-  type StatusFilterId,
 } from "@/lib/callsTriage";
+import {
+  classifyInboxPurpose,
+  type InboxHold,
+  type InboxJob,
+} from "@/lib/inboxPurpose";
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
@@ -81,8 +86,13 @@ function buildSummarySentence(opts: {
   return `${who} called about: ${reason}.${opts.urgent ? " This sounded urgent." : ""}`;
 }
 
-function parseFromFilter(raw: string | undefined): StatusFilterId | undefined {
+function parseFromFilter(raw: string | undefined): string | undefined {
   if (
+    raw === "needs" ||
+    raw === "hold" ||
+    raw === "job" ||
+    raw === "human" ||
+    raw === "answered" ||
     raw === "all" ||
     raw === "new" ||
     raw === "contacted" ||
@@ -124,19 +134,17 @@ export default async function CallDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const fromFilter = parseFromFilter(sp.from);
-  const backHref = fromFilter ? callsHref({ status: fromFilter }) : "/calls";
-  const backLabel =
-    fromFilter === "new"
-      ? "Back to new leads"
-      : fromFilter === "contacted"
-        ? "Back to followed up"
-        : fromFilter === "resolved"
-          ? "Back to done"
-          : fromFilter === "archived"
-            ? "Back to archived"
-            : fromFilter === "all"
-              ? "Back to all calls"
-              : "Back to inbox";
+  const backHref = fromFilter
+    ? fromFilter === "new" ||
+      fromFilter === "contacted" ||
+      fromFilter === "resolved" ||
+      fromFilter === "archived"
+      ? callsHref({
+          status: fromFilter as "new" | "contacted" | "resolved" | "archived",
+        })
+      : callsHref({ purpose: fromFilter })
+    : "/calls";
+  const backLabel = "Inbox";
 
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
@@ -208,6 +216,41 @@ export default async function CallDetailPage({
 
   const turns = (transcripts || []) as TranscriptRow[];
 
+  const [holdRes, jobRes] = await Promise.all([
+    workspace.client
+      .from("service_requests")
+      .select(
+        "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id"
+      )
+      .eq("tenant_id", tenant.id)
+      .eq("call_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    workspace.client
+      .from("appointments")
+      .select(
+        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
+      )
+      .eq("tenant_id", tenant.id)
+      .eq("call_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
+
+  const hold = holdRes.error
+    ? null
+    : (((holdRes.data || [])[0] || null) as InboxHold | null);
+  const job = jobRes.error
+    ? null
+    : (((jobRes.data || [])[0] || null) as InboxJob | null);
+  const purpose = classifyInboxPurpose({
+    primaryIntent: row.primary_intent,
+    resolution,
+    leadStatus,
+    hold,
+    job,
+  });
+
   return (
     <div className="max-w-6xl">
       <Link
@@ -224,6 +267,9 @@ export default async function CallDetailPage({
             <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
               {title}
             </h1>
+            <div className="mt-3">
+              <InboxPurposeChip purpose={purpose} />
+            </div>
             <p className="mt-2 text-sm text-ink-soft">
               {formatCallWhen(row.created_at, "full")}
             </p>
