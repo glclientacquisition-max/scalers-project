@@ -25,6 +25,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 | Line item | Ledger kind | Amount |
 |---|---|---|
 | Receptionist minutes | `call_charge` | `round(minutes × rate)` KES |
+| Live transfer outbound (future) | `call_charge` on a **second** `calls` row | Same formula; rate `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (defaults to inbound rate). Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
 | Line rental | `line_rental` | Fixed KES / calendar month (UTC) |
 | Ops seed / correction | `admin_adjustment` | Signed KES |
 | Future M-Pesa | `topup` | Positive KES |

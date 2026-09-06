@@ -30,6 +30,7 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 1. **One prepaid KES wallet** — AI bundled into per-minute rate; no resurrecting dual USD/KES client wallets.
 2. Ledger is append-only; credits/debits via security-definer RPCs / service role only.
 3. `charge_call_to_wallet` (and JS wrapper) must stay **idempotent** per call.
+4. Live transfer outbound is a **second** call id. Never fold those minutes into the inbound row. Beta does not originate outbound PSTN unless ops sets the lab flag. See [`docs/LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8.
 4. Beta default: `billing_enforcement = off` → meter only, no charges (`docs/BETA_WALLET_PROGRAM.md`).
 5. Soft/hard enforcement behavior must match docs; do not silently bill beta tenants.
 6. DID pool statuses (`available` / `assigned` / `reserved` / `disabled`) stay consistent with tenant `sautikit_virtual_number`.

@@ -13,6 +13,7 @@ const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-record
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 15);
+const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
 
 function throwIfError(context, error) {
   if (error) {
@@ -305,10 +306,53 @@ async function saveEscalation({ callSid, teammate, reason }) {
  */
 async function saveTransferAttempt({ callSid, attempt } = {}) {
   if (!callSid || !attempt || typeof attempt !== 'object') return null;
+  const existing = await getCall(callSid);
+  const prev = existing ? parseSummary(existing.summary).transfer_attempt : null;
+  const merged =
+    prev && typeof prev === 'object' ? { ...prev, ...attempt } : attempt;
   return mergeCallSummaryMeta({
     callSid,
-    patch: { transfer_attempt: attempt },
+    patch: { transfer_attempt: merged },
   });
+}
+
+/**
+ * Outbound conference join is a second SautiKit CDR. Persist it as its own
+ * calls row (same tenant) so charge_call_to_wallet stays idempotent per id.
+ */
+async function persistOutboundTransferLeg({
+  inboundCallSid,
+  outboundCallSid,
+  tenantId,
+  fromNumber,
+  toNumber,
+} = {}) {
+  if (!outboundCallSid || !tenantId) return null;
+  const outbound = await upsertCall({
+    callSid: outboundCallSid,
+    fromNumber: fromNumber || 'unknown',
+    toNumber: toNumber || null,
+    tenantId,
+    provider: 'sautikit',
+  });
+  await mergeCallSummaryMeta({
+    callSid: outboundCallSid,
+    patch: {
+      direction: 'outbound',
+      kind: 'live_transfer',
+      parent_call_sid: inboundCallSid || null,
+    },
+  });
+  if (inboundCallSid) {
+    await saveTransferAttempt({
+      callSid: inboundCallSid,
+      attempt: {
+        outbound_call_sid: outboundCallSid,
+        outbound_call_id: outbound?.id || null,
+      },
+    });
+  }
+  return outbound;
 }
 
 async function markEscalationSent(callSid) {
@@ -420,6 +464,11 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     return null;
   }
 
+  const existingMeta = parseSummary(existing.summary);
+  const isOutboundTransfer =
+    existingMeta.kind === 'live_transfer' && existingMeta.direction === 'outbound';
+  const outboundRate = isOutboundTransfer ? envTransferRateKesPerMin() : WALLET_RATE_KES_PER_MINUTE;
+
   const terminalStatuses = new Set(['complete', 'completed', 'failed', 'no_answer']);
   const alreadyTerminal = terminalStatuses.has(String(existing.status || '').toLowerCase());
   const patch = {};
@@ -441,7 +490,12 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
       if (!existing.duration_seconds || nextDuration >= Number(existing.duration_seconds || 0)) {
         patch.duration_seconds = nextDuration;
         // Billable minutes ≈ talk time (0.1 min resolution). Used by one-KES wallet charge.
-        patch.ai_processing_minutes = Math.round((nextDuration / 60) * 10) / 10;
+        // Unanswered outbound transfer ring time is not billable (SautiKit does not charge it).
+        if (isOutboundTransfer && finalStatus !== 'complete') {
+          patch.ai_processing_minutes = 0;
+        } else {
+          patch.ai_processing_minutes = Math.round((nextDuration / 60) * 10) / 10;
+        }
       }
     }
   }
@@ -452,6 +506,7 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
       await chargeCallToWallet({
         callId: existing.id,
         minutes: Number(existing.ai_processing_minutes),
+        rateKesPerMin: outboundRate,
       }).catch((err) => {
         console.warn('[db] chargeCallToWallet:', err?.message || err);
       });
@@ -477,6 +532,7 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     await chargeCallToWallet({
       callId: shaped.id,
       minutes: Number(shaped.ai_processing_minutes || patch.ai_processing_minutes),
+      rateKesPerMin: outboundRate,
     }).catch((err) => {
       console.warn('[db] chargeCallToWallet:', err?.message || err);
     });
@@ -671,10 +727,20 @@ async function getTenantById(tenantId) {
   let { data, error } = await supabase
     .from('tenants')
     .select(
-      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'
+      'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, billing_enforcement, wallet_balance_kes, is_active'
     )
     .eq('id', tenantId)
     .maybeSingle();
+
+  if (error && /billing_enforcement|wallet_balance_kes/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from('tenants')
+      .select(
+        'id, business_name, sautikit_virtual_number, llm_system_prompt, whatsapp_notification_number, alert_email, notify_channels, agent_name, agent_tone, business_hours, hours_schedule, after_hours_mode, services_offered, services_catalog, product_catalog, social_handles, faqs, team_directory, unknown_answer_fallback, daily_bulletin, agent_tools, tts_lexicon, soniox_voice_id, soniox_voice_label, vertical, handoff_mode, business_locations, business_policies, is_active'
+      )
+      .eq('id', tenantId)
+      .maybeSingle());
+  }
 
   if (error && /notify_channels/i.test(error.message)) {
     ({ data, error } = await supabase
@@ -840,6 +906,8 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       handoffMode: 'callback',
       businessLocations: [],
       businessPolicies: {},
+      billingEnforcement: null,
+      walletBalanceKes: null,
     };
   }
 
@@ -883,6 +951,10 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
     handoffMode: parseHandoffMode(row.handoff_mode),
     businessLocations: row.business_locations || [],
     businessPolicies: row.business_policies || {},
+    billingEnforcement:
+      row.billing_enforcement != null ? String(row.billing_enforcement) : null,
+    walletBalanceKes:
+      row.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null,
   };
 }
 
@@ -1331,6 +1403,7 @@ module.exports = {
   saveCallerInfo,
   saveEscalation,
   saveTransferAttempt,
+  persistOutboundTransferLeg,
   appendTranscript,
   attachRecording,
   updateCallStatus,

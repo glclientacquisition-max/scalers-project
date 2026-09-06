@@ -5,6 +5,10 @@ const { parseAgentTools } = require('./agentTools');
 const { openClosedStatus } = require('./businessHours');
 const { normalizeTeam } = require('./liveKnowledge');
 const { resolveEscalation } = require('./escalation');
+const {
+  canOriginateOutboundTransfer,
+  envTransferRateKesPerMin,
+} = require('../billing/liveTransferLegs');
 
 function envLiveTransferIgnoreHours() {
   return /^(1|true|on|yes)$/i.test(
@@ -77,6 +81,16 @@ function liveTransferReady({ profile = {}, executorEnabled, now } = {}) {
   }
   if (!teamHasDialablePhone(profile.teamDirectory)) {
     return { ready: false, reason: 'no_destination' };
+  }
+  if (profile.billingEnforcement != null || profile.walletBalanceKes != null) {
+    const bill = canOriginateOutboundTransfer({
+      billingEnforcement: profile.billingEnforcement,
+      walletBalanceKes: profile.walletBalanceKes,
+      rateKesPerMin: envTransferRateKesPerMin(),
+    });
+    if (!bill.ok) {
+      return { ready: false, reason: bill.reason };
+    }
   }
   return { ready: true, reason: 'ok' };
 }

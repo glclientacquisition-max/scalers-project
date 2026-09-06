@@ -80,6 +80,17 @@ describe('liveTransferReady', () => {
     }
   });
 
+  it('does not authorize outbound on beta without the lab flag', () => {
+    assert.equal(
+      liveTransferReady({
+        profile: { ...profileBase, billingEnforcement: 'off' },
+        executorEnabled: true,
+        now: openNow(),
+      }).reason,
+      'beta_no_outbound'
+    );
+  });
+
   it('picks a dialable directory destination', () => {
     assert.equal(teamHasDialablePhone(profileBase.teamDirectory), true);
     const dest = liveTransferDestination(profileBase.teamDirectory, 'owner');

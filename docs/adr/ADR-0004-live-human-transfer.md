@@ -42,7 +42,7 @@ Canonical spec: [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md).
 
 - Voice must change `/voice/incoming` skip-stream behavior: empty Response **or** Dial/Say, never a surprise second Stream.
 - Lab spike ran. WS close does not yield a Dial webhook. Redirect after Stream does not run. Revisit is **conference + REST outbound**, not another WS-close.
-- Ops must confirm Dial destinations are authorized and that wallet events cover the outbound leg.
+- Ops must confirm Dial destinations are authorized and that **each PSTN leg** has its own `calls` row and wallet debit. Beta must not originate outbound.
 - Desk copy must stay honest until the executor and flag are on.
 - Multiple lanes are involved; ship as sequenced PRs (Platform → Voice → Brain → Desk → Ops), not one mixed PR.
 
