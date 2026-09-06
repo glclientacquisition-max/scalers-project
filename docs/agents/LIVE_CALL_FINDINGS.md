@@ -13,9 +13,9 @@ Staging DID `+254709221536` (tenant Done and Dusted Cleaning). Owner set **Conne
 
 Staging Voice is on `cursor/live-transfer-spec-3c65`. `/healthz` shows `liveTransfer.executor=true`, `ignoreHours=true` (Sunday hours bypass). Production Voice was not retargeted.
 
-**Next spike:** call `+254709221536` from a **different** mobile than `+254790381872`. Ask for a human, give a name. Expect “stay on the line”, then Alvin’s phone rings. Logs: `live transfer queued Dial`, `[voice/transfer] live transfer action=dial`.
+**Do not repeat the WS-close spike.** Staging `VOICE_LIVE_TRANSFER` is **off** again so callers get SMS + AI on the line, not dead air.
 
-Turn off `VOICE_LIVE_TRANSFER_IGNORE_HOURS` after the Sunday spike. Point staging source back to `main` when the experiment is done.
+Next build: conference hold + `POST /v1/calls` into the same room ([SautiKit call-center guide](https://sautikit.com/developers/guides/build-a-call-center-with-conferences)). That is a dedicated Voice spike. Do not turn the env flag on until Alvin’s phone rings.
 
 ---
 

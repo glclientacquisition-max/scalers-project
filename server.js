@@ -2056,14 +2056,12 @@ mediaWss.on('connection', (ws, req) => {
           }
         }, 800);
       } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
-        console.log(`[ws/media][${sidLabel()}] live transfer — closing media for Dial`);
-        setTimeout(() => {
-          try {
-            ws.close(1000, 'live_transfer');
-          } catch {
-            /* ignore */
-          }
-        }, 1200);
+        // Staging spikes proved SautiKit does not continue the voice document
+        // after Stream (no Redirect, no StreamStopped on /voice/incoming).
+        // Closing media leaves dead air. Keep the AI on the line; SMS already sent.
+        console.warn(
+          `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
+        );
       }
       turnTiming.log({ outcome: turnOutcome });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;

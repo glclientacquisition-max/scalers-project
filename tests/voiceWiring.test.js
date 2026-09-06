@@ -78,8 +78,8 @@ assert.match(
 
 assert.match(
   source,
-  /buildAnswerStreamXml/,
-  'answer XML must include Stream then Redirect so Dial can run after media close'
+  /live transfer Dial blocked/,
+  'must not close /ws/media for transfer until conference REST can ring a human'
 );
 
 assert.match(

@@ -2,7 +2,11 @@
 
 ## Status
 
-**Proposed**
+**Superseded for the executor** (desk preference still Proposed)
+
+Cold Dial after Stream **failed** on staging (2026-09-06): `HD_ae71b5349f5e`, `HD_4f14d4d55244`. StreamStopped does not re-POST the voice URL. Redirect after Stream never ran. Dial XML returned on Completed after hangup.
+
+Next executor: SautiKit conference + outbound `POST /v1/calls` into the same room. Keep `VOICE_LIVE_TRANSFER=off` until that rings a human. Callback escalate stays the live product.
 
 ## Context
 
@@ -37,7 +41,7 @@ Canonical spec: [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md).
 ## Consequences
 
 - Voice must change `/voice/incoming` skip-stream behavior: empty Response **or** Dial/Say, never a surprise second Stream.
-- A **lab spike** on staging is mandatory before `VOICE_LIVE_TRANSFER=on`. If WS close hangs up the caller, this ADR is revisited (Redirect or conference).
+- Lab spike ran. WS close does not yield a Dial webhook. Redirect after Stream does not run. Revisit is **conference + REST outbound**, not another WS-close.
 - Ops must confirm Dial destinations are authorized and that wallet events cover the outbound leg.
 - Desk copy must stay honest until the executor and flag are on.
 - Multiple lanes are involved; ship as sequenced PRs (Platform → Voice → Brain → Desk → Ops), not one mixed PR.
