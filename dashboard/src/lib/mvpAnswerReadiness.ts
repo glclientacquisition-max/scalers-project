@@ -141,7 +141,7 @@ export function assessMvpAnswerReadiness(
       label: "Structured open/closed schedule",
       required: false,
       ok: hasStructuredHours(input.hoursSchedule),
-      hint: "Use Mon–Sat 9:00 AM – 7:00 PM style text so open/closed is automatic.",
+      hint: "Use Mon-Sat 9:00 AM to 7:00 PM style text so open/closed is automatic.",
     },
     {
       id: "location",
@@ -177,7 +177,7 @@ export function assessMvpAnswerReadiness(
       required: false,
       ok: hasProducts(input.productCatalog),
       hint: retail
-        ? "Upload titles in Train for price/hold/order — blank prices are OK."
+        ? "Upload titles in Train for price/hold/order. Blank prices are OK."
         : "Optional until you sell discrete products.",
     },
   ];

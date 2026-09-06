@@ -49,12 +49,12 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
         {page > 1 ? (
           <Link
             href={buildHref(href, page - 1, params)}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:border-accent"
+            className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
           >
             Previous
           </Link>
         ) : (
-          <span className="rounded-lg border border-line/50 px-3 py-1.5 text-sm text-ink-soft opacity-50">
+          <span className="inline-flex min-h-11 items-center rounded-lg border border-line/50 px-3 text-sm text-ink-soft opacity-50">
             Previous
           </span>
         )}
@@ -64,12 +64,12 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
         {page < totalPages ? (
           <Link
             href={buildHref(href, page + 1, params)}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:border-accent"
+            className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
           >
             Next
           </Link>
         ) : (
-          <span className="rounded-lg border border-line/50 px-3 py-1.5 text-sm text-ink-soft opacity-50">
+          <span className="inline-flex min-h-11 items-center rounded-lg border border-line/50 px-3 text-sm text-ink-soft opacity-50">
             Next
           </span>
         )}

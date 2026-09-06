@@ -2,6 +2,15 @@ import Link from "next/link";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
+import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import { FilterTabs } from "@/components/ui/FilterTabs";
+import {
+  focusRingVisible,
+  pageTitleClass,
+  tableCellClass,
+  tableHeadCellClass,
+} from "@/components/ui/deskChrome";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +43,7 @@ function formatWhen(iso: string) {
 function typeLabel(type: string) {
   switch (type) {
     case "hold":
-      return "Hold / pickup";
+      return "Hold";
     case "order":
       return "Order";
     case "callback":
@@ -84,20 +93,32 @@ export default async function RequestsPage({
   )
     .trim()
     .toLowerCase();
+  const page = Math.max(
+    1,
+    Number.parseInt(
+      String(Array.isArray(params.page) ? params.page[0] : params.page || "1"),
+      10
+    ) || 1
+  );
+  const from = (page - 1) * DEFAULT_PAGE_SIZE;
+  const to = from + DEFAULT_PAGE_SIZE - 1;
 
   const workspace = await createWorkspaceDataClient();
   let rows: ServiceRequestRow[] = [];
   let loadError: string | null = null;
+  let total = 0;
+  let openCount = 0;
 
   if (workspace) {
     let query = workspace.client
       .from("service_requests")
       .select(
-        "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id"
+        "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id",
+        { count: "exact" }
       )
       .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .range(from, to);
 
     if (statusFilter && statusFilter !== "all") {
       query = query.eq("status", statusFilter);
@@ -106,7 +127,14 @@ export default async function RequestsPage({
       query = query.eq("request_type", typeFilter);
     }
 
-    const { data, error } = await query;
+    const [{ data, error, count }, openRes] = await Promise.all([
+      query,
+      workspace.client
+        .from("service_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .eq("status", "open"),
+    ]);
 
     if (error) {
       loadError = /service_requests|relation/i.test(error.message)
@@ -114,10 +142,10 @@ export default async function RequestsPage({
         : error.message;
     } else {
       rows = (data || []) as ServiceRequestRow[];
+      total = count ?? rows.length;
+      openCount = openRes.count ?? 0;
     }
   }
-
-  const openCount = rows.filter((r) => r.status === "open").length;
 
   const filterLink = (status: string, type: string) => {
     const q = new URLSearchParams();
@@ -131,82 +159,54 @@ export default async function RequestsPage({
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
-          Requests
-        </h1>
-        <div className="rounded-2xl border border-line bg-surface px-4 py-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-            Open
-          </p>
-          <p className="font-display text-2xl tracking-tight text-ink">{openCount}</p>
-        </div>
+        <h1 className={pageTitleClass}>Requests</h1>
+        <p className="text-sm text-ink-soft">
+          <span className="font-display text-2xl tracking-tight text-ink">
+            {openCount}
+          </span>{" "}
+          open
+        </p>
       </div>
 
-      <nav
-        aria-label="Filter by status"
-        className="mt-6 border-b border-line"
-      >
-        <ul className="flex gap-1 overflow-x-auto">
-          {(
-            [
-              ["open", "Open"],
-              ["fulfilled", "Done"],
-              ["cancelled", "Cancelled"],
-              ["all", "All"],
-            ] as const
-          ).map(([id, label]) => {
-            const active = statusFilter === id;
-            return (
-              <li key={id}>
-                <Link
-                  href={filterLink(id, typeFilter)}
-                  aria-current={active ? "page" : undefined}
-                  className={[
-                    "inline-flex border-b-2 px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
-                    active
-                      ? "border-[#0096FF] text-[#005ccc]"
-                      : "border-transparent text-ink-soft hover:border-line hover:text-ink",
-                  ].join(" ")}
-                >
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      <nav aria-label="Filter by type" className="mt-2 border-b border-line">
-        <ul className="flex gap-1 overflow-x-auto">
-          {(
-            [
-              ["all", "All types"],
-              ["hold", "Holds"],
-              ["order", "Orders"],
-              ["enquiry", "Enquiries"],
-              ["callback", "Callbacks"],
-            ] as const
-          ).map(([id, label]) => {
-            const active = typeFilter === id;
-            return (
-              <li key={id}>
-                <Link
-                  href={filterLink(statusFilter, id)}
-                  aria-current={active ? "page" : undefined}
-                  className={[
-                    "inline-flex border-b-2 px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
-                    active
-                      ? "border-[#0096FF] text-[#005ccc]"
-                      : "border-transparent text-ink-soft hover:border-line hover:text-ink",
-                  ].join(" ")}
-                >
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <div className="mt-6">
+        <FilterTabs
+          label="Filter by status"
+          active={statusFilter}
+          items={[
+            { id: "open", label: "Open", href: filterLink("open", typeFilter) },
+            {
+              id: "fulfilled",
+              label: "Done",
+              href: filterLink("fulfilled", typeFilter),
+            },
+            {
+              id: "cancelled",
+              label: "Cancelled",
+              href: filterLink("cancelled", typeFilter),
+            },
+            { id: "all", label: "All", href: filterLink("all", typeFilter) },
+          ]}
+        />
+      </div>
+      <FilterTabs
+        label="Filter by type"
+        active={typeFilter}
+        items={[
+          { id: "all", label: "All types", href: filterLink(statusFilter, "all") },
+          { id: "hold", label: "Holds", href: filterLink(statusFilter, "hold") },
+          { id: "order", label: "Orders", href: filterLink(statusFilter, "order") },
+          {
+            id: "enquiry",
+            label: "Enquiries",
+            href: filterLink(statusFilter, "enquiry"),
+          },
+          {
+            id: "callback",
+            label: "Callbacks",
+            href: filterLink(statusFilter, "callback"),
+          },
+        ]}
+      />
 
       {loadError ? (
         <p className="mt-6 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
@@ -222,56 +222,82 @@ export default async function RequestsPage({
         </div>
       ) : null}
 
-      <ul className="mt-6 space-y-3">
-        {rows.map((row) => (
-          <li
-            key={row.id}
-            className="rounded-2xl border border-line bg-surface px-5 py-5"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                  {typeLabel(row.request_type)} · {statusLabel(row.status)} ·{" "}
-                  {formatWhen(row.created_at)}
-                </p>
-                <p className="mt-1 text-lg font-semibold text-ink">
-                  {row.caller_name || "Caller"}
-                </p>
-                {row.item ? (
-                  <p className="mt-0.5 text-sm text-ink-soft">
-                    {row.item}
-                    {row.quantity ? ` (×${row.quantity})` : ""}
-                  </p>
-                ) : null}
-                {row.when_text ? (
-                  <p className="mt-2 text-sm text-ink">When: {row.when_text}</p>
-                ) : null}
-                {row.notes ? (
-                  <p className="mt-1 text-sm leading-relaxed text-ink-soft">
-                    {row.notes}
-                  </p>
-                ) : null}
-              </div>
-              <RequestStatusToggle id={row.id} status={row.status} />
-            </div>
-            {(row.caller_phone || row.call_id) && (
-              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-line/80 pt-4 text-sm">
-                {row.caller_phone ? (
-                  <WhatsAppLink number={row.caller_phone} label="WhatsApp caller" />
-                ) : null}
-                {row.call_id ? (
-                  <Link
-                    href={`/calls/${row.call_id}`}
-                    className="font-medium text-[#0096FF] hover:text-[#005ccc] hover:underline"
+      {!loadError && rows.length > 0 ? (
+        <>
+          <div className="mt-6">
+            <DeskDataTable minWidthClass="min-w-[760px]">
+              <thead className="border-b border-line bg-surface-muted/70 text-ink-soft">
+                <tr>
+                  <th className={tableHeadCellClass}>When</th>
+                  <th className={tableHeadCellClass}>Caller</th>
+                  <th className={tableHeadCellClass}>Request</th>
+                  <th className={tableHeadCellClass}>Status</th>
+                  <th className={tableHeadCellClass} />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-t border-line/70 hover:bg-surface-muted/30"
                   >
-                    Open call
-                  </Link>
-                ) : null}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+                    <td className={`${tableCellClass} whitespace-nowrap text-ink-soft`}>
+                      {formatWhen(row.created_at)}
+                    </td>
+                    <td className={tableCellClass}>
+                      <div className="font-medium text-ink">
+                        {row.caller_name || "Caller"}
+                      </div>
+                      {row.caller_phone ? (
+                        <WhatsAppLink number={row.caller_phone} />
+                      ) : null}
+                    </td>
+                    <td className={tableCellClass}>
+                      <div className="font-medium text-ink">
+                        {typeLabel(row.request_type)}
+                        {row.item ? ` · ${row.item}` : ""}
+                        {row.quantity ? ` ×${row.quantity}` : ""}
+                      </div>
+                      {row.when_text ? (
+                        <div className="mt-0.5 text-ink-soft">{row.when_text}</div>
+                      ) : null}
+                      {row.notes ? (
+                        <div className="mt-0.5 line-clamp-1 text-ink-soft">
+                          {row.notes}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className={tableCellClass}>
+                      <RequestStatusToggle id={row.id} status={row.status} />
+                      <p className="sr-only">{statusLabel(row.status)}</p>
+                    </td>
+                    <td className={`${tableCellClass} text-right`}>
+                      {row.call_id ? (
+                        <Link
+                          href={`/calls/${row.call_id}`}
+                          className={`font-medium text-[#005CCC] ${focusRingVisible}`}
+                        >
+                          Open
+                        </Link>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DeskDataTable>
+          </div>
+          <Pagination
+            page={page}
+            pageSize={DEFAULT_PAGE_SIZE}
+            total={total}
+            href="/requests"
+            params={{
+              status: statusFilter !== "open" ? statusFilter : undefined,
+              type: typeFilter !== "all" ? typeFilter : undefined,
+            }}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,17 @@ import Link from "next/link";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { AppointmentStatusToggle } from "@/components/AppointmentStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { businessSettingsHref } from "@/lib/businessSettingsNav";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
+import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import { FilterTabs } from "@/components/ui/FilterTabs";
+import {
+  btnGhost,
+  focusRingVisible,
+  pageTitleClass,
+  tableCellClass,
+  tableHeadCellClass,
+} from "@/components/ui/deskChrome";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +49,8 @@ export default async function AppointmentsPage({
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16">
-        <p className="text-[var(--ink-soft)]">Sign in to view appointments.</p>
+      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
+        Sign in to view appointments.
       </div>
     );
   }
@@ -50,26 +61,45 @@ export default async function AppointmentsPage({
   )
     .trim()
     .toLowerCase();
+  const page = Math.max(
+    1,
+    Number.parseInt(
+      String(Array.isArray(params.page) ? params.page[0] : params.page || "1"),
+      10
+    ) || 1
+  );
+  const from = (page - 1) * DEFAULT_PAGE_SIZE;
+  const to = from + DEFAULT_PAGE_SIZE - 1;
 
   const workspace = await createWorkspaceDataClient();
   let rows: AppointmentRow[] = [];
   let loadError: string | null = null;
+  let total = 0;
+  let requestedCount = 0;
 
   if (workspace) {
     let query = workspace.client
       .from("appointments")
       .select(
-        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
+        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id",
+        { count: "exact" }
       )
       .eq("tenant_id", tenant.id)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .range(from, to);
 
     if (statusFilter && statusFilter !== "all") {
       query = query.eq("status", statusFilter);
     }
 
-    const { data, error } = await query;
+    const [{ data, error, count }, requestedRes] = await Promise.all([
+      query,
+      workspace.client
+        .from("appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .eq("status", "requested"),
+    ]);
 
     if (error) {
       loadError = /appointments|relation/i.test(error.message)
@@ -77,10 +107,10 @@ export default async function AppointmentsPage({
         : error.message;
     } else {
       rows = (data || []) as AppointmentRow[];
+      total = count ?? rows.length;
+      requestedCount = requestedRes.count ?? 0;
     }
   }
-
-  const requestedCount = rows.filter((r) => r.status === "requested").length;
 
   const filterLink = (status: string) => {
     const q = new URLSearchParams();
@@ -91,121 +121,123 @@ export default async function AppointmentsPage({
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight text-[var(--ink)]">
-            Appointments
-          </h1>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Visit requests your receptionist booked from home-services calls.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-line bg-surface px-5 py-3">
-          <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
-            In this list
-          </p>
-          <p className="font-display text-2xl text-[var(--ink)]">
-            {statusFilter === "requested" ? requestedCount : rows.length}
-          </p>
-        </div>
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className={pageTitleClass}>Appointments</h1>
+        <p className="text-sm text-ink-soft">
+          <span className="font-display text-2xl tracking-tight text-ink">
+            {requestedCount}
+          </span>{" "}
+          requested
+        </p>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {(
-          [
-            ["requested", "Requested"],
-            ["confirmed", "Confirmed"],
-            ["done", "Done"],
-            ["cancelled", "Cancelled"],
-            ["all", "All"],
-          ] as const
-        ).map(([id, label]) => (
-          <Link
-            key={id}
-            href={filterLink(id)}
-            className={[
-              "rounded-lg border px-3 py-1.5 text-sm",
-              statusFilter === id
-                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]"
-                : "border-line bg-surface text-[var(--ink-soft)]",
-            ].join(" ")}
-          >
-            {label}
-          </Link>
-        ))}
+      <div className="mt-6">
+        <FilterTabs
+          label="Filter by status"
+          active={statusFilter}
+          items={[
+            { id: "requested", label: "Requested", href: filterLink("requested") },
+            { id: "confirmed", label: "Confirmed", href: filterLink("confirmed") },
+            { id: "done", label: "Done", href: filterLink("done") },
+            { id: "cancelled", label: "Cancelled", href: filterLink("cancelled") },
+            { id: "all", label: "All", href: filterLink("all") },
+          ]}
+        />
       </div>
 
       {loadError ? (
-        <p className="mt-8 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-[var(--warn)]">
+        <p className="mt-6 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
           {loadError}
         </p>
       ) : null}
 
       {!loadError && rows.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-line bg-surface px-6 py-10 text-center">
-          <p className="text-[var(--ink)] font-medium">
+        <div className="mt-6 border-y border-line py-10 text-center">
+          <p className="font-display text-xl tracking-tight text-ink">
             No appointments in this filter
           </p>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            When a caller books a visit, it appears here. Set vertical to{" "}
-            <span className="font-medium text-[var(--ink)]">Home services</span>{" "}
-            in{" "}
-            <Link href="/settings#train" className="text-[var(--accent)] hover:underline">
-              Business
-            </Link>{" "}
-            and train your services catalogue.
-          </p>
+          <Link href={businessSettingsHref("train")} className={`${btnGhost} mt-5`}>
+            Train
+          </Link>
         </div>
       ) : null}
 
-      <ul className="mt-8 space-y-3">
-        {rows.map((row) => (
-          <li
-            key={row.id}
-            className="rounded-2xl border border-line bg-surface px-5 py-4"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">
-                  {row.status} · {formatWhen(row.created_at)}
-                </p>
-                <p className="mt-1 font-medium text-[var(--ink)]">
-                  {row.caller_name || "Caller"}
-                  <span className="font-normal text-[var(--ink-soft)]">
-                    {" "}
-                    — {row.service_name}
-                  </span>
-                </p>
-                {row.when_text ? (
-                  <p className="mt-1 text-sm text-[var(--ink)]">
-                    When: {row.when_text}
-                  </p>
-                ) : null}
-                {row.address_landmark ? (
-                  <p className="mt-1 text-sm text-[var(--ink)]">
-                    Where: {row.address_landmark}
-                  </p>
-                ) : null}
-                {row.notes ? (
-                  <p className="mt-1 text-sm text-[var(--ink-soft)]">{row.notes}</p>
-                ) : null}
-              </div>
-              <AppointmentStatusToggle id={row.id} status={row.status} />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-sm">
-              {row.caller_phone ? (
-                <WhatsAppLink number={row.caller_phone} label="WhatsApp caller" />
-              ) : null}
-              {row.call_id ? (
-                <Link href="/calls" className="text-[var(--accent)] hover:underline">
-                  Related calls
-                </Link>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
+      {!loadError && rows.length > 0 ? (
+        <>
+          <div className="mt-6">
+            <DeskDataTable minWidthClass="min-w-[760px]">
+              <thead className="border-b border-line bg-surface-muted/70 text-ink-soft">
+                <tr>
+                  <th className={tableHeadCellClass}>When</th>
+                  <th className={tableHeadCellClass}>Caller</th>
+                  <th className={tableHeadCellClass}>Visit</th>
+                  <th className={tableHeadCellClass}>Status</th>
+                  <th className={tableHeadCellClass} />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-t border-line/70 hover:bg-surface-muted/30"
+                  >
+                    <td className={`${tableCellClass} whitespace-nowrap text-ink-soft`}>
+                      {formatWhen(row.created_at)}
+                    </td>
+                    <td className={tableCellClass}>
+                      <div className="font-medium text-ink">
+                        {row.caller_name || "Caller"}
+                      </div>
+                      {row.caller_phone ? (
+                        <WhatsAppLink number={row.caller_phone} />
+                      ) : null}
+                    </td>
+                    <td className={tableCellClass}>
+                      <div className="font-medium text-ink">{row.service_name}</div>
+                      {row.when_text ? (
+                        <div className="mt-0.5 text-ink-soft">{row.when_text}</div>
+                      ) : null}
+                      {row.address_landmark ? (
+                        <div className="mt-0.5 text-ink-soft">
+                          {row.address_landmark}
+                        </div>
+                      ) : null}
+                      {row.notes ? (
+                        <div className="mt-0.5 line-clamp-1 text-ink-soft">
+                          {row.notes}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className={tableCellClass}>
+                      <AppointmentStatusToggle id={row.id} status={row.status} />
+                    </td>
+                    <td className={`${tableCellClass} text-right`}>
+                      {row.call_id ? (
+                        <Link
+                          href={`/calls/${row.call_id}`}
+                          className={`font-medium text-[#005CCC] ${focusRingVisible}`}
+                        >
+                          Open
+                        </Link>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DeskDataTable>
+          </div>
+          <Pagination
+            page={page}
+            pageSize={DEFAULT_PAGE_SIZE}
+            total={total}
+            href="/appointments"
+            params={{
+              status: statusFilter !== "requested" ? statusFilter : undefined,
+            }}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

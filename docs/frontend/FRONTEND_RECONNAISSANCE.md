@@ -1,7 +1,7 @@
 # Scalers frontend reconnaissance
 
-**Status:** Phase 0 of Frontend 2.0. Documentation only. No UI changes.  
-**Date:** 2026-08-30  
+**Status:** Phases 0–2 documented. Phases 3–4 implemented 2026-09-06 (Home Command Center + Requests/Appointments tables).  
+**Date:** 2026-08-30 (recon). Implementation follow-up 2026-09-06.  
 **Branch base:** `main` @ `0d7ea1b`  
 **Lane:** Desk UI/UX (`docs/agents/DESK_UX.md`)  
 **Mission:** Scalers Frontend 2.0 brief (Principal Product Design + Frontend Architecture). Product vision: **the operating console for a business's AI receptionist.**
@@ -472,4 +472,4 @@ No other blockers. Token migration, list density, deep links, and Home layout ar
 
 ## Next step
 
-Phase 1: write `docs/frontend/FRONTEND_CONSTITUTION.md` from this recon + `.cursor/rules/scalers-design-ux.mdc`. Still no UI.
+Phase 5: remaining auth/onboarding/admin token dialect and leftover focus rings. Do not reopen Home/list layout unless a defect appears.
