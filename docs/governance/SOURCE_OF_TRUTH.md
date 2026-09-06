@@ -35,7 +35,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | --- | --- | --- | --- | --- | --- |
 | Agent runtime | Gemini turn loop | `server.js` `runGeminiTurn*` | `@google/genai` import; called from media handler | `/ws/relay` path | CORE |
 | Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../ESCALATION.md) | Live Dial | CORE |
-| Human handoff (live) | Cold Dial after Stream stop | Not implemented (`liveTransfer: false`) | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Conference / warm transfer | PROPOSED |
+| Human handoff (live) | Conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
 | Brain state | Per-call semantic memory | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
 | Tool parse | Marker protocol | `src/conversation/toolMarkers.js` | `parseGeminiResponse` | None | CORE |

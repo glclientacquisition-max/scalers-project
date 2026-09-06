@@ -36,3 +36,4 @@ Brand primary: `#0096FF`.
 - Use strictly Tailwind CSS utility classes in components. Do not add one-off custom CSS for layout or chrome.
 - Maintain generous, consistent container padding (`p-4` to `p-6`) to enforce whitespace and reduce visual congestion.
 - Apply distinct, consistent focus rings on active inputs: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`.
+- Spacing and contrast details: `docs/frontend/FRONTEND_CONSTITUTION.md` and `docs/frontend/design-system/MASTER.md` (8px grid, 44px primary targets, `#005CCC` for small links).

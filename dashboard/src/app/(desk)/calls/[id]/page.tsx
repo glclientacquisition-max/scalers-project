@@ -9,7 +9,7 @@ import {
   type TranscriptRow,
 } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { CallAudioPlayer } from "@/components/CallAudioPlayer";
+import { CallRecording } from "@/components/CallRecording";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import {
@@ -262,7 +262,7 @@ export default async function CallDetailPage({
               href={waHref}
               target="_blank"
               rel="noreferrer"
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-xl bg-[#25D366] px-4 py-4 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
+              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-xl bg-[#0096FF] px-4 py-4 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
             >
               <WhatsAppGlyph className="h-5 w-5 shrink-0" />
               Reply on WhatsApp
@@ -332,15 +332,11 @@ export default async function CallDetailPage({
                   {escalateReason ? `: ${escalateReason}` : ""}
                 </p>
               ) : null}
-              {!row.recording_url ? (
-                <p className="mt-3 text-sm text-ink-soft">No recording attached yet.</p>
-              ) : null}
+              <CallRecording recordingUrl={row.recording_url} variant="empty" />
             </div>
           </div>
 
-          {row.recording_url ? (
-            <CallAudioPlayer src={row.recording_url} />
-          ) : null}
+          <CallRecording recordingUrl={row.recording_url} variant="player" />
         </aside>
 
         {/* RIGHT PANE: transcript + FAQ ideas */}

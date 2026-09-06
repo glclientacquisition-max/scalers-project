@@ -69,6 +69,12 @@ export default {
       maxWidth: {
         desk: "72rem",
       },
+      minHeight: {
+        tap: "2.75rem",
+      },
+      minWidth: {
+        tap: "2.75rem",
+      },
     },
   },
   plugins: [],

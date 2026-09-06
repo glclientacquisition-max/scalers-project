@@ -4,13 +4,13 @@
  */
 
 export const settingsFieldClass =
-  "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+  "mt-1 w-full min-h-11 rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]";
 
 export const settingsDenseFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+  "w-full min-h-11 min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]";
 
 export const settingsTableFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]";
 
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
@@ -20,7 +20,7 @@ export const settingsStickyHeaderClass =
   "sticky top-[var(--desk-header-h,4.5rem)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
 
 export const settingsActionClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition hover:border-[#0096FF]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition hover:border-[#0096FF]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]";
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
@@ -109,7 +109,7 @@ export function ToolSwitch({
         onChange(!checked);
       }}
       className={[
-        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
+        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
         disabled ? "cursor-not-allowed opacity-60" : "",
         checked && !disabled ? "bg-[#0096FF]" : "bg-line",
       ].join(" ")}

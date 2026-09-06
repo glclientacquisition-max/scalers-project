@@ -53,10 +53,10 @@ Without a Gemini key, a local template is saved instead.
 Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triage inbox.
 
 **Home dashboard**
-1. **Glance cards** (interactive) — Waiting · Followed Up · Today · Balance
-2. **Next action** — train / test / triage / caught up
-3. **Line & tools** — DID, Done count, Archived count, quick links
-4. **Lead triage** — top New leads with WhatsApp, Done, Archive, Open
+1. **Line chip** — Line live / Number pending / Needs training (DID + readiness). Never Online.
+2. **Needs you** — dense table of New leads, or the next useful empty state
+3. **What happened** — Today, Followed up, Wallet
+4. **One CTA** — Process pending leads, Train, or Test line
 
 **Inbox (`/calls`)**
 - Search + filters: All · New · Followed Up · Done · Archived
