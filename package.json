@@ -27,6 +27,7 @@
     "smoke:retail": "node scripts/smoke-retail-playbooks.js",
     "smoke:home": "node scripts/smoke-home-services-playbooks.js",
     "smoke:escalation": "node scripts/smoke-escalation-scenarios.js",
+    "smoke:live-transfer": "node scripts/smoke-live-transfer.js",
     "smoke:mvp": "node scripts/smoke-mvp-retail.js",
     "smoke:one-person": "node scripts/smoke-one-person-voice.js",
     "test:notify": "node --test tests/textsmsNotify.test.js",
