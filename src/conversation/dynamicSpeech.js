@@ -1,6 +1,6 @@
 // Dynamic spoken lines — instant varied greeting; optional Gemini rewrite.
 
-const { isInterruptOnlyUtterance } = require('../speech/turnTaking');
+const { decideCallerEvent, isInterruptOnlyUtterance } = require('../speech/turnTaking');
 const {
   eatTimeOfDay,
   composeBusinessAssistantIntro,
@@ -342,26 +342,36 @@ function shouldSkipCallerTurn(text, opts = {}) {
   const t = normalizeCallerText(text);
   if (!t) return true;
 
-  // After barge-in, interrupt-only finals should yield silence — not "I'm listening…".
-  if (isInterruptOnlyUtterance(t)) return true;
-
   const lastAgent = String(opts.lastAgentText || '');
   const awaiting = looksLikeAwaitingCallerReply(lastAgent);
+  const decision = decideCallerEvent({
+    text: t,
+    speaking: false,
+    turnBusy: false,
+    lastAgentText: lastAgent,
+    lastAgentAskedQuestion: awaiting,
+    phase: 'idle',
+    isFinal: true,
+  });
 
-  // Corrections with substance must reach the model ("no, it's Ann").
-  if (/^(no|nope|actually|it's|it is|not |correction)\b/.test(t) && !isInterruptOnlyUtterance(t)) {
+  if (decision.runGemini) return false;
+
+  // Short names like "John" / "Ann" / "Ali" — do not treat as noise after a name ask.
+  if (awaiting && looksLikeNamePrompt(lastAgent) && looksLikeCallerName(t)) {
     return false;
   }
 
-  if (awaiting && CONFIRM_ANSWERS.has(t)) return false;
-
-  // Short names like "John" / "Ann" / "Ali" — do not treat as noise after a name ask.
-  if (awaiting && looksLikeNamePrompt(lastAgent)) {
-    const words = t.split(' ').filter(Boolean);
-    if (words.length <= 3 && t.length <= 40 && !PURE_NOISE.has(t)) return false;
+  if (
+    decision.skip ||
+    decision.replay ||
+    decision.action === 'ignore' ||
+    decision.action === 'skip' ||
+    decision.action === 'barge_listen'
+  ) {
+    return true;
   }
 
-  if (isNonSubstantiveTurn(t)) return true;
+  if (isNonSubstantiveTurn(t) && !awaiting) return true;
   return false;
 }
 

@@ -24,8 +24,8 @@ assert.match(
 
 assert.match(
   source,
-  /classifyFinalDuringAgentSpeech/,
-  'media path must classify finals heard during TTS (echo drop vs queue)'
+  /decideCallerEvent/,
+  'media path must ask the turn-taking decision table what to do with caller speech'
 );
 
 assert.match(

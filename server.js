@@ -107,7 +107,6 @@ const {
   analyzeCallerLanguage,
   createLanguageState,
   resolveLanguageState,
-  isBackchannel,
   languageDirective,
 } = require('./src/conversation/language');
 const {
@@ -123,9 +122,10 @@ const {
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
   adaptiveFlushMs,
-  evaluateBargeIn,
+  decideCallerEvent,
   looksLikeEcho: turnLooksLikeEcho,
   classifyFinalDuringAgentSpeech,
+  agentAwaitingReply,
 } = require('./src/speech/turnTaking');
 const {
   createSpokenStreamBuffer,
@@ -1411,15 +1411,16 @@ mediaWss.on('connection', (ws, req) => {
 
   let lastBargeSkipLogAt = 0;
   function maybeBargeIn(text, source) {
-    const decision = evaluateBargeIn({
+    const decision = decideCallerEvent({
       text,
       speaking,
       turnBusy,
       speakStartedAt,
       lastAgentText,
-      isBackchannel,
+      lastAgentAskedQuestion: agentAwaitingReply(lastAgentText),
+      now: Date.now(),
     });
-    if (!decision.barge) {
+    if (!decision.interrupt) {
       // Rate-limited diagnostics (interim STT is chatty).
       const now = Date.now();
       const sample = String(text || '').trim();
@@ -1434,10 +1435,10 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media][${sidLabel()}] barge skipped (${decision.reason}) src=${source}: ${sample.slice(0, 80)}`
         );
       }
-      return false;
+      return decision;
     }
     cancelSpeech(`${source}/${decision.reason}`);
-    return true;
+    return decision;
   }
 
   function looksLikeEcho(text) {
@@ -1502,6 +1503,22 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
 
+    const idleDecision = decideCallerEvent({
+      text: clean,
+      speaking: false,
+      turnBusy: false,
+      lastAgentText,
+      lastAgentAskedQuestion: agentAwaitingReply(lastAgentText),
+      phase: 'idle',
+      isFinal: true,
+    });
+    if (idleDecision.replay && lastAgentText) {
+      console.log(
+        `[ws/media][${sidLabel()}] hear_again replay reason=${idleDecision.reason}`
+      );
+      await speakText(lastAgentText);
+      return;
+    }
     // Skip pure noise, but keep yes/no and short names when the agent just asked.
     if (shouldSkipCallerTurn(clean, { lastAgentText })) {
       console.log(`[ws/media][${sidLabel()}] skip non-substantive turn: ${clean}`);
@@ -2074,11 +2091,45 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
-      // Finals replace the interim hypothesis.
+      // Finals: one turn-taking decision, then act.
       interimBargeText = '';
-      maybeBargeIn(text, 'final speech');
+      const decision = maybeBargeIn(text, 'final speech');
+
+      if (decision.reason === 'echo') {
+        console.log(
+          `[ws/media][${sidLabel()}] drop echo final while TTS: ${text.slice(0, 80)}`
+        );
+        return;
+      }
+
+      if (decision.replay) {
+        const replay = String(lastAgentText || '').trim();
+        if (replay) {
+          console.log(
+            `[ws/media][${sidLabel()}] hear_again replay reason=${decision.reason}`
+          );
+          void speakText(replay);
+        }
+        return;
+      }
+
+      if (decision.action === 'barge_listen') {
+        return;
+      }
+
+      if (decision.action === 'ignore' || decision.action === 'skip') {
+        if (decision.queue) {
+          utteranceParts.push(text);
+          if (!(speaking && !bargeInActive)) scheduleUtteranceFlush();
+        }
+        return;
+      }
+
       if (speaking && !bargeInActive) {
-        const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText);
+        const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText, {
+          lastAgentAskedQuestion: agentAwaitingReply(lastAgentText),
+          speakStartedAt,
+        });
         if (overlap === 'drop_echo') {
           console.log(
             `[ws/media][${sidLabel()}] drop echo final while TTS: ${text.slice(0, 80)}`
