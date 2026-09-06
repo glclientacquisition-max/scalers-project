@@ -27,6 +27,14 @@ describe('sonioxVoice catalog', () => {
     assert.equal(resolveCuratedVoiceId('not-a-real-voice'), id);
   });
 
+  it('ttsVoiceNeedsSwap is false for null vs default clone', () => {
+    const { ttsVoiceNeedsSwap } = require('../src/speech/sonioxVoice');
+    const id = getDefaultVoiceId();
+    assert.equal(ttsVoiceNeedsSwap(null, undefined), false);
+    assert.equal(ttsVoiceNeedsSwap(id, null), false);
+    assert.equal(ttsVoiceNeedsSwap(id, 'not-a-real-voice'), false);
+  });
+
   it('rejects unknown tenant voice ids', () => {
     assert.equal(isAllowedVoiceId('Adrian'), false);
     assert.equal(resolveSonioxVoice('Adrian'), getDefaultVoiceId());

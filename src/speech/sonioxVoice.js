@@ -20,6 +20,10 @@ function resolveSonioxVoice(tenantVoiceId) {
   return resolveCuratedVoiceId(tenantVoiceId);
 }
 
+function ttsVoiceNeedsSwap(currentVoiceId, wantedVoiceId) {
+  return resolveSonioxVoice(currentVoiceId) !== resolveSonioxVoice(wantedVoiceId);
+}
+
 function isUuidVoice(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     String(value || '').trim()
@@ -151,6 +155,7 @@ async function ensureSonioxVoiceReady(opts = {}) {
 module.exports = {
   SCALERS_SONIOX_VOICE_ID,
   resolveSonioxVoice,
+  ttsVoiceNeedsSwap,
   isUuidVoice,
   isAllowedVoiceId,
   listCuratedVoices,

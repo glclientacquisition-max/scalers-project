@@ -168,6 +168,30 @@ assert.match(
 
 assert.match(
   source,
+  /function bindMediaTts/,
+  'TTS must connect in parallel with tenant fetch, not after tenantWarm'
+);
+
+assert.match(
+  source,
+  /ttsVoiceNeedsSwap/,
+  'greeting may swap TTS only when the tenant catalog voice differs'
+);
+
+assert.match(
+  source,
+  /mode: 'instant'/,
+  'media greeting must be the local instant opener after tenant names load'
+);
+
+assert.doesNotMatch(
+  source,
+  /tenantWarm\s*\.then\(async/,
+  'must not delay TTS connect until tenantWarm resolves'
+);
+
+assert.match(
+  source,
   /if \(state === 'completed' && hasCallSetupFields\) return false;/,
   'SautiKit initial callback with callSessionState=Completed must still open the media stream'
 );
