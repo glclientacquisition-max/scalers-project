@@ -12,7 +12,10 @@ import {
   type CatalogImportState,
 } from "@/app/(desk)/settings/catalogActions";
 import {
+  settingsActionClass,
+  settingsBlockTitleClass,
   settingsFieldClass,
+  settingsPrimaryButtonClass,
   settingsRadioCardClass,
   compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
@@ -89,16 +92,8 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
   const flashIsError = Boolean(applyState.error || previewState.error);
 
   return (
-    <section className="mt-8 space-y-4 border-t border-[var(--line)] pt-8">
-      <div>
-        <h3 className="text-sm font-medium text-[var(--ink)]">
-          Import product catalogue
-        </h3>
-        <p className="mt-1 text-xs text-[var(--ink-soft)]">
-          Products (books, SKUs) separate from services. CSV works best; paste or a
-          public product page also work.
-        </p>
-      </div>
+    <section className="mt-8 space-y-4 border-t border-line pt-8">
+      <p className={settingsBlockTitleClass}>Products</p>
 
       {!products ? (
         <div className="space-y-3">
@@ -116,8 +111,8 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                 onClick={() => setMode(opt.id)}
                 className={settingsRadioCardClass(mode === opt.id)}
               >
-                <span className="font-medium text-[var(--ink)]">{opt.label}</span>
-                <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
+                <span className="font-medium text-ink">{opt.label}</span>
+                <span className="mt-0.5 block text-xs text-ink-soft">
                   {opt.blurb}
                 </span>
               </button>
@@ -145,7 +140,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={previewPending}
-                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                    className={settingsPrimaryButtonClass}
                   >
                     {previewPending ? "Scanning…" : "Scan catalogue"}
                   </button>
@@ -174,7 +169,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={previewPending}
-                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                    className={settingsPrimaryButtonClass}
                   >
                     {previewPending ? "Scanning…" : "Scan catalogue"}
                   </button>
@@ -185,14 +180,14 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-[var(--ink-soft)]">
+          <p className="text-sm text-ink-soft">
             {previewState.message || "Tick products to keep."}
           </p>
           <ul className="max-h-72 space-y-2 overflow-y-auto">
             {products.map((p, i) => (
               <li
                 key={`p-${i}`}
-                className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm"
+                className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2 text-sm"
               >
                 <input
                   type="checkbox"
@@ -206,8 +201,8 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   }}
                 />
                 <div>
-                  <p className="font-medium text-[var(--ink)]">{p.name}</p>
-                  <p className="text-[var(--ink-soft)]">
+                  <p className="font-medium text-ink">{p.name}</p>
+                  <p className="text-ink-soft">
                     {[p.price, p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
                       .filter(Boolean)
                       .join(" · ")}
@@ -218,7 +213,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
           </ul>
 
           {social && socialHandlesHaveContent(social) ? (
-            <label className="flex gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm">
+            <label className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
               <input
                 type="checkbox"
                 className="mt-1"
@@ -227,7 +222,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
               />
               <span>
                 <span className="font-medium">Also save phones / social found</span>
-                <span className="mt-1 block text-[var(--ink-soft)]">
+                <span className="mt-1 block text-ink-soft">
                   {social.channels
                     .filter((c) => c.value.trim())
                     .map((c) => `${c.kind}${c.label ? ` (${c.label})` : ""}: ${c.value}`)
@@ -241,24 +236,14 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             <button
               type="button"
               onClick={() => setMergeMode("merge")}
-              className={[
-                "rounded-xl border px-3 py-2 text-left text-sm",
-                mergeMode === "merge"
-                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                  : "border-[var(--line)] bg-white",
-              ].join(" ")}
+              className={settingsRadioCardClass(mergeMode === "merge")}
             >
               Keep existing products
             </button>
             <button
               type="button"
               onClick={() => setMergeMode("replace")}
-              className={[
-                "rounded-xl border px-3 py-2 text-left text-sm",
-                mergeMode === "replace"
-                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                  : "border-[var(--line)] bg-white",
-              ].join(" ")}
+              className={settingsRadioCardClass(mergeMode === "replace")}
             >
               Replace catalogue
             </button>
@@ -285,14 +270,14 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             <button
               type="submit"
               disabled={applyPending || selectedProducts.length === 0}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+              className={settingsPrimaryButtonClass}
             >
               {applyPending ? "Saving…" : "Add to catalogue"}
             </button>
             <button
               type="button"
               onClick={() => setProducts(null)}
-              className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm"
+              className={settingsActionClass}
             >
               Start over
             </button>
@@ -303,7 +288,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
       {flash ? (
         <p
           className={
-            flashIsError ? "text-sm text-[var(--warn)]" : "text-sm text-[var(--accent-deep)]"
+            flashIsError ? "text-sm text-warn" : "text-sm text-[#005ccc]"
           }
           role={flashIsError ? "alert" : "status"}
         >

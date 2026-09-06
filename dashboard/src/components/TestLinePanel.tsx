@@ -23,6 +23,10 @@ import {
   objectUrlFromPreviewResponse,
   previewErrorCopy,
 } from "@/lib/previewAudio";
+import {
+  settingsPanelHeadingClass,
+  settingsPrimaryButtonClass,
+} from "@/components/settingsUi";
 
 /**
  * Business Settings → Test
@@ -127,11 +131,9 @@ export function TestLinePanel({
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-10">
+    <div className="mx-auto max-w-xl space-y-6">
       <header>
-        <h2 className="font-display text-[clamp(1.5rem,4vw,2rem)] tracking-tight text-[var(--ink)]">
-          Test
-        </h2>
+        <h2 className={settingsPanelHeadingClass}>Test</h2>
       </header>
 
       <section className="space-y-4" aria-labelledby="test-preview-heading">
@@ -160,7 +162,7 @@ export function TestLinePanel({
               type="button"
               onClick={() => playPhonePreview()}
               disabled={phonePreviewLoading}
-              className="w-full rounded-2xl bg-[var(--accent)] px-4 py-3.5 text-center text-sm font-semibold text-white hover:bg-[var(--accent-deep)] disabled:opacity-60 sm:w-auto sm:min-w-[12rem]"
+              className={`${settingsPrimaryButtonClass} w-full sm:w-auto sm:min-w-[12rem]`}
             >
               {phonePreviewLoading ? "Generating…" : "Play phone preview"}
             </button>
@@ -185,12 +187,12 @@ export function TestLinePanel({
           </>
         ) : (
           <p className="text-sm text-[var(--ink-soft)]">
-            Add a business name and agent name in{" "}
+            Add a business name and assistant name in{" "}
             <Link
               href={businessSettingsHref("train", "identity")}
               className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
             >
-              Agent Persona
+              Assistant
             </Link>{" "}
             to preview the greeting.
           </p>

@@ -19,6 +19,11 @@ export const POLICY_FIELDS: {
     placeholder: "M-Pesa and cash",
   },
   {
+    id: "deposit",
+    label: "Holds",
+    placeholder: "Hold until 6pm with a name",
+  },
+  {
     id: "returns",
     label: "Returns",
     placeholder: "Unused within 7 days",
@@ -26,12 +31,7 @@ export const POLICY_FIELDS: {
   {
     id: "delivery",
     label: "Delivery",
-    placeholder: "Nairobi CBD, same-day before 2pm",
-  },
-  {
-    id: "deposit",
-    label: "Holds",
-    placeholder: "Hold until evening with a name",
+    placeholder: "Nairobi CBD, same day before 2pm",
   },
   {
     id: "cancellation",
@@ -41,12 +41,12 @@ export const POLICY_FIELDS: {
   {
     id: "warranty",
     label: "Warranty",
-    placeholder: "30-day workmanship warranty",
+    placeholder: "30-day workmanship",
   },
   {
     id: "other",
     label: "Other",
-    placeholder: "Other caller FAQs",
+    placeholder: "No refunds on custom orders",
   },
 ];
 
