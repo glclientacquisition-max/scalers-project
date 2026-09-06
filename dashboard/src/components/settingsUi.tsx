@@ -3,14 +3,16 @@
  * Keep density, focus rings, selection, and destructive actions consistent.
  */
 
+import type { ReactNode } from "react";
+
 export const settingsFieldClass =
-  "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+  "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
 
 export const settingsDenseFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+  "w-full min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
 
 export const settingsTableFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none transition focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+  "w-full min-w-0 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
 
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
@@ -20,23 +22,29 @@ export const settingsStickyHeaderClass =
   "sticky top-[var(--desk-header-h,4.5rem)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
 
 export const settingsActionClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition hover:border-[#0096FF]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:bg-[#0096FF]/[0.04] active:scale-[0.99] active:bg-[#0096FF]/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
+
+export const settingsPrimaryButtonClass =
+  "inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:scale-[0.99] active:bg-[#007acc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 disabled:opacity-60";
+
+export const settingsPanelHeadingClass =
+  "font-display text-xl tracking-tight text-ink";
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
-    "w-full text-left rounded-xl border px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
+    "w-full text-left rounded-xl border px-4 py-3 transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
     selected
-      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF]"
-      : "border-line bg-white hover:border-[#0096FF]/40",
+      ? "border-transparent bg-[#0096FF]/10 ring-2 ring-[#0096FF] active:bg-[#0096FF]/15"
+      : "border-line bg-white hover:border-[#0096FF]/40 hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.08]",
   ].join(" ");
 }
 
 export function settingsChipClass(selected: boolean) {
   return [
-    "inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
+    "inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
     selected
-      ? "border-transparent bg-[#0096FF]/10 text-[#005ccc] ring-1 ring-[#0096FF]"
-      : "border-line bg-white text-ink hover:border-[#0096FF]/40",
+      ? "border-transparent bg-[#0096FF]/10 text-[#005ccc] ring-1 ring-[#0096FF] active:bg-[#0096FF]/15"
+      : "border-line bg-white text-ink hover:border-[#0096FF]/40 hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.08]",
   ].join(" ");
 }
 
@@ -77,7 +85,7 @@ export function TrashButton({
       onClick={onClick}
       aria-label={label}
       className={[
-        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
+        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft transition duration-150 hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
         className,
       ].join(" ")}
     >
@@ -109,7 +117,7 @@ export function ToolSwitch({
         onChange(!checked);
       }}
       className={[
-        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
+        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition duration-150 hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2",
         disabled ? "cursor-not-allowed opacity-60" : "",
         checked && !disabled ? "bg-[#0096FF]" : "bg-line",
       ].join(" ")}
@@ -125,7 +133,43 @@ export function ToolSwitch({
 }
 
 export const settingsGhostButtonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft transition duration-150 hover:bg-surface hover:text-ink active:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
+
+export function SettingsPageHeader({
+  businessName,
+  lineLive,
+  lineDetail,
+  action,
+}: {
+  businessName: string;
+  lineLive: boolean;
+  lineDetail?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <header className={settingsStickyHeaderClass}>
+      <div className="min-w-0">
+        <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
+          Business
+        </p>
+        <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink [overflow-wrap:anywhere]">
+          {businessName}
+        </h1>
+        <p className="mt-1 text-[13px] text-ink-soft [overflow-wrap:anywhere]">
+          <span className="font-medium text-ink">
+            {lineLive ? "Line live" : "Number pending"}
+          </span>
+          {lineLive && lineDetail ? (
+            <span className="mt-0.5 block truncate font-mono text-xs font-normal">
+              {lineDetail}
+            </span>
+          ) : null}
+        </p>
+      </div>
+      {action}
+    </header>
+  );
+}
 
 /** Default rows={2}; expands on focus for long paste without vertical sprawl. */
 export const compactTextareaExpandHandlers = {

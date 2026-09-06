@@ -14,7 +14,12 @@ import {
   postBulletinAction,
   type BulletinActionState,
 } from "@/app/(desk)/settings/bulletinActions";
-import { settingsChipClass, settingsFieldClass } from "@/components/settingsUi";
+import {
+  settingsChipClass,
+  settingsFieldClass,
+  settingsPanelHeadingClass,
+  settingsPrimaryButtonClass,
+} from "@/components/settingsUi";
 
 const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
@@ -62,9 +67,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="min-w-0 space-y-4">
-      <h2 className="font-display tracking-tight text-ink text-[clamp(1.25rem,4vw,1.5rem)]">
-        Updates
-      </h2>
+      <h2 className={settingsPanelHeadingClass}>Updates</h2>
 
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
@@ -101,7 +104,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
         <button
           type="submit"
           disabled={postPending || !text.trim()}
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50"
+          className={settingsPrimaryButtonClass}
         >
           {postPending ? "Posting…" : "Post update"}
         </button>
@@ -135,7 +138,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 <button
                   type="submit"
                   disabled={clearPending}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft hover:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft transition duration-150 hover:text-warn active:text-[#9a3209] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50"
                 >
                   Clear
                 </button>

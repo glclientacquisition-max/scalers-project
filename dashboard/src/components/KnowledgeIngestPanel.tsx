@@ -12,7 +12,10 @@ import {
   type IngestExtractState,
 } from "@/app/(desk)/settings/ingestActions";
 import {
+  settingsActionClass,
   settingsFieldClass,
+  settingsPanelHeadingClass,
+  settingsPrimaryButtonClass,
   settingsRadioCardClass,
   compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
@@ -142,9 +145,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="font-display text-2xl tracking-tight text-ink">
-          Import knowledge
-        </h2>
+        <h2 className={settingsPanelHeadingClass}>Import knowledge</h2>
       </div>
 
       {!draft ? (
@@ -206,7 +207,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={extractPending}
-                    className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
+                    className={settingsPrimaryButtonClass}
                   >
                     {extractPending ? "Finding services…" : "Scan and suggest"}
                   </button>
@@ -230,7 +231,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={extractPending}
-                    className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
+                    className={settingsPrimaryButtonClass}
                   >
                     {extractPending ? "Opening page…" : "Scan and suggest"}
                   </button>
@@ -595,12 +596,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               <button
                 type="button"
                 onClick={() => setMergeMode("merge")}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left text-sm",
-                  mergeMode === "merge"
-                    ? "border-[#0096FF] bg-accent-soft"
-                    : "border-line bg-white",
-                ].join(" ")}
+                className={settingsRadioCardClass(mergeMode === "merge")}
               >
                 <span className="font-medium">Keep my current list</span>
                 <span className="mt-0.5 block text-xs text-ink-soft">
@@ -611,12 +607,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               <button
                 type="button"
                 onClick={() => setMergeMode("replace_services_faqs")}
-                className={[
-                  "rounded-xl border px-3 py-2.5 text-left text-sm",
-                  mergeMode === "replace_services_faqs"
-                    ? "border-[#0096FF] bg-accent-soft"
-                    : "border-line bg-white",
-                ].join(" ")}
+                className={settingsRadioCardClass(mergeMode === "replace_services_faqs")}
               >
                 <span className="font-medium">Start fresh</span>
                 <span className="mt-0.5 block text-xs text-ink-soft">
@@ -684,15 +675,15 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   !includeContactPhone &&
                   !renameBusiness)
               }
-              className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
+              className={settingsPrimaryButtonClass}
             >
-              {applyPending ? "Adding…" : "Add to my receptionist"}
+              {applyPending ? "Adding…" : "Add to my assistant"}
             </button>
             <button
               type="button"
               disabled={applyPending}
               onClick={() => setDraft(null)}
-              className="rounded-xl border border-line bg-white px-4 py-2.5 text-sm text-ink-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+              className={settingsActionClass}
             >
               Start over
             </button>

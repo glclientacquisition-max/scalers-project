@@ -92,13 +92,14 @@ import {
 } from "@/lib/notifyChannels";
 import {
   ExpandTextarea,
+  SettingsPageHeader,
   ToolSwitch,
   TrashIcon,
   settingsChipClass,
   compactTextareaExpandHandlers,
   settingsDenseFieldClass,
   settingsFieldClass,
-  settingsStickyHeaderClass,
+  settingsPanelHeadingClass,
   settingsTableFieldClass,
 } from "@/components/settingsUi";
 import {
@@ -261,7 +262,7 @@ function CatalogPager({
           type="button"
           disabled={page <= 0}
           onClick={onPrev}
-          className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
+          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
         >
           Previous
         </button>
@@ -272,7 +273,7 @@ function CatalogPager({
           type="button"
           disabled={page >= pageCount - 1}
           onClick={onNext}
-          className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
+          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
         >
           Next
         </button>
@@ -513,11 +514,7 @@ export function TenantForm({
 
   useEffect(() => {
     if (state.ok) {
-      setFlash(
-        state.source === "gemini"
-          ? "Training complete. Your receptionist will use this on the next call."
-          : "Training saved (basic mode). Your receptionist will use this on the next call."
-      );
+      setFlash("Saved. Your assistant will use this on the next call.");
     }
   }, [state]);
 
@@ -728,26 +725,21 @@ export function TenantForm({
 
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
-      <header className={settingsStickyHeaderClass}>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">
-            Business
-          </h1>
-          {lineNumber ? (
-            <p className="mt-0.5 text-sm text-ink-soft">
-              Line <span className="font-medium text-ink">{lineNumber}</span>
-            </p>
-          ) : null}
-        </div>
-        <TenantSettingsSaveButton pending={pending} />
-      </header>
+      <SettingsPageHeader
+        businessName={tenant.business_name?.trim() || "Business"}
+        lineLive={Boolean(lineNumber) && lineNumber !== "Number pending"}
+        lineDetail={
+          Boolean(lineNumber) && lineNumber !== "Number pending" ? lineNumber : ""
+        }
+        action={<TenantSettingsSaveButton pending={pending} />}
+      />
 
       <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
         {sidebar}
 
         <div className="min-w-0 flex-1 space-y-4">
           {heading ? (
-            <h2 className="font-display text-xl tracking-tight text-ink">{heading}</h2>
+            <h2 className={settingsPanelHeadingClass}>{heading}</h2>
           ) : null}
 
       <input type="hidden" name="id" value={tenant.id} />
@@ -808,7 +800,7 @@ export function TenantForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="agent_name">
-              Agent name
+              Assistant name
             </label>
             <input
               id="agent_name"

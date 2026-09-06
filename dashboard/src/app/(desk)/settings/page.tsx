@@ -28,10 +28,15 @@ export default async function SettingsPage({
 
   if (!tenant) {
     return (
-      <div className="max-w-xl">
-        <h1 className="font-display text-4xl tracking-tight">Business</h1>
-        <p className="mt-3 text-ink-soft">
-          No workspace is linked to this account yet. Sign up again or contact support.
+      <div className="min-w-0">
+        <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
+          Business
+        </p>
+        <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+          No workspace
+        </h1>
+        <p className="mt-1 text-sm text-ink-soft">
+          Sign up again or contact support.
         </p>
       </div>
     );

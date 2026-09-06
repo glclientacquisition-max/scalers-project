@@ -13,7 +13,7 @@ import {
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
-import { settingsStickyHeaderClass } from "@/components/settingsUi";
+import { SettingsPageHeader } from "@/components/settingsUi";
 
 const PRIMARY_NAV = [
   { id: "updates" as const, label: "Updates" },
@@ -23,11 +23,11 @@ const PRIMARY_NAV = [
 ];
 
 const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
-  { id: "identity", label: "Agent Persona" },
+  { id: "identity", label: "Assistant" },
   { id: "hours", label: "Hours" },
   { id: "locations", label: "Locations" },
   { id: "policies", label: "Policies" },
-  { id: "team", label: "Escalation Team" },
+  { id: "team", label: "Team" },
   { id: "faqs", label: "FAQs" },
   { id: "tools", label: "Tools & voice" },
   { id: "pronunciation", label: "Pronunciation" },
@@ -35,10 +35,10 @@ const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
 
 function navLinkClass(active: boolean) {
   return [
-    "block rounded-lg px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:shadow-focus",
+    "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
     active
       ? "bg-[#0096FF]/10 text-[#005ccc]"
-      : "text-ink-soft hover:bg-surface hover:text-ink",
+      : "text-ink-soft hover:bg-[#0096FF]/[0.04] hover:text-ink active:bg-[#0096FF]/[0.08]",
   ].join(" ");
 }
 
@@ -50,16 +50,13 @@ function panelHeading(tab: BusinessSettingsTab, trainPanel: SettingsPanel): stri
   return null;
 }
 
-function BusinessLine({ tenant }: { tenant: TenantRow }) {
-  const pendingDid = String(tenant.sautikit_virtual_number || "").startsWith("pending:");
-  return (
-    <p className="mt-0.5 text-sm text-ink-soft [overflow-wrap:anywhere]">
-      Line{" "}
-      <span className="font-medium text-ink">
-        {pendingDid ? "Pending assignment" : tenant.sautikit_virtual_number}
-      </span>
-    </p>
-  );
+function settingsLineState(did: string | null | undefined): {
+  lineLive: boolean;
+  lineDetail: string;
+} {
+  const value = String(did ?? "").trim();
+  const lineLive = Boolean(value) && !/^pending:/i.test(value);
+  return { lineLive, lineDetail: lineLive ? value : "" };
 }
 
 function SettingsSidebar({
@@ -85,7 +82,7 @@ function SettingsSidebar({
         ))}
 
         <li>
-          <p className="pointer-events-none mt-4 mb-2 select-none px-3 text-xs font-bold uppercase tracking-wider text-gray-500">
+          <p className="pointer-events-none mt-4 mb-2 select-none px-3 text-xs font-bold uppercase tracking-wide text-gray-500">
             Train
           </p>
           <ul className="space-y-0.5">
@@ -136,11 +133,12 @@ export function BusinessSettingsShell({
   trainPanel: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
 }) {
-  const pendingDid = String(tenant.sautikit_virtual_number || "").startsWith("pending:");
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
   const showForm = tab === "catalog" || tab === "train";
   const heading = panelHeading(tab, trainPanel);
+  const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
+  const businessName = tenant.business_name?.trim() || "Business";
 
   const tenantFormKey = [
     tenant.id,
@@ -162,21 +160,16 @@ export function BusinessSettingsShell({
           panel={formPanel}
           curatedVoices={curatedVoices}
           heading={heading}
-          lineNumber={
-            pendingDid ? "Pending assignment" : tenant.sautikit_virtual_number || ""
-          }
+          lineNumber={lineLive ? lineDetail : "Number pending"}
           sidebar={<SettingsSidebar tab={tab} trainPanel={trainPanel} />}
         />
       ) : (
         <>
-          <header className={settingsStickyHeaderClass}>
-            <div className="min-w-0">
-              <h1 className="font-display tracking-tight text-ink text-[clamp(1.5rem,4vw,1.875rem)]">
-                Business
-              </h1>
-              <BusinessLine tenant={tenant} />
-            </div>
-          </header>
+          <SettingsPageHeader
+            businessName={businessName}
+            lineLive={lineLive}
+            lineDetail={lineDetail}
+          />
 
           <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-start">
             <SettingsSidebar tab={tab} trainPanel={trainPanel} />

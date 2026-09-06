@@ -16,6 +16,10 @@ import {
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
+import {
+  settingsPanelHeadingClass,
+  settingsPrimaryButtonClass,
+} from "@/components/settingsUi";
 
 /**
  * Business Settings → Test
@@ -118,11 +122,9 @@ export function TestLinePanel({
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-10">
+    <div className="mx-auto max-w-xl space-y-6">
       <header>
-        <h2 className="font-display text-[clamp(1.5rem,4vw,2rem)] tracking-tight text-ink">
-          Test
-        </h2>
+        <h2 className={settingsPanelHeadingClass}>Test</h2>
       </header>
 
       <section className="space-y-4" aria-labelledby="test-preview-heading">
@@ -151,7 +153,7 @@ export function TestLinePanel({
               type="button"
               onClick={() => playPhonePreview()}
               disabled={phonePreviewLoading}
-              className="w-full rounded-2xl bg-[#0096FF] px-4 py-3.5 text-center text-sm font-semibold text-white hover:bg-[#005ccc] disabled:opacity-60 sm:w-auto sm:min-w-[12rem]"
+              className={`${settingsPrimaryButtonClass} min-h-12 w-full text-base font-semibold sm:w-auto sm:min-w-[12rem]`}
             >
               {phonePreviewLoading ? "Generating…" : "Play phone preview"}
             </button>
@@ -172,12 +174,12 @@ export function TestLinePanel({
           </>
         ) : (
           <p className="text-sm text-ink-soft">
-            Add a business name and agent name in{" "}
+            Add a business name and assistant name in{" "}
             <Link
               href={businessSettingsHref("train", "identity")}
-              className="font-medium text-[#0096FF] underline-offset-2 hover:underline"
+              className="font-medium text-[#0096FF] underline-offset-2 transition-colors duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
             >
-              Agent Persona
+              Assistant
             </Link>{" "}
             to preview the greeting.
           </p>
@@ -198,7 +200,7 @@ export function TestLinePanel({
         ) : (
           <a
             href={`tel:${did}`}
-            className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-line bg-white px-4 py-4 text-center font-display text-[clamp(1.15rem,4vw,1.5rem)] tracking-tight text-ink transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+            className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-line bg-white px-4 py-4 text-center font-display text-[clamp(1.15rem,4vw,1.5rem)] tracking-tight text-ink transition duration-150 hover:border-[#0096FF] hover:bg-[#0096FF]/[0.04] active:scale-[0.99] active:bg-[#0096FF]/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             {did}
           </a>
@@ -207,7 +209,7 @@ export function TestLinePanel({
           Fix names in{" "}
           <Link
             href={businessSettingsHref("train", "pronunciation")}
-            className="font-medium text-[#0096FF] underline-offset-2 hover:underline"
+            className="font-medium text-[#0096FF] underline-offset-2 transition-colors duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             Pronunciation
           </Link>
@@ -215,7 +217,7 @@ export function TestLinePanel({
           change voice in{" "}
           <Link
             href={businessSettingsHref("train", "tools")}
-            className="font-medium text-[#0096FF] underline-offset-2 hover:underline"
+            className="font-medium text-[#0096FF] underline-offset-2 transition-colors duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             Tools &amp; voice
           </Link>
