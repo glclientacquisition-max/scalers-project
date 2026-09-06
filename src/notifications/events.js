@@ -23,6 +23,7 @@ const EVENTS = Object.freeze({
  * @property {Array<[string, string]>} fields  Ordered label/value rows
  * @property {string} [action]    What the owner should do next
  * @property {string} [recordingUrl]
+ * @property {string} [callUrl]   Deep link to the desk call detail
  * @property {{ name?: string, phone?: string, reason?: string }} [caller]
  * @property {{ name?: string, role?: string, phone?: string }} [teammate]
  * @property {string} [when]      Visit / hold time text for caller confirmations
@@ -47,6 +48,7 @@ function renderEventText(event) {
     if (row) lines.push(row);
   }
   if (event.recordingUrl) lines.push(`Recording: ${event.recordingUrl}`);
+  if (event.callUrl) lines.push(`Open call: ${event.callUrl}`);
   if (event.action) lines.push(event.action);
   return lines.filter(Boolean).join('\n');
 }
@@ -149,6 +151,7 @@ function ownerLeadEvent(call = {}, businessName) {
     businessName,
     fields,
     recordingUrl: call.recording_url,
+    callUrl: call.callUrl || call.call_url || null,
     caller: {
       name: call.name,
       phone: call.from_number || call.caller_number,
