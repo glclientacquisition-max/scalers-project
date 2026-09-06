@@ -130,7 +130,7 @@ const {
 const {
   createSpokenStreamBuffer,
 } = require('./src/speech/spokenStreamBuffer');
-const { createVoiceTurnTiming } = require('./src/speech/voiceTiming');
+const { createVoiceTurnTiming, createCallTranscript } = require('./src/speech/voiceTiming');
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
@@ -1102,7 +1102,13 @@ mediaWss.on('connection', (ws, req) => {
   let afterHoursMode = 'serve';
   let closureNotice = null;
   let messages = [{ role: 'system', content: systemPrompt }];
-  const transcriptLog = [];
+  const callTranscript = createCallTranscript();
+  function logTurnTiming(timing, extra) {
+    if (!timing) return null;
+    const summary = timing.log(extra);
+    callTranscript.stampFromSummary(summary);
+    return summary;
+  }
   let greetingStarted = false;
   /** Soniox 402/fatal: speak a local fallback once, then hang up. */
   let speechOutageStarted = false;
@@ -1277,7 +1283,7 @@ mediaWss.on('connection', (ws, req) => {
       });
       if (pcm?.length) {
         const waitMs = await playLocalPcm(pcm);
-        transcriptLog.push(`Agent: ${line}`);
+        callTranscript.pushAgent(line);
         messages.push({ role: 'assistant', content: line, local: true });
         hangupAfterSpeechOutage(waitMs);
         return { ok: true, outage: true, emergency: true };
@@ -1395,10 +1401,10 @@ mediaWss.on('connection', (ws, req) => {
       }
     }
     clearMediaPlayback(ws);
-    if (activeTurnTiming) {
-      activeTurnTiming.log({ outcome: 'barge_in' });
-      activeTurnTiming = null;
-    }
+        if (activeTurnTiming) {
+          logTurnTiming(activeTurnTiming, { outcome: 'barge_in' });
+          activeTurnTiming = null;
+        }
     releaseQueuedCallerSpeech();
   }
 
@@ -1576,7 +1582,7 @@ mediaWss.on('connection', (ws, req) => {
         ` intent=${brainState.intent} goal=${brainState.goal.primary}` +
         ` next=${nextBestAction.action}: ${clean}`
     );
-    transcriptLog.push(`Caller: ${clean}`);
+    callTranscript.pushCaller(clean);
     messages.push({ role: 'user', content: clean });
 
     const turnMatches = selectProductsForTurn({
@@ -1638,7 +1644,7 @@ mediaWss.on('connection', (ws, req) => {
             ` lang=${callLanguage}: ${progressLine}`
         );
         // Persist progress in the desk transcript — callers hear this line.
-        transcriptLog.push(`Agent: ${progressLine}`);
+        callTranscript.pushAgent(progressLine);
         progressAlreadySpoken = true;
         spokeThisTurn = true;
         actionProgressSpeak = speakText(progressLine)
@@ -1807,7 +1813,7 @@ mediaWss.on('connection', (ws, req) => {
         }
         if (!bargeInActive) {
           await actionProgressSpeak;
-          transcriptLog.push(`Agent: ${result.spokenText}`);
+          callTranscript.pushAgent(result.spokenText);
           turnTiming.markFirstSpokenChunk();
           await speakText(result.spokenText);
           spokeThisTurn = true;
@@ -1835,7 +1841,7 @@ mediaWss.on('connection', (ws, req) => {
               speaking = false;
               releaseQueuedCallerSpeech();
             }
-            turnTiming.log({ outcome: 'barge_in' });
+            logTurnTiming(turnTiming, { outcome: 'barge_in' });
             if (activeTurnTiming === turnTiming) activeTurnTiming = null;
             return;
           }
@@ -1862,7 +1868,7 @@ mediaWss.on('connection', (ws, req) => {
               }
               speakSession = null;
             }
-            if (planned.reply) transcriptLog.push(`Agent: ${planned.reply}`);
+            if (planned.reply) callTranscript.pushAgent(planned.reply);
             spokeThisTurn = true;
           } else {
             try {
@@ -1876,7 +1882,7 @@ mediaWss.on('connection', (ws, req) => {
                 result?.timedOut || result?.llmFailed
                   ? await resolveLlmRecoverySpeech(clean)
                   : planned.reply;
-              transcriptLog.push(`Agent: ${reply}`);
+              callTranscript.pushAgent(reply);
               turnTiming.markFirstSpokenChunk();
               await speakText(reply);
               spokeThisTurn = true;
@@ -1906,7 +1912,7 @@ mediaWss.on('connection', (ws, req) => {
               result?.timedOut || result?.llmFailed
                 ? await resolveLlmRecoverySpeech(clean)
                 : planned.reply;
-            transcriptLog.push(`Agent: ${reply}`);
+            callTranscript.pushAgent(reply);
             turnTiming.markFirstSpokenChunk();
             await speakText(reply);
             spokeThisTurn = true;
@@ -1915,7 +1921,7 @@ mediaWss.on('connection', (ws, req) => {
         } else {
           discardUnspokenAssistant(result?.spokenText || '');
           bargeInActive = false;
-          turnTiming.log({ outcome: 'barge_in' });
+          logTurnTiming(turnTiming, { outcome: 'barge_in' });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
@@ -1942,7 +1948,7 @@ mediaWss.on('connection', (ws, req) => {
           console.log(`[ws/media][${sidLabel()}] discarding Gemini reply after barge-in`);
           discardUnspokenAssistant(reply);
           bargeInActive = false;
-          turnTiming.log({ outcome: 'barge_in' });
+          logTurnTiming(turnTiming, { outcome: 'barge_in' });
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
@@ -1954,7 +1960,7 @@ mediaWss.on('connection', (ws, req) => {
           progressAlreadySpoken &&
           !result?.actionConfirmation;
         if (reply && !skipDuplicateAsk) {
-          transcriptLog.push(`Agent: ${reply}`);
+          callTranscript.pushAgent(reply);
           turnTiming.markFirstSpokenChunk();
           await speakText(reply);
           spokeThisTurn = true;
@@ -1963,7 +1969,7 @@ mediaWss.on('connection', (ws, req) => {
 
       if (result?.actionConfirmation && !bargeInActive) {
         await actionProgressSpeak;
-        transcriptLog.push(`Agent: ${result.actionConfirmation}`);
+        callTranscript.pushAgent(result.actionConfirmation);
         await speakText(result.actionConfirmation);
         spokeThisTurn = true;
       }
@@ -1983,7 +1989,7 @@ mediaWss.on('connection', (ws, req) => {
         console.warn(
           `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}`
         );
-        transcriptLog.push(`Agent: ${guarantee}`);
+        callTranscript.pushAgent(guarantee);
         turnTiming.markFirstSpokenChunk();
         await speakText(guarantee);
         spokeThisTurn = true;
@@ -2009,21 +2015,21 @@ mediaWss.on('connection', (ws, req) => {
           }
         }, 1200);
       }
-      turnTiming.log({ outcome: turnOutcome });
+      logTurnTiming(turnTiming, { outcome: turnOutcome });
       if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] turn failed:`, err?.message || err);
-      turnTiming.log({ outcome: 'error' });
-      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
       if (!bargeInActive && !progressAlreadySpoken && !spokeThisTurn) {
         const recovery = await resolveLlmRecoverySpeech(clean);
-        transcriptLog.push(`Agent: ${recovery}`);
+        callTranscript.pushAgent(recovery);
         await speakText(recovery);
       }
+      logTurnTiming(turnTiming, { outcome: 'error' });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
     } finally {
       clearFillerTimer();
       if (activeTurnTiming === turnTiming) {
-        turnTiming.log({ outcome: 'early_return' });
+        logTurnTiming(turnTiming, { outcome: 'early_return' });
         activeTurnTiming = null;
       }
       turnBusy = false;
@@ -2278,7 +2284,7 @@ mediaWss.on('connection', (ws, req) => {
       const spoken = await speakText(greetingLine);
       if (spoken?.outage || speechOutageStarted) return;
       if (spoken?.ok) {
-        transcriptLog.push(`Agent: ${greetingLine}`);
+        callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
       }
     } catch (err) {
@@ -2388,8 +2394,8 @@ mediaWss.on('connection', (ws, req) => {
       }
       tts = null;
     }
-    if (sessionCallSid && transcriptLog.length) {
-      db.appendTranscript({ callSid: sessionCallSid, transcript: transcriptLog.join('\n') }).catch(
+    if (sessionCallSid && callTranscript.size()) {
+      db.appendTranscript({ callSid: sessionCallSid, turns: callTranscript.turns() }).catch(
         (err) => {
           console.error(`[ws/media] transcript flush failed:`, err?.message || err);
         }

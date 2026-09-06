@@ -77,6 +77,78 @@ function createVoiceTurnTiming(callSid, opts = {}) {
   };
 }
 
+/**
+ * Persistable first-audio latency for transcripts.latency_ms.
+ * Prefer first PCM (audible) over first spoken chunk.
+ * @param {{ first_pcm_ms?: number|null, first_chunk_ms?: number|null }} summary
+ * @returns {number|null}
+ */
+function persistableLatencyMs(summary = {}) {
+  const n = summary.first_pcm_ms ?? summary.first_chunk_ms;
+  if (n == null || !Number.isFinite(Number(n))) return null;
+  return Math.max(0, Math.round(Number(n)));
+}
+
+/**
+ * Structured media-call transcript so appendTranscript can write latency_ms.
+ */
+function createCallTranscript() {
+  /** @type {{ speaker: string, text: string, latencyMs: number|null }[]} */
+  const rows = [];
+
+  function push(speaker, text) {
+    const clean = String(text || '').trim();
+    if (!clean) return null;
+    const row = { speaker, text: clean, latencyMs: null };
+    rows.push(row);
+    return row;
+  }
+
+  function stampFirstAgentSince(startIndex, latencyMs) {
+    if (latencyMs == null || !Number.isFinite(Number(latencyMs))) return null;
+    const ms = Math.max(0, Math.round(Number(latencyMs)));
+    const start = Math.max(0, Number(startIndex) || 0);
+    for (let i = start; i < rows.length; i += 1) {
+      if (rows[i].speaker === 'agent' && rows[i].latencyMs == null) {
+        rows[i].latencyMs = ms;
+        return rows[i];
+      }
+    }
+    return null;
+  }
+
+  function stampFromSummary(summary) {
+    const ms = persistableLatencyMs(summary);
+    let since = 0;
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      if (rows[i].speaker === 'caller') {
+        since = i;
+        break;
+      }
+    }
+    return stampFirstAgentSince(since, ms);
+  }
+
+  return {
+    pushCaller(text) {
+      return push('caller', text);
+    },
+    pushAgent(text) {
+      return push('agent', text);
+    },
+    stampFirstAgentSince,
+    stampFromSummary,
+    size() {
+      return rows.length;
+    },
+    turns() {
+      return rows.map((row) => ({ ...row }));
+    },
+  };
+}
+
 module.exports = {
   createVoiceTurnTiming,
+  persistableLatencyMs,
+  createCallTranscript,
 };
