@@ -1,7 +1,6 @@
-// Billing rules for live transfer. SautiKit charges the workspace for the
-// inbound DID leg and for a separate outbound PSTN leg (conference join).
-// Scalers must not eat that outbound cost, and must not double-charge the
-// inbound call_id (charge_call_to_wallet is idempotent per call id).
+// Billing rules for live transfer.
+// SautiKit currently charges the workspace KES 0 for inbound DID legs and
+// bills outbound PSTN. Tenant card matches that: inbound 0, outbound 4 / min.
 
 const DEFAULT_INBOUND_RATE = 0;
 const DEFAULT_OUTBOUND_RATE = 4;

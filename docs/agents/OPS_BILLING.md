@@ -38,8 +38,8 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 
 ## Rate card defaults (env)
 
-- `WALLET_RATE_KES_PER_MINUTE` (inbound, default **0**)
-- `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (outbound live transfer, default **4**)
+- `WALLET_RATE_KES_PER_MINUTE` (inbound, default **0**; SautiKit inbound is currently free)
+- `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (outbound live transfer, default **4**; covers SautiKit outbound)
 - `WALLET_LINE_FEE_KES_PER_MONTH` (default 1000)
 - `WALLET_CHARGING_ENABLED`
 

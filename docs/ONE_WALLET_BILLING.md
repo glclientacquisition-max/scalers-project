@@ -24,7 +24,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 
 | Line item | Ledger kind | Amount |
 |---|---|---|
-| Receptionist minutes (inbound) | `call_charge` | **KES 0** (`round(minutes × 0)`) |
+| Receptionist minutes (inbound) | `call_charge` | **KES 0**. Matches SautiKit inbound (currently free). Revisit if SautiKit starts charging inbound. |
 | Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 4 / min** (`WALLET_TRANSFER_RATE_KES_PER_MINUTE`). Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
 | Line rental | `line_rental` | Fixed KES / calendar month (UTC) |
 | Ops seed / correction | `admin_adjustment` | Signed KES |
@@ -43,7 +43,6 @@ Full project order: [`docs/supabase/README.md`](./supabase/README.md) (wallet se
 WALLET_CHARGING_ENABLED=true
 WALLET_RATE_KES_PER_MINUTE=0
 WALLET_TRANSFER_RATE_KES_PER_MINUTE=4
-WALLET_LINE_FEE_KES_PER_MONTH=1000
 WALLET_LINE_FEE_KES_PER_MONTH=1000
 ```
 
