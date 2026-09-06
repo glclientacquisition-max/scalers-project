@@ -17,9 +17,11 @@ import {
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
 import {
+  assertPreviewAudioPlayable,
   isAutoplayBlock,
   NO_VOICE_SAMPLE_COPY,
   objectUrlFromPreviewResponse,
+  previewErrorCopy,
 } from "@/lib/previewAudio";
 
 /**
@@ -102,6 +104,12 @@ export function TestLinePanel({
         }),
       });
       const url = await objectUrlFromPreviewResponse(res);
+      try {
+        await assertPreviewAudioPlayable(url);
+      } catch (probeErr) {
+        URL.revokeObjectURL(url);
+        throw probeErr;
+      }
       setPhonePreviewUrl(url);
       try {
         await new Audio(url).play();
@@ -112,9 +120,7 @@ export function TestLinePanel({
         throw playErr;
       }
     } catch (err) {
-      setPhonePreviewError(
-        err instanceof Error ? err.message : NO_VOICE_SAMPLE_COPY
-      );
+      setPhonePreviewError(previewErrorCopy(err));
     } finally {
       setPhonePreviewLoading(false);
     }
@@ -164,10 +170,13 @@ export function TestLinePanel({
                 src={phonePreviewUrl}
                 controls
                 className="w-full max-w-md"
+                onError={() => {
+                  URL.revokeObjectURL(phonePreviewUrl);
+                  setPhonePreviewUrl(null);
+                  setPhonePreviewError(NO_VOICE_SAMPLE_COPY);
+                }}
               />
-            ) : null}
-
-            {phonePreviewError ? (
+            ) : phonePreviewError ? (
               <p className="text-sm text-[var(--warn)]" role="alert">
                 {phonePreviewError}
               </p>

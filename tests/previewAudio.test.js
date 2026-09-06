@@ -20,7 +20,13 @@ function wavBytes(size) {
 
 function loadHelper() {
   const script = `
-    import { hasWavMagic, isUsableWavBytes, NO_VOICE_SAMPLE_COPY } from ${JSON.stringify(helperPath)};
+    import {
+      hasWavMagic,
+      isUsableWavBytes,
+      isPlayablePreviewMetadata,
+      previewErrorCopy,
+      NO_VOICE_SAMPLE_COPY,
+    } from ${JSON.stringify(helperPath)};
     const valid = Uint8Array.from(${JSON.stringify(wavBytes(44))});
     const shortWav = Uint8Array.from(${JSON.stringify(wavBytes(12))});
     const empty = new Uint8Array(0);
@@ -34,6 +40,11 @@ function loadHelper() {
       empty: isUsableWavBytes(empty),
       html: isUsableWavBytes(html),
       json: isUsableWavBytes(json),
+      durationOk: isPlayablePreviewMetadata(1.2),
+      durationZero: isPlayablePreviewMetadata(0),
+      durationNaN: isPlayablePreviewMetadata(Number.NaN),
+      browserMedia: previewErrorCopy(new Error("Failed to load because no supported source was found.")),
+      engine: previewErrorCopy(new Error("Could not reach voice engine at https://example.")),
     }));
   `;
   const ran = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], {
@@ -52,6 +63,11 @@ test("only a real WAV payload is a usable voice sample", () => {
   assert.equal(result.empty, false);
   assert.equal(result.html, false);
   assert.equal(result.json, false);
+  assert.equal(result.durationOk, true);
+  assert.equal(result.durationZero, false);
+  assert.equal(result.durationNaN, false);
+  assert.equal(result.browserMedia, "No voice sample available.");
+  assert.equal(result.engine, "Could not reach voice engine at https://example.");
 });
 
 test("voice preview API rejects a non-WAV body before returning audio/wav", () => {
@@ -63,15 +79,17 @@ test("voice preview API rejects a non-WAV body before returning audio/wav", () =
 test("Hear sample mounts audio only after a usable preview blob", () => {
   const source = fs.readFileSync(tenantFormPath, "utf8");
   assert.match(source, /objectUrlFromPreviewResponse/);
+  assert.match(source, /assertPreviewAudioPlayable/);
   assert.match(source, /Hear sample/);
-  assert.match(source, /voiceSampleUrl \? \(/);
-  assert.match(source, /<audio src=\{voiceSampleUrl\}/);
+  assert.match(source, /onError=/);
+  assert.match(source, /voice-sample-empty/);
   assert.doesNotMatch(source, /createObjectURL\(blob\)/);
 });
 
 test("phone preview uses the same usable-audio gate", () => {
   const source = fs.readFileSync(testLinePath, "utf8");
   assert.match(source, /objectUrlFromPreviewResponse/);
-  assert.match(source, /phonePreviewUrl \? \(/);
+  assert.match(source, /assertPreviewAudioPlayable/);
+  assert.match(source, /onError=/);
   assert.doesNotMatch(source, /createObjectURL\(blob\)/);
 });
