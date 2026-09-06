@@ -3,6 +3,7 @@ import { TriageLeadCard } from "@/components/TriageLeadCard";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import {
   callsHref,
+  nairobiDateLabel,
   nairobiDayStartIso,
   nairobiGreeting,
   toLead,
@@ -45,7 +46,7 @@ function StatLink({
   return (
     <Link
       href={href}
-      className="flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-1 py-1 text-sm text-ink-soft transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+      className="flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft transition-colors duration-150 hover:bg-[#0096FF]/[0.04] hover:text-ink active:bg-[#0096FF]/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
     >
       <span>{label}</span>
       <span className="tabular-nums font-medium text-ink">{value}</span>
@@ -146,6 +147,7 @@ export default async function HomeOverviewPage() {
 
   const leads = leadRows.map(toLead);
   const queueError = Boolean(leadsError);
+  const today = nairobiDateLabel();
   const next = homeNextAction({
     newLeadCount: newCount ?? leads.length,
     line,
@@ -157,9 +159,15 @@ export default async function HomeOverviewPage() {
   return (
     <div className="min-w-0">
       <header className="min-w-0">
-        <h1 className="font-display text-[clamp(1.375rem,3vw,1.75rem)] tracking-tight text-ink [overflow-wrap:anywhere]">
-          {nairobiGreeting()}, {businessName}
+        <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
+          {nairobiGreeting()}
+        </p>
+        <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink [overflow-wrap:anywhere]">
+          {businessName}
         </h1>
+        <p className="mt-1 font-sans text-[13px] text-ink-soft">
+          <time dateTime={today.iso}>{today.label}</time>
+        </p>
       </header>
 
       {primaryUpdate ? (
@@ -196,7 +204,7 @@ export default async function HomeOverviewPage() {
               </div>
               <Link
                 href={businessSettingsHref("updates")}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-[#0096FF]/35 bg-white px-4 text-sm font-semibold text-[#0096FF] transition hover:border-[#0096FF] hover:bg-[#0096FF]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-[#0096FF]/35 bg-white px-4 text-sm font-semibold text-[#0096FF] transition duration-150 hover:border-[#0096FF] hover:bg-[#0096FF]/5 active:scale-[0.99] active:bg-[#0096FF]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
               >
                 Manage
               </Link>
@@ -222,7 +230,7 @@ export default async function HomeOverviewPage() {
             <p className="mt-1">
               <Link
                 href={callsHref({ status: "new" })}
-                className="text-sm font-medium text-[#0096FF] hover:text-[#005ccc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                className="text-sm font-medium text-[#0096FF] transition-colors duration-150 hover:text-[#005ccc] active:text-[#004a99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
               >
                 All new
               </Link>
@@ -254,74 +262,85 @@ export default async function HomeOverviewPage() {
           )}
         </section>
 
-        <aside className="flex min-w-0 flex-col gap-6 lg:col-span-4 lg:sticky lg:top-24">
-          {todayCount != null || followedCount != null ? (
-            <section aria-label="Activity">
-              <ul>
-                {todayCount != null ? (
-                  <li>
-                    <StatLink
-                      href={callsHref({ status: "all" })}
-                      label="Calls today"
-                      value={todayCount}
-                    />
-                  </li>
-                ) : null}
-                {followedCount != null ? (
-                  <li>
-                    <StatLink
-                      href={callsHref({ status: "contacted" })}
-                      label="Followed up"
-                      value={followedCount}
-                    />
-                  </li>
-                ) : null}
-              </ul>
-            </section>
-          ) : null}
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-4">
+          <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+            {todayCount != null || followedCount != null ? (
+              <section aria-label="Activity" className="px-3 py-3">
+                <ul>
+                  {todayCount != null ? (
+                    <li>
+                      <StatLink
+                        href={callsHref({ status: "all" })}
+                        label="Calls today"
+                        value={todayCount}
+                      />
+                    </li>
+                  ) : null}
+                  {followedCount != null ? (
+                    <li>
+                      <StatLink
+                        href={callsHref({ status: "contacted" })}
+                        label="Followed up"
+                        value={followedCount}
+                      />
+                    </li>
+                  ) : null}
+                </ul>
+              </section>
+            ) : null}
 
-          <section aria-labelledby="line-heading">
-            <h2
-              id="line-heading"
-              className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft"
+            <section
+              aria-labelledby="line-heading"
+              className={
+                todayCount != null || followedCount != null
+                  ? "border-t border-line px-4 py-4"
+                  : "px-4 py-4"
+              }
             >
-              Line
-            </h2>
-            <p className="mt-2 text-sm font-medium text-ink">
-              {line === "line_live" ? "Line live" : "Number pending"}
-            </p>
-            {line === "line_live" ? (
-              <p className="mt-0.5 truncate font-mono text-xs text-ink-soft">
-                {tenant.sautikit_virtual_number}
-              </p>
-            ) : null}
-            {trainingGap ? (
-              <p className="mt-2 text-sm text-ink">
-                Needs training
-                <span className="block text-xs font-normal text-ink-soft">
-                  {trainingGapLabel(trainingGap.id)}
-                </span>
-              </p>
-            ) : null}
-            {walletLow ? (
-              <Link
-                href="/wallet"
-                className="mt-2 block text-sm text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              <h2
+                id="line-heading"
+                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft"
               >
-                Wallet low
-                <span className="block font-mono text-xs font-normal">
-                  KES {kes.toLocaleString("en-KE")}
-                </span>
-              </Link>
-            ) : null}
-          </section>
+                Line
+              </h2>
+              <p className="mt-2 text-sm font-medium text-ink">
+                {line === "line_live" ? "Line live" : "Number pending"}
+              </p>
+              {line === "line_live" ? (
+                <p className="mt-0.5 truncate font-mono text-xs text-ink-soft">
+                  {tenant.sautikit_virtual_number}
+                </p>
+              ) : null}
+              {trainingGap ? (
+                <p className="mt-2 text-sm text-ink">
+                  Needs training
+                  <span className="block text-xs font-normal text-ink-soft">
+                    {trainingGapLabel(trainingGap.id)}
+                  </span>
+                </p>
+              ) : null}
+              {walletLow ? (
+                <Link
+                  href="/wallet"
+                  className="mt-2 block text-sm text-warn transition-colors duration-150 hover:text-[#9a3209] active:text-[#7a2707] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+                >
+                  Wallet low
+                  <span className="block font-mono text-xs font-normal">
+                    KES {kes.toLocaleString("en-KE")}
+                  </span>
+                </Link>
+              ) : null}
+            </section>
 
-          <Link
-            href={next.href}
-            className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
-          >
-            {next.label}
-          </Link>
+            <div className="border-t border-line px-4 py-4">
+              <Link
+                href={next.href}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:scale-[0.99] active:bg-[#007acc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
+              >
+                {next.label}
+              </Link>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
