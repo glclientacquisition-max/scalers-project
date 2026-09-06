@@ -159,6 +159,10 @@ const {
 } = require('./src/sautikit/safeLog');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
+  ownerLeadEvent,
+  renderEventText,
+} = require('./src/notifications/events');
+const {
   dispatchAlert,
   dispatchEscalationAlert,
   whatsAppSenderReady,
@@ -2945,6 +2949,8 @@ async function maybeSendWhatsAppNotification(callSid) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
 
+    const event = ownerLeadEvent(call, businessName);
+    const body = renderEventText(event);
     const lead = {
       businessName,
       name: call.name,
@@ -2956,6 +2962,7 @@ async function maybeSendWhatsAppNotification(callSid) {
     const result = await dispatchAlert({
       to: ownerNumber,
       email: ownerEmail,
+      body,
       lead,
       channels: notifyChannels,
     });

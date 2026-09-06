@@ -8,6 +8,7 @@ const {
   renderEventSubject,
   renderCallerText,
   leadEvent,
+  ownerLeadEvent,
 } = require('../src/notifications/events');
 
 describe('notify events', () => {
@@ -60,8 +61,7 @@ describe('notify events', () => {
     }
   });
 
-  it('renders caller confirmations with business, name, and the specific ask', () => {
-    const appt = renderCallerText({
+  it('renders caller confirmations with business, name, and the specific ask', () => {    const appt = renderCallerText({
       kind: EVENTS.CALLER_APPOINTMENT,
       businessName: 'Done and Dusted Cleaning Services',
       caller: { name: 'Jane' },
@@ -104,5 +104,41 @@ describe('notify events', () => {
     });
     assert.match(text, /your visit for Tuesday/);
     assert.doesNotMatch(text, /your call was important/i);
+  });
+
+  it('owner lead event carries intent, summary, and outcome when present', () => {
+    const event = ownerLeadEvent(
+      {
+        name: 'Jane',
+        from_number: '+254790381872',
+        reason: 'Book carpet cleaning',
+        primary_intent: 'book_visit',
+        brain_summary: 'Intent: book_visit. Caller: Jane. Goal: carpet cleaning tomorrow.',
+        resolution_note: 'Visit request saved',
+        recording_url: 'https://example.com/rec.mp3',
+      },
+      'Done and Dusted Cleaning Services'
+    );
+    const text = renderEventText(event);
+    assert.match(text, /New missed-call lead — Done and Dusted Cleaning Services/);
+    assert.match(text, /Intent: book_visit/);
+    assert.match(text, /Summary: Intent: book_visit/);
+    assert.match(text, /Outcome: Visit request saved/);
+    assert.match(text, /Recording: https:\/\/example\.com\/rec\.mp3/);
+  });
+
+  it('owner lead event falls back to name and reason when no summary', () => {
+    const event = ownerLeadEvent(
+      {
+        name: 'Jane',
+        from_number: '+254790381872',
+        reason: 'Book carpet cleaning',
+      },
+      'Done and Dusted'
+    );
+    const text = renderEventText(event);
+    assert.match(text, /Name: Jane/);
+    assert.match(text, /Reason: Book carpet cleaning/);
+    assert.doesNotMatch(text, /Intent:/);
   });
 });
