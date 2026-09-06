@@ -23,7 +23,7 @@ function buildBrainCapabilities(profile = {}, runtime = {}) {
     notifyCallback: runtime.notifyCallback !== false,
     escalate: tools.escalate !== false,
     endCall: tools.end_call !== false && tools.endCall !== false,
-    // There is no live transfer executor in the current voice runtime.
+    // Voice sets this from liveTransferReady (env + handoff_mode + hours + directory phone).
     liveTransfer: runtime.liveTransfer === true,
   };
 }

@@ -53,7 +53,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 6. Spoken agent lines that play to the caller should land in the transcript.
 7. Keep `db.js` orchestration surface stable (`upsertCall`, `appendTranscript`, `attachRecording`, `chargeCallToWallet`, …).
 8. Greeting must await TTS ready (`ttsReadyPromise`) — never call `speakText` while `tts` is still null.
-9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air.
+9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air. `TRANSFER` / `liveTransfer` is **not** executable until the cold-Dial path in [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) is implemented and `VOICE_LIVE_TRANSFER=on`. Do not claim a bridge from the media loop.
 10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
 11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Play the catalog-voice downtime recording (same voice as that line's greeting), hang up, and surface `soniox.lastError` plus `soniox.outageClips` on `/healthz`. Key clips by catalog voice × language. Keep the spoken line voice-generic. Alert each owner at most once per cooldown. See [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md).
 12. Gemini **credits depleted / denied** is a reasoning outage, not speech. STT and TTS still work. Keep the line open, ask for a name, save it, and alert the owner once per cooldown. Surface `gemini.lastError` on `/healthz`. Do not retry depleted credits on the next turn.
@@ -106,6 +106,7 @@ Target: first audible audio usually **≤ 800–1200 ms** after the caller stops
 
 ## Good first tickets
 
+- Staging spike: Stream-stop → `<Dial>` (see [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) Spike 0). Do not enable `liveTransfer` until that spike is green.
 - Phase 2 from `VOICE_SPEED_CONSISTENCY.md` (media clear, interim barge, cached ack PCM)
 - Kenya TTS pronunciation edge cases (money, names, Sheng)
 - Extract media session from `server.js` toward `src/telephony/mediaStreamHandler.js` without behavior change

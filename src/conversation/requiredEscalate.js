@@ -15,6 +15,7 @@ function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
   const action = String(state.resolution?.nextBestAction || '');
   const needsEscalate =
     action === 'ESCALATE' ||
+    action === 'TRANSFER' ||
     (String(state.intent || '') === 'human' &&
       Boolean(state.handoff?.requested) &&
       !(Array.isArray(state.goal?.missingSlots) && state.goal.missingSlots.length));
@@ -59,13 +60,18 @@ function formatEscalateActionDirective(state = {}) {
   const intent = String(state.intent || '');
   const handoffRequested = Boolean(state.handoff?.requested);
 
-  if (action === 'ESCALATE' && name) {
+  if ((action === 'ESCALATE' || action === 'TRANSFER') && name) {
+    const connect = action === 'TRANSFER';
     return [
       'REQUIRED ACTION THIS TURN (do not read aloud):',
       `Caller name is known (${name}). Append the escalate ###TOOL### marker now.`,
-      'Do not only share a WhatsApp or phone number — the escalate tool must fire so the team is notified.',
-      'Spoken line: say only that you will try to send the request to the team.',
-    ].join('\n');
+      connect
+        ? 'Spoken line: say only that you will try to connect them. Never claim the transfer is done.'
+        : 'Do not only share a WhatsApp or phone number — the escalate tool must fire so the team is notified.',
+      connect ? '' : 'Spoken line: say only that you will try to send the request to the team.',
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   // Human asked for, name still missing — speak the ask; do not claim notify yet.

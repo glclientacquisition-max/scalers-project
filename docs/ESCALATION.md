@@ -10,10 +10,12 @@ Canonical code: `src/conversation/escalationFeature.js`, `requiredEscalate.js`, 
 
 | Is | Is not |
 | --- | --- |
-| Async handoff: notify teammate/owner + desk note | Live cold transfer (unless telephony later executes it) |
+| Async handoff: notify teammate/owner + desk note | Live cold transfer (that is a separate product: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md)) |
 | Requires **caller name + reason** before notify | Guessing a name or inventing staff |
 | Routes via `tenants.team_directory` | Sharing random phone numbers as “done” |
 | Honest confirm after backend outcome | “I’ve transferred you” / “I’ve texted them” before send OK |
+
+**Live transfer** (`handoff_mode = live_transfer`) is specified, not shipped. Runtime still sets `liveTransfer: false`. Until Voice Dial exists, Brain must keep using this async escalate path even if the tenant preference says live transfer.
 
 ---
 
@@ -88,7 +90,7 @@ Resolution: `needs_human` when escalate succeeded or handoff requested without a
 2. **Desk UI** — show `escalation_notify.channels` on call detail (SMS vs desk-only)
 3. **Per-tenant sender ID** (optional) when businesses register their own shortcodes
 4. **Delivery receipts** — TextSMS DLR webhook → update `escalation_notify`
-5. **Live transfer** — only when SautiKit transfer executor exists; keep async escalate as default
+5. **Live transfer** — spec: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) + [`adr/ADR-0004-live-human-transfer.md`](./adr/ADR-0004-live-human-transfer.md). Do not implement until the Stream-stop → Dial staging spike passes. Keep this async escalate path as default and as Dial fallback.
 6. **Owner preference** — SMS vs WA vs email priority per tenant
 7. **Quiet hours** — delay SMS, still desk-note immediately
 

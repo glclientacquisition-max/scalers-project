@@ -195,6 +195,10 @@ export default async function CallDetailPage({
       : null;
   const escalateReason =
     typeof meta.escalate_reason === "string" ? meta.escalate_reason : null;
+  const transferAttempt =
+    meta.transfer_attempt && typeof meta.transfer_attempt === "object"
+      ? (meta.transfer_attempt as { status?: string })
+      : null;
 
   const { data: transcripts } = await workspace.client
     .from("transcripts")
@@ -301,6 +305,9 @@ export default async function CallDetailPage({
                 </span>
                 <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
                 <span>Escalation: {meta.escalation_sent ? "sent" : "no"}</span>
+                {transferAttempt?.status ? (
+                  <span>Transfer: {transferAttempt.status}</span>
+                ) : null}
               </div>
               {row.resolution != null || row.primary_intent || row.resolution_note ? (
                 <div className="mt-3 space-y-1 text-sm">

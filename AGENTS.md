@@ -31,6 +31,8 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 | [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md) | Branching, lifecycle, PR checklist |
 | [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md) | Permanent engineering rules |
 | [`docs/agents/AGENT_ARCHITECTURE.md`](docs/agents/AGENT_ARCHITECTURE.md) | AI agent stack on live calls |
+| [`docs/LIVE_TRANSFER.md`](docs/LIVE_TRANSFER.md) | Live human Dial (spec; not shipped) |
+| [`docs/ESCALATION.md`](docs/ESCALATION.md) | Async human notify (shipped) |
 | [`docs/database/DATABASE_GOVERNANCE.md`](docs/database/DATABASE_GOVERNANCE.md) | Manual SQL model |
 | [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](docs/frontend/FRONTEND_RECONNAISSANCE.md) | Desk Frontend 2.0 recon (no UI until constitution) |
 

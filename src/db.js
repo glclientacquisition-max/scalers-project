@@ -299,6 +299,18 @@ async function saveEscalation({ callSid, teammate, reason }) {
   return shapeCall(data);
 }
 
+/**
+ * Persist a live-transfer attempt on calls.summary (no schema migration).
+ * @param {{ callSid: string, attempt?: object }} opts
+ */
+async function saveTransferAttempt({ callSid, attempt } = {}) {
+  if (!callSid || !attempt || typeof attempt !== 'object') return null;
+  return mergeCallSummaryMeta({
+    callSid,
+    patch: { transfer_attempt: attempt },
+  });
+}
+
 async function markEscalationSent(callSid) {
   const existing = await getCall(callSid);
   if (!existing) return false;
@@ -1318,6 +1330,7 @@ module.exports = {
   upsertCall,
   saveCallerInfo,
   saveEscalation,
+  saveTransferAttempt,
   appendTranscript,
   attachRecording,
   updateCallStatus,
