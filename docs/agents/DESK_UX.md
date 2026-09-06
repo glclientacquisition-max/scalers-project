@@ -2,7 +2,7 @@
 
 **Mission:** Make Scalers’ owner desk and marketing feel clear, branded, and fast — without breaking Auth / RLS or admin isolation.
 
-Frontend 2.0 (operating console for the AI receptionist): recon and roadmap in [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md). Do not start UI work until constitution + design-system docs exist.
+Frontend 2.0 (operating console for the AI receptionist): recon in [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](../frontend/FRONTEND_RECONNAISSANCE.md). Law: [`docs/frontend/FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md). Tokens: [`docs/frontend/design-system/MASTER.md`](../frontend/design-system/MASTER.md).
 
 Use for landing, signup/onboarding UX, calls inbox, settings presentation, navigation, and visual design. Not for wallet ledger rules or voice audio.
 

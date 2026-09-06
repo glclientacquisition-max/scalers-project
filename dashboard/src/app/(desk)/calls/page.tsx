@@ -12,6 +12,7 @@ import {
 } from "@/components/MarkLeadDoneButton";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
+import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import {
   callsHref,
   followUpWhatsAppMessage,
@@ -85,10 +86,10 @@ function EmptyCalls({
       <div className="mt-6 border-y border-[#0096FF]/30 bg-[#0096FF]/5 py-10 text-center">
         <p className="font-display text-xl tracking-tight text-ink">Number being assigned</p>
         <Link
-          href="/settings#train"
-          className="mt-5 inline-flex rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:shadow-focus"
+          href={businessSettingsHref("train")}
+          className="mt-5 inline-flex min-h-11 rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
         >
-          Train assistant
+          Train
         </Link>
       </div>
     );
@@ -108,10 +109,10 @@ function EmptyCalls({
         from another phone.
       </p>
       <Link
-        href="/settings#test"
-        className="mt-5 inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:shadow-focus"
+        href={businessSettingsHref("test")}
+        className="mt-5 inline-flex min-h-11 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005CCC] transition hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
       >
-        How to test
+        Test line
       </Link>
     </div>
   );
