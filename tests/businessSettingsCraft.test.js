@@ -14,11 +14,10 @@ describe("business settings craft", () => {
   const test = read("dashboard/src/components/TestLinePanel.tsx");
   const save = read("dashboard/src/components/TenantSettingsSaveButton.tsx");
   const page = read("dashboard/src/app/(desk)/settings/page.tsx");
+  const nav = read("dashboard/src/lib/businessSettingsNav.ts");
 
-  it("keeps Train IA and does not invent Online", () => {
-    assert.match(shell, /label: "Assistant"/);
-    assert.match(shell, /label: "Team"/);
-    assert.match(shell, /pointer-events-none[\s\S]*Train/);
+  it("keeps assistant chrome and does not invent Online", () => {
+    assert.match(form, /Assistant name/);
     assert.doesNotMatch(shell, /Agent Persona|Escalation Team/);
     assert.doesNotMatch(shell, /\bOnline\b/);
     assert.doesNotMatch(page, /text-5xl|text-6xl/);
@@ -32,6 +31,33 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /Your receptionist/);
     assert.match(test, /assistant name/);
     assert.doesNotMatch(test, /Agent Persona/);
+  });
+
+  it("groups settings by owner job without new routes", () => {
+    assert.match(nav, /id: "general"/);
+    assert.match(nav, /id: "knowledge"/);
+    assert.match(nav, /id: "operations"/);
+    assert.match(nav, /id: "line"/);
+    assert.match(nav, /title: "General"/);
+    assert.match(nav, /title: "Knowledge"/);
+    assert.match(nav, /title: "Operations"/);
+    assert.match(nav, /title: "Line"/);
+    assert.match(nav, /label: "Updates"/);
+    assert.match(nav, /label: "Assistant"/);
+    assert.match(nav, /label: "Team"/);
+    assert.match(nav, /label: "Catalog"/);
+    assert.match(nav, /label: "FAQs"/);
+    assert.match(nav, /label: "Import"/);
+    assert.match(nav, /label: "Hours"/);
+    assert.match(nav, /label: "Locations"/);
+    assert.match(nav, /label: "Policies"/);
+    assert.match(nav, /label: "Tools & voice"/);
+    assert.match(nav, /label: "Pronunciation"/);
+    assert.match(nav, /label: "Test"/);
+    assert.match(shell, /SETTINGS_NAV/);
+    assert.doesNotMatch(shell, />\s*Train\s*</);
+    assert.doesNotMatch(nav, /Billing|Security|Appearance/);
+    assert.match(nav, /businessSettingsHref\("train"/);
   });
 
   it("defines hover, focus, and active on settings primitives", () => {

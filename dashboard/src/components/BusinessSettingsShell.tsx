@@ -9,29 +9,14 @@ import { TenantForm } from "@/components/TenantForm";
 import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import {
-  businessSettingsHref,
+  SETTINGS_NAV,
+  settingsNavHref,
+  settingsNavItemActive,
+  settingsPanelHeading,
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
 import { SettingsPageHeader } from "@/components/settingsUi";
-
-const PRIMARY_NAV = [
-  { id: "updates" as const, label: "Updates" },
-  { id: "catalog" as const, label: "Catalog" },
-  { id: "import" as const, label: "Import" },
-  { id: "test" as const, label: "Test" },
-];
-
-const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
-  { id: "identity", label: "Assistant" },
-  { id: "hours", label: "Hours" },
-  { id: "locations", label: "Locations" },
-  { id: "policies", label: "Policies" },
-  { id: "team", label: "Team" },
-  { id: "faqs", label: "FAQs" },
-  { id: "tools", label: "Tools & voice" },
-  { id: "pronunciation", label: "Pronunciation" },
-];
 
 function navLinkClass(active: boolean) {
   return [
@@ -40,14 +25,6 @@ function navLinkClass(active: boolean) {
       ? "bg-[#0096FF]/10 text-[#005ccc]"
       : "text-ink-soft hover:bg-[#0096FF]/[0.04] hover:text-ink active:bg-[#0096FF]/[0.08]",
   ].join(" ");
-}
-
-function panelHeading(tab: BusinessSettingsTab, trainPanel: SettingsPanel): string | null {
-  if (tab === "catalog") return "Catalog";
-  if (tab === "train") {
-    return TRAIN_PANELS.find((p) => p.id === trainPanel)?.label ?? "Train";
-  }
-  return null;
 }
 
 function settingsLineState(did: string | null | undefined): {
@@ -68,50 +45,33 @@ function SettingsSidebar({
 }) {
   return (
     <nav aria-label="Business sections" className="min-w-0 shrink-0 lg:w-56">
-      <ul className="space-y-1 rounded-2xl border border-line bg-surface p-2">
-        {PRIMARY_NAV.slice(0, 2).map((item) => (
-          <li key={item.id}>
-            <Link
-              href={businessSettingsHref(item.id)}
-              aria-current={tab === item.id ? "page" : undefined}
-              className={navLinkClass(tab === item.id)}
+      <ul className="rounded-2xl border border-line bg-surface p-2">
+        {SETTINGS_NAV.map((section, index) => (
+          <li key={section.id}>
+            <p
+              className={[
+                "pointer-events-none mb-1.5 select-none px-3 text-xs font-bold uppercase tracking-wide text-gray-500",
+                index === 0 ? "mt-1" : "mt-4",
+              ].join(" ")}
             >
-              {item.label}
-            </Link>
-          </li>
-        ))}
-
-        <li>
-          <p className="pointer-events-none mt-4 mb-2 select-none px-3 text-xs font-bold uppercase tracking-wide text-gray-500">
-            Train
-          </p>
-          <ul className="space-y-0.5">
-            {TRAIN_PANELS.map((sub) => {
-              const subActive = tab === "train" && trainPanel === sub.id;
-              return (
-                <li key={sub.id}>
-                  <Link
-                    href={businessSettingsHref("train", sub.id)}
-                    aria-current={subActive ? "page" : undefined}
-                    className={navLinkClass(subActive)}
-                  >
-                    {sub.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </li>
-
-        {PRIMARY_NAV.slice(2).map((item) => (
-          <li key={item.id}>
-            <Link
-              href={businessSettingsHref(item.id)}
-              aria-current={tab === item.id ? "page" : undefined}
-              className={navLinkClass(tab === item.id)}
-            >
-              {item.label}
-            </Link>
+              {section.title}
+            </p>
+            <ul className="space-y-0.5">
+              {section.items.map((item) => {
+                const active = settingsNavItemActive(item.target, tab, trainPanel);
+                return (
+                  <li key={`${item.target.tab}-${item.label}`}>
+                    <Link
+                      href={settingsNavHref(item.target)}
+                      aria-current={active ? "page" : undefined}
+                      className={navLinkClass(active)}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </li>
         ))}
       </ul>
@@ -136,7 +96,7 @@ export function BusinessSettingsShell({
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
   const showForm = tab === "catalog" || tab === "train";
-  const heading = panelHeading(tab, trainPanel);
+  const heading = settingsPanelHeading(tab, trainPanel);
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 

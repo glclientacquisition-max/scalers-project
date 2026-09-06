@@ -229,7 +229,7 @@ Sticky save: `settingsStickyHeaderClass` + `TenantSettingsSaveButton`.
 
 ### 6.7 Nested nav
 
-`SettingsSidebar`: container `rounded-2xl border border-line bg-surface p-2`. Links `rounded-lg px-3 py-2 text-sm`. Active `bg-[#0096FF]/10 text-[#005ccc]`. Section header `pointer-events-none … text-xs font-bold uppercase tracking-wider text-gray-500` (`Train`).
+`SettingsSidebar`: container `rounded-2xl border border-line bg-surface p-2`. Links `min-h-11 rounded-lg px-3 text-sm`. Active `bg-[#0096FF]/10 text-[#005ccc]`. Section headers `pointer-events-none … text-xs font-bold uppercase tracking-wide text-gray-500` (`General`, `Knowledge`, `Operations`, `Line`). Source: `SETTINGS_NAV` in `businessSettingsNav.ts`.
 
 ### 6.8 Status
 
