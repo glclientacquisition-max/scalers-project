@@ -155,13 +155,11 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               [
                 {
                   id: "paste" as const,
-                  label: "Paste text",
-                  blurb: "Menu, business overview, or FAQs from WhatsApp or a doc",
+                  label: "Paste",
                 },
                 {
                   id: "url" as const,
-                  label: "Website link",
-                  blurb: "A public page that lists what you offer",
+                  label: "Website",
                 },
               ] as const
             ).map((opt) => {
@@ -174,9 +172,6 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   className={settingsRadioCardClass(selected)}
                 >
                   <span className="font-medium text-ink">{opt.label}</span>
-                  <span className="mt-1 block text-sm text-ink-soft">
-                    {opt.blurb}
-                  </span>
                 </button>
               );
             })}
@@ -188,8 +183,8 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
 
             {mode === "paste" ? (
               <div className="flex flex-col gap-1.5">
-                <label className="block text-sm font-medium" htmlFor="ingest_paste">
-                  Paste your menu, overview, or FAQs
+                <label className="block text-xs font-medium text-ink-soft" htmlFor="ingest_paste">
+                  Text
                 </label>
                 <textarea
                   id="ingest_paste"
@@ -199,7 +194,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   rows={2}
                   {...compactTextareaExpandHandlers}
                   placeholder={
-                    "ChapterOne Bookstore, Nairobi CBD\nMon-Sat 9am-7pm\nSame-day Nairobi delivery\n\nOr a menu:\nHome cleaning - from 2,500 KES\n\nQ: Do you cover Westlands?\nA: Yes, same-day when booked before noon."
+                    "Westlands Books, Nairobi\nMon-Sat 9am-7pm\nHome cleaning from 2,500 KES\nQ: Do you cover Westlands?\nA: Yes, same day before noon."
                   }
                   className={`${fieldClass} mt-0 leading-relaxed`}
                 />
@@ -215,8 +210,8 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                <label className="block text-sm font-medium" htmlFor="ingest_url">
-                  Website link
+                <label className="block text-xs font-medium text-ink-soft" htmlFor="ingest_url">
+                  URL
                 </label>
                 <input
                   id="ingest_url"
@@ -224,7 +219,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://yourbusiness.co.ke/services"
+                  placeholder="https://shop.co.ke/services"
                   className={`${fieldClass} mt-0`}
                 />
                 <div className="flex justify-end self-end">

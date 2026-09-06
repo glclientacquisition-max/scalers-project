@@ -7,12 +7,12 @@ export const HANDOFF_OPTIONS: {
 }[] = [
   {
     id: "callback",
-    label: "WhatsApp / email callback",
+    label: "Callback",
     blurb: "Notify a teammate. AI stays on the line and takes a message.",
   },
   {
     id: "live_transfer",
-    label: "Live transfer (when available)",
+    label: "Live transfer",
     blurb: "Connect to a human. Falls back to callback if transfer is not ready.",
   },
 ];

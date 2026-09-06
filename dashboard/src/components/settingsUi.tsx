@@ -31,6 +31,9 @@ export const settingsPrimaryButtonClass =
 export const settingsPanelHeadingClass =
   "font-display text-xl tracking-tight text-ink";
 
+export const settingsBlockTitleClass =
+  "text-[11px] font-bold uppercase tracking-wide text-gray-500";
+
 export function settingsRadioCardClass(selected: boolean) {
   return [
     "w-full text-left rounded-xl border px-4 py-3 transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",

@@ -13,6 +13,7 @@ import {
 } from "@/app/(desk)/settings/catalogActions";
 import {
   settingsActionClass,
+  settingsBlockTitleClass,
   settingsFieldClass,
   settingsPrimaryButtonClass,
   settingsRadioCardClass,
@@ -92,15 +93,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="mt-8 space-y-4 border-t border-line pt-8">
-      <div>
-        <h3 className="text-sm font-medium text-ink">
-          Import product catalogue
-        </h3>
-        <p className="mt-1 text-xs text-ink-soft">
-          Products (books, SKUs) separate from services. CSV works best; paste or a
-          public product page also work.
-        </p>
-      </div>
+      <p className={settingsBlockTitleClass}>Products</p>
 
       {!products ? (
         <div className="space-y-3">

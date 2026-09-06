@@ -16,7 +16,7 @@ export const FAQ_STARTERS: FaqEntry[] = [
   },
   {
     question: "Where are you located?",
-    answer: "We are in Nairobi. Share the exact area or landmark when you save this.",
+    answer: "Westlands, opposite Naivas.",
   },
   {
     question: "Do you deliver?",

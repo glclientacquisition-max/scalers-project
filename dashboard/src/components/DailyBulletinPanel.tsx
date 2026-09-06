@@ -72,8 +72,8 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
-        <label className="block text-sm font-medium" htmlFor="bulletin_text">
-          What should callers know
+        <label className="block text-xs font-medium text-ink-soft" htmlFor="bulletin_text">
+          Callers hear
         </label>
         <input
           id="bulletin_text"
