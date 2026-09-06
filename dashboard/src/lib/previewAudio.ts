@@ -51,7 +51,9 @@ export async function objectUrlFromPreviewResponse(res: Response): Promise<strin
   if (!(await isUsablePreviewAudioBlob(blob))) {
     throw new Error(NO_VOICE_SAMPLE_COPY);
   }
-  return URL.createObjectURL(blob);
+  const bytes = await blob.arrayBuffer();
+  const playable = new Blob([bytes], { type: "audio/wav" });
+  return URL.createObjectURL(playable);
 }
 
 export function isAutoplayBlock(err: unknown): boolean {

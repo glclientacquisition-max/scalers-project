@@ -362,6 +362,7 @@ app.post('/api/tts/preview', async (req, res) => {
     });
     const resolvedVoice = resolveSonioxVoice(voiceId);
     res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('Content-Disposition', 'inline; filename="preview.wav"');
     res.setHeader('X-Spoken-Text', encodeURIComponent(result.spokenText));
     res.setHeader('X-Tts-Language', result.language);
     res.setHeader('X-Soniox-Voice', resolvedVoice);

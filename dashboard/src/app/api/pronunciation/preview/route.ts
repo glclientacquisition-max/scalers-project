@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     });
     const headers = new Headers({
       "Content-Type": "audio/wav",
+      "Content-Disposition": 'inline; filename="preview.wav"',
       "Cache-Control": "no-store",
     });
     if (result.spokenText) {
