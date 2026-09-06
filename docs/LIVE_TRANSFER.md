@@ -1,6 +1,6 @@
 # Live human transfer (caller escalation to a real person)
 
-**Status:** Spec plus gated executor. Default `VOICE_LIVE_TRANSFER=off`. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, and the env flag all pass.  
+**Status:** Desk option exists. Cold Dial after Stream is **blocked** on current SautiKit (staging 2026-09-06). Default `VOICE_LIVE_TRANSFER=off`. Keep callback escalate until a conference REST spike rings a human. Tenant option is Business → Train → Escalation Team (`handoff_mode`). Brain sets `liveTransfer` only when that option, open hours, a directory phone, and the env flag all pass.  
 **Job:** When a caller needs a human *and* the business opted in, Scalers leaves the AI media stream and bridges the live call to a real teammate. If the bridge cannot run or the human does not answer, the existing async escalate path still notifies and the caller hears an honest fallback.
 
 **Related:** async notify is already shipped in [`ESCALATION.md`](./ESCALATION.md). Decision record: [`adr/ADR-0004-live-human-transfer.md`](./adr/ADR-0004-live-human-transfer.md).
@@ -14,7 +14,7 @@ Two different products share the word “escalation”. Do not collapse them.
 | Mode | What the caller gets | Owner setting | Runtime today |
 | --- | --- | --- | --- |
 | **Callback** (async escalate) | AI stays on the line, takes name + reason, texts/emails the teammate, confirms follow-up | `tenants.handoff_mode = callback` (default) | **Shipped** |
-| **Live transfer** | AI says it will connect, then the PSTN bridges to a teammate’s mobile. AI leaves the call | `tenants.handoff_mode = live_transfer` on Escalation Team | **Gated.** Executor present; Dial only if `VOICE_LIVE_TRANSFER=on` |
+| **Live transfer** | AI says it will connect, then the PSTN bridges to a teammate’s mobile. AI leaves the call | `tenants.handoff_mode = live_transfer` on Escalation Team | **Blocked.** Cold Dial after Stream failed on staging. Next executor is conference + `POST /v1/calls` |
 
 Live transfer is **opt-in per tenant**. Kenya shops that cannot pick up during the day keep callback. Never auto-upgrade a tenant because they filled in a team phone.
 
@@ -45,10 +45,10 @@ That empty-response hook is the transfer executor’s insertion point:
 
 1. While the AI stream is up, persist a **pending Dial**.
 2. Stop the media WebSocket so the Stream ends cleanly (do not hard-hangup the PSTN caller).
-3. On the StreamStopped / StreamCompleted webhook, return **`<Dial>`** instead of empty XML.
-4. If Dial times out or is busy, the next webhook returns **`<Say>` fallback + hangup** (or re-notify). Stream is already gone, so Gemini cannot talk.
+3. Staging (`HD_0a8d5911d055`) showed StreamStopped **does not** re-POST `/voice/incoming`; it hits `events_url`, which cannot return Dial. Answer XML is therefore `<Stream connect="true"/>` then `<Redirect>` to `/voice/transfer`.
+4. `/voice/transfer` returns **`<Dial>`** when a transfer is pending. If Dial times out or is busy, the next webhook returns **`<Say>` fallback + hangup**.
 
-Warm conference (`POST /v1/calls` into a named room, AI stays until the human joins) is better UX but doubles outbound cost, needs a whisper path, and fights the current single-stream media loop. Defer to v2 after cold Dial is proven on a staging DID.
+Warm conference is now the **next executor**, not v2. SautiKit’s call-center pattern: hold the PSTN in a named `<Conference>`, then `POST /v1/calls` to the directory mobile with a voice callback that joins the same room. Cold Dial after Stream cannot run: StreamStopped never re-hits `/voice/incoming`, and verbs after `<Stream connect="true"/>` (Redirect) never execute. Do not close `/ws/media` for transfer until that conference path is proven.
 
 ---
 
@@ -67,7 +67,7 @@ Warm conference (`POST /v1/calls` into a named room, AI stays until the human jo
 | F7 | Caller hears progress (“Okay, let me connect you.”) then ringback from Dial. Never silence. |
 | F8 | If Dial is not answered / busy / failed / unauthorized destination: mark transfer failed, keep the escalate notify, tell the caller they will be followed up, then hang up. Do not claim they were connected. |
 | F9 | Call detail shows transfer attempt (pending / bridged / failed / fallback_notify) plus escalate notify channels. |
-| F10 | Wallet: inbound AI minutes **and** outbound Dial minutes are both billable SautiKit usage. Ops must not drop the existing inbound `chargeCallToWallet` path. |
+| F10 | Wallet: inbound **KES 0**/min, outbound transfer **KES 4**/min. Two SautiKit CDRs, two `calls` rows, `charge_call_to_wallet` per `call_id`. Unanswered outbound is 0 KES. Beta does not originate outbound unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. |
 | F11 | Feature flag `VOICE_LIVE_TRANSFER=off` (default) until the Stream-stop → Dial lab spike passes on staging. Tenant toggle cannot override a global off. |
 
 ### 3.2 Honesty / speech (non-negotiable)
@@ -100,7 +100,8 @@ AND shop is open (or after_hours_mode === 'serve' while open-unknown is treated 
 AND resolveEscalation(...).teammate.phone is valid E.164
 AND SautiKit API can Dial (key present; destination not on a block list)
 AND no transfer already pending/bridged on this callSid
-AND telecom wallet / billing enforcement does not forbid a new outbound leg
+AND telecom wallet / billing enforcement allows a new outbound PSTN leg
+    (beta off unless VOICE_LIVE_TRANSFER_BETA_OUTBOUND; hard needs ≥ 1 outbound minute in prepaid)
 ```
 
 If any check fails → `liveTransfer: false` → next-best-action stays **ESCALATE** (already implemented).
@@ -124,8 +125,8 @@ TRANSFER path
   3. DB: saveEscalation + transfer_attempt={ status: pending, to, timeout }
   4. Notify SMS/WA/email (existing dispatch; do not block Dial on SMS failure)
   5. Stop STT/TTS; close /ws/media without hanging up the caller leg
-  6. SautiKit POSTs StreamStopped → POST /voice/incoming
-  7. Incoming sees pending transfer → return Dial XML (callerId = tenant DID)
+  6. Answer XML Redirect to POST /voice/transfer (StreamStopped does not re-hit /voice/incoming)
+  7. /voice/transfer sees pending transfer → return Dial XML (callerId = tenant DID)
   8a. Human answers → bridged. AI is gone. status=bridged. Call completes on hangup.
   8b. Timeout/busy/fail → webhook → Say fallback → hangup. status=failed, fallback_notify.
 
@@ -210,10 +211,28 @@ Do not add a second team editor. Directory stays the single source of destinatio
 
 ## 8. Billing and ops
 
-- Inbound Stream minutes: existing `chargeCallToWallet` on call complete.
-- Outbound Dial minutes: SautiKit bills the workspace; Scalers must record duration when `/voice/events` reports the Dial leg. If events do not split legs, charge the full parent call duration once (document the gap) rather than double-charge.
-- Destination authorization: SautiKit Dial is subject to the same allow-list as `POST /v1/calls`. Ops must confirm Kenya mobiles on the directory are authorized before turning `VOICE_LIVE_TRANSFER=on` for a tenant.
-- Super Admin: optional later flag per tenant; v1 uses env + `handoff_mode` only.
+SautiKit currently charges the workspace **KES 0 / min inbound** and **KES 3 / min outbound**. Conference transfer is two legs:
+
+| Leg | Who is on it | SautiKit (workspace, current) | Scalers tenant wallet |
+| --- | --- | --- | --- |
+| Inbound | Caller → business DID (AI then conference) | **KES 0 / min** | **KES 0 / min**. Meter duration; debit is 0. |
+| Outbound | Business DID → teammate mobile | **KES 3 / min** answered (`POST /v1/calls`) | **KES 4 / min** answered on a separate `calls` row |
+
+Margin on a connected transfer is KES 1 / min (4 retail minus 3 cost). If SautiKit changes either rate, update `WALLET_RATE_KES_PER_MINUTE` and/or `WALLET_TRANSFER_RATE_KES_PER_MINUTE` before that ships.
+
+Rules:
+
+1. **Inbound is KES 0 on both sides today.** SautiKit does not charge inbound. Scalers does not charge the tenant. Minutes are still stored.
+2. **Outbound is KES 4 / answered minute** to the tenant. SautiKit costs us **KES 3 / min** on that leg. Unanswered outbound stays 0 on both sides.
+3. **Unanswered outbound is free** at SautiKit and must stay 0 minutes on our ledger (`no_answer` / `busy` / `failed` / `canceled`).
+4. **Beta (`billing_enforcement=off`)** meters inbound only and **must not** `POST /v1/calls` in production. Otherwise Scalers eats outbound PSTN. Lab exception: `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on` on staging only.
+5. **Hard enforcement:** do not originate if prepaid cannot cover one outbound minute. Soft still originates (wallet may go negative). Fallback is callback SMS.
+6. **SMS** stays best-effort and is not a wallet debit today.
+7. Destination authorization: same allow-list as `POST /v1/calls`. Confirm Kenya mobiles before enabling the executor.
+
+Helpers: `src/billing/liveTransferLegs.js`, `db.persistOutboundTransferLeg`. No new SQL. Ledger kind stays `call_charge` with metadata `role=outbound_transfer` once the outbound row completes via `/voice/events`.
+
+Super Admin: optional later flag per tenant; v1 uses env + `handoff_mode` + billing enforcement.
 
 ---
 
@@ -226,7 +245,7 @@ Do **not** land Voice Dial, Brain prompt copy, Desk copy, and SQL in one PR. Seq
 Lab on staging DID, no product toggle:
 
 1. From a live `/ws/media` session, close the WS (or documented stream-stop) **without** dropping the caller.
-2. Confirm `/voice/incoming` receives StreamStopped/Completed.
+2. Confirm `/voice/transfer` (post-Stream Redirect) or `/voice/incoming` receives a continue webhook.
 3. Return `<Dial>` to a known mobile; confirm ring and two-way audio.
 4. Confirm timeout path can return `<Say>` + `<Hangup>`.
 5. Write findings in `docs/agents/LIVE_CALL_FINDINGS.md`.

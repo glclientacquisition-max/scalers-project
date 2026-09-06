@@ -4,6 +4,7 @@ import {
   WALLET_LINE_FEE_KES_PER_MONTH,
   WALLET_LOW_BALANCE_KES,
   WALLET_RATE_KES_PER_MINUTE,
+  WALLET_TRANSFER_RATE_KES_PER_MINUTE,
   getTenantUsageSummary,
 } from "@/lib/wallet";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
@@ -142,11 +143,17 @@ export default async function WalletPage() {
           </dl>
         </div>
 
-        <dl className="mt-8 grid gap-3 border-t border-line pt-6 sm:grid-cols-3 text-sm">
+        <dl className="mt-8 grid gap-3 border-t border-line pt-6 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           <div>
-            <dt className="text-ink-soft">Call rate</dt>
+            <dt className="text-ink-soft">Inbound</dt>
             <dd className="mt-1 font-medium text-ink">
               KES {WALLET_RATE_KES_PER_MINUTE}/min
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-soft">Live transfer</dt>
+            <dd className="mt-1 font-medium text-ink">
+              KES {WALLET_TRANSFER_RATE_KES_PER_MINUTE}/min
             </dd>
           </div>
           <div>

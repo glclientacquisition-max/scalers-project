@@ -37,6 +37,27 @@ function emptyVoiceXml() {
   return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
 }
 
+function escapeXmlAttr(raw) {
+  return escapeXml(raw).replace(/'/g, '&apos;');
+}
+
+/**
+ * Answer XML: hold the PSTN on Stream, then continue to Redirect when the
+ * media socket closes. Staging showed StreamStopped never hits /voice/incoming
+ * (it rides events_url, which cannot return Dial).
+ */
+function buildAnswerStreamXml({ streamUrl, continueUrl } = {}) {
+  const url = escapeXmlAttr(streamUrl);
+  const next = escapeXml(continueUrl);
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<Response>\n` +
+    `    <Stream url="${url}" name="ai-receptionist" track="inbound_track" connect="true" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />\n` +
+    `    <Redirect method="POST">${next}</Redirect>\n` +
+    `</Response>`
+  );
+}
+
 function transferTimeoutSeconds() {
   return Math.min(60, Math.max(10, Number(process.env.VOICE_TRANSFER_TIMEOUT_S || 30) || 30));
 }
@@ -93,15 +114,20 @@ function isCompletedEvent(blob) {
 /**
  * Choose XML for a skip-stream webhook. Null means the caller should keep today's empty Response.
  */
-function consumeLiveTransferWebhook({ callSid, callSessionState, body } = {}) {
+function consumeLiveTransferWebhook({ callSid, callSessionState, body, source } = {}) {
   const sid = String(callSid || '').trim();
   if (!sid) return null;
   const row = pendingByCall.get(sid);
   if (!row) return null;
   const blob = eventBlob(callSessionState, body);
+  const fromContinue = source === 'redirect' || source === 'transfer_continue';
 
   if (row.status === 'pending') {
-    if (isStreamStopEvent(blob) || (isCompletedEvent(blob) && !isDialFailEvent(blob))) {
+    if (
+      fromContinue ||
+      isStreamStopEvent(blob) ||
+      (isCompletedEvent(blob) && !isDialFailEvent(blob))
+    ) {
       row.status = 'dialing';
       pendingByCall.set(sid, row);
       return {
@@ -149,6 +175,7 @@ function resetPendingLiveTransfersForTests() {
 module.exports = {
   buildDialXml,
   buildTransferFallbackXml,
+  buildAnswerStreamXml,
   emptyVoiceXml,
   transferTimeoutSeconds,
   queuePendingLiveTransfer,

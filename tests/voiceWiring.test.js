@@ -102,6 +102,18 @@ assert.match(
 
 assert.match(
   source,
+  /live transfer Dial blocked/,
+  'must not close /ws/media for transfer until conference REST can ring a human'
+);
+
+assert.match(
+  source,
+  /\/voice\/transfer/,
+  'post-Stream Redirect must hit /voice/transfer to issue Dial'
+);
+
+assert.match(
+  source,
   /liveTransfer: \{/,
   'healthz must expose liveTransfer executor flags for staging Dial verification'
 );

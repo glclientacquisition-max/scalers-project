@@ -132,6 +132,15 @@ See: [`../database/DATABASE_GOVERNANCE.md`](../database/DATABASE_GOVERNANCE.md).
 
 ---
 
+## Billing
+
+**FACT:** Wallet RPC `charge_call_to_wallet` is the billing source of truth (idempotent per `call_id`).  
+**FACT:** Locked SautiKit cost vs Scalers retail (KES, answered minutes): inbound 0 / 0; outbound 3 / 4 (KES 1/min margin). Unanswered outbound 0 / 0.  
+**FACT:** `src/billing/liveTransferLegs.js` — inbound `calls` row uses `WALLET_RATE_KES_PER_MINUTE` (default 0). Outbound live-transfer row (`kind=live_transfer`) uses `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default 4).  
+**FACT:** Beta (`billing_enforcement=off`) does not originate outbound transfer unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. See [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8.
+
+---
+
 ## Notifications
 
 **FACT:** Dispatch order in `src/notifications/dispatch.js`: TextSMS.co.ke → SautiKit WhatsApp → Resend email.  

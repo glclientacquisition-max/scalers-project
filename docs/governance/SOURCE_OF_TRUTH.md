@@ -35,7 +35,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | --- | --- | --- | --- | --- | --- |
 | Agent runtime | Gemini turn loop | `server.js` `runGeminiTurn*` | `@google/genai` import; called from media handler | `/ws/relay` path | CORE |
 | Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../ESCALATION.md) | Live Dial | CORE |
-| Human handoff (live) | Cold Dial after Stream stop | Not implemented (`liveTransfer: false`) | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Conference / warm transfer | PROPOSED |
+| Human handoff (live) | Conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
 | Brain state | Per-call semantic memory | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
 | Tool parse | Marker protocol | `src/conversation/toolMarkers.js` | `parseGeminiResponse` | None | CORE |
@@ -112,6 +112,17 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | --- | --- | --- | --- | --- | --- |
 | Inbound provider | SautiKit | External API | `server.js` webhooks; Twilio removed from path comment | Twilio `/ws/relay` | CORE / LEGACY |
 | DID assignment | Pool + tenant column | `sautikit_did_pool`, `tenants.sautikit_virtual_number` | `did_number_pool.sql`, ops panels | Manual env `SAUTIKIT_DID` | CORE |
+
+---
+
+## Billing (rate card)
+
+| Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
+| --- | --- | --- | --- | --- | --- |
+| Call wallet debit | RPC `charge_call_to_wallet` | `src/db.js` | Idempotent per `call_id` | None | CORE |
+| Inbound minutes | Env `WALLET_RATE_KES_PER_MINUTE` | default 0 | SautiKit inbound cost KES 0/min | Raise env if SautiKit starts charging | CORE |
+| Outbound live transfer | Env `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | default 4 | SautiKit outbound cost **KES 3/min** answered; tenant **KES 4/min**; unanswered 0 | Conference executor not live | PROPOSED (executor) / CORE (rates) |
+| Transfer billing helpers | `src/billing/liveTransferLegs.js` | Ops | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8 | Fold outbound into inbound | CORE (do not fold) |
 
 ---
 
