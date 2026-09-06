@@ -1389,7 +1389,7 @@ mediaWss.on('connection', (ws, req) => {
       speaking = false;
       if (activeOutboundStreamId === streamId) activeOutboundStreamId = null;
       if (fillerStreamId === streamId) fillerStreamId = null;
-      if (!speechOutageStarted) releaseQueuedCallerSpeech();
+      if (!speechOutageStarted) releaseQueuedCallerSpeech(gen);
     }
     return { ok: true, cached: true };
   }

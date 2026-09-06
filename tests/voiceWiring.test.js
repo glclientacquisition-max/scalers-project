@@ -102,12 +102,6 @@ assert.match(
 
 assert.match(
   source,
-  /queue overlapping final while TTS/,
-  'non-echo finals during TTS must be queued for the next caller turn'
-);
-
-assert.match(
-  source,
   /function releaseQueuedCallerSpeech/,
   'playback end / barge-in must release queued caller speech'
 );

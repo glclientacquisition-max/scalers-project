@@ -13,6 +13,7 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `src/sautikit/**` | Webhook signature / guards used by voice HTTP |
 | `tests/ttsNormalize.test.js` | TTS prep unit tests |
 | `tests/turnTaking.test.js` | Endpoint / barge-in unit tests |
+| `tests/overlapHold.test.js` | Overlap queue + last-question replay |
 | `tests/spokenStreamBuffer.test.js` | LLM→TTS chunking tests |
 | `tests/voiceWiring.test.js` | Static wiring checks for runtime voice paths |
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
