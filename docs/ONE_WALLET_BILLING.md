@@ -25,7 +25,7 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 | Line item | Ledger kind | Amount |
 |---|---|---|
 | Receptionist minutes (inbound) | `call_charge` | **KES 0**. Matches SautiKit inbound (currently free). Revisit if SautiKit starts charging inbound. |
-| Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 4 / min** (`WALLET_TRANSFER_RATE_KES_PER_MINUTE`). Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
+| Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 4 / min** retail. SautiKit costs **KES 3 / min**. Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
 | Line rental | `line_rental` | Fixed KES / calendar month (UTC) |
 | Ops seed / correction | `admin_adjustment` | Signed KES |
 | Future M-Pesa | `topup` | Positive KES |

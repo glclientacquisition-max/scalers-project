@@ -115,6 +115,17 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 
 ---
 
+## Billing (rate card)
+
+| Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
+| --- | --- | --- | --- | --- | --- |
+| Call wallet debit | RPC `charge_call_to_wallet` | `src/db.js` | Idempotent per `call_id` | None | CORE |
+| Inbound minutes | Env `WALLET_RATE_KES_PER_MINUTE` | default 0 | SautiKit inbound cost KES 0/min | Raise env if SautiKit starts charging | CORE |
+| Outbound live transfer | Env `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | default 4 | SautiKit outbound cost **KES 3/min** answered; tenant **KES 4/min**; unanswered 0 | Conference executor not live | PROPOSED (executor) / CORE (rates) |
+| Transfer billing helpers | `src/billing/liveTransferLegs.js` | Ops | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8 | Fold outbound into inbound | CORE (do not fold) |
+
+---
+
 ## Authentication
 
 | Subsystem | Source of truth | Path | Evidence | Alternatives | Status |

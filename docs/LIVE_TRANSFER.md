@@ -211,19 +211,19 @@ Do not add a second team editor. Directory stays the single source of destinatio
 
 ## 8. Billing and ops
 
-SautiKit currently charges the workspace **KES 0 for inbound** and bills **outbound** PSTN. Conference transfer is two legs:
+SautiKit currently charges the workspace **KES 0 / min inbound** and **KES 3 / min outbound**. Conference transfer is two legs:
 
 | Leg | Who is on it | SautiKit (workspace, current) | Scalers tenant wallet |
 | --- | --- | --- | --- |
-| Inbound | Caller → business DID (AI then conference) | **KES 0** | **KES 0**. Meter duration; debit is 0. |
-| Outbound | Business DID → teammate mobile | Per-minute outbound CDR from `POST /v1/calls` | **KES 4 / min** on a separate `calls` row |
+| Inbound | Caller → business DID (AI then conference) | **KES 0 / min** | **KES 0 / min**. Meter duration; debit is 0. |
+| Outbound | Business DID → teammate mobile | **KES 3 / min** answered (`POST /v1/calls`) | **KES 4 / min** answered on a separate `calls` row |
 
-If SautiKit starts charging inbound, raise `WALLET_RATE_KES_PER_MINUTE` before that ships. Do not leave inbound retail at 0 against a paid inbound CDR.
+Margin on a connected transfer is KES 1 / min (4 retail minus 3 cost). If SautiKit changes either rate, update `WALLET_RATE_KES_PER_MINUTE` and/or `WALLET_TRANSFER_RATE_KES_PER_MINUTE` before that ships.
 
 Rules:
 
 1. **Inbound is KES 0 on both sides today.** SautiKit does not charge inbound. Scalers does not charge the tenant. Minutes are still stored.
-2. **Outbound is KES 4 / answered minute.** If we ring Alvin, the tenant pays `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default 4) on the outbound `call_id`. Unanswered outbound stays 0.
+2. **Outbound is KES 4 / answered minute** to the tenant. SautiKit costs us **KES 3 / min** on that leg. Unanswered outbound stays 0 on both sides.
 3. **Unanswered outbound is free** at SautiKit and must stay 0 minutes on our ledger (`no_answer` / `busy` / `failed` / `canceled`).
 4. **Beta (`billing_enforcement=off`)** meters inbound only and **must not** `POST /v1/calls` in production. Otherwise Scalers eats outbound PSTN. Lab exception: `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on` on staging only.
 5. **Hard enforcement:** do not originate if prepaid cannot cover one outbound minute. Soft still originates (wallet may go negative). Fallback is callback SMS.

@@ -1,6 +1,6 @@
 // Billing rules for live transfer.
-// SautiKit currently charges the workspace KES 0 for inbound DID legs and
-// bills outbound PSTN. Tenant card matches that: inbound 0, outbound 4 / min.
+// SautiKit workspace cost today: inbound KES 0 / min, outbound KES 3 / min.
+// Tenant card: inbound 0, outbound 4 / min (KES 1 / min margin on a connected transfer).
 
 const DEFAULT_INBOUND_RATE = 0;
 const DEFAULT_OUTBOUND_RATE = 4;
