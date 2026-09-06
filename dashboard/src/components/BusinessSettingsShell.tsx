@@ -9,45 +9,83 @@ import { TenantForm } from "@/components/TenantForm";
 import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import {
-  businessSettingsHref,
+  SETTINGS_NAV,
+  settingsNavHref,
+  settingsNavItemActive,
+  settingsPanelHeading,
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
 import { SettingsPageHeader } from "@/components/settingsUi";
 
-const PRIMARY_NAV = [
-  { id: "updates" as const, label: "Updates" },
-  { id: "catalog" as const, label: "Catalog" },
-  { id: "import" as const, label: "Import" },
-  { id: "test" as const, label: "Test" },
-];
-
-const TRAIN_PANELS: { id: SettingsPanel; label: string }[] = [
-  { id: "identity", label: "Assistant" },
-  { id: "hours", label: "Hours" },
-  { id: "locations", label: "Locations" },
-  { id: "policies", label: "Policies" },
-  { id: "team", label: "Team" },
-  { id: "faqs", label: "FAQs" },
-  { id: "tools", label: "Tools & voice" },
-  { id: "pronunciation", label: "Pronunciation" },
-];
-
-function navLinkClass(active: boolean) {
-  return [
-    "flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
-    active
-      ? "bg-[#0096FF]/10 text-[#005ccc]"
-      : "text-ink-soft hover:bg-[#0096FF]/[0.04] hover:text-ink active:bg-[#0096FF]/[0.08]",
-  ].join(" ");
+function SettingsChevron() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-ink-soft"
+      aria-hidden
+    >
+      <path
+        d="M7.5 4.5 13 10l-5.5 5.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
-function panelHeading(tab: BusinessSettingsTab, trainPanel: SettingsPanel): string | null {
-  if (tab === "catalog") return "Catalog";
-  if (tab === "train") {
-    return TRAIN_PANELS.find((p) => p.id === trainPanel)?.label ?? "Train";
-  }
-  return null;
+function SettingsMenu({
+  tab,
+  trainPanel,
+  variant,
+}: {
+  tab: BusinessSettingsTab;
+  trainPanel: SettingsPanel;
+  variant: "index" | "rail";
+}) {
+  const isRail = variant === "rail";
+  return (
+    <nav
+      aria-label="Business sections"
+      className={isRail ? "min-w-0 shrink-0 lg:w-60" : "min-w-0 w-full"}
+    >
+      {SETTINGS_NAV.map((section, index) => (
+        <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
+          <h2 className="pointer-events-none mb-1.5 select-none px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+            {section.title}
+          </h2>
+          <ul className="overflow-hidden rounded-2xl border border-line bg-surface">
+            {section.items.map((item, itemIndex) => {
+              const active = settingsNavItemActive(item.target, tab, trainPanel);
+              return (
+                <li
+                  key={`${item.target.tab}-${item.label}`}
+                  className={itemIndex === 0 ? undefined : "border-t border-line"}
+                >
+                  <Link
+                    href={settingsNavHref(item.target)}
+                    aria-current={active ? "page" : undefined}
+                    className={[
+                      "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]/40",
+                      active
+                        ? "bg-[#0096FF]/10 text-[#005ccc]"
+                        : "text-ink hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.08]",
+                    ].join(" ")}
+                  >
+                    {item.label}
+                    <SettingsChevron />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </nav>
+  );
 }
 
 function settingsLineState(did: string | null | undefined): {
@@ -59,68 +97,9 @@ function settingsLineState(did: string | null | undefined): {
   return { lineLive, lineDetail: lineLive ? value : "" };
 }
 
-function SettingsSidebar({
-  tab,
-  trainPanel,
-}: {
-  tab: BusinessSettingsTab;
-  trainPanel: SettingsPanel;
-}) {
-  return (
-    <nav aria-label="Business sections" className="min-w-0 shrink-0 lg:w-56">
-      <ul className="space-y-1 rounded-2xl border border-line bg-surface p-2">
-        {PRIMARY_NAV.slice(0, 2).map((item) => (
-          <li key={item.id}>
-            <Link
-              href={businessSettingsHref(item.id)}
-              aria-current={tab === item.id ? "page" : undefined}
-              className={navLinkClass(tab === item.id)}
-            >
-              {item.label}
-            </Link>
-          </li>
-        ))}
-
-        <li>
-          <p className="pointer-events-none mt-4 mb-2 select-none px-3 text-xs font-bold uppercase tracking-wide text-gray-500">
-            Train
-          </p>
-          <ul className="space-y-0.5">
-            {TRAIN_PANELS.map((sub) => {
-              const subActive = tab === "train" && trainPanel === sub.id;
-              return (
-                <li key={sub.id}>
-                  <Link
-                    href={businessSettingsHref("train", sub.id)}
-                    aria-current={subActive ? "page" : undefined}
-                    className={navLinkClass(subActive)}
-                  >
-                    {sub.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </li>
-
-        {PRIMARY_NAV.slice(2).map((item) => (
-          <li key={item.id}>
-            <Link
-              href={businessSettingsHref(item.id)}
-              aria-current={tab === item.id ? "page" : undefined}
-              className={navLinkClass(tab === item.id)}
-            >
-              {item.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
 /**
- * Business settings: sticky header save inside the form tree, unified sidebar.
+ * Business settings: menu of destinations, then one screen.
+ * Mobile is list or detail. Desktop keeps the list beside the panel.
  */
 export function BusinessSettingsShell({
   tenant,
@@ -136,7 +115,8 @@ export function BusinessSettingsShell({
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
   const showForm = tab === "catalog" || tab === "train";
-  const heading = panelHeading(tab, trainPanel);
+  const isMenu = tab === "menu";
+  const heading = settingsPanelHeading(tab, trainPanel);
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 
@@ -151,6 +131,25 @@ export function BusinessSettingsShell({
     JSON.stringify(tenant.social_handles || {}),
   ].join(":");
 
+  if (isMenu) {
+    return (
+      <div className="w-full min-w-0 max-w-5xl">
+        <SettingsPageHeader
+          businessName={businessName}
+          lineLive={lineLive}
+          lineDetail={lineDetail}
+        />
+        <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
+      </div>
+    );
+  }
+
+  const rail = (
+    <div className="hidden min-w-0 lg:block">
+      <SettingsMenu tab={tab} trainPanel={trainPanel} variant="rail" />
+    </div>
+  );
+
   return (
     <div className="w-full min-w-0 max-w-5xl">
       {showForm ? (
@@ -161,7 +160,7 @@ export function BusinessSettingsShell({
           curatedVoices={curatedVoices}
           heading={heading}
           lineNumber={lineLive ? lineDetail : "Number pending"}
-          sidebar={<SettingsSidebar tab={tab} trainPanel={trainPanel} />}
+          sidebar={rail}
         />
       ) : (
         <>
@@ -169,11 +168,11 @@ export function BusinessSettingsShell({
             businessName={businessName}
             lineLive={lineLive}
             lineDetail={lineDetail}
+            showBack
           />
 
           <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-start">
-            <SettingsSidebar tab={tab} trainPanel={trainPanel} />
-
+            {rail}
             <div className="min-w-0 flex-1">
               {tab === "updates" ? <DailyBulletinPanel tenant={tenant} /> : null}
 

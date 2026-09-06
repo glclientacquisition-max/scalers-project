@@ -229,7 +229,7 @@ Sticky save: `settingsStickyHeaderClass` + `TenantSettingsSaveButton`.
 
 ### 6.7 Nested nav
 
-`SettingsSidebar`: container `rounded-2xl border border-line bg-surface p-2`. Links `rounded-lg px-3 py-2 text-sm`. Active `bg-[#0096FF]/10 text-[#005ccc]`. Section header `pointer-events-none … text-xs font-bold uppercase tracking-wider text-gray-500` (`Train`).
+Settings menu: grouped destination rows. Section headers `uppercase tracking-wide text-gray-500` (`General`, `Knowledge`, `Operations`, `Line`). Rows `min-h-12` label plus chevron, `border-line` groups. Active `bg-[#0096FF]/10 text-[#005ccc]`. Source: `SETTINGS_NAV`. `/settings` is the menu. Mobile is list or detail. Desktop keeps the list beside the panel.
 
 ### 6.8 Status
 
@@ -283,7 +283,7 @@ Gaps remaining: icon Done/Archive have labels (good) but `h-9` hit area is under
 | Desk nav | Inline `md+`, Menu drawer below | Yes |
 | Calls table | Horizontal scroll, `min-w-[760px]` | Yes |
 | Call detail | Stack, then 4/8 split at `lg` | Yes |
-| Settings | Sidebar stacks above content until `lg` | Yes |
+| Settings | Menu on `/settings`. Mobile list or detail. Desktop list plus panel at `lg` | Yes |
 | Save | Full width on small, `sm:w-auto` | Yes |
 
 Do not convert Calls to stacked cards on mobile.

@@ -4,6 +4,7 @@
  */
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 export const settingsFieldClass =
   "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
@@ -135,20 +136,48 @@ export function ToolSwitch({
 export const settingsGhostButtonClass =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft transition duration-150 hover:bg-surface hover:text-ink active:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40";
 
+export function SettingsBackLink() {
+  return (
+    <Link
+      href="/settings"
+      className="mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-[#0096FF] transition duration-150 hover:text-[#005ccc] active:text-[#004a99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 lg:hidden"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="none"
+        className="h-4 w-4 shrink-0"
+        aria-hidden
+      >
+        <path
+          d="M12.5 4.5 7 10l5.5 5.5"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      Business
+    </Link>
+  );
+}
+
 export function SettingsPageHeader({
   businessName,
   lineLive,
   lineDetail,
   action,
+  showBack = false,
 }: {
   businessName: string;
   lineLive: boolean;
   lineDetail?: string;
   action?: ReactNode;
+  showBack?: boolean;
 }) {
   return (
     <header className={settingsStickyHeaderClass}>
       <div className="min-w-0">
+        {showBack ? <SettingsBackLink /> : null}
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           Business
         </p>
