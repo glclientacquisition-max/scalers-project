@@ -12,7 +12,9 @@ import {
   type CatalogImportState,
 } from "@/app/(desk)/settings/catalogActions";
 import {
+  settingsActionClass,
   settingsFieldClass,
+  settingsPrimaryButtonClass,
   settingsRadioCardClass,
   compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
@@ -145,7 +147,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={previewPending}
-                    className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
+                    className={settingsPrimaryButtonClass}
                   >
                     {previewPending ? "Scanning…" : "Scan catalogue"}
                   </button>
@@ -174,7 +176,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={previewPending}
-                    className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
+                    className={settingsPrimaryButtonClass}
                   >
                     {previewPending ? "Scanning…" : "Scan catalogue"}
                   </button>
@@ -241,24 +243,14 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             <button
               type="button"
               onClick={() => setMergeMode("merge")}
-              className={[
-                "rounded-xl border px-3 py-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
-                mergeMode === "merge"
-                  ? "border-[#0096FF] bg-accent-soft"
-                  : "border-line bg-white",
-              ].join(" ")}
+              className={settingsRadioCardClass(mergeMode === "merge")}
             >
               Keep existing products
             </button>
             <button
               type="button"
               onClick={() => setMergeMode("replace")}
-              className={[
-                "rounded-xl border px-3 py-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
-                mergeMode === "replace"
-                  ? "border-[#0096FF] bg-accent-soft"
-                  : "border-line bg-white",
-              ].join(" ")}
+              className={settingsRadioCardClass(mergeMode === "replace")}
             >
               Replace catalogue
             </button>
@@ -285,14 +277,14 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             <button
               type="submit"
               disabled={applyPending || selectedProducts.length === 0}
-              className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
+              className={settingsPrimaryButtonClass}
             >
               {applyPending ? "Saving…" : "Add to catalogue"}
             </button>
             <button
               type="button"
               onClick={() => setProducts(null)}
-              className="rounded-xl border border-line px-4 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+              className={settingsActionClass}
             >
               Start over
             </button>

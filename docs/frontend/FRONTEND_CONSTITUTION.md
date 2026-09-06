@@ -233,13 +233,16 @@ The owner should feel: **I am teaching my receptionist how my business works.**
 
 Expose only what the backend supports today: identity, voice, languages, knowledge, behavior, escalation, hours, test. Do not invent controls for capabilities that do not exist.
 
-Settings IA to preserve:
+Settings is a menu of destinations. `/settings` is the list. Each row opens one screen. Same tabs and panels. Do not flatten into one form.
 
 ```text
-Updates · Catalog · Train · Import · Test
+General     Updates · Assistant · Team
+Knowledge   Catalog · FAQs · Import
+Operations  Hours · Locations · Policies
+Line        Tools & voice · Pronunciation · Test
 ```
 
-`Train` remains a non-clickable section header. Do not mandate a `TenantForm` rewrite to ship visual work. Split that file only if a later phase cannot ship safely without it.
+Mobile is list or detail. Desktop keeps the list beside the panel. Section titles are non-clickable. `Train` remains the verb (Save & train). Do not mandate a `TenantForm` rewrite to ship visual work. Split that file only if a later phase cannot ship safely without it.
 
 ---
 
@@ -287,7 +290,7 @@ Do not rename to Conversations / Receptionist / Settings for style. Bookmarks an
 
 Owner and Super Admin shells stay split. Never merge those navs.
 
-Nested navigation (Business settings) uses a vertical sidebar. Section titles (`Train`) are non-clickable: `uppercase`, `tracking-wide`, `text-gray-500`, no hover.
+Nested navigation (Business settings) is a destination menu. Section titles (`General`, `Knowledge`, `Operations`, `Line`) are non-clickable: `uppercase`, `tracking-wide`, `text-gray-500`, no hover. Rows are label plus chevron. Mobile shows the menu or the open screen. Desktop shows both.
 
 Desk chrome today is a top bar and a mobile drawer. Do not add a second desk sidebar in Phases 3–5.
 
@@ -301,7 +304,7 @@ Do not replace these without a clear UX reason. Preserve does not mean never imp
 2. Calls table, filters, search, empty states
 3. Call-detail split pane (`lg+`); mobile stack allowed
 4. Settings sidebar
-5. `Train` as a non-clickable section
+5. Settings section headers as non-clickable (`General`, `Knowledge`, `Operations`, `Line`)
 6. Sticky Save
 7. Existing brand tokens
 8. Landing first viewport (one composition)
