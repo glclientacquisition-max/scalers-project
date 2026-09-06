@@ -113,9 +113,11 @@ import {
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
 import {
+  assertPreviewAudioPlayable,
   isAutoplayBlock,
   NO_VOICE_SAMPLE_COPY,
   objectUrlFromPreviewResponse,
+  previewErrorCopy,
 } from "@/lib/previewAudio";
 import type { SettingsPanel } from "@/lib/businessSettingsNav";
 
@@ -558,6 +560,12 @@ export function TenantForm({
         }),
       });
       const url = await objectUrlFromPreviewResponse(res);
+      try {
+        await assertPreviewAudioPlayable(url);
+      } catch (probeErr) {
+        URL.revokeObjectURL(url);
+        throw probeErr;
+      }
       setVoiceSampleUrl(url);
       try {
         await new Audio(url).play();
@@ -568,9 +576,7 @@ export function TenantForm({
         throw playErr;
       }
     } catch (err) {
-      setVoiceSampleError(
-        err instanceof Error ? err.message : NO_VOICE_SAMPLE_COPY
-      );
+      setVoiceSampleError(previewErrorCopy(err));
     } finally {
       setVoiceSampleLoading(false);
     }
@@ -1884,9 +1890,18 @@ export function TenantForm({
             </button>
           </div>
           {voiceSampleUrl ? (
-            <audio src={voiceSampleUrl} controls className="max-w-full" />
+            <audio
+              src={voiceSampleUrl}
+              controls
+              className="max-w-full"
+              onError={() => {
+                URL.revokeObjectURL(voiceSampleUrl);
+                setVoiceSampleUrl(null);
+                setVoiceSampleError(NO_VOICE_SAMPLE_COPY);
+              }}
+            />
           ) : voiceSampleError ? (
-            <p className="text-xs text-[var(--warn)]" role="alert">
+            <p className="text-xs text-[var(--warn)]" role="alert" data-testid="voice-sample-empty">
               {voiceSampleError}
             </p>
           ) : null}

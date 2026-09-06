@@ -57,3 +57,42 @@ export async function objectUrlFromPreviewResponse(res: Response): Promise<strin
 export function isAutoplayBlock(err: unknown): boolean {
   return err instanceof DOMException && err.name === "NotAllowedError";
 }
+
+export function isPlayablePreviewMetadata(duration: number): boolean {
+  return Number.isFinite(duration) && duration > 0;
+}
+
+/** Never surface the browser media-error string in Desk UI. */
+export function previewErrorCopy(err: unknown): string {
+  const raw = err instanceof Error ? err.message.trim() : "";
+  if (
+    !raw ||
+    /no supported source|failed to load|not supported/i.test(raw)
+  ) {
+    return NO_VOICE_SAMPLE_COPY;
+  }
+  return raw;
+}
+
+export function assertPreviewAudioPlayable(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio();
+    const finish = (fn: () => void) => {
+      audio.onerror = null;
+      audio.onloadedmetadata = null;
+      fn();
+    };
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      const ok = isPlayablePreviewMetadata(audio.duration);
+      finish(() => {
+        if (ok) resolve();
+        else reject(new Error(NO_VOICE_SAMPLE_COPY));
+      });
+    };
+    audio.onerror = () => {
+      finish(() => reject(new Error(NO_VOICE_SAMPLE_COPY)));
+    };
+    audio.src = url;
+  });
+}
