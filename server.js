@@ -43,6 +43,7 @@ const {
 const { noteSpeechOutage } = require('./src/speech/speechOutageNotify');
 const {
   resolveSonioxVoice,
+  ttsVoiceNeedsSwap,
   ensureSonioxVoiceReady,
   listCuratedVoices,
   refreshCuratedVoicesFromDb,
@@ -1220,6 +1221,8 @@ mediaWss.on('connection', (ws, req) => {
   let ttsLexiconOverrides = [];
   /** Tenant-selected Soniox voice from curated catalog. */
   let tenantSonioxVoiceId = null;
+  /** Voice id the live TTS websocket was opened with. */
+  let ttsSessionVoiceId = null;
   /** Latest tenant fields used to build Soniox STT context (hearing path). */
   let sttTenantSnapshot = null;
 
@@ -2303,6 +2306,33 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
+  function bindMediaTts(voiceId) {
+    const session = createSonioxTtsSession({
+      callSid: sidLabel(),
+      voiceId,
+      onAudio: (pcm, meta = {}) => {
+        // Drop outbound audio after barge-in cancel / superseded playback generation.
+        if (!speaking) return;
+        if (activePlaybackGeneration !== playbackGeneration) return;
+        // Drop orphan filler / cancelled-stream PCM that arrives late.
+        if (
+          activeOutboundStreamId &&
+          meta.streamId &&
+          meta.streamId !== activeOutboundStreamId
+        ) {
+          return;
+        }
+        if (activeTurnTiming) activeTurnTiming.markFirstPcm();
+        if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
+        // Live clone-voice audio means we can record downtime clips for the next outage.
+        scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
+      },
+    });
+    tts = session;
+    ttsSessionVoiceId = resolveSonioxVoice(voiceId);
+    return session;
+  }
+
   // Warm tenant prompt early when callSid is already on the WS URL.
   const tenantWarm =
     sessionCallSid
@@ -2330,64 +2360,58 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   if (isSonioxTtsConfigured()) {
-    tenantWarm
-      .then(async () => {
-        try {
-          tts = createSonioxTtsSession({
-            callSid: sidLabel(),
-            voiceId: tenantSonioxVoiceId,
-            onAudio: (pcm, meta = {}) => {
-              // Drop outbound audio after barge-in cancel / superseded playback generation.
-              if (!speaking) return;
-              if (activePlaybackGeneration !== playbackGeneration) return;
-              // Drop orphan filler / cancelled-stream PCM that arrives late.
-              if (
-                activeOutboundStreamId &&
-                meta.streamId &&
-                meta.streamId !== activeOutboundStreamId
-              ) {
-                return;
-              }
-              if (activeTurnTiming) activeTurnTiming.markFirstPcm();
-              if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
-              // Live clone-voice audio means we can record downtime clips for the next outage.
-              scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
-            },
-          });
-          try {
-            await tts.ready;
-            resolveTtsReady(tts);
-          } catch (err) {
-            console.error(`[ws/media] Soniox TTS failed to start:`, err?.message || err);
-            tts = null;
-            resolveTtsReady(null);
-          }
-        } catch (err) {
-          console.error(`[ws/media] Soniox TTS init error:`, err?.message || err);
+    try {
+      const session = bindMediaTts(tenantSonioxVoiceId);
+      session.ready
+        .then(() => {
+          resolveTtsReady(session);
+        })
+        .catch((err) => {
+          console.error(`[ws/media] Soniox TTS failed to start:`, err?.message || err);
           tts = null;
           resolveTtsReady(null);
-        }
-      })
-      .catch((err) => {
-        console.error(`[ws/media] Soniox TTS tenant warm failed:`, err?.message || err);
-        resolveTtsReady(null);
-      });
+        });
+    } catch (err) {
+      console.error(`[ws/media] Soniox TTS init error:`, err?.message || err);
+      tts = null;
+      resolveTtsReady(null);
+    }
   } else {
     console.warn('[ws/media] SONIOX_API_KEY missing — skipping TTS for this call');
     resolveTtsReady(null);
   }
 
-  // Greet once media + TTS + tenant prompt are ready.
-  // Greeting is generated fresh by Gemini (dynamic) with a fast time-of-day fallback.
+  // Greet once the tenant profile is loaded (correct business/agent name) and TTS is up.
+  // TTS connects in parallel with tenant fetch so first PCM is not serial.
   (async () => {
     if (greetingStarted) return;
     greetingStarted = true;
     try {
       await ensureTenantPrompt();
-      // Wait until TTS is assigned + connected — avoid silent greetings when
-      // speakText raced ahead of tenantWarm.then(() => createSonioxTtsSession).
-      const readyTts = await ttsReadyPromise;
+      let readyTts = await ttsReadyPromise;
       if (speechOutageStarted) return;
+      if (
+        readyTts &&
+        ttsVoiceNeedsSwap(ttsSessionVoiceId, tenantSonioxVoiceId)
+      ) {
+        console.log(
+          `[ws/media][${sidLabel()}] tts voice swap ${ttsSessionVoiceId} → ${resolveSonioxVoice(tenantSonioxVoiceId)}`
+        );
+        try {
+          readyTts.close();
+        } catch {
+          /* ignore */
+        }
+        tts = null;
+        try {
+          const next = bindMediaTts(tenantSonioxVoiceId);
+          readyTts = await next.ready.then(() => next);
+        } catch (err) {
+          console.error(`[ws/media] Soniox TTS voice swap failed:`, err?.message || err);
+          readyTts = null;
+          tts = null;
+        }
+      }
       if (!readyTts) {
         console.warn(
           `[ws/media][${sidLabel()}] greeting skipped — TTS not ready`
@@ -2396,8 +2420,7 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
-      // Instant local greeting by default (correct business name, no Gemini wait).
-      // Set VOICE_GREETING_MODE=gemini only if you want an LLM-written opener.
+      // Instant local greeting (correct tenant name). Do not wait on Gemini.
       greetingLine = await generateDynamicGreeting({
         businessName,
         agentName,
@@ -2407,12 +2430,11 @@ mediaWss.on('connection', (ws, req) => {
         afterHoursMode,
         closureNotice,
         callSid: sidLabel(),
-        generateText: generateGeminiText,
-        mode: process.env.VOICE_GREETING_MODE || 'instant',
+        mode: 'instant',
       });
       if (speechOutageStarted) return;
       console.log(
-        `[ws/media][${sidLabel()}] greeting mode=${process.env.VOICE_GREETING_MODE || 'instant'} agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
+        `[ws/media][${sidLabel()}] greeting mode=instant agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
       );
 
       const spoken = await speakText(greetingLine);

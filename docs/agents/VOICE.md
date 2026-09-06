@@ -52,7 +52,7 @@ Legacy `/ws/relay` (ConversationRelay) may still exist — do not expand it; pro
 5. Barge-in must cancel TTS + clear queued playback; avoid false cancels on backchannels / echo.
 6. Spoken agent lines that play to the caller should land in the transcript.
 7. Keep `db.js` orchestration surface stable (`upsertCall`, `appendTranscript`, `attachRecording`, `chargeCallToWallet`, …).
-8. Greeting must await TTS ready (`ttsReadyPromise`) — never call `speakText` while `tts` is still null.
+8. Greeting must await tenant profile + TTS ready — never speak a default-name opener, and never call `speakText` while `tts` is still null. TTS connect runs in parallel with tenant fetch.
 9. Action turns (`CREATE_REQUEST` / `CAPTURE` / `ESCALATE` / `TRANSFER`) speak an immediate progress line before Gemini+tools; do not leave dead air. `TRANSFER` / `liveTransfer` is **not** executable until conference REST in [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) rings a human and `VOICE_LIVE_TRANSFER=on`. Do not close Stream for cold Dial. Do not claim a bridge from the media loop. SautiKit outbound cost is KES 3/min answered; tenant outbound is KES 4/min (Ops owns rates).
 10. Filler cancel must target **only** the filler `stream_id` (plus generation bump). Never `tts.cancel()` with no id while a reply stream is prefetched.
 11. Soniox **402 billing exhausted** is a speech-provider outage, not a turn-policy miss. Play the catalog-voice downtime recording (same voice as that line's greeting), hang up, and surface `soniox.lastError` plus `soniox.outageClips` on `/healthz`. Key clips by catalog voice × language. Keep the spoken line voice-generic. Alert each owner at most once per cooldown. See [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md).
