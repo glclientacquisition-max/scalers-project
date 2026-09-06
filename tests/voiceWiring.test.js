@@ -30,6 +30,24 @@ assert.match(
 
 assert.match(
   source,
+  /createOverlapHold/,
+  'media path must hold overlapping caller finals by playback generation'
+);
+
+assert.match(
+  source,
+  /rememberSelectedSpeech/,
+  'complete agent questions must be stored before cancellable TTS can fragment them'
+);
+
+assert.match(
+  source,
+  /release overlap queue gen=/,
+  'playback end must release the generation-tagged overlap queue'
+);
+
+assert.match(
+  source,
   /filler cancelled for reply audio/,
   'reply path must cancel thinking-ack without awaiting remote TTS terminated'
 );

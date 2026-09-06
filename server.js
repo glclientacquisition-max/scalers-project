@@ -130,6 +130,10 @@ const {
 const {
   createSpokenStreamBuffer,
 } = require('./src/speech/spokenStreamBuffer');
+const {
+  createOverlapHold,
+  createAgentReplayMemory,
+} = require('./src/speech/overlapHold');
 const { createVoiceTurnTiming } = require('./src/speech/voiceTiming');
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
@@ -1026,6 +1030,8 @@ mediaWss.on('connection', (ws, req) => {
   let turnBusy = false;
   let utteranceParts = [];
   let utteranceTimer = null;
+  const overlapHold = createOverlapHold();
+  const agentReplay = createAgentReplayMemory();
   let fillerTimer = null;
   /** When true, discard the in-flight Gemini/TTS reply and wait for the caller turn. */
   let bargeInActive = false;
@@ -1163,7 +1169,30 @@ mediaWss.on('connection', (ws, req) => {
     }
   }
 
-  function releaseQueuedCallerSpeech() {
+  function lastAskedQuestion() {
+    return (
+      agentAwaitingReply(lastAgentText) ||
+      agentAwaitingReply(agentReplay.snapshot().lastCompleteAgentQuestion)
+    );
+  }
+
+  function hearAgainReplayText() {
+    return agentReplay.pickReplay(lastAgentText);
+  }
+
+  function releaseQueuedCallerSpeech(endedGeneration) {
+    const gen =
+      endedGeneration != null ? endedGeneration : activePlaybackGeneration;
+    const { text, duplicate } = overlapHold.drain(gen);
+    if (duplicate) return;
+    if (text) {
+      utteranceParts.push(text);
+      console.log(
+        `[ws/media][${sidLabel()}] release overlap queue gen=${gen}: ${text.slice(0, 80)}`
+      );
+      scheduleUtteranceFlush();
+      return;
+    }
     if (utteranceParts.length) {
       scheduleUtteranceFlush();
       return;
@@ -1195,7 +1224,7 @@ mediaWss.on('connection', (ws, req) => {
     await sleep(waitMs);
     if (activePlaybackGeneration === gen) {
       speaking = false;
-      releaseQueuedCallerSpeech();
+      releaseQueuedCallerSpeech(gen);
     }
     return waitMs;
   }
@@ -1269,6 +1298,7 @@ mediaWss.on('connection', (ws, req) => {
     speaking = true;
     speakStartedAt = Date.now();
     lastAgentText = String(text);
+    agentReplay.rememberSelectedSpeech(text, { isFiller: opts.isFiller });
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
     // One owner for TTS language + pronunciation prep (per-utterance + sticky call lang).
@@ -1322,12 +1352,13 @@ mediaWss.on('connection', (ws, req) => {
         if (activeOutboundStreamId === session?.streamId) {
           activeOutboundStreamId = null;
         }
-        if (!speechOutageStarted) releaseQueuedCallerSpeech();
+        if (!speechOutageStarted) releaseQueuedCallerSpeech(gen);
       }
     }
   }
 
   function cancelSpeech(reason) {
+    const endingGen = activePlaybackGeneration;
     clearFillerTimer();
     bargeInActive = true;
     playbackGeneration += 1;
@@ -1348,7 +1379,7 @@ mediaWss.on('connection', (ws, req) => {
       activeTurnTiming.log({ outcome: 'barge_in' });
       activeTurnTiming = null;
     }
-    releaseQueuedCallerSpeech();
+    releaseQueuedCallerSpeech(endingGen);
   }
 
   function discardUnspokenAssistant(reply) {
@@ -1366,7 +1397,8 @@ mediaWss.on('connection', (ws, req) => {
       turnBusy,
       speakStartedAt,
       lastAgentText,
-      lastAgentAskedQuestion: agentAwaitingReply(lastAgentText),
+      lastAgentAskedQuestion: lastAskedQuestion(),
+      replayText: hearAgainReplayText(),
       now: Date.now(),
     });
     if (!decision.interrupt) {
@@ -1457,15 +1489,17 @@ mediaWss.on('connection', (ws, req) => {
       speaking: false,
       turnBusy: false,
       lastAgentText,
-      lastAgentAskedQuestion: agentAwaitingReply(lastAgentText),
+      lastAgentAskedQuestion: lastAskedQuestion(),
+      replayText: hearAgainReplayText(),
       phase: 'idle',
       isFinal: true,
     });
-    if (idleDecision.replay && lastAgentText) {
+    const replayLine = hearAgainReplayText();
+    if (idleDecision.replay && replayLine) {
       console.log(
         `[ws/media][${sidLabel()}] hear_again replay reason=${idleDecision.reason}`
       );
-      await speakText(lastAgentText);
+      await speakText(replayLine);
       return;
     }
     // Skip pure noise, but keep yes/no and short names when the agent just asked.
@@ -1474,6 +1508,7 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
 
+    overlapHold.discardExcept(0);
     turnBusy = true;
     bargeInActive = false;
     const turnTiming = createVoiceTurnTiming(sidLabel());
@@ -1726,10 +1761,12 @@ mediaWss.on('connection', (ws, req) => {
         }
 
         if (!speaking || activePlaybackGeneration !== playbackGeneration) {
+          const prev = activePlaybackGeneration;
           speaking = true;
           speakStartedAt = Date.now();
           activePlaybackGeneration = ++playbackGeneration;
           streamPlaybackGen = activePlaybackGeneration;
+          if (prev > 0) overlapHold.reassignPending(prev, activePlaybackGeneration);
         }
         activeOutboundStreamId = session.streamId;
 
@@ -1785,7 +1822,7 @@ mediaWss.on('connection', (ws, req) => {
             speakSession = null;
             if (activePlaybackGeneration === streamPlaybackGen) {
               speaking = false;
-              releaseQueuedCallerSpeech();
+              releaseQueuedCallerSpeech(streamPlaybackGen);
             }
             turnTiming.log({ outcome: 'barge_in' });
             if (activeTurnTiming === turnTiming) activeTurnTiming = null;
@@ -1800,6 +1837,9 @@ mediaWss.on('connection', (ws, req) => {
             fallbackLine: currentLlmRecoveryLine(),
           });
           if (planned.alreadySpoken) {
+            if (planned.reply) {
+              agentReplay.rememberSelectedSpeech(planned.reply);
+            }
             try {
               await speakSession.end();
             } catch (err) {
@@ -1810,7 +1850,7 @@ mediaWss.on('connection', (ws, req) => {
             } finally {
               if (activePlaybackGeneration === streamPlaybackGen) {
                 speaking = false;
-                releaseQueuedCallerSpeech();
+                releaseQueuedCallerSpeech(streamPlaybackGen);
               }
               speakSession = null;
             }
@@ -2046,7 +2086,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       if (decision.replay) {
-        const replay = String(lastAgentText || '').trim();
+        const replay = hearAgainReplayText();
         if (replay) {
           console.log(
             `[ws/media][${sidLabel()}] hear_again replay reason=${decision.reason}`
@@ -2070,7 +2110,7 @@ mediaWss.on('connection', (ws, req) => {
 
       if (speaking && !bargeInActive) {
         const overlap = classifyFinalDuringAgentSpeech(text, lastAgentText, {
-          lastAgentAskedQuestion: agentAwaitingReply(lastAgentText),
+          lastAgentAskedQuestion: lastAskedQuestion(),
           speakStartedAt,
         });
         if (overlap === 'drop_echo') {
@@ -2079,8 +2119,8 @@ mediaWss.on('connection', (ws, req) => {
           );
           return;
         }
-        // Real overlap that wasn't strong enough to barge — keep for after playback.
-        utteranceParts.push(text);
+        // Hold until this playback generation ends — do not Gemini while TTS is active.
+        overlapHold.enqueue(text, activePlaybackGeneration);
         console.log(
           `[ws/media][${sidLabel()}] queue overlapping final while TTS: ${text.slice(0, 80)}`
         );

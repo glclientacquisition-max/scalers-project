@@ -409,7 +409,9 @@ function decideCallerEvent(opts = {}) {
   }
 
   if (kind === 'hear_again') {
-    const replay = Boolean(String(lastAgentText || '').trim());
+    const replay = Boolean(
+      String(opts.replayText || lastAgentText || '').trim()
+    );
     if (phase === 'speaking') {
       return outcome({
         ...base,
