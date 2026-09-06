@@ -42,7 +42,8 @@
     "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh"
   },
   "devDependencies": {
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "word-list": "^4.1.0"
   },
   "dependencies": {
     "@google/genai": "^2.13.0",
