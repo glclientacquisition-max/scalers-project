@@ -67,7 +67,7 @@ function deriveCallSummary(opts = {}) {
       const type = result.requestType || result.value?.type || 'request';
       const item = result.value?.item || products[0] || '';
       const when = result.value?.whenText || result.value?.when_text || '';
-      actions.push(clean([type, item, when].filter(Boolean).join(' — '), 160));
+      actions.push(clean([type, item, when].filter(Boolean).join('. '), 160));
       if (when) instructions.push(clean(`Pickup/when: ${when}`, 120));
       if (result.value?.notes) instructions.push(clean(result.value.notes, 160));
     }
@@ -80,6 +80,13 @@ function deriveCallSummary(opts = {}) {
 
   const name = safeCallerName(state);
   const goal = safeGoalDescription(state.goal?.description || '');
+  const reason = buildOwnerReason({
+    callerName: name,
+    primaryIntent,
+    goal,
+    products,
+    results,
+  });
   const bits = [];
   if (primaryIntent) bits.push(`Intent: ${primaryIntent}`);
   if (name) bits.push(`Caller: ${name}`);
@@ -100,6 +107,7 @@ function deriveCallSummary(opts = {}) {
 
   return {
     text: clean(text, 400),
+    reason,
     primaryIntent,
     products,
     actions,
@@ -107,6 +115,52 @@ function deriveCallSummary(opts = {}) {
     callerName: name || null,
     language: state.language?.current || null,
   };
+}
+
+function buildOwnerReason({ callerName, primaryIntent, goal, products, results }) {
+  const who = callerName || 'Caller';
+  const rows = Array.isArray(results) ? results : [];
+  const hold = rows.find(
+    (row) =>
+      row.action === 'create_service_request' &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+  const visit = rows.find(
+    (row) =>
+      (row.action === 'create_appointment' ||
+        row.action === 'update_appointment') &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+
+  if (hold) {
+    const item = hold.value?.item || products?.[0] || '';
+    const when = hold.value?.whenText || hold.value?.when_text || '';
+    return clean([`${who} left a hold`, item, when].filter(Boolean).join('. '), 220);
+  }
+  if (visit) {
+    const service =
+      visit.value?.serviceName ||
+      visit.value?.service ||
+      visit.record?.service_name ||
+      '';
+    const when = visit.value?.whenText || visit.value?.when_text || '';
+    const verb =
+      visit.action === 'update_appointment' ? 'updated a visit' : 'booked a visit';
+    return clean([`${who} ${verb}`, service, when].filter(Boolean).join('. '), 220);
+  }
+  if (primaryIntent === 'human') {
+    return clean(`${who} needs you to return the call.`, 220);
+  }
+  if (goal) {
+    return clean(`${who} asked about ${goal.replace(/\.$/, '')}.`, 220);
+  }
+  if (primaryIntent === 'hours_open') {
+    return clean(`${who} asked about hours.`, 220);
+  }
+  if (primaryIntent === 'product_inquiry' && products?.[0]) {
+    return clean(`${who} asked about ${products[0]}.`, 220);
+  }
+  return clean(`${who} called.`, 220);
 }
 
 module.exports = {

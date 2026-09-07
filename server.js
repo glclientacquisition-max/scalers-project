@@ -77,6 +77,10 @@ const {
 const { deriveCallResolution } = require('./src/conversation/callResolution');
 const { deriveCallSummary } = require('./src/conversation/callSummary');
 const {
+  schedulePostCallTranscriptReview,
+  toolFlagsFromBrain,
+} = require('./src/conversation/callTranscriptReview');
+const {
   extractGeminiText,
   extractThoughtSignature,
   extractGeminiParts,
@@ -665,7 +669,7 @@ function detectCallTermination(body = {}, kind = '') {
   return { terminal: false, status: null };
 }
 
-async function persistCallResolution(callSid, source = 'call') {
+async function persistCallResolution(callSid, source = 'call', opts = {}) {
   if (!callSid) return null;
   const brainState = callBrainStates.get(callSid);
   if (!brainState) return null;
@@ -684,6 +688,7 @@ async function persistCallResolution(callSid, source = 'call') {
         patch: {
           text: summary.text,
           brain_summary: summary.text,
+          reason: summary.reason,
           primary_intent: derived.primaryIntent || summary.primaryIntent,
           products: summary.products,
           actions: summary.actions,
@@ -697,6 +702,15 @@ async function persistCallResolution(callSid, source = 'call') {
         err?.message || err
       );
     }
+    const profile = callTenantProfiles.get(callSid) || {};
+    schedulePostCallTranscriptReview({
+      callSid,
+      vertical: profile.vertical || '',
+      derived,
+      summary,
+      toolFlags: toolFlagsFromBrain(brainState),
+      turns: Array.isArray(opts.turns) ? opts.turns : null,
+    });
     if (saved) {
       console.log(
         `[${source}] call resolution ${callSid} → ${derived.resolution}` +
@@ -713,7 +727,7 @@ async function persistCallResolution(callSid, source = 'call') {
   }
 }
 
-async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, source }) {
+async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, source, turns }) {
   if (!callSid) {
     console.warn(`[${source}] termination detected but no callSid — skipping DB update`);
     return null;
@@ -729,7 +743,7 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       found: Boolean(updated),
     });
     // Best-effort outcome while Brain state may still be in memory.
-    await persistCallResolution(callSid, source);
+    await persistCallResolution(callSid, source, { turns });
     return updated;
   } catch (err) {
     console.error(`[${source}] updateCallStatus failed:`, err?.message || err);
@@ -2685,6 +2699,7 @@ mediaWss.on('connection', (ws, req) => {
         status: 'complete',
         durationSeconds,
         source: 'ws/media',
+        turns: callTranscript.turns(),
       })
         .catch(() => {})
         .finally(() => {
