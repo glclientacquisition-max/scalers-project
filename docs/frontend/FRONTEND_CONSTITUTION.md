@@ -118,8 +118,8 @@ Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointme
 
 | Route | Job | Layout |
 | --- | --- | --- |
-| `/home` | Map of Needs you, Holds, Jobs. Briefing names the next action. Line. One CTA into the sharpest queue. | Command Center. Not a second inbox. |
-| `/calls` | Signal-stamped Inbox | Dense table. Work leads. Holds and Jobs change columns. |
+| `/home` | Exclusive map: return calls, Holds, Visits or Bookings by niche. Briefing names the next action. Line. One CTA into the sharpest queue. | Command Center. Not a second inbox. |
+| `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Dense table. Work leads. Holds and Jobs change columns. |
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
 | `/appointments` | Confirm visits | Redirect `/calls?purpose=job` |
@@ -136,7 +136,7 @@ Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointme
 
 - Scan, do not educate.
 - Prefer “Requests”, “Open”, “Reply on WhatsApp”, “Save”.
-- Stamps name the next action: Confirm visit, Hold, Order, Human asked, Missed.
+- Stamps name the next action in the workspace niche: Confirm visit, Pickup, Confirm booking, Human asked, Missed.
 - Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday).
 - Ban: em dash, en dash, “How to test” as a story, “Coming soon” filler.
 - WhatsApp prefill is owner-facing: no dashes.

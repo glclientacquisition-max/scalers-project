@@ -54,15 +54,16 @@ Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triag
 
 **Home dashboard**
 1. **Line chip** — Line live / Number pending / Needs training (DID + readiness). Never Online.
-2. **Work map** — Needs you, Holds, Jobs. Briefing names the next action.
+2. **Work map** — Exclusive queues from the same Inbox assemble: return calls, Holds, Visits or Bookings. Copy follows the workspace niche.
 3. **What happened** — Calls today
-4. **One CTA** — Confirm visit, Fulfill hold, Return call, Train, or Test line
+4. **One CTA** — Confirm visit, Confirm booking, Fulfill hold, Return call, Train, or Test line
 
 **Inbox (`/calls`)**
-- Signal stamps: Confirm visit, Hold, Human asked, Missed, Answered
+- Brain ids mapped: `hold_or_pickup` is a hold, `product_inquiry` is answered
+- Niche stamps: Pickup (retail), Confirm visit (home services), Confirm booking (hospitality)
 - Caption briefing: `3 need you. 1 to confirm.`
 - Mixed columns: Work / Needed / When
-- Filters: Needs you · Holds · Jobs · Human · Answered · All
+- Filters: Needs you · Holds · Visits, Jobs, or Bookings · Human · Answered · All
 - Bare `/calls` defaults to Needs you when work is waiting
 - `/requests` and `/appointments` redirect into Holds / Jobs filters
 

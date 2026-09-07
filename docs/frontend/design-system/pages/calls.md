@@ -1,19 +1,21 @@
 # Inbox
 
 **Route:** `/calls`  
-**Job:** One work surface. Signal stamps name the next action: Confirm visit, Visit, Hold, Order, Human asked, Missed, Answered.
+**Job:** One work surface. Brain intent ids are mapped onto owner stamps. Copy follows `tenants.vertical`.
 
-**Chrome:** Title Inbox (matches nav). Caption is a briefing (`3 need you. 1 to confirm.`), not a raw count. Search stays here.
+Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
 
-Filters: Needs you / Holds / Jobs / Human / Answered / All.
+**Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
-Work that needs the owner sorts above answered rows. Urgent above the rest.
+Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Human / Answered / All.
+
+Work that needs the owner sorts above answered rows. Visits before holds. Urgent first.
+
+`hold_or_pickup` and `order_enquiry` are Holds. `product_inquiry` is Answered, not Needs you.
 
 Columns:
-- Mixed filters: Work / Needed / When / Action. When is Today / Yesterday / weekday.
+- Mixed filters: Work / Needed / When / Action.
 - Holds: Item / Who / Needed. Verb **Done**. Transcript is **Call**.
-- Jobs: Visit / Who / Place. Verb **Confirm**. Transcript is **Call**.
-
-Voice rows still **Open** the transcript.
+- Jobs: Visit or Booking / Who / Place. Verb **Confirm**. Transcript is **Call**.
 
 `/requests` → `?purpose=hold`. `/appointments` → `?purpose=job`.
