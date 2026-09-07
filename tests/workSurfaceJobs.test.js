@@ -28,29 +28,35 @@ describe("work surface jobs on unified inbox", () => {
 
   it("makes Overview a map into Inbox purposes", () => {
     assert.match(home, /Needs you/);
-    assert.match(home, /Holds/);
-    assert.match(home, /Jobs/);
+    assert.match(home, /copy.holdFilter/);
+    assert.match(home, /copy.jobFilter/);
     assert.match(home, /homeBriefing/);
-    assert.match(home, /Confirm visit/);
-    assert.match(home, /Fulfill hold/);
-    assert.match(home, /Return call/);
+    assert.match(home, /summarizeInboxWork/);
+    assert.match(home, /purpose: "human"/);
+    assert.match(home, /purpose: "hold"/);
+    assert.match(home, /purpose: "job"/);
     assert.doesNotMatch(home, /Open inbox/);
     assert.doesNotMatch(home, /DeskDataTable/);
   });
 
   it("changes Holds and Jobs columns inside Inbox", () => {
+    const niche = read("dashboard/src/lib/inboxNiche.ts");
     assert.match(toolbar, />\s*Inbox\s*</);
     assert.match(toolbar, /need you/);
     assert.match(toolbar, /caption/);
+    assert.match(toolbar, /purposeFilters/);
     assert.doesNotMatch(toolbar, /clamp\(2rem/);
-    assert.match(inbox, /Nothing to fulfill/);
-    assert.match(inbox, /No visits to confirm/);
+    assert.match(niche, /holdEmpty: "Nothing to fulfill"/);
+    assert.match(niche, /jobEmpty: "No visits to confirm"/);
+    assert.match(niche, /jobFilter: "Visits"/);
+    assert.match(niche, /jobFilter: "Bookings"/);
+    assert.match(niche, /pickupStamp: "Pickup"/);
     assert.match(inbox, />\s*Item\s*</);
     assert.match(inbox, />\s*Needed\s*</);
-    assert.match(inbox, />\s*Visit\s*</);
+    assert.match(inbox, /copy.jobColumn/);
     assert.match(inbox, />\s*Place\s*</);
-    assert.match(inbox, /inboxCaption\(searched\)/);
-    assert.match(inbox, /itemSignalLabel\(item\)/);
+    assert.match(inbox, /inboxCaption\(searched, vertical\)/);
+    assert.match(inbox, /itemSignalLabel\(item, vertical\)/);
     assert.match(inbox, /formatCallWhenRelative/);
     assert.doesNotMatch(inbox, />\s*Purpose\s*</);
     assert.match(inbox, /openLabel = item.hold \|\| item.job \? "Call" : "Open"/);

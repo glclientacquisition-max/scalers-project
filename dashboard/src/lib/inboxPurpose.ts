@@ -1,5 +1,6 @@
 import type { CallResolution, LeadStatus } from "@/lib/supabase";
 import type { Lead } from "@/lib/callsTriage";
+import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 
 export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered";
 
@@ -11,24 +12,35 @@ export type InboxPurposeFilterId =
   | "answered"
   | "all";
 
-export const PURPOSE_FILTERS = [
-  { id: "needs", label: "Needs you" },
-  { id: "hold", label: "Holds" },
-  { id: "job", label: "Jobs" },
-  { id: "human", label: "Human" },
-  { id: "answered", label: "Answered" },
-  { id: "all", label: "All" },
-] as const;
+export const PURPOSE_FILTERS = purposeFilters("general");
 
-const JOB_INTENTS = new Set([
-  "book_visit",
-  "booking",
-  "reschedule",
-  "cancel",
-  "cancellation",
+/** Brain persist ids. Desk must read these, not the short aliases. */
+const INTENT_ALIASES: Record<string, string> = {
+  hold: "hold_or_pickup",
+  hold_or_pickup: "hold_or_pickup",
+  hours: "hours_open",
+  hours_open: "hours_open",
+  location: "directions",
+  directions: "directions",
+  order: "order_enquiry",
+  order_enquiry: "order_enquiry",
+  enquiry: "order_enquiry",
+  booking: "book_visit",
+  book_visit: "book_visit",
+  cancellation: "cancel",
+  cancel: "cancel",
+  reschedule: "reschedule",
+};
+
+const JOB_INTENTS = new Set(["book_visit", "reschedule", "cancel"]);
+
+const HOLD_INTENTS = new Set([
+  "hold_or_pickup",
+  "order_enquiry",
+  "callback",
+  "hold",
+  "order",
 ]);
-
-const HOLD_INTENTS = new Set(["hold", "order", "enquiry", "callback"]);
 
 const HUMAN_INTENTS = new Set([
   "human",
@@ -47,10 +59,20 @@ const ANSWER_INTENTS = new Set([
   "price_band",
   "availability",
   "policy",
+  "product_inquiry",
   "service_inquiry",
   "service_area",
+  "general_enquiry",
   "other",
 ]);
+
+export function canonicalInboxIntent(raw?: string | null): string {
+  const key = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (!key || key === "unknown") return "";
+  return INTENT_ALIASES[key] || key;
+}
 
 export type InboxHold = {
   id: string;
@@ -92,13 +114,15 @@ export type InboxItem = {
   lead: Lead | null;
   hold: InboxHold | null;
   job: InboxJob | null;
+  intent: string | null;
   urgent: boolean;
 };
 
-export function purposeLabel(purpose: InboxPurpose): string {
+export function purposeLabel(purpose: InboxPurpose, vertical?: string | null): string {
+  const copy = nicheCopy(vertical);
   switch (purpose) {
     case "job":
-      return "Visit";
+      return copy.visitStamp;
     case "hold":
       return "Hold";
     case "human":
@@ -110,37 +134,52 @@ export function purposeLabel(purpose: InboxPurpose): string {
   }
 }
 
-/** Next action in owner words. Taxonomy chips (Job, Hold) are noise. */
+/** Next action in the owner's niche language. */
 export function signalLabel(opts: {
   purpose: InboxPurpose;
   hold?: InboxHold | null;
   job?: InboxJob | null;
+  intent?: string | null;
+  vertical?: string | null;
 }): string {
+  const copy = nicheCopy(opts.vertical);
   if (opts.purpose === "job") {
     const status = String(opts.job?.status || "").toLowerCase();
-    if (status === "confirmed") return "Visit";
-    if (status === "done") return "Visit done";
+    if (status === "confirmed") return copy.visitStamp;
+    if (status === "done") return copy.visitDoneStamp;
     if (status === "cancelled") return "Cancelled";
-    return "Confirm visit";
+    return copy.confirmStamp;
   }
   if (opts.purpose === "hold") {
     const status = String(opts.hold?.status || "").toLowerCase();
     if (status === "fulfilled") return "Item done";
     if (status === "cancelled") return "Cancelled";
-    return holdTypeLabel(opts.hold?.request_type || "hold");
+    return holdTypeLabel(
+      opts.hold?.request_type || opts.intent || "hold",
+      opts.vertical
+    );
   }
-  return purposeLabel(opts.purpose);
+  return purposeLabel(opts.purpose, opts.vertical);
 }
 
-export function itemSignalLabel(item: InboxItem): string {
+export function itemSignalLabel(
+  item: InboxItem,
+  vertical?: string | null
+): string {
   return signalLabel({
     purpose: item.purpose,
     hold: item.hold,
     job: item.job,
+    intent: item.intent,
+    vertical,
   });
 }
 
-export function inboxCaption(items: InboxItem[]): string {
+export function inboxCaption(
+  items: InboxItem[],
+  vertical?: string | null
+): string {
+  const copy = nicheCopy(vertical);
   const needs = items.filter((item) => item.needsYou).length;
   if (needs === 0) return "Clear";
   const toConfirm = items.filter(
@@ -150,20 +189,30 @@ export function inboxCaption(items: InboxItem[]): string {
     (item) => item.hold && String(item.hold.status || "").toLowerCase() === "open"
   ).length;
   if (toConfirm === needs) {
-    return toConfirm === 1 ? "1 to confirm" : `${toConfirm} to confirm`;
+    return `${toConfirm} ${copy.jobUnit}`;
   }
   if (toFulfill === needs) {
-    return toFulfill === 1 ? "1 to fulfill" : `${toFulfill} to fulfill`;
+    return `${toFulfill} ${copy.holdUnit}`;
   }
   const bits = [`${needs} need you`];
-  if (toConfirm > 0) bits.push(`${toConfirm} to confirm`);
-  else if (toFulfill > 0) bits.push(`${toFulfill} to fulfill`);
+  if (toConfirm > 0) bits.push(`${toConfirm} ${copy.jobUnit}`);
+  else if (toFulfill > 0) bits.push(`${toFulfill} ${copy.holdUnit}`);
   return bits.length === 1 ? bits[0] : `${bits[0]}. ${bits[1]}.`;
 }
 
+function signalRank(item: InboxItem): number {
+  if (item.urgent && item.needsYou) return 0;
+  if (item.purpose === "job" && item.needsYou) return 1;
+  if (item.purpose === "hold" && item.needsYou) return 2;
+  if (item.purpose === "missed" && item.needsYou) return 3;
+  if (item.purpose === "human" && item.needsYou) return 4;
+  if (item.needsYou) return 5;
+  return 6;
+}
+
 export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
-  if (a.needsYou !== b.needsYou) return a.needsYou ? -1 : 1;
-  if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+  const rank = signalRank(a) - signalRank(b);
+  if (rank !== 0) return rank;
   if (a.createdAt < b.createdAt) return 1;
   if (a.createdAt > b.createdAt) return -1;
   return 0;
@@ -181,23 +230,55 @@ export function homeQueueUnit(
   return fallback;
 }
 
-export function homeBriefing(opts: {
-  toReturn: number;
-  toFulfill: number;
-  toConfirm: number;
-}): string {
+export function homeBriefing(
+  opts: {
+    toReturn: number;
+    toFulfill: number;
+    toConfirm: number;
+  },
+  vertical?: string | null
+): string {
+  const copy = nicheCopy(vertical);
   const bits: string[] = [];
-  if (opts.toConfirm > 0) bits.push(`${opts.toConfirm} to confirm`);
-  if (opts.toFulfill > 0) bits.push(`${opts.toFulfill} to fulfill`);
-  if (opts.toReturn > 0) bits.push(`${opts.toReturn} to return`);
+  if (opts.toConfirm > 0) bits.push(`${opts.toConfirm} ${copy.jobUnit}`);
+  if (opts.toFulfill > 0) bits.push(`${opts.toFulfill} ${copy.holdUnit}`);
+  if (opts.toReturn > 0) bits.push(`${opts.toReturn} ${copy.returnUnit}`);
   if (bits.length === 0) return "Clear";
   return `${bits.join(". ")}.`;
 }
 
-export function holdTypeLabel(type: string): string {
-  switch (type) {
+export function summarizeInboxWork(items: InboxItem[]): {
+  needs: number;
+  toReturn: number;
+  toFulfill: number;
+  toConfirm: number;
+  nextHold: InboxItem | null;
+  nextJob: InboxItem | null;
+} {
+  const needs = items.filter((item) => item.needsYou);
+  const toReturn = needs.filter(
+    (item) => item.purpose === "human" || item.purpose === "missed"
+  );
+  const toFulfill = needs.filter((item) => item.purpose === "hold");
+  const toConfirm = needs.filter((item) => item.purpose === "job");
+  return {
+    needs: needs.length,
+    toReturn: toReturn.length,
+    toFulfill: toFulfill.length,
+    toConfirm: toConfirm.length,
+    nextHold: toFulfill[0] || null,
+    nextJob: toConfirm[0] || null,
+  };
+}
+
+export function holdTypeLabel(type: string, vertical?: string | null): string {
+  const copy = nicheCopy(vertical);
+  const key = canonicalInboxIntent(type) || String(type || "").toLowerCase();
+  switch (key) {
+    case "hold_or_pickup":
     case "hold":
-      return "Hold";
+      return copy.pickupStamp;
+    case "order_enquiry":
     case "order":
       return "Order";
     case "callback":
@@ -205,7 +286,7 @@ export function holdTypeLabel(type: string): string {
     case "enquiry":
       return "Enquiry";
     default:
-      return type || "Hold";
+      return type || copy.pickupStamp;
   }
 }
 
@@ -219,9 +300,7 @@ export function classifyInboxPurpose(opts: {
   if (opts.job) return "job";
   if (opts.hold) return "hold";
 
-  const intent = String(opts.primaryIntent || "")
-    .trim()
-    .toLowerCase();
+  const intent = canonicalInboxIntent(opts.primaryIntent);
   const resolution = opts.resolution || "unknown";
 
   if (HUMAN_INTENTS.has(intent) || resolution === "needs_human") return "human";
@@ -233,37 +312,44 @@ export function classifyInboxPurpose(opts: {
   return "answered";
 }
 
+function leadStillOpen(leadStatus?: LeadStatus | null): boolean {
+  return leadStatus !== "resolved" && leadStatus !== "archived";
+}
+
 export function inboxNeedsYou(opts: {
   purpose: InboxPurpose;
   leadStatus?: LeadStatus | null;
   hold?: InboxHold | null;
   job?: InboxJob | null;
 }): boolean {
+  if (opts.purpose === "answered") return false;
   const jobStatus = String(opts.job?.status || "").toLowerCase();
   const holdStatus = String(opts.hold?.status || "").toLowerCase();
   if (opts.job && (jobStatus === "requested" || jobStatus === "confirmed")) {
     return true;
   }
   if (opts.hold && holdStatus === "open") return true;
-  if (opts.purpose === "human" && opts.leadStatus !== "resolved" && opts.leadStatus !== "archived") {
+  if (opts.purpose === "job" && !opts.job && leadStillOpen(opts.leadStatus)) {
     return true;
   }
-  if (opts.purpose === "missed" && opts.leadStatus !== "resolved" && opts.leadStatus !== "archived") {
+  if (opts.purpose === "hold" && !opts.hold && leadStillOpen(opts.leadStatus)) {
     return true;
   }
+  if (opts.purpose === "human" && leadStillOpen(opts.leadStatus)) return true;
+  if (opts.purpose === "missed" && leadStillOpen(opts.leadStatus)) return true;
   return false;
 }
 
-export function holdHeadline(hold: InboxHold): string {
+export function holdHeadline(hold: InboxHold, vertical?: string | null): string {
   const item = hold.item?.trim();
   if (item) {
     return hold.quantity ? `${item} x${hold.quantity}` : item;
   }
-  return holdTypeLabel(hold.request_type);
+  return holdTypeLabel(hold.request_type, vertical);
 }
 
-export function jobHeadline(job: InboxJob): string {
-  return job.service_name?.trim() || "Visit";
+export function jobHeadline(job: InboxJob, vertical?: string | null): string {
+  return job.service_name?.trim() || nicheCopy(vertical).visitStamp;
 }
 
 export function jobDetail(job: InboxJob): string | null {
@@ -275,10 +361,13 @@ export function buildInboxItem(opts: {
   lead?: Lead | null;
   hold?: InboxHold | null;
   job?: InboxJob | null;
+  vertical?: string | null;
 }): InboxItem {
   const lead = opts.lead || null;
   const hold = opts.hold || null;
   const job = opts.job || null;
+  const vertical = opts.vertical || null;
+  const intent = canonicalInboxIntent(lead?.primaryIntent) || null;
   const purpose = classifyInboxPurpose({
     primaryIntent: lead?.primaryIntent,
     resolution: lead?.resolution,
@@ -298,13 +387,13 @@ export function buildInboxItem(opts: {
   const callerPhone =
     job?.caller_phone || hold?.caller_phone || lead?.call.caller_number || null;
 
-  let headline = lead?.reason || purposeLabel(purpose);
+  let headline = lead?.reason || purposeLabel(purpose, vertical);
   let detail: string | null = lead?.primaryIntent || null;
   if (job) {
-    headline = jobHeadline(job);
+    headline = jobHeadline(job, vertical);
     detail = jobDetail(job);
   } else if (hold) {
-    headline = holdHeadline(hold);
+    headline = holdHeadline(hold, vertical);
     const when = hold.when_text?.trim();
     detail = when || hold.notes;
   }
@@ -326,6 +415,7 @@ export function buildInboxItem(opts: {
     lead,
     hold,
     job,
+    intent: intent || canonicalInboxIntent(hold?.request_type) || null,
     urgent: Boolean(lead?.urgent),
   };
 }
@@ -334,11 +424,13 @@ export function assembleInboxItems(opts: {
   leads: Lead[];
   holds: InboxHold[];
   jobs: InboxJob[];
+  vertical?: string | null;
 }): InboxItem[] {
   const holdByCall = new Map<string, InboxHold>();
   const jobByCall = new Map<string, InboxJob>();
   const usedHold = new Set<string>();
   const usedJob = new Set<string>();
+  const vertical = opts.vertical || null;
 
   for (const hold of opts.holds) {
     if (hold.call_id && !holdByCall.has(hold.call_id)) {
@@ -358,16 +450,16 @@ export function assembleInboxItems(opts: {
     const job = jobByCall.get(lead.call.id) || null;
     if (hold) usedHold.add(hold.id);
     if (job) usedJob.add(job.id);
-    items.push(buildInboxItem({ lead, hold, job }));
+    items.push(buildInboxItem({ lead, hold, job, vertical }));
   }
 
   for (const hold of opts.holds) {
     if (usedHold.has(hold.id)) continue;
-    items.push(buildInboxItem({ hold }));
+    items.push(buildInboxItem({ hold, vertical }));
   }
   for (const job of opts.jobs) {
     if (usedJob.has(job.id)) continue;
-    items.push(buildInboxItem({ job }));
+    items.push(buildInboxItem({ job, vertical }));
   }
 
   items.sort(compareInboxSignal);
@@ -415,6 +507,7 @@ export function itemMatchesQuery(item: InboxItem, q: string): boolean {
     item.detail,
     item.lead?.reason,
     item.lead?.call.summary,
+    item.intent,
   ]
     .filter(Boolean)
     .join(" ")

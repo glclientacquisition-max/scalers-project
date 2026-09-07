@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { type CallRow } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxToolbar } from "@/components/InboxToolbar";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
@@ -14,10 +13,10 @@ import {
   followUpWhatsAppMessage,
   formatCallWhenRelative,
   sanitizeSearchQuery,
-  toLead,
 } from "@/lib/callsTriage";
+import { loadInboxItems } from "@/lib/inboxLoad";
+import { nicheCopy } from "@/lib/inboxNiche";
 import {
-  assembleInboxItems,
   countInboxPurposes,
   holdTypeLabel,
   inboxCaption,
@@ -25,26 +24,11 @@ import {
   itemMatchesQuery,
   itemSignalLabel,
   resolvePurposeFilter,
-  type InboxHold,
   type InboxItem,
-  type InboxJob,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
 
-const CALL_SELECT =
-  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
-const CALL_SELECT_LEGACY =
-  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
-const CALL_SELECT_LEAD =
-  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
-
-const HOLD_SELECT =
-  "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id";
-const JOB_SELECT =
-  "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id";
-
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
-const INBOX_WINDOW = 150;
 
 function EmptyInbox({
   total,
@@ -52,13 +36,16 @@ function EmptyInbox({
   did,
   purpose,
   q,
+  vertical,
 }: {
   total: number;
   pendingDid: boolean;
   did: string;
   purpose: InboxPurposeFilterId;
   q: string;
+  vertical?: string | null;
 }) {
+  const copy = nicheCopy(vertical);
   if (q) {
     return (
       <div className="mt-8 border-y border-line py-12 text-center">
@@ -76,9 +63,9 @@ function EmptyInbox({
   if (total > 0) {
     const emptyLabel =
       purpose === "hold"
-        ? "Nothing to fulfill"
+        ? copy.holdEmpty
         : purpose === "job"
-          ? "No visits to confirm"
+          ? copy.jobEmpty
           : purpose === "needs"
             ? "Nothing needs you"
             : "Nothing in this filter";
@@ -144,10 +131,12 @@ function InboxRow({
   item,
   businessName,
   purpose,
+  vertical,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
+  vertical?: string | null;
 }) {
   const kind = inboxTableKind(purpose);
   const message = followUpWhatsAppMessage({
@@ -180,7 +169,7 @@ function InboxRow({
             </p>
             {item.hold ? (
               <p className="mt-0.5 text-sm text-ink-soft">
-                {holdTypeLabel(item.hold.request_type)}
+                {holdTypeLabel(item.hold.request_type, vertical)}
               </p>
             ) : null}
           </td>
@@ -228,7 +217,7 @@ function InboxRow({
           <td className="px-5 py-5 align-top">
             <InboxPurposeChip
               purpose={item.purpose}
-              label={itemSignalLabel(item)}
+              label={itemSignalLabel(item, vertical)}
             />
           </td>
           <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
@@ -307,45 +296,20 @@ export default async function CallsPage({
 
   const client = workspace.client;
   const businessName = tenant.business_name?.trim() || "us";
+  const vertical = tenant.vertical;
+  const copy = nicheCopy(vertical);
 
-  const listQuery = client
-    .from("calls")
-    .select(CALL_SELECT)
-    .eq("tenant_id", tenant.id)
-    .order("created_at", { ascending: false })
-    .limit(INBOX_WINDOW);
-
-  const first = await listQuery;
-  let data = first.data as CallRow[] | null;
-  let error = first.error;
-
-  if (error && /resolution|primary_intent|resolution_note|column/i.test(error.message)) {
-    const retry = await client
-      .from("calls")
-      .select(CALL_SELECT_LEAD)
-      .eq("tenant_id", tenant.id)
-      .order("created_at", { ascending: false })
-      .limit(INBOX_WINDOW);
-    data = retry.data as CallRow[] | null;
-    error = retry.error;
-  }
-
-  if (error && /lead_status|column/i.test(error.message)) {
-    const retry = await client
-      .from("calls")
-      .select(CALL_SELECT_LEGACY)
-      .eq("tenant_id", tenant.id)
-      .order("created_at", { ascending: false })
-      .limit(INBOX_WINDOW);
-    data = retry.data as CallRow[] | null;
-    error = retry.error;
-  }
+  const { items: assembled, error } = await loadInboxItems(
+    client,
+    tenant.id,
+    vertical
+  );
 
   if (error) {
     return (
       <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Could not load inbox: {error.message}
-        {/row-level security|permission denied|rls/i.test(error.message) ? (
+        Could not load inbox: {error}
+        {/row-level security|permission denied|rls/i.test(error) ? (
           <p className="mt-2 text-sm text-ink-soft">
             Apply docs/supabase/owner_rls.sql in Supabase if you have not yet.
           </p>
@@ -353,26 +317,6 @@ export default async function CallsPage({
       </div>
     );
   }
-
-  const [holdsRes, jobsRes] = await Promise.all([
-    client
-      .from("service_requests")
-      .select(HOLD_SELECT)
-      .eq("tenant_id", tenant.id)
-      .order("created_at", { ascending: false })
-      .limit(INBOX_WINDOW),
-    client
-      .from("appointments")
-      .select(JOB_SELECT)
-      .eq("tenant_id", tenant.id)
-      .order("created_at", { ascending: false })
-      .limit(INBOX_WINDOW),
-  ]);
-
-  const holds = (holdsRes.error ? [] : holdsRes.data || []) as InboxHold[];
-  const jobs = (jobsRes.error ? [] : jobsRes.data || []) as InboxJob[];
-  const leads = (data || []).map(toLead);
-  const assembled = assembleInboxItems({ leads, holds, jobs });
 
   const searched = q
     ? assembled.filter((item) => itemMatchesQuery(item, q))
@@ -395,7 +339,8 @@ export default async function CallsPage({
         active={activeFilter}
         counts={counts}
         q={q}
-        caption={inboxCaption(searched)}
+        caption={inboxCaption(searched, vertical)}
+        vertical={vertical}
       />
 
       {pageRows.length === 0 ? (
@@ -405,6 +350,7 @@ export default async function CallsPage({
           did={tenant.sautikit_virtual_number}
           purpose={activeFilter}
           q={q}
+          vertical={vertical}
         />
       ) : (
         <>
@@ -428,7 +374,7 @@ export default async function CallsPage({
                   {inboxTableKind(activeFilter) === "job" ? (
                     <>
                       <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Visit
+                        {copy.jobColumn}
                       </th>
                       <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
                         Who
@@ -466,6 +412,7 @@ export default async function CallsPage({
                     item={item}
                     businessName={businessName}
                     purpose={activeFilter}
+                    vertical={vertical}
                   />
                 ))}
               </tbody>
