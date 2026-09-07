@@ -159,6 +159,27 @@ const {
 } = require('./src/sautikit/safeLog');
 const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
+  ownerLeadEvent,
+  renderEventText,
+} = require('./src/notifications/events');
+
+/** Desk base for deep links in owner alerts. */
+function deskBaseUrl() {
+  return (
+    String(
+      process.env.DESK_PUBLIC_URL ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        'https://scalers-project.vercel.app'
+    ).trim() || 'https://scalers-project.vercel.app'
+  );
+}
+
+function callDeskUrl(callId) {
+  const id = String(callId || '').trim();
+  if (!id) return null;
+  return `${deskBaseUrl()}/calls/${encodeURIComponent(id)}`;
+}
+const {
   dispatchAlert,
   dispatchEscalationAlert,
   whatsAppSenderReady,
@@ -2945,6 +2966,11 @@ async function maybeSendWhatsAppNotification(callSid) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
 
+    const event = ownerLeadEvent(
+      { ...call, callUrl: callDeskUrl(call.id) },
+      businessName
+    );
+    const body = renderEventText(event);
     const lead = {
       businessName,
       name: call.name,
@@ -2956,6 +2982,7 @@ async function maybeSendWhatsAppNotification(callSid) {
     const result = await dispatchAlert({
       to: ownerNumber,
       email: ownerEmail,
+      body,
       lead,
       channels: notifyChannels,
     });

@@ -19,7 +19,7 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 
 | Event | When it fires | Owner title | Caller text? |
 | --- | --- | --- | --- |
-| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` | No |
+| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` + Intent / Summary / Outcome when known | No |
 | `escalation` | Caller asks for a human; name + reason captured | `Escalation for {Teammate}` | No |
 | `service_request` | Hold / order / enquiry created | `HOLD / ORDER / ENQUIRY` | Yes, when shipped |
 | `appointment` | Visit requested / updated / cancelled | `VISIT REQUEST` | Yes, when shipped |
@@ -27,6 +27,9 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `wallet_empty` | Prepaid balance ≤ 0 | `Scalers prepaid empty` | No |
 | `outage_speech` | Soniox 402 / fatal | `Scalers line downtime` | No |
 | `outage_llm` | Gemini credits / denied | `Scalers line taking names only` | No |
+| `caller_appointment` | Visit requested | — | Yes, when shipped |
+| `caller_hold` | Hold placed | — | Yes, when shipped |
+| `caller_callback` | Callback promised | — | Yes, when shipped |
 
 One event = one owner message per call per kind. `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation marks it so the lead path does not re-send.
 
@@ -55,7 +58,7 @@ All owner bodies are plain text, ordered label rows, no vendor names, no "techni
 
 | Event | Body |
 | --- | --- |
-| Lead | `New missed-call lead — {Business}` + `Name:` / `Phone:` / `Reason:` / `Recording:` |
+| Lead | `New missed-call lead — {Business}` + `Name:` / `Phone:` / `Reason:` / `Intent:` / `Summary:` / `Outcome:` / `Recording:` |
 | Escalation | `Escalation for {Teammate} — {Business}` + `Caller:` / `Phone:` / `Reason:` |
 | Service request | `{HOLD\|ORDER\|ENQUIRY} — {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Requests in Scalers desk to mark fulfilled.` |
 | Appointment | `VISIT REQUEST — {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Appointments in Scalers desk to confirm or cancel.` |
@@ -83,16 +86,20 @@ Scalers does **not** text the caller today. The only caller-facing channel is th
 
 Only on **actionable** outcomes: appointment requested, hold placed, callback promised. Not on FAQ-only calls.
 
+The template is **not generic**. It carries the business name, the caller's name when known, the specific thing captured, and the next step. No "your call was important to us".
+
 | Trigger | Caller text |
 | --- | --- |
-| Appointment requested | `{Business}: we have your visit request for {when}. We will confirm shortly.` |
-| Hold placed | `{Business}: we have held {item} for you. We will confirm shortly.` |
-| Callback promised | `{Business}: the team will call you back.` |
+| Appointment requested | `Hi {Name}, {Business} here. We have your {service} visit for {when}. We will confirm shortly.` |
+| Hold placed | `Hi {Name}, {Business} here. We have held {item} for you. We will confirm shortly.` |
+| Callback promised | `Hi {Name}, {Business} here. The team will call you back.` |
 
 **Rules**
 
 - Send from the business's Scalers DID or a shared Scalers sender ID, not the owner's personal number.
 - Include the business name so the caller knows who it is.
+- Use the caller's name when the call captured it. Skip it when it did not.
+- Name the service or item. Do not say "your request" when we know it was carpet cleaning.
 - One text per call. No follow-up marketing.
 - Opt-out line when required: `Reply STOP to opt out.`
 - Owner can turn caller texts off per workspace.
@@ -131,3 +138,27 @@ Only on **actionable** outcomes: appointment requested, hold placed, callback pr
 3. **Pricing:** is caller SMS bundled in the line fee, metered per text, or an add-on?
 4. **Language:** match the call language, or always English?
 5. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
+
+---
+
+## 8. Owner insight without the dashboard
+
+The owner lead text is not a label dump. When the Brain has persisted intent, summary, and resolution, the SMS carries them:
+
+```
+New missed-call lead — Done and Dusted Cleaning Services
+Name: Jane
+Phone: +254790381872
+Reason: Book carpet cleaning
+Intent: book_visit
+Summary: Intent: book_visit. Caller: Jane. Goal: carpet cleaning tomorrow.
+Outcome: Visit request saved
+Recording: https://…
+Open call: https://scalers-project.vercel.app/calls/{call_id}
+```
+
+The owner knows who called, what they wanted, and what happened without opening the desk. One tap on `Open call:` opens the exact conversation.
+
+The link is the desk call detail (`/calls/{id}`). Set `DESK_PUBLIC_URL` (or `NEXT_PUBLIC_APP_URL`) on the voice host so the link points at the right desk.
+
+**Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.
