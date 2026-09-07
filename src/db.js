@@ -241,6 +241,31 @@ async function appendTranscript({ callSid, transcript, turns }) {
   return data;
 }
 
+/**
+ * Load transcript turns for a call (post-call review). Empty array on miss.
+ */
+async function listTranscriptTurns(callSid) {
+  const sid = String(callSid || '').trim();
+  if (!sid) return [];
+  const call = await getCall(sid);
+  if (!call) return [];
+  const { data, error } = await supabase
+    .from('transcripts')
+    .select('speaker,text_content,created_at')
+    .eq('call_id', call.id)
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.warn('[db] listTranscriptTurns', sid, error.message);
+    return [];
+  }
+  return (data || []).map((row) => ({
+    speaker: row.speaker,
+    text: row.text_content,
+    text_content: row.text_content,
+    created_at: row.created_at,
+  }));
+}
+
 async function getCall(callSid) {
   const { data, error } = await supabase
     .from('calls')
@@ -1409,6 +1434,7 @@ module.exports = {
   saveTransferAttempt,
   persistOutboundTransferLeg,
   appendTranscript,
+  listTranscriptTurns,
   attachRecording,
   updateCallStatus,
   setCallResolution,

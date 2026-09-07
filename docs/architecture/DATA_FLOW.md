@@ -107,9 +107,10 @@ Legend: **Persisted** = written to Supabase. **Memory** = process-local only. **
 | `call.completed` webhook | Duration, terminal status | **Persisted** — `updateCallStatus` |
 | `recording.ready` | Recording URL | **Persisted** — `attachRecording`; may upload to Storage bucket `call-recordings` |
 | Resolution | `primary_intent`, `resolution`, `resolution_note` | **Persisted** — `setCallResolution` via `deriveCallResolution` |
-| Summary | JSON in `calls.summary` | **Persisted** |
+| Summary | JSON in `calls.summary` (`text`, `brain_summary`, `reason`) | **Persisted** instantly from Brain; Gemini transcript review may rewrite `reason` |
+| Transcript review | Owner sentence + human-need check | **Persisted** — `mergeCallSummaryMeta` / `setCallResolution` (non-blocking) |
 
-**Files:** `server.js` `/voice/events`, `callResolution.js`, `callSummary.js`
+**Files:** `server.js` `/voice/events`, `callResolution.js`, `callSummary.js`, `callTranscriptReview.js`
 
 ---
 

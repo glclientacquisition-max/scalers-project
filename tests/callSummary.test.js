@@ -56,6 +56,9 @@ describe('deriveCallSummary', () => {
     assert.ok(summary.actions.some((a) => /hold/i.test(a)));
     assert.ok(summary.instructions.some((i) => /5:00 PM/i.test(i)));
     assert.equal(summary.callerName, 'Brian');
+    assert.match(summary.reason, /Brian left a hold/i);
+    assert.match(summary.reason, /Smart Money Tribe/i);
+    assert.doesNotMatch(summary.reason, /[\u2014\u2013]/);
   });
 
   it('ignores STT name/goal fragments and prefers human when handoff was requested', () => {
@@ -74,5 +77,6 @@ describe('deriveCallSummary', () => {
     assert.equal(summary.callerName, null);
     assert.doesNotMatch(summary.text, /uh-huh/i);
     assert.doesNotMatch(summary.text, /I'd like to discuss/i);
+    assert.match(summary.reason, /needs you to return the call/i);
   });
 });

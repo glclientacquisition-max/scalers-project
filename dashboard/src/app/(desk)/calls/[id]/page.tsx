@@ -80,11 +80,23 @@ function buildSummarySentence(opts: {
   urgent: boolean;
 }): string {
   const who = opts.name || `The caller (${opts.callerNumber})`;
+  const extra = opts.urgent ? " This sounded urgent." : "";
   if (!opts.reason) {
-    return `${who} called, but no reason was captured yet. Skim the conversation.`;
+    return `${who} called.${extra}`;
   }
-  const reason = opts.reason.replace(/\.$/, "");
-  return `${who} called about: ${reason}.${opts.urgent ? " This sounded urgent." : ""}`;
+  const reason = opts.reason.replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
+  const named =
+    /^(caller|the caller)\b/i.test(reason) ||
+    (opts.name && reason.toLowerCase().startsWith(opts.name.toLowerCase()));
+  const complete =
+    reason.length >= 40 ||
+    /\b(left a hold|booked a visit|updated a visit|needs you|asked about)\b/i.test(
+      reason
+    );
+  if (named || complete) {
+    return `${reason}.${extra}`;
+  }
+  return `${who} called about ${reason}.${extra}`;
 }
 
 function parseFromFilter(raw: string | undefined): string | undefined {
@@ -297,7 +309,7 @@ export default async function CallDetailPage({
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                What this call was about
+                Summary
               </h2>
               {leadStatusReady ? (
                 <LeadStatusToggle callId={row.id} initial={leadStatus} size="md" />
