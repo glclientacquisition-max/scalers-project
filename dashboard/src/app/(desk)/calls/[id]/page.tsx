@@ -271,7 +271,13 @@ export default async function CallDetailPage({
             <div className="mt-3">
               <InboxPurposeChip
                 purpose={purpose}
-                label={signalLabel({ purpose, hold, job })}
+                label={signalLabel({
+                  purpose,
+                  hold,
+                  job,
+                  intent: row.primary_intent,
+                  vertical: tenant.vertical,
+                })}
               />
             </div>
             <p className="mt-2 text-sm text-ink-soft">

@@ -20,7 +20,7 @@ describe("home overview craft", () => {
   });
 
   it("maps Inbox queues and does not invent Online", () => {
-    assert.match(page, /purpose: "needs"/);
+    assert.match(page, /purpose: "human"/);
     assert.match(page, /purpose: "hold"/);
     assert.match(page, /purpose: "job"/);
     assert.match(page, /lineStatusLabel\(line\)/);

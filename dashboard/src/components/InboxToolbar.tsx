@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { callsHref } from "@/lib/callsTriage";
-import {
-  PURPOSE_FILTERS,
-  type InboxPurposeFilterId,
-} from "@/lib/inboxPurpose";
+import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
+import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import { settingsGhostButtonClass } from "@/components/settingsUi";
 
 export function InboxToolbar({
@@ -13,12 +11,16 @@ export function InboxToolbar({
   counts,
   q,
   caption,
+  vertical,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
   q: string;
   caption?: string;
+  vertical?: string | null;
 }) {
+  const copy = nicheCopy(vertical);
+  const filters = purposeFilters(vertical);
   const briefing =
     caption ||
     (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
@@ -46,7 +48,7 @@ export function InboxToolbar({
             name="q"
             type="search"
             defaultValue={q}
-            placeholder="Name, number, job"
+            placeholder={copy.searchPlaceholder}
             className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-white px-4 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-[#0096FF]/40 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]"
           />
           <button type="submit" className={settingsGhostButtonClass}>
@@ -57,7 +59,7 @@ export function InboxToolbar({
 
       <nav aria-label="Filter by purpose" className="border-b border-line">
         <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
-          {PURPOSE_FILTERS.map((item) => {
+          {filters.map((item) => {
             const isActive = active === item.id;
             return (
               <li key={item.id} className="shrink-0">

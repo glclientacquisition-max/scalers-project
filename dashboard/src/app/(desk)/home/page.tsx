@@ -22,11 +22,10 @@ import {
 import {
   homeBriefing,
   homeQueueUnit,
+  summarizeInboxWork,
 } from "@/lib/inboxPurpose";
-
-function isMissingRelation(message: string): boolean {
-  return /relation|does not exist|service_requests|appointments/i.test(message);
-}
+import { loadInboxItems } from "@/lib/inboxLoad";
+import { nicheCopy } from "@/lib/inboxNiche";
 
 export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
@@ -79,114 +78,69 @@ export default async function HomeOverviewPage() {
     agentTools: tenant.agent_tools,
   });
   const line = resolveLineStatus(tenant.sautikit_virtual_number, readiness.ready);
+  const vertical = tenant.vertical;
+  const copy = nicheCopy(vertical);
 
-  const [todayRes, newRes, openHoldsRes, pendingJobsRes, nextHoldRes, nextJobRes] =
-    await Promise.all([
+  const [todayRes, inbox] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
-    client
-      .from("calls")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id)
-      .eq("lead_status", "new"),
-    client
-      .from("service_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id)
-      .eq("status", "open"),
-    client
-      .from("appointments")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id)
-      .in("status", ["requested", "confirmed"]),
-    client
-      .from("service_requests")
-      .select("item, when_text, request_type")
-      .eq("tenant_id", tenant.id)
-      .eq("status", "open")
-      .order("created_at", { ascending: true })
-      .limit(1),
-    client
-      .from("appointments")
-      .select("when_text, service_name")
-      .eq("tenant_id", tenant.id)
-      .in("status", ["requested", "confirmed"])
-      .order("created_at", { ascending: true })
-      .limit(1),
+    loadInboxItems(client, tenant.id, vertical),
   ]);
 
-  const leadStatusReady = !(
-    newRes.error && /lead_status|column/i.test(newRes.error.message)
-  );
-  const holdsReady = !(
-    openHoldsRes.error && isMissingRelation(openHoldsRes.error.message)
-  );
-  const jobsReady = !(
-    pendingJobsRes.error && isMissingRelation(pendingJobsRes.error.message)
-  );
-
   const todayCount = todayRes.count ?? 0;
-  const newCount = leadStatusReady ? newRes.count ?? 0 : 0;
-  const openHolds = holdsReady ? openHoldsRes.count ?? 0 : 0;
-  const pendingJobs = jobsReady ? pendingJobsRes.count ?? 0 : 0;
-  const waitingCount = newCount + openHolds + pendingJobs;
-  const briefing = homeBriefing({
-    toReturn: newCount,
-    toFulfill: openHolds,
-    toConfirm: pendingJobs,
-  });
-
-  const nextHold = holdsReady
-    ? ((nextHoldRes.data || [])[0] as
-        | { item?: string | null; when_text?: string | null; request_type?: string | null }
-        | undefined)
-    : undefined;
-  const nextJob = jobsReady
-    ? ((nextJobRes.data || [])[0] as
-        | { when_text?: string | null; service_name?: string | null }
-        | undefined)
-    : undefined;
-  const holdSample = nextHold?.item?.trim() || nextHold?.when_text?.trim() || null;
-  const jobSample = nextJob?.when_text?.trim() || nextJob?.service_name?.trim() || null;
+  const work = summarizeInboxWork(inbox.items);
+  const waitingCount = work.needs;
+  const briefing = homeBriefing(
+    {
+      toReturn: work.toReturn,
+      toFulfill: work.toFulfill,
+      toConfirm: work.toConfirm,
+    },
+    vertical
+  );
+  const holdSample =
+    work.nextHold?.headline || work.nextHold?.hold?.when_text || null;
+  const jobSample =
+    work.nextJob?.job?.when_text || work.nextJob?.headline || null;
 
   const queues = [
     {
       id: "needs",
       label: "Needs you",
-      href: callsHref({ purpose: "needs" }),
-      count: waitingCount,
-      unit: homeQueueUnit(waitingCount, "need you"),
+      href: callsHref({ purpose: "human" }),
+      count: work.toReturn,
+      unit: homeQueueUnit(work.toReturn, copy.returnUnit),
     },
     {
       id: "hold",
-      label: "Holds",
+      label: copy.holdFilter,
       href: callsHref({ purpose: "hold" }),
-      count: openHolds,
-      unit: homeQueueUnit(openHolds, "to fulfill", holdSample),
+      count: work.toFulfill,
+      unit: homeQueueUnit(work.toFulfill, copy.holdUnit, holdSample),
     },
     {
       id: "job",
-      label: "Jobs",
+      label: copy.jobFilter,
       href: callsHref({ purpose: "job" }),
-      count: pendingJobs,
-      unit: homeQueueUnit(pendingJobs, "to confirm", jobSample),
+      count: work.toConfirm,
+      unit: homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample),
     },
   ] as const;
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
-  if (pendingJobs > 0) {
+  if (work.toConfirm > 0) {
     ctaHref = callsHref({ purpose: "job" });
-    ctaLabel = pendingJobs === 1 ? "Confirm visit" : "Confirm visits";
-  } else if (openHolds > 0) {
+    ctaLabel = work.toConfirm === 1 ? copy.jobCtaOne : copy.jobCtaMany;
+  } else if (work.toFulfill > 0) {
     ctaHref = callsHref({ purpose: "hold" });
-    ctaLabel = openHolds === 1 ? "Fulfill hold" : "Fulfill holds";
-  } else if (newCount > 0) {
-    ctaHref = callsHref({ purpose: "needs" });
-    ctaLabel = newCount === 1 ? "Return call" : "Return calls";
+    ctaLabel = work.toFulfill === 1 ? copy.holdCtaOne : copy.holdCtaMany;
+  } else if (work.toReturn > 0) {
+    ctaHref = callsHref({ purpose: "human" });
+    ctaLabel = work.toReturn === 1 ? copy.returnCtaOne : copy.returnCtaMany;
   } else if (line === "needs_training") {
     ctaHref = businessSettingsHref("train");
     ctaLabel = "Train";

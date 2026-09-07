@@ -5,8 +5,14 @@ const assert = require("node:assert/strict");
  * Mirrors dashboard/src/lib/inboxPurpose.ts classify + signal labels.
  * Keep in lockstep when changing purpose stamps.
  */
-const JOB_INTENTS = new Set(["book_visit", "booking", "reschedule", "cancel", "cancellation"]);
-const HOLD_INTENTS = new Set(["hold", "order", "enquiry", "callback"]);
+const JOB_INTENTS = new Set(["book_visit", "reschedule", "cancel"]);
+const HOLD_INTENTS = new Set([
+  "hold_or_pickup",
+  "order_enquiry",
+  "callback",
+  "hold",
+  "order",
+]);
 const HUMAN_INTENTS = new Set(["human", "emergency", "complaint", "escalate", "handoff"]);
 const ANSWER_INTENTS = new Set([
   "hours",
@@ -17,15 +23,39 @@ const ANSWER_INTENTS = new Set([
   "price_band",
   "availability",
   "policy",
+  "product_inquiry",
   "service_inquiry",
   "service_area",
+  "general_enquiry",
   "other",
 ]);
+
+const INTENT_ALIASES = {
+  hold: "hold_or_pickup",
+  hold_or_pickup: "hold_or_pickup",
+  hours: "hours_open",
+  hours_open: "hours_open",
+  location: "directions",
+  order: "order_enquiry",
+  order_enquiry: "order_enquiry",
+  enquiry: "order_enquiry",
+  booking: "book_visit",
+  book_visit: "book_visit",
+  cancellation: "cancel",
+  cancel: "cancel",
+  reschedule: "reschedule",
+};
+
+function canonicalInboxIntent(raw) {
+  const key = String(raw || "").trim().toLowerCase();
+  if (!key || key === "unknown") return "";
+  return INTENT_ALIASES[key] || key;
+}
 
 function classify({ primaryIntent, resolution, leadStatus, hold, job }) {
   if (job) return "job";
   if (hold) return "hold";
-  const intent = String(primaryIntent || "").trim().toLowerCase();
+  const intent = canonicalInboxIntent(primaryIntent);
   if (HUMAN_INTENTS.has(intent) || resolution === "needs_human") return "human";
   if (JOB_INTENTS.has(intent)) return "job";
   if (HOLD_INTENTS.has(intent)) return "hold";
@@ -104,8 +134,17 @@ function inboxCaption(items) {
 }
 
 function compareInboxSignal(a, b) {
-  if (a.needsYou !== b.needsYou) return a.needsYou ? -1 : 1;
-  if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+  function rank(item) {
+    if (item.urgent && item.needsYou) return 0;
+    if (item.purpose === "job" && item.needsYou) return 1;
+    if (item.purpose === "hold" && item.needsYou) return 2;
+    if (item.purpose === "missed" && item.needsYou) return 3;
+    if (item.purpose === "human" && item.needsYou) return 4;
+    if (item.needsYou) return 5;
+    return 6;
+  }
+  const diff = rank(a) - rank(b);
+  if (diff !== 0) return diff;
   if (a.createdAt < b.createdAt) return 1;
   if (a.createdAt > b.createdAt) return -1;
   return 0;
@@ -196,6 +235,28 @@ describe("inbox purpose", () => {
   it("stamps abandoned as missed", () => {
     assert.equal(classify({ resolution: "abandoned" }), "missed");
   });
+
+  it("reads Brain hold_or_pickup and order_enquiry as hold", () => {
+    assert.equal(classify({ primaryIntent: "hold_or_pickup" }), "hold");
+    assert.equal(classify({ primaryIntent: "hold" }), "hold");
+    assert.equal(classify({ primaryIntent: "order_enquiry" }), "hold");
+  });
+
+  it("does not treat a new product inquiry as missed", () => {
+    assert.equal(
+      classify({ primaryIntent: "product_inquiry", leadStatus: "new" }),
+      "answered"
+    );
+    assert.equal(
+      classify({ primaryIntent: "hours_open", leadStatus: "new" }),
+      "answered"
+    );
+  });
+
+  it("stamps book_visit as job from the Brain id", () => {
+    assert.equal(classify({ primaryIntent: "book_visit" }), "job");
+    assert.equal(classify({ primaryIntent: "booking" }), "job");
+  });
 });
 
 describe("inbox signal", () => {
@@ -226,10 +287,17 @@ describe("inbox signal", () => {
   });
 
   it("sorts work that needs the owner first", () => {
-    const answered = { needsYou: false, urgent: false, createdAt: "2026-09-07T12:00:00.000Z" };
-    const olderNeed = { needsYou: true, urgent: false, createdAt: "2026-09-07T08:00:00.000Z" };
+    const answered = { needsYou: false, urgent: false, purpose: "answered", createdAt: "2026-09-07T12:00:00.000Z" };
+    const olderNeed = { needsYou: true, urgent: false, purpose: "missed", createdAt: "2026-09-07T08:00:00.000Z" };
     const rows = [answered, olderNeed].sort(compareInboxSignal);
     assert.equal(rows[0], olderNeed);
+  });
+
+  it("sorts visits ahead of holds", () => {
+    const hold = { needsYou: true, urgent: false, purpose: "hold", createdAt: "2026-09-07T12:00:00.000Z" };
+    const visit = { needsYou: true, urgent: false, purpose: "job", createdAt: "2026-09-07T08:00:00.000Z" };
+    const rows = [hold, visit].sort(compareInboxSignal);
+    assert.equal(rows[0], visit);
   });
 
   it("briefs Home by the sharpest queue", () => {
