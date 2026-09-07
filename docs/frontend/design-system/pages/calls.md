@@ -1,8 +1,17 @@
-# Calls
+# Inbox
 
 **Route:** `/calls`  
-**Role:** Benchmark inbox. Do not redesign.
+**Job:** One work surface. Purpose stamps: Job, Hold, Human, Missed, Answered.
 
-Preserve: toolbar + search, dense table, pagination, `?from=` on detail, bare `/calls` defaults to New when work waits.
+**Chrome:** Title Inbox (matches nav). Caption is the Needs you count. Search stays here.
 
-**Fix when touching:** empty-state hrefs must use `?tab=train` / `?tab=test` via `businessSettingsHref`, not `#train` / `#test`.
+Filters: Needs you / Holds / Jobs / Human / Answered / All.
+
+Columns:
+- Mixed filters: When / Purpose / Work / Action
+- Holds: Item / Who / Needed. Verb **Done**. Transcript is **Call**.
+- Jobs: Visit / Who / Place. Verb **Confirm**. Transcript is **Call**.
+
+Voice rows still **Open** the transcript.
+
+`/requests` → `?purpose=hold`. `/appointments` → `?purpose=job`.

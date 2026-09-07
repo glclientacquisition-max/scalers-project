@@ -19,11 +19,12 @@ describe("home overview craft", () => {
     assert.doesNotMatch(page, />Overview</);
   });
 
-  it("keeps the command-center table and one aside", () => {
-    assert.match(page, /DeskDataTable/);
-    assert.match(page, /aria-label="What happened"/);
+  it("maps Inbox queues and does not invent Online", () => {
+    assert.match(page, /purpose: "needs"/);
+    assert.match(page, /purpose: "hold"/);
+    assert.match(page, /purpose: "job"/);
     assert.match(page, /lineStatusLabel\(line\)/);
-    assert.match(page, /hover:border-l-\[#0096FF\]/);
+    assert.doesNotMatch(page, /DeskDataTable/);
     assert.doesNotMatch(page, /TriageLeadCard/);
     assert.doesNotMatch(page, /\bOnline\b/);
   });

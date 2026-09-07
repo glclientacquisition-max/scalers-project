@@ -21,12 +21,13 @@ export function InboxToolbar({
     <header className="space-y-6">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
-            Desk
-          </p>
-          <h1 className="mt-1 font-display text-[clamp(2rem,5vw,2.75rem)] font-semibold leading-[1.05] tracking-tight text-ink">
+          <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
             Inbox
           </h1>
+          <p className="mt-1 text-[13px] text-ink-soft">
+            <span className="tabular-nums font-medium text-ink">{counts.needs}</span>{" "}
+            need you
+          </p>
         </div>
         <form
           action="/calls"
