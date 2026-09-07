@@ -12,11 +12,17 @@ export function InboxToolbar({
   active,
   counts,
   q,
+  caption,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
   q: string;
+  caption?: string;
 }) {
+  const briefing =
+    caption ||
+    (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
+
   return (
     <header className="space-y-6">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -24,10 +30,7 @@ export function InboxToolbar({
           <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
             Inbox
           </h1>
-          <p className="mt-1 text-[13px] text-ink-soft">
-            <span className="tabular-nums font-medium text-ink">{counts.needs}</span>{" "}
-            need you
-          </p>
+          <p className="mt-1 text-[13px] text-ink-soft">{briefing}</p>
         </div>
         <form
           action="/calls"

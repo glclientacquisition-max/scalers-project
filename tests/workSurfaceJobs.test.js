@@ -30,13 +30,18 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(home, /Needs you/);
     assert.match(home, /Holds/);
     assert.match(home, /Jobs/);
-    assert.match(home, /Open inbox/);
+    assert.match(home, /homeBriefing/);
+    assert.match(home, /Confirm visit/);
+    assert.match(home, /Fulfill hold/);
+    assert.match(home, /Return call/);
+    assert.doesNotMatch(home, /Open inbox/);
     assert.doesNotMatch(home, /DeskDataTable/);
   });
 
   it("changes Holds and Jobs columns inside Inbox", () => {
     assert.match(toolbar, />\s*Inbox\s*</);
     assert.match(toolbar, /need you/);
+    assert.match(toolbar, /caption/);
     assert.doesNotMatch(toolbar, /clamp\(2rem/);
     assert.match(inbox, /Nothing to fulfill/);
     assert.match(inbox, /No visits to confirm/);
@@ -44,6 +49,10 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(inbox, />\s*Needed\s*</);
     assert.match(inbox, />\s*Visit\s*</);
     assert.match(inbox, />\s*Place\s*</);
+    assert.match(inbox, /inboxCaption\(searched\)/);
+    assert.match(inbox, /itemSignalLabel\(item\)/);
+    assert.match(inbox, /formatCallWhenRelative/);
+    assert.doesNotMatch(inbox, />\s*Purpose\s*</);
     assert.match(inbox, /openLabel = item.hold \|\| item.job \? "Call" : "Open"/);
   });
 });

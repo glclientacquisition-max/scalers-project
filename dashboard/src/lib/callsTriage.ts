@@ -57,6 +57,54 @@ export function formatCallWhen(iso: string, style: "short" | "full" = "short") {
   }
 }
 
+function nairobiDayKey(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Nairobi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function nairobiTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-KE", {
+    timeZone: "Africa/Nairobi",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+/** Inbox When column: Today / Yesterday / weekday, not a full timestamp. */
+export function formatCallWhenRelative(iso: string, now = new Date()): string {
+  try {
+    const time = nairobiTime(iso);
+    const thenDay = nairobiDayKey(new Date(iso));
+    const today = nairobiDayKey(now);
+    if (thenDay === today) return `Today ${time}`;
+
+    const [ty, tm, td] = today.split("-").map(Number);
+    const [yy, ym, yd] = thenDay.split("-").map(Number);
+    const diffDays = Math.round(
+      (Date.UTC(ty, tm - 1, td) - Date.UTC(yy, ym - 1, yd)) / 86400000
+    );
+    if (diffDays === 1) return `Yesterday ${time}`;
+    if (diffDays > 1 && diffDays < 7) {
+      const weekday = new Intl.DateTimeFormat("en-KE", {
+        timeZone: "Africa/Nairobi",
+        weekday: "short",
+      }).format(new Date(iso));
+      return `${weekday} ${time}`;
+    }
+    return new Intl.DateTimeFormat("en-KE", {
+      timeZone: "Africa/Nairobi",
+      day: "numeric",
+      month: "short",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 export function nairobiDayStartIso(): string {
   const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Nairobi",
