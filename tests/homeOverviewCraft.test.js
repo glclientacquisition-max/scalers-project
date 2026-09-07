@@ -24,6 +24,8 @@ describe("home overview craft", () => {
     assert.match(page, /purpose: "hold"/);
     assert.match(page, /purpose: "job"/);
     assert.match(page, /lineStatusLabel\(line\)/);
+    assert.match(page, />\s*Work\s*</);
+    assert.match(page, /homeBriefing/);
     assert.doesNotMatch(page, /DeskDataTable/);
     assert.doesNotMatch(page, /TriageLeadCard/);
     assert.doesNotMatch(page, /\bOnline\b/);

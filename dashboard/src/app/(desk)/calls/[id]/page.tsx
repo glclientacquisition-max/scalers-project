@@ -25,6 +25,7 @@ import {
 } from "@/lib/callsTriage";
 import {
   classifyInboxPurpose,
+  signalLabel,
   type InboxHold,
   type InboxJob,
 } from "@/lib/inboxPurpose";
@@ -268,7 +269,10 @@ export default async function CallDetailPage({
               {title}
             </h1>
             <div className="mt-3">
-              <InboxPurposeChip purpose={purpose} />
+              <InboxPurposeChip
+                purpose={purpose}
+                label={signalLabel({ purpose, hold, job })}
+              />
             </div>
             <p className="mt-2 text-sm text-ink-soft">
               {formatCallWhen(row.created_at, "full")}

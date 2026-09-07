@@ -9,15 +9,21 @@ const TONE: Record<InboxPurpose, string> = {
   answered: "bg-white text-ink-soft ring-line",
 };
 
-export function InboxPurposeChip({ purpose }: { purpose: InboxPurpose }) {
+export function InboxPurposeChip({
+  purpose,
+  label,
+}: {
+  purpose: InboxPurpose;
+  label?: string;
+}) {
   return (
     <span
       className={[
-        "inline-flex min-h-7 items-center rounded-md px-2 text-[11px] font-semibold uppercase tracking-[0.12em] ring-1",
+        "inline-flex min-h-7 max-w-[11rem] items-center truncate rounded-md px-2 text-[11px] font-semibold tracking-wide ring-1",
         TONE[purpose],
       ].join(" ")}
     >
-      {purposeLabel(purpose)}
+      {label || purposeLabel(purpose)}
     </span>
   );
 }

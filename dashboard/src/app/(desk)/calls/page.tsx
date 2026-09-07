@@ -12,15 +12,18 @@ import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import {
   callsHref,
   followUpWhatsAppMessage,
-  formatCallWhen,
+  formatCallWhenRelative,
   sanitizeSearchQuery,
   toLead,
 } from "@/lib/callsTriage";
 import {
   assembleInboxItems,
   countInboxPurposes,
+  holdTypeLabel,
+  inboxCaption,
   itemMatchesPurpose,
   itemMatchesQuery,
+  itemSignalLabel,
   resolvePurposeFilter,
   type InboxHold,
   type InboxItem,
@@ -177,7 +180,7 @@ function InboxRow({
             </p>
             {item.hold ? (
               <p className="mt-0.5 text-sm text-ink-soft">
-                {item.hold.request_type}
+                {holdTypeLabel(item.hold.request_type)}
               </p>
             ) : null}
           </td>
@@ -213,12 +216,6 @@ function InboxRow({
 
       {kind === "mixed" ? (
         <>
-          <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
-            {formatCallWhen(item.createdAt)}
-          </td>
-          <td className="px-5 py-5 align-top">
-            <InboxPurposeChip purpose={item.purpose} />
-          </td>
           <td className="px-5 py-5 align-top">
             <p className="text-base font-semibold tracking-tight text-ink">
               {item.callerName || item.callerPhone || "Caller"}
@@ -227,6 +224,15 @@ function InboxRow({
             {item.detail ? (
               <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
             ) : null}
+          </td>
+          <td className="px-5 py-5 align-top">
+            <InboxPurposeChip
+              purpose={item.purpose}
+              label={itemSignalLabel(item)}
+            />
+          </td>
+          <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
+            {formatCallWhenRelative(item.createdAt)}
           </td>
         </>
       ) : null}
@@ -385,7 +391,12 @@ export default async function CallsPage({
 
   return (
     <div>
-      <InboxToolbar active={activeFilter} counts={counts} q={q} />
+      <InboxToolbar
+        active={activeFilter}
+        counts={counts}
+        q={q}
+        caption={inboxCaption(searched)}
+      />
 
       {pageRows.length === 0 ? (
         <EmptyInbox
@@ -430,13 +441,13 @@ export default async function CallsPage({
                   {inboxTableKind(activeFilter) === "mixed" ? (
                     <>
                       <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        When
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Purpose
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
                         Work
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        Needed
+                      </th>
+                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                        When
                       </th>
                     </>
                   ) : null}

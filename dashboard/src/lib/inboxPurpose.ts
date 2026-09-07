@@ -98,16 +98,100 @@ export type InboxItem = {
 export function purposeLabel(purpose: InboxPurpose): string {
   switch (purpose) {
     case "job":
-      return "Job";
+      return "Visit";
     case "hold":
       return "Hold";
     case "human":
-      return "Human";
+      return "Human asked";
     case "missed":
       return "Missed";
     default:
       return "Answered";
   }
+}
+
+/** Next action in owner words. Taxonomy chips (Job, Hold) are noise. */
+export function signalLabel(opts: {
+  purpose: InboxPurpose;
+  hold?: InboxHold | null;
+  job?: InboxJob | null;
+}): string {
+  if (opts.purpose === "job") {
+    const status = String(opts.job?.status || "").toLowerCase();
+    if (status === "confirmed") return "Visit";
+    if (status === "done") return "Visit done";
+    if (status === "cancelled") return "Cancelled";
+    return "Confirm visit";
+  }
+  if (opts.purpose === "hold") {
+    const status = String(opts.hold?.status || "").toLowerCase();
+    if (status === "fulfilled") return "Item done";
+    if (status === "cancelled") return "Cancelled";
+    return holdTypeLabel(opts.hold?.request_type || "hold");
+  }
+  return purposeLabel(opts.purpose);
+}
+
+export function itemSignalLabel(item: InboxItem): string {
+  return signalLabel({
+    purpose: item.purpose,
+    hold: item.hold,
+    job: item.job,
+  });
+}
+
+export function inboxCaption(items: InboxItem[]): string {
+  const needs = items.filter((item) => item.needsYou).length;
+  if (needs === 0) return "Clear";
+  const toConfirm = items.filter(
+    (item) => item.job && String(item.job.status || "").toLowerCase() === "requested"
+  ).length;
+  const toFulfill = items.filter(
+    (item) => item.hold && String(item.hold.status || "").toLowerCase() === "open"
+  ).length;
+  if (toConfirm === needs) {
+    return toConfirm === 1 ? "1 to confirm" : `${toConfirm} to confirm`;
+  }
+  if (toFulfill === needs) {
+    return toFulfill === 1 ? "1 to fulfill" : `${toFulfill} to fulfill`;
+  }
+  const bits = [`${needs} need you`];
+  if (toConfirm > 0) bits.push(`${toConfirm} to confirm`);
+  else if (toFulfill > 0) bits.push(`${toFulfill} to fulfill`);
+  return bits.length === 1 ? bits[0] : `${bits[0]}. ${bits[1]}.`;
+}
+
+export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
+  if (a.needsYou !== b.needsYou) return a.needsYou ? -1 : 1;
+  if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+  if (a.createdAt < b.createdAt) return 1;
+  if (a.createdAt > b.createdAt) return -1;
+  return 0;
+}
+
+export function homeQueueUnit(
+  count: number,
+  fallback: string,
+  sample?: string | null
+): string {
+  if (count === 1) {
+    const text = sample?.trim();
+    if (text) return text;
+  }
+  return fallback;
+}
+
+export function homeBriefing(opts: {
+  toReturn: number;
+  toFulfill: number;
+  toConfirm: number;
+}): string {
+  const bits: string[] = [];
+  if (opts.toConfirm > 0) bits.push(`${opts.toConfirm} to confirm`);
+  if (opts.toFulfill > 0) bits.push(`${opts.toFulfill} to fulfill`);
+  if (opts.toReturn > 0) bits.push(`${opts.toReturn} to return`);
+  if (bits.length === 0) return "Clear";
+  return `${bits.join(". ")}.`;
 }
 
 export function holdTypeLabel(type: string): string {
@@ -286,7 +370,7 @@ export function assembleInboxItems(opts: {
     items.push(buildInboxItem({ job }));
   }
 
-  items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  items.sort(compareInboxSignal);
   return items;
 }
 

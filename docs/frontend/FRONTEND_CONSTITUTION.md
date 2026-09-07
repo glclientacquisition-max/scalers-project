@@ -44,6 +44,7 @@ Cross-referenced. Product rules win when sources disagree.
 | Color / contrast | WCAG 2.2 SC 1.4.3, 1.4.11 | Ink `#0A192F` on canvas. Link text `#005CCC`. `#0096FF` on white is **~3.09:1** (fails AA body text; passes AA large text). Never use `#0096FF` for small links. White on `#0096FF` is the same ratio: primary buttons use **≥16px semibold** and **min-height 44px**. | Brand-blue body copy |
 | Touch / Kenya mobile | Apple 44pt; Material 48dp; WCAG 2.5.8 24px | Design for one-thumb morning triage on a mid-range Android. Container `px-4` / `sm:px-6`. | Hover-only actions |
 | Reduced motion | WCAG 2.2 SC 2.3.3 | `prefers-reduced-motion` already kills landing motion. Desk adds no new loops except the existing bulletin ping. | Orbs, drift, blobs on desk |
+| Situation awareness | Endsley 1995; Klein RPD | Stamps and captions name the **next action** (comprehension). Home units name what is at risk now (projection). | KPI tiles, conversion dashboards, taxonomy chips (Job, Hold) |
 
 ---
 
@@ -117,8 +118,8 @@ Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointme
 
 | Route | Job | Layout |
 | --- | --- | --- |
-| `/home` | Map of Needs you, Holds, Jobs. Line. One next action. | Command Center. Not a second inbox. |
-| `/calls` | Purpose-stamped Inbox | Dense table. Search. Holds and Jobs change columns. |
+| `/home` | Map of Needs you, Holds, Jobs. Briefing names the next action. Line. One CTA into the sharpest queue. | Command Center. Not a second inbox. |
+| `/calls` | Signal-stamped Inbox | Dense table. Work leads. Holds and Jobs change columns. |
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
 | `/appointments` | Confirm visits | Redirect `/calls?purpose=job` |
@@ -135,6 +136,8 @@ Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointme
 
 - Scan, do not educate.
 - Prefer “Requests”, “Open”, “Reply on WhatsApp”, “Save”.
+- Stamps name the next action: Confirm visit, Hold, Order, Human asked, Missed.
+- Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday).
 - Ban: em dash, en dash, “How to test” as a story, “Coming soon” filler.
 - WhatsApp prefill is owner-facing: no dashes.
 

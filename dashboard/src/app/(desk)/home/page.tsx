@@ -19,6 +19,10 @@ import {
   btnPrimary,
   focusRingVisible,
 } from "@/components/ui/deskChrome";
+import {
+  homeBriefing,
+  homeQueueUnit,
+} from "@/lib/inboxPurpose";
 
 function isMissingRelation(message: string): boolean {
   return /relation|does not exist|service_requests|appointments/i.test(message);
@@ -76,7 +80,8 @@ export default async function HomeOverviewPage() {
   });
   const line = resolveLineStatus(tenant.sautikit_virtual_number, readiness.ready);
 
-  const [todayRes, newRes, openHoldsRes, pendingJobsRes] = await Promise.all([
+  const [todayRes, newRes, openHoldsRes, pendingJobsRes, nextHoldRes, nextJobRes] =
+    await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
@@ -97,6 +102,20 @@ export default async function HomeOverviewPage() {
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .in("status", ["requested", "confirmed"]),
+    client
+      .from("service_requests")
+      .select("item, when_text, request_type")
+      .eq("tenant_id", tenant.id)
+      .eq("status", "open")
+      .order("created_at", { ascending: true })
+      .limit(1),
+    client
+      .from("appointments")
+      .select("when_text, service_name")
+      .eq("tenant_id", tenant.id)
+      .in("status", ["requested", "confirmed"])
+      .order("created_at", { ascending: true })
+      .limit(1),
   ]);
 
   const leadStatusReady = !(
@@ -114,6 +133,24 @@ export default async function HomeOverviewPage() {
   const openHolds = holdsReady ? openHoldsRes.count ?? 0 : 0;
   const pendingJobs = jobsReady ? pendingJobsRes.count ?? 0 : 0;
   const waitingCount = newCount + openHolds + pendingJobs;
+  const briefing = homeBriefing({
+    toReturn: newCount,
+    toFulfill: openHolds,
+    toConfirm: pendingJobs,
+  });
+
+  const nextHold = holdsReady
+    ? ((nextHoldRes.data || [])[0] as
+        | { item?: string | null; when_text?: string | null; request_type?: string | null }
+        | undefined)
+    : undefined;
+  const nextJob = jobsReady
+    ? ((nextJobRes.data || [])[0] as
+        | { when_text?: string | null; service_name?: string | null }
+        | undefined)
+    : undefined;
+  const holdSample = nextHold?.item?.trim() || nextHold?.when_text?.trim() || null;
+  const jobSample = nextJob?.when_text?.trim() || nextJob?.service_name?.trim() || null;
 
   const queues = [
     {
@@ -121,29 +158,35 @@ export default async function HomeOverviewPage() {
       label: "Needs you",
       href: callsHref({ purpose: "needs" }),
       count: waitingCount,
-      unit: "waiting",
+      unit: homeQueueUnit(waitingCount, "need you"),
     },
     {
       id: "hold",
       label: "Holds",
       href: callsHref({ purpose: "hold" }),
       count: openHolds,
-      unit: "open",
+      unit: homeQueueUnit(openHolds, "to fulfill", holdSample),
     },
     {
       id: "job",
       label: "Jobs",
       href: callsHref({ purpose: "job" }),
       count: pendingJobs,
-      unit: "to confirm",
+      unit: homeQueueUnit(pendingJobs, "to confirm", jobSample),
     },
   ] as const;
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
-  if (waitingCount > 0) {
+  if (pendingJobs > 0) {
+    ctaHref = callsHref({ purpose: "job" });
+    ctaLabel = pendingJobs === 1 ? "Confirm visit" : "Confirm visits";
+  } else if (openHolds > 0) {
+    ctaHref = callsHref({ purpose: "hold" });
+    ctaLabel = openHolds === 1 ? "Fulfill hold" : "Fulfill holds";
+  } else if (newCount > 0) {
     ctaHref = callsHref({ purpose: "needs" });
-    ctaLabel = "Open inbox";
+    ctaLabel = newCount === 1 ? "Return call" : "Return calls";
   } else if (line === "needs_training") {
     ctaHref = businessSettingsHref("train");
     ctaLabel = "Train";
@@ -194,18 +237,15 @@ export default async function HomeOverviewPage() {
       ) : null}
 
       <div className="mt-6 grid items-start gap-8 lg:grid-cols-12">
-        <section className="min-w-0 lg:col-span-8" aria-labelledby="needs-you-heading">
+        <section className="min-w-0 lg:col-span-8" aria-labelledby="work-heading">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2
-              id="needs-you-heading"
+              id="work-heading"
               className="font-display text-xl tracking-tight text-ink"
             >
-              Needs you
+              Work
             </h2>
-            <p className="text-[13px] text-ink-soft">
-              <span className="tabular-nums font-medium text-ink">{waitingCount}</span>{" "}
-              waiting
-            </p>
+            <p className="text-[13px] text-ink-soft">{briefing}</p>
           </div>
 
           <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
@@ -224,8 +264,8 @@ export default async function HomeOverviewPage() {
                   ].join(" ")}
                 >
                   <span className="text-ink">{queue.label}</span>
-                  <span className="flex items-center gap-3 text-ink-soft">
-                    <span>
+                  <span className="flex min-w-0 items-center gap-3 text-ink-soft">
+                    <span className="min-w-0 truncate">
                       <span className="tabular-nums font-medium text-ink">
                         {queue.count}
                       </span>{" "}
