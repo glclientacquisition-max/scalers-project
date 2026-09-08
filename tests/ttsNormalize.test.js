@@ -20,7 +20,9 @@ const {
   expandBarePriceInContext,
   expandSpokenForms,
   expandTimes,
+  expand24HourTime,
   expandDayRanges,
+  expandPhones,
   numberToSw,
 } = require('../src/speech/spokenForms');
 const { rewriteShengForTts, shouldRewriteSheng } = require('../src/speech/shengRewrite');
@@ -144,6 +146,41 @@ test('expandTimes + day ranges', () => {
   assert.match(expandTimes('Fungua 8am', 'sw'), /saa 8 asubuhi/);
   assert.match(expandDayRanges('Mon-Sat', 'en'), /Monday to Saturday/);
   assert.match(expandDayRanges('Mon-Sat', 'sw'), /Jumatatu hadi Jumamosi/);
+});
+
+test('expandPhones spaced Kenyan mobiles', () => {
+  const spoken = '0 7 4 0 4 4 2 9 4 3';
+  assert.strictEqual(expandPhones('0740442943'), spoken);
+  assert.strictEqual(expandPhones('0740 442 943'), spoken);
+  assert.strictEqual(expandPhones('07404 42943'), spoken);
+  assert.strictEqual(expandPhones('0740-442-943'), spoken);
+  assert.strictEqual(expandPhones('0712 345 678'), '0 7 1 2 3 4 5 6 7 8');
+  assert.strictEqual(
+    expandPhones('Call +254712345678 please'),
+    'Call 2 5 4 7 1 2 3 4 5 6 7 8 please'
+  );
+});
+
+test('expand24HourTime is a safety net and skips AM/PM forms', () => {
+  assert.strictEqual(expand24HourTime('14:30', 'en'), '2:30 PM');
+  assert.strictEqual(expand24HourTime('08:00-18:00', 'en'), '8 AM to 6 PM');
+  assert.strictEqual(expand24HourTime('08:00–18:00', 'en'), '8 AM to 6 PM');
+  assert.strictEqual(
+    expand24HourTime('08:00-18:00', 'sw'),
+    'saa 8 asubuhi hadi saa 6 jioni'
+  );
+  assert.strictEqual(
+    expand24HourTime('14:30', 'sw'),
+    'saa 2 na dakika 30 jioni'
+  );
+  assert.strictEqual(expand24HourTime('8 A M', 'en'), '8 A M');
+  assert.strictEqual(expand24HourTime('9:00 AM', 'en'), '9:00 AM');
+  assert.match(expandSpokenForms('Open 8am close 6:30pm', 'en'), /8 A M/);
+  assert.match(expandSpokenForms('Open 8am close 6:30pm', 'en'), /6 30 P M/);
+  assert.strictEqual(
+    expandSpokenForms('Mon-Sat: 09:00-19:00 EAT', 'en'),
+    'Monday to Saturday: 9 AM to 7 PM EAT'
+  );
 });
 
 console.log('shengRewrite');

@@ -1,5 +1,7 @@
 // Language-aware spoken forms for money, times, day ranges, and phones.
 
+const { minutesToHour12 } = require('../conversation/appointmentHours');
+
 const EN_ONES = [
   'zero',
   'one',
@@ -316,6 +318,46 @@ function expandTimes(text, lang = 'en') {
   return out;
 }
 
+const TIME_24 = '([01]?\\d|2[0-3]):([0-5]\\d)';
+const NOT_MERIDIEM = '(?!\\s*(?:a\\.?m\\.?|p\\.?m\\.?))';
+
+function speak24hClock(hour24, minute, lang) {
+  const label = minutesToHour12(hour24 * 60 + minute);
+  if (lang !== 'sw') return label;
+  const parsed = /^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/.exec(label);
+  if (!parsed) return label;
+  const hour12 = Number(parsed[1]);
+  const mins = parsed[2] ? Number(parsed[2]) : 0;
+  const period = parsed[3] === 'PM' ? 'jioni' : 'asubuhi';
+  if (mins) return `saa ${hour12} na dakika ${mins} ${period}`;
+  return `saa ${hour12} ${period}`;
+}
+
+/**
+ * Safety net for bare 24-hour clocks the model did not paraphrase.
+ * Skips times that already have an AM/PM marker (those stay on expandTimes).
+ * @param {string} text
+ * @param {'en'|'sw'|string} lang
+ */
+function expand24HourTime(text, lang = 'en') {
+  let out = String(text || '');
+  const ttsLang = lang === 'sw' ? 'sw' : 'en';
+  const joiner = rangeJoiner(ttsLang);
+
+  out = out.replace(
+    new RegExp(`\\b${TIME_24}\\s*[-–—]\\s*${TIME_24}${NOT_MERIDIEM}\\b`, 'gi'),
+    (full, h1, m1, h2, m2) =>
+      `${speak24hClock(Number(h1), Number(m1), ttsLang)} ${joiner} ${speak24hClock(Number(h2), Number(m2), ttsLang)}`
+  );
+
+  out = out.replace(
+    new RegExp(`\\b${TIME_24}${NOT_MERIDIEM}\\b`, 'gi'),
+    (full, h, m) => speak24hClock(Number(h), Number(m), ttsLang)
+  );
+
+  return out;
+}
+
 /**
  * Expand day ranges like Mon-Sat / Monday–Saturday.
  * @param {string} text
@@ -337,7 +379,7 @@ function expandDayRanges(text, lang = 'en') {
 
 /**
  * Expand phone-ish digit runs digit-by-digit (works for EN and SW TTS).
- * Handles +254… and bare 07xxxxxxxx Kenyan mobiles.
+ * Handles +254…, compact 07/01xxxxxxxx, and spaced/hyphenated local mobiles.
  * @param {string} text
  */
 function expandPhones(text) {
@@ -350,11 +392,17 @@ function expandPhones(text) {
 
   out = out.replace(/\b(0[71]\d{8})\b/g, (_, digits) => digits.split('').join(' '));
 
+  out = out.replace(/\b(0[71](?:[\s-]*\d){8})\b/g, (full) => {
+    const d = String(full).replace(/\D/g, '');
+    if (!/^0[71]\d{8}$/.test(d)) return full;
+    return d.split('').join(' ');
+  });
+
   return out;
 }
 
 /**
- * Apply money → catalog Price: numbers → time → day-range spoken forms.
+ * Apply money → catalog Price: numbers → AM/PM times → 24h safety net → day ranges.
  * @param {string} text
  * @param {'en'|'sw'|string} lang
  */
@@ -363,6 +411,7 @@ function expandSpokenForms(text, lang = 'en') {
   out = expandMoney(out, lang);
   out = expandBarePriceInContext(out, lang);
   out = expandTimes(out, lang);
+  out = expand24HourTime(out, lang);
   out = expandDayRanges(out, lang);
   return out;
 }
@@ -371,6 +420,7 @@ module.exports = {
   expandMoney,
   expandBarePriceInContext,
   expandTimes,
+  expand24HourTime,
   expandDayRanges,
   expandPhones,
   expandSpokenForms,
