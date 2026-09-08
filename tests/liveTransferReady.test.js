@@ -27,8 +27,10 @@ const profileBase = {
 
 describe('liveTransferReady', () => {
   it('normalizes Kenya mobiles to E.164', () => {
-    assert.equal(normalizeKenyaE164('0712 345 678'), '+254712345678');
+    assert.equal(normalizeKenyaE164('0712345678'), '+254712345678');
+    assert.equal(normalizeKenyaE164('254712345678'), '+254712345678');
     assert.equal(normalizeKenyaE164('+254712345678'), '+254712345678');
+    assert.equal(normalizeKenyaE164('0712 345 678'), '+254712345678');
     assert.equal(normalizeKenyaE164('712345678'), '+254712345678');
     assert.equal(normalizeKenyaE164('not-a-phone'), null);
   });
