@@ -169,14 +169,74 @@ function speakAmount(amount, lang) {
   return `${numberToEn(whole)} shillings`;
 }
 
+function speakNumber(amount, lang) {
+  const whole = Math.floor(amount);
+  return lang === 'sw' ? numberToSw(whole) : numberToEn(whole);
+}
+
+function rangeJoiner(lang) {
+  return lang === 'sw' ? 'hadi' : 'to';
+}
+
+function formatAmountRange(rawA, rawB, lang, withUnit) {
+  const a = parseAmount(rawA);
+  const b = parseAmount(rawB);
+  if (a == null || b == null) return null;
+  const joiner = rangeJoiner(lang);
+  if (withUnit) {
+    return `${speakAmount(a, lang)} ${joiner} ${speakAmount(b, lang)}`;
+  }
+  return `${speakNumber(a, lang)} ${joiner} ${speakNumber(b, lang)}`;
+}
+
+const AMOUNT_CAPTURE = '([\\d,]+(?:\\.\\d{1,2})?)';
+const RANGE_DASH = '\\s*[-–—]\\s*';
+
 /**
  * Expand KES / Ksh / bob money amounts into spoken words.
+ * Range forms run first so both sides convert (KSh 500-800).
  * @param {string} text
  * @param {'en'|'sw'|string} lang
  */
 function expandMoney(text, lang = 'en') {
   let out = String(text || '');
   const ttsLang = lang === 'sw' ? 'sw' : 'en';
+
+  // Prefix range: KSh 500-800 / KES 1,500–2,000/=
+  out = out.replace(
+    new RegExp(
+      `\\b(?:kes|ksh|kshs|sh)\\.?\\s*${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}(?:\\s*(?:kes|ksh|kshs|bob|shillings?)|\\/[=-])?`,
+      'gi'
+    ),
+    (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
+  );
+
+  // Suffix range: 500-800 bob / 1,500-2,000 shillings
+  out = out.replace(
+    new RegExp(
+      `\\b${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}\\s*(?:kes|ksh|kshs|bob|shillings?)\\b`,
+      'gi'
+    ),
+    (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
+  );
+
+  // Receipt-range: 500-800/= or 500-800/-
+  out = out.replace(
+    new RegExp(
+      `\\b${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}\\/[=-](?!\\w)`,
+      'gi'
+    ),
+    (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
+  );
+
+  // Receipt shorthand: 1500/= or 500/-
+  out = out.replace(
+    new RegExp(`\\b${AMOUNT_CAPTURE}\\/[=-](?!\\w)`, 'gi'),
+    (full, raw) => {
+      const amount = parseAmount(raw);
+      return amount == null ? full : speakAmount(amount, ttsLang);
+    }
+  );
 
   out = out.replace(
     /\b(?:kes|ksh|kshs|sh)\.?\s*([\d,]+(?:\.\d{1,2})?)\b/gi,
@@ -195,6 +255,30 @@ function expandMoney(text, lang = 'en') {
   );
 
   return out;
+}
+
+/**
+ * Convert catalog `Price: 15,000` numbers to words. Does not add a currency
+ * unit and does not touch quantities elsewhere in the sentence.
+ * @param {string} text
+ * @param {'en'|'sw'|string} lang
+ */
+function expandBarePriceInContext(text, lang = 'en') {
+  const ttsLang = lang === 'sw' ? 'sw' : 'en';
+  return String(text || '').replace(
+    new RegExp(
+      `\\b(price:\\s*)${AMOUNT_CAPTURE}(?:${RANGE_DASH}${AMOUNT_CAPTURE})?`,
+      'gi'
+    ),
+    (full, label, rawA, rawB) => {
+      if (rawB) {
+        const spoken = formatAmountRange(rawA, rawB, ttsLang, false);
+        return spoken ? `${label}${spoken}` : full;
+      }
+      const amount = parseAmount(rawA);
+      return amount == null ? full : `${label}${speakNumber(amount, ttsLang)}`;
+    }
+  );
 }
 
 /**
@@ -270,13 +354,14 @@ function expandPhones(text) {
 }
 
 /**
- * Apply money → time → day-range spoken forms.
+ * Apply money → catalog Price: numbers → time → day-range spoken forms.
  * @param {string} text
  * @param {'en'|'sw'|string} lang
  */
 function expandSpokenForms(text, lang = 'en') {
   let out = String(text || '');
   out = expandMoney(out, lang);
+  out = expandBarePriceInContext(out, lang);
   out = expandTimes(out, lang);
   out = expandDayRanges(out, lang);
   return out;
@@ -284,6 +369,7 @@ function expandSpokenForms(text, lang = 'en') {
 
 module.exports = {
   expandMoney,
+  expandBarePriceInContext,
   expandTimes,
   expandDayRanges,
   expandPhones,

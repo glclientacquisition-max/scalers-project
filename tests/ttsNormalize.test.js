@@ -17,6 +17,8 @@ const {
 } = require('../src/speech/pronunciationLexicon');
 const {
   expandMoney,
+  expandBarePriceInContext,
+  expandSpokenForms,
   expandTimes,
   expandDayRanges,
   numberToSw,
@@ -77,6 +79,63 @@ test('expandMoney EN/SW', () => {
   assert.match(expandMoney('2000 bob', 'en'), /two thousand shillings/);
   assert.match(expandMoney('Ksh 1500', 'sw'), /shilingi elfu moja mia tano/);
   assert.ok(numberToSw(2000).includes('elfu'));
+});
+
+test('expandMoney ranges convert both sides', () => {
+  assert.strictEqual(
+    expandMoney('KSh 500-800', 'en'),
+    'five hundred shillings to eight hundred shillings'
+  );
+  assert.strictEqual(
+    expandMoney('KSh 500–800', 'en'),
+    'five hundred shillings to eight hundred shillings'
+  );
+  assert.strictEqual(
+    expandMoney('500-800 bob', 'en'),
+    'five hundred shillings to eight hundred shillings'
+  );
+  assert.strictEqual(
+    expandMoney('KSh 500-800', 'sw'),
+    'shilingi mia tano hadi shilingi mia nane'
+  );
+});
+
+test('expandMoney receipt shorthand /= and /-', () => {
+  assert.strictEqual(
+    expandMoney('1500/=', 'en'),
+    'one thousand five hundred shillings'
+  );
+  assert.strictEqual(expandMoney('500/-', 'en'), 'five hundred shillings');
+  assert.strictEqual(
+    expandMoney('1500/=', 'sw'),
+    'shilingi elfu moja mia tano'
+  );
+  assert.strictEqual(expandMoney('500/-', 'sw'), 'shilingi mia tano');
+  assert.strictEqual(
+    expandMoney('500-800/=', 'en'),
+    'five hundred shillings to eight hundred shillings'
+  );
+});
+
+test('expandBarePriceInContext only after Price:', () => {
+  assert.strictEqual(
+    expandBarePriceInContext('Price: 15,000', 'en'),
+    'Price: fifteen thousand'
+  );
+  assert.strictEqual(
+    expandBarePriceInContext('Price: 900', 'en'),
+    'Price: nine hundred'
+  );
+  assert.strictEqual(
+    expandBarePriceInContext('Price: 1,500-2,000', 'en'),
+    'Price: one thousand five hundred to two thousand'
+  );
+  assert.strictEqual(
+    expandSpokenForms('Price: 15,000 for 3 books', 'en'),
+    'Price: fifteen thousand for 3 books'
+  );
+  assert.strictEqual(expandSpokenForms('3 books', 'en'), '3 books');
+  assert.strictEqual(expandSpokenForms('3 items', 'en'), '3 items');
 });
 
 test('expandTimes + day ranges', () => {
