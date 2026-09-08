@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Raw vs production Soniox TTS listen harness for the shared normalization fixture.
+// Raw vs production Soniox TTS listen harness for a JSON cases fixture.
 //
 // Usage:
 //   node scripts/soniox-tts-listen-harness.js
 //   node scripts/soniox-tts-listen-harness.js --mode raw
 //   node scripts/soniox-tts-listen-harness.js --mode production
 //   node scripts/soniox-tts-listen-harness.js --id 05-phone-spaced-local
+//   node scripts/soniox-tts-listen-harness.js --fixture tests/fixtures/kenya-phonetic-listen.json --mode production
 //
 // Requires SONIOX_API_KEY + SONIOX_VOICE for WAV output. Without them, still writes
 // the scoring sheet and production-text manifest (no audio).
@@ -18,17 +19,26 @@ const { prepareForTts } = require('../src/speech/ttsNormalize');
 const { createSonioxTtsSession, isSonioxTtsConfigured, SAMPLE_RATE } =
   require('../src/speech/sonioxTts');
 
-const FIXTURE_PATH = path.join(__dirname, '../tests/fixtures/tts-normalization.json');
+const DEFAULT_FIXTURE = path.join(__dirname, '../tests/fixtures/tts-normalization.json');
 const DEFAULT_OUTPUT = path.join(__dirname, '../output/tts-normalization');
 
 function parseArgs(argv) {
-  const opts = { mode: 'both', output: DEFAULT_OUTPUT, ids: null };
+  const opts = {
+    mode: 'both',
+    output: DEFAULT_OUTPUT,
+    outputSet: false,
+    fixture: DEFAULT_FIXTURE,
+    ids: null,
+  };
   for (let i = 2; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--mode' && argv[i + 1]) {
       opts.mode = argv[++i];
     } else if (arg === '--output' && argv[i + 1]) {
       opts.output = path.resolve(argv[++i]);
+      opts.outputSet = true;
+    } else if (arg === '--fixture' && argv[i + 1]) {
+      opts.fixture = path.resolve(argv[++i]);
     } else if (arg === '--id' && argv[i + 1]) {
       opts.ids = opts.ids || new Set();
       opts.ids.add(argv[++i]);
@@ -38,6 +48,8 @@ function parseArgs(argv) {
 Options:
   --mode raw|production|both   Which audio passes to synthesize (default: both)
   --output <dir>               Output directory (default: output/tts-normalization)
+  --fixture <path>             JSON fixture with a cases array
+                               (default: tests/fixtures/tts-normalization.json)
   --id <fixture-id>            Repeatable filter for one case
 `);
       process.exit(0);
@@ -46,13 +58,17 @@ Options:
   if (!['raw', 'production', 'both'].includes(opts.mode)) {
     throw new Error(`Invalid --mode ${opts.mode} (use raw, production, or both)`);
   }
+  if (opts.fixture !== DEFAULT_FIXTURE && !opts.outputSet) {
+    const stem = path.basename(opts.fixture, path.extname(opts.fixture));
+    opts.output = path.join(__dirname, '../output', stem);
+  }
   return opts;
 }
 
-function loadFixture() {
-  const raw = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8'));
+function loadFixture(fixturePath) {
+  const raw = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
   if (!Array.isArray(raw.cases) || !raw.cases.length) {
-    throw new Error(`Fixture missing cases: ${FIXTURE_PATH}`);
+    throw new Error(`Fixture missing cases: ${fixturePath}`);
   }
   return raw;
 }
@@ -182,7 +198,7 @@ function buildScoringMarkdown(fixture, cases, rows) {
 
 async function main() {
   const opts = parseArgs(process.argv);
-  const fixture = loadFixture();
+  const fixture = loadFixture(opts.fixture);
   let cases = fixture.cases;
   if (opts.ids) {
     cases = cases.filter((c) => opts.ids.has(c.id));
@@ -234,7 +250,7 @@ async function main() {
 
   const manifest = {
     generatedAt: new Date().toISOString(),
-    fixture: path.relative(process.cwd(), FIXTURE_PATH),
+    fixture: path.relative(process.cwd(), opts.fixture),
     sonioxConfigured: sonioxReady,
     modes,
     cases: cases.map((c) => {

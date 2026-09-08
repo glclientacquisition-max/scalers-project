@@ -1,0 +1,3509 @@
+[
+  {
+    "match": "abonyo",
+    "say": "Ah-boh-nyoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "achieng",
+    "say": "Ah-chee-eng",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "adhiambo",
+    "say": "Ah-dhee-ah-mboh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "ainabkoi",
+    "say": "Eye-nab-koh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "ainamoi",
+    "say": "Eye-nah-moh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "akinyi",
+    "say": "Ah-kee-nyee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "aldai",
+    "say": "Al-dy",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "alego",
+    "say": "Ah-leh-goh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "alego\\s+usonga",
+    "say": "Ah-leh-goh Oo-soh-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "anyango",
+    "say": "Ah-nyah-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "aoko",
+    "say": "Ah-oh-koh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "apiyo",
+    "say": "Ah-pee-yoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "atieno",
+    "say": "Ah-tee-eh-noh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "auma",
+    "say": "Ow-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "awendo",
+    "say": "Ah-weh-ndoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "awino",
+    "say": "Ah-wee-noh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "awuor",
+    "say": "Ah-woo-or",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "bahati",
+    "say": "Bah-hah-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "balambala",
+    "say": "Bah-lah-mbah-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "banissa",
+    "say": "Bah-nis-sah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "barasa",
+    "say": "Bah-rah-sah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "baringo",
+    "say": "Bah-ree-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "baringo\\s+central",
+    "say": "Bah-ree-ngoh Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "baringo\\s+north",
+    "say": "Bah-ree-ngoh North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "baringo\\s+south",
+    "say": "Bah-ree-ngoh South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "belgut",
+    "say": "Bel-gut",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "bett",
+    "say": "Bett",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "biwott",
+    "say": "Bee-wott",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "bobasi",
+    "say": "Boh-bah-see",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "bomachoge",
+    "say": "Boh-mah-choh-geh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "bomachoge\\s+borabu",
+    "say": "Boh-mah-choh-geh Boh-rah-boo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "bomachoge\\s+chache",
+    "say": "Boh-mah-choh-geh Chah-cheh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "bomet",
+    "say": "Boh-met",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "bomet\\s+central",
+    "say": "Boh-met Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "bomet\\s+east",
+    "say": "Boh-met East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "bonchari",
+    "say": "Bon-chah-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "bondo",
+    "say": "Boh-ndoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "borabu",
+    "say": "Boh-rah-boo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "budalangi",
+    "say": "Boo-dah-lah-ngee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "bumula",
+    "say": "Boo-moo-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "bungoma",
+    "say": "Boo-ngoh-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "busia",
+    "say": "Boo-see-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "butere",
+    "say": "Boo-teh-reh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "butula",
+    "say": "Boo-too-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "buuri",
+    "say": "Boo-oo-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "central\\s+imenti",
+    "say": "Central Ee-men-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "chache",
+    "say": "Chah-cheh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "changamwe",
+    "say": "Chah-ngam-weh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "chebet",
+    "say": "Cheh-bet",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "chege",
+    "say": "Cheh-geh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "chelagat",
+    "say": "Cheh-lah-gat",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "chemutai",
+    "say": "Cheh-moo-ty",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "chepalungu",
+    "say": "Cheh-pah-loo-ngoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "chepkemoi",
+    "say": "Chep-keh-moh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "chepkoech",
+    "say": "Chep-koh-ech",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "chepngetich",
+    "say": "Chep-ngeh-tich",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "cherangany",
+    "say": "Cheh-rah-ngany",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "cheruiyot",
+    "say": "Cheh-roo-ee-yot",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "chesumei",
+    "say": "Cheh-soo-meh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "choge",
+    "say": "Choh-geh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "dadaab",
+    "say": "Dah-dah-ab",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "dagoretti",
+    "say": "Dah-goh-ret-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "dikirr",
+    "say": "Dee-kirr",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "dujis",
+    "say": "Doo-jis",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "eldama",
+    "say": "El-dah-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "eldama\\s+ravine",
+    "say": "El-dah-mah Ravine",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "eldas",
+    "say": "El-das",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "elgeyo[\\s\\-]+marakwet",
+    "say": "El-geh-yoh-Mah-rah-kwet",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "elgon",
+    "say": "El-gon",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "embakasi\\s+central",
+    "say": "Eh-mbah-kah-see Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "embakasi\\s+east",
+    "say": "Eh-mbah-kah-see East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "embakasi\\s+north",
+    "say": "Eh-mbah-kah-see North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "embakasi\\s+south",
+    "say": "Eh-mbah-kah-see South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "embakasi\\s+west",
+    "say": "Eh-mbah-kah-see West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "embu",
+    "say": "Eh-mboo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "emgwen",
+    "say": "Em-gwen",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "emuhaya",
+    "say": "Eh-moo-hah-yah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "emurua",
+    "say": "Eh-moo-roo-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "emurua\\s+dikirr",
+    "say": "Eh-moo-roo-ah Dee-kirr",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "endebess",
+    "say": "Eh-ndeh-bess",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "fafi",
+    "say": "Fah-fee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "funyula",
+    "say": "Foo-nyoo-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gachagua",
+    "say": "Gah-chah-goo-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "gachoka",
+    "say": "Gah-choh-kah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "galole",
+    "say": "Gah-loh-leh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ganze",
+    "say": "Gah-nzeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "garissa",
+    "say": "Gah-ris-sah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "garsen",
+    "say": "Gar-sen",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "gatanga",
+    "say": "Gah-tah-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gatundu",
+    "say": "Gah-too-ndoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gatundu\\s+north",
+    "say": "Gah-too-ndoo North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gatundu\\s+south",
+    "say": "Gah-too-ndoo South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gicheru",
+    "say": "Gee-cheh-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gichugu",
+    "say": "Gee-choo-goo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gichuru",
+    "say": "Gee-choo-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gikonyo",
+    "say": "Gee-koh-nyoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "gilgil",
+    "say": "Gil-gil",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "gishu",
+    "say": "Gee-shoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "gitau",
+    "say": "Gee-tow",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "githinji",
+    "say": "Gee-thee-njee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "githunguri",
+    "say": "Gee-thoo-ngoo-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "gitonga",
+    "say": "Gee-toh-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "hamisi",
+    "say": "Hah-mee-see",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "horr",
+    "say": "Horr",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "igembe",
+    "say": "Ee-geh-mbeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "igembe\\s+central",
+    "say": "Ee-geh-mbeh Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "igembe\\s+north",
+    "say": "Ee-geh-mbeh North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "igembe\\s+south",
+    "say": "Ee-geh-mbeh South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ijara",
+    "say": "Ee-jah-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ikolomani",
+    "say": "Ee-koh-loh-mah-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 3
+  },
+  {
+    "match": "imenti",
+    "say": "Ee-men-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "irungu",
+    "say": "Ee-roo-ngoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "isiolo",
+    "say": "Ee-see-oh-loh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "isiolo\\s+north",
+    "say": "Ee-see-oh-loh North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "isiolo\\s+south",
+    "say": "Ee-see-oh-loh South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "jepchirchir",
+    "say": "Jep-chir-chir",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "jepkosgei",
+    "say": "Jep-kos-geh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "jomvu",
+    "say": "Joh-mvoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "jorok",
+    "say": "Joh-rok",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "juma",
+    "say": "Joo-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kabondo",
+    "say": "Kah-boh-ndoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kabondo\\s+kasipul",
+    "say": "Kah-boh-ndoh Kah-see-pul",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kabuchai",
+    "say": "Kah-boo-chy",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kacheliba",
+    "say": "Kah-cheh-lee-bah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kaiti",
+    "say": "Ky-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kajiado",
+    "say": "Kah-jee-ah-doh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kajiado\\s+central",
+    "say": "Kah-jee-ah-doh Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kajiado\\s+east",
+    "say": "Kah-jee-ah-doh East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kajiado\\s+north",
+    "say": "Kah-jee-ah-doh North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kajiado\\s+south",
+    "say": "Kah-jee-ah-doh South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kajiado\\s+west",
+    "say": "Kah-jee-ah-doh West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kakamega",
+    "say": "Kah-kah-meh-gah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kaleli",
+    "say": "Kah-leh-lee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kaloleni",
+    "say": "Kah-loh-leh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kalou",
+    "say": "Kah-loh-oo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kamukunji",
+    "say": "Kah-moo-koo-njee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kandara",
+    "say": "Kah-ndah-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kanduyi",
+    "say": "Kah-ndoo-yee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kangema",
+    "say": "Kah-ngeh-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kangundo",
+    "say": "Kah-ngoo-ndoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kapenguria",
+    "say": "Kah-peh-ngoo-ree-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 3
+  },
+  {
+    "match": "kapseret",
+    "say": "Kap-seh-ret",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "karachuonyo",
+    "say": "Kah-rah-choo-oh-nyoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 3
+  },
+  {
+    "match": "karanja",
+    "say": "Kah-rah-njah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kariuki",
+    "say": "Kah-ree-oo-kee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kasipul",
+    "say": "Kah-see-pul",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kathiani",
+    "say": "Kah-thee-ah-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kavinya",
+    "say": "Kah-vee-nyah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "keitany",
+    "say": "Keh-ee-tany",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "keiyo",
+    "say": "Keh-ee-yoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "keiyo\\s+north",
+    "say": "Keh-ee-yoh North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "keiyo\\s+south",
+    "say": "Keh-ee-yoh South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kemboi",
+    "say": "Keh-mboh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kenyatta",
+    "say": "Keh-nyat-tah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kericho",
+    "say": "Keh-ree-choh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kesses",
+    "say": "Kes-ses",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "khaemba",
+    "say": "Khah-eh-mbah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "khalayi",
+    "say": "Khah-lah-yee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "khwisero",
+    "say": "Khwee-seh-roh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kiambaa",
+    "say": "Kee-ah-mbah-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kibaki",
+    "say": "Kee-bah-kee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kibet",
+    "say": "Kee-bet",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kibra",
+    "say": "Kib-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kibwezi",
+    "say": "Kib-weh-zee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kibwezi\\s+east",
+    "say": "Kib-weh-zee East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kibwezi\\s+west",
+    "say": "Kib-weh-zee West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kieni",
+    "say": "Kee-eh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kigumo",
+    "say": "Kee-goo-moh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kiharu",
+    "say": "Kee-hah-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kilgoris",
+    "say": "Kil-goh-ris",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kilifi",
+    "say": "Kee-lee-fee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kilifi\\s+north",
+    "say": "Kee-lee-fee North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kilifi\\s+south",
+    "say": "Kee-lee-fee South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kilome",
+    "say": "Kee-loh-meh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kilunda",
+    "say": "Kee-loo-ndah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kimaiyo",
+    "say": "Kee-my-yoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kimani",
+    "say": "Kee-mah-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kimilili",
+    "say": "Kee-mee-lee-lee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kiminini",
+    "say": "Kee-mee-nee-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kimutai",
+    "say": "Kee-moo-ty",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kinango",
+    "say": "Kee-nah-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kinangop",
+    "say": "Kee-nah-ngop",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kinuthia",
+    "say": "Kee-noo-thee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kinyua",
+    "say": "Kee-nyoo-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kioko",
+    "say": "Kee-oh-koh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kipchoge",
+    "say": "Kip-choh-geh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kipipiri",
+    "say": "Kee-pee-pee-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kipkelion",
+    "say": "Kip-keh-lee-on",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kipkelion\\s+east",
+    "say": "Kip-keh-lee-on East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kipkelion\\s+west",
+    "say": "Kip-keh-lee-on West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kiplagat",
+    "say": "Kip-lah-gat",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kiprop",
+    "say": "Kip-rop",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kipruto",
+    "say": "Kip-roo-toh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kipsang",
+    "say": "Kip-sang",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kiptoo",
+    "say": "Kip-toh-oh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kirinyaga",
+    "say": "Kee-ree-nyah-gah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kirinyaga\\s+central",
+    "say": "Kee-ree-nyah-gah Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kisauni",
+    "say": "Kee-sow-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kisii",
+    "say": "Kee-see-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kisumu\\s+central",
+    "say": "Kee-soo-moo Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kisumu\\s+east",
+    "say": "Kee-soo-moo East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kisumu\\s+west",
+    "say": "Kee-soo-moo West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitui",
+    "say": "Kee-too-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitui\\s+central",
+    "say": "Kee-too-ee Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitui\\s+east",
+    "say": "Kee-too-ee East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitui\\s+rural",
+    "say": "Kee-too-ee Rural",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitui\\s+south",
+    "say": "Kee-too-ee South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitui\\s+west",
+    "say": "Kee-too-ee West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitutu",
+    "say": "Kee-too-too",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitutu\\s+chache\\s+north",
+    "say": "Kee-too-too Chah-cheh North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitutu\\s+chache\\s+south",
+    "say": "Kee-too-too Chah-cheh South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kitutu\\s+masaba",
+    "say": "Kee-too-too Mah-sah-bah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "koech",
+    "say": "Koh-ech",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "konoin",
+    "say": "Koh-noh-in",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "korir",
+    "say": "Koh-rir",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kosgei",
+    "say": "Kos-geh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kundu",
+    "say": "Koo-ndoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "kuresoi",
+    "say": "Koo-reh-soh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kuresoi\\s+north",
+    "say": "Koo-reh-soh-ee North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kuresoi\\s+south",
+    "say": "Koo-reh-soh-ee South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "kuria",
+    "say": "Koo-ree-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kuria\\s+east",
+    "say": "Koo-ree-ah East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kuria\\s+west",
+    "say": "Koo-ree-ah West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "kwale",
+    "say": "Kwah-leh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "lafey",
+    "say": "Lah-fey",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "lagdera",
+    "say": "Lag-deh-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "laikipia",
+    "say": "Ly-kee-pee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "laikipia\\s+east",
+    "say": "Ly-kee-pee-ah East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "laikipia\\s+north",
+    "say": "Ly-kee-pee-ah North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "laikipia\\s+west",
+    "say": "Ly-kee-pee-ah West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "laisamis",
+    "say": "Ly-sah-mis",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "lamu",
+    "say": "Lah-moo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "lamu\\s+east",
+    "say": "Lah-moo East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "lamu\\s+west",
+    "say": "Lah-moo West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "langat",
+    "say": "Lah-ngat",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "likoni",
+    "say": "Lee-koh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "likuyani",
+    "say": "Lee-koo-yah-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "loima",
+    "say": "Loh-ee-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "luanda",
+    "say": "Loo-ah-ndah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "lugari",
+    "say": "Loo-gah-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "lunga",
+    "say": "Loo-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "lunga\\s+lunga",
+    "say": "Loo-ngah Loo-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "lurambi",
+    "say": "Loo-rah-mbee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "lusweti",
+    "say": "Loo-sweh-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "maara",
+    "say": "Mah-ah-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "maathai",
+    "say": "Mah-ah-thy",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "machakos",
+    "say": "Mah-chah-kos",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "machakos\\s+town",
+    "say": "Mah-chah-kos Town",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "macharia",
+    "say": "Mah-chah-ree-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "magarini",
+    "say": "Mah-gah-ree-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "maina",
+    "say": "My-nah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "makadara",
+    "say": "Mah-kah-dah-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "makokha",
+    "say": "Mah-kok-hah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "makueni",
+    "say": "Mah-koo-eh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "malava",
+    "say": "Mah-lah-vah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "malindi",
+    "say": "Mah-lee-ndee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mandera",
+    "say": "Mah-ndeh-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mandera\\s+east",
+    "say": "Mah-ndeh-rah East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mandera\\s+north",
+    "say": "Mah-ndeh-rah North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mandera\\s+south",
+    "say": "Mah-ndeh-rah South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mandera\\s+west",
+    "say": "Mah-ndeh-rah West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "manze",
+    "say": "Mah-nzeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "maragwa",
+    "say": "Mah-rah-gwah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "marahaba",
+    "say": "Mah-rah-hah-bah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "marakwet",
+    "say": "Mah-rah-kwet",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "marakwet\\s+east",
+    "say": "Mah-rah-kwet East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "marakwet\\s+west",
+    "say": "Mah-rah-kwet West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "marsabit",
+    "say": "Mar-sah-bit",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "masaba",
+    "say": "Mah-sah-bah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "masinde",
+    "say": "Mah-see-ndeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "masinga",
+    "say": "Mah-see-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "matayos",
+    "say": "Mah-tah-yos",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mathare",
+    "say": "Mah-thah-reh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mathioya",
+    "say": "Mah-thee-oh-yah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "mathira",
+    "say": "Mah-thee-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "matiang'i",
+    "say": "Mah-tee-ah-ng'ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "matuga",
+    "say": "Mah-too-gah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "matungu",
+    "say": "Mah-too-ngoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "matungulu",
+    "say": "Mah-too-ngoo-loo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "mavoko",
+    "say": "Mah-voh-koh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mbithe",
+    "say": "Mbee-theh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mbooni",
+    "say": "Mboh-oh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mbugua",
+    "say": "Mboo-goo-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mburu",
+    "say": "Mboo-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "meru",
+    "say": "Meh-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "migori",
+    "say": "Mee-goh-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mogotio",
+    "say": "Moh-goh-tee-oh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "moiben",
+    "say": "Moh-ee-ben",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "molo",
+    "say": "Moh-loh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mosop",
+    "say": "Moh-sop",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "moyale",
+    "say": "Moh-yah-leh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "msambweni",
+    "say": "Msamb-weh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "msee",
+    "say": "Mseh-eh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mt\\.\\s+elgon",
+    "say": "Mt El-gon",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "muchiri",
+    "say": "Moo-chee-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mueni",
+    "say": "Moo-eh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mugambi",
+    "say": "Moo-gah-mbee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mugirango",
+    "say": "Moo-gee-rah-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "muhoroni",
+    "say": "Moo-hoh-roh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "mukami",
+    "say": "Moo-kah-mee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mukhwana",
+    "say": "Mukh-wah-nah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mukurweni",
+    "say": "Moo-kur-weh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "muli",
+    "say": "Moo-lee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mumias",
+    "say": "Moo-mee-as",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mumias\\s+east",
+    "say": "Moo-mee-as East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mumias\\s+west",
+    "say": "Moo-mee-as West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mungai",
+    "say": "Moo-ngy",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "murang'a",
+    "say": "Moo-rah-ng'ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "muriuki",
+    "say": "Moo-ree-oo-kee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "musyimi",
+    "say": "Mus-yee-mee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "musyoka",
+    "say": "Mus-yoh-kah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "muthama",
+    "say": "Moo-thah-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mutheu",
+    "say": "Moo-theh-oo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "muthoni",
+    "say": "Moo-thoh-nee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mutiso",
+    "say": "Moo-tee-soh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mutua",
+    "say": "Moo-too-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mutuku",
+    "say": "Moo-too-koo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mvita",
+    "say": "Mvee-tah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mwala",
+    "say": "Mwah-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mwatate",
+    "say": "Mwah-tah-teh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mwea",
+    "say": "Mweh-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mwende",
+    "say": "Mweh-ndeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mwikali",
+    "say": "Mwee-kah-lee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "mwingi",
+    "say": "Mwee-ngee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mwingi\\s+east",
+    "say": "Mwee-ngee East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mwingi\\s+north",
+    "say": "Mwee-ngee North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "mwingi\\s+west",
+    "say": "Mwee-ngee West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nafula",
+    "say": "Nah-foo-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "naivasha",
+    "say": "Ny-vah-shah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nakuru\\s+town\\s+east",
+    "say": "Nah-koo-roo Town East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nakuru\\s+town\\s+west",
+    "say": "Nah-koo-roo Town West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "naliaka",
+    "say": "Nah-lee-ah-kah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "nambale",
+    "say": "Nah-mbah-leh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nandi",
+    "say": "Nah-ndee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nandi\\s+hills",
+    "say": "Nah-ndee Hills",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "narok",
+    "say": "Nah-rok",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "narok\\s+east",
+    "say": "Nah-rok East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "narok\\s+north",
+    "say": "Nah-rok North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "narok\\s+south",
+    "say": "Nah-rok South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "narok\\s+west",
+    "say": "Nah-rok West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nasambu",
+    "say": "Nah-sah-mboo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nasimiyu",
+    "say": "Nah-see-mee-yoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "navakholo",
+    "say": "Nah-vak-hoh-loh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "ndaragwa",
+    "say": "Ndah-rah-gwah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ndegwa",
+    "say": "Ndeh-gwah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ndhiwa",
+    "say": "Ndhee-wah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ndia",
+    "say": "Ndee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ndolo",
+    "say": "Ndoh-loh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ndunge",
+    "say": "Ndoo-ngeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nekesa",
+    "say": "Neh-keh-sah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nelima",
+    "say": "Neh-lee-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ng'ang'a",
+    "say": "Ng'ah-ng'ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ngugi",
+    "say": "Ngoo-gee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ngui",
+    "say": "Ngoo-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "niaje",
+    "say": "Nee-ah-jeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nimebamba",
+    "say": "Nee-meh-bah-mbah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "nimechill",
+    "say": "Nee-meh-chill",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nithi",
+    "say": "Nee-thee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "njambi",
+    "say": "Njah-mbee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "njeru",
+    "say": "Njeh-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "njoki",
+    "say": "Njoh-kee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "njoro",
+    "say": "Njoh-roh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "njoroge",
+    "say": "Njoh-roh-geh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "north\\s+horr",
+    "say": "North Horr",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "north\\s+imenti",
+    "say": "North Ee-men-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "north\\s+mugirango",
+    "say": "North Moo-gee-rah-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "nyakach",
+    "say": "Nyah-kach",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nyali",
+    "say": "Nyah-lee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nyambura",
+    "say": "Nyah-mboo-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nyamira",
+    "say": "Nyah-mee-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nyandarua",
+    "say": "Nyah-ndah-roo-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "nyando",
+    "say": "Nyah-ndoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nyaribari",
+    "say": "Nyah-ree-bah-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "nyaribari\\s+chache",
+    "say": "Nyah-ree-bah-ree Chah-cheh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "nyaribari\\s+masaba",
+    "say": "Nyah-ree-bah-ree Mah-sah-bah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "nyatike",
+    "say": "Nyah-tee-keh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nyawira",
+    "say": "Nyah-wee-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nyeri",
+    "say": "Nyeh-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nyeri\\s+town",
+    "say": "Nyeh-ree Town",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nyokabi",
+    "say": "Nyoh-kah-bee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "nyong'o",
+    "say": "Nyoh-ng'oh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "nzoia",
+    "say": "Nzoh-ee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "odhiambo",
+    "say": "Oh-dhee-ah-mboh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "odinga",
+    "say": "Oh-dee-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "odongo",
+    "say": "Oh-doh-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "oduor",
+    "say": "Oh-doo-or",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ogutu",
+    "say": "Oh-goo-too",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "okello",
+    "say": "Oh-kel-loh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "okoth",
+    "say": "Oh-koth",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ol",
+    "say": "Ol",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ol\\s+jorok",
+    "say": "Ol Joh-rok",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "ol\\s+kalou",
+    "say": "Ol Kah-loh-oo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "oloo",
+    "say": "Oh-loh-oh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "omondi",
+    "say": "Oh-moh-ndee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "onyango",
+    "say": "Oh-nyah-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "opiyo",
+    "say": "Oh-pee-yoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "othaya",
+    "say": "Oh-thah-yah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "owino",
+    "say": "Oh-wee-noh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "owiti",
+    "say": "Oh-wee-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "owuor",
+    "say": "Oh-woo-or",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "oyoo",
+    "say": "Oh-yoh-oh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "pokot",
+    "say": "Poh-kot",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "pokot\\s+south",
+    "say": "Poh-kot South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "polepole",
+    "say": "Poh-leh-poh-leh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "rabai",
+    "say": "Rah-by",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "rangwe",
+    "say": "Rang-weh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "rarieda",
+    "say": "Rah-ree-eh-dah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "rongai",
+    "say": "Roh-ngy",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "rongo",
+    "say": "Roh-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "rotich",
+    "say": "Roh-tich",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "roysambu",
+    "say": "Roy-sah-mboo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ruaraka",
+    "say": "Roo-ah-rah-kah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "runyenjes",
+    "say": "Roo-nyeh-njes",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ruto",
+    "say": "Roo-toh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "sabatia",
+    "say": "Sah-bah-tee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "saboti",
+    "say": "Sah-boh-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "saitoti",
+    "say": "Sy-toh-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "saku",
+    "say": "Sah-koo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "samburu",
+    "say": "Sah-mboo-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "samburu\\s+east",
+    "say": "Sah-mboo-roo East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "samburu\\s+north",
+    "say": "Sah-mboo-roo North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "samburu\\s+west",
+    "say": "Sah-mboo-roo West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "shikamoo",
+    "say": "Shee-kah-moh-oh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "shinyalu",
+    "say": "Shee-nyah-loo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "siakago",
+    "say": "See-ah-kah-goh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "siaya",
+    "say": "See-ah-yah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "sigor",
+    "say": "See-gor",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "sigowet",
+    "say": "See-goh-wet",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "sigowet\\s+soin",
+    "say": "See-goh-weh-tsoh-in",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 3
+  },
+  {
+    "match": "simiyu",
+    "say": "See-mee-yoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "sirisia",
+    "say": "See-ree-see-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "soin",
+    "say": "Soh-in",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "sotik",
+    "say": "Soh-tik",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "south\\s+imenti",
+    "say": "South Ee-men-tee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "south\\s+mugirango",
+    "say": "South Moo-gee-rah-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "starehe",
+    "say": "Stah-reh-heh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "subukia",
+    "say": "Soo-boo-kee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "sukuma",
+    "say": "Soo-koo-mah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "suna",
+    "say": "Soo-nah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "suna\\s+east",
+    "say": "Soo-nah East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "suna\\s+west",
+    "say": "Soo-nah West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "syombua",
+    "say": "Syoh-mboo-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "taita",
+    "say": "Ty-tah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "taita\\s+taveta",
+    "say": "Ty-tah Tah-veh-tah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "tanui",
+    "say": "Tah-noo-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "tarbaj",
+    "say": "Tar-baj",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "taveta",
+    "say": "Tah-veh-tah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "teso",
+    "say": "Teh-soh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "teso\\s+north",
+    "say": "Teh-soh North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "teso\\s+south",
+    "say": "Teh-soh South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "tetu",
+    "say": "Teh-too",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "tharaka",
+    "say": "Thah-rah-kah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "tharaka[\\s\\-]+nithi",
+    "say": "Thah-rah-kah-Nee-thee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "thika\\s+town",
+    "say": "Thee-kah Town",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "tiaty",
+    "say": "Tee-aty",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "tigania",
+    "say": "Tee-gah-nee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "tigania\\s+east",
+    "say": "Tee-gah-nee-ah East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "tigania\\s+west",
+    "say": "Tee-gah-nee-ah West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "tinderet",
+    "say": "Tee-ndeh-ret",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "tongaren",
+    "say": "Toh-ngah-ren",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "trans\\s+nzoia",
+    "say": "Trans Nzoh-ee-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "turkana",
+    "say": "Tur-kah-nah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "turkana\\s+central",
+    "say": "Tur-kah-nah Central",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "turkana\\s+east",
+    "say": "Tur-kah-nah East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "turkana\\s+north",
+    "say": "Tur-kah-nah North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "turkana\\s+south",
+    "say": "Tur-kah-nah South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "turkana\\s+west",
+    "say": "Tur-kah-nah West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "uasin",
+    "say": "Oo-ah-sin",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "uasin\\s+gishu",
+    "say": "Oo-ah-sin Gee-shoo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ugenya",
+    "say": "Oo-geh-nyah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "ugunja",
+    "say": "Oo-goo-njah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "uriri",
+    "say": "Oo-ree-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "usonga",
+    "say": "Oo-soh-ngah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "vihiga",
+    "say": "Vee-hee-gah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "voi",
+    "say": "Voh-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "wafula",
+    "say": "Wah-foo-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wainaina",
+    "say": "Wy-ny-nah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wairimu",
+    "say": "Wy-ree-moo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "waithera",
+    "say": "Wy-theh-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wajir",
+    "say": "Wah-jir",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "wajir\\s+east",
+    "say": "Wah-jir East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "wajir\\s+north",
+    "say": "Wah-jir North",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "wajir\\s+south",
+    "say": "Wah-jir South",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "wajir\\s+west",
+    "say": "Wah-jir West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "wambua",
+    "say": "Wah-mboo-ah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wambugu",
+    "say": "Wah-mboo-goo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wangari",
+    "say": "Wah-ngah-ree",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wangui",
+    "say": "Wah-ngoo-ee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wanjala",
+    "say": "Wah-njah-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wanjira",
+    "say": "Wah-njee-rah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wanjiru",
+    "say": "Wah-njee-roo",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wanyonyi",
+    "say": "Wah-nyoh-nyee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "webuye",
+    "say": "Weh-boo-yeh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "webuye\\s+east",
+    "say": "Weh-boo-yeh East",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "webuye\\s+west",
+    "say": "Weh-boo-yeh West",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "wekesa",
+    "say": "Weh-keh-sah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "west\\s+mugirango",
+    "say": "West Moo-gee-rah-ngoh",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "west\\s+pokot",
+    "say": "West Poh-kot",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  },
+  {
+    "match": "wetangula",
+    "say": "Weh-tah-ngoo-lah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 2
+  },
+  {
+    "match": "wundanyi",
+    "say": "Woo-ndah-nyee",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 1
+  },
+  {
+    "match": "yatta",
+    "say": "Yat-tah",
+    "priority": 80,
+    "source": "generated",
+    "stressSyllable": 0
+  }
+]

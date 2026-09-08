@@ -80,6 +80,13 @@ Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / 
 - Do: light respellings (`Eye-sha`, `Moo-in-dee Mbeen-goo`, `Chapter One`).
 - Don’t: hyphenate every English syllable (`Si-ti`, `Op-po-sit`, `loh-kay-tid`).
 - Don’t: single common words as `match`.
+- Don’t: ALLCAPS stress in `say` (`KIP-rop`). Soniox may spell the letters. Keep stress in `stressSyllable` metadata on generated candidates only.
+
+Generated candidates live in `src/speech/generatedKenyaLexicon.json`. `scripts/generate-kenya-lexicon.js` does not write `KENYA_LEXICON` unless `--promote`. Listen first:
+
+```bash
+node scripts/soniox-tts-listen-harness.js --fixture tests/fixtures/kenya-phonetic-listen.json --mode production
+```
 
 ## Verify
 
