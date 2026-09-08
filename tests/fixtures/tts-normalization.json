@@ -118,7 +118,7 @@
       "text": "0740 442 943",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "0740 442 943",
+      "expectProductionText": "0 7 4 0 4 4 2 9 4 3",
       "source": "spaced Kenyan mobile — seen in live agent lines"
     },
     {
@@ -128,7 +128,34 @@
       "text": "0712 345 678",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "0712 345 678"
+      "expectProductionText": "0 7 1 2 3 4 5 6 7 8"
+    },
+    {
+      "id": "29-phone-spaced-5-5",
+      "group": "universal",
+      "category": "phone",
+      "text": "07404 42943",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "0 7 4 0 4 4 2 9 4 3"
+    },
+    {
+      "id": "30-phone-hyphen-groups",
+      "group": "universal",
+      "category": "phone",
+      "text": "0740-442-943",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "0 7 4 0 4 4 2 9 4 3"
+    },
+    {
+      "id": "31-phone-spaced-4-6",
+      "group": "universal",
+      "category": "phone",
+      "text": "0712 345678",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "0 7 1 2 3 4 5 6 7 8"
     },
     {
       "id": "07-phone-e164",
@@ -156,7 +183,7 @@
       "text": "14:30",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "14:30"
+      "expectProductionText": "2:30 PM"
     },
     {
       "id": "10-hours-line",
@@ -165,7 +192,7 @@
       "text": "Mon-Sat: 09:00-19:00 EAT",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "Monday to Saturday: 09:00-19:00 EAT"
+      "expectProductionText": "Monday to Saturday: 9 AM to 7 PM EAT"
     },
     {
       "id": "11-date-ordinal",
