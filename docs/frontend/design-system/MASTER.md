@@ -109,7 +109,7 @@ Do not add a second palette. Prefer Tailwind names over `text-[var(--ink)]`.
 | Lead (in progress) | `--lead` `#B98A1F` | `lead` |
 | WhatsApp (glyph only) | `--whatsapp` `#25D366` | `whatsapp` |
 
-Also shipped: `shadow-focus`, `shadow-lift`, `rounded-panel` (0.875rem), `max-w-desk` (72rem), `--desk-header-h` (4.25rem / 4.5rem from `sm`).
+Also shipped: `shadow-focus`, `shadow-lift`, `rounded-panel` (0.875rem), `max-w-desk` (72rem), `--desk-header-h` (4.25rem / 4.5rem from `sm`), `--desk-bottom-nav-h` (`0px` from `md`; `3.25rem + safe-area` below).
 
 Body canvas wash (radial brand tints) is global in `globals.css`. Do not add more gradients on desk components.
 
@@ -138,7 +138,10 @@ Do not use landing-scale `text-5xl` / `md:text-6xl` on the desk.
 
 - Sticky header, `border-b border-line/80 bg-surface/95 backdrop-blur`
 - Inner: `mx-auto flex max-w-desk … px-4 py-3 sm:px-6 sm:py-3.5`
-- Main: `mx-auto w-full min-w-0 max-w-desk px-4 py-6 sm:px-6 sm:py-10`
+- Desktop nav (`DeskNav`): six text links + Sign out, `hidden md:flex`
+- Mobile nav (`DeskMobileNav`): sibling of header/main (not inside the blurred header). `Overview · Calls · Requests · More`. More sheet: Appointments, Business, Wallet, Sign out.
+- Main: `mx-auto w-full min-w-0 max-w-desk px-4 py-6 sm:px-6 sm:pt-10` plus `--desk-bottom-nav-h` on the bottom padding so the bar does not cover content.
+- `--desk-bottom-nav-h` is `0px` from `md`; below `md` it is `3.25rem` plus `safe-area-inset-bottom`. Call audio uses the same offset (`CallAudioPlayer`).
 
 Pages must not add a second page gutter. Appointments currently does (`px-4 py-10` inside main). That is Phase 4 debt.
 
@@ -280,7 +283,7 @@ Gaps remaining: icon Done/Archive have labels (good) but `h-9` hit area is under
 
 | Surface | Extracted behavior | Keep |
 | --- | --- | --- |
-| Desk nav | Inline `md+`, Menu drawer below | Yes |
+| Desk nav | Inline `md+`, labeled bottom bar below (`Overview · Calls · Requests · More`) | Yes |
 | Calls table | Horizontal scroll, `min-w-[760px]` | Yes |
 | Call detail | Stack, then 4/8 split at `lg` | Yes |
 | Settings | Menu on `/settings`. Mobile list or detail. Desktop list plus panel at `lg` | Yes |
@@ -297,7 +300,7 @@ Do not create these unless a later phase proves a source and a job:
 - Live Online indicator
 - Contacts
 - New fonts or color tokens
-- Modal/drawer primitive (none ships; native or a first copy from an existing panel)
+- Modal/drawer primitive (none ships; More is a local disclosure in `DeskMobileNav`, not a shared overlay system)
 - Chart library
 - Toast system
 - Dark mode
@@ -315,6 +318,7 @@ Do not create these unless a later phase proves a source and a job:
 | Token dialect `text-[var(--ink)]` on Owner Desk | auth, onboarding, settings panels | 5 (consumed). Admin/landing kept. |
 | Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 (consumed). Blue fill, green glyph. |
 | Focus ring `/40` vs mandate solid | `settingsUi` vs constitution | 5 (consumed). Canonical desk ring is `/40`. |
+| Mobile hamburger hid all destinations | `DeskNav.tsx` | 6B (consumed). Persistent labeled bottom bar. |
 
 ---
 

@@ -280,7 +280,7 @@ Icon-only controls need an accessible name. Do not use emoji as UI icons.
 
 ## 16. Navigation
 
-Current owner labels are product surface. Keep them through Phase 5:
+Current owner labels are product surface. Keep them:
 
 ```text
 Overview · Calls · Requests · Appointments · Business · Wallet
@@ -292,7 +292,7 @@ Owner and Super Admin shells stay split. Never merge those navs.
 
 Nested navigation (Business settings) is a destination menu. Section titles (`General`, `Knowledge`, `Operations`, `Line`) are non-clickable: `uppercase`, `tracking-wide`, `text-gray-500`, no hover. Rows are label plus chevron. Mobile shows the menu or the open screen. Desktop shows both.
 
-Desk chrome today is a top bar and a mobile drawer. Do not add a second desk sidebar in Phases 3–5.
+Desk chrome: sticky **top bar** on `md+` (six destinations plus Sign out). Below `md`: persistent **bottom bar** `Overview · Calls · Requests · More`. More holds Appointments, Business, Wallet, and Sign out. Same URLs. No owner sidebar. No nav badges. No fake Online.
 
 ---
 
@@ -342,7 +342,7 @@ Do not silently edit `.cursor/rules/scalers-design-ux.mdc` to hide these. Amend 
 | Topic | Mandate (alwaysApply) | Constitution | Resolution until mandate is amended |
 | --- | --- | --- | --- |
 | Split pane | "Never stack them vertically." | Call detail may stack on small screens. | Follow constitution. Desktop remains split. |
-| Nested nav | Nested nav must be a vertical sidebar. | Settings already is. Desk chrome is a top bar through Phase 5. | Sidebar rule applies to nested settings, not a second desk shell. |
+| Nested nav | Nested nav must be a vertical sidebar. | Settings already is. Desk chrome is a top bar on `md+` and a bottom bar below `md` (Phase 6B). | Sidebar rule applies to nested settings, not a second desk shell. |
 | Custom CSS | No one-off CSS for layout/chrome. | Landing rise/drift already lives in `globals.css`. | No new desk chrome CSS. Do not delete landing motion in a drive-by. |
 
 Desk nav label is **Business** (route `/settings`). Older docs sometimes say Settings. Use the shipped label.
@@ -382,4 +382,4 @@ Do not pull later phases into this one. UI starts at Phase 3, using [`design-sys
 - New npm packages
 - Backend, schema, auth, voice, Brain, billing, DID changes
 - Fake Online or other invented state
-- Renaming owner nav before Phase 6 (and only then with a product decision)
+- Renaming owner nav without a product decision (Phase 6B kept current labels)
