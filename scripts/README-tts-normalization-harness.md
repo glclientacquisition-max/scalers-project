@@ -73,6 +73,7 @@ node scripts/soniox-tts-listen-harness.js --mode raw
 node scripts/soniox-tts-listen-harness.js --mode production
 node scripts/soniox-tts-listen-harness.js --id 05-phone-spaced-local
 node scripts/soniox-tts-listen-harness.js --output /tmp/tts-listen
+node scripts/soniox-tts-listen-harness.js --fixture tests/fixtures/kenya-phonetic-listen.json --mode production
 ```
 
 ## Outputs

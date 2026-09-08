@@ -1,0 +1,258 @@
+{
+  "description": "Listen-pass for generated Kenya phonetic say-forms. text is the candidate sent to Soniox (generated say, or engine say for golden-set misses that are not in generatedKenyaLexicon.json). Do not promote into KENYA_LEXICON until a human scores Pass B on a phone speaker.",
+  "datePriorityNote": "Not a TTS-normalization fixture. Score whether each candidate say is safe for Soniox (no spelled-out letters, stress sounds natural).",
+  "cases": [
+    {
+      "id": "closed-kiprop",
+      "group": "closed-syllable",
+      "category": "generated-say",
+      "text": "Kip-rop",
+      "callLanguage": "en",
+      "surface": "Kiprop",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "closed-rotich",
+      "group": "closed-syllable",
+      "category": "generated-say",
+      "text": "Roh-tich",
+      "callLanguage": "en",
+      "surface": "Rotich",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "closed-chebet",
+      "group": "closed-syllable",
+      "category": "generated-say",
+      "text": "Cheh-bet",
+      "callLanguage": "en",
+      "surface": "Chebet",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-muthoni",
+      "group": "names",
+      "category": "gikuyu",
+      "text": "Moo-thoh-nee",
+      "callLanguage": "en",
+      "surface": "Muthoni",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-kariuki",
+      "group": "names",
+      "category": "gikuyu",
+      "text": "Kah-ree-oo-kee",
+      "callLanguage": "en",
+      "surface": "Kariuki",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-ngugi",
+      "group": "names",
+      "category": "gikuyu",
+      "text": "Ngoo-gee",
+      "callLanguage": "en",
+      "surface": "Ngugi",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-nyambura",
+      "group": "names",
+      "category": "gikuyu",
+      "text": "Nyah-mboo-rah",
+      "callLanguage": "en",
+      "surface": "Nyambura",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-adhiambo",
+      "group": "names",
+      "category": "luo",
+      "text": "Ah-dhee-ah-mboh",
+      "callLanguage": "en",
+      "surface": "Adhiambo",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-omondi",
+      "group": "names",
+      "category": "luo",
+      "text": "Oh-moh-ndee",
+      "callLanguage": "en",
+      "surface": "Omondi",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-akinyi",
+      "group": "names",
+      "category": "luo",
+      "text": "Ah-kee-nyee",
+      "callLanguage": "en",
+      "surface": "Akinyi",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-cheruiyot",
+      "group": "names",
+      "category": "kalenjin",
+      "text": "Cheh-roo-ee-yot",
+      "callLanguage": "en",
+      "surface": "Cheruiyot",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-kiplagat",
+      "group": "names",
+      "category": "kalenjin",
+      "text": "Kip-lah-gat",
+      "callLanguage": "en",
+      "surface": "Kiplagat",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "name-chepkoech",
+      "group": "names",
+      "category": "kalenjin",
+      "text": "Chep-koh-ech",
+      "callLanguage": "en",
+      "surface": "Chepkoech",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-kakamega",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Kah-kah-meh-gah",
+      "callLanguage": "en",
+      "surface": "Kakamega",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-kericho",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Keh-ree-choh",
+      "callLanguage": "en",
+      "surface": "Kericho",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-bungoma",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Boo-ngoh-mah",
+      "callLanguage": "en",
+      "surface": "Bungoma",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-meru",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Meh-roo",
+      "callLanguage": "en",
+      "surface": "Meru",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-machakos",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Mah-chah-kos",
+      "callLanguage": "en",
+      "surface": "Machakos",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-kajiado",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Kah-jee-ah-doh",
+      "callLanguage": "en",
+      "surface": "Kajiado",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-narok",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Nah-rok",
+      "callLanguage": "en",
+      "surface": "Narok",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-muranga",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Moo-rah-ng'ah",
+      "callLanguage": "en",
+      "surface": "Murang'a",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-bomet",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Boh-met",
+      "callLanguage": "en",
+      "surface": "Bomet",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "county-kisii",
+      "group": "counties",
+      "category": "generated-say",
+      "text": "Kee-see-ee",
+      "callLanguage": "en",
+      "surface": "Kisii",
+      "source": "generatedKenyaLexicon.json"
+    },
+    {
+      "id": "miss-aisha",
+      "group": "golden-misses",
+      "category": "engine-say",
+      "text": "Eye-shah",
+      "callLanguage": "en",
+      "surface": "aisha",
+      "source": "engine (hand-tuned Eye-sha; not in generatedKenyaLexicon.json)"
+    },
+    {
+      "id": "miss-nairobi",
+      "group": "golden-misses",
+      "category": "engine-say",
+      "text": "Ny-roh-bee",
+      "callLanguage": "en",
+      "surface": "nairobi",
+      "source": "engine (hand-tuned Nairobi; not in generatedKenyaLexicon.json)"
+    },
+    {
+      "id": "miss-syokimau",
+      "group": "golden-misses",
+      "category": "engine-say",
+      "text": "Syoh-kee-mow",
+      "callLanguage": "en",
+      "surface": "syokimau",
+      "source": "engine (hand-tuned Shyo-kee-mau; not in generatedKenyaLexicon.json)"
+    },
+    {
+      "id": "miss-eastleigh",
+      "group": "golden-misses",
+      "category": "engine-say",
+      "text": "Eh-ast-leh-igh",
+      "callLanguage": "en",
+      "surface": "eastleigh",
+      "source": "engine (hand-tuned East-lee; not in generatedKenyaLexicon.json)"
+    },
+    {
+      "id": "miss-geyser",
+      "group": "golden-misses",
+      "category": "engine-say",
+      "text": "Gey-ser",
+      "callLanguage": "en",
+      "surface": "geyser",
+      "source": "engine (hand-tuned geezer; not in generatedKenyaLexicon.json)"
+    }
+  ]
+}

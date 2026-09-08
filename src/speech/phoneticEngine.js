@@ -214,43 +214,70 @@ function joinUnits(tokens) {
 /**
  * Open syllables respell the nucleus (a→ah …; ai→y, au→ow).
  * Closed syllables keep the vowel letters as written.
+ * Word-initial ai/au (no onset) are a standalone syllable: eye / ow.
  * @param {Syllable} syl
+ * @param {{ wordInitial?: boolean }} [opts]
  * @returns {string}
  */
-function respellSyllable(syl) {
+function respellSyllable(syl, opts = {}) {
   if (!syl) return '';
   const onset = joinUnits(syl.onset);
   const coda = joinUnits(syl.coda);
   if (!syl.nucleus) return onset + coda;
   const open = coda.length === 0;
-  const nucleus = open
-    ? OPEN_VOWELS[syl.nucleus.raw] || syl.nucleus.raw
-    : syl.nucleus.raw;
+  const initialDiphthong =
+    Boolean(opts.wordInitial) && onset.length === 0 && (syl.nucleus.raw === 'ai' || syl.nucleus.raw === 'au');
+  let nucleus;
+  if (initialDiphthong) {
+    nucleus = syl.nucleus.raw === 'ai' ? 'eye' : 'ow';
+  } else if (open) {
+    nucleus = OPEN_VOWELS[syl.nucleus.raw] || syl.nucleus.raw;
+  } else {
+    nucleus = syl.nucleus.raw;
+  }
   return onset + nucleus + coda;
 }
 
-function respellToken(raw) {
+function capitalizeFirst(text) {
+  const s = String(text || '');
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * @param {string} raw
+ * @returns {{ say: string, stressSyllable: number, parts: string[] }}
+ */
+function respellTokenDetails(raw) {
   const syllables = buildSyllables(tokenize(raw));
-  if (!syllables.length) return '';
-  const parts = syllables.map(respellSyllable).filter(Boolean);
-  if (!parts.length) return '';
-  const stressAt = parts.length === 1 ? 0 : parts.length - 2;
-  return parts
-    .map((part, i) => (i === stressAt ? part.toUpperCase() : part))
-    .join('-');
+  const parts = syllables
+    .map((syl, i) => respellSyllable(syl, { wordInitial: i === 0 }))
+    .filter(Boolean);
+  const stressSyllable = parts.length <= 1 ? 0 : parts.length - 2;
+  return {
+    say: capitalizeFirst(parts.join('-')),
+    stressSyllable,
+    parts,
+  };
+}
+
+function respellToken(raw) {
+  return respellTokenDetails(raw).say;
 }
 
 /**
  * @param {string} word
  * @param {{ skipEnglish?: boolean }} [opts]
- * @returns {string|null} hyphenated say-form, or null when English bypass applies
+ * @returns {{ say: string, stressSyllable: number }|null}
  */
-function phoneticRespell(word, opts = {}) {
+function phoneticRespellDetails(word, opts = {}) {
   const skipEnglish = opts.skipEnglish !== false;
   const raw = String(word || '').trim();
   if (!raw) return null;
   if (skipEnglish && isEnglishWord(raw)) return null;
 
+  let stressSyllable = 0;
+  let capturedStress = false;
   const spaceParts = raw.split(/\s+/).filter(Boolean);
   const spelled = spaceParts.map((part) => {
     if (skipEnglish && isEnglishWord(part)) return part;
@@ -260,15 +287,36 @@ function phoneticRespell(word, opts = {}) {
       return bits
         .map((bit) => {
           if (skipEnglish && isEnglishWord(bit)) return bit;
-          return respellToken(bit);
+          const detail = respellTokenDetails(bit);
+          if (!capturedStress && detail.say) {
+            stressSyllable = detail.stressSyllable;
+            capturedStress = true;
+          }
+          return detail.say;
         })
         .filter(Boolean)
         .join('-');
     }
-    return respellToken(part);
+    const detail = respellTokenDetails(part);
+    if (!capturedStress && detail.say) {
+      stressSyllable = detail.stressSyllable;
+      capturedStress = true;
+    }
+    return detail.say;
   });
   const joined = spelled.filter(Boolean).join(' ').trim();
-  return joined || null;
+  if (!joined) return null;
+  return { say: joined, stressSyllable };
+}
+
+/**
+ * @param {string} word
+ * @param {{ skipEnglish?: boolean }} [opts]
+ * @returns {string|null} hyphenated say-form, or null when English bypass applies
+ */
+function phoneticRespell(word, opts = {}) {
+  const detail = phoneticRespellDetails(word, opts);
+  return detail ? detail.say : null;
 }
 
 module.exports = {
@@ -276,5 +324,6 @@ module.exports = {
   buildSyllables,
   respellSyllable,
   phoneticRespell,
+  phoneticRespellDetails,
   isEnglishWord,
 };
