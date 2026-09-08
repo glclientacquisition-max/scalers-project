@@ -37,7 +37,79 @@
       "text": "KSh 500–800",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "five hundred shillings–800"
+      "expectProductionText": "five hundred shillings to eight hundred shillings"
+    },
+    {
+      "id": "21-price-slash-equals",
+      "group": "universal",
+      "category": "price-receipt",
+      "text": "1500/=",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "one thousand five hundred shillings"
+    },
+    {
+      "id": "22-price-slash-hyphen",
+      "group": "universal",
+      "category": "price-receipt",
+      "text": "500/-",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five hundred shillings"
+    },
+    {
+      "id": "23-price-slash-equals-sw",
+      "group": "universal",
+      "category": "price-receipt",
+      "text": "Bei ni 1500/=. Asante sana.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectProductionText": "Bei ni shilingi elfu moja mia tano. Asante sana."
+    },
+    {
+      "id": "24-price-slash-hyphen-sw",
+      "group": "universal",
+      "category": "price-receipt",
+      "text": "Bei ni 500/-. Asante sana.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectProductionText": "Bei ni shilingi mia tano. Asante sana."
+    },
+    {
+      "id": "25-price-label-thousands",
+      "group": "universal",
+      "category": "price-catalog",
+      "text": "Price: 15,000",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Price: fifteen thousand"
+    },
+    {
+      "id": "26-price-label-hundreds",
+      "group": "universal",
+      "category": "price-catalog",
+      "text": "Price: 900",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Price: nine hundred"
+    },
+    {
+      "id": "27-price-label-range",
+      "group": "universal",
+      "category": "price-catalog",
+      "text": "Price: 1,500-2,000",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Price: one thousand five hundred to two thousand"
+    },
+    {
+      "id": "28-price-label-with-quantity",
+      "group": "universal",
+      "category": "price-catalog",
+      "text": "Price: 15,000 for 3 books",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Price: fifteen thousand for 3 books"
     },
     {
       "id": "05-phone-spaced-local",

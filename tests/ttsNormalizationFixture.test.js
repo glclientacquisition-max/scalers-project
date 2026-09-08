@@ -29,7 +29,7 @@ test('fixture has universal + lexicon_control groups', () => {
   const groups = new Set(fixture.cases.map((c) => c.group));
   assert.ok(groups.has('universal'));
   assert.ok(groups.has('lexicon_control'));
-  assert.strictEqual(fixture.cases.length, 20);
+  assert.strictEqual(fixture.cases.length, 28);
 });
 
 for (const c of fixture.cases) {
