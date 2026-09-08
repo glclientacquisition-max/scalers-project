@@ -82,7 +82,7 @@ export function MarkLeadActionButton({
   }
 
   const iconButtonClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50";
+    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition duration-150 hover:bg-surface-muted hover:text-ink active:bg-line active:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50";
 
   return (
     <span
@@ -105,7 +105,7 @@ export function MarkLeadActionButton({
               setError(
                 res.error ||
                   (action === "archived"
-                    ? "Could not archive. Apply docs/supabase/lead_status_archive.sql if needed."
+                    ? "Could not archive."
                     : "Could not mark done.")
               );
               return;

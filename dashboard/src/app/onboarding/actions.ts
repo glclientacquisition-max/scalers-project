@@ -224,8 +224,9 @@ export async function completeOnboardingAction(
             .update({ llm_system_prompt: prompt })
             .eq("id", tenant.id);
           if (promptErr) {
+            console.error("[onboarding.save]", error.message, promptErr.message);
             return {
-              error: `${error.message} Apply docs/supabase/business_operating_model.sql and tenant_business_profile.sql in Supabase.`,
+              error: "Could not save.",
               step: 3,
             };
           }
@@ -244,17 +245,17 @@ export async function completeOnboardingAction(
         .update({ llm_system_prompt: prompt })
         .eq("id", tenant.id);
       if (promptErr) {
+        console.error("[onboarding.save]", error.message, promptErr.message);
         return {
-          error: `${error.message} Apply docs/supabase/tenant_business_profile.sql in Supabase.`,
+          error: "Could not save.",
           step: 3,
         };
       }
       redirect("/home");
     }
+    console.error("[onboarding.save]", error.message);
     return {
-      error: /row-level security|permission denied|rls/i.test(error.message)
-        ? `${error.message} Apply docs/supabase/owner_rls.sql if needed.`
-        : error.message,
+      error: "Could not save.",
       step: 3,
     };
   }

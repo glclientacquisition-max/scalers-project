@@ -46,10 +46,10 @@ export async function signupAction(
   let supabase;
   try {
     supabase = await createSupabaseServerClient();
-  } catch {
+  } catch (err) {
+    console.error("[signup] auth client", err);
     return {
-      error:
-        "Supabase Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      error: "Sign up is not available. Try again later.",
     };
   }
 
@@ -85,7 +85,7 @@ export async function signupAction(
     const message = err instanceof Error ? err.message : String(err);
     console.error("[signup] ensureTenantForUser failed:", message);
     return {
-      error: `Account created, but tenant setup failed: ${message}. Apply docs/supabase/multi_tenant_onboarding.sql then retry sign-in.`,
+      error: "Account created. Sign in after you confirm your email.",
     };
   }
 

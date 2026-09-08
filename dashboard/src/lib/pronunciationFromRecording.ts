@@ -298,14 +298,14 @@ export async function deriveLexiconFromRecording(opts: {
       return {
         ok: false,
         error:
-          "Pronunciation check isn’t configured (missing Gemini). Ask support to set GEMINI_API_KEY.",
+          "Pronunciation check is not available. Try again later.",
       };
     }
     if (/timed out/i.test(message)) {
       return {
         ok: false,
         error:
-          "Verification timed out. Tap Use this take again — or record a shorter, clearer take.",
+          "Verification timed out. Tap Use this take again, or record a shorter, clearer take.",
       };
     }
     if (/unsupported|invalid.*(mime|argument)|does not support/i.test(message)) {

@@ -6,22 +6,24 @@ import { signupAction, type SignupState } from "./actions";
 
 const initial: SignupState = {};
 
+const fieldClass =
+  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+
 export function SignupForm() {
   const [state, formAction, pending] = useActionState(signupAction, initial);
 
   if (state.checkEmail) {
     return (
-      <div className="mt-10 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <p className="font-medium text-[var(--ink)]">Check your email</p>
-        <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
-          We sent a confirmation link. After you confirm, sign in to open Scalers
-          workspace.
+      <div className="mt-10 rounded-panel border border-line bg-surface p-6">
+        <p className="font-medium text-ink">Check your email</p>
+        <p className="mt-2 text-sm text-ink-soft leading-relaxed">
+          We sent a confirmation link. After you confirm, sign in.
         </p>
         <Link
           href="/login"
-          className="mt-5 inline-block text-sm font-medium text-[var(--accent)] hover:text-[var(--accent-deep)]"
+          className="mt-5 inline-block text-sm font-medium text-[#0096FF] hover:text-[#005ccc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
         >
-          Go to sign in →
+          Go to sign in
         </Link>
       </div>
     );
@@ -30,10 +32,10 @@ export function SignupForm() {
   return (
     <form
       action={formAction}
-      className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 shadow-lift space-y-4"
+      className="mt-8 rounded-panel border border-line bg-surface p-6 shadow-lift space-y-4"
     >
       <div>
-        <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="business_name">
+        <label className="block text-sm font-medium text-ink" htmlFor="business_name">
           Business name
         </label>
         <input
@@ -41,13 +43,13 @@ export function SignupForm() {
           name="business_name"
           required
           autoFocus
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className={fieldClass}
           placeholder="Jirani Home Services"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="email">
+        <label className="block text-sm font-medium text-ink" htmlFor="email">
           Work email
         </label>
         <input
@@ -56,13 +58,13 @@ export function SignupForm() {
           type="email"
           required
           autoComplete="email"
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className={fieldClass}
           placeholder="you@business.co.ke"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="password">
+        <label className="block text-sm font-medium text-ink" htmlFor="password">
           Password
         </label>
         <input
@@ -72,16 +74,13 @@ export function SignupForm() {
           required
           minLength={8}
           autoComplete="new-password"
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className={fieldClass}
           placeholder="At least 8 characters"
         />
       </div>
 
       <div>
-        <label
-          className="block text-sm font-medium text-[var(--ink)]"
-          htmlFor="notification_phone"
-        >
+        <label className="block text-sm font-medium text-ink" htmlFor="notification_phone">
           Notification phone
         </label>
         <input
@@ -89,21 +88,21 @@ export function SignupForm() {
           name="notification_phone"
           type="tel"
           required
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className={fieldClass}
           placeholder="+2547…"
         />
-        <p className="mt-1.5 text-xs text-[var(--ink-soft)]">
-          Where we send lead alerts (WhatsApp / Telegram later). The assistant
-          automatically speaks English, Kiswahili, and Sheng.
-        </p>
       </div>
 
-      {state.error ? <p className="text-sm text-[var(--warn)]">{state.error}</p> : null}
+      {state.error ? (
+        <p className="text-sm text-warn" role="alert">
+          {state.error}
+        </p>
+      ) : null}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-60"
+        className="min-h-12 w-full rounded-xl bg-[#0096FF] px-4 py-3 text-white font-medium transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
       >
         {pending ? "Creating workspace…" : "Create Scalers workspace"}
       </button>

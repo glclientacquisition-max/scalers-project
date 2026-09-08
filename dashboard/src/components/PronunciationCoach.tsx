@@ -689,7 +689,7 @@ export function PronunciationCoach({
   return (
     <section
       id="pronunciation-coach"
-      className={omitLexiconField ? "space-y-4" : "space-y-5 border-t border-[var(--line)] pt-8"}
+      className={omitLexiconField ? "space-y-4" : "space-y-5 border-t border-line pt-8"}
       aria-labelledby="pronunciation-coach-heading"
     >
       {omitLexiconField ? null : (
@@ -700,29 +700,29 @@ export function PronunciationCoach({
         {omitLexiconField ? (
           <h3
             id="pronunciation-coach-heading"
-            className="text-sm font-medium text-[var(--ink)]"
+            className="text-sm font-medium text-ink"
           >
             Practice lines
           </h3>
         ) : (
           <h2
             id="pronunciation-coach-heading"
-            className="font-display text-2xl tracking-tight text-[var(--ink)]"
+            className="font-display text-2xl tracking-tight text-ink"
           >
             Pronunciation Overrides
           </h2>
         )}
         {cleanNote ? (
-          <p className="mt-2 text-xs text-[var(--ok)]" role="status">
+          <p className="mt-2 text-xs text-ok" role="status">
             {cleanNote}
           </p>
         ) : null}
         {omitLexiconField ? (
-          <p className="mt-1 text-xs text-[var(--ink-soft)]">
+          <p className="mt-1 text-xs text-ink-soft">
             After you save overrides, hear the full greeting on{" "}
             <Link
               href={businessSettingsHref("test")}
-              className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+              className="font-medium text-[#0096FF] underline-offset-2 hover:underline"
             >
               Test
             </Link>
@@ -732,7 +732,7 @@ export function PronunciationCoach({
       </div>
 
       <div
-        className="flex flex-wrap gap-1 border-b border-[var(--line)] pb-px"
+        className="flex flex-wrap gap-1 border-b border-line pb-px"
         role="tablist"
         aria-label="Pronunciation studio modes"
       >
@@ -748,12 +748,12 @@ export function PronunciationCoach({
               className={[
                 "-mb-px border-b-2 px-3 py-2 text-sm transition",
                 selected
-                  ? "border-[var(--accent)] font-medium text-[var(--ink)]"
-                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]",
+                  ? "border-[#0096FF] font-medium text-ink"
+                  : "border-transparent text-ink-soft hover:text-ink",
               ].join(" ")}
             >
               {m.label}
-              <span className="ml-1.5 text-xs font-normal text-[var(--ink-soft)]">
+              <span className="ml-1.5 text-xs font-normal text-ink-soft">
                 {m.hint}
               </span>
             </button>
@@ -764,20 +764,20 @@ export function PronunciationCoach({
       {mode === "practice" ? (
         <div className="space-y-5">
           {!todoItems.length && !active ? (
-            <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
-              <p className="text-sm font-medium text-[var(--ink)]">Nothing left to practice</p>
+            <div className="rounded-xl border border-dashed border-line bg-white/60 px-4 py-5">
+              <p className="text-sm font-medium text-ink">Nothing left to practice</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setMode("fix")}
-                  className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+                  className="rounded-xl bg-[#0096FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#005ccc]"
                 >
                   Fix a word
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("library")}
-                  className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+                  className="text-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
                 >
                   Open library
                 </button>
@@ -786,28 +786,28 @@ export function PronunciationCoach({
           ) : (
             <>
               {active ? (
-                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/35 to-white px-4 py-4 sm:px-5">
+                <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-white via-accent-soft/35 to-white px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                       {active.label} · say this line
                     </p>
                     {totalFocus ? (
-                      <p className="text-xs text-[var(--ink-soft)]">
+                      <p className="text-xs text-ink-soft">
                         {doneCount} of {totalFocus} done
                       </p>
                     ) : null}
                   </div>
                   <p
-                    className="mt-2 font-display text-xl leading-snug tracking-tight text-[var(--ink)] sm:text-2xl"
+                    className="mt-2 font-display text-xl leading-snug tracking-tight text-ink sm:text-2xl"
                     aria-live="polite"
                   >
                     {active.prompt}
                   </p>
-                  <p className="mt-2 text-sm text-[var(--ink-soft)]">{active.reason}</p>
+                  <p className="mt-2 text-sm text-ink-soft">{active.reason}</p>
                   {active.targets?.length ? (
-                    <p className="mt-2 text-xs text-[var(--ink-soft)]">
+                    <p className="mt-2 text-xs text-ink-soft">
                       Learns:{" "}
-                      <span className="font-medium text-[var(--ink)]">
+                      <span className="font-medium text-ink">
                         {active.targets.map((t) => t.label).join(" · ")}
                       </span>
                     </p>
@@ -818,7 +818,7 @@ export function PronunciationCoach({
                       <button
                         type="button"
                         onClick={startRecording}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#0096FF] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#005ccc]"
                       >
                         <span
                           aria-hidden="true"
@@ -831,7 +831,7 @@ export function PronunciationCoach({
                       <button
                         type="button"
                         onClick={stopRecording}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-white"
+                        className="inline-flex items-center gap-2 rounded-xl bg-warn px-5 py-3 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
                       >
                         <span
                           aria-hidden="true"
@@ -851,7 +851,7 @@ export function PronunciationCoach({
                         <button
                           type="button"
                           onClick={startRecording}
-                          className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium"
+                          className="rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-medium"
                         >
                           Retry
                         </button>
@@ -859,7 +859,7 @@ export function PronunciationCoach({
                           type="button"
                           onClick={keepRecording}
                           disabled={confirmPending}
-                          className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                          className="rounded-xl bg-ok px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
                         >
                           {confirmPending ? "Checking…" : "Use this take"}
                         </button>
@@ -868,31 +868,31 @@ export function PronunciationCoach({
                     <button
                       type="button"
                       onClick={skipActive}
-                      className="text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                      className="text-sm text-ink-soft underline-offset-2 hover:underline"
                     >
                       Skip for now
                     </button>
                   </div>
 
                   {micError ? (
-                    <p className="mt-3 text-sm text-[var(--warn)]" role="alert">
+                    <p className="mt-3 text-sm text-warn" role="alert">
                       {micError}
                     </p>
                   ) : null}
                   {showMismatch ? (
-                    <div className="mt-3 rounded-xl border border-[var(--warn)]/30 bg-[var(--warn-soft)] px-3 py-2">
-                      <p className="text-sm text-[var(--warn)]" role="alert">
+                    <div className="mt-3 rounded-xl border border-warn/30 bg-warn-soft px-3 py-2">
+                      <p className="text-sm text-warn" role="alert">
                         {confirmState.error}
                       </p>
                       {confirmState.heard ? (
-                        <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                        <p className="mt-1 text-xs text-ink-soft">
                           We heard something like: “{confirmState.heard}”
                         </p>
                       ) : null}
                     </div>
                   ) : null}
                   {keepNote ? (
-                    <p className="mt-3 text-sm text-[var(--ok)]" role="status">
+                    <p className="mt-3 text-sm text-ok" role="status">
                       {keepNote}
                     </p>
                   ) : null}
@@ -902,14 +902,14 @@ export function PronunciationCoach({
               {(todoItems.length > 1 || showFullQueue) && queueList.length > 0 ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                       Up next
                     </p>
                     {items.length > 5 || showFullQueue ? (
                       <button
                         type="button"
                         onClick={() => setShowFullQueue((v) => !v)}
-                        className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
+                        className="text-xs font-medium text-[#005ccc] hover:underline"
                       >
                         {showFullQueue
                           ? "Show remaining only"
@@ -941,20 +941,20 @@ export function PronunciationCoach({
                             className={[
                               "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition",
                               selected
-                                ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                                : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                                ? "border-[#0096FF] bg-accent-soft"
+                                : "border-line bg-white hover:border-[#0096FF]/50",
                               item.status === "done" ? "opacity-60" : "",
                             ].join(" ")}
                           >
                             <span className="min-w-0">
-                              <span className="block text-xs text-[var(--ink-soft)]">
+                              <span className="block text-xs text-ink-soft">
                                 {item.label}
                               </span>
-                              <span className="mt-0.5 block truncate font-medium text-[var(--ink)]">
+                              <span className="mt-0.5 block truncate font-medium text-ink">
                                 {item.prompt}
                               </span>
                             </span>
-                            <span className="shrink-0 text-xs text-[var(--ink-soft)]">
+                            <span className="shrink-0 text-xs text-ink-soft">
                               {item.status === "done"
                                 ? "Done"
                                 : item.status === "skipped"
@@ -976,19 +976,19 @@ export function PronunciationCoach({
       {mode === "library" ? (
         <div className="space-y-4">
           {lexicon.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
-              <p className="text-sm font-medium text-[var(--ink)]">Nothing trained yet</p>
+            <div className="rounded-xl border border-dashed border-line bg-white/60 px-4 py-5">
+              <p className="text-sm font-medium text-ink">Nothing trained yet</p>
               <button
                 type="button"
                 onClick={() => setMode("practice")}
-                className="mt-3 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+                className="mt-3 rounded-xl bg-[#0096FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#005ccc]"
               >
                 Start practicing
               </button>
             </div>
           ) : (
             <>
-              <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
+              <ul className="divide-y divide-line border-y border-line">
                 {visibleLexicon.map((entry) => {
                   const label = displayLexiconLabel(entry);
                   const isEditing = editingMatch === entry.match;
@@ -999,11 +999,11 @@ export function PronunciationCoach({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="min-w-0">
-                      <span className="block text-[var(--ink)]">
+                      <span className="block text-ink">
                         {label}
                       </span>
                       {!isEditing ? (
-                        <span className="font-mono text-xs text-[var(--ink-soft)]">
+                        <span className="font-mono text-xs text-ink-soft">
                           phone says → {entry.say}
                         </span>
                       ) : null}
@@ -1012,7 +1012,7 @@ export function PronunciationCoach({
                       <button
                         type="button"
                         onClick={() => renewEntry(entry)}
-                        className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
+                        className="text-xs font-medium text-[#005ccc] hover:underline"
                       >
                         Renew
                       </button>
@@ -1028,7 +1028,7 @@ export function PronunciationCoach({
                             setAddError(null);
                           }
                         }}
-                        className="text-xs font-medium text-[var(--ink-soft)] hover:underline"
+                        className="text-xs font-medium text-ink-soft hover:underline"
                       >
                         {isEditing ? "Cancel" : "Edit say"}
                       </button>
@@ -1036,7 +1036,7 @@ export function PronunciationCoach({
                         type="button"
                         onClick={() => removeEntry(entry.match)}
                         disabled={persistPending}
-                        className="text-xs text-[var(--warn)] hover:underline disabled:opacity-60"
+                        className="text-xs text-warn hover:underline disabled:opacity-60"
                       >
                         Remove
                       </button>
@@ -1048,13 +1048,13 @@ export function PronunciationCoach({
                           value={editSay}
                           onChange={(e) => setEditSay(e.target.value)}
                           aria-label={`Say-as for ${label}`}
-                          className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-[var(--accent)]"
+                          className="min-w-[12rem] flex-1 rounded-xl border border-line bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
                         />
                         <button
                           type="button"
                           onClick={() => saveEditedSay(entry.match)}
                           disabled={persistPending || !editSay.trim()}
-                          className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                          className="rounded-xl bg-[#0096FF] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
                         >
                           {persistPending ? "Saving…" : "Save"}
                         </button>
@@ -1066,7 +1066,7 @@ export function PronunciationCoach({
               </ul>
               {lexicon.length > LEXICON_PAGE_SIZE ? (
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-[var(--ink-soft)]">
+                  <p className="text-xs text-ink-soft">
                     {safeLexiconPage * LEXICON_PAGE_SIZE + 1}-
                     {Math.min(lexicon.length, (safeLexiconPage + 1) * LEXICON_PAGE_SIZE)}{" "}
                     of {lexicon.length}
@@ -1076,11 +1076,11 @@ export function PronunciationCoach({
                       type="button"
                       disabled={safeLexiconPage <= 0}
                       onClick={() => setLexiconPage((p) => Math.max(0, p - 1))}
-                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] disabled:opacity-40"
+                      className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
                     >
                       Previous
                     </button>
-                    <span className="text-xs text-[var(--ink-soft)]">
+                    <span className="text-xs text-ink-soft">
                       {safeLexiconPage + 1} / {lexiconPageCount}
                     </span>
                     <button
@@ -1089,7 +1089,7 @@ export function PronunciationCoach({
                       onClick={() =>
                         setLexiconPage((p) => Math.min(lexiconPageCount - 1, p + 1))
                       }
-                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] disabled:opacity-40"
+                      className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
                     >
                       Next
                     </button>
@@ -1099,15 +1099,15 @@ export function PronunciationCoach({
             </>
           )}
           {persistState.error ? (
-            <p className="text-xs text-[var(--warn)]">{persistState.error}</p>
+            <p className="text-xs text-warn">{persistState.error}</p>
           ) : null}
           {persistState.ok && !persistState.error ? (
-            <p className="text-xs text-[var(--ok)]" role="status">
+            <p className="text-xs text-ok" role="status">
               Updated. Next call will use it.
             </p>
           ) : null}
           {addError && mode === "library" ? (
-            <p className="text-xs text-[var(--warn)]" role="alert">
+            <p className="text-xs text-warn" role="alert">
               {addError}
             </p>
           ) : null}
@@ -1120,7 +1120,7 @@ export function PronunciationCoach({
           <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h3 className="font-medium text-[var(--ink)]">Needs review</h3>
+                <h3 className="font-medium text-ink">Needs review</h3>
               </div>
               {reviewQueue.some((c) => c.confidence === "high") ? (
                 <button
@@ -1132,7 +1132,7 @@ export function PronunciationCoach({
                     fd.set("current_lexicon", lexiconJson);
                     batchAction(fd);
                   }}
-                  className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                  className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#005ccc] hover:bg-accent-soft disabled:opacity-60"
                 >
                   {batchPending ? "Applying…" : "Apply all high-confidence"}
                 </button>
@@ -1143,8 +1143,8 @@ export function PronunciationCoach({
               <p
                 className={`text-xs ${
                   geminiState.error || approveState.error || dismissState.error
-                    ? "text-[var(--warn)]"
-                    : "text-[var(--ink-soft)]"
+                    ? "text-warn"
+                    : "text-ink-soft"
                 }`}
                 role="status"
               >
@@ -1153,12 +1153,12 @@ export function PronunciationCoach({
             ) : null}
 
             {fixReviewRows.length === 0 ? (
-              <p className="text-sm text-[var(--ink-soft)]" role="status">
+              <p className="text-sm text-ink-soft" role="status">
                 Nothing waiting. Add a fix below, or find more from recent calls.
               </p>
             ) : (
               <ul
-                className="divide-y divide-[var(--line)] border-y border-[var(--line)]"
+                className="divide-y divide-line border-y border-line"
                 aria-label="Pronunciation review queue"
               >
                 {fixReviewRows.map((row) => {
@@ -1167,27 +1167,27 @@ export function PronunciationCoach({
                   return (
                     <li key={row.id} className="py-3">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                           {row.kindLabel}
                         </span>
-                        <span className="text-[11px] text-[var(--ink-soft)]">
+                        <span className="text-[11px] text-ink-soft">
                           {row.confidence}
                         </span>
-                        <span className="text-sm font-medium text-[var(--ink)]">
+                        <span className="text-sm font-medium text-ink">
                           {row.phrase}
                         </span>
                         {row.kind === "hearing" ? (
-                          <span className="text-xs text-[var(--ink-soft)]">
+                          <span className="text-xs text-ink-soft">
                             → {row.suggested}
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                      <p className="mt-1 text-xs text-ink-soft">
                         {row.reasoning}
                       </p>
 
                       {row.canApproveSpelling ? (
-                        <label className="mt-2 block text-xs text-[var(--ink-soft)]">
+                        <label className="mt-2 block text-xs text-ink-soft">
                           Say like
                           <input
                             value={reviewEdits[c.id] ?? c.suggested_form}
@@ -1197,11 +1197,11 @@ export function PronunciationCoach({
                                 [c.id]: e.target.value,
                               }))
                             }
-                            className="mt-1 w-full max-w-md rounded-lg border border-[var(--line)] px-2 py-1.5 text-sm"
+                            className="mt-1 w-full max-w-md rounded-lg border border-line px-2 py-1.5 text-sm"
                           />
                         </label>
                       ) : (
-                        <p className="mt-1 text-[11px] text-[var(--ink-soft)]">
+                        <p className="mt-1 text-[11px] text-ink-soft">
                           Not a phone-speech fix. Dismiss so it does not keep coming back.
                         </p>
                       )}
@@ -1211,7 +1211,7 @@ export function PronunciationCoach({
                           <button
                             type="button"
                             onClick={() => recordCandidateInstead(c)}
-                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white"
+                            className="rounded-lg bg-[#0096FF] px-3 py-1.5 text-xs font-medium text-white"
                           >
                             Record
                           </button>
@@ -1220,7 +1220,7 @@ export function PronunciationCoach({
                             type="button"
                             onClick={() => dismissCandidate(c, "rejected")}
                             disabled={dismissPending}
-                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                            className="rounded-lg bg-[#0096FF] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
                           >
                             Dismiss
                           </button>
@@ -1230,7 +1230,7 @@ export function PronunciationCoach({
                             type="button"
                             onClick={() => approveCandidate(c)}
                             disabled={approvePending || dismissPending}
-                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium disabled:opacity-60"
                           >
                             Approve spelling
                           </button>
@@ -1240,7 +1240,7 @@ export function PronunciationCoach({
                           onClick={() =>
                             setOpenMoreId(moreOpen ? null : row.id)
                           }
-                          className="text-xs font-medium text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                          className="text-xs font-medium text-ink-soft underline-offset-2 hover:underline"
                         >
                           More
                         </button>
@@ -1251,7 +1251,7 @@ export function PronunciationCoach({
                             type="button"
                             onClick={() => dismissCandidate(c, "rejected")}
                             disabled={dismissPending}
-                            className="text-xs text-[var(--ink-soft)] underline-offset-2 hover:underline disabled:opacity-60"
+                            className="text-xs text-ink-soft underline-offset-2 hover:underline disabled:opacity-60"
                           >
                             Reject
                           </button>
@@ -1259,7 +1259,7 @@ export function PronunciationCoach({
                             type="button"
                             onClick={() => dismissCandidate(c, "snoozed")}
                             disabled={dismissPending}
-                            className="text-xs text-[var(--ink-soft)] underline-offset-2 hover:underline disabled:opacity-60"
+                            className="text-xs text-ink-soft underline-offset-2 hover:underline disabled:opacity-60"
                           >
                             Snooze
                           </button>
@@ -1273,13 +1273,13 @@ export function PronunciationCoach({
           </div>
 
           {/* 2) Add a fix */}
-          <div className="space-y-3 border-t border-[var(--line)] pt-6">
+          <div className="space-y-3 border-t border-line pt-6">
             <div>
-              <h3 className="font-medium text-[var(--ink)]">Add a fix</h3>
+              <h3 className="font-medium text-ink">Add a fix</h3>
             </div>
             <div>
               <label
-                className="block text-xs font-medium text-[var(--ink-soft)]"
+                className="block text-xs font-medium text-ink-soft"
                 htmlFor="pron-add-phrase"
               >
                 Word or sentence
@@ -1292,7 +1292,7 @@ export function PronunciationCoach({
                   setAddError(null);
                 }}
                 placeholder="Muindi Mbingu"
-                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                className="mt-1 w-full max-w-lg rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -1300,14 +1300,14 @@ export function PronunciationCoach({
                 type="button"
                 onClick={() => submitQuickAdd("record")}
                 disabled={!addPhrase.trim()}
-                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
+                className="rounded-xl bg-[#0096FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#005ccc] disabled:opacity-60"
               >
                 Record &amp; train
               </button>
               <button
                 type="button"
                 onClick={() => setShowTypedSave((v) => !v)}
-                className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                className="text-sm font-medium text-ink-soft underline-offset-2 hover:underline"
               >
                 {showTypedSave ? "Hide typed spelling" : "Or save a spelling…"}
               </button>
@@ -1315,7 +1315,7 @@ export function PronunciationCoach({
             {showTypedSave ? (
               <div className="max-w-lg space-y-2">
                 <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  className="block text-xs font-medium text-ink-soft"
                   htmlFor="pron-add-say"
                 >
                   Say like
@@ -1328,30 +1328,30 @@ export function PronunciationCoach({
                     setAddError(null);
                   }}
                   placeholder="Moo-in-dee Mbeen-goo"
-                  className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
                 />
                 <button
                   type="button"
                   onClick={() => submitQuickAdd("save")}
                   disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
-                  className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-60"
+                  className="rounded-xl border border-line bg-white px-4 py-2 text-sm font-medium text-ink disabled:opacity-60"
                 >
                   {quickPending ? "Saving…" : "Save spelling"}
                 </button>
               </div>
             ) : null}
             {addError ? (
-              <p className="text-xs text-[var(--warn)]" role="alert">
+              <p className="text-xs text-warn" role="alert">
                 {addError}
               </p>
             ) : null}
             {quickState.error ? (
-              <p className="text-xs text-[var(--warn)]" role="alert">
+              <p className="text-xs text-warn" role="alert">
                 {quickState.error}
               </p>
             ) : null}
             {quickState.ok && !quickState.error ? (
-              <p className="text-xs text-[var(--ok)]" role="status">
+              <p className="text-xs text-ok" role="status">
                 Saved. Next call will use it. Confirm on{" "}
                 <Link
                   href={businessSettingsHref("test")}
@@ -1365,16 +1365,16 @@ export function PronunciationCoach({
           </div>
 
           {/* 3) Find more */}
-          <div className="space-y-3 border-t border-[var(--line)] pt-6">
+          <div className="space-y-3 border-t border-line pt-6">
             <div>
-              <h3 className="font-medium text-[var(--ink)]">Find more</h3>
+              <h3 className="font-medium text-ink">Find more</h3>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={scanCalls}
                 disabled={minePending || geminiPending}
-                className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+                className="rounded-xl border border-line bg-white px-4 py-2 text-sm font-medium text-ink hover:border-[#0096FF] disabled:opacity-60"
               >
                 {minePending ? "Scanning…" : "Quick scan"}
               </button>
@@ -1384,7 +1384,7 @@ export function PronunciationCoach({
                 value={geminiBatch}
                 onChange={(e) => setGeminiBatch(Number(e.target.value))}
                 disabled={geminiPending}
-                className="rounded-xl border border-[var(--line)] bg-white px-2 py-2 text-sm"
+                className="rounded-xl border border-line bg-white px-2 py-2 text-sm"
               >
                 {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
                   <option key={n} value={n}>
@@ -1396,7 +1396,7 @@ export function PronunciationCoach({
                 type="button"
                 onClick={() => runGeminiScan(false)}
                 disabled={geminiPending || minePending}
-                className="rounded-xl border border-[var(--ink)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+                className="rounded-xl border border-ink bg-ink px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
               >
                 {geminiPending ? "Listening…" : "AI listen"}
               </button>
@@ -1404,11 +1404,11 @@ export function PronunciationCoach({
 
             {geminiConfirmOpen ? (
               <div
-                className="rounded-xl border border-[var(--warn)]/40 px-3 py-3 text-sm"
+                className="rounded-xl border border-warn/40 px-3 py-3 text-sm"
                 role="alertdialog"
                 aria-label="Confirm AI listen cost"
               >
-                <p className="text-[var(--ink)]">
+                <p className="text-ink">
                   {geminiState.message ||
                     `AI will listen to up to ${geminiBatch} recordings (paid).`}
                 </p>
@@ -1417,7 +1417,7 @@ export function PronunciationCoach({
                     type="button"
                     onClick={() => runGeminiScan(true)}
                     disabled={geminiPending}
-                    className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                    className="rounded-lg bg-[#0096FF] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
                   >
                     Confirm
                   </button>
@@ -1427,7 +1427,7 @@ export function PronunciationCoach({
                       setGeminiConfirmOpen(false);
                       setGeminiNote(null);
                     }}
-                    className="rounded-lg px-3 py-1.5 text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                    className="rounded-lg px-3 py-1.5 text-sm text-ink-soft underline-offset-2 hover:underline"
                   >
                     Cancel
                   </button>
@@ -1436,10 +1436,10 @@ export function PronunciationCoach({
             ) : null}
 
             {mineState.error ? (
-              <p className="text-xs text-[var(--warn)]">{mineState.error}</p>
+              <p className="text-xs text-warn">{mineState.error}</p>
             ) : null}
             {mineState.ok ? (
-              <p className="text-xs text-[var(--ink-soft)]" role="status">
+              <p className="text-xs text-ink-soft" role="status">
                 Quick scan: {mineState.scannedLines ?? 0} lines
                 {mineState.suggestions?.length
                   ? ` · ${mineState.suggestions.length} sent to Practice`

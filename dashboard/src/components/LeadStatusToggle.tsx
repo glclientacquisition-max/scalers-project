@@ -78,7 +78,7 @@ export function LeadStatusToggle({
               onClick={() => select(step.id)}
               aria-pressed={active}
               className={[
-                "rounded-full border font-medium transition",
+                "rounded-full border font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40",
                 pad,
                 active ? STYLES[step.id].active : STYLES[step.id].idle,
               ].join(" ")}

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 
+const fieldClass =
+  "mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
+
 export default function LoginPage({
   searchParams,
 }: {
@@ -18,7 +21,7 @@ export default function LoginPage({
           className="mt-8 rounded-panel border border-line bg-surface p-6 shadow-lift space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="email">
+            <label className="block text-sm font-medium text-ink" htmlFor="email">
               Email
             </label>
             <input
@@ -28,7 +31,7 @@ export default function LoginPage({
               required
               autoFocus
               autoComplete="email"
-              className="mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus"
+              className={fieldClass}
               placeholder="you@business.co.ke"
             />
           </div>
@@ -42,22 +45,25 @@ export default function LoginPage({
               type="password"
               required
               autoComplete="current-password"
-              className="mt-2 w-full rounded-xl border border-line bg-white px-4 py-3 outline-none focus:border-accent focus-visible:shadow-focus"
+              className={fieldClass}
               placeholder="••••••••"
             />
           </div>
           <LoginError searchParams={searchParams} />
           <button
             type="submit"
-            className="w-full rounded-xl bg-accent px-4 py-3 font-medium text-white transition hover:bg-accent-deep focus-visible:outline-none focus-visible:shadow-focus"
+            className="min-h-12 w-full rounded-xl bg-[#0096FF] px-4 py-3 font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             Sign in
           </button>
         </form>
 
-        <p className="mt-6 text-sm text-[var(--ink-soft)]">
+        <p className="mt-6 text-sm text-ink-soft">
           New business?{" "}
-          <Link href="/signup" className="text-[var(--accent)] hover:text-[var(--accent-deep)]">
+          <Link
+            href="/signup"
+            className="text-[#0096FF] hover:text-[#005ccc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+          >
             Create a workspace
           </Link>
         </p>

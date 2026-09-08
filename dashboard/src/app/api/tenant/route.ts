@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
+import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export async function POST(request: Request) {
@@ -49,12 +49,8 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    const hint =
-      /row-level security|permission denied|rls/i.test(error.message) &&
-      !(await isLegacyAuthenticated())
-        ? " Apply docs/supabase/owner_rls.sql in Supabase."
-        : "";
-    return NextResponse.json({ error: `${error.message}${hint}` }, { status: 500 });
+    console.error("[api.tenant]", error.message);
+    return NextResponse.json({ error: "Could not save." }, { status: 500 });
   }
   return NextResponse.json({ ok: true, tenant: data, mode: workspace.mode });
 }

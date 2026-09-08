@@ -35,6 +35,14 @@ describe("home command center", () => {
     path.join(__dirname, "../dashboard/src/app/(desk)/home/page.tsx"),
     "utf8"
   );
+  const leadCard = fs.readFileSync(
+    path.join(__dirname, "../dashboard/src/components/TriageLeadCard.tsx"),
+    "utf8"
+  );
+  const triage = fs.readFileSync(
+    path.join(__dirname, "../dashboard/src/lib/callsTriage.ts"),
+    "utf8"
+  );
 
   it("does not invent live presence or readiness scores", () => {
     assert.doesNotMatch(homePage, /\bOnline\b/);
@@ -75,5 +83,30 @@ describe("home command center", () => {
       ),
       null
     );
+  });
+
+  it("keeps greeting, business name, and Nairobi date in separate hierarchy", () => {
+    assert.match(triage, /export function nairobiDateLabel/);
+    assert.match(homePage, /nairobiGreeting\(\)/);
+    assert.match(homePage, /nairobiDateLabel\(\)/);
+    assert.match(homePage, /<time dateTime=\{today\.iso\}>/);
+    assert.doesNotMatch(homePage, /nairobiGreeting\(\)\}, \{businessName\}/);
+    assert.doesNotMatch(homePage, /text-5xl|text-6xl/);
+  });
+
+  it("uses assistant CTAs and forbids receptionist labels on Home", () => {
+    assert.match(commandCenter, /label: "Test assistant"/);
+    assert.match(commandCenter, /label: "Teach assistant"/);
+    assert.doesNotMatch(commandCenter, /Test receptionist|Train receptionist/);
+  });
+
+  it("keeps the aside as one surface and lead rows interactive", () => {
+    assert.match(homePage, /overflow-hidden rounded-2xl border border-line bg-surface/);
+    assert.match(leadCard, /group-hover:bg-\[#0096FF\]\/\[0\.04\]/);
+    assert.match(leadCard, /group-focus-within:bg-\[#0096FF\]\/\[0\.04\]/);
+    assert.match(leadCard, /active:scale-\[0\.99\]/);
+    assert.match(homePage, /active:scale-\[0\.99\]/);
+    assert.doesNotMatch(homePage, /MetricCard|backdrop-blur|glass|mesh/);
+    assert.doesNotMatch(homePage, /KPI|readiness score/i);
   });
 });

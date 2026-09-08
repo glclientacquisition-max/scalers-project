@@ -14,7 +14,12 @@ import {
   postBulletinAction,
   type BulletinActionState,
 } from "@/app/(desk)/settings/bulletinActions";
-import { settingsChipClass, settingsFieldClass } from "@/components/settingsUi";
+import {
+  settingsChipClass,
+  settingsFieldClass,
+  settingsPanelHeadingClass,
+  settingsPrimaryButtonClass,
+} from "@/components/settingsUi";
 
 const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
@@ -62,9 +67,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="min-w-0 space-y-4">
-      <h2 className="font-display tracking-tight text-[var(--ink)] text-[clamp(1.25rem,4vw,1.5rem)]">
-        Updates
-      </h2>
+      <h2 className={settingsPanelHeadingClass}>Updates</h2>
 
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
@@ -101,14 +104,14 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
         <button
           type="submit"
           disabled={postPending || !text.trim()}
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
+          className={settingsPrimaryButtonClass}
         >
           {postPending ? "Posting…" : "Post update"}
         </button>
       </form>
 
       {items.length === 0 ? (
-        <p className="text-sm text-[var(--ink-soft)] [overflow-wrap:anywhere]">
+        <p className="text-sm text-ink-soft [overflow-wrap:anywhere]">
           No live updates. The assistant will use your normal services and FAQs.
         </p>
       ) : (
@@ -116,16 +119,16 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-3 sm:px-4"
+              className="flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3 sm:px-4"
             >
               <div className="min-w-0 flex-1 basis-[12rem]">
-                <p className="text-xs font-medium uppercase tracking-wide text-[var(--accent)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[#0096FF]">
                   Live now
                 </p>
-                <p className="mt-1 text-sm font-medium text-[var(--ink)] [overflow-wrap:anywhere]">
+                <p className="mt-1 text-sm font-medium text-ink [overflow-wrap:anywhere]">
                   {item.text}
                 </p>
-                <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                <p className="mt-1 text-xs text-ink-soft">
                   {formatBulletinEndLabel(item.ends_at)}
                 </p>
               </div>
@@ -135,7 +138,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 <button
                   type="submit"
                   disabled={clearPending}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-[var(--ink-soft)] hover:text-[var(--warn)] disabled:opacity-50"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft transition duration-150 hover:text-warn active:text-[#9a3209] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50"
                 >
                   Clear
                 </button>
@@ -147,7 +150,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
       {flash ? (
         <p
-          className={`text-sm [overflow-wrap:anywhere] ${flashIsError ? "text-[var(--warn)]" : "text-[var(--ok)]"}`}
+          className={`text-sm [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
           role={flashIsError ? "alert" : undefined}
         >
           {flash}

@@ -43,11 +43,9 @@ export async function saveOnDemandUsage(
   });
 
   if (error) {
-    const message = error.message || "Could not save on-demand setting";
-    const hint = /function|schema cache|set_tenant_on_demand_usage/i.test(message)
-      ? " Apply docs/supabase/wallet_on_demand_alerts.sql in Supabase."
-      : "";
-    return { error: `${message}${hint}` };
+    const message = error.message || "Could not save on-demand setting.";
+    console.error("[wallet.onDemand]", message);
+    return { error: "Could not save on-demand setting." };
   }
 
   const row = Array.isArray(data) ? data[0] : data;

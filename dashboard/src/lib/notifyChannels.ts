@@ -46,7 +46,7 @@ export function platformNotifyAvailability(): Record<
     },
     whatsapp: {
       available: envFlag("NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE", false),
-      unavailableLabel: "Coming soon — WhatsApp alerts are being wired",
+      unavailableLabel: "WhatsApp alerts are not available",
     },
     email: {
       available: envFlag("NEXT_PUBLIC_NOTIFY_EMAIL_AVAILABLE", true),

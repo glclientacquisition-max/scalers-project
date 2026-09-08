@@ -439,12 +439,8 @@ export async function applyIngestAction(
     .eq("id", tenant.id);
 
   if (error) {
-    if (/vertical|business_locations|business_policies/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/business_operating_model.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    console.error("[settings.ingest]", error.message);
+    return { error: "Could not save." };
   }
 
   revalidatePath("/settings");
@@ -480,7 +476,7 @@ export async function applyIngestAction(
     return {
       ok: true,
       source,
-      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Train below should refresh — open Train to review. Live on the next call.${capNote}`,
+      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Open Train to review. Live on the next call.${capNote}`,
     };
   }
 

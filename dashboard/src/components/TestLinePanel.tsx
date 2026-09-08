@@ -16,6 +16,10 @@ import {
   type CuratedSonioxVoice,
 } from "@/lib/sonioxVoiceCatalog";
 import type { TenantRow } from "@/lib/supabase";
+import {
+  settingsPanelHeadingClass,
+  settingsPrimaryButtonClass,
+} from "@/components/settingsUi";
 
 /**
  * Business Settings → Test
@@ -118,29 +122,27 @@ export function TestLinePanel({
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-10">
+    <div className="mx-auto max-w-xl space-y-6">
       <header>
-        <h2 className="font-display text-[clamp(1.5rem,4vw,2rem)] tracking-tight text-[var(--ink)]">
-          Test
-        </h2>
+        <h2 className={settingsPanelHeadingClass}>Test</h2>
       </header>
 
       <section className="space-y-4" aria-labelledby="test-preview-heading">
         <h3
           id="test-preview-heading"
-          className="text-sm font-medium text-[var(--ink)]"
+          className="text-sm font-medium text-ink"
         >
           Phone preview
         </h3>
 
         {greetingPreview ? (
           <>
-            <blockquote className="border-l-2 border-[var(--accent)]/50 pl-4 text-base leading-relaxed text-[var(--ink)]">
+            <blockquote className="border-l-2 border-[#0096FF]/50 pl-4 text-base leading-relaxed text-ink">
               “{greetingPreview}”
             </blockquote>
             {voiceLabel ? (
-              <p className="text-xs text-[var(--ink-soft)]">
-                Voice · <span className="text-[var(--ink)]">{voiceLabel}</span>
+              <p className="text-xs text-ink-soft">
+                Voice · <span className="text-ink">{voiceLabel}</span>
                 {lexicon.length
                   ? ` · ${lexicon.length} pronunciation override${lexicon.length === 1 ? "" : "s"}`
                   : null}
@@ -151,7 +153,7 @@ export function TestLinePanel({
               type="button"
               onClick={() => playPhonePreview()}
               disabled={phonePreviewLoading}
-              className="w-full rounded-2xl bg-[var(--accent)] px-4 py-3.5 text-center text-sm font-semibold text-white hover:bg-[var(--accent-deep)] disabled:opacity-60 sm:w-auto sm:min-w-[12rem]"
+              className={`${settingsPrimaryButtonClass} min-h-12 w-full text-base font-semibold sm:w-auto sm:min-w-[12rem]`}
             >
               {phonePreviewLoading ? "Generating…" : "Play phone preview"}
             </button>
@@ -165,49 +167,49 @@ export function TestLinePanel({
             ) : null}
 
             {phonePreviewError ? (
-              <p className="text-sm text-[var(--warn)]" role="alert">
+              <p className="text-sm text-warn" role="alert">
                 {phonePreviewError}
               </p>
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-[var(--ink-soft)]">
-            Add a business name and agent name in{" "}
+          <p className="text-sm text-ink-soft">
+            Add a business name and assistant name in{" "}
             <Link
               href={businessSettingsHref("train", "identity")}
-              className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+              className="font-medium text-[#0096FF] underline-offset-2 transition-colors duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
             >
-              Agent Persona
+              Assistant
             </Link>{" "}
             to preview the greeting.
           </p>
         )}
       </section>
 
-      <section className="space-y-3 border-t border-[var(--line)] pt-8" aria-labelledby="test-call-heading">
+      <section className="space-y-3 border-t border-line pt-8" aria-labelledby="test-call-heading">
         <h3
           id="test-call-heading"
-          className="text-sm font-medium text-[var(--ink)]"
+          className="text-sm font-medium text-ink"
         >
           Live call
         </h3>
         {pendingDid || !did ? (
-          <p className="text-sm text-[var(--ink-soft)]">
+          <p className="text-sm text-ink-soft">
             Number pending. Finish setup before calling.
           </p>
         ) : (
           <a
             href={`tel:${did}`}
-            className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-[var(--line)] bg-white px-4 py-4 text-center font-display text-[clamp(1.15rem,4vw,1.5rem)] tracking-tight text-[var(--ink)] transition hover:border-[var(--accent)]"
+            className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-line bg-white px-4 py-4 text-center font-display text-[clamp(1.15rem,4vw,1.5rem)] tracking-tight text-ink transition duration-150 hover:border-[#0096FF] hover:bg-[#0096FF]/[0.04] active:scale-[0.99] active:bg-[#0096FF]/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             {did}
           </a>
         )}
-        <p className="text-xs text-[var(--ink-soft)]">
+        <p className="text-xs text-ink-soft">
           Fix names in{" "}
           <Link
             href={businessSettingsHref("train", "pronunciation")}
-            className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+            className="font-medium text-[#0096FF] underline-offset-2 transition-colors duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             Pronunciation
           </Link>
@@ -215,7 +217,7 @@ export function TestLinePanel({
           change voice in{" "}
           <Link
             href={businessSettingsHref("train", "tools")}
-            className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+            className="font-medium text-[#0096FF] underline-offset-2 transition-colors duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             Tools &amp; voice
           </Link>

@@ -92,13 +92,14 @@ import {
 } from "@/lib/notifyChannels";
 import {
   ExpandTextarea,
+  SettingsPageHeader,
   ToolSwitch,
   TrashIcon,
   settingsChipClass,
   compactTextareaExpandHandlers,
   settingsDenseFieldClass,
   settingsFieldClass,
-  settingsStickyHeaderClass,
+  settingsPanelHeadingClass,
   settingsTableFieldClass,
 } from "@/components/settingsUi";
 import {
@@ -261,7 +262,7 @@ function CatalogPager({
           type="button"
           disabled={page <= 0}
           onClick={onPrev}
-          className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
+          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
         >
           Previous
         </button>
@@ -272,7 +273,7 @@ function CatalogPager({
           type="button"
           disabled={page >= pageCount - 1}
           onClick={onNext}
-          className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink disabled:opacity-40"
+          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
         >
           Next
         </button>
@@ -513,11 +514,7 @@ export function TenantForm({
 
   useEffect(() => {
     if (state.ok) {
-      setFlash(
-        state.source === "gemini"
-          ? "Training complete. Your receptionist will use this on the next call."
-          : "Training saved (basic mode). Your receptionist will use this on the next call."
-      );
+      setFlash("Saved. Your assistant will use this on the next call.");
     }
   }, [state]);
 
@@ -728,26 +725,22 @@ export function TenantForm({
 
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
-      <header className={settingsStickyHeaderClass}>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl tracking-tight text-ink sm:text-3xl">
-            Business
-          </h1>
-          {lineNumber ? (
-            <p className="mt-0.5 text-sm text-ink-soft">
-              Line <span className="font-medium text-ink">{lineNumber}</span>
-            </p>
-          ) : null}
-        </div>
-        <TenantSettingsSaveButton pending={pending} />
-      </header>
+      <SettingsPageHeader
+        businessName={tenant.business_name?.trim() || "Business"}
+        lineLive={Boolean(lineNumber) && lineNumber !== "Number pending"}
+        lineDetail={
+          Boolean(lineNumber) && lineNumber !== "Number pending" ? lineNumber : ""
+        }
+        showBack
+        action={<TenantSettingsSaveButton pending={pending} />}
+      />
 
       <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
         {sidebar}
 
         <div className="min-w-0 flex-1 space-y-4">
           {heading ? (
-            <h2 className="font-display text-xl tracking-tight text-ink">{heading}</h2>
+            <h2 className={settingsPanelHeadingClass}>{heading}</h2>
           ) : null}
 
       <input type="hidden" name="id" value={tenant.id} />
@@ -808,7 +801,7 @@ export function TenantForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="agent_name">
-              Agent name
+              Assistant name
             </label>
             <input
               id="agent_name"
@@ -887,7 +880,7 @@ export function TenantForm({
 
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-medium text-[var(--ink)]">Contacts</h3>
+            <h3 className="text-sm font-medium text-ink">Contacts</h3>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1062,7 +1055,7 @@ export function TenantForm({
       <section className={panel === "catalog" ? "space-y-4" : "hidden"}>
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h3 className="text-sm font-medium text-[var(--ink)]">Services</h3>
+            <h3 className="text-sm font-medium text-ink">Services</h3>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1070,14 +1063,14 @@ export function TenantForm({
                   setServices((prev) => [...prev, emptyService()]);
                   setServicePage(Math.floor(services.length / SERVICE_PAGE_SIZE));
                 }}
-                className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-accent-soft"
               >
                 Add 1
               </button>
               <button
                 type="button"
                 onClick={() => addBlankServiceRows(3)}
-                className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-accent-soft"
               >
                 Add 3 blank
               </button>
@@ -1087,7 +1080,7 @@ export function TenantForm({
                   setShowBulkServices((v) => !v);
                   setBulkServicesError(null);
                 }}
-                className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:border-[var(--accent)]/50"
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink hover:border-[#0096FF]/50"
               >
                 {showBulkServices ? "Hide paste" : "Paste list"}
               </button>
@@ -1095,7 +1088,7 @@ export function TenantForm({
           </div>
 
           {showBulkServices ? (
-            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-3">
+            <div className="space-y-3 rounded-xl border border-line bg-accent-soft/40 p-3">
               <label className="block text-sm font-medium" htmlFor="bulk_services">
                 Paste list
               </label>
@@ -1113,28 +1106,28 @@ export function TenantForm({
                 }
                 className={`${denseFieldClass} text-sm leading-relaxed`}
               />
-              <details className="text-xs text-[var(--ink-soft)]">
-                <summary className="cursor-pointer font-medium text-[var(--ink)]">
+              <details className="text-xs text-ink-soft">
+                <summary className="cursor-pointer font-medium text-ink">
                   Spreadsheet format
                 </summary>
                 <p className="mt-2 leading-relaxed">
                   Columns:{" "}
-                  <span className="font-medium text-[var(--ink)]">
+                  <span className="font-medium text-ink">
                     name | price | notes | out of scope
                   </span>
                 </p>
               </details>
 
               {bulkPreview.length > 0 ? (
-                <div className="rounded-xl border border-[var(--line)] bg-white px-3 py-2">
-                  <p className="text-xs font-medium text-[var(--ink)]">
+                <div className="rounded-xl border border-line bg-white px-3 py-2">
+                  <p className="text-xs font-medium text-ink">
                     Ready to add {bulkPreview.length} service
                     {bulkPreview.length === 1 ? "" : "s"}
                   </p>
-                  <ul className="mt-2 space-y-1 text-sm text-[var(--ink-soft)]">
+                  <ul className="mt-2 space-y-1 text-sm text-ink-soft">
                     {bulkPreview.slice(0, 8).map((row, i) => (
                       <li key={`${row.name}-${i}`}>
-                        <span className="font-medium text-[var(--ink)]">{row.name}</span>
+                        <span className="font-medium text-ink">{row.name}</span>
                         {row.price_range ? ` · ${row.price_range}` : ""}
                       </li>
                     ))}
@@ -1146,7 +1139,7 @@ export function TenantForm({
               ) : null}
 
               {bulkServicesError ? (
-                <p className="text-sm text-[var(--warn)]" role="alert">
+                <p className="text-sm text-warn" role="alert">
                   {bulkServicesError}
                 </p>
               ) : null}
@@ -1154,7 +1147,7 @@ export function TenantForm({
                 type="button"
                 onClick={applyBulkServices}
                 disabled={!bulkPreview.length}
-                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
+                className="rounded-xl bg-[#0096FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#005ccc] disabled:opacity-50"
               >
                 Add to services
               </button>
@@ -1334,7 +1327,7 @@ export function TenantForm({
 
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h3 className="text-sm font-medium text-[var(--ink)]">Products</h3>
+            <h3 className="text-sm font-medium text-ink">Products</h3>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1342,7 +1335,7 @@ export function TenantForm({
                   setProducts((prev) => [...prev, emptyProduct()]);
                   setProductPage(Math.floor(products.length / PRODUCT_PAGE_SIZE));
                 }}
-                className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-accent-soft"
               >
                 Add product
               </button>
@@ -1352,7 +1345,7 @@ export function TenantForm({
                   setShowBulkProducts((v) => !v);
                   setBulkProductsError(null);
                 }}
-                className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)]"
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink"
               >
                 {showBulkProducts ? "Hide paste" : "Paste products"}
               </button>
@@ -1360,7 +1353,7 @@ export function TenantForm({
           </div>
 
           {showBulkProducts ? (
-            <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 p-3">
+            <div className="space-y-3 rounded-xl border border-line bg-accent-soft/40 p-3">
               <textarea
                 value={bulkProductsText}
                 onChange={(e) => {
@@ -1375,19 +1368,19 @@ export function TenantForm({
                 className={`${denseFieldClass} text-sm leading-relaxed`}
               />
               {bulkProductPreview.length ? (
-                <p className="text-xs text-[var(--ink-soft)]">
+                <p className="text-xs text-ink-soft">
                   Ready to add {bulkProductPreview.length} product
                   {bulkProductPreview.length === 1 ? "" : "s"}
                 </p>
               ) : null}
               {bulkProductsError ? (
-                <p className="text-sm text-[var(--warn)]">{bulkProductsError}</p>
+                <p className="text-sm text-warn">{bulkProductsError}</p>
               ) : null}
               <button
                 type="button"
                 onClick={applyBulkProducts}
                 disabled={!bulkProductPreview.length}
-                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-xl bg-[#0096FF] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 Add to catalogue
               </button>
@@ -1395,7 +1388,7 @@ export function TenantForm({
           ) : null}
 
           {products.length === 0 ? (
-            <p className="text-sm text-[var(--ink-soft)]">No products yet.</p>
+            <p className="text-sm text-ink-soft">No products yet.</p>
           ) : (
             <>
             <div className="hidden space-y-3 md:hidden">
@@ -1553,7 +1546,7 @@ export function TenantForm({
                   key={day}
                   className="flex min-w-0 flex-col gap-2 rounded-lg border border-line/70 bg-white/60 px-3 py-2.5 sm:grid sm:grid-cols-[8.5rem_auto_1fr_1fr] sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
                 >
-                  <span className="text-sm font-medium text-[var(--ink)]">
+                  <span className="text-sm font-medium text-ink">
                     {DAY_LABELS[day]}
                   </span>
                   <button
@@ -1562,8 +1555,8 @@ export function TenantForm({
                     className={[
                       "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium transition",
                       open
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                        : "border-[var(--line)] text-[var(--ink-soft)]",
+                        ? "border-[#0096FF] bg-accent-soft text-[#0096FF]"
+                        : "border-line text-ink-soft",
                     ].join(" ")}
                   >
                     {open ? "Open" : "Closed"}
@@ -1580,7 +1573,7 @@ export function TenantForm({
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
                         className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
                       />
-                      <span className="text-xs text-[var(--ink-soft)]">to</span>
+                      <span className="text-xs text-ink-soft">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
                         Closes
                       </label>
@@ -1593,7 +1586,7 @@ export function TenantForm({
                       />
                     </div>
                   ) : (
-                    <span className="text-xs text-[var(--ink-soft)] sm:col-span-2">
+                    <span className="text-xs text-ink-soft sm:col-span-2">
                       Closed all day
                     </span>
                   )}
@@ -1640,7 +1633,7 @@ export function TenantForm({
                 prev.length >= LOCATIONS_MAX ? prev : [...prev, emptyLocation()]
               )
             }
-            className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
+            className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-accent-soft disabled:opacity-50"
           >
             Add location
           </button>
@@ -1649,12 +1642,12 @@ export function TenantForm({
           {locations.map((loc, index) => (
             <div
               key={`loc-${index}`}
-              className="space-y-2 rounded-xl border border-[var(--line)] bg-white/60 p-3"
+              className="space-y-2 rounded-xl border border-line bg-white/60 p-3"
             >
               <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <label
-                    className="block text-xs font-medium text-[var(--ink-soft)]"
+                    className="block text-xs font-medium text-ink-soft"
                     htmlFor={`loc-label-${index}`}
                   >
                     Label
@@ -1679,7 +1672,7 @@ export function TenantForm({
                 </div>
                 <div>
                   <label
-                    className="block text-xs font-medium text-[var(--ink-soft)]"
+                    className="block text-xs font-medium text-ink-soft"
                     htmlFor={`loc-landmark-${index}`}
                   >
                     Landmark
@@ -1709,7 +1702,7 @@ export function TenantForm({
               </div>
               <div>
                 <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  className="block text-xs font-medium text-ink-soft"
                   htmlFor={`loc-address-${index}`}
                 >
                   Address / area
@@ -1735,7 +1728,7 @@ export function TenantForm({
               </div>
               <div>
                 <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  className="block text-xs font-medium text-ink-soft"
                   htmlFor={`loc-directions-${index}`}
                 >
                   Directions (spoken)
@@ -1751,7 +1744,7 @@ export function TenantForm({
               </div>
               <div>
                 <label
-                  className="block text-xs font-medium text-[var(--ink-soft)]"
+                  className="block text-xs font-medium text-ink-soft"
                   htmlFor={`loc-coverage-${index}`}
                 >
                   Coverage notes
@@ -1772,7 +1765,7 @@ export function TenantForm({
                   onClick={() =>
                     setLocations((prev) => prev.filter((_, i) => i !== index))
                   }
-                  className="text-xs text-[var(--warn)] hover:underline"
+                  className="text-xs text-warn hover:underline"
                 >
                   Remove location
                 </button>
@@ -1824,7 +1817,7 @@ export function TenantForm({
             <section className={panel === "tools" ? "space-y-4" : "hidden"}>
         <div className="space-y-2">
           <div>
-            <p className="text-sm font-medium text-[var(--ink)]">Phone voice</p>
+            <p className="text-sm font-medium text-ink">Phone voice</p>
           </div>
           {voiceOptions.length > 1 ? (
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Phone voice profile">
@@ -1846,9 +1839,9 @@ export function TenantForm({
               })}
             </div>
           ) : voiceOptions[0]?.description ? (
-            <p className="text-sm text-[var(--ink-soft)]">{voiceOptions[0].description}</p>
+            <p className="text-sm text-ink-soft">{voiceOptions[0].description}</p>
           ) : (
-            <p className="text-sm text-[var(--ink-soft)]">
+            <p className="text-sm text-ink-soft">
               No platform voices loaded yet. Super Admin can add them under Voices.
             </p>
           )}
@@ -1871,7 +1864,7 @@ export function TenantForm({
               type="button"
               onClick={() => void playVoiceSample()}
               disabled={voiceSampleLoading}
-              className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+              className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium text-ink hover:border-[#0096FF] disabled:opacity-60"
             >
               {voiceSampleLoading ? "Generating…" : "Hear sample"}
             </button>
@@ -1880,14 +1873,14 @@ export function TenantForm({
             <audio src={voiceSampleUrl} controls className="max-w-full" />
           ) : null}
           {voiceSampleError ? (
-            <p className="text-xs text-[var(--warn)]" role="alert">
+            <p className="text-xs text-warn" role="alert">
               {voiceSampleError}
             </p>
           ) : null}
           {sonioxVoiceLabel.trim() || sonioxVoiceId ? (
-            <p className="text-xs text-[var(--ink-soft)]">
+            <p className="text-xs text-ink-soft">
               Selected:{" "}
-              <span className="font-medium text-[var(--ink)]">
+              <span className="font-medium text-ink">
                 {displaySonioxVoiceLabel(
                   sonioxVoiceLabel,
                   sonioxVoiceId,
@@ -1898,7 +1891,7 @@ export function TenantForm({
           ) : null}
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-[var(--ink)]">Handoff</p>
+          <p className="text-sm font-medium text-ink">Handoff</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
             {HANDOFF_OPTIONS.map((opt) => {
               const selected = handoffMode === opt.id;
@@ -1927,8 +1920,8 @@ export function TenantForm({
                 className="flex items-center justify-between gap-4 px-3 py-2.5"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--ink)]">{opt.label}</p>
-                  <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+                  <p className="text-sm font-medium text-ink">{opt.label}</p>
+                  <p className="mt-0.5 text-xs text-ink-soft">
                     {on ? opt.onLabel : opt.offLabel}
                   </p>
                 </div>
@@ -1981,7 +1974,7 @@ export function TenantForm({
           <button
             type="button"
             onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-            className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#0096FF] hover:bg-accent-soft"
           >
             Add teammate
           </button>
@@ -1991,7 +1984,7 @@ export function TenantForm({
           {team.map((member, index) => (
             <div key={`team-${index}`} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
               <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-name-${index}`}>
+                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-name-${index}`}>
                   Name
                 </label>
                 <input
@@ -2003,7 +1996,7 @@ export function TenantForm({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-role-${index}`}>
+                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-role-${index}`}>
                   Role
                 </label>
                 <input
@@ -2015,7 +2008,7 @@ export function TenantForm({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-phone-${index}`}>
+                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-phone-${index}`}>
                   Phone / WhatsApp
                 </label>
                 <input
@@ -2027,7 +2020,7 @@ export function TenantForm({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`team-email-${index}`}>
+                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-email-${index}`}>
                   Email
                 </label>
                 <input
@@ -2061,7 +2054,7 @@ export function TenantForm({
         className={panel === "faqs" ? "space-y-3" : "hidden"}
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <p className="text-xs text-[var(--ink-soft)]" aria-live="polite">
+          <p className="text-xs text-ink-soft" aria-live="polite">
             {filledFaqCount} of {FAQ_MAX}
           </p>
           <button
@@ -2071,15 +2064,15 @@ export function TenantForm({
               setFaqPage(Math.floor(faqs.length / FAQ_PAGE_SIZE));
             }}
             disabled={faqs.length >= FAQ_MAX}
-            className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
+            className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#005ccc] hover:bg-accent-soft disabled:opacity-60"
           >
             Add FAQ
           </button>
         </div>
 
         {filledFaqCount === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3">
-            <p className="text-sm text-[var(--ink-soft)]">Common questions</p>
+          <div className="rounded-xl border border-dashed border-line bg-white/70 px-4 py-3">
+            <p className="text-sm text-ink-soft">Common questions</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {FAQ_STARTERS.map((starter) => (
                 <button
@@ -2096,7 +2089,7 @@ export function TenantForm({
                       return next;
                     })
                   }
-                  className="rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 text-left text-xs text-[var(--ink)] hover:border-[var(--accent)]"
+                  className="rounded-xl border border-line bg-white px-3 py-1.5 text-left text-xs text-ink hover:border-[#0096FF]"
                 >
                   {starter.question}
                 </button>
@@ -2111,7 +2104,7 @@ export function TenantForm({
             return (
             <div key={`faq-${index}`} className="space-y-1.5 rounded-xl border border-line bg-white px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                   FAQ {index + 1}
                 </p>
                 <button
@@ -2121,14 +2114,14 @@ export function TenantForm({
                       prev.length <= 1 ? [emptyFaq()] : prev.filter((_, i) => i !== index)
                     )
                   }
-                  className="text-xs text-[var(--ink-soft)] hover:text-[var(--warn)]"
+                  className="text-xs text-ink-soft hover:text-warn"
                   aria-label={`Remove FAQ ${index + 1}`}
                 >
                   Remove
                 </button>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`faq-q-${index}`}>
+                <label className="block text-xs font-medium text-ink-soft" htmlFor={`faq-q-${index}`}>
                   Question
                 </label>
                 <input
@@ -2144,13 +2137,13 @@ export function TenantForm({
                   className={`${fieldClass} mt-1 py-2`}
                 />
                 {faqDupIndexes.has(index) ? (
-                  <p id={`faq-dup-${index}`} className="mt-1 text-xs text-[var(--warn)]" role="status">
+                  <p id={`faq-dup-${index}`} className="mt-1 text-xs text-warn" role="status">
                     Same as another FAQ. Keep one clear wording.
                   </p>
                 ) : null}
               </div>
               <div>
-                <label className="block text-xs font-medium text-[var(--ink-soft)]" htmlFor={`faq-a-${index}`}>
+                <label className="block text-xs font-medium text-ink-soft" htmlFor={`faq-a-${index}`}>
                   Answer
                 </label>
                 <textarea
@@ -2162,7 +2155,7 @@ export function TenantForm({
                   placeholder="Yes, free parking behind the building."
                   className={`${fieldClass} mt-1 py-2 leading-relaxed`}
                 />
-                <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
+                <p className="mt-0.5 text-xs text-ink-soft">
                   {faq.answer.length}/{FAQ_ANSWER_MAX}
                 </p>
               </div>

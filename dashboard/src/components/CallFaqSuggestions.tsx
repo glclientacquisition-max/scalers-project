@@ -12,7 +12,7 @@ import {
 } from "@/app/(desk)/calls/faqActions";
 
 const fieldClass =
-  "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
+  "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40";
 
 const suggestInitial: FaqSuggestState = {};
 const applyInitial: FaqApplyState = {};
@@ -110,7 +110,7 @@ export function CallFaqSuggestions({
   return (
     <section
       ref={panelRef}
-      className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"
+      className="mt-8 rounded-2xl border border-line bg-surface p-5"
       aria-labelledby="call-faq-heading"
     >
       <div>
@@ -120,7 +120,7 @@ export function CallFaqSuggestions({
         >
           FAQ ideas from this call
         </h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]" id="call-faq-help">
+        <p className="mt-1 text-sm text-ink-soft" id="call-faq-help">
           If the caller asked something useful, we&apos;ll suggest a Golden FAQ. You
           edit and approve. Nothing goes live on its own.
         </p>
@@ -136,19 +136,19 @@ export function CallFaqSuggestions({
             aria-describedby={
               !hasTranscript ? "call-faq-no-transcript" : "call-faq-help"
             }
-            className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+            className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
           >
             {suggestPending ? "Looking through the call…" : "Find FAQ ideas"}
           </button>
           {!hasTranscript ? (
             <p
               id="call-faq-no-transcript"
-              className="mt-2 text-xs text-[var(--ink-soft)]"
+              className="mt-2 text-xs text-ink-soft"
             >
               Needs a conversation transcript first.
             </p>
           ) : suggestPending ? (
-            <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
+            <p className="mt-2 text-xs text-ink-soft" aria-live="polite">
               Usually a few seconds.
             </p>
           ) : null}
@@ -158,17 +158,17 @@ export function CallFaqSuggestions({
           <h3
             ref={resultsHeadingRef}
             tabIndex={-1}
-            className="text-sm font-medium text-[var(--ink)] outline-none"
+            className="text-sm font-medium text-ink outline-none"
           >
             Results
           </h3>
-          <p className="text-sm text-[var(--ink-soft)]">
+          <p className="text-sm text-ink-soft">
             {suggestState.message || "No new FAQ ideas from this call."}
           </p>
           <button
             type="button"
             onClick={() => setItems(null)}
-            className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink-soft)]"
+            className="rounded-xl border border-line bg-white px-4 py-2.5 text-sm text-ink-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
           >
             Back
           </button>
@@ -184,7 +184,7 @@ export function CallFaqSuggestions({
           </h3>
           {suggestState.message ? (
             <p
-              className="rounded-xl border border-[var(--accent)]/30 bg-accent-soft px-4 py-3 text-sm text-[var(--ink)]"
+              className="rounded-xl border border-[#0096FF]/30 bg-accent-soft px-4 py-3 text-sm text-ink"
               role="status"
             >
               {suggestState.message}
@@ -201,7 +201,7 @@ export function CallFaqSuggestions({
               return (
                 <li
                   key={`faq-idea-${index}`}
-                  className="rounded-xl border border-[var(--line)] bg-white px-3 py-3"
+                  className="rounded-xl border border-line bg-white px-3 py-3"
                 >
                   <div className="flex gap-3">
                     <input
@@ -218,13 +218,13 @@ export function CallFaqSuggestions({
                         .join(" ")}
                     />
                     <div className="min-w-0 flex-1 space-y-2">
-                      <p id={reasonId} className="text-xs text-[var(--ink-soft)]">
+                      <p id={reasonId} className="text-xs text-ink-soft">
                         {item.reason}
                       </p>
                       {item.needsOwnerAnswer ? (
                         <p
                           id={warnId}
-                          className="text-xs font-medium text-[var(--warn)]"
+                          className="text-xs font-medium text-warn"
                           role="status"
                         >
                           Fill in your answer before adding
@@ -233,7 +233,7 @@ export function CallFaqSuggestions({
                       <div>
                         <label
                           id={`${questionId}-label`}
-                          className="block text-xs font-medium text-[var(--ink-soft)]"
+                          className="block text-xs font-medium text-ink-soft"
                           htmlFor={questionId}
                         >
                           Question callers ask
@@ -250,7 +250,7 @@ export function CallFaqSuggestions({
                       </div>
                       <div>
                         <label
-                          className="block text-xs font-medium text-[var(--ink-soft)]"
+                          className="block text-xs font-medium text-ink-soft"
                           htmlFor={answerId}
                         >
                           What the receptionist should say
@@ -271,7 +271,7 @@ export function CallFaqSuggestions({
                         {incomplete ? (
                           <p
                             id={`${answerId}-err`}
-                            className="mt-1 text-xs text-[var(--warn)]"
+                            className="mt-1 text-xs text-warn"
                             role="alert"
                           >
                             Add an answer, or untick this FAQ.
@@ -292,7 +292,7 @@ export function CallFaqSuggestions({
               type="submit"
               disabled={applyPending || selectedReady === 0}
               aria-describedby="call-faq-add-help"
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+              className="rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-60"
             >
               {applyPending
                 ? "Adding…"
@@ -304,11 +304,11 @@ export function CallFaqSuggestions({
               type="button"
               disabled={applyPending}
               onClick={() => setItems(null)}
-              className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink-soft)]"
+              className="rounded-xl border border-line bg-white px-4 py-2.5 text-sm text-ink-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
             >
               Start over
             </button>
-            <p id="call-faq-add-help" className="w-full text-xs text-[var(--ink-soft)]">
+            <p id="call-faq-add-help" className="w-full text-xs text-ink-soft">
               {selectedReady === 0
                 ? "Tick a FAQ with both a question and answer to enable Add."
                 : "Selected FAQs are added to your Golden FAQs for the next call."}
@@ -321,7 +321,7 @@ export function CallFaqSuggestions({
         <p
           className={[
             "mt-3 text-sm",
-            flashIsError ? "text-[var(--warn)]" : "text-[var(--accent-deep)]",
+            flashIsError ? "text-warn" : "text-[#005ccc]",
           ].join(" ")}
           role={flashIsError ? "alert" : "status"}
         >

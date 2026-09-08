@@ -109,7 +109,7 @@ Do not add a second palette. Prefer Tailwind names over `text-[var(--ink)]`.
 | Lead (in progress) | `--lead` `#B98A1F` | `lead` |
 | WhatsApp (glyph only) | `--whatsapp` `#25D366` | `whatsapp` |
 
-Also shipped: `shadow-focus`, `shadow-lift`, `rounded-panel` (0.875rem), `max-w-desk` (72rem), `--desk-header-h` (4.25rem / 4.5rem from `sm`).
+Also shipped: `shadow-focus`, `shadow-lift`, `rounded-panel` (0.875rem), `max-w-desk` (72rem), `--desk-header-h` (4.25rem / 4.5rem from `sm`), `--desk-bottom-nav-h` (`0px` from `md`; `3.25rem + safe-area` below).
 
 Body canvas wash (radial brand tints) is global in `globals.css`. Do not add more gradients on desk components.
 
@@ -138,7 +138,10 @@ Do not use landing-scale `text-5xl` / `md:text-6xl` on the desk.
 
 - Sticky header, `border-b border-line/80 bg-surface/95 backdrop-blur`
 - Inner: `mx-auto flex max-w-desk … px-4 py-3 sm:px-6 sm:py-3.5`
-- Main: `mx-auto w-full min-w-0 max-w-desk px-4 py-6 sm:px-6 sm:py-10`
+- Desktop nav (`DeskNav`): six text links + Sign out, `hidden md:flex`
+- Mobile nav (`DeskMobileNav`): sibling of header/main (not inside the blurred header). `Overview · Calls · Requests · More`. More sheet: Appointments, Business, Wallet, Sign out.
+- Main: `mx-auto w-full min-w-0 max-w-desk px-4 py-6 sm:px-6 sm:pt-10` plus `--desk-bottom-nav-h` on the bottom padding so the bar does not cover content.
+- `--desk-bottom-nav-h` is `0px` from `md`; below `md` it is `3.25rem` plus `safe-area-inset-bottom`. Call audio uses the same offset (`CallAudioPlayer`).
 
 Pages must not add a second page gutter. Appointments currently does (`px-4 py-10` inside main). That is Phase 4 debt.
 
@@ -158,8 +161,7 @@ Pages must not add a second page gutter. Appointments currently does (`px-4 py-1
 | Secondary | `settingsActionClass` or Calls empty-state: `inline-flex rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-[#005ccc] hover:border-[#0096FF]` | |
 | Ghost | `settingsGhostButtonClass` | Calls Search |
 | Destructive / mute | `MarkLeadArchiveButton` icon: `text-ink-soft hover:bg-surface-muted`; `TrashButton` hover `text-warn` | Not a red filled button |
-| WhatsApp **canonical** | Blue fill, green glyph (`TriageLeadCard`) | Constitution |
-| WhatsApp **current detail** | `bg-[#25D366]` full button | Debt. Phase 5 or Home reuse of `TriageLeadCard` |
+| WhatsApp | Blue fill, green glyph (`TriageLeadCard`, call detail) | Constitution. Green is glyph/channel identity only. |
 
 One primary per screen.
 
@@ -167,11 +169,13 @@ One primary per screen.
 
 ## 5. Focus
 
-**Constitution / mandate target:** `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`
+**Canonical desk field (Phase 5):** `outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40`
 
-**Shipped settings fields:** `outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40`
+**Canonical desk control:** `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40`
 
-Until Phase 5, **copy `settingsFieldClass`**. Do not invent a third ring. Do not ship `outline-none` without a ring or `shadow-focus`.
+Primary filled CTAs may add `focus-visible:ring-offset-2` (Home, Save, call-detail WhatsApp). Do not invent a third ring color.
+
+Never ship `outline-none` without a ring or `shadow-focus`. Copy `settingsFieldClass` for fields.
 
 ---
 
@@ -228,7 +232,7 @@ Sticky save: `settingsStickyHeaderClass` + `TenantSettingsSaveButton`.
 
 ### 6.7 Nested nav
 
-`SettingsSidebar`: container `rounded-2xl border border-line bg-surface p-2`. Links `rounded-lg px-3 py-2 text-sm`. Active `bg-[#0096FF]/10 text-[#005ccc]`. Section header `pointer-events-none … text-xs font-bold uppercase tracking-wider text-gray-500` (`Train`).
+Settings menu: grouped destination rows. Section headers `uppercase tracking-wide text-gray-500` (`General`, `Knowledge`, `Operations`, `Line`). Rows `min-h-12` label plus chevron, `border-line` groups. Active `bg-[#0096FF]/10 text-[#005ccc]`. Source: `SETTINGS_NAV`. `/settings` is the menu. Mobile is list or detail. Desktop keeps the list beside the panel.
 
 ### 6.8 Status
 
@@ -271,7 +275,7 @@ Extracted from what the good screens already do, plus constitution:
 - Primary actions `min-h-11` or larger (`min-h-12` / `min-h-14`)
 - Contrast: ink on canvas/surface; white on `#0096FF`
 
-Gaps (Phase 5): many auth/onboarding inputs lack the ring; icon Done/Archive have labels (good) but `h-9` hit area is under 44px.
+Gaps remaining: icon Done/Archive have labels (good) but `h-9` hit area is under 44px. Pronunciation Coach has many secondary controls; inputs now use the field ring.
 
 ---
 
@@ -279,10 +283,10 @@ Gaps (Phase 5): many auth/onboarding inputs lack the ring; icon Done/Archive hav
 
 | Surface | Extracted behavior | Keep |
 | --- | --- | --- |
-| Desk nav | Inline `md+`, Menu drawer below | Yes |
+| Desk nav | Inline `md+`, labeled bottom bar below (`Overview · Calls · Requests · More`) | Yes |
 | Calls table | Horizontal scroll, `min-w-[760px]` | Yes |
 | Call detail | Stack, then 4/8 split at `lg` | Yes |
-| Settings | Sidebar stacks above content until `lg` | Yes |
+| Settings | Menu on `/settings`. Mobile list or detail. Desktop list plus panel at `lg` | Yes |
 | Save | Full width on small, `sm:w-auto` | Yes |
 
 Do not convert Calls to stacked cards on mobile.
@@ -296,7 +300,7 @@ Do not create these unless a later phase proves a source and a job:
 - Live Online indicator
 - Contacts
 - New fonts or color tokens
-- Modal/drawer primitive (none ships; native or a first copy from an existing panel)
+- Modal/drawer primitive (none ships; More is a local disclosure in `DeskMobileNav`, not a shared overlay system)
 - Chart library
 - Toast system
 - Dark mode
@@ -308,12 +312,13 @@ Do not create these unless a later phase proves a source and a job:
 
 | Debt | Source | Phase |
 | --- | --- | --- |
-| Requests/Appointments are cards | those pages | 4 |
-| Appointments double padding + fluff + em dash | `appointments/page.tsx` | 4 |
-| Related call → `/calls` not `/calls/{id}` | appointments | 4 |
-| Token dialect `text-[var(--ink)]` | auth, onboarding, admin | 5 |
-| Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 |
-| Focus ring `/40` vs mandate solid | `settingsUi` vs constitution | 5 |
+| Requests/Appointments are cards | those pages | 4 (consumed) |
+| Appointments double padding + fluff + em dash | `appointments/page.tsx` | 4 (consumed) |
+| Related call → `/calls` not `/calls/{id}` | appointments | 4 (consumed) |
+| Token dialect `text-[var(--ink)]` on Owner Desk | auth, onboarding, settings panels | 5 (consumed). Admin/landing kept. |
+| Call-detail WhatsApp green fill | `[id]/page.tsx` | 5 (consumed). Blue fill, green glyph. |
+| Focus ring `/40` vs mandate solid | `settingsUi` vs constitution | 5 (consumed). Canonical desk ring is `/40`. |
+| Mobile hamburger hid all destinations | `DeskNav.tsx` | 6B (consumed). Persistent labeled bottom bar. |
 
 ---
 

@@ -205,12 +205,13 @@ export default async function CallDetailPage({
   const turns = (transcripts || []) as TranscriptRow[];
 
   return (
-    <div className="max-w-6xl">
+    <div>
       <Link
         href={backHref}
-        className="text-sm font-medium text-[#0096FF] hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+        aria-label={backLabel}
+        className="text-sm font-medium text-[#0096FF] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
       >
-        ← {backLabel}
+        Back
       </Link>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
@@ -258,7 +259,7 @@ export default async function CallDetailPage({
               href={waHref}
               target="_blank"
               rel="noreferrer"
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-xl bg-[#25D366] px-4 py-4 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
+              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-xl bg-[#0096FF] px-4 py-4 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
             >
               <WhatsAppGlyph className="h-5 w-5 shrink-0" />
               Reply on WhatsApp
