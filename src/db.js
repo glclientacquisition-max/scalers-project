@@ -9,6 +9,7 @@
 
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
+const { mergeContactIdentity } = require('./conversation/contactIdentity');
 
 const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
@@ -143,30 +144,12 @@ async function listActiveTenantDids() {
   return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
 }
 
-async function rememberCallerContact(call) {
-  if (!call?.tenant_id) return null;
-  const phone = normalizeStoredPhone(call.from_number);
-  if (!phone || phone.toLowerCase() === 'unknown') return null;
-  try {
-    return await upsertContact({
-      tenantId: call.tenant_id,
-      phone,
-      name: call.name || null,
-      lastReason: call.reason || null,
-    });
-  } catch (err) {
-    console.warn('[db] rememberCallerContact skipped:', err?.message || err);
-    return null;
-  }
-}
-
 async function upsertCall({
   callSid,
   fromNumber,
   toNumber,
   tenantId,
   provider = 'sautikit',
-  rememberContact = true,
 } = {}) {
   const resolvedTenantId = await resolveTenantId({ toNumber, fromNumber, tenantId });
   const existing = await getCall(callSid);
@@ -195,9 +178,7 @@ async function upsertCall({
     .single();
 
   throwIfError('upsertCall', error);
-  const shaped = shapeCall(data);
-  if (rememberContact) await rememberCallerContact(shaped);
-  return shaped;
+  return shapeCall(data);
 }
 
 async function saveCallerInfo({ callSid, name, reason }) {
@@ -223,9 +204,7 @@ async function saveCallerInfo({ callSid, name, reason }) {
     .maybeSingle();
 
   throwIfError('saveCallerInfo', error);
-  const shaped = shapeCall(data);
-  await rememberCallerContact(shaped);
-  return shaped;
+  return shapeCall(data);
 }
 
 /**
@@ -402,7 +381,6 @@ async function persistOutboundTransferLeg({
     toNumber: toNumber || null,
     tenantId,
     provider: 'sautikit',
-    rememberContact: false,
   });
   await mergeCallSummaryMeta({
     callSid: outboundCallSid,
@@ -1038,6 +1016,7 @@ async function upsertContact({
   lastReason,
   notes,
   metadata,
+  callId,
 } = {}) {
   if (!tenantId) return null;
   const phoneNorm = normalizeStoredPhone(phone);
@@ -1045,6 +1024,8 @@ async function upsertContact({
   const reasonNorm = String(lastReason || '').trim() || null;
   const notesNorm = String(notes || '').trim() || null;
   const now = new Date().toISOString();
+  const incomingMeta = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+  delete incomingMeta.alternate_names;
 
   if (phoneNorm) {
     const { data: existing, error: findErr } = await supabase
@@ -1060,16 +1041,20 @@ async function upsertContact({
     throwIfError('upsertContact(find)', findErr);
 
     if (existing?.id) {
+      const identity = mergeContactIdentity(existing, {
+        name: nameNorm,
+        callId: callId || null,
+        seenAt: now,
+      });
       const patch = {
         updated_at: now,
-        name: nameNorm || existing.name || null,
+        name: identity.name,
         last_reason: reasonNorm || existing.last_reason || null,
         notes: notesNorm || existing.notes || null,
         metadata: {
-          ...(existing.metadata && typeof existing.metadata === 'object'
-            ? existing.metadata
-            : {}),
-          ...(metadata && typeof metadata === 'object' ? metadata : {}),
+          ...identity.metadata,
+          ...incomingMeta,
+          alternate_names: identity.metadata.alternate_names,
         },
       };
       const { data, error } = await supabase
@@ -1083,15 +1068,24 @@ async function upsertContact({
     }
   }
 
+  const identity = mergeContactIdentity(null, {
+    name: nameNorm,
+    callId: callId || null,
+    seenAt: now,
+  });
   const { data, error } = await supabase
     .from('contacts')
     .insert({
       tenant_id: tenantId,
       phone: phoneNorm,
-      name: nameNorm,
+      name: identity.name,
       last_reason: reasonNorm,
       notes: notesNorm,
-      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      metadata: {
+        ...identity.metadata,
+        ...incomingMeta,
+        alternate_names: identity.metadata.alternate_names,
+      },
       updated_at: now,
     })
     .select('*')
@@ -1145,6 +1139,7 @@ async function createServiceRequest({
     tenantId: resolvedTenantId,
     phone: callerPhone,
     name: callerName,
+    callId: callRow?.id || null,
     lastReason:
       [requestType, itemText, when].filter(Boolean).join(' — ') || noteText,
   });
@@ -1301,6 +1296,7 @@ async function createAppointment({
     tenantId: resolvedTenantId,
     phone: callerPhone,
     name: callerName,
+    callId: callRow?.id || null,
     lastReason:
       ['visit', service, when, addressLandmark].filter(Boolean).join(' — ') ||
       noteText,
@@ -1495,4 +1491,5 @@ module.exports = {
   RECORDINGS_BUCKET,
   shapeCall,
   normalizeStoredPhone,
+  mergeContactIdentity,
 };

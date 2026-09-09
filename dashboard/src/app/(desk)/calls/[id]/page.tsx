@@ -202,12 +202,14 @@ export default async function CallDetailPage({
   const row = call;
   const { data: person } = await workspace.client
     .from("contacts")
-    .select("id")
+    .select("id, name")
     .eq("tenant_id", tenant.id)
     .eq("phone", row.caller_number)
     .maybeSingle();
   const meta = parseSummary(row.summary);
-  const name = typeof meta.name === "string" ? meta.name : null;
+  const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
+  const contactName = person?.name?.trim() || "";
+  const name = contactName || summaryName || null;
   const reason = typeof meta.reason === "string" ? meta.reason : null;
   const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
   const leadStatus = parseLeadStatus(row.lead_status);

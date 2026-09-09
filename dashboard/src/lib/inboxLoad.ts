@@ -95,7 +95,7 @@ export async function loadInboxItems(
   if (phones.length) {
     const people = await client
       .from("contacts")
-      .select("id, phone")
+      .select("id, phone, name")
       .eq("tenant_id", tenantId)
       .in("phone", phones);
     if (!people.error) {

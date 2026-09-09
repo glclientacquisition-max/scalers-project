@@ -35,11 +35,14 @@ describe('caller phone normalize before DB write', () => {
     assert.match(src, /const phoneNorm = normalizeStoredPhone\(phone\);/);
   });
 
-  it('writes a contact on inbound upsertCall, not outbound transfer legs', () => {
+  it('does not write contacts from the live upsertCall path', () => {
     const src = fs.readFileSync(path.join(__dirname, '../src/db.js'), 'utf8');
-    assert.match(src, /async function rememberCallerContact/);
-    assert.match(src, /if \(rememberContact\) await rememberCallerContact/);
-    assert.match(src, /rememberContact: false/);
-    assert.match(src, /await rememberCallerContact\(shaped\)/);
+    assert.doesNotMatch(src, /rememberCallerContact/);
+    const review = fs.readFileSync(
+      path.join(__dirname, '../src/conversation/callTranscriptReview.js'),
+      'utf8'
+    );
+    assert.match(review, /persistCompletedCallContact/);
+    assert.match(review, /runPostCallHangupJobs/);
   });
 });

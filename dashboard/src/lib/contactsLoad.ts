@@ -35,21 +35,51 @@ function maxIso(a: string | null, b: string | null): string | null {
   return a >= b ? a : b;
 }
 
+export type ContactSavedFilter = "all" | "saved" | "unsaved";
+
+export function resolveContactSavedFilter(
+  raw?: string | null
+): ContactSavedFilter {
+  const value = String(raw || "all").toLowerCase();
+  if (value === "saved" || value === "unsaved") return value;
+  return "all";
+}
+
+export function contactsHref(opts: {
+  saved?: ContactSavedFilter;
+  page?: number;
+}): string {
+  const q = new URLSearchParams();
+  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
+  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  const qs = q.toString();
+  return qs ? `/contacts?${qs}` : "/contacts";
+}
+
 export async function loadContactsPage(
   client: SupabaseClient,
   tenantId: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  saved: ContactSavedFilter = "all"
 ): Promise<{ rows: ContactListRow[]; total: number; error: string | null }> {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const listed = await client
+  let listedQuery = client
     .from("contacts")
     .select(CONTACT_SELECT, { count: "exact" })
     .eq("tenant_id", tenantId)
     .order("updated_at", { ascending: false })
     .range(from, to);
+
+  if (saved === "saved") {
+    listedQuery = listedQuery.not("name", "is", null).neq("name", "");
+  } else if (saved === "unsaved") {
+    listedQuery = listedQuery.or("name.is.null,name.eq.");
+  }
+
+  const listed = await listedQuery;
 
   if (listed.error) {
     return { rows: [], total: 0, error: listed.error.message };
