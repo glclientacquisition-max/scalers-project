@@ -32,6 +32,13 @@ export function normalizeKenyaE164(raw: unknown): string | null {
   return `+${digits}`;
 }
 
+/** Same contract as src/db.js: Kenya E.164, else trimmed original. */
+export function normalizeStoredPhone(raw: unknown): string | null {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return null;
+  return normalizeKenyaE164(trimmed) || trimmed;
+}
+
 export function teamHasDialablePhone(
   team: Array<{ phone?: string | null }> | null | undefined
 ): boolean {

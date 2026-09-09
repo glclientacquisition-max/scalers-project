@@ -186,6 +186,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 | LEDGER-NOTIFY-CH | `tenants.notify_channels` jsonb | Owner notify prefs | `notify_channels.sql` | `7af0fcb` (#155) | YES (2026-08-15) | YES (inferred pre-3E) | `20260813210755` | Staging rebuild; production CLI row |
 | LEDGER-PROD-NOTIFY-GRANT | `GRANT UPDATE (notify_channels)` | Desk owner notify persistence | `notify_channels.sql` + `production_pending/grant_notify_channels_update.sql` | Phase 3H A3 | YES (2026-08-15) | YES (2026-08-16) | `20260816180900` | `has_column_privilege` true; wallet UPDATE still false |
 | LEDGER-APPOINTMENTS | `appointments` table + RLS | Home-services bookings | `appointments.sql` | `7af0fcb` (#155) | YES (2026-08-15) | YES (inferred pre-3E) | `20260812083631` | Staging insert smoke |
+| LEDGER-CONTACTS-INSERT | Owner INSERT on `contacts` | Desk add + CSV import | `contacts_owner_insert.sql` | this PR | YES (2026-09-09) | NO | NO | Policy `contacts_insert_member` |
 | LEDGER-SIGNUP-FIX | Drop 1-arg prompt; 2-arg canonical | Fix signup `42725` | `voice_languages.sql`, `did_number_pool.sql` | `f61c11f` (#158) | YES (2026-08-15) | UNKNOWN | NO | Staging signup PASS |
 
 ### Staging-only / proposed (not in standard Git apply)
