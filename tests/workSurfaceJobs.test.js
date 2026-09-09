@@ -15,9 +15,10 @@ describe("work surface jobs on unified inbox", () => {
   const requests = read("dashboard/src/app/(desk)/requests/page.tsx");
   const appointments = read("dashboard/src/app/(desk)/appointments/page.tsx");
 
-  it("keeps the four-item nav and Inbox redirects", () => {
+  it("keeps Overview Inbox Contacts Business Wallet and Inbox redirects", () => {
     assert.match(nav, /label: "Overview"/);
     assert.match(nav, /label: "Inbox"/);
+    assert.match(nav, /label: "Contacts"/);
     assert.match(nav, /label: "Business"/);
     assert.match(nav, /label: "Wallet"/);
     assert.doesNotMatch(nav, /label: "Requests"/);
@@ -60,5 +61,10 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(inbox, /formatCallWhenRelative/);
     assert.doesNotMatch(inbox, />\s*Purpose\s*</);
     assert.match(inbox, /openLabel = item.hold \|\| item.job \? "Call" : "Open"/);
+    const load = read("dashboard/src/lib/inboxLoad.ts");
+    const purpose = read("dashboard/src/lib/inboxPurpose.ts");
+    assert.match(inbox, /\/contacts\/\$\{item.contactId\}/);
+    assert.match(load, /attachContactIds/);
+    assert.match(purpose, /compareInboxSignal/);
   });
 });

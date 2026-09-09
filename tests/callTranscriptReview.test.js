@@ -1,11 +1,15 @@
 const { afterEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  extractCallerNameFromTranscript,
   formatTranscriptForReview,
   isReviewEnabled,
   mergeTranscriptReview,
+  parseExtractedCallerName,
   parseReviewJson,
+  persistCompletedCallContact,
   resetTranscriptReviewScheduleForTests,
+  runPostCallHangupJobs,
   runPostCallTranscriptReview,
   schedulePostCallTranscriptReview,
   toolFlagsFromBrain,
@@ -315,12 +319,157 @@ describe('runPostCallTranscriptReview', () => {
     assert.equal(result.reason, 'no_turns');
   });
 
-  it('honors POST_CALL_GEMINI_REVIEW=off', async () => {
+  it('honors POST_CALL_GEMINI_REVIEW=off for the review pass only', async () => {
     process.env.POST_CALL_GEMINI_REVIEW = 'off';
     assert.equal(isReviewEnabled(), false);
     const result = await runPostCallTranscriptReview({ callSid: 'CA_off' });
     assert.equal(result.reason, 'disabled');
-    const scheduled = schedulePostCallTranscriptReview({ callSid: 'CA_off' });
-    assert.equal(scheduled.scheduled, false);
+    const scheduled = schedulePostCallTranscriptReview(
+      { callSid: 'CA_off' },
+      { scheduleDelayMs: 999999 }
+    );
+    assert.equal(scheduled.scheduled, true);
+  });
+});
+
+const fatTurns = [
+  { speaker: 'caller', text: 'Hi, my name is Amina. Are you open on Sunday?' },
+  { speaker: 'agent', text: 'Yes, 10 to 4.' },
+];
+
+describe('parseExtractedCallerName', () => {
+  it('returns null for NONE', () => {
+    assert.equal(parseExtractedCallerName('NONE'), null);
+    assert.equal(parseExtractedCallerName('none'), null);
+  });
+
+  it('accepts a plausible name', () => {
+    assert.equal(parseExtractedCallerName('Amina'), 'Amina');
+    assert.equal(parseExtractedCallerName('"Brian"'), 'Brian');
+  });
+});
+
+describe('post-call contact persist and name extract', () => {
+  it('upserts a contact with a null name when none is known', async () => {
+    const upserts = [];
+    const result = await persistCompletedCallContact(
+      { callSid: 'CA_anon' },
+      {
+        getCall: async () => ({
+          id: 'call-1',
+          tenant_id: 't1',
+          from_number: '+254712345678',
+          name: null,
+          reason: 'Hours',
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return { id: 'ct-1', ...row };
+        },
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(upserts.length, 1);
+    assert.equal(upserts[0].name, null);
+    assert.equal(upserts[0].phone, '+254712345678');
+    assert.equal(upserts[0].callId, 'call-1');
+  });
+
+  it('skips unknown phones', async () => {
+    const result = await persistCompletedCallContact(
+      { callSid: 'CA_unk' },
+      {
+        getCall: async () => ({
+          id: 'call-2',
+          tenant_id: 't1',
+          from_number: 'unknown',
+        }),
+        upsertContact: async () => {
+          throw new Error('should not upsert');
+        },
+      }
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'no_phone');
+  });
+
+  it('maps mocked Gemini NONE to a nameless upsert', async () => {
+    process.env.POST_CALL_GEMINI_REVIEW = 'off';
+    const upserts = [];
+    const result = await runPostCallHangupJobs(
+      {
+        callSid: 'CA_none',
+        turns: fatTurns,
+        summary: { name: null, reason: 'Sunday hours' },
+      },
+      {
+        waitMs: 0,
+        retryMs: 0,
+        generateNameText: async () => 'NONE',
+        generateText: async () => {
+          throw new Error('review should not run');
+        },
+        getCall: async () => ({
+          id: 'call-3',
+          tenant_id: 't1',
+          from_number: '+254700000001',
+          name: null,
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return row;
+        },
+        save: async () => {
+          throw new Error('should not save review');
+        },
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.extracted, null);
+    assert.equal(upserts.length, 1);
+    assert.equal(upserts[0].name, null);
+  });
+
+  it('feeds a mocked Gemini name into upsertContact', async () => {
+    process.env.POST_CALL_GEMINI_REVIEW = 'off';
+    const upserts = [];
+    const result = await runPostCallHangupJobs(
+      {
+        callSid: 'CA_name',
+        turns: fatTurns,
+        summary: { name: null, reason: 'Sunday hours' },
+      },
+      {
+        waitMs: 0,
+        retryMs: 0,
+        generateNameText: async ({ system }) => {
+          assert.match(system, /ONLY the name/);
+          return 'Amina';
+        },
+        getCall: async () => ({
+          id: 'call-4',
+          tenant_id: 't1',
+          from_number: '+254700000002',
+          name: null,
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return row;
+        },
+      }
+    );
+    assert.equal(result.extracted, 'Amina');
+    assert.equal(upserts[upserts.length - 1].name, 'Amina');
+  });
+
+  it('extractCallerNameFromTranscript maps NONE and a real name', async () => {
+    const none = await extractCallerNameFromTranscript(fatTurns, {
+      generateNameText: async () => 'NONE',
+    });
+    const named = await extractCallerNameFromTranscript(fatTurns, {
+      generateNameText: async () => 'Jane',
+    });
+    assert.equal(none, null);
+    assert.equal(named, 'Jane');
   });
 });

@@ -8,6 +8,8 @@
 // Preserves the orchestration-facing API used by server.js (async).
 
 const { supabase } = require('./lib/supabaseClient');
+const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
+const { mergeContactIdentity } = require('./conversation/contactIdentity');
 
 const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
@@ -36,6 +38,13 @@ function parseSummary(summary) {
 
 function serializeSummary(meta) {
   return JSON.stringify(meta || {});
+}
+
+/** Prefer Kenya E.164; keep trimmed original when the number is not dialable. */
+function normalizeStoredPhone(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return null;
+  return normalizeKenyaE164(trimmed) || trimmed;
 }
 
 /** Map a live `calls` row to the shape server.js historically expected from SQLite. */
@@ -135,7 +144,13 @@ async function listActiveTenantDids() {
   return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
 }
 
-async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'sautikit' }) {
+async function upsertCall({
+  callSid,
+  fromNumber,
+  toNumber,
+  tenantId,
+  provider = 'sautikit',
+} = {}) {
   const resolvedTenantId = await resolveTenantId({ toNumber, fromNumber, tenantId });
   const existing = await getCall(callSid);
   const meta = existing
@@ -147,7 +162,10 @@ async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 
 
   const row = {
     tenant_id: resolvedTenantId,
-    caller_number: fromNumber || existing?.from_number || 'unknown',
+    caller_number:
+      normalizeStoredPhone(fromNumber) ||
+      existing?.from_number ||
+      'unknown',
     sautikit_call_sid: callSid,
     status: existing?.status || 'in_progress',
     summary: serializeSummary(meta),
@@ -998,13 +1016,16 @@ async function upsertContact({
   lastReason,
   notes,
   metadata,
+  callId,
 } = {}) {
   if (!tenantId) return null;
-  const phoneNorm = String(phone || '').trim() || null;
+  const phoneNorm = normalizeStoredPhone(phone);
   const nameNorm = String(name || '').trim() || null;
   const reasonNorm = String(lastReason || '').trim() || null;
   const notesNorm = String(notes || '').trim() || null;
   const now = new Date().toISOString();
+  const incomingMeta = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+  delete incomingMeta.alternate_names;
 
   if (phoneNorm) {
     const { data: existing, error: findErr } = await supabase
@@ -1020,16 +1041,20 @@ async function upsertContact({
     throwIfError('upsertContact(find)', findErr);
 
     if (existing?.id) {
+      const identity = mergeContactIdentity(existing, {
+        name: nameNorm,
+        callId: callId || null,
+        seenAt: now,
+      });
       const patch = {
         updated_at: now,
-        name: nameNorm || existing.name || null,
+        name: identity.name,
         last_reason: reasonNorm || existing.last_reason || null,
         notes: notesNorm || existing.notes || null,
         metadata: {
-          ...(existing.metadata && typeof existing.metadata === 'object'
-            ? existing.metadata
-            : {}),
-          ...(metadata && typeof metadata === 'object' ? metadata : {}),
+          ...identity.metadata,
+          ...incomingMeta,
+          alternate_names: identity.metadata.alternate_names,
         },
       };
       const { data, error } = await supabase
@@ -1043,15 +1068,24 @@ async function upsertContact({
     }
   }
 
+  const identity = mergeContactIdentity(null, {
+    name: nameNorm,
+    callId: callId || null,
+    seenAt: now,
+  });
   const { data, error } = await supabase
     .from('contacts')
     .insert({
       tenant_id: tenantId,
       phone: phoneNorm,
-      name: nameNorm,
+      name: identity.name,
       last_reason: reasonNorm,
       notes: notesNorm,
-      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      metadata: {
+        ...identity.metadata,
+        ...incomingMeta,
+        alternate_names: identity.metadata.alternate_names,
+      },
       updated_at: now,
     })
     .select('*')
@@ -1095,7 +1129,7 @@ async function createServiceRequest({
     : 'enquiry';
   const callerName = String(name || callRow?.name || '').trim() || null;
   const callerPhone =
-    String(phone || callRow?.from_number || '').trim() || null;
+    normalizeStoredPhone(phone || callRow?.from_number) || null;
   const itemText = String(item || '').trim() || null;
   const qtyText = String(quantity || '').trim() || null;
   const when = String(whenText || '').trim() || null;
@@ -1105,6 +1139,7 @@ async function createServiceRequest({
     tenantId: resolvedTenantId,
     phone: callerPhone,
     name: callerName,
+    callId: callRow?.id || null,
     lastReason:
       [requestType, itemText, when].filter(Boolean).join(' — ') || noteText,
   });
@@ -1188,7 +1223,7 @@ async function updateServiceRequest({
     if (requestType) patch.request_type = requestType;
   }
   if (name != null) patch.caller_name = String(name || '').trim() || null;
-  if (phone != null) patch.caller_phone = String(phone || '').trim() || null;
+  if (phone != null) patch.caller_phone = normalizeStoredPhone(phone);
   if (item != null) patch.item = String(item || '').trim() || null;
   if (quantity != null) patch.quantity = String(quantity || '').trim() || null;
   if (whenText != null) patch.when_text = String(whenText || '').trim() || null;
@@ -1249,7 +1284,7 @@ async function createAppointment({
 
   const callerName = String(name || callRow?.name || '').trim() || null;
   const callerPhone =
-    String(phone || callRow?.from_number || '').trim() || null;
+    normalizeStoredPhone(phone || callRow?.from_number) || null;
   const when = String(whenText || '').trim() || null;
   const addressLandmark =
     String(landmark || address || '').trim() || null;
@@ -1261,6 +1296,7 @@ async function createAppointment({
     tenantId: resolvedTenantId,
     phone: callerPhone,
     name: callerName,
+    callId: callRow?.id || null,
     lastReason:
       ['visit', service, when, addressLandmark].filter(Boolean).join(' — ') ||
       noteText,
@@ -1379,7 +1415,7 @@ async function updateAppointment({
 
   if (!targetId) {
     const callerPhone =
-      String(phone || callRow?.from_number || '').trim() || null;
+      normalizeStoredPhone(phone || callRow?.from_number) || null;
     let findQuery = supabase
       .from('appointments')
       .select('id')
@@ -1454,4 +1490,6 @@ module.exports = {
   mergeCallSummaryMeta,
   RECORDINGS_BUCKET,
   shapeCall,
+  normalizeStoredPhone,
+  mergeContactIdentity,
 };

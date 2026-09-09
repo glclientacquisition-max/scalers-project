@@ -108,6 +108,7 @@ export type InboxItem = {
   needsYou: boolean;
   callerName: string | null;
   callerPhone: string | null;
+  contactId: string | null;
   headline: string;
   detail: string | null;
   callId: string | null;
@@ -409,6 +410,7 @@ export function buildInboxItem(opts: {
     needsYou,
     callerName,
     callerPhone,
+    contactId: null,
     headline,
     detail,
     callId: lead?.call.id || job?.call_id || hold?.call_id || null,
@@ -464,6 +466,40 @@ export function assembleInboxItems(opts: {
 
   items.sort(compareInboxSignal);
   return items;
+}
+
+export function resolveDisplayedCallerName(
+  item: InboxItem,
+  contactName?: string | null
+): string | null {
+  const fromContact = String(contactName || "").trim() || null;
+  const fromSummary = String(item.lead?.name || "").trim() || null;
+  const fromHoldOrJob =
+    String(item.job?.caller_name || item.hold?.caller_name || "").trim() || null;
+  return fromContact || fromSummary || fromHoldOrJob || item.callerPhone || null;
+}
+
+export function attachContactIds(
+  items: InboxItem[],
+  contacts: Array<{ id: string; phone: string | null; name?: string | null }>
+): InboxItem[] {
+  const byPhone = new Map<string, { id: string; name: string | null }>();
+  for (const row of contacts) {
+    if (row.phone) {
+      byPhone.set(row.phone, {
+        id: row.id,
+        name: row.name?.trim() || null,
+      });
+    }
+  }
+  return items.map((item) => {
+    const person = item.callerPhone ? byPhone.get(item.callerPhone) || null : null;
+    return {
+      ...item,
+      contactId: person?.id || null,
+      callerName: resolveDisplayedCallerName(item, person?.name || null),
+    };
+  });
 }
 
 export function itemMatchesPurpose(
