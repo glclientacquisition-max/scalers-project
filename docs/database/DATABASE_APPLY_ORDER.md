@@ -151,6 +151,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | --- | --- | --- |
 | 30 | `business_operating_model.sql` | knowledge era / `agent_tools.sql` |
 | 31 | `contacts_and_requests.sql` | `business_operating_model.sql`, `owner_rls.sql` |
+| 31b | `contacts_owner_insert.sql` | `contacts_and_requests.sql` |
 | 32 | `product_catalog_and_social.sql` | `business_operating_model.sql` |
 | 33 | `appointments.sql` | **`contacts_and_requests.sql`** (FK to contacts) |
 

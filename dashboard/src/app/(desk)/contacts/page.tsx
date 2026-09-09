@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddContactPanel } from "@/components/AddContactPanel";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
@@ -79,15 +80,26 @@ export default async function ContactsPage({
   return (
     <div>
       <header className="space-y-6">
-        <div>
-          <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-            Contacts
-          </h1>
-          {total > 0 ? (
-            <p className="mt-1 text-[13px] text-ink-soft">
-              {total} {total === 1 ? "caller" : "callers"}
-            </p>
-          ) : null}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+              Contacts
+            </h1>
+            {total > 0 ? (
+              <p className="mt-1 text-[13px] text-ink-soft">
+                {total} {total === 1 ? "caller" : "callers"}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/contacts/import"
+              className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+            >
+              Import CSV
+            </Link>
+            <AddContactPanel />
+          </div>
         </div>
         <nav aria-label="Filter by name" className="border-b border-line">
           <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
