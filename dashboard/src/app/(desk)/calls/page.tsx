@@ -175,7 +175,16 @@ function InboxRow({
           </td>
           <td className="px-5 py-5 align-top">
             <p className="font-medium text-ink">
-              {item.callerName || "Caller"}
+              {item.contactId ? (
+                <Link
+                  href={`/contacts/${item.contactId}`}
+                  className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                >
+                  {item.callerName || "Caller"}
+                </Link>
+              ) : (
+                item.callerName || "Caller"
+              )}
             </p>
             {item.callerPhone ? (
               <WhatsAppLink number={item.callerPhone} message={message} compact />
@@ -193,7 +202,16 @@ function InboxRow({
           </td>
           <td className="px-5 py-5 align-top">
             <p className="font-medium text-ink">
-              {item.callerName || "Caller"}
+              {item.contactId ? (
+                <Link
+                  href={`/contacts/${item.contactId}`}
+                  className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                >
+                  {item.callerName || "Caller"}
+                </Link>
+              ) : (
+                item.callerName || "Caller"
+              )}
             </p>
             {item.callerPhone ? (
               <WhatsAppLink number={item.callerPhone} message={message} compact />
@@ -207,7 +225,16 @@ function InboxRow({
         <>
           <td className="px-5 py-5 align-top">
             <p className="text-base font-semibold tracking-tight text-ink">
-              {item.callerName || item.callerPhone || "Caller"}
+              {item.contactId ? (
+                <Link
+                  href={`/contacts/${item.contactId}`}
+                  className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                >
+                  {item.callerName || item.callerPhone || "Caller"}
+                </Link>
+              ) : (
+                item.callerName || item.callerPhone || "Caller"
+              )}
             </p>
             <p className="mt-0.5 text-sm font-medium text-ink">{item.headline}</p>
             {item.detail ? (

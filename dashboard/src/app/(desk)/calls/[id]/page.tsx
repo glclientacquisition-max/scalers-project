@@ -200,6 +200,12 @@ export default async function CallDetailPage({
 
   if (error || !call) notFound();
   const row = call;
+  const { data: person } = await workspace.client
+    .from("contacts")
+    .select("id")
+    .eq("tenant_id", tenant.id)
+    .eq("phone", row.caller_number)
+    .maybeSingle();
   const meta = parseSummary(row.summary);
   const name = typeof meta.name === "string" ? meta.name : null;
   const reason = typeof meta.reason === "string" ? meta.reason : null;
@@ -356,6 +362,14 @@ export default async function CallDetailPage({
               <p className="mt-2 text-lg font-medium text-ink">{row.caller_number}</p>
               {name ? (
                 <p className="mt-1 text-sm text-ink-soft">Name: {name}</p>
+              ) : null}
+              {person?.id ? (
+                <Link
+                  href={`/contacts/${person.id}`}
+                  className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                >
+                  Open contact
+                </Link>
               ) : null}
               <p className="mt-2 text-xs text-ink-soft">
                 SID {row.sautikit_call_sid || "Not set"}

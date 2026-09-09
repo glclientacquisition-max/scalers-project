@@ -108,6 +108,7 @@ export type InboxItem = {
   needsYou: boolean;
   callerName: string | null;
   callerPhone: string | null;
+  contactId: string | null;
   headline: string;
   detail: string | null;
   callId: string | null;
@@ -409,6 +410,7 @@ export function buildInboxItem(opts: {
     needsYou,
     callerName,
     callerPhone,
+    contactId: null,
     headline,
     detail,
     callId: lead?.call.id || job?.call_id || hold?.call_id || null,
@@ -464,6 +466,20 @@ export function assembleInboxItems(opts: {
 
   items.sort(compareInboxSignal);
   return items;
+}
+
+export function attachContactIds(
+  items: InboxItem[],
+  contacts: Array<{ id: string; phone: string | null }>
+): InboxItem[] {
+  const byPhone = new Map<string, string>();
+  for (const row of contacts) {
+    if (row.phone) byPhone.set(row.phone, row.id);
+  }
+  return items.map((item) => ({
+    ...item,
+    contactId: item.callerPhone ? byPhone.get(item.callerPhone) || null : null,
+  }));
 }
 
 export function itemMatchesPurpose(

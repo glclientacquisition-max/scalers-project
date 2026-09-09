@@ -2,6 +2,7 @@ import { type CallRow } from "@/lib/supabase";
 import { toLead } from "@/lib/callsTriage";
 import {
   assembleInboxItems,
+  attachContactIds,
   type InboxHold,
   type InboxItem,
   type InboxJob,
@@ -81,8 +82,29 @@ export async function loadInboxItems(
   const holds = (holdsRes.error ? [] : holdsRes.data || []) as InboxHold[];
   const jobs = (jobsRes.error ? [] : jobsRes.data || []) as InboxJob[];
   const leads = (data || []).map(toLead);
+  const items = assembleInboxItems({ leads, holds, jobs, vertical });
+
+  const phones = [
+    ...new Set(
+      items
+        .map((item) => item.callerPhone)
+        .filter((phone): phone is string => Boolean(phone && phone !== "unknown"))
+    ),
+  ];
+  let withPeople = items;
+  if (phones.length) {
+    const people = await client
+      .from("contacts")
+      .select("id, phone")
+      .eq("tenant_id", tenantId)
+      .in("phone", phones);
+    if (!people.error) {
+      withPeople = attachContactIds(items, people.data || []);
+    }
+  }
+
   return {
-    items: assembleInboxItems({ leads, holds, jobs, vertical }),
+    items: withPeople,
     error: null,
   };
 }

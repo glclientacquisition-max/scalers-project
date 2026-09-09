@@ -59,13 +59,33 @@ export default async function ContactsPage({
 
   return (
     <div>
-      <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
-        Contacts
-      </h1>
+      <header className="space-y-1">
+        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+          Contacts
+        </h1>
+        {total > 0 ? (
+          <p className="text-[13px] text-ink-soft">
+            {total} {total === 1 ? "caller" : "callers"}
+          </p>
+        ) : null}
+      </header>
 
       {rows.length === 0 ? (
         <div className="mt-8 border-y border-line py-12 text-center">
-          <p className="font-display text-2xl tracking-tight text-ink">No contacts</p>
+          <p className="font-display text-2xl tracking-tight text-ink">No callers</p>
+          {String(tenant.sautikit_virtual_number || "").startsWith("pending:") ? (
+            <p className="mt-2 text-sm text-ink-soft">Number being assigned</p>
+          ) : tenant.sautikit_virtual_number ? (
+            <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+              Call{" "}
+              <a
+                href={`tel:${tenant.sautikit_virtual_number}`}
+                className="font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-2 hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              >
+                {tenant.sautikit_virtual_number}
+              </a>
+            </p>
+          ) : null}
         </div>
       ) : (
         <>

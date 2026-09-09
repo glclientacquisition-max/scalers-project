@@ -143,7 +143,31 @@ async function listActiveTenantDids() {
   return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
 }
 
-async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 'sautikit' }) {
+async function rememberCallerContact(call) {
+  if (!call?.tenant_id) return null;
+  const phone = normalizeStoredPhone(call.from_number);
+  if (!phone || phone.toLowerCase() === 'unknown') return null;
+  try {
+    return await upsertContact({
+      tenantId: call.tenant_id,
+      phone,
+      name: call.name || null,
+      lastReason: call.reason || null,
+    });
+  } catch (err) {
+    console.warn('[db] rememberCallerContact skipped:', err?.message || err);
+    return null;
+  }
+}
+
+async function upsertCall({
+  callSid,
+  fromNumber,
+  toNumber,
+  tenantId,
+  provider = 'sautikit',
+  rememberContact = true,
+} = {}) {
   const resolvedTenantId = await resolveTenantId({ toNumber, fromNumber, tenantId });
   const existing = await getCall(callSid);
   const meta = existing
@@ -171,7 +195,9 @@ async function upsertCall({ callSid, fromNumber, toNumber, tenantId, provider = 
     .single();
 
   throwIfError('upsertCall', error);
-  return shapeCall(data);
+  const shaped = shapeCall(data);
+  if (rememberContact) await rememberCallerContact(shaped);
+  return shaped;
 }
 
 async function saveCallerInfo({ callSid, name, reason }) {
@@ -197,7 +223,9 @@ async function saveCallerInfo({ callSid, name, reason }) {
     .maybeSingle();
 
   throwIfError('saveCallerInfo', error);
-  return shapeCall(data);
+  const shaped = shapeCall(data);
+  await rememberCallerContact(shaped);
+  return shaped;
 }
 
 /**
@@ -374,6 +402,7 @@ async function persistOutboundTransferLeg({
     toNumber: toNumber || null,
     tenantId,
     provider: 'sautikit',
+    rememberContact: false,
   });
   await mergeCallSummaryMeta({
     callSid: outboundCallSid,
