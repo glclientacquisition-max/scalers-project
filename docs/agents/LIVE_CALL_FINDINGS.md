@@ -1,3 +1,21 @@
+# Silent DID test after #238 — Done and Dusted (2026-09-10)
+
+Staging DID `+254709221536` (Shy). Caller `+254790381872`. Call `HD_0ae324d56f23` (~06:18 UTC, 48s). Staging `/healthz.gitSha=65883c8` (`#238` on `main`).
+
+The line answered. The caller heard **no agent audio**. Transcript still stored a greeting and a reply (*I am doing great, thank you for asking!*). Railway:
+
+```
+⚠ Soniox voice not ready voice=7b197f3c-84b4-4404-986f-114e4dac1432 model=tts-rt-v1 status=missing
+```
+
+`tts-rt-v1` was removed 2026-08-31. Clone voices must be `ready` on `tts-rt-v2`. Staging did not pin `SONIOX_TTS_MODEL`; `#238` still defaulted to v1. TTS opened a stream and logged chunks, but Soniox returned no PCM.
+
+Fix: default and remap to `tts-rt-v2` (even if env is still v1), recompute the clone when status is `missing`, log `silent stream` when a TTS stream terminates with 0 bytes.
+
+Earlier the same morning `HD_7ef72820c4b5` (~06:13, pre-`#238` boot) still had a full conversation. Silence started on the v1-default deploy, not hangup.
+
+---
+
 # Speech naturality — Done and Dusted (2026-09-10)
 
 Staging DID `+254709221536` (Shy) on `main` `#237` (`VOICE_PROFILE=balanced`, speed 1.0, gain 1.22). Caller `+254790381872`.
@@ -15,6 +33,8 @@ Staging DID `+254709221536` (Shy) on `main` `#237` (`VOICE_PROFILE=balanced`, sp
 3. TTS exclamation (*thank you!*) makes Soniox punch/strain, then the next streamed sentence restarts.
 
 Voice fix: do not arm idle nudge until the caller has spoken; calmer line (*How can I help?*); default delay 10s; skip thinking-ack on phatic turns; speak `!` as `.`.
+
+**Articulation (where the struggle is loudest):** we were flushing 5-word / comma fragments into Soniox. The model treats each fragment as a finished utterance, so words are over-enunciated then restarted. That is the sounding-out quality. Default is now sentence-only flush (Pipecat does the same: sentence aggregation) and `tts-rt-v2`. Do not turn `reduce_silence` on. Hyphenated owner names (`Kris-to-fa`) stay a Desk pronunciation issue.
 
 Brain leftover (separate lane): *I'm doing well, thank you!* plus an unsolicited couch/carpet/mattress list still violates the 1-sentence / no-lists phone rule.
 

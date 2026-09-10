@@ -71,6 +71,15 @@ test('early word-window flush for first audio', () => {
   assert.strictEqual(rest, 'afternoon if that works');
 });
 
+test('default is sentence-only so TTS does not articulate a fragment', () => {
+  const { chunks, rest } = splitSpeakableChunks(
+    'We can send someone this afternoon if that works',
+    { final: false, earlyFlushChars: 0, earlyFlushWords: 0 }
+  );
+  assert.deepStrictEqual(chunks, []);
+  assert.match(rest, /We can send someone this afternoon/);
+});
+
 console.log('createSpokenStreamBuffer');
 test('streams sentence then tools without speaking markers', () => {
   const buf = createSpokenStreamBuffer({ earlyFlushChars: 80 });

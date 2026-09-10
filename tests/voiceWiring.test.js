@@ -448,4 +448,38 @@ assert.doesNotMatch(
   'Express res.send(Uint8Array) JSON-serializes preview audio; use writeWavResponse'
 );
 
+const ttsPath = path.join(__dirname, '..', 'src/speech/sonioxTts.js');
+const ttsSource = fs.readFileSync(ttsPath, 'utf8');
+assert.match(
+  ttsSource,
+  /resolveSonioxTtsModel/,
+  'live TTS must resolve the model at send time (retired v1 remaps to v2)'
+);
+assert.doesNotMatch(
+  ttsSource,
+  /reduce_silence/,
+  'must not send reduce_silence (invalid_request on models that lack it)'
+);
+
+const voicePath = path.join(__dirname, '..', 'src/speech/sonioxVoice.js');
+const voiceSource = fs.readFileSync(voicePath, 'utf8');
+assert.match(
+  voiceSource,
+  /DEFAULT_SONIOX_TTS_MODEL = 'tts-rt-v2'/,
+  'live TTS must default to tts-rt-v2 (v1 removed)'
+);
+assert.match(
+  voiceSource,
+  /tts-rt-v1/,
+  'retired tts-rt-v1 must be remapped so clone voices are not silent'
+);
+
+const streamBufPath = path.join(__dirname, '..', 'src/speech/spokenStreamBuffer.js');
+const streamBufSource = fs.readFileSync(streamBufPath, 'utf8');
+assert.match(
+  streamBufSource,
+  /envInt\('VOICE_STREAM_EARLY_CHARS', 0\)/,
+  'streamed TTS must default to sentence-only flush so fragments are not articulated'
+);
+
 console.log('Voice runtime wiring checks passed.');

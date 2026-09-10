@@ -107,7 +107,8 @@ VOICE_PROFILE=balanced
 VOICE_TTS_GAIN=1.22
 GEMINI_THINKING_LEVEL=MINIMAL
 GEMINI_MAX_OUTPUT_TOKENS=120
-# stream buffer (code defaults): earlyFlushChars=18, earlyFlushWords=5
+# stream buffer: sentence-only (earlyFlushChars=0). Do not flush 5-word fragments.
+SONIOX_TTS_MODEL=tts-rt-v2
 ```
 
 ---

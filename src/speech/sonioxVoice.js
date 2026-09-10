@@ -12,6 +12,29 @@ const SCALERS_SONIOX_VOICE_ID = getDefaultVoiceId();
 const SONIOX_VOICES_API =
   process.env.SONIOX_VOICES_API || 'https://api.soniox.com/v1/voices';
 
+const DEFAULT_SONIOX_TTS_MODEL = 'tts-rt-v2';
+/** Removed 2026-08-31. Clones are `missing` on v1 → TTS accepts the stream and plays silence. */
+const RETIRED_SONIOX_TTS_MODELS = new Set(['tts-rt-v1']);
+
+/**
+ * Live TTS model. Retired names (tts-rt-v1) always map to tts-rt-v2,
+ * even when SONIOX_TTS_MODEL is pinned in env.
+ * @param {string|null|undefined} [requested]
+ */
+function resolveSonioxTtsModel(requested) {
+  const raw = String(
+    requested != null && String(requested).trim()
+      ? requested
+      : process.env.SONIOX_TTS_MODEL || DEFAULT_SONIOX_TTS_MODEL
+  ).trim();
+  if (!raw || RETIRED_SONIOX_TTS_MODELS.has(raw)) return DEFAULT_SONIOX_TTS_MODEL;
+  return raw;
+}
+
+function shouldRecomputeVoiceStatus(status) {
+  return status === 'not_computed' || status === 'missing';
+}
+
 /**
  * Resolve Soniox TTS voice for a call or preview.
  * @param {string|null|undefined} [tenantVoiceId]
@@ -106,8 +129,11 @@ async function recomputeVoiceForModel(model, voiceId) {
  */
 async function ensureSonioxVoiceReady(opts = {}) {
   const log = opts.log || console.log;
-  const model =
-    opts.model || process.env.SONIOX_TTS_MODEL || 'tts-rt-v1';
+  const requested = String(opts.model || process.env.SONIOX_TTS_MODEL || '').trim();
+  const model = resolveSonioxTtsModel(opts.model);
+  if (requested && requested !== model) {
+    log(`ℹ SONIOX_TTS_MODEL=${requested} retired — using ${model}`);
+  }
 
   const envVoice = String(process.env.SONIOX_VOICE || '').trim();
   if (envVoice && !isAllowedVoiceId(envVoice)) {
@@ -128,8 +154,10 @@ async function ensureSonioxVoiceReady(opts = {}) {
       continue;
     }
 
-    if (status.status === 'not_computed') {
-      log(`ℹ Soniox voice ${voice.id} not prepared for ${model} — recompute…`);
+    if (shouldRecomputeVoiceStatus(status.status)) {
+      log(
+        `ℹ Soniox voice ${voice.id} ${status.status || 'missing'} for ${model} — recompute…`
+      );
       const recompute = await recomputeVoiceForModel(model, voice.id);
       if (!recompute.ok) {
         log(`⚠ Soniox voice recompute failed (${voice.id}): ${recompute.error}`);
@@ -154,7 +182,10 @@ async function ensureSonioxVoiceReady(opts = {}) {
 
 module.exports = {
   SCALERS_SONIOX_VOICE_ID,
+  DEFAULT_SONIOX_TTS_MODEL,
   resolveSonioxVoice,
+  resolveSonioxTtsModel,
+  shouldRecomputeVoiceStatus,
   ttsVoiceNeedsSwap,
   isUuidVoice,
   isAllowedVoiceId,
