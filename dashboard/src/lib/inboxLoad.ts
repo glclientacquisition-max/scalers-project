@@ -79,9 +79,9 @@ export async function loadInboxItems(
       .limit(INBOX_WINDOW),
   ]);
 
-  let jobsRes = jobsFirst;
-  if (jobsRes.error && /window_start|window_end|column/i.test(jobsRes.error.message)) {
-    jobsRes = await client
+  let jobs: InboxJob[] = [];
+  if (jobsFirst.error && /window_start|window_end|column/i.test(jobsFirst.error.message)) {
+    const retry = await client
       .from("appointments")
       .select(
         "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
@@ -89,10 +89,12 @@ export async function loadInboxItems(
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW);
+    jobs = (retry.error ? [] : retry.data || []) as InboxJob[];
+  } else {
+    jobs = (jobsFirst.error ? [] : jobsFirst.data || []) as InboxJob[];
   }
 
   const holds = (holdsRes.error ? [] : holdsRes.data || []) as InboxHold[];
-  const jobs = (jobsRes.error ? [] : jobsRes.data || []) as InboxJob[];
   const leads = (data || []).map(toLead);
   const items = assembleInboxItems({ leads, holds, jobs, vertical });
 
