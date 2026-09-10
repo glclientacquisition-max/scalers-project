@@ -231,6 +231,12 @@ test('empty input is safe', () => {
   assert.deepStrictEqual(prepared, { original: '', text: '', language: 'en' });
 });
 
+test('exclamation becomes a period so TTS does not punch', () => {
+  const prepared = prepareForTts("I'm doing well, thank you! How can I help?");
+  assert.ok(!prepared.text.includes('!'));
+  assert.match(prepared.text, /thank you\./);
+});
+
 console.log('speedForLanguage');
 test('SW speed env override', () => {
   const prev = process.env.SONIOX_TTS_SPEED_SW;

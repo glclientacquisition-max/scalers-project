@@ -7,6 +7,8 @@ const {
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
   looksLikeCallerName,
+  looksLikePhaticCallerTurn,
+  shouldSpeakThinkingAck,
 } = require('../src/conversation/dynamicSpeech');
 
 assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay, let me save that.');
@@ -16,6 +18,11 @@ assert.strictEqual(pickActionProgress('TRANSFER', 'en'), 'Okay, let me connect y
 assert.match(pickActionProgress('CREATE_REQUEST', 'sw'), /Sawa/i);
 assert.match(pickActionProgress('CAPTURE', 'sw'), /^Sawa\.?$/i);
 assert.ok(pickContextualAck('I want to order a book', 'en'));
+assert.equal(looksLikePhaticCallerTurn('How are you doing?'), true);
+assert.equal(looksLikePhaticCallerTurn('hello'), true);
+assert.equal(looksLikePhaticCallerTurn('how much for a couch?'), false);
+assert.equal(shouldSpeakThinkingAck('How are you doing?'), false);
+assert.equal(shouldSpeakThinkingAck('How much for a couch?'), true);
 assert.match(
   pickClarifyProgress({
     action: 'ASK_CLARIFICATION',

@@ -1,7 +1,7 @@
 // After a committed agent question, speak one canned check-in if the
 // caller stays silent. Not a Gemini turn. Not an auto hangup.
 
-const DEFAULT_DELAY_MS = 5000;
+const DEFAULT_DELAY_MS = 10000;
 const MIN_DELAY_MS = 1500;
 const MAX_DELAY_MS = 15000;
 const MAX_PER_CALL = 2;
