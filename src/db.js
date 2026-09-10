@@ -955,6 +955,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       businessPolicies: {},
       billingEnforcement: null,
       walletBalanceKes: null,
+      openAppointments: [],
     };
   }
 
@@ -1002,7 +1003,32 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       row.billing_enforcement != null ? String(row.billing_enforcement) : null,
     walletBalanceKes:
       row.wallet_balance_kes != null ? Number(row.wallet_balance_kes) : null,
+    openAppointments: await listOpenAppointments(row.id),
   };
+}
+
+async function listOpenAppointments(tenantId, { limit = 30 } = {}) {
+  if (!tenantId) return [];
+  const { data, error } = await supabase
+    .from('appointments')
+    .select(
+      'id, service_name, status, when_text, window_start, window_end, address_landmark, caller_name'
+    )
+    .eq('tenant_id', tenantId)
+    .in('status', ['requested', 'confirmed'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (/appointments|relation/i.test(error.message)) {
+      console.warn(
+        '[db] listOpenAppointments skipped (apply appointments.sql):',
+        error.message
+      );
+      return [];
+    }
+    throwIfError('listOpenAppointments', error);
+  }
+  return Array.isArray(data) ? data : [];
 }
 
 /**
@@ -1487,6 +1513,7 @@ module.exports = {
   updateServiceRequest,
   createAppointment,
   updateAppointment,
+  listOpenAppointments,
   mergeCallSummaryMeta,
   RECORDINGS_BUCKET,
   shapeCall,

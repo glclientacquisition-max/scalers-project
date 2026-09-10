@@ -174,12 +174,16 @@ export function callsHref(opts: {
   status?: StatusFilterId;
   page?: number;
   q?: string;
+  view?: string;
+  week?: string;
 } = {}): string {
   const q = new URLSearchParams();
   if (opts.purpose) q.set("purpose", opts.purpose);
   else if (opts.status) q.set("status", opts.status);
   if (opts.q?.trim()) q.set("q", opts.q.trim());
   if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  if (opts.view) q.set("view", opts.view);
+  if (opts.week) q.set("week", opts.week);
   const qs = q.toString();
   return qs ? `/calls?${qs}` : "/calls";
 }

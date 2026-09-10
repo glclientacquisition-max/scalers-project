@@ -142,6 +142,8 @@ function buildLiveGroundTruth(profile = {}) {
   const products = require('./productCatalog').normalizeProducts(
     profile.productCatalog
   );
+  const { formatProductsOverview } = require('./productCatalog');
+  const { formatOpenVisitsForPrompt } = require('./visitCalendar');
   const {
     normalizeSocialHandles,
     socialHandlesHaveContent,
@@ -157,7 +159,7 @@ function buildLiveGroundTruth(profile = {}) {
   const tools = parseAgentTools(profile.agentTools);
   const vertical = parseVertical(profile.vertical);
   const handoffMode = parseHandoffMode(profile.handoffMode);
-
+  const openVisits = formatOpenVisitsForPrompt(profile.openAppointments);
   const hasAny =
     services.length ||
     products.length ||
@@ -167,7 +169,8 @@ function buildLiveGroundTruth(profile = {}) {
     policiesHaveContent(policies) ||
     socialHandlesHaveContent(social) ||
     unknown ||
-    extras;
+    extras ||
+    Boolean(openVisits);
   if (!hasAny) return '';
 
   const parts = [
@@ -197,7 +200,6 @@ function buildLiveGroundTruth(profile = {}) {
     parts.push('', 'SERVICE NOTES:', extras);
   }
 
-  const { formatProductsOverview } = require('./productCatalog');
   parts.push(
     '',
     'PRODUCT CATALOGUE (individual items — prices/stock from here / TARGETED PRODUCT MATCHES only):',
@@ -206,6 +208,10 @@ function buildLiveGroundTruth(profile = {}) {
 
   if (socialHandlesHaveContent(social)) {
     parts.push('', 'PHONES, SOCIAL & WEB:', formatSocialHandlesBlock(social));
+  }
+
+  if (openVisits) {
+    parts.push('', openVisits);
   }
 
   parts.push('', 'POLICIES:', formatPoliciesBlock(policies));

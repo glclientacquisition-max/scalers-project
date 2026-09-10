@@ -27,6 +27,11 @@ import {
   type InboxItem,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
+import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
+import {
+  parseWeekParam,
+  shiftWeekYmd,
+} from "@/lib/visitCalendar";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -293,6 +298,8 @@ export default async function CallsPage({
     status?: string;
     purpose?: string;
     q?: string;
+    view?: string;
+    week?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -351,13 +358,17 @@ export default async function CallsPage({
   const counts = countInboxPurposes(searched);
   const activeFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
   const filtered = searched.filter((item) => itemMatchesPurpose(item, activeFilter));
+  const weekView = activeFilter === "job" && String(sp.view || "") === "week";
+  const monday = parseWeekParam(sp.week);
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = filtered.slice(from, from + PAGE_SIZE);
+  const pageRows = weekView ? filtered : filtered.slice(from, from + PAGE_SIZE);
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
     q: q || undefined,
+    view: weekView ? "week" : undefined,
+    week: weekView ? monday : undefined,
   };
 
   return (
@@ -368,6 +379,8 @@ export default async function CallsPage({
         q={q}
         caption={inboxCaption(searched, vertical)}
         vertical={vertical}
+        view={weekView ? "week" : undefined}
+        week={weekView ? monday : undefined}
       />
 
       {pageRows.length === 0 ? (
@@ -377,6 +390,26 @@ export default async function CallsPage({
           did={tenant.sautikit_virtual_number}
           purpose={activeFilter}
           q={q}
+          vertical={vertical}
+        />
+      ) : weekView ? (
+        <VisitWeekCalendar
+          items={filtered}
+          monday={monday}
+          prevHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "week",
+            week: shiftWeekYmd(monday, -1),
+          })}
+          nextHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "week",
+            week: shiftWeekYmd(monday, 1),
+          })}
+          listHref={callsHref({ purpose: "job", q: q || undefined })}
+          businessName={businessName}
           vertical={vertical}
         />
       ) : (

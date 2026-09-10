@@ -221,7 +221,7 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '',
     'Completion rules:',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
-    '- For book_visit: only fire create_appointment after service + name + when + landmark are known.',
+    '- For book_visit: only fire create_appointment after service + name + when + landmark are known. If OPEN VISITS already has that window, offer another time.',
     '- For reschedule/cancel: use update_appointment; never invent that a visit was moved or cancelled.',
     '- Never invent prices, coverage, ETAs, or claim booked. If a tool fires this turn, speak nothing. The backend confirms.',
     '- After a clear completion, confirm briefly and goodbye.'

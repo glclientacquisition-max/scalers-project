@@ -12,18 +12,23 @@ export function InboxToolbar({
   q,
   caption,
   vertical,
+  view,
+  week,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
   q: string;
   caption?: string;
   vertical?: string | null;
+  view?: string;
+  week?: string;
 }) {
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
   const briefing =
     caption ||
     (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
+  const weekView = active === "job" && view === "week";
 
   return (
     <header className="space-y-6">
@@ -64,7 +69,12 @@ export function InboxToolbar({
             return (
               <li key={item.id} className="shrink-0">
                 <Link
-                  href={callsHref({ purpose: item.id, q: q || undefined })}
+                  href={callsHref({
+                    purpose: item.id,
+                    q: q || undefined,
+                    view: item.id === "job" && weekView ? "week" : undefined,
+                    week: item.id === "job" && weekView ? week : undefined,
+                  })}
                   aria-current={isActive ? "page" : undefined}
                   className={[
                     "group inline-flex min-h-12 items-center gap-2 whitespace-nowrap border-b-2 px-3.5 text-sm font-medium transition duration-150",
@@ -91,6 +101,38 @@ export function InboxToolbar({
           })}
         </ul>
       </nav>
+
+      {active === "job" ? (
+        <nav aria-label="Visit layout" className="flex gap-2">
+          <Link
+            href={callsHref({ purpose: "job", q: q || undefined })}
+            className={[
+              "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
+              !weekView
+                ? "bg-[#0096FF] font-semibold text-white"
+                : "border border-line text-ink hover:border-[#0096FF]",
+            ].join(" ")}
+          >
+            List
+          </Link>
+          <Link
+            href={callsHref({
+              purpose: "job",
+              q: q || undefined,
+              view: "week",
+              week,
+            })}
+            className={[
+              "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
+              weekView
+                ? "bg-[#0096FF] font-semibold text-white"
+                : "border border-line text-ink hover:border-[#0096FF]",
+            ].join(" ")}
+          >
+            Week
+          </Link>
+        </nav>
+      ) : null}
 
       {q ? (
         <p className="text-sm text-ink-soft">
