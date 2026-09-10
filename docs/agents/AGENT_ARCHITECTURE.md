@@ -170,7 +170,7 @@ Trace schema version: `1` (not agent version).
 | Voice ID | `soniox_voice_id` | Default from catalog |
 | Pronunciation | `tts_lexicon` | `TTS_LEXICON_OVERRIDES` |
 | STT vocabulary | Profile fields | `SONIOX_STT_CONTEXT*` |
-| TTS speed | — | `SONIOX_TTS_SPEED`, `SONIOX_TTS_SPEED_SW` |
+| TTS speed / loudness | — | `VOICE_PROFILE`, `VOICE_TTS_GAIN`, `SONIOX_TTS_SPEED*` |
 | Greeting mode | — | `VOICE_GREETING_MODE` |
 | Barge-in tuning | — | `VOICE_BARGE_*`, `SONIOX_MAX_ENDPOINT_DELAY_MS` |
 

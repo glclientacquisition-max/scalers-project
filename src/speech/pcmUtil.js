@@ -60,9 +60,42 @@ function wavBytesTo16kPcm(buf) {
   return parsed.pcm;
 }
 
+/** Scale s16le PCM. gain=1 is a no-op. Clips to int16. */
+function applyPcmGain(pcm, gain) {
+  const src = Buffer.isBuffer(pcm) ? pcm : Buffer.from(pcm || []);
+  const g = Number(gain);
+  if (!src.length || !Number.isFinite(g) || Math.abs(g - 1) < 0.01) return src;
+  const out = Buffer.allocUnsafe(src.length);
+  for (let i = 0; i + 1 < src.length; i += 2) {
+    const v = Math.round(src.readInt16LE(i) * g);
+    out.writeInt16LE(Math.max(-32768, Math.min(32767, v)), i);
+  }
+  if (src.length % 2) out[src.length - 1] = src[src.length - 1];
+  return out;
+}
+
+/**
+ * Raise quiet clips toward targetPeak so fillers and long replies sit at one loudness.
+ * Does not crush already-loud audio. Safe on full utterances, not 20 ms frames.
+ */
+function evenOutPcmS16le(pcm, { targetPeak = 20000, maxGain = 1.8 } = {}) {
+  const src = Buffer.isBuffer(pcm) ? pcm : Buffer.from(pcm || []);
+  if (src.length < 4) return src;
+  let peak = 1;
+  for (let i = 0; i + 1 < src.length; i += 2) {
+    const s = Math.abs(src.readInt16LE(i));
+    if (s > peak) peak = s;
+  }
+  const gain = Math.min(maxGain, targetPeak / peak);
+  if (gain <= 1.04) return src;
+  return applyPcmGain(src, gain);
+}
+
 module.exports = {
   pcmDurationMs,
   resampleS16le,
   wavToPcm,
   wavBytesTo16kPcm,
+  applyPcmGain,
+  evenOutPcmS16le,
 };

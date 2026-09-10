@@ -6,6 +6,7 @@ const { pickContextualAck } = require('../conversation/dynamicSpeech');
 const { prepareForTts } = require('./ttsNormalize');
 const { speedForLanguage } = require('./sonioxTts');
 const { resolveSonioxVoice } = require('./sonioxVoice');
+const { evenOutPcmS16le } = require('./pcmUtil');
 
 const MAX_ENTRIES = 48;
 const CACHED_FILLER_STREAM_PREFIX = 'cached-filler-';
@@ -53,7 +54,10 @@ function getFillerPcm(key) {
 function putFillerPcm(key, pcm) {
   if (!key || !pcm || !pcm.length) return null;
   if (cache.has(key)) cache.delete(key);
-  cache.set(key, Buffer.from(pcm));
+  // Even-out full clips only (≥100 ms). 20 ms frames would pump.
+  let stored = Buffer.from(pcm);
+  if (stored.length >= 3200) stored = evenOutPcmS16le(stored);
+  cache.set(key, stored);
   while (cache.size > MAX_ENTRIES) {
     const oldest = cache.keys().next().value;
     cache.delete(oldest);

@@ -20,6 +20,13 @@ const {
   isSonioxTtsConfigured,
 } = require('./src/speech/sonioxTts');
 const {
+  resolveVoiceProfile,
+  fillerLanguage,
+  publicVoiceProfile,
+  speedForLanguage,
+} = require('./src/speech/voiceProfile');
+const { applyPcmGain } = require('./src/speech/pcmUtil');
+const {
   isFillerCacheEnabled,
   lookupFillerPcm,
   putFillerPcm,
@@ -347,6 +354,7 @@ app.get('/healthz', (_req, res) => {
       executor: envLiveTransferExecutorEnabled(),
       ignoreHours: envLiveTransferIgnoreHours(),
     },
+    voiceProfile: publicVoiceProfile(),
   });
 });
 
@@ -1134,9 +1142,11 @@ const OUTBOUND_PCM_FRAME_BYTES = 640;
 
 function sendPcmToMedia(ws, pcm) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !pcm || !pcm.length) return;
+  // Fixed phone gain on the whole utterance. Do not even-out 20 ms frames (pumping).
+  const boosted = applyPcmGain(pcm, resolveVoiceProfile().gain);
   // Prefer small frames for smoother playback on the telephony side.
-  for (let offset = 0; offset < pcm.length; offset += OUTBOUND_PCM_FRAME_BYTES) {
-    const slice = pcm.subarray(offset, offset + OUTBOUND_PCM_FRAME_BYTES);
+  for (let offset = 0; offset < boosted.length; offset += OUTBOUND_PCM_FRAME_BYTES) {
+    const slice = boosted.subarray(offset, offset + OUTBOUND_PCM_FRAME_BYTES);
     try {
       ws.send(slice, { binary: true });
     } catch (err) {
@@ -1580,6 +1590,7 @@ mediaWss.on('connection', (ws, req) => {
         language: prepared.language,
         callLanguage,
         alreadyPrepared: true,
+        speed: speedForLanguage(prepared.language),
         capture: Boolean(opts.isFiller && isFillerCacheEnabled()),
       });
       activeOutboundStreamId = session.streamId;
@@ -1917,10 +1928,10 @@ mediaWss.on('connection', (ws, req) => {
         fillerMode !== 'off' &&
         !fillerUsedThisCall &&
         !needsImmediateProgress;
-      const fillerDelayMs = Number(process.env.VOICE_FILLER_DELAY_MS || 400);
+      const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
       const fillerText =
         fillerMode === 'ack' || fillerMode === 'auto'
-          ? pickContextualAck(clean, callLanguage)
+          ? pickContextualAck(clean, fillerLanguage(callLanguage))
           : process.env.VOICE_FILLER;
       let fillerStarted = false;
       let firstSpokenChunk = false;

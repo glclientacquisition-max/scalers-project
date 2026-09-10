@@ -35,6 +35,7 @@ Caller stops
 3. Endpoint/flush defaults that sometimes wait nearly a full second on short answers.
 4. Filler cancel / overlap races (partially fixed in PR #74).
 5. No per-turn timing logs → hard to know if a “slow call” was STT, LLM, or TTS.
+6. Pace/loudness drift: EN vs SW TTS speed, quiet fillers vs loud replies, no phone-level gain. Locked by `VOICE_PROFILE`.
 
 ---
 
@@ -44,7 +45,7 @@ Caller stops
 2. **First audio beats perfect sentence** — speak a short clause ASAP; finish the thought in the next chunk.
 3. **Warm the pipe** — prefetch TTS while Gemini starts; don’t pay setup on the critical path.
 4. **Stable defaults > clever one-offs** — tune env defaults so every deploy feels the same.
-5. **Don’t sacrifice Kenya clarity** — TTS speed stays ≤ ~1.0; Swahili can stay slightly slower.
+5. **Don’t sacrifice Kenya clarity** — TTS speed stays at **1.0** by default (same EN/SW). Cap at ~1.06 (`snappy`). Never 1.2+.
 6. **Filler is a safety net, not the product** — auto ack only when first audio is late; prefer real reply audio.
 
 ---
@@ -81,11 +82,12 @@ Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FIND
 
 ### Phase 3 — Operate like a product
 
-| Change | Why |
-| --- | --- |
-| Persist turn timings (or sample to Supabase/log drain) | p50/p90 over real Kenya calls |
-| Env “voice profile” (`balanced` / `snappy`) | One-knob deploy tuning |
-| Regression checklist on staging DID | Manual script: yes/no, name, barge, SW switch |
+| Change | Why | Status |
+| --- | --- | --- |
+| Persist turn timings (or sample to Supabase/log drain) | p50/p90 over real Kenya calls | `latency_ms` on transcript turns; p50 rollup next |
+| Env “voice profile” (`balanced` / `snappy`) | One-knob deploy: locked EN/SW pace + PCM phone gain | This PR |
+| Same-language thinking-acks | English greeting must not be followed by Sawa / Poa | This PR |
+| Regression checklist on staging DID | Manual script: yes/no, name, barge, SW switch | Next |
 
 ---
 
@@ -99,8 +101,10 @@ VOICE_FILLER_DELAY_MS=400
 SONIOX_MAX_ENDPOINT_DELAY_MS=700
 VOICE_FLUSH_MIN_MS=300
 VOICE_FLUSH_MAX_MS=1200
-SONIOX_TTS_SPEED=1.02
-SONIOX_TTS_SPEED_SW=0.98
+SONIOX_TTS_SPEED=1.0
+SONIOX_TTS_SPEED_SW=1.0
+VOICE_PROFILE=balanced
+VOICE_TTS_GAIN=1.22
 GEMINI_THINKING_LEVEL=MINIMAL
 GEMINI_MAX_OUTPUT_TOKENS=120
 # stream buffer (code defaults): earlyFlushChars=18, earlyFlushWords=5

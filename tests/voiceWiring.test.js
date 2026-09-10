@@ -198,6 +198,30 @@ assert.match(
 
 assert.match(
   source,
+  /voiceProfile: publicVoiceProfile\(\)/,
+  'healthz must expose the locked TTS pace and PCM gain profile'
+);
+
+assert.match(
+  source,
+  /applyPcmGain\(pcm, resolveVoiceProfile\(\)\.gain\)/,
+  'outbound PCM must apply the voice-profile phone gain on the whole utterance'
+);
+
+assert.match(
+  source,
+  /pickContextualAck\(clean, fillerLanguage\(callLanguage\)\)/,
+  'thinking-acks must follow the call language, not swap EN/SW'
+);
+
+assert.match(
+  source,
+  /speed: speedForLanguage\(prepared\.language\)/,
+  'speakText must pass the profile speed into Soniox TTS'
+);
+
+assert.match(
+  source,
   /gitSha: resolveVoiceGitSha\(\)/,
   'healthz must expose gitSha so staging Voice can be verified without merging to main'
 );
