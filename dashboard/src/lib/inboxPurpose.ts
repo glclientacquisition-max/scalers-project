@@ -94,6 +94,8 @@ export type InboxJob = {
   service_name: string;
   status: string;
   when_text: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
   address_landmark: string | null;
   notes: string | null;
   caller_name: string | null;

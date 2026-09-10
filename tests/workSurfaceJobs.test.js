@@ -25,6 +25,8 @@ describe("work surface jobs on unified inbox", () => {
     assert.doesNotMatch(nav, /label: "Appointments"/);
     assert.match(requests, /\/calls\?purpose=hold/);
     assert.match(appointments, /\/calls\?purpose=job/);
+    assert.match(inbox, /view: "week"/);
+    assert.match(toolbar, />\s*Week\s*</);
   });
 
   it("makes Overview a map into Inbox purposes", () => {

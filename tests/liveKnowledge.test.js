@@ -109,5 +109,17 @@ test('formatPoliciesBlock marks empty returns as not on file without forcing nam
   assert.equal(hit.text, '');
 });
 
+test('buildLiveGroundTruth lists open visits for booking', () => {
+  const truth = buildLiveGroundTruth({
+    servicesCatalog: [{ name: 'Carpet cleaning' }],
+    openAppointments: [
+      { when_text: 'Tue 10 AM', service_name: 'Carpet cleaning', status: 'requested' },
+    ],
+  });
+  assert.match(truth, /OPEN VISITS/);
+  assert.match(truth, /Tue 10 AM/);
+  assert.match(truth, /Do not offer these exact windows/);
+});
+
 console.log(`\n${passed} passed`);
 if (process.exitCode) process.exit(process.exitCode);
