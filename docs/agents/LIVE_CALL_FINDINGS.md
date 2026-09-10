@@ -16,6 +16,8 @@ Staging DID `+254709221536` (Shy) on `main` `#237` (`VOICE_PROFILE=balanced`, sp
 
 Voice fix: do not arm idle nudge until the caller has spoken; calmer line (*How can I help?*); default delay 10s; skip thinking-ack on phatic turns; speak `!` as `.`.
 
+**Articulation (where the struggle is loudest):** we were flushing 5-word / comma fragments into Soniox. The model treats each fragment as a finished utterance, so words are over-enunciated then restarted. That is the sounding-out quality. Default is now sentence-only flush (Pipecat does the same: sentence aggregation) and `tts-rt-v2`. Do not turn `reduce_silence` on. Hyphenated owner names (`Kris-to-fa`) stay a Desk pronunciation issue.
+
 Brain leftover (separate lane): *I'm doing well, thank you!* plus an unsolicited couch/carpet/mattress list still violates the 1-sentence / no-lists phone rule.
 
 ---
