@@ -21,13 +21,14 @@ describe('business assistant introduction', () => {
     });
     assert.match(line, /you've reached ChapterOne Bookstore/i);
     assert.match(line, /this is Aisha speaking/i);
-    assert.match(line, /English or Kiswahili/i);
     assert.match(line, /How can I help/i);
+    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.doesNotMatch(line, /We help with/i);
     assert.doesNotMatch(line, /^\s*Habari/i);
     assert.ok(introLooksValid(line, 'ChapterOne Bookstore', 'Aisha'));
   });
 
-  it('tells the caller they can use English or Kiswahili', () => {
+  it('keeps the language invite constant but does not speak it on first open', () => {
     const { LANGUAGE_INVITE } = require('../src/conversation/businessAssistantIntro');
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',
@@ -37,9 +38,8 @@ describe('business assistant introduction', () => {
       variant: 0,
     });
     assert.equal(LANGUAGE_INVITE, 'You can speak in English or Kiswahili.');
-    assert.match(line, /You can speak in English or Kiswahili\./);
-    assert.ok(line.indexOf('Aisha') < line.indexOf('English or Kiswahili'));
-    assert.ok(line.indexOf('English or Kiswahili') < line.indexOf('How can I help'));
+    assert.doesNotMatch(line, /You can speak in English or Kiswahili\./);
+    assert.match(line, /How can I help/);
   });
 
   it('adds a short grounded offering from the services catalog', () => {
@@ -79,11 +79,10 @@ describe('business assistant introduction', () => {
       variant: 0,
     });
     assert.match(line, /you've reached ChapterOne Bookstore/i);
-    assert.match(line, /We help with/i);
-    assert.match(line, /delivery/i);
     assert.match(line, /How can I help/i);
-    // Brand still leads — offering is not the first signal.
-    assert.ok(line.indexOf('ChapterOne') < line.indexOf('We help with'));
+    assert.doesNotMatch(line, /We help with/i);
+    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.doesNotMatch(line, /delivery/i);
   });
 
   it('does not invent an offering when none is on file', () => {

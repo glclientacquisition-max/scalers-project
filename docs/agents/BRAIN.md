@@ -26,7 +26,7 @@ Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain t
 
 **MVP product job:** Onboard a business → the DID answers unanswered calls efficiently (greet, hours/location/FAQ, message/hold/escalate, notify). Full-assist resolution remains the north star (`docs/BUSINESS_INTELLIGENCE_ROADMAP.md`) but does not block MVP. Gate: `docs/MVP_SHIP_AND_TEST.md` + `npm run test:mvp`.
 
-**First-open introduction:** Brand-first English greeting via `src/conversation/businessAssistantIntro.js`. When open: business name → agent name → short grounded offering → English/Kiswahili invite → help invite. When closed (or a closure bulletin): identity, closed honesty, one question. Do not list services or invite languages on the closed opener. Offering comes only from services on file. Do not lottery-open in Kiswahili; match language after the caller speaks.
+**First-open introduction:** Brand-first English greeting via `src/conversation/businessAssistantIntro.js`: identity (business name, agent name) then one question. Do not list services or invite languages on the opener, open or closed. Closed adds honesty then still help. Offering stays in live ground truth for later turns. Do not lottery-open in Kiswahili; match language after the caller speaks.
 
 ## Do not touch
 

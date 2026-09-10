@@ -4,16 +4,17 @@
  * Top-level rules (MVP unanswered-call path):
  * 1. Brand first — business name is the hero signal in the first sentence.
  * 2. Agent named — callers know who is speaking.
- * 3. Offering in one short clause when OPEN — grounded in services on file (never invent).
- * 4. Language invite when OPEN — tell callers they can use English or Kiswahili.
+ * 3. Offering is compiled from services on file for later turns, not spoken on
+ *    the first open (callers drop during a catalog dump).
+ * 4. Language match happens after the caller speaks. Do not spend the opener
+ *    on an English/Kiswahili invite.
  * 5. English-default on first open — do not lottery-open in Kiswahili before
  *    the caller has spoken (prevents sticky language flip).
  * 6. One invite — how can I help (or message/closed honesty).
- * 7. Closed honesty — identity, closed/bulletin, one question. No services list
- *    or language invite (those make the opener too long; callers drop).
+ * 7. Closed honesty — identity, closed/bulletin, one question.
  */
 
-/** Spoken once on open — keep short; match language after the caller speaks. */
+/** Kept for desk/tests. Not spoken on the first open. */
 const LANGUAGE_INVITE =
   'You can speak in English or Kiswahili.';
 
@@ -166,7 +167,6 @@ function composeBusinessAssistantIntro(opts = {}) {
       : 'serve';
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
-  const offering = summarizeOfferingForIntro(opts);
 
   // Variant 0 = primary brand-first line; 1 = thank-you alternate (still English).
   const variant =
@@ -194,8 +194,7 @@ function composeBusinessAssistantIntro(opts = {}) {
     return `${identity} We're closed now, but I can still help. How can I assist?`;
   }
 
-  const withOffer = offering ? `${identity} ${offering}` : identity;
-  return `${withOffer} ${LANGUAGE_INVITE} How can I help?`;
+  return `${identity} How can I help?`;
 }
 
 /**
