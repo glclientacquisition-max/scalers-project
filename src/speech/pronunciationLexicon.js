@@ -246,6 +246,34 @@ function isBlockedMatch(match) {
 }
 
 /**
+ * Brand / place say-forms that must keep a single hyphen (Soniox reads them).
+ * Caller names like Al-vin are not in this set: they leak as an extra word.
+ */
+const KEEP_HYPHEN_TOKENS = new Set([
+  'air-tel',
+  'm-pesa',
+  'co-op',
+  'west-lands',
+  'park-lands',
+  'east-lee',
+  'thee-kah',
+  'joo-jah',
+  'man-gah',
+  'e-book',
+  'handy-man',
+  'eye-sha',
+  'njeh-ree',
+  'kah-mau',
+  'mwahn-gee',
+]);
+
+function joinHyphenToken(token) {
+  const joined = token.replace(/-/g, '');
+  if (!joined) return token;
+  return joined.charAt(0).toUpperCase() + joined.slice(1).toLowerCase();
+}
+
+/**
  * Soften over-hyphenated "say" forms that make Soniox pause every syllable.
  * @param {string} say
  */
@@ -254,17 +282,28 @@ function sanitizeSayForm(say) {
   if (!s) return '';
   // Collapse runs of hyphens / weird spacing.
   s = s.replace(/-+/g, '-').replace(/\s*-\s*/g, '-').replace(/\s+/g, ' ').trim();
-  // If almost every syllable is hyphenated (e.g. Op-po-sit Si-ti), prefer de-hyphenated words
-  // when the token is a common short English word.
   s = s
     .split(' ')
     .map((token) => {
       const hyphens = (token.match(/-/g) || []).length;
       const letters = token.replace(/[^a-zA-Z]/g, '');
+      const key = token.toLowerCase();
+      if (KEEP_HYPHEN_TOKENS.has(key)) return token;
+      // Al-vin / Jo-hn: one hyphen, both sides letters → one name, not two words.
+      if (
+        hyphens === 1 &&
+        /^[A-Za-z]+-[A-Za-z]+$/.test(token) &&
+        letters.length >= 4 &&
+        letters.length <= 10
+      ) {
+        return joinHyphenToken(token);
+      }
+      // If almost every syllable is hyphenated (e.g. Op-po-sit Si-ti), prefer de-hyphenated words
+      // when the token is a common short English word.
       if (hyphens >= 2 && letters.length <= 8) {
         const joined = token.replace(/-/g, '');
         if (BLOCKED_MATCH_TOKENS.has(joined.toLowerCase())) {
-          return joined.charAt(0).toUpperCase() + joined.slice(1).toLowerCase();
+          return joinHyphenToken(token);
         }
       }
       return token;

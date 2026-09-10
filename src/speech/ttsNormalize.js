@@ -17,7 +17,9 @@ const SW_UTTERANCE_MARKERS =
  */
 function stripMarkup(text) {
   return String(text || '')
+    .replace(/###(?:ENDCALL|ENDTOOL|TOOL)###/gi, '')
     .replace(/[*_`#]+/g, '')
+    .replace(/\bENDCALL\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -29,6 +31,8 @@ function stripMarkup(text) {
 function polishPunctuation(text) {
   let t = String(text || '');
   t = t.replace(/\u2026/g, '.').replace(/\.\.\./g, '.');
+  // Em/en dash is a Gemini leak. Soniox may speak "dash" or restart the clause.
+  t = t.replace(/\s*[\u2014\u2013]\s*/g, ', ');
   t = t.replace(/([!?.,])\1+/g, '$1');
   // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
   t = t.replace(/!+/g, '.');

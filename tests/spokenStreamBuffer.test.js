@@ -80,6 +80,20 @@ test('default is sentence-only so TTS does not articulate a fragment', () => {
   assert.match(rest, /We can send someone this afternoon/);
 });
 
+test('holds Sure. so it is not its own TTS utterance', () => {
+  const { chunks, rest } = splitSpeakableChunks('Sure.', { final: false });
+  assert.deepStrictEqual(chunks, []);
+  assert.strictEqual(rest, 'Sure.');
+});
+
+test('joins Sure. onto the following question', () => {
+  const { chunks } = splitSpeakableChunks(
+    'Sure. Are you looking to clean a couch?',
+    { final: false }
+  );
+  assert.deepStrictEqual(chunks, ['Sure. Are you looking to clean a couch?']);
+});
+
 console.log('createSpokenStreamBuffer');
 test('streams sentence then tools without speaking markers', () => {
   const buf = createSpokenStreamBuffer({ earlyFlushChars: 80 });
