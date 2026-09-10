@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
+import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
@@ -98,6 +99,7 @@ export default async function ContactsPage({
             >
               Import CSV
             </Link>
+            <PhonebookImportButton />
             <AddContactPanel />
           </div>
         </div>

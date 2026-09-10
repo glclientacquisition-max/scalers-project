@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const {
+  csvFromPickedContacts,
   isContactPickerAvailable,
   planContactCsv,
   planManualContact,
@@ -99,7 +100,7 @@ describe('planContactCsv', () => {
 });
 
 describe('Contact Picker feature detection', () => {
-  it('is true only when contacts and ContactsManager exist', () => {
+  it('is true when navigator.contacts.select exists', () => {
     assert.equal(isContactPickerAvailable(null), false);
     assert.equal(isContactPickerAvailable({ navigator: {} }), false);
     assert.equal(
@@ -108,21 +109,31 @@ describe('Contact Picker feature detection', () => {
     );
     assert.equal(
       isContactPickerAvailable({
-        navigator: { contacts: {} },
-        ContactsManager: function ContactsManager() {},
+        navigator: { contacts: { select: async () => [] } },
       }),
       true
     );
   });
 
+  it('turns picked contacts into the same CSV import path', () => {
+    const csv = csvFromPickedContacts([
+      { name: ['Amina'], tel: ['0712345678', '0700000000'] },
+    ]);
+    assert.match(csv, /^name,phone,notes/);
+    assert.match(csv, /Amina,0712345678,/);
+    const plan = planContactCsv(csv);
+    assert.equal(plan.ok, true);
+    assert.equal(plan.create[0].phone, '+254712345678');
+  });
+
   it('renders the picker button only when available', () => {
     const src = fs.readFileSync(
-      path.join(__dirname, '../dashboard/src/components/AddContactPanel.tsx'),
+      path.join(__dirname, '../dashboard/src/components/PhonebookImportButton.tsx'),
       'utf8'
     );
     assert.match(src, /export function ContactPickButton/);
     assert.match(src, /if \(!available\) return null/);
-    assert.match(src, /Pick from phone contacts/);
+    assert.match(src, /From this phone/);
     assert.match(src, /isContactPickerAvailable\(window\)/);
   });
 });
