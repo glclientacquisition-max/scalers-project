@@ -31,6 +31,57 @@ Hangup `owner_review` is already the better source. It lands 1 to 2 minutes afte
 
 ---
 
+## Caller SMS (client to their customer)
+
+This is the other recipient in the contract: the business's customer, not the Scalers owner.
+
+**Live position:** off until the owner turns on **Text customers** (`notify_channels.caller_sms`, default false). Templates and send path exist. Capture, confirm, cancel, hold, order, and callback are the only triggers.
+
+The live call is still the only thing the customer hears. That is why a booking can be saved and the caller still has no written proof.
+
+### Same corpus: what the customer would have received
+
+Contract: text the caller only on appointment, hold, or promised callback. Not on FAQ, not on enquiry, not on every lead.
+
+| SID | What happened | Send? | Excellence text |
+| --- | --- | --- | --- |
+| `HD_29b949b1e0f0` | Airbnb clean tomorrow 8:00 AM Runda | Yes | `Hi Alvin, Done and Dusted Cleaning Services here. We have your general cleaning visit for tomorrow at 8:00 AM. We will confirm shortly.` |
+| `HD_60edbb89422b` | Mattress tomorrow 10 AM Rongai | Yes | `Hi Alvin, Done and Dusted Cleaning Services here. We have your mattress cleaning visit for tomorrow at 10 AM. We will confirm shortly.` |
+| `HD_af5d6344b42b` | Visit updated Tuesday 10:00 AM | Yes, once | Same shape with the new when. Do not send a second text if create already fired. |
+| `HD_16dd2b701133` | Couch Runda tomorrow 8:30 AM | Yes if a visit row was saved | Name the service and the slot. |
+| `HD_3f7ed2a5f526` | Roof cleaning **enquiry** | No | Asking about a service is not a booking. Owner gets the lead. Caller does not get "we will confirm shortly". |
+| `HD_e8d4ee7283b5` | Covers Kericho? | No | FAQ / coverage. |
+| `HD_43492e7e296e` | Medical emergency Ruaka | No | Human path. Do not SMS `Hi Haijawekwa`. |
+| `HD_0a8d5911d055` | "Calling is my name", wants a human | Callback only if the agent promised a call back | `Hi, Done and Dusted Cleaning Services here. The team will call you back.` Skip the fake name. |
+| Greeting-only hangups | No capture | No | Correct silence. |
+
+### How this would fail if we wired it naively
+
+The owner gaps become customer-facing spam:
+
+1. **Fake names.** `Hi Haijawekwa` / `Hi Calling` from the same STT bugs.
+2. **Wrong trigger.** Enquiry and "save_caller_info" would look like a confirmed booking.
+3. **Unknown sender.** TextSMS shortcode, not `+254709221536`. The customer called a DID and gets a text from a different ID.
+4. **Language.** Swahili calls (`HD_43492e7e296e`, `HD_ea33941e0a5c`) would get English unless we match `summary.language`.
+5. **Timing.** Immediate on tool success can confirm a slot the owner has not accepted. After owner confirms in the desk is safer for home services; slower for trust on the call.
+6. **Double send.** Create + update + lead would stack three customer texts the way owner SMS already stacks.
+7. **No STOP / no owner off switch.** Contract requires both before this is legal-looking in Kenya.
+
+### Bar to ship against
+
+| Decision | Bar |
+| --- | --- |
+| Who | The person who just called, on their `from_number` |
+| When | Appointment requested, hold placed, or callback promised. Zero otherwise. |
+| Copy | Business name + specific service/item + when + next step. Templates already in `renderCallerText`. |
+| Name | Same `displayOwnerCallerName` gate. If blocked, `Hi, {Business} here`. |
+| Volume | One SMS per call. Updates wait or replace, they do not add a second text. |
+| Sender | Open: shared Scalers shortcode vs tenant DID. DID is more trusted. |
+| Toggle | Owner default **off** until copy and sender are proven on staging. |
+| Not this | Transcript, recording link, staff names, marketing, WhatsApp to the customer (needs a template). |
+
+---
+
 ## What went out (staging, `whatsapp_sent`)
 
 Silent / no-name calls are omitted. Those are correct non-sends.
@@ -141,9 +192,11 @@ If a VISIT or ENQUIRY SMS already went out, do not also send `New missed-call le
 
 Reject `Haijawekwa` / `Calling` at `save_caller_info`, not only at SMS. Confirm the name once (PR #234 is the start). Stop treating the last user turn as `goal` for `brain_summary`.
 
-### Later (product)
+### Later (caller SMS)
 
-Caller confirmation SMS behind the owner toggle. Set `DESK_PUBLIC_URL` on Railway so `Open call:` works. Production voice must run this notify path; staging-only hygiene will not fix ALCR.
+Do not ship until owner payload hygiene and one-text-per-call are in. Then: owner toggle default off, `renderCallerText` only on visit/hold/callback, persist `caller_notify_body`, never send on enquiry/FAQ/emergency. Sender ID and Kenya STOP are still open product calls.
+
+Set `DESK_PUBLIC_URL` on Railway so owner `Open call:` works. Production voice must run this notify path; staging-only hygiene will not fix ALCR.
 
 ---
 
@@ -159,5 +212,5 @@ Caller confirmation SMS behind the owner toggle. Set `DESK_PUBLIC_URL` on Railwa
 | Summary owner-grade | Fail |
 | Outcome owner-grade | Fail except visit/request saved |
 | One SMS per call | Fail when visit/enquiry also fires |
-| Caller confirmation | Not shipped (correct for now) |
+| Caller confirmation | Not shipped. Templates exist. No send path. Correct silence until the toggle and triggers above exist. |
 | Deep link | Unknown (env) |

@@ -5,7 +5,7 @@ alter table public.tenants
   add column if not exists notify_channels jsonb not null default '{"sms":true,"whatsapp":true,"email":true}'::jsonb;
 
 comment on column public.tenants.notify_channels is
-  'Owner notify prefs: {sms, whatsapp, email} booleans. Platform still greys channels that are not live yet.';
+  'Notify prefs: {sms, whatsapp, email} owner alerts (default on) and caller_sms (default off, texts the caller on visit/hold/callback).';
 
 -- Desk settings save patches this column with the owner JWT.
 -- RLS: tenants_update_member. Idempotent if already granted.

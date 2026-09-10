@@ -5,7 +5,9 @@
 
 export type NotifyChannelId = "sms" | "whatsapp" | "email";
 
-export type NotifyChannels = Record<NotifyChannelId, boolean>;
+export type NotifyChannels = Record<NotifyChannelId, boolean> & {
+  caller_sms: boolean;
+};
 
 export type NotifyChannelMeta = {
   id: NotifyChannelId;
@@ -21,6 +23,7 @@ export const DEFAULT_NOTIFY_CHANNELS: NotifyChannels = {
   sms: true,
   whatsapp: true,
   email: true,
+  caller_sms: false,
 };
 
 /**
@@ -89,10 +92,11 @@ export function parseNotifyChannels(raw: unknown): NotifyChannels {
   if (typeof obj.sms === "boolean") next.sms = obj.sms;
   if (typeof obj.whatsapp === "boolean") next.whatsapp = obj.whatsapp;
   if (typeof obj.email === "boolean") next.email = obj.email;
+  if (typeof obj.caller_sms === "boolean") next.caller_sms = obj.caller_sms;
 
   // Force unavailable platform channels off in the saved preference view.
   const avail = platformNotifyAvailability();
-  for (const id of Object.keys(next) as NotifyChannelId[]) {
+  for (const id of Object.keys(avail) as NotifyChannelId[]) {
     if (!avail[id].available) next[id] = false;
   }
 

@@ -27,9 +27,13 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `wallet_empty` | Prepaid balance ≤ 0 | `Scalers prepaid empty` | No |
 | `outage_speech` | Soniox 402 / fatal | `Scalers line downtime` | No |
 | `outage_llm` | Gemini credits / denied | `Scalers line taking names only` | No |
-| `caller_appointment` | Visit requested | — | Yes, when shipped |
-| `caller_hold` | Hold placed | — | Yes, when shipped |
-| `caller_callback` | Callback promised | — | Yes, when shipped |
+| `caller_appointment` | Visit requested on the call | — | Yes, if **Text customers** is on |
+| `caller_appointment_confirmed` | Owner taps Confirm in the desk | — | Yes, if on |
+| `caller_appointment_cancelled` | Owner or caller cancels | — | Yes, if on |
+| `caller_appointment_rescheduled` | Visit time changes | — | Yes, if on |
+| `caller_hold` | Hold placed | — | Yes, if on |
+| `caller_order` | Order captured | — | Yes, if on |
+| `caller_callback` | Callback promised | — | Yes, if on |
 
 One event = one owner message per call per kind. `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation marks it so the lead path does not re-send.
 
@@ -46,7 +50,7 @@ Owner alerts use the first channel that works, in this order:
 | 3 | **Email** | Resend | Fallback when SMS and WhatsApp miss. |
 | 4 | **Desk note** | Supabase call row | Always saved. Soft success if 1–3 miss. |
 
-Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email}`). At least one stays on.
+Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email, caller_sms}`). At least one **owner** channel stays on. `caller_sms` is a separate opt-in and defaults **off**.
 
 Escalation adds a **teammate** step before the owner: SMS teammate → SMS owner → WhatsApp teammate/owner → owner email.
 
@@ -69,40 +73,41 @@ All owner bodies are plain text, ordered label rows, no vendor names, no "techni
 
 ---
 
-## 4. Caller messages (not shipped)
+## 4. Caller messages (opt-in)
 
-Scalers does **not** text the caller today. The only caller-facing channel is the live call itself.
+The customer is not texted unless the owner turns **Text customers** on in Business Settings. Default is off. Existing workspaces stay off until they flip it.
 
-### Should we text the caller?
+This is not "anything". Only the rows below. FAQ, price questions, greetings, leads, and emergencies do not text the caller.
 
-| Angle | For | Against |
+| Trigger | Who sends | Caller text |
 | --- | --- | --- |
-| Trust | Caller knows the ask was captured, not lost | A text from an unknown number can feel like spam |
-| Conversion | "We got your booking for Tuesday" closes the loop | The business may want to confirm first |
-| Cost | One SMS per actionable call is cheap | Every call texting is a new line item |
-| Consent | Caller gave their number by calling | Kenya SMS marketing rules need opt-out |
+| Visit captured on the call | Voice | `Hi {Name}, {Business} here. We have your {service} visit for {when}. We will confirm shortly.` |
+| Owner taps Confirm | Desk | `Hi {Name}, {Business} here. Your {service} visit for {when} is confirmed.` |
+| Visit rescheduled | Voice or desk (When + Save) | `Hi {Name}, {Business} here. We moved your {service} visit to {when}.` |
+| Visit cancelled | Voice or desk | `Hi {Name}, {Business} here. We cancelled your {service} visit for {when}.` |
+| Hold placed | Voice | `Hi {Name}, {Business} here. We have held {item} for you. We will confirm shortly.` |
+| Hold time changed | Desk (When + Save) | `Hi {Name}, {Business} here. Pickup for {item} is now {when}.` |
+| Order captured | Voice | `Hi {Name}, {Business} here. We have your order for {item}. We will confirm shortly.` |
+| Callback promised | Voice | `Hi {Name}, {Business} here. The team will call you back.` |
+| Owner note | Desk Polish then Send | Gemini rewrite of the owner's note. Owner must tap Send. |
 
-### Recommended caller message (when it ships)
+**Never**
 
-Only on **actionable** outcomes: appointment requested, hold placed, callback promised. Not on FAQ-only calls.
-
-The template is **not generic**. It carries the business name, the caller's name when known, the specific thing captured, and the next step. No "your call was important to us".
-
-| Trigger | Caller text |
-| --- | --- |
-| Appointment requested | `Hi {Name}, {Business} here. We have your {service} visit for {when}. We will confirm shortly.` |
-| Hold placed | `Hi {Name}, {Business} here. We have held {item} for you. We will confirm shortly.` |
-| Callback promised | `Hi {Name}, {Business} here. The team will call you back.` |
+- Enquiry / FAQ / hours / directions with no hold, order, visit, or callback
+- Lead dumps, transcripts, recordings, staff directory
+- Escalation or medical detail (callback line only if a callback was actually promised)
+- Marketing or a second follow-up
+- Owner taps **Send** on a polished note. Never auto-send freeform AI text.
 
 **Rules**
 
-- Send from the business's Scalers DID or a shared Scalers sender ID, not the owner's personal number.
-- Include the business name so the caller knows who it is.
-- Use the caller's name when the call captured it. Skip it when it did not.
-- Name the service or item. Do not say "your request" when we know it was carpet cleaning.
-- One text per call. No follow-up marketing.
+- Owner toggle `notify_channels.caller_sms`. Off until they turn it on.
+- Desk: open the call. Change When/Where and Save. Confirm or Cancel. Note, Polish, Send.
+- One customer text per trigger. Capture then Confirm is two texts on purpose (received, then confirmed).
+- Use the captured name when it is a real name. Otherwise `Hi, {Business} here`.
+- Name the service or item.
+- Send from the Scalers TextSMS sender, not the owner's personal number.
 - Opt-out line when required: `Reply STOP to opt out.`
-- Owner can turn caller texts off per workspace.
 
 ---
 
@@ -134,10 +139,9 @@ The template is **not generic**. It carries the business name, the caller's name
 ## 7. Open decisions
 
 1. **Caller SMS sender:** shared Scalers sender ID vs the tenant DID. Shared is simpler; tenant DID is more trusted.
-2. **When to send:** immediately on tool success, or after owner confirms in the desk?
-3. **Pricing:** is caller SMS bundled in the line fee, metered per text, or an add-on?
-4. **Language:** match the call language, or always English?
-5. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
+2. **Pricing:** is caller SMS bundled in the line fee, metered per text, or an add-on?
+3. **Language:** match the call language, or always English?
+4. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
 
 ---
 
