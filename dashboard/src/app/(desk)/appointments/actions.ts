@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { parseNotifyChannels } from "@/lib/notifyChannels";
+import { renderDeskCallerText, sendDeskCallerSms } from "@/lib/callerSms";
 
 export type AppointmentStatusState = {
   error?: string;
@@ -29,11 +31,13 @@ export async function updateAppointmentStatus(
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
 
-  const { error } = await workspace.client
+  const { data: row, error } = await workspace.client
     .from("appointments")
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("tenant_id", tenant.id);
+    .eq("tenant_id", tenant.id)
+    .select("caller_phone, caller_name, service_name, when_text")
+    .maybeSingle();
 
   if (error) {
     if (/appointments|relation/i.test(error.message)) {
@@ -42,6 +46,28 @@ export async function updateAppointmentStatus(
       };
     }
     return { error: error.message };
+  }
+
+  const prefs = parseNotifyChannels(tenant.notify_channels);
+  if (
+    prefs.caller_sms &&
+    row?.caller_phone &&
+    (status === "confirmed" || status === "cancelled")
+  ) {
+    const body = renderDeskCallerText({
+      kind:
+        status === "cancelled"
+          ? "caller_appointment_cancelled"
+          : "caller_appointment_confirmed",
+      businessName: tenant.business_name,
+      callerName: row.caller_name,
+      service: row.service_name,
+      when: row.when_text,
+    });
+    const sent = await sendDeskCallerSms({ to: row.caller_phone, body });
+    if (!sent.ok) {
+      console.warn("[appointment caller sms]", sent.reason);
+    }
   }
 
   revalidatePath("/appointments");

@@ -11,7 +11,11 @@ const EVENTS = Object.freeze({
   OUTAGE_SPEECH: 'outage_speech',
   OUTAGE_LLM: 'outage_llm',
   CALLER_APPOINTMENT: 'caller_appointment',
+  CALLER_APPOINTMENT_CONFIRMED: 'caller_appointment_confirmed',
+  CALLER_APPOINTMENT_CANCELLED: 'caller_appointment_cancelled',
+  CALLER_APPOINTMENT_RESCHEDULED: 'caller_appointment_rescheduled',
   CALLER_HOLD: 'caller_hold',
+  CALLER_ORDER: 'caller_order',
   CALLER_CALLBACK: 'caller_callback',
 });
 
@@ -94,7 +98,7 @@ function renderEventSubject(event) {
  */
 function renderCallerText(event) {
   const business = String(event.businessName || '').trim() || 'We';
-  const name = String(event.caller?.name || '').trim();
+  const name = displayOwnerCallerName(event.caller?.name) || '';
   const hi = name ? `Hi ${name}, ` : 'Hi, ';
   switch (event.kind) {
     case EVENTS.CALLER_APPOINTMENT: {
@@ -104,10 +108,35 @@ function renderCallerText(event) {
       const at = when ? ` for ${when}` : '';
       return `${hi}${business} here. We have ${what}${at}. We will confirm shortly.`;
     }
+    case EVENTS.CALLER_APPOINTMENT_CONFIRMED: {
+      const when = String(event.when || '').trim();
+      const service = String(event.item || '').trim();
+      const at = when ? ` for ${when}` : '';
+      return `${hi}${business} here. Your ${service ? `${service} visit` : 'visit'}${at} is confirmed.`;
+    }
+    case EVENTS.CALLER_APPOINTMENT_CANCELLED: {
+      const when = String(event.when || '').trim();
+      const service = String(event.item || '').trim();
+      const what = service ? `your ${service} visit` : 'your visit';
+      const at = when ? ` for ${when}` : '';
+      return `${hi}${business} here. We cancelled ${what}${at}.`;
+    }
+    case EVENTS.CALLER_APPOINTMENT_RESCHEDULED: {
+      const when = String(event.when || '').trim();
+      const service = String(event.item || '').trim();
+      const what = service ? `your ${service} visit` : 'your visit';
+      const to = when ? ` to ${when}` : '';
+      return `${hi}${business} here. We moved ${what}${to}.`;
+    }
     case EVENTS.CALLER_HOLD: {
       const item = String(event.item || '').trim();
       const what = item ? `we have held ${item} for you` : 'we have held your item';
       return `${hi}${business} here. ${what}. We will confirm shortly.`;
+    }
+    case EVENTS.CALLER_ORDER: {
+      const item = String(event.item || '').trim();
+      const what = item ? `your order for ${item}` : 'your order';
+      return `${hi}${business} here. We have ${what}. We will confirm shortly.`;
     }
     case EVENTS.CALLER_CALLBACK:
       return `${hi}${business} here. The team will call you back.`;
