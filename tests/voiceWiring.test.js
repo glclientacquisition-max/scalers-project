@@ -72,6 +72,18 @@ assert.match(
 
 assert.match(
   source,
+  /heardCallerUtterance/,
+  'idle check-in must not arm after the greeting before the caller has spoken'
+);
+
+assert.match(
+  source,
+  /shouldSpeakThinkingAck\(clean\)/,
+  'how-are-you turns must not get a thinking-ack stall'
+);
+
+assert.match(
+  source,
   /isIdleNudge/,
   'idle check-in must not arm another nudge from its own playback'
 );

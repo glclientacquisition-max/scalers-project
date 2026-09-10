@@ -30,6 +30,9 @@ function polishPunctuation(text) {
   let t = String(text || '');
   t = t.replace(/\u2026/g, '.').replace(/\.\.\./g, '.');
   t = t.replace(/([!?.,])\1+/g, '$1');
+  // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
+  t = t.replace(/!+/g, '.');
+  t = t.replace(/\.{2,}/g, '.');
   return t.replace(/\s+/g, ' ').trim();
 }
 

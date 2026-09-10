@@ -148,6 +148,30 @@ function pickContextualAck(userText, lang) {
 }
 
 /**
+ * Greetings / how-are-you. A thinking-ack here sounds like stalling.
+ * "how much" / "how do I book" must stay eligible for an ack.
+ */
+function looksLikePhaticCallerTurn(text) {
+  const t = normalizeCallerText(text).replace(/[?'!-]+$/g, '').trim();
+  if (!t) return false;
+  if (/^(hi|hello|hey|yo|niaje|sasa|mambo|vipi|polo|fiti|habari( yako)?)$/.test(t)) {
+    return true;
+  }
+  if (/^good (morning|afternoon|evening)( to you)?$/.test(t)) return true;
+  if (/^how('?s| is| are) (you|it|things)( doing| going| been)?( today)?$/.test(t)) {
+    return true;
+  }
+  if (/^(i('?m| am) )?(fine|good|okay|ok|great)( thanks| thank you)?$/.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldSpeakThinkingAck(text) {
+  return !looksLikePhaticCallerTurn(text);
+}
+
+/**
  * Immediate progress line for action turns (order/save/escalate) so the caller
  * hears feedback while Gemini + tools run. Not a success claim — confirmation
  * still comes from the backend after tools finish.
@@ -230,8 +254,8 @@ function pickLlmRecoveryLine(opts = {}) {
 function pickIdleNudgeLine(opts = {}) {
   const lang = opts.language || 'en';
   const sw = lang === 'sw' || lang === 'sheng';
-  if (sw) return 'Bado uko? Naweza kusaidia?';
-  return 'Are you still there? How can I help?';
+  if (sw) return 'Naweza kusaidia?';
+  return 'How can I help?';
 }
 
 function pickLlmRecoverySaved(opts = {}) {
@@ -390,6 +414,8 @@ module.exports = {
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
+  looksLikePhaticCallerTurn,
+  shouldSpeakThinkingAck,
   looksLikeCallerName,
   cleanSpokenLine,
   greetingLooksValid,

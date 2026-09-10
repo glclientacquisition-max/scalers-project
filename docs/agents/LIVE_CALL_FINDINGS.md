@@ -1,3 +1,25 @@
+# Speech naturality — Done and Dusted (2026-09-10)
+
+Staging DID `+254709221536` (Shy) on `main` `#237` (`VOICE_PROFILE=balanced`, speed 1.0, gain 1.22). Caller `+254790381872`.
+
+| Call SID | Duration | What the caller heard |
+| --- | --- | --- |
+| `HD_3bf5d73422fd` | 44s | Greeting → **Are you still there?** (5s) → **Alright.** (thinking-ack) → *I'm doing well, thank you!* + service pitch → **Are you still there?** again. Caller only said *How are you doing?* twice. |
+| `HD_3fc0d4ba863a` | 13s | Greeting → idle nudge started → abandoned. |
+| `HD_fa53b29c5cb0`, `HD_c393a3315e15`, `HD_a9ae13b3d120` | 31–39s | Same morning, other caller. Greeting then *Are you still there?* then hangup. Abandoned. |
+
+**What “struggling” is (not volume, not TTS speed):** the agent works to keep the call alive instead of waiting like a person.
+
+1. Idle check-in 5s after the greeting (*Are you still there?*) reads as anxiety. Four abandoned calls this morning stop there.
+2. Thinking-ack *Alright.* on *How are you doing?* because `how` looks like a content question. Sounds like stalling.
+3. TTS exclamation (*thank you!*) makes Soniox punch/strain, then the next streamed sentence restarts.
+
+Voice fix: do not arm idle nudge until the caller has spoken; calmer line (*How can I help?*); default delay 10s; skip thinking-ack on phatic turns; speak `!` as `.`.
+
+Brain leftover (separate lane): *I'm doing well, thank you!* plus an unsolicited couch/carpet/mattress list still violates the 1-sentence / no-lists phone rule.
+
+---
+
 # Live transfer spike — Done and Dusted (2026-09-06)
 
 Staging DID `+254709221536` (tenant Done and Dusted Cleaning). Owner set **Connect live call**. Team dest `+254790381872`.

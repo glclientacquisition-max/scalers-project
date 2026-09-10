@@ -11,20 +11,20 @@ function wait(ms) {
 }
 
 describe('idleNudgeDelayMs', () => {
-  it('defaults to 5000 and clamps the env knob', () => {
-    assert.equal(idleNudgeDelayMs({}), 5000);
+  it('defaults to 10000 and clamps the env knob', () => {
+    assert.equal(idleNudgeDelayMs({}), 10000);
     assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '4000' }), 4000);
-    assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '200' }), 5000);
-    assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '99999' }), 5000);
+    assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '200' }), 10000);
+    assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '99999' }), 10000);
   });
 });
 
 describe('pickIdleNudgeLine', () => {
   it('stays English until the caller has a language, then matches SW', () => {
-    assert.equal(pickIdleNudgeLine({ language: 'en' }), 'Are you still there? How can I help?');
-    assert.equal(pickIdleNudgeLine({ language: 'unknown' }), 'Are you still there? How can I help?');
-    assert.equal(pickIdleNudgeLine({ language: 'sw' }), 'Bado uko? Naweza kusaidia?');
-    assert.equal(pickIdleNudgeLine({ language: 'sheng' }), 'Bado uko? Naweza kusaidia?');
+    assert.equal(pickIdleNudgeLine({ language: 'en' }), 'How can I help?');
+    assert.equal(pickIdleNudgeLine({ language: 'unknown' }), 'How can I help?');
+    assert.equal(pickIdleNudgeLine({ language: 'sw' }), 'Naweza kusaidia?');
+    assert.equal(pickIdleNudgeLine({ language: 'sheng' }), 'Naweza kusaidia?');
   });
 });
 

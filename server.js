@@ -140,6 +140,7 @@ const {
   pickLlmRecoverySaved,
   looksLikeCallerName,
   shouldSkipCallerTurn,
+  shouldSpeakThinkingAck,
 } = require('./src/conversation/dynamicSpeech');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -1221,6 +1222,8 @@ mediaWss.on('connection', (ws, req) => {
   let turnBusy = false;
   let utteranceParts = [];
   let utteranceTimer = null;
+  /** Idle check-in only after the caller has actually spoken. */
+  let heardCallerUtterance = false;
   const overlapHold = createOverlapHold();
   const agentReplay = createAgentReplayMemory();
   const idleNudge = createIdleNudgeController({
@@ -1247,7 +1250,10 @@ mediaWss.on('connection', (ws, req) => {
     const committed = agentReplay.commitPlayback();
     if (pendingQuestion) {
       console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
-      idleNudge.arm({ skip: Boolean(opts.isIdleNudge) });
+      // Do not poke "still there?" after the greeting. Wait until the caller has spoken.
+      idleNudge.arm({
+        skip: Boolean(opts.isIdleNudge) || !heardCallerUtterance,
+      });
     }
     return committed;
   }
@@ -1927,7 +1933,8 @@ mediaWss.on('connection', (ws, req) => {
         Boolean(tts) &&
         fillerMode !== 'off' &&
         !fillerUsedThisCall &&
-        !needsImmediateProgress;
+        !needsImmediateProgress &&
+        shouldSpeakThinkingAck(clean);
       const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
       const fillerText =
         fillerMode === 'ack' || fillerMode === 'auto'
@@ -2331,6 +2338,7 @@ mediaWss.on('connection', (ws, req) => {
       return;
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
+    heardCallerUtterance = true;
     runCallerTurn(text).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
