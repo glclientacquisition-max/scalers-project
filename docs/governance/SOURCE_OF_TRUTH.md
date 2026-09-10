@@ -37,7 +37,8 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../ESCALATION.md) | Live Dial | CORE |
 | Human handoff (live) | Conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
-| Brain state | Per-call semantic memory | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
+| Brain state | Per-call semantic memory, seeded from returning-caller card | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
+| Returning-caller card | Compact phone file at call setup | `src/conversation/callerMemory.js` + `getCallerMemory` | CONTEXT HEADER; ADR-0005 | Transcript dump, RAG | CORE |
 | Tool parse | Marker protocol | `src/conversation/toolMarkers.js` | `parseGeminiResponse` | None | CORE |
 | Tool execute | Validated side effects | `src/conversation/toolExecution.js` | `executeBrainTools` | None | CORE |
 | Brain observability | Console traces | `src/conversation/brainObservability.js` | `logBrainTrace` → stdout | None persisted | CORE (ephemeral) |

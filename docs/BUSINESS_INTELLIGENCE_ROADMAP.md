@@ -415,7 +415,7 @@ Trained home-services tenant: book a visit with service + time + landmark + name
 1. **Gap mining** — weekly top unresolved intents per tenant/vertical  
 2. **Raise FAQ/catalog ceilings** carefully; add `knowledge_documents` + chunk retrieve **at call setup only** if prompt size breaks (architecture blueprint RAG phase — not mid-turn for latency)  
 3. **Live transfer** — specified in [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) (cold Dial after Stream stop). Implement only after the Voice staging spike; keep async escalate as default and fallback.  
-4. **Caller memory** — greet returning numbers from `contacts`  
+4. **Caller memory** — returning-caller card from `contacts` at call setup (ADR-0005). Instant greeting stays brand-first.  
 5. **Scenario smokes** — extend `scripts/smoke-escalation-scenarios.js` pattern to retail/home playbook scripts  
 6. **Vertical template library** — starter catalogs/FAQs/policies per vertical  
 7. **Optional integrations** — Google Calendar, Shopify/stock, tracking APIs — only after owned thin SoR works  
@@ -551,7 +551,8 @@ Home services script mirrors with book/reschedule/area/emergency.
 | 4. `contacts` + `service_requests` + `create_service_request` | **Done** | `contacts_and_requests.sql`, tool + `/requests` |
 | 5. Retail playbook + richer requests UX | **Done** (playbook) | `src/conversation/playbooks/retail.js` + smoke |
 | 6. Appointments + home services pack | **Done** | `appointments.sql`, playbooks, tools, Inbox Visits list + week calendar, see `docs/HOME_SERVICES_PHASE2.md` |
-| 7. Call resolution metrics + learning loop | Partial | resolution columns landed; learning loop next |
+| 7. Call resolution metrics + learning loop | Partial | resolution columns landed; Evalite Brain suite started (`npm run eval:brain`) |
+| 8. Returning-caller card | **Done** | `getCallerMemory` + CONTEXT HEADER; ADR-0005 |
 
 **Apply migration:** run `docs/supabase/business_operating_model.sql` in Supabase SQL editor (grants included for authenticated updates).
 

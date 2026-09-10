@@ -70,6 +70,7 @@ const {
   recordActionResults,
   formatBrainStateForPrompt,
 } = require('./src/conversation/brainState');
+const { attachCallerMemory } = require('./src/conversation/callerMemory');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const {
   buildBrainCapabilities,
@@ -261,6 +262,14 @@ if (missingEnvironmentVariables.length > 0) {
 }
 
 const db = require('./src/db');
+
+async function hydrateCallerMemory(profile, callSid) {
+  return attachCallerMemory(profile, {
+    callSid,
+    getCall: (sid) => db.getCall(sid),
+    getCallerMemory: (opts) => db.getCallerMemory(opts),
+  });
+}
 
 let geminiClient = null;
 function getGeminiClient() {
@@ -1349,6 +1358,7 @@ mediaWss.on('connection', (ws, req) => {
     }
     try {
       const profile = await db.getTenantProfile({ callSid: sessionCallSid });
+      await hydrateCallerMemory(profile, sessionCallSid);
       brainProfile = profile;
       businessName = profile.businessName || businessName;
       agentName = profile.agentName || agentName;
@@ -3307,6 +3317,7 @@ wss.on('connection', (ws) => {
         });
         try {
           const profile = await db.getTenantProfile({ callSid, toNumber: data.to });
+          await hydrateCallerMemory(profile, callSid);
           brainProfile = profile;
           systemPrompt = buildSystemPrompt(profile);
           const parsedTools = parseAgentTools(profile.agentTools);

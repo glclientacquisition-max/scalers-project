@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "Preserve",
+    "target": "ES2022",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["evals/**/*.ts"]
+}

@@ -7,6 +7,9 @@ scripts/.deploy-sha
 # Node dependencies
 node_modules/
 
+# Evalite local traces
+evals/.evalite
+
 # Logs
 *.log
 npm-debug.log*

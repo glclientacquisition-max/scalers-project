@@ -32,7 +32,7 @@ Also owns: merge conflicts on shared files; defining new stable function signatu
 ## Platform invariants
 
 1. **Stable DB surface** for voice orchestration:
-   `upsertCall`, `saveCallerInfo`, `appendTranscript`, `attachRecording`, `getCall`, `markWhatsappSent`, `updateCallStatus`, `chargeCallToWallet`, `getTenantProfile`, …
+   `upsertCall`, `saveCallerInfo`, `appendTranscript`, `attachRecording`, `getCall`, `markWhatsappSent`, `updateCallStatus`, `chargeCallToWallet`, `getTenantProfile`, `getCallerMemory`, …
 2. Voice engine + Super Admin + signup provisioner use **service role**; owners use Auth JWT + **RLS**.
 3. Never put service role in `NEXT_PUBLIC_*` or client bundles.
 4. SQL files are additive/ordered; document apply order in the migration header + [`docs/supabase/README.md`](../supabase/README.md).

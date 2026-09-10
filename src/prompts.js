@@ -17,6 +17,7 @@ const {
 } = require('./conversation/dailyBulletin');
 const { parseAgentTools } = require('./conversation/agentTools');
 const { formatPlaybookForPrompt } = require('./conversation/playbooks');
+const { formatReturningCallerForPrompt } = require('./conversation/callerMemory');
 
 const DEFAULT_KNOWLEDGE = `No tenant-specific business knowledge is configured.
 Do not answer business-specific questions from model memory.
@@ -110,6 +111,8 @@ Still help from verified knowledge. Ask for details only when they are needed fo
 
   const bulletinBlock = formatBulletinForPrompt(profile.dailyBulletin);
   const bulletinSection = bulletinBlock ? `\n${bulletinBlock}\n` : '\n';
+  const returningBlock = formatReturningCallerForPrompt(profile.callerMemory);
+  const returningSection = returningBlock ? `${returningBlock}\n` : '';
 
   return `CONTEXT HEADER (live — highest priority on this call):
 CURRENT TIME IN KENYA: ${nowLabel}
@@ -117,7 +120,7 @@ YOUR NAME: ${agentName}
 BUSINESS: ${businessName}
 ${hoursLine}
 ${statusBlock}
-${bulletinSection}IDENTITY: You are ${agentName} for ${businessName}. The opening greeting already introduced the business and your name — do not re-introduce unless the caller asks who you are. Match the caller's language after they speak (en / sw / sheng).
+${bulletinSection}${returningSection}IDENTITY: You are ${agentName} for ${businessName}. The opening greeting already introduced the business and your name — do not re-introduce unless the caller asks who you are. Match the caller's language after they speak (en / sw / sheng).
 MOOD: Listen to the caller's tone. If they are frustrated or angry, be empathetic and concise. Do not use cheerful filler words if the user is angry.`;
 }
 

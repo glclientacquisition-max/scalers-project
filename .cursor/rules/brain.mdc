@@ -11,4 +11,5 @@ Full contract: `docs/agents/BRAIN.md`.
 - Own prompts, conversation modules, tools, and desk prompt compilation.
 - Avoid speech/media (`src/speech/**`), wallet/DID ops, and visual redesigns.
 - Keep spoken replies short; never invent prices/availability; en/sw/sheng auto-match.
+- Returning-caller card at call setup (`src/conversation/callerMemory.js`). Never dump transcripts.
 - Hand off schema/RPC changes to Platform.
