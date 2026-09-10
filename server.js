@@ -175,6 +175,8 @@ const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
   ownerLeadEvent,
   renderEventText,
+  displayOwnerCallerName,
+  shouldSendOwnerLead,
 } = require('./src/notifications/events');
 
 /** Desk base for deep links in owner alerts. */
@@ -2830,7 +2832,8 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     const resolved = resolveEscalation(teamDirectory, escalate.teammate);
     const teammate = resolved.teammate;
-    const callerName = String(escalate.name || call.name || '').trim() || null;
+    const callerName =
+      displayOwnerCallerName(escalate.name || call.name) || null;
     let reason =
       String(escalate.reason || call.reason || call.escalate_reason || '').trim() || null;
     if (resolved.match === 'fallback' && resolved.requested) {
@@ -2850,13 +2853,14 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     const lead = {
       businessName,
-      name: callerName || call.name,
+      name: callerName || 'Caller',
       reason: reason || call.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
     const body = buildEscalationText({
       ...lead,
+      callerName: lead.name,
       teammate,
       requested: resolved.requested,
       match: resolved.match,
@@ -3013,8 +3017,7 @@ async function maybeSendWhatsAppNotification(callSid) {
   const call = await db.getCall(callSid);
   if (!call) return;
 
-  const hasCallerInfo = Boolean(call.name && call.reason);
-  if (!hasCallerInfo) return;
+  if (!shouldSendOwnerLead(call)) return;
 
   if (ownerNotifyInProgress.has(callSid)) return;
   if (call.whatsapp_sent) return;
@@ -3042,8 +3045,8 @@ async function maybeSendWhatsAppNotification(callSid) {
     const body = renderEventText(event);
     const lead = {
       businessName,
-      name: call.name,
-      reason: call.reason,
+      name: event.caller?.name || call.name,
+      reason: event.caller?.reason || call.reason,
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
@@ -3071,6 +3074,13 @@ async function maybeSendWhatsAppNotification(callSid) {
     }
 
     await db.markWhatsappSent(callSid);
+    await db.mergeCallSummaryMeta({
+      callSid,
+      patch: {
+        owner_notify_body: body,
+        owner_notify_channel: result.channel,
+      },
+    });
     console.log(
       `[${callSid}] Lead notify via ${result.channel}` +
         (result.to ? ` → ${result.to}` : '') +

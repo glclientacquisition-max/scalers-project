@@ -133,19 +133,128 @@ function leadEvent({ businessName, name, reason, callerNumber, recordingUrl } = 
   };
 }
 
+const BLOCKED_OWNER_NAMES = new Set([
+  'calling',
+  'callings',
+  'haijawekwa',
+  'caller',
+  'customer',
+  'unknown',
+  'test',
+  'user',
+]);
+
+function cleanOwnerName(raw) {
+  return String(raw || '')
+    .replace(/[.,;:]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Name that is safe to put on an owner SMS. Null means print "Caller" or skip the lead.
+ */
+function displayOwnerCallerName(raw) {
+  const name = cleanOwnerName(raw);
+  if (!name || name.length < 2 || name.length > 40) return null;
+  const lower = name.toLowerCase();
+  if (BLOCKED_OWNER_NAMES.has(lower)) return null;
+  if (!/^[\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3}$/u.test(name)) {
+    return null;
+  }
+  return name;
+}
+
+function reviewOf(call) {
+  return call && call.owner_review && typeof call.owner_review === 'object'
+    ? call.owner_review
+    : {};
+}
+
+function ownerIntent(call) {
+  const review = reviewOf(call);
+  const intent = String(
+    review.primary_intent || call.primary_intent || ''
+  ).trim();
+  if (!intent || intent === 'general_enquiry') return null;
+  return intent;
+}
+
+function ownerReason(call) {
+  const review = reviewOf(call);
+  return (
+    String(review.reason || call.reason || '')
+      .replace(/\s+/g, ' ')
+      .trim() || null
+  );
+}
+
+function isWeakBrainSummary(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return true;
+  const lower = raw.toLowerCase();
+  if (
+    /how are you doing|mm-hm|mbona unakwama|still there|is there anything else|which cleaning service do i need|i'd like to make a booking for tomorrow, but/i.test(
+      lower
+    )
+  ) {
+    return true;
+  }
+  const goalMatch = /goal:\s*(.*)$/i.exec(raw);
+  const goal = goalMatch
+    ? goalMatch[1]
+        .replace(/\.\s*products:.*$/i, '')
+        .replace(/\.\s*actions:.*$/i, '')
+        .trim()
+    : '';
+  if (goal && /^(uh|um|eh|best|evening|hello|hi|mm-hm|mm hm)\b/i.test(goal)) {
+    return true;
+  }
+  if (goal && goal.split(/\s+/).length <= 3 && /[?]$/.test(goal)) return true;
+  return false;
+}
+
+function ownerSummary(call, reason) {
+  const review = reviewOf(call);
+  const raw = String(call.brain_summary || '').trim();
+  if (!raw || isWeakBrainSummary(raw)) return null;
+  const reasonLc = String(reason || review.reason || '').trim().toLowerCase();
+  if (reasonLc && raw.toLowerCase().includes(reasonLc)) return null;
+  return raw;
+}
+
+function isInternalResolutionNote(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return true;
+  return /permitted end-call action|ask for that one slot|attempt direct resolution|close naturally|resolve from knowledge|the goal needs|the caller goal is complete/i.test(
+    raw
+  );
+}
+
+function ownerOutcome(call) {
+  const note = String(call.resolution_note || '').trim();
+  if (!note || isInternalResolutionNote(note)) return null;
+  return note;
+}
+
 /**
  * Build an owner lead event that is actionable without opening the desk.
- * Uses the persisted Brain summary + intent + resolution when present.
+ * Prefers hangup owner_review. Drops live Brain dump that repeats greetings.
  */
 function ownerLeadEvent(call = {}, businessName) {
+  const name = displayOwnerCallerName(call.name) || null;
+  const reason = ownerReason(call);
   const fields = [
-    ['Name', call.name],
+    ['Name', name],
     ['Phone', call.from_number || call.caller_number],
-    ['Reason', call.reason],
+    ['Reason', reason],
   ];
-  if (call.primary_intent) fields.push(['Intent', call.primary_intent]);
-  if (call.brain_summary) fields.push(['Summary', call.brain_summary]);
-  if (call.resolution_note) fields.push(['Outcome', call.resolution_note]);
+  const intent = ownerIntent(call);
+  if (intent) fields.push(['Intent', intent]);
+  const summary = ownerSummary(call, reason);
+  if (summary) fields.push(['Summary', summary]);
+  const outcome = ownerOutcome(call);
+  if (outcome) fields.push(['Outcome', outcome]);
   return {
     kind: EVENTS.LEAD,
     businessName,
@@ -153,11 +262,15 @@ function ownerLeadEvent(call = {}, businessName) {
     recordingUrl: call.recording_url,
     callUrl: call.callUrl || call.call_url || null,
     caller: {
-      name: call.name,
+      name,
       phone: call.from_number || call.caller_number,
-      reason: call.reason,
+      reason,
     },
   };
+}
+
+function shouldSendOwnerLead(call = {}) {
+  return Boolean(displayOwnerCallerName(call.name) && ownerReason(call));
 }
 
 module.exports = {
@@ -167,4 +280,6 @@ module.exports = {
   renderCallerText,
   leadEvent,
   ownerLeadEvent,
+  displayOwnerCallerName,
+  shouldSendOwnerLead,
 };
