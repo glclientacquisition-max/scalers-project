@@ -229,6 +229,17 @@ function pickLlmRecoveryLine(opts = {}) {
   return `Okay, I can't finish that just now. ${REACH_THEM_NAME_ASK_EN}`;
 }
 
+/**
+ * After a committed agent question, if the caller stays silent.
+ * Local line, not a Gemini turn. English until the caller has spoken.
+ */
+function pickIdleNudgeLine(opts = {}) {
+  const lang = opts.language || 'en';
+  const sw = lang === 'sw' || lang === 'sheng';
+  if (sw) return 'Bado uko? Naweza kusaidia?';
+  return 'Are you still there? How can I help?';
+}
+
 function pickLlmRecoverySaved(opts = {}) {
   const lang = opts.language || 'en';
   const sw = lang === 'sw' || lang === 'sheng';
@@ -383,6 +394,7 @@ module.exports = {
   pickActionProgress,
   pickClarifyProgress,
   pickLlmRecoveryLine,
+  pickIdleNudgeLine,
   pickLlmRecoverySaved,
   looksLikeCallerName,
   cleanSpokenLine,

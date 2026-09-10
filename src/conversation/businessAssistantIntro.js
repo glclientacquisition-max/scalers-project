@@ -4,12 +4,13 @@
  * Top-level rules (MVP unanswered-call path):
  * 1. Brand first — business name is the hero signal in the first sentence.
  * 2. Agent named — callers know who is speaking.
- * 3. Offering in one short clause — grounded in services on file (never invent).
- * 4. Language invite — tell callers they can use English or Kiswahili.
+ * 3. Offering in one short clause when OPEN — grounded in services on file (never invent).
+ * 4. Language invite when OPEN — tell callers they can use English or Kiswahili.
  * 5. English-default on first open — do not lottery-open in Kiswahili before
  *    the caller has spoken (prevents sticky language flip).
  * 6. One invite — how can I help (or message/closed honesty).
- * 7. Closed honesty — state closed/bulletin briefly, then still help or take a message.
+ * 7. Closed honesty — identity, closed/bulletin, one question. No services list
+ *    or language invite (those make the opener too long; callers drop).
  */
 
 /** Spoken once on open — keep short; match language after the caller speaks. */
@@ -176,26 +177,25 @@ function composeBusinessAssistantIntro(opts = {}) {
   const identityPrimary = `${opener}, you've reached ${businessName}, this is ${agentName} speaking.`;
   const identityThanks = `Thank you for calling ${businessName}, this is ${agentName} speaking.`;
   const identity = variant === 1 ? identityThanks : identityPrimary;
-  const withOffer = offering ? `${identity} ${offering}` : identity;
-  const withLang = `${withOffer} ${LANGUAGE_INVITE}`;
 
   if (closureNotice) {
     const follow =
       afterHoursMode === 'message'
         ? 'I can still take a message. May I have your name?'
         : 'Even so, I can still help. How can I assist?';
-    return `${withLang} ${closureNotice} ${follow}`;
+    return `${identity} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === 'message') {
-    return `${withLang} We're closed right now, but I can take a message.`;
+    return `${identity} We're closed right now, but I can take a message. May I have your name?`;
   }
 
   if (closed) {
-    return `${withLang} We're closed now, but I can still help. How can I assist?`;
+    return `${identity} We're closed now, but I can still help. How can I assist?`;
   }
 
-  return `${withLang} How can I help?`;
+  const withOffer = offering ? `${identity} ${offering}` : identity;
+  return `${withOffer} ${LANGUAGE_INVITE} How can I help?`;
 }
 
 /**

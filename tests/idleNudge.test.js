@@ -1,0 +1,92 @@
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const {
+  idleNudgeDelayMs,
+  createIdleNudgeController,
+} = require('../src/speech/idleNudge');
+const { pickIdleNudgeLine } = require('../src/conversation/dynamicSpeech');
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+describe('idleNudgeDelayMs', () => {
+  it('defaults to 5000 and clamps the env knob', () => {
+    assert.equal(idleNudgeDelayMs({}), 5000);
+    assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '4000' }), 4000);
+    assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '200' }), 5000);
+    assert.equal(idleNudgeDelayMs({ VOICE_IDLE_NUDGE_MS: '99999' }), 5000);
+  });
+});
+
+describe('pickIdleNudgeLine', () => {
+  it('stays English until the caller has a language, then matches SW', () => {
+    assert.equal(pickIdleNudgeLine({ language: 'en' }), 'Are you still there? How can I help?');
+    assert.equal(pickIdleNudgeLine({ language: 'unknown' }), 'Are you still there? How can I help?');
+    assert.equal(pickIdleNudgeLine({ language: 'sw' }), 'Bado uko? Naweza kusaidia?');
+    assert.equal(pickIdleNudgeLine({ language: 'sheng' }), 'Bado uko? Naweza kusaidia?');
+  });
+});
+
+describe('createIdleNudgeController', () => {
+  it('speaks once after the delay when still idle', async () => {
+    const spoken = [];
+    const idle = createIdleNudgeController({
+      delayMs: 20,
+      maxPerCall: 2,
+      canFire: () => true,
+      speak: () => spoken.push('nudge'),
+    });
+    assert.equal(idle.arm(), true);
+    await wait(40);
+    assert.equal(spoken.length, 1);
+    assert.equal(idle.count(), 1);
+  });
+
+  it('does not speak when caller speech clears the timer', async () => {
+    const spoken = [];
+    const idle = createIdleNudgeController({
+      delayMs: 40,
+      canFire: () => true,
+      speak: () => spoken.push('nudge'),
+    });
+    idle.arm();
+    idle.clear();
+    await wait(60);
+    assert.equal(spoken.length, 0);
+    assert.equal(idle.count(), 0);
+  });
+
+  it('does not fire when canFire is false', async () => {
+    const spoken = [];
+    const idle = createIdleNudgeController({
+      delayMs: 20,
+      canFire: () => false,
+      speak: () => spoken.push('nudge'),
+    });
+    idle.arm();
+    await wait(40);
+    assert.equal(spoken.length, 0);
+    assert.equal(idle.count(), 0);
+  });
+
+  it('caps at two nudges and skips arm after an idle-nudge playback', async () => {
+    const spoken = [];
+    const idle = createIdleNudgeController({
+      delayMs: 15,
+      maxPerCall: 2,
+      canFire: () => true,
+      speak: () => spoken.push('nudge'),
+    });
+    idle.arm();
+    await wait(25);
+    idle.arm({ skip: true });
+    await wait(25);
+    idle.arm();
+    await wait(25);
+    idle.arm();
+    await wait(25);
+    assert.equal(spoken.length, 2);
+    assert.equal(idle.arm(), false);
+  });
+});
