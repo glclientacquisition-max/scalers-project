@@ -61,6 +61,11 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(inbox, /formatCallWhenRelative/);
     assert.doesNotMatch(inbox, />\s*Purpose\s*</);
     assert.match(inbox, /openLabel = item.hold \|\| item.job \? "Call" : "Open"/);
+    const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
+    assert.match(detail, /InboxJobEditor/);
+    assert.match(detail, /InboxHoldEditor/);
+    assert.match(detail, /CallerNoteComposer/);
+    assert.match(detail, /callerSmsOn/);
     const load = read("dashboard/src/lib/inboxLoad.ts");
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(inbox, /\/contacts\/\$\{item.contactId\}/);

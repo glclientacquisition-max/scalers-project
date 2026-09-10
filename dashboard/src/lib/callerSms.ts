@@ -7,7 +7,8 @@ type CallerKind =
   | "caller_appointment"
   | "caller_appointment_confirmed"
   | "caller_appointment_cancelled"
-  | "caller_appointment_rescheduled";
+  | "caller_appointment_rescheduled"
+  | "caller_hold_updated";
 
 function normalizeSmsTo(phone: string): string {
   let digits = String(phone || "").replace(/[^\d+]/g, "");
@@ -56,6 +57,13 @@ export function renderDeskCallerText(opts: {
       return `${hi}${business} here. We cancelled ${what}${at}.`;
     case "caller_appointment_rescheduled":
       return `${hi}${business} here. We moved ${what}${to}.`;
+    case "caller_hold_updated": {
+      const item = String(opts.service || "").trim();
+      const when = String(opts.when || "").trim();
+      const what = item ? `Pickup for ${item}` : "Pickup";
+      const now = when ? ` is now ${when}` : " was updated";
+      return `${hi}${business} here. ${what}${now}.`;
+    }
     default:
       return `${hi}${business} here. We have ${what}${at}. We will confirm shortly.`;
   }
