@@ -14,6 +14,7 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `tests/ttsNormalize.test.js` | TTS prep unit tests |
 | `tests/turnTaking.test.js` | Endpoint / barge-in unit tests |
 | `tests/overlapHold.test.js` | Overlap queue + last-question replay |
+| `tests/idleNudge.test.js` | Idle silence check-in after a committed question |
 | `tests/spokenStreamBuffer.test.js` | LLM→TTS chunking tests |
 | `tests/voiceWiring.test.js` | Static wiring checks for runtime voice paths |
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
@@ -72,7 +73,7 @@ See `.env.example` — key ones:
 - `SONIOX_API_KEY`, `SONIOX_SAMPLE_RATE` (curated voices: voice engine `src/data/soniox-voices.json`, desk mirror `dashboard/src/data/soniox-voices.json`; per-tenant pick in `tenants.soniox_voice_id`)
 - `SONIOX_STT_CONTEXT` (per-tenant vocabulary; default on), `SONIOX_STT_CONTEXT_MAX_TERMS`
 - `VOICE_GREETING_MODE`, `VOICE_FILLER`, `VOICE_FILLER_DELAY_MS`, `VOICE_FILLER_CACHE`
-- `VOICE_LLM_STREAM`, `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`
+- `VOICE_LLM_STREAM`, `VOICE_FLUSH_MIN_MS`, `VOICE_FLUSH_MAX_MS`, `VOICE_IDLE_NUDGE_MS`
 - `VOICE_BARGE_GRACE_MS`, `VOICE_BARGE_EARLY_MS`, `VOICE_BARGE_MIN_CHARS`
 - Soniox endpointing: `SONIOX_MAX_ENDPOINT_DELAY_MS`, `SONIOX_ENDPOINT_SENSITIVITY`, …
 

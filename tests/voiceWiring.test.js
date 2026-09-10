@@ -66,6 +66,24 @@ assert.match(
 
 assert.match(
   source,
+  /idle_nudge/,
+  'after a committed question, silent callers get one canned check-in'
+);
+
+assert.match(
+  source,
+  /isIdleNudge/,
+  'idle check-in must not arm another nudge from its own playback'
+);
+
+assert.match(
+  source,
+  /createIdleNudgeController/,
+  'media path must arm an idle nudge timer after a committed agent question'
+);
+
+assert.match(
+  source,
   /isReplay:\s*true/,
   'question replay must not commit as a newly generated question'
 );

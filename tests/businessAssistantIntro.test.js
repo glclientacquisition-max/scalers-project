@@ -111,18 +111,58 @@ describe('business assistant introduction', () => {
     assert.match(line, /^Good morning,/);
   });
 
-  it('states closed honestly then still helps', () => {
+  it('states closed honestly then still helps without services or language invite', () => {
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',
       agentName: 'Aisha',
+      servicesCatalog: [
+        { name: 'Special orders / sourcing' },
+        { name: 'Delivery' },
+      ],
       isOpen: false,
       afterHoursMode: 'serve',
       now: afternoon,
       variant: 0,
     });
+    assert.match(line, /you've reached ChapterOne Bookstore/i);
+    assert.match(line, /this is Aisha speaking/i);
     assert.match(line, /closed/i);
     assert.match(line, /still help/i);
-    assert.match(line, /ChapterOne Bookstore/);
+    assert.match(line, /How can I assist/i);
+    assert.doesNotMatch(line, /We help with/i);
+    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.ok(introLooksValid(line, 'ChapterOne Bookstore', 'Aisha'));
+  });
+
+  it('closed message mode asks for a name without the open-hours catalog', () => {
+    const line = composeBusinessAssistantIntro({
+      businessName: 'ChapterOne Bookstore',
+      agentName: 'Aisha',
+      servicesCatalog: [{ name: 'Delivery' }],
+      isOpen: false,
+      afterHoursMode: 'message',
+      now: afternoon,
+      variant: 0,
+    });
+    assert.match(line, /take a message/i);
+    assert.match(line, /May I have your name/i);
+    assert.doesNotMatch(line, /We help with/i);
+    assert.doesNotMatch(line, /English or Kiswahili/i);
+  });
+
+  it('closed bulletin opener stays short', () => {
+    const line = composeBusinessAssistantIntro({
+      businessName: 'ChapterOne Bookstore',
+      agentName: 'Aisha',
+      servicesCatalog: [{ name: 'Delivery' }],
+      isOpen: true,
+      closureNotice: 'We are closed for inventory today.',
+      now: afternoon,
+      variant: 0,
+    });
+    assert.match(line, /closed for inventory/i);
+    assert.doesNotMatch(line, /We help with/i);
+    assert.doesNotMatch(line, /English or Kiswahili/i);
   });
 
   it('preview is deterministic for Desk Test', () => {

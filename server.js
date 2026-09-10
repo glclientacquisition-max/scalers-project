@@ -129,6 +129,7 @@ const {
   pickActionProgress,
   pickClarifyProgress,
   pickLlmRecoveryLine,
+  pickIdleNudgeLine,
   pickLlmRecoverySaved,
   looksLikeCallerName,
   shouldSkipCallerTurn,
@@ -146,6 +147,7 @@ const {
   createOverlapHold,
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
+const { createIdleNudgeController } = require('./src/speech/idleNudge');
 const { createVoiceTurnTiming, createCallTranscript } = require('./src/speech/voiceTiming');
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
@@ -1211,6 +1213,40 @@ mediaWss.on('connection', (ws, req) => {
   let utteranceTimer = null;
   const overlapHold = createOverlapHold();
   const agentReplay = createAgentReplayMemory();
+  const idleNudge = createIdleNudgeController({
+    canFire: () =>
+      ws.readyState === WebSocket.OPEN &&
+      !speaking &&
+      !turnBusy &&
+      !speechOutageStarted &&
+      !utteranceParts.length &&
+      !pendingUtterance,
+    speak: () => {
+      const line = pickIdleNudgeLine({ language: callLanguage });
+      console.log(`[ws/media][${sidLabel()}] idle_nudge`);
+      return speakText(line, { isIdleNudge: true }).then((spoken) => {
+        if (spoken?.ok) {
+          callTranscript.pushAgent(line);
+          messages.push({ role: 'assistant', content: line, local: true });
+        }
+      });
+    },
+  });
+  function commitAgentQuestionIfNeeded(opts = {}) {
+    const pendingQuestion = Boolean(agentReplay.snapshot().pendingIsQuestion);
+    const committed = agentReplay.commitPlayback();
+    if (pendingQuestion) {
+      console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
+      idleNudge.arm({ skip: Boolean(opts.isIdleNudge) });
+    }
+    return committed;
+  }
+  function noteCallerSpeechForIdle(text) {
+    const sample = String(text || '').trim();
+    if (!sample || sample.length < 3) return;
+    if (looksLikeEcho(text)) return;
+    idleNudge.clear();
+  }
   let fillerTimer = null;
   /** When true, discard the in-flight Gemini/TTS reply and wait for the caller turn. */
   let bargeInActive = false;
@@ -1459,6 +1495,7 @@ mediaWss.on('connection', (ws, req) => {
     if (speechOutageStarted) return { ok: false, outage: true };
     speechOutageStarted = true;
     greetingStarted = true;
+    idleNudge.close();
     const clip = loadOutageClip(callLanguage, { voiceId: tenantSonioxVoiceId });
     const line = pickSpeechOutageLine(clip?.language || callLanguage);
     console.error(
@@ -1586,10 +1623,7 @@ mediaWss.on('connection', (ws, req) => {
           activeOutboundStreamId = null;
         }
         if (!opts.isFiller && !opts.isReplay && !speechOutageStarted) {
-          const committed = agentReplay.commitPlayback();
-          if (committed.lastAgentQuestion) {
-            console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
-          }
+          commitAgentQuestionIfNeeded({ isIdleNudge: opts.isIdleNudge });
         }
         if (!speechOutageStarted) releaseQueuedCallerSpeech(gen);
       }
@@ -1599,6 +1633,7 @@ mediaWss.on('connection', (ws, req) => {
   function cancelSpeech(reason) {
     const endingGen = activePlaybackGeneration;
     clearFillerTimer();
+    idleNudge.clear();
     bargeInActive = true;
     playbackGeneration += 1;
     speaking = false;
@@ -1718,6 +1753,7 @@ mediaWss.on('connection', (ws, req) => {
   async function runCallerTurn(userText) {
     const clean = String(userText || '').replace(/\s+/g, ' ').trim();
     if (!clean) return;
+    idleNudge.clear();
     if (turnBusy) {
       // Merge continuation fragments into one pending utterance (don't drop context).
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
@@ -2088,10 +2124,7 @@ mediaWss.on('connection', (ws, req) => {
               if (activePlaybackGeneration === streamPlaybackGen) {
                 speaking = false;
                 if (planned.reply) {
-                  const committed = agentReplay.commitPlayback();
-                  if (committed.lastAgentQuestion) {
-                    console.log(`[ws/media][${sidLabel()}] agent_question_committed`);
-                  }
+                  commitAgentQuestionIfNeeded();
                 } else {
                   agentReplay.abandonPlayback();
                 }
@@ -2320,6 +2353,7 @@ mediaWss.on('connection', (ws, req) => {
     if (evt.type === 'transcript' && evt.text) {
       const text = String(evt.text).trim();
       if (!text) return;
+      noteCallerSpeechForIdle(text);
 
       const isInterim = !evt.isFinal;
 
@@ -2663,6 +2697,7 @@ mediaWss.on('connection', (ws, req) => {
       `[ws/media] closed after ${ms}ms code=${code} reason=${reason?.toString?.() || ''} callSid=${sessionCallSid || 'unknown'} frames={text:${textFrames},binary:${binaryFrames}}`
     );
     clearFillerTimer();
+    idleNudge.close();
     if (utteranceTimer) {
       clearTimeout(utteranceTimer);
       utteranceTimer = null;
