@@ -3,13 +3,13 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createContact } from "@/app/(desk)/contacts/actions";
+import { mapPickedContacts, isContactPickerAvailable } from "@/lib/contactImport";
 import {
-  isContactPickerAvailable,
-  mapPickedContacts,
-} from "@/lib/contactImport";
+  ContactPickButton,
+  selectPhonebookContacts,
+} from "@/components/PhonebookImportButton";
 import {
   compactTextareaExpandHandlers,
-  settingsActionClass,
   settingsFieldClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
@@ -17,25 +17,6 @@ import {
 type Draft = { name: string; phone: string; notes: string };
 
 const emptyDraft = (): Draft => ({ name: "", phone: "", notes: "" });
-
-export function ContactPickButton({
-  available,
-  onPick,
-}: {
-  available: boolean;
-  onPick: () => void;
-}) {
-  if (!available) return null;
-  return (
-    <button
-      type="button"
-      onClick={onPick}
-      className={settingsActionClass}
-    >
-      Pick from phone contacts
-    </button>
-  );
-}
 
 export function AddContactPanel() {
   const router = useRouter();
@@ -60,17 +41,7 @@ export function AddContactPanel() {
     setError(null);
     setExistingId(null);
     try {
-      const nav = navigator as Navigator & {
-        contacts?: {
-          select: (
-            props: string[],
-            opts?: { multiple?: boolean }
-          ) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
-        };
-      };
-      const selected = await nav.contacts?.select(["name", "tel"], {
-        multiple: true,
-      });
+      const selected = await selectPhonebookContacts();
       const mapped = mapPickedContacts(selected);
       if (!mapped.length) return;
       setDrafts(
@@ -80,7 +51,8 @@ export function AddContactPanel() {
           notes: "",
         }))
       );
-    } catch {
+    } catch (err) {
+      if ((err as { name?: string })?.name === "AbortError") return;
       setError("Could not read phone contacts.");
     }
   }
@@ -218,7 +190,11 @@ export function AddContactPanel() {
                 <button type="submit" disabled={pending} className={settingsPrimaryButtonClass}>
                   {pending ? "Saving" : drafts.length > 1 ? `Save ${drafts.length}` : "Save"}
                 </button>
-                <ContactPickButton available={pickerOn} onPick={pickFromPhone} />
+                <ContactPickButton
+                  available={pickerOn}
+                  onPick={pickFromPhone}
+                  label="From this phone"
+                />
               </div>
 
               {error ? (

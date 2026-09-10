@@ -10,6 +10,15 @@ import {
   type ContactImportPreviewState,
 } from "@/app/(desk)/contacts/actions";
 import {
+  csvFromPickedContacts,
+  isContactPickerAvailable,
+} from "@/lib/contactImport";
+import {
+  ContactPickButton,
+  PHONEBOOK_CSV_KEY,
+  selectPhonebookContacts,
+} from "@/components/PhonebookImportButton";
+import {
   settingsActionClass,
   settingsFieldClass,
   settingsPrimaryButtonClass,
@@ -21,6 +30,8 @@ const applyInitial: ContactImportApplyState = {};
 export function ContactImportForm() {
   const router = useRouter();
   const [csvText, setCsvText] = useState("");
+  const [pickerOn, setPickerOn] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
   const [previewState, previewAction, previewPending] = useActionState(
     previewContactCsv,
     previewInitial
@@ -31,8 +42,21 @@ export function ContactImportForm() {
   );
 
   useEffect(() => {
+    setPickerOn(isContactPickerAvailable(window));
+  }, []);
+
+  useEffect(() => {
     if (previewState.ok && previewState.csv) setCsvText(previewState.csv);
   }, [previewState]);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem(PHONEBOOK_CSV_KEY);
+    if (!stored) return;
+    sessionStorage.removeItem(PHONEBOOK_CSV_KEY);
+    const fd = new FormData();
+    fd.set("csvText", stored);
+    previewAction(fd);
+  }, [previewAction]);
 
   useEffect(() => {
     if (applyState.ok) {
@@ -41,30 +65,54 @@ export function ContactImportForm() {
     }
   }, [applyState.ok, router]);
 
+  async function pickFromPhone() {
+    setPickerError(null);
+    try {
+      const selected = await selectPhonebookContacts();
+      if (!selected?.length) return;
+      const csv = csvFromPickedContacts(selected);
+      const fd = new FormData();
+      fd.set("csvText", csv);
+      previewAction(fd);
+    } catch (err) {
+      if ((err as { name?: string })?.name === "AbortError") return;
+      setPickerError("Could not read phone contacts.");
+    }
+  }
+
   const plan = previewState.plan;
   const summary = plan?.summary;
 
   return (
     <div className="space-y-6">
       {!plan ? (
-        <form action={previewAction} className="space-y-4">
-          <label className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-            CSV
-            <input
-              type="file"
-              name="csv"
-              accept=".csv,text/csv"
-              required
-              className={`${settingsFieldClass} file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium`}
-            />
-          </label>
-          <button type="submit" disabled={previewPending} className={settingsPrimaryButtonClass}>
-            {previewPending ? "Checking" : "Preview"}
-          </button>
-          {previewState.error ? (
-            <p className="text-sm text-warn">{previewState.error}</p>
-          ) : null}
-        </form>
+        <div className="space-y-4">
+          <ContactPickButton
+            available={pickerOn}
+            primary
+            onPick={pickFromPhone}
+          />
+          {pickerError ? <p className="text-sm text-warn">{pickerError}</p> : null}
+
+          <form action={previewAction} className="space-y-4">
+            <label className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+              CSV
+              <input
+                type="file"
+                name="csv"
+                accept=".csv,text/csv"
+                required={!pickerOn}
+                className={`${settingsFieldClass} file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium`}
+              />
+            </label>
+            <button type="submit" disabled={previewPending} className={settingsPrimaryButtonClass}>
+              {previewPending ? "Checking" : "Preview"}
+            </button>
+            {previewState.error ? (
+              <p className="text-sm text-warn">{previewState.error}</p>
+            ) : null}
+          </form>
+        </div>
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-ink">

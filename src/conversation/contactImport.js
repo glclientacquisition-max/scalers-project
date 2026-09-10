@@ -214,8 +214,10 @@ function planManualContact({ name, phone, notes, existingId } = {}) {
 
 function isContactPickerAvailable(globalObj) {
   if (!globalObj || typeof globalObj !== 'object') return false;
-  const nav = globalObj.navigator;
-  return Boolean(nav && 'contacts' in nav && 'ContactsManager' in globalObj);
+  const select = globalObj.navigator && globalObj.navigator.contacts
+    ? globalObj.navigator.contacts.select
+    : null;
+  return typeof select === 'function';
 }
 
 function mapPickedContacts(entries) {
@@ -231,9 +233,31 @@ function mapPickedContacts(entries) {
   });
 }
 
+function csvEscape(value) {
+  const text = String(rawOrEmpty(value));
+  if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function rawOrEmpty(value) {
+  return value == null ? '' : String(value);
+}
+
+function csvFromPickedContacts(entries) {
+  const rows = mapPickedContacts(entries);
+  const lines = ['name,phone,notes'];
+  for (const row of rows) {
+    lines.push(
+      [csvEscape(row.name), csvEscape(row.phone), csvEscape(row.notes)].join(',')
+    );
+  }
+  return lines.join('\n');
+}
+
 module.exports = {
   CONTACT_CSV_MAX_ROWS,
   buildNewContactIdentity,
+  csvFromPickedContacts,
   isContactPickerAvailable,
   mapPickedContacts,
   normalizeStoredPhone,

@@ -257,12 +257,11 @@ export function planManualContact(opts: {
   };
 }
 
-export function isContactPickerAvailable(
-  globalObj: { navigator?: object; ContactsManager?: unknown } | null
-): boolean {
+export function isContactPickerAvailable(globalObj: unknown): boolean {
   if (!globalObj || typeof globalObj !== "object") return false;
-  const nav = globalObj.navigator;
-  return Boolean(nav && "contacts" in nav && "ContactsManager" in globalObj);
+  const nav = (globalObj as { navigator?: { contacts?: { select?: unknown } } })
+    .navigator;
+  return typeof nav?.contacts?.select === "function";
 }
 
 export function mapPickedContacts(
@@ -273,4 +272,23 @@ export function mapPickedContacts(
     phone: trimField(row?.tel?.[0]),
     notes: null,
   }));
+}
+
+function csvEscape(value: unknown): string {
+  const text = value == null ? "" : String(value);
+  if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+export function csvFromPickedContacts(
+  entries: Array<{ name?: string[]; tel?: string[] }> | null | undefined
+): string {
+  const rows = mapPickedContacts(entries);
+  const lines = ["name,phone,notes"];
+  for (const row of rows) {
+    lines.push(
+      [csvEscape(row.name), csvEscape(row.phone), csvEscape(row.notes)].join(",")
+    );
+  }
+  return lines.join("\n");
 }

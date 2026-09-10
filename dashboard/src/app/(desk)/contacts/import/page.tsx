@@ -34,9 +34,9 @@ export default async function ContactImportPage() {
         Contacts
       </Link>
       <h1 className="mt-4 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-        Import CSV
+        Import
       </h1>
-      <p className="mt-2 text-sm text-ink-soft">name, phone, notes. Max 500 rows.</p>
+      <p className="mt-2 text-sm text-ink-soft">CSV. Max 500 rows.</p>
       <div className="mt-8">
         <ContactImportForm />
       </div>
