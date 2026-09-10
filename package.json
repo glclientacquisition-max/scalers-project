@@ -26,7 +26,7 @@
     "test:live-transfer": "node --test tests/liveTransferXml.test.js tests/liveTransferLegs.test.js",
     "test:voice": "npm run test:tts && npm run test:tts-fixture && npm run test:phonetic && npm run test:stream && npm run test:turns && npm run test:overlap && npm run test:wiring && npm run test:action-progress && npm run test:tts-cancel && npm run test:soniox-errors && npm run test:soniox-voice && npm run test:timing && npm run test:filler-pcm && npm run test:interim && npm run test:stt-context && npm run test:request-log && npm run test:gemini-voice && npm run test:live-transfer && npm run test:idle-nudge",
     "test:request-log": "node --test tests/requestLog.test.js",
-    "test:brain": "node --test tests/brainCore.test.js tests/brainConversation.test.js tests/brainSafety.test.js tests/toolExecution.test.js tests/liveKnowledge.test.js tests/toolMarkers.test.js tests/retailPlaybooks.test.js tests/homeServicesPlaybooks.test.js tests/callResolution.test.js tests/callSummary.test.js tests/callTranscriptReview.test.js tests/contactIdentity.test.js tests/contactImport.test.js tests/dbPhoneNormalize.test.js tests/backfillContacts.test.js tests/requiredEscalate.test.js tests/businessAssistantIntro.test.js tests/escalationFeature.test.js tests/notifyChannels.test.js tests/notifyEvents.test.js tests/callerSms.test.js tests/appointmentHours.test.js tests/businessHours.test.js tests/liveTransferReady.test.js tests/liveTransferLegs.test.js",
+    "test:brain": "node --test tests/brainCore.test.js tests/brainConversation.test.js tests/brainSafety.test.js tests/toolExecution.test.js tests/liveKnowledge.test.js tests/toolMarkers.test.js tests/retailPlaybooks.test.js tests/homeServicesPlaybooks.test.js tests/callResolution.test.js tests/callSummary.test.js tests/callTranscriptReview.test.js tests/contactIdentity.test.js tests/contactImport.test.js tests/dbPhoneNormalize.test.js tests/backfillContacts.test.js tests/requiredEscalate.test.js tests/businessAssistantIntro.test.js tests/escalationFeature.test.js tests/notifyChannels.test.js tests/notifyEvents.test.js tests/callerSms.test.js tests/appointmentHours.test.js tests/businessHours.test.js tests/liveTransferReady.test.js tests/liveTransferLegs.test.js tests/callerMemory.test.js",
     "test:knowledge": "node --test tests/liveKnowledge.test.js tests/toolMarkers.test.js tests/retailPlaybooks.test.js tests/homeServicesPlaybooks.test.js tests/ingestProseGuard.test.js tests/ingestBusinessBrief.test.js tests/productCatalogSocial.test.js tests/retailOnboardingPack.test.js",
     "smoke:retail": "node scripts/smoke-retail-playbooks.js",
     "smoke:home": "node scripts/smoke-home-services-playbooks.js",
@@ -35,6 +35,7 @@
     "smoke:one-person": "node scripts/smoke-one-person-voice.js",
     "test:notify": "node --test tests/textsmsNotify.test.js",
     "test:mvp": "npm run test:brain && npm run test:knowledge && npm run smoke:retail && npm run smoke:home && npm run smoke:escalation && npm run smoke:mvp && npm run smoke:one-person && npm run test:notify",
+    "eval:brain": "evalite evals/caller-memory.eval.ts",
     "smoke:db": "node scripts/smoke-db.js",
     "verify:staging-schema": "node scripts/verify-staging-schema.js",
     "verify:staging-schema:catalog": "node scripts/verify-staging-schema.js --catalog",
@@ -44,7 +45,9 @@
     "tunnel:cloudflared": "bash scripts/tunnel-cloudflared.sh"
   },
   "devDependencies": {
+    "evalite": "^0.19.0",
     "pg": "^8.13.1",
+    "vitest": "^4.0.16",
     "word-list": "^4.1.0"
   },
   "dependencies": {

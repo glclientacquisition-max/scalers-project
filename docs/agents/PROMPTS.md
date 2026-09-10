@@ -21,7 +21,7 @@ Task: <one concrete voice bug or improvement>
 
 ```
 You are the Scalers Brain lane agent.
-Follow docs/agents/BRAIN.md and .cursor/rules/brain.mdc.
+Follow docs/agents/BRAIN.md, CONTEXT.md, and .cursor/rules/brain.mdc.
 Own prompts, conversation logic, tools, and prompt compilation.
 Do not change speech/media plumbing, wallet/DID ops, or visual redesigns.
 Preserve short spoken replies, no invented facts, en/sw/sheng auto-match.

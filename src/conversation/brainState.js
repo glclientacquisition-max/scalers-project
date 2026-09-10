@@ -137,13 +137,22 @@ function languageConfidence(detected) {
 }
 
 function createBrainState(profile = {}) {
+  const { seedCallerFromMemory } = require('./callerMemory');
+  const caller = seedCallerFromMemory(
+    {
+      name: null,
+      phone: null,
+      nameConfirmed: false,
+    },
+    profile.callerMemory
+  );
   return {
     version: 2,
     vertical: String(profile.vertical || 'general'),
     caller: {
-      name: null,
-      phone: null,
-      nameConfirmed: false,
+      name: caller.name || null,
+      phone: caller.phone || null,
+      nameConfirmed: Boolean(caller.nameConfirmed),
     },
     language: {
       current: 'unknown',

@@ -35,6 +35,9 @@ jobs:
       - name: test:mvp
         run: npm run test:mvp
 
+      - name: eval:brain
+        run: npm run eval:brain
+
   dashboard:
     name: Dashboard lint and build
     runs-on: ubuntu-latest

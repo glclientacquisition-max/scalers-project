@@ -68,6 +68,7 @@ ADRs marked **Reconstructed historical decision** were written after the fact fr
 | [ADR-0002](./ADR-0002-five-lane-agent-governance.md) | Five-lane agent governance model | Accepted |
 | [ADR-0003](./ADR-0003-manual-sql-governance.md) | Manual SQL script governance | Accepted (historical) |
 | [ADR-0004](./ADR-0004-live-human-transfer.md) | Live human transfer via cold Dial after Stream stop | Proposed |
+| [ADR-0005](./ADR-0005-returning-caller-card.md) | Returning-caller card at call setup | Accepted |
 
 ---
 

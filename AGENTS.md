@@ -67,3 +67,16 @@ Before committing:
 4. Distinguish **documentation-only** PRs from **behavioral** PRs.
 
 Distinguish documentation work from architectural rewrites. Governance PRs must not change runtime behavior.
+
+## Agent skills
+
+Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review). They do **not** replace lanes.
+
+### Issue tracker
+
+GitHub for humans; Cloud Agents write specs under `docs/specs/` (read-only `gh`). See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context glossary at `CONTEXT.md`. ADRs stay in `docs/adr/`. Lane contracts stay in `docs/agents/`. See `docs/agents/domain.md`.
+

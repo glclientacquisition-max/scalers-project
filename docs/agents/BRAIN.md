@@ -41,7 +41,7 @@ Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain t
 Desk structured fields (hours, services, FAQs, team, bulletin, tone)
   → Gemini prompt compiler → tenants.llm_system_prompt
 Voice loads tenant profile per call
-  → structured Brain state (goal / intent / entities / language / repair)
+  → structured Brain state (goal / intent / entities / language / repair), seeded from a returning-caller card when the phone is known
   → authority policy + next-best-action
   → buildSystemPrompt + CONTEXT HEADER + LIVE GROUND TRUTH + CALL STATE
   → Gemini response plan → validated tool request
@@ -70,13 +70,15 @@ Core runtime modules:
 9. Escalation requires caller name + reason; notify WA/email when configured; if channels are down, persist a desk note and soft-confirm follow-up (never invent a live transfer). When NEXT BEST ACTION is ESCALATE and name is known, the escalate tool must fire (backend may inject if the model only shares a phone/WhatsApp). Live Dial is specified in [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md); until Voice sets `liveTransfer: true`, NBA stays ESCALATE even if `handoff_mode` is `live_transfer`.
 10. Call summary / primary intent persist instantly from Brain state + tools (STT text). Gemini does **not** hear live audio. After hangup, a fire-and-forget hangup job (`src/conversation/callTranscriptReview.js`) upserts a `contacts` row (name may stay null) and runs a **narrow name extract** (name or `NONE`) plus the existing **transcript review** (Flash-Lite, ~6s timeout) that may rewrite `summary.reason` and only upgrade `needs_human` when merge rules agree. Kill switch for review only: `POST_CALL_GEMINI_REVIEW=off`. Contact persist still runs. Ignore STT fragments/backchannels as caller name or goal text; prefer `human` when handoff was requested.
 11. Compiled `llm_system_prompt` is written by Desk compiler; owners do not edit raw prompt in UI. Stale compiled prompts that force name capture fight resolution-first runtime — recompile after Brain policy changes.
-12. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`. Post-call review may patch `reason` / resolution only through those same helpers.
+12. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`.
+13. Returning callers: load a compact phone file at call setup (`getCallerMemory` → CONTEXT HEADER). Never dump prior transcripts. Shared lines confirm identity; unique named lines may seed `caller.name` as confirmed. Instant greeting stays brand-first and local.
 
 ## Test / verify
 
 - **MVP ship gate:** `npm run test:mvp` (Brain + knowledge + retail/escalation/MVP smokes). Live DID pack: `docs/MVP_SHIP_AND_TEST.md`
 - Escalation smoke: `npm run smoke:escalation` (or `node scripts/smoke-escalation-scenarios.js`)
 - Brain outcomes: `npm run test:brain`
+- Returning-caller evals: `npm run eval:brain`
 - Manual: change settings → compile → place a test call; confirm CONTEXT HEADER / ground truth behavior
 - Do not require `npm run test:voice` unless you touched media path (you shouldn’t)
 
@@ -84,7 +86,7 @@ Core runtime modules:
 
 ```
 You are the Scalers Brain lane agent.
-Follow docs/agents/BRAIN.md and .cursor/rules/brain.mdc.
+Follow docs/agents/BRAIN.md, CONTEXT.md, and .cursor/rules/brain.mdc.
 Own prompts, conversation logic, tools, and prompt compilation.
 Do not change speech/media plumbing, wallet/DID ops, or visual redesigns.
 Preserve short spoken replies, no invented facts, en/sw/sheng auto-match.

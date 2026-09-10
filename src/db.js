@@ -10,6 +10,7 @@
 const { supabase } = require('./lib/supabaseClient');
 const { normalizeKenyaE164 } = require('./conversation/liveTransferReady');
 const { mergeContactIdentity } = require('./conversation/contactIdentity');
+const { buildCallerMemoryCard } = require('./conversation/callerMemory');
 
 const RECORDINGS_BUCKET = process.env.SUPABASE_RECORDINGS_BUCKET || 'call-recordings';
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
@@ -1099,6 +1100,95 @@ async function upsertContact({
   return data || null;
 }
 
+async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
+  const base = () =>
+    supabase
+      .from('service_requests')
+      .select('id, request_type, item, when_text, status, notes, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(2);
+
+  if (contactId) {
+    const { data, error } = await base().eq('contact_id', contactId);
+    if (error && /service_requests|relation/i.test(error.message)) return [];
+    if (error) throwIfError('getCallerMemory(requests)', error);
+    if (data?.length) return data;
+  }
+  if (!phoneNorm) return [];
+  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  if (error && /service_requests|relation/i.test(error.message)) return [];
+  if (error) throwIfError('getCallerMemory(requests-phone)', error);
+  return data || [];
+}
+
+async function listNextAppointmentForCaller(tenantId, contactId, phoneNorm) {
+  const base = () =>
+    supabase
+      .from('appointments')
+      .select(
+        'id, service_name, status, when_text, window_start, address_landmark, created_at'
+      )
+      .eq('tenant_id', tenantId)
+      .in('status', ['requested', 'confirmed'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+  if (contactId) {
+    const { data, error } = await base().eq('contact_id', contactId);
+    if (error && /appointments|relation/i.test(error.message)) return null;
+    if (error) throwIfError('getCallerMemory(appointment)', error);
+    if (data?.[0]) return data[0];
+  }
+  if (!phoneNorm) return null;
+  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  if (error && /appointments|relation/i.test(error.message)) return null;
+  if (error) throwIfError('getCallerMemory(appointment-phone)', error);
+  return data?.[0] || null;
+}
+
+/**
+ * Load the returning-caller card for a live call (read path).
+ * Returns null when the number is new or the contacts table is missing.
+ */
+async function getCallerMemory({ tenantId, phone } = {}) {
+  const phoneNorm = normalizeStoredPhone(phone);
+  if (!tenantId || !phoneNorm) return null;
+
+  const { data: contact, error: findErr } = await supabase
+    .from('contacts')
+    .select('id, name, notes, last_reason, phone, metadata')
+    .eq('tenant_id', tenantId)
+    .eq('phone', phoneNorm)
+    .maybeSingle();
+  if (findErr && /contacts|relation/i.test(findErr.message)) {
+    console.warn(
+      '[db] getCallerMemory skipped (apply contacts_and_requests.sql):',
+      findErr.message
+    );
+    return null;
+  }
+  throwIfError('getCallerMemory(contact)', findErr);
+  if (!contact) return null;
+
+  const openRequests = await listOpenRequestsForCaller(
+    tenantId,
+    contact.id,
+    phoneNorm
+  );
+  const nextAppointment = await listNextAppointmentForCaller(
+    tenantId,
+    contact.id,
+    phoneNorm
+  );
+  return buildCallerMemoryCard({
+    contact,
+    openRequests,
+    nextAppointment,
+  });
+}
+
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
 /**
@@ -1483,6 +1573,7 @@ module.exports = {
   markWhatsappSent,
   markEscalationSent,
   upsertContact,
+  getCallerMemory,
   createServiceRequest,
   updateServiceRequest,
   createAppointment,
