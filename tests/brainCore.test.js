@@ -223,4 +223,90 @@ describe('Brain state and next-best-action', () => {
     assert.equal(human.intent, 'human');
     assert.equal(human.caller.name, null);
   });
+
+  it('asks to confirm a newly extracted name once, then stops', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'My name is Jane',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('My name is Jane'),
+    });
+    assert.equal(state.caller.name, 'Jane');
+    assert.equal(state.caller.nameConfirmed, false);
+    assert.match(formatBrainStateForPrompt(state), /Got it, Jane\. Is that right\?/);
+    assert.match(formatBrainStateForPrompt(state), /Sawa, Jane\. Ni hivyo\?/);
+    assert.match(formatBrainStateForPrompt(state), /this turn only/);
+
+    state = observeCallerTurn(state, {
+      text: 'yes',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('yes', { state }),
+    });
+    assert.equal(state.caller.name, 'Jane');
+    assert.equal(state.caller.nameConfirmed, true);
+    assert.match(formatBrainStateForPrompt(state), /Caller name: confirmed/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /this turn only/);
+
+    state = observeCallerTurn(state, {
+      text: 'How much is the printer?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('How much is the printer?', { state }),
+    });
+    assert.equal(state.caller.nameConfirmed, true);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /Got it, Jane/);
+  });
+
+  it('overwrites the name when the next turn is a negation plus a new name', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'Naitwa Jane',
+      detectedLanguage: 'sw',
+      resolvedLanguage: 'sw',
+      entities: extractConversationEntities('Naitwa Jane'),
+    });
+    assert.equal(state.caller.nameConfirmed, false);
+
+    state = observeCallerTurn(state, {
+      text: 'Hapana, naitwa Wanjiku',
+      detectedLanguage: 'sw',
+      resolvedLanguage: 'sw',
+      entities: extractConversationEntities('Hapana, naitwa Wanjiku', { state }),
+    });
+    assert.equal(state.caller.name, 'Wanjiku');
+    assert.equal(state.caller.nameConfirmed, true);
+    assert.equal(state.entities.name.source, 'caller_correction');
+  });
+
+  it('treats a normal follow-up as confirmation without changing the name', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'My name is Jane',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('My name is Jane'),
+    });
+    state = observeCallerTurn(state, {
+      text: 'Are you open tomorrow?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('Are you open tomorrow?', { state }),
+    });
+    assert.equal(state.caller.name, 'Jane');
+    assert.equal(state.caller.nameConfirmed, true);
+  });
+
+  it('extracts a corrected name after no / hapana without a my-name-is prefix', () => {
+    const {
+      extractCorrectedName,
+      isNameAffirmation,
+      isNameNegation,
+    } = require('../src/conversation/entityExtraction');
+    assert.equal(extractCorrectedName("No, it's James"), 'James');
+    assert.equal(extractCorrectedName('hapana ni Mary'), 'Mary');
+    assert.equal(isNameAffirmation('ndiyo'), true);
+    assert.equal(isNameNegation('hapana'), true);
+  });
 });

@@ -321,4 +321,55 @@ describe('multi-turn Brain outcomes', () => {
     const turn2 = runTurn(createBrainState(profile), createLanguageState(), 'I want you to forward this call to Alvin');
     assert.equal(turn2.state.intent, 'human');
   });
+
+  it('confirms then corrects the caller name before save_caller_info can persist it', async () => {
+    const { executeBrainTools } = require('../src/conversation/toolExecution');
+    const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
+    let state = createBrainState(profile);
+    let languageState = createLanguageState();
+    let turn = runTurn(state, languageState, 'My name is Jane, how much is the HP printer?');
+    assert.equal(turn.state.caller.name, 'Jane');
+    assert.equal(turn.state.caller.nameConfirmed, false);
+    assert.match(formatBrainStateForPrompt(turn.state), /Got it, Jane/);
+    assert.equal(turn.decision.action, 'ANSWER');
+
+    let saved = null;
+    let early = await executeBrainTools({
+      parsed: parseGeminiResponse(
+        '###TOOL###{"save_caller_info":{"name":"Jane","reason":"price"}}###ENDTOOL###'
+      ),
+      capabilities: { saveCallerInfo: true },
+      nameConfirmed: turn.state.caller.nameConfirmed,
+      handlers: {
+        saveCallerInfo: async (info) => {
+          saved = info;
+          return info;
+        },
+      },
+    });
+    assert.equal(early.results[0].status, 'deferred');
+    assert.equal(saved, null);
+
+    ({ state, languageState } = turn);
+    turn = runTurn(state, languageState, 'No, it\'s James');
+    assert.equal(turn.state.caller.name, 'James');
+    assert.equal(turn.state.caller.nameConfirmed, true);
+    assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /this turn only/);
+
+    const persisted = await executeBrainTools({
+      parsed: parseGeminiResponse(
+        '###TOOL###{"save_caller_info":{"name":"James","reason":"price"}}###ENDTOOL###'
+      ),
+      capabilities: { saveCallerInfo: true },
+      nameConfirmed: turn.state.caller.nameConfirmed,
+      handlers: {
+        saveCallerInfo: async (info) => {
+          saved = info;
+          return info;
+        },
+      },
+    });
+    assert.equal(persisted.results[0].status, 'succeeded');
+    assert.equal(saved.name, 'James');
+  });
 });

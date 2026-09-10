@@ -1,7 +1,12 @@
 // Structured, call-local Brain state.
 // This is conversation memory, not tenant knowledge or long-term customer memory.
 
-const { entityValue, isBackchannelOrFragment, isHearAgainSignal } = require('./entityExtraction');
+const {
+  entityValue,
+  isBackchannelOrFragment,
+  isHearAgainSignal,
+  applyCallerNameConfirmation,
+} = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt } = require('./goalModel');
 const {
   isRepairSignal,
@@ -138,6 +143,7 @@ function createBrainState(profile = {}) {
     caller: {
       name: null,
       phone: null,
+      nameConfirmed: false,
     },
     language: {
       current: 'unknown',
@@ -267,7 +273,17 @@ function observeCallerTurn(state, input = {}) {
   if (input.entities && typeof input.entities === 'object') {
     next.entities = { ...next.entities, ...input.entities };
   }
-  if (entityValue(next.entities.name)) next.caller.name = entityValue(next.entities.name);
+  const nameResolution = applyCallerNameConfirmation(
+    {
+      caller: state?.caller || next.caller,
+      entities: state?.entities || {},
+    },
+    text,
+    next.entities
+  );
+  next.entities = { ...next.entities, ...nameResolution.entities };
+  next.caller.name = nameResolution.name || null;
+  next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   if (entityValue(next.entities.phone)) next.caller.phone = entityValue(next.entities.phone);
 
   const addedEntity = Object.keys(next.entities).some(
@@ -377,6 +393,7 @@ function recordActionResults(state, results = []) {
     }
     if (result.action === 'save_caller_info' && result.status === 'succeeded') {
       if (result.name) next.caller.name = String(result.name);
+      next.caller.nameConfirmed = true;
     }
     if (
       (result.action === 'create_service_request' ||
@@ -392,6 +409,15 @@ function recordActionResults(state, results = []) {
   }
   next.actions.completedFingerprints = next.actions.completedFingerprints.slice(-20);
   return next;
+}
+
+function formatNameConfirmForPrompt(state) {
+  const name = String(state?.caller?.name || '').trim();
+  if (!name) return '';
+  if (state?.caller?.nameConfirmed) {
+    return '- Caller name: confirmed. Do not ask to confirm the name again. You may append save_caller_info with this confirmed name.';
+  }
+  return `- Name confirmation (this turn only): add one short confirm of the name, then still answer their request. English: "Got it, ${name}. Is that right?" Kiswahili: "Sawa, ${name}. Ni hivyo?" Sheng: "Sawa, ${name}. Ni hiyo?" Do not append save_caller_info until they confirm, correct, or continue. Do not replace their actual ask.`;
 }
 
 function formatBrainStateForPrompt(state) {
@@ -420,6 +446,7 @@ function formatBrainStateForPrompt(state) {
     `- Language: ${value.language.current} (detected ${value.language.detected}, confidence ${value.language.confidence})`,
     `- Repair failures: ${value.repair.failureCount}`,
     `- ${formatRepairForPrompt(value)}`,
+    formatNameConfirmForPrompt(value),
     value.conversation?.hearAgain
       ? '- Hear-again: caller did not hear the last line. Repeat that question more clearly. Do not save, book, or call a tool.'
       : '',
@@ -439,5 +466,6 @@ module.exports = {
   setNextBestAction,
   recordRepairFailure,
   recordActionResults,
+  formatNameConfirmForPrompt,
   formatBrainStateForPrompt,
 };

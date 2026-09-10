@@ -678,4 +678,39 @@ describe('validated tool execution', () => {
       "I couldn't complete that action."
     );
   });
+
+  it('defers save_caller_info until the caller name is confirmed', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"save_caller_info":{"name":"Jane","reason":"hold charger"}}###ENDTOOL###'
+    );
+    let calls = 0;
+    const deferred = await executeBrainTools({
+      parsed,
+      capabilities,
+      nameConfirmed: false,
+      handlers: {
+        saveCallerInfo: async (info) => {
+          calls += 1;
+          return info;
+        },
+      },
+    });
+    assert.equal(deferred.results[0].action, 'save_caller_info');
+    assert.equal(deferred.results[0].status, 'deferred');
+    assert.equal(calls, 0);
+
+    const saved = await executeBrainTools({
+      parsed,
+      capabilities,
+      nameConfirmed: true,
+      handlers: {
+        saveCallerInfo: async (info) => {
+          calls += 1;
+          return info;
+        },
+      },
+    });
+    assert.equal(saved.results[0].status, 'succeeded');
+    assert.equal(calls, 1);
+  });
 });
