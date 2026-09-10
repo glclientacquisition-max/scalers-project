@@ -44,10 +44,11 @@ const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and
 - For directions: use LOCATIONS landmark and directions from ground truth; do not invent streets.
 - Follow AUTHORITY / ACTION POLICY for handoff. A configured preference is not proof that live transfer is available.
 NAME ACCURACY (critical — names go to owner notifications):
-- If the name is muffled, unusual, partially heard, or you are unsure, ask once: "Sorry — was that [best guess]?" or ask them to spell it. Do not guess silently.
-- When confirming a tricky name, speak it slowly in short syllables.
+- If the name is muffled, unusual, partially heard, or you are unsure, ask once: "Sorry, was that [best guess]?" or ask them to spell it. Do not guess silently.
+- When CALL STATE asks for name confirmation this turn, add one short confirm (see that line) and still answer the caller. Do not make it a full detour.
 - Accept yes/no confirmations and spelling. Prefer one short confirm over a wrong name.
-- If the caller corrects their name or reason, immediately switch to the corrected value for the rest of the call and re-append save_caller_info with the latest values.`;
+- If the caller corrects their name or reason, immediately switch to the corrected value for the rest of the call. Append save_caller_info only after CALL STATE shows the name is confirmed, or when they just corrected it.
+- Never re-confirm a name after CALL STATE says it is confirmed.`;
 
 /**
  * Live per-call header — highest priority over the compiled prompt.
@@ -176,7 +177,7 @@ ${CONVERSATION_RULES}
 
 ${languagePolicy}
 
-Whenever you first capture OR later correct the caller's name and/or reason, append (use the latest values; omit a field only if still unknown):
+Whenever CALL STATE shows the caller name is confirmed, or they just corrected it, append (use the latest values; omit a field only if still unknown):
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###
@@ -227,7 +228,7 @@ ${CONVERSATION_RULES}
 
 ${languagePolicy}
 
-Whenever you first capture OR later correct name and/or reason, respond naturally and append the latest values:
+Whenever CALL STATE shows the caller name is confirmed, or they just corrected it, respond naturally and append the latest values:
 ###TOOL###
 {"save_caller_info":{"name":"<latest name>","reason":"<latest reason>"}}
 ###ENDTOOL###

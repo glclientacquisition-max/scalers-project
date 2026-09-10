@@ -3429,6 +3429,7 @@ async function applyGeminiTools(callSid, parsed) {
     businessName:
       groundedProfile.businessName || process.env.BUSINESS_NAME || '',
     hoursSchedule: groundedProfile.hoursSchedule || null,
+    nameConfirmed: state.caller?.nameConfirmed === true,
     handlers: {
       createServiceRequest: async (request) => {
         const created = await db.createServiceRequest({

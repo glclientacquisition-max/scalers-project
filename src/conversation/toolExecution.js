@@ -427,6 +427,7 @@ async function executeBrainTools({
   businessName = '',
   hoursSchedule = null,
   now = new Date(),
+  nameConfirmed = true,
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
@@ -684,7 +685,14 @@ async function executeBrainTools({
   }
 
   const callerInfo = validateCallerInfo(parsed, { agentName, businessName });
-  if (callerInfo.valid) {
+  if (callerInfo.valid && callerInfo.value.name && nameConfirmed !== true) {
+    results.push({
+      action: 'save_caller_info',
+      status: 'deferred',
+      reason: 'Caller name is not confirmed yet.',
+      name: callerInfo.value.name,
+    });
+  } else if (callerInfo.valid) {
     const fingerprint = stableFingerprint('save_caller_info', callerInfo.value);
     try {
       const saved = await handlers.saveCallerInfo?.(callerInfo.value);

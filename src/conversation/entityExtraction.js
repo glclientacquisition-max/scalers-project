@@ -70,6 +70,97 @@ function extractName(text) {
   return isPlausibleCallerName(value) ? value : null;
 }
 
+const NAME_AFFIRMATION =
+  /^(yes|yeah|yep|yup|ndiyo|ndio|sawa|okay|ok|sure|right|alright|poa|eeh|ehe|ee|correct|that'?s right|that is right|ni hivyo|ndivyo)(?:\s+(?:please|thanks|asante))?$/i;
+
+const NAME_NEGATION =
+  /(?:^|[^\p{L}])(no|nope|nah|hapana|siyo)(?:$|[^\p{L}])/iu;
+
+function isNameAffirmation(text) {
+  const lower = String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[?.!,]+$/g, '')
+    .trim();
+  return Boolean(lower) && NAME_AFFIRMATION.test(lower);
+}
+
+function isNameNegation(text) {
+  const value = String(text || '').trim();
+  if (!value) return false;
+  if (NAME_NEGATION.test(value)) return true;
+  return /\b(wrong name|not my name|sio hiyo|si hivyo|si jina)\b/i.test(value);
+}
+
+function extractCorrectedName(text) {
+  const explicit = extractName(text);
+  if (explicit) return explicit;
+  const match =
+    /(?:\b(?:no|nope|nah|hapana|siyo)\b)\s*[,:]?\s*(?:it'?s\s+|ni\s+|jina(?:\s+langu)?\s+ni\s+)?([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})/iu.exec(
+      String(text || '')
+    );
+  if (!match) return null;
+  const value = match[1]
+    .replace(/\s+(?:and|na|calling|looking|nataka)\b.*$/i, '')
+    .trim();
+  if (/^(not|that|this|it|ni|the|my|jina)$/i.test(value)) return null;
+  return isPlausibleCallerName(value) ? value : null;
+}
+
+/**
+ * One-time name confirm/correct after first capture.
+ * First extract stays unconfirmed. Next caller turn: negation+new name
+ * overwrites; yes/continue confirms; later extracts may update without re-asking.
+ */
+function applyCallerNameConfirmation(previous = {}, text = '', incomingEntities = {}) {
+  const entities = { ...(incomingEntities || {}) };
+  const prevName =
+    String(previous?.caller?.name || '').trim() ||
+    entityValue(previous?.entities?.name);
+  const prevConfirmed = previous?.caller?.nameConfirmed === true;
+  const extracted = entityValue(entities.name);
+
+  function stamp(name, source, confirmed, confidence = 0.95) {
+    if (!name) return entities;
+    entities.name = entity(name, source, confidence, confirmed);
+    return entities;
+  }
+
+  if (prevConfirmed) {
+    if (extracted && extracted !== prevName) {
+      stamp(extracted, entities.name?.source || 'caller_explicit', true);
+      return { name: extracted, nameConfirmed: true, entities };
+    }
+    if (prevName) stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
+    return { name: prevName || extracted || null, nameConfirmed: true, entities };
+  }
+
+  if (!prevName && extracted) {
+    stamp(extracted, entities.name?.source || 'caller_explicit', false, entities.name?.confidence || 0.9);
+    return { name: extracted, nameConfirmed: false, entities };
+  }
+
+  if (prevName) {
+    const corrected = isNameNegation(text) ? extractCorrectedName(text) : null;
+    if (corrected) {
+      stamp(corrected, 'caller_correction', true, 0.98);
+      return { name: corrected, nameConfirmed: true, entities };
+    }
+    if (isNameNegation(text)) {
+      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
+      return { name: prevName, nameConfirmed: false, entities };
+    }
+    if (extracted && extracted !== prevName) {
+      stamp(extracted, entities.name?.source || 'caller_explicit', true);
+      return { name: extracted, nameConfirmed: true, entities };
+    }
+    stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
+    return { name: prevName, nameConfirmed: true, entities };
+  }
+
+  return { name: extracted || null, nameConfirmed: false, entities };
+}
+
 const NAME_BLOCKLIST = new Set([
   'yes',
   'no',
@@ -280,7 +371,7 @@ function extractConversationEntities(
   }
 
   const name = extractName(text);
-  if (name) entities.name = entity(name, 'caller_explicit', 0.95, true);
+  if (name) entities.name = entity(name, 'caller_explicit', 0.95, false);
   const phone = extractPhone(text);
   if (phone) entities.phone = entity(phone, 'caller_explicit', 0.98, true);
   const when = extractWhen(text);
@@ -346,6 +437,10 @@ module.exports = {
   entity,
   findCatalogMatch,
   extractName,
+  extractCorrectedName,
+  isNameAffirmation,
+  isNameNegation,
+  applyCallerNameConfirmation,
   extractPhone,
   extractWhen,
   extractLandmark,
