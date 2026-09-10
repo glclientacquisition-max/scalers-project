@@ -1,10 +1,10 @@
 /**
  * Desk mirror of src/conversation/businessAssistantIntro.js
- * Keep rules in sync: brand-first, agent named. Open: short grounded offering
- * plus English/Kiswahili invite. Closed: identity, closed honesty, one question.
+ * Keep rules in sync: brand-first, agent named, one help question.
+ * Open and closed: no services list or language invite on the first line.
  */
 
-/** Spoken once on open — keep short; match language after the caller speaks. */
+/** Kept for desk/tests. Not spoken on the first open. */
 export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
 
 export type BusinessAssistantIntroOpts = {
@@ -131,7 +131,6 @@ export function composeBusinessAssistantIntro(
       : "serve";
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
-  const offering = summarizeOfferingForIntro(opts);
   const variant = opts.variant === 1 ? 1 : 0;
 
   const identityPrimary = `${opener}, you've reached ${businessName}, this is ${agentName} speaking.`;
@@ -154,6 +153,5 @@ export function composeBusinessAssistantIntro(
     return `${identity} We're closed now, but I can still help. How can I assist?`;
   }
 
-  const withOffer = offering ? `${identity} ${offering}` : identity;
-  return `${withOffer} ${LANGUAGE_INVITE} How can I help?`;
+  return `${identity} How can I help?`;
 }

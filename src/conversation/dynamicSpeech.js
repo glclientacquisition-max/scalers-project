@@ -100,24 +100,18 @@ async function generateDynamicGreeting(opts) {
           ? 'The business is OPEN now.'
           : 'Open/closed status is unknown; do not claim the shop is closed.';
 
-  const { summarizeOfferingForIntro } = require('./businessAssistantIntro');
-  const offering = summarizeOfferingForIntro(offeringOpts);
-  const offeringRule = offering
-    ? `After your name, include this exact offering clause (do not invent more): "${offering}"`
-    : 'Do not invent what the business offers; skip any offering line if unknown.';
-
-  const maxWords = closureNotice ? 44 : offering ? 38 : 28;
+  const maxWords = closureNotice ? 36 : 28;
   const instruction = `You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
 Write ONE short spoken greeting to open the call (max ${maxWords} words).
 BRAND FIRST: lead with the business — e.g. "you've reached ${businessName}" or "thank you for calling ${businessName}".
 You MUST include the exact business name "${businessName}".
 You MUST introduce yourself as ${agentName} (e.g. "this is ${agentName} speaking").
-${offeringRule}
-You MUST tell the caller they can speak in English or Kiswahili (one short sentence).
+Do not list services or prices in the greeting. Grounded offerings wait until they ask.
+Do not say they can speak in English or Kiswahili. Match language after they talk.
 It is ${tod} in Nairobi. ${openLine}
 Use clear English for this first greeting (the caller has not spoken yet — do not open with Habari).
 Sound warm and natural. No quotes, no markdown, never say "the business" as a placeholder.
-End by inviting how you can help (or taking a message if closed in message mode).`;
+End with one question: how can I help (or the closed/message follow from the status line).`;
 
   const task = opts
     .generateText({
