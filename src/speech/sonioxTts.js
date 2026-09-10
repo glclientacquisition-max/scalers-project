@@ -19,7 +19,7 @@ const {
 
 const SONIOX_TTS_URL =
   process.env.SONIOX_TTS_URL || 'wss://tts-rt.soniox.com/tts-websocket';
-const SONIOX_TTS_MODEL = process.env.SONIOX_TTS_MODEL || 'tts-rt-v1';
+const SONIOX_TTS_MODEL = process.env.SONIOX_TTS_MODEL || 'tts-rt-v2';
 const SAMPLE_RATE = Number(process.env.SONIOX_SAMPLE_RATE || 16000);
 
 function isSonioxTtsConfigured() {
@@ -251,6 +251,8 @@ function createSonioxTtsSession({
       if (configured) return;
       language = resolvedLang === 'sw' ? 'sw' : 'en';
       speed = speedHint != null ? speedHint : speedForLanguage(language);
+      // Do not send the silence-reduction flag. Unsupported models 400,
+      // and the default keeps natural pauses between words.
       sendJson({
         api_key: apiKey,
         model: SONIOX_TTS_MODEL,

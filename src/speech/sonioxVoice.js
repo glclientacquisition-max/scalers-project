@@ -107,7 +107,7 @@ async function recomputeVoiceForModel(model, voiceId) {
 async function ensureSonioxVoiceReady(opts = {}) {
   const log = opts.log || console.log;
   const model =
-    opts.model || process.env.SONIOX_TTS_MODEL || 'tts-rt-v1';
+    opts.model || process.env.SONIOX_TTS_MODEL || 'tts-rt-v2';
 
   const envVoice = String(process.env.SONIOX_VOICE || '').trim();
   if (envVoice && !isAllowedVoiceId(envVoice)) {

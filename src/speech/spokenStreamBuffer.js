@@ -34,9 +34,16 @@ function stripMarkersForSpeech(raw, opts = {}) {
   return s.replace(/\s+/g, ' ').trim();
 }
 
+function envInt(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 /**
  * Split speakable text into completed sentences; keep the remainder.
- * Prefers early first-audio: short clauses / word windows before a full sentence.
+ * Default is sentence-only. Word/comma early flush is opt-in (hurts articulation).
  * @param {string} text
  * @param {{ final?: boolean, earlyFlushChars?: number, earlyFlushWords?: number }} [opts]
  * @returns {{ chunks: string[], rest: string }}
@@ -46,12 +53,12 @@ function splitSpeakableChunks(text, opts = {}) {
   const earlyFlushChars = Number(
     opts.earlyFlushChars != null
       ? opts.earlyFlushChars
-      : process.env.VOICE_STREAM_EARLY_CHARS || 18
+      : envInt('VOICE_STREAM_EARLY_CHARS', 0)
   );
   const earlyFlushWords = Number(
     opts.earlyFlushWords != null
       ? opts.earlyFlushWords
-      : process.env.VOICE_STREAM_EARLY_WORDS || 5
+      : envInt('VOICE_STREAM_EARLY_WORDS', 0)
   );
   const src = String(text || '').replace(/\s+/g, ' ').trim();
   if (!src) return { chunks: [], rest: '' };
@@ -68,8 +75,9 @@ function splitSpeakableChunks(text, opts = {}) {
   }
   let rest = src.slice(lastIndex).trim();
 
-  // First-audio boost: flush a clause on comma before the period arrives.
-  if (!final && rest.length >= earlyFlushChars) {
+  // Opt-in first-audio boost: flush a clause on comma before the period arrives.
+  // Off by default. Flushing mid-phrase makes Soniox articulate a fragment, then restart.
+  if (!final && earlyFlushChars > 0 && rest.length >= earlyFlushChars) {
     const comma = rest.lastIndexOf(',');
     // Require a real clause before the comma (avoid "Ok," alone) and some tail.
     if (comma >= 4 && rest.length - comma >= 8) {
@@ -80,9 +88,8 @@ function splitSpeakableChunks(text, opts = {}) {
     }
   }
 
-  // Second boost: if still no sentence/comma flush, speak the first N words once
-  // we have a stable clause-sized window (keeps first audio under ~1s).
-  if (!final && !chunks.length && rest) {
+  // Opt-in word window. Speaks "We can send someone this" as if it were the end.
+  if (!final && earlyFlushChars > 0 && earlyFlushWords > 0 && !chunks.length && rest) {
     const words = rest.split(/\s+/).filter(Boolean);
     if (words.length >= earlyFlushWords && rest.length >= earlyFlushChars) {
       const head = words.slice(0, earlyFlushWords).join(' ');
