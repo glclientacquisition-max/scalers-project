@@ -1,3 +1,21 @@
+# Silent DID test after #238 — Done and Dusted (2026-09-10)
+
+Staging DID `+254709221536` (Shy). Caller `+254790381872`. Call `HD_0ae324d56f23` (~06:18 UTC, 48s). Staging `/healthz.gitSha=65883c8` (`#238` on `main`).
+
+The line answered. The caller heard **no agent audio**. Transcript still stored a greeting and a reply (*I am doing great, thank you for asking!*). Railway:
+
+```
+⚠ Soniox voice not ready voice=7b197f3c-84b4-4404-986f-114e4dac1432 model=tts-rt-v1 status=missing
+```
+
+`tts-rt-v1` was removed 2026-08-31. Clone voices must be `ready` on `tts-rt-v2`. Staging did not pin `SONIOX_TTS_MODEL`; `#238` still defaulted to v1. TTS opened a stream and logged chunks, but Soniox returned no PCM.
+
+Fix: default and remap to `tts-rt-v2` (even if env is still v1), recompute the clone when status is `missing`, log `silent stream` when a TTS stream terminates with 0 bytes.
+
+Earlier the same morning `HD_7ef72820c4b5` (~06:13, pre-`#238` boot) still had a full conversation. Silence started on the v1-default deploy, not hangup.
+
+---
+
 # Speech naturality — Done and Dusted (2026-09-10)
 
 Staging DID `+254709221536` (Shy) on `main` `#237` (`VOICE_PROFILE=balanced`, speed 1.0, gain 1.22). Caller `+254790381872`.

@@ -70,7 +70,7 @@ See `.env.example` — key ones:
 
 See `.env.example` — key ones:
 
-- `SONIOX_API_KEY`, `SONIOX_SAMPLE_RATE` (curated voices: voice engine `src/data/soniox-voices.json`, desk mirror `dashboard/src/data/soniox-voices.json`; per-tenant pick in `tenants.soniox_voice_id`)
+- `SONIOX_API_KEY`, `SONIOX_SAMPLE_RATE`, `SONIOX_TTS_MODEL` (default `tts-rt-v2`; retired `tts-rt-v1` remaps so clones are not silent; curated voices: voice engine `src/data/soniox-voices.json`, desk mirror `dashboard/src/data/soniox-voices.json`; per-tenant pick in `tenants.soniox_voice_id`)
 - `SONIOX_STT_CONTEXT` (per-tenant vocabulary; default on), `SONIOX_STT_CONTEXT_MAX_TERMS`
 - `VOICE_GREETING_MODE`, `VOICE_FILLER`, `VOICE_FILLER_DELAY_MS`, `VOICE_FILLER_CACHE`
 - `VOICE_PROFILE` (`balanced` | `snappy`), `VOICE_TTS_GAIN`, `SONIOX_TTS_SPEED`, `SONIOX_TTS_SPEED_EN`, `SONIOX_TTS_SPEED_SW`

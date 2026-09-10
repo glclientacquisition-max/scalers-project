@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
 
 const { prepareForTts } = require('./ttsNormalize');
-const { resolveSonioxVoice } = require('./sonioxVoice');
+const { resolveSonioxVoice, resolveSonioxTtsModel } = require('./sonioxVoice');
 const { classifySonioxError } = require('./sonioxErrors');
 const {
   noteSonioxProviderError,
@@ -19,7 +19,6 @@ const {
 
 const SONIOX_TTS_URL =
   process.env.SONIOX_TTS_URL || 'wss://tts-rt.soniox.com/tts-websocket';
-const SONIOX_TTS_MODEL = process.env.SONIOX_TTS_MODEL || 'tts-rt-v2';
 const SAMPLE_RATE = Number(process.env.SONIOX_SAMPLE_RATE || 16000);
 
 function isSonioxTtsConfigured() {
@@ -87,8 +86,9 @@ function createSonioxTtsSession({
       socket.once('open', () => {
         clearTimeout(timer);
         const profile = resolveVoiceProfile();
+        const model = resolveSonioxTtsModel();
         console.log(
-          `[soniox-tts][${callSid}] session open model=${SONIOX_TTS_MODEL} rate=${SAMPLE_RATE} voice=${voice}` +
+          `[soniox-tts][${callSid}] session open model=${model} rate=${SAMPLE_RATE} voice=${voice}` +
             ` profile=${profile.name} speedEn=${profile.speedEn} speedSw=${profile.speedSw} gain=${profile.gain}`
         );
         resolve();
@@ -153,6 +153,9 @@ function createSonioxTtsSession({
             noteSonioxProviderOk('tts');
             const pcm = Buffer.from(msg.audio, 'base64');
             const audioWaiter = streamId ? active.get(streamId) : null;
+            if (pcm.length && audioWaiter) {
+              audioWaiter.bytesReceived = (audioWaiter.bytesReceived || 0) + pcm.length;
+            }
             if (pcm.length && audioWaiter?.chunks) audioWaiter.chunks.push(pcm);
             if (pcm.length && !audioWaiter?.silent) {
               onAudio(pcm, { streamId, audioEnd: Boolean(msg.audio_end) });
@@ -162,6 +165,23 @@ function createSonioxTtsSession({
           if (msg.terminated) {
             const waiter = streamId ? active.get(streamId) : null;
             if (waiter) {
+              if (
+                !waiter.cancelled &&
+                !waiter.silent &&
+                !(waiter.bytesReceived > 0)
+              ) {
+                const model = resolveSonioxTtsModel();
+                console.error(
+                  `[soniox-tts][${callSid}] silent stream=${streamId} model=${model} voice=${voice} — no PCM`
+                );
+                noteSonioxProviderError('tts', {
+                  billing: false,
+                  fatal: false,
+                  code: 'tts_silent',
+                  type: 'no_audio',
+                  message: `TTS stream produced no PCM model=${model} voice=${voice}`,
+                });
+              }
               active.delete(streamId);
               resolveWaiter(waiter, { cancelled: waiter.cancelled });
             }
@@ -240,6 +260,7 @@ function createSonioxTtsSession({
       cancelled: false,
       chunks: opts.capture ? [] : null,
       silent: Boolean(opts.silent),
+      bytesReceived: 0,
     };
     const done = new Promise((resolve, reject) => {
       waiter.resolve = resolve;
@@ -255,7 +276,7 @@ function createSonioxTtsSession({
       // and the default keeps natural pauses between words.
       sendJson({
         api_key: apiKey,
-        model: SONIOX_TTS_MODEL,
+        model: resolveSonioxTtsModel(),
         language,
         voice,
         speed,
@@ -423,4 +444,5 @@ module.exports = {
   isSonioxTtsConfigured,
   speedForLanguage,
   SAMPLE_RATE,
+  resolveSonioxTtsModel,
 };
