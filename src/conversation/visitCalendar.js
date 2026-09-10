@@ -89,6 +89,44 @@ function groupVisitsByDay(visits, monday, now = new Date()) {
   return { days, byDay, unscheduled };
 }
 
+const SLOT_MS = 60 * 60 * 1000;
+
+function eatWeekRangeIso(monday) {
+  const start = eatMidnightUtc(monday);
+  if (!start) return null;
+  return {
+    from: start.toISOString(),
+    to: new Date(start.getTime() + 7 * DAY_MS).toISOString(),
+  };
+}
+
+/**
+ * True when a proposed visit hour overlaps an open booked slot (same EAT day, 60-minute windows).
+ */
+function visitOverlapsOpen(hours, openAppointments = [], now = new Date()) {
+  const startDate = hours?.resolved?.instant;
+  if (!startDate || Number.isNaN(startDate.getTime())) return null;
+  const start = startDate.getTime();
+  const end = start + SLOT_MS;
+  const day = eatYmd(startDate);
+  for (const row of Array.isArray(openAppointments) ? openAppointments : []) {
+    const status = String(row?.status || '').toLowerCase();
+    if (status && status !== 'requested' && status !== 'confirmed') continue;
+    const existing = visitInstant(row, now);
+    if (!existing) continue;
+    if (eatYmd(existing) !== day) continue;
+    const eStart = existing.getTime();
+    const eEnd = eStart + SLOT_MS;
+    if (start < eEnd && eStart < end) {
+      return {
+        error: 'That time overlaps an open visit. Offer another slot.',
+        code: 'overlap',
+      };
+    }
+  }
+  return null;
+}
+
 function formatOpenVisitsForPrompt(visits = [], now = new Date()) {
   const rows = (Array.isArray(visits) ? visits : [])
     .filter((row) => {
@@ -115,8 +153,10 @@ module.exports = {
   mondayYmd,
   shiftWeekYmd,
   weekDayKeys,
+  eatWeekRangeIso,
   visitInstant,
   visitDayKey,
+  visitOverlapsOpen,
   groupVisitsByDay,
   formatOpenVisitsForPrompt,
 };

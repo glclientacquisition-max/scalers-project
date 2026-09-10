@@ -68,6 +68,12 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(detail, /InboxHoldEditor/);
     assert.match(detail, /CallerNoteComposer/);
     assert.match(detail, /callerSmsOn/);
+    assert.match(inbox, /loadWeekJobItems/);
+    assert.match(inbox, /todayHref/);
+    const calendar = read("dashboard/src/components/VisitWeekCalendar.tsx");
+    assert.match(calendar, />\s*Today\s*</);
+    assert.match(calendar, /Rest of week/);
+    assert.doesNotMatch(calendar, /InboxJobActions/);
     const load = read("dashboard/src/lib/inboxLoad.ts");
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(inbox, /\/contacts\/\$\{item.contactId\}/);

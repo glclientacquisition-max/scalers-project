@@ -14,7 +14,7 @@ import {
   formatCallWhenRelative,
   sanitizeSearchQuery,
 } from "@/lib/callsTriage";
-import { loadInboxItems } from "@/lib/inboxLoad";
+import { loadInboxItems, loadWeekJobItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import {
   countInboxPurposes,
@@ -29,6 +29,7 @@ import {
 } from "@/lib/inboxPurpose";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import {
+  mondayYmd,
   parseWeekParam,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
@@ -338,6 +339,11 @@ export default async function CallsPage({
     tenant.id,
     vertical
   );
+  const monday = parseWeekParam(sp.week);
+  const weekJobs =
+    String(sp.view || "") === "week"
+      ? await loadWeekJobItems(client, tenant.id, monday, vertical)
+      : [];
 
   if (error) {
     return (
@@ -359,10 +365,10 @@ export default async function CallsPage({
   const activeFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
   const filtered = searched.filter((item) => itemMatchesPurpose(item, activeFilter));
   const weekView = activeFilter === "job" && String(sp.view || "") === "week";
-  const monday = parseWeekParam(sp.week);
+  const weekRows = q ? weekJobs.filter((item) => itemMatchesQuery(item, q)) : weekJobs;
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = weekView ? filtered : filtered.slice(from, from + PAGE_SIZE);
+  const pageRows = weekView ? weekRows : filtered.slice(from, from + PAGE_SIZE);
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
@@ -383,18 +389,9 @@ export default async function CallsPage({
         week={weekView ? monday : undefined}
       />
 
-      {pageRows.length === 0 ? (
-        <EmptyInbox
-          total={total}
-          pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
-          did={tenant.sautikit_virtual_number}
-          purpose={activeFilter}
-          q={q}
-          vertical={vertical}
-        />
-      ) : weekView ? (
+      {weekView ? (
         <VisitWeekCalendar
-          items={filtered}
+          items={weekRows}
           monday={monday}
           prevHref={callsHref({
             purpose: "job",
@@ -408,8 +405,21 @@ export default async function CallsPage({
             view: "week",
             week: shiftWeekYmd(monday, 1),
           })}
+          todayHref={`${callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "week",
+            week: mondayYmd(),
+          })}#eat-today`}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
-          businessName={businessName}
+        />
+      ) : pageRows.length === 0 ? (
+        <EmptyInbox
+          total={total}
+          pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
+          did={tenant.sautikit_virtual_number}
+          purpose={activeFilter}
+          q={q}
           vertical={vertical}
         />
       ) : (

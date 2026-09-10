@@ -5,7 +5,9 @@ const {
   mondayYmd,
   shiftWeekYmd,
   weekDayKeys,
+  eatWeekRangeIso,
   visitDayKey,
+  visitOverlapsOpen,
   groupVisitsByDay,
   formatOpenVisitsForPrompt,
 } = require('../src/conversation/visitCalendar');
@@ -63,5 +65,39 @@ describe('visit calendar', () => {
     assert.match(block, /OPEN VISITS/);
     assert.match(block, /Carpet cleaning/);
     assert.doesNotMatch(block, /Sofa/);
+  });
+
+  it('builds an EAT Monday–Sunday ISO range', () => {
+    const range = eatWeekRangeIso('2026-09-07');
+    assert.ok(range);
+    assert.equal(range.from, '2026-09-06T21:00:00.000Z');
+    assert.equal(range.to, '2026-09-13T21:00:00.000Z');
+  });
+
+  it('rejects overlapping open visits on the same EAT hour', () => {
+    const slot = eat(2026, 9, 8, 10, 0);
+    const hours = { resolved: { instant: slot } };
+    const hit = visitOverlapsOpen(hours, [
+      {
+        status: 'requested',
+        when_text: 'Tuesday 10 AM',
+        window_start: slot.toISOString(),
+      },
+    ]);
+    assert.equal(hit?.code, 'overlap');
+    const miss = visitOverlapsOpen(hours, [
+      {
+        status: 'requested',
+        window_start: eat(2026, 9, 8, 11, 0).toISOString(),
+      },
+    ]);
+    assert.equal(miss, null);
+    const cancelled = visitOverlapsOpen(hours, [
+      {
+        status: 'cancelled',
+        window_start: slot.toISOString(),
+      },
+    ]);
+    assert.equal(cancelled, null);
   });
 });

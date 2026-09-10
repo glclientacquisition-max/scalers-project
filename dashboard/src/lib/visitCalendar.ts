@@ -65,6 +65,26 @@ export function shiftWeekYmd(monday: string, deltaWeeks: number): string {
   return eatYmd(new Date(start.getTime() + deltaWeeks * 7 * 86400000));
 }
 
+export function eatWeekRangeIso(monday: string): { from: string; to: string } | null {
+  const start = ymdToEatMidnight(monday);
+  if (Number.isNaN(start.getTime())) return null;
+  return {
+    from: start.toISOString(),
+    to: new Date(start.getTime() + 7 * 86400000).toISOString(),
+  };
+}
+
+export function visitClockLabel(visit: CalendarVisit, now = new Date()): string {
+  const instant = visitInstant(visit, now);
+  if (!instant) return "Time TBD";
+  return new Intl.DateTimeFormat("en-KE", {
+    timeZone: EAT,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(instant);
+}
+
 export function weekDays(monday: string, now = new Date()): WeekDay[] {
   const today = eatYmd(now);
   const start = ymdToEatMidnight(monday);

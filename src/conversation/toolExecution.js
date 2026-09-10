@@ -5,6 +5,7 @@ const {
   evaluateAppointmentHours,
   formatRequestedWhenLabel,
 } = require('./appointmentHours');
+const { visitOverlapsOpen } = require('./visitCalendar');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -331,7 +332,10 @@ function validateEscalation(raw, { agentName = '', businessName = '' } = {}) {
   return { valid: true, value };
 }
 
-function validateCreateAppointment(raw, { hoursSchedule = null, now = new Date() } = {}) {
+function validateCreateAppointment(
+  raw,
+  { hoursSchedule = null, now = new Date(), openAppointments = [] } = {}
+) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing appointment payload.' };
   }
@@ -371,6 +375,17 @@ function validateCreateAppointment(raw, { hoursSchedule = null, now = new Date()
       valid: false,
       reason: hours.code,
       code: hours.code,
+      missingSlots: ['when_text'],
+      hours,
+      value,
+    };
+  }
+  const overlap = visitOverlapsOpen(hours, openAppointments, now);
+  if (overlap) {
+    return {
+      valid: false,
+      reason: overlap.error,
+      code: 'overlap',
       missingSlots: ['when_text'],
       hours,
       value,
@@ -428,6 +443,7 @@ async function executeBrainTools({
   hoursSchedule = null,
   now = new Date(),
   nameConfirmed = true,
+  openAppointments = [],
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
@@ -570,6 +586,7 @@ async function executeBrainTools({
     const validation = validateCreateAppointment(parsed.appointment, {
       hoursSchedule,
       now,
+      openAppointments,
     });
     const fingerprint = validation.valid
       ? stableFingerprint('create_appointment', validation.value)
@@ -873,6 +890,11 @@ function formatToolConfirmation(results = [], language = 'en') {
         if (sw) return 'Niambie siku na saa unayopendelea.';
         if (sheng) return 'Niambie day na time unataka.';
         return 'What day and time would you prefer?';
+      }
+      if (code === 'overlap') {
+        if (sw) return 'Hiyo saa imeshikwa. Toa nyingine.';
+        if (sheng) return 'Hiyo saa imewekwa. Toa nyingine.';
+        return 'That time is taken. Pick another.';
       }
       const missing = Array.isArray(meaningful.missingSlots)
         ? meaningful.missingSlots

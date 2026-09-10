@@ -591,6 +591,39 @@ describe('validated tool execution', () => {
     assert.equal(/confirmed/i.test(spoken), false);
   });
 
+  it('does not persist a visit that overlaps an open slot', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 16, 18, 0, 0)),
+      openAppointments: [
+        {
+          status: 'requested',
+          when_text: 'Tuesday 10 AM',
+          window_start: '2026-08-18T07:00:00.000Z',
+        },
+      ],
+      handlers: {
+        createAppointment: async () => {
+          calls += 1;
+          return { id: 'should_not' };
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(execution.results[0].status, 'invalid');
+    assert.equal(execution.results[0].code, 'overlap');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /taken/i);
+    assert.match(formatToolConfirmation(execution.results, 'sw'), /imeshikwa/i);
+    assert.match(formatToolConfirmation(execution.results, 'sheng'), /imewekwa/i);
+    assert.equal(/saved your visit request/i.test(formatToolConfirmation(execution.results, 'en')), false);
+  });
+
   it('does not claim success when createAppointment throws', async () => {
     const parsed = parseGeminiResponse(
       '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'

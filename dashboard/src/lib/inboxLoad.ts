@@ -7,6 +7,7 @@ import {
   type InboxItem,
   type InboxJob,
 } from "@/lib/inboxPurpose";
+import { eatWeekRangeIso } from "@/lib/visitCalendar";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const CALL_SELECT =
@@ -98,6 +99,17 @@ export async function loadInboxItems(
   const leads = (data || []).map(toLead);
   const items = assembleInboxItems({ leads, holds, jobs, vertical });
 
+  return {
+    items: await attachInboxPeople(client, tenantId, items),
+    error: null,
+  };
+}
+
+async function attachInboxPeople(
+  client: SupabaseClient,
+  tenantId: string,
+  items: InboxItem[]
+): Promise<InboxItem[]> {
   const phones = [
     ...new Set(
       items
@@ -105,20 +117,66 @@ export async function loadInboxItems(
         .filter((phone): phone is string => Boolean(phone && phone !== "unknown"))
     ),
   ];
-  let withPeople = items;
-  if (phones.length) {
-    const people = await client
-      .from("contacts")
-      .select("id, phone, name")
+  if (!phones.length) return items;
+  const people = await client
+    .from("contacts")
+    .select("id, phone, name")
+    .eq("tenant_id", tenantId)
+    .in("phone", phones);
+  if (people.error) return items;
+  return attachContactIds(items, people.data || []);
+}
+
+/** Appointments whose window_start falls in the visible EAT Monday–Sunday. */
+export async function loadWeekJobItems(
+  client: SupabaseClient,
+  tenantId: string,
+  monday: string,
+  vertical?: string | null
+): Promise<InboxItem[]> {
+  const range = eatWeekRangeIso(monday);
+  if (!range) return [];
+
+  const ranged = await client
+    .from("appointments")
+    .select(JOB_SELECT)
+    .eq("tenant_id", tenantId)
+    .gte("window_start", range.from)
+    .lt("window_start", range.to)
+    .order("window_start", { ascending: true })
+    .limit(200);
+
+  let jobs: InboxJob[] = [];
+  if (ranged.error && /window_start|window_end|column/i.test(ranged.error.message)) {
+    const retry = await client
+      .from("appointments")
+      .select(
+        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
+      )
       .eq("tenant_id", tenantId)
-      .in("phone", phones);
-    if (!people.error) {
-      withPeople = attachContactIds(items, people.data || []);
+      .order("created_at", { ascending: false })
+      .limit(INBOX_WINDOW);
+    jobs = (retry.error ? [] : retry.data || []) as InboxJob[];
+  } else {
+    jobs = (ranged.error ? [] : ranged.data || []) as InboxJob[];
+    const loose = await client
+      .from("appointments")
+      .select(JOB_SELECT)
+      .eq("tenant_id", tenantId)
+      .is("window_start", null)
+      .order("created_at", { ascending: false })
+      .limit(80);
+    if (!loose.error && loose.data?.length) {
+      const seen = new Set(jobs.map((row) => row.id));
+      for (const row of loose.data as InboxJob[]) {
+        if (!seen.has(row.id)) {
+          jobs.push(row);
+          seen.add(row.id);
+        }
+      }
     }
   }
 
-  return {
-    items: withPeople,
-    error: null,
-  };
+  const items = assembleInboxItems({ leads: [], holds: [], jobs, vertical });
+  return attachInboxPeople(client, tenantId, items);
 }
