@@ -11,28 +11,16 @@ const {
   noteSonioxProviderError,
   noteSonioxProviderOk,
 } = require('./sonioxProviderHealth');
+const {
+  clampSpeed,
+  resolveVoiceProfile,
+  speedForLanguage,
+} = require('./voiceProfile');
 
 const SONIOX_TTS_URL =
   process.env.SONIOX_TTS_URL || 'wss://tts-rt.soniox.com/tts-websocket';
 const SONIOX_TTS_MODEL = process.env.SONIOX_TTS_MODEL || 'tts-rt-v1';
 const SAMPLE_RATE = Number(process.env.SONIOX_SAMPLE_RATE || 16000);
-function clampSpeed(n) {
-  return Math.min(1.3, Math.max(0.7, Number(n)));
-}
-
-/** Modest bump over 1.0 — snappier than 0.95, without rushing Kenya EN calls. */
-const TTS_SPEED = clampSpeed(process.env.SONIOX_TTS_SPEED || 1.02);
-
-/** Optional slower Swahili pacing (falls back to SONIOX_TTS_SPEED). */
-function speedForLanguage(lang) {
-  if (lang === 'sw' && process.env.SONIOX_TTS_SPEED_SW) {
-    return clampSpeed(process.env.SONIOX_TTS_SPEED_SW);
-  }
-  if (lang === 'en' && process.env.SONIOX_TTS_SPEED_EN) {
-    return clampSpeed(process.env.SONIOX_TTS_SPEED_EN);
-  }
-  return TTS_SPEED;
-}
 
 function isSonioxTtsConfigured() {
   return Boolean(process.env.SONIOX_API_KEY);
@@ -98,8 +86,10 @@ function createSonioxTtsSession({
 
       socket.once('open', () => {
         clearTimeout(timer);
+        const profile = resolveVoiceProfile();
         console.log(
-          `[soniox-tts][${callSid}] session open model=${SONIOX_TTS_MODEL} rate=${SAMPLE_RATE} voice=${voice}`
+          `[soniox-tts][${callSid}] session open model=${SONIOX_TTS_MODEL} rate=${SAMPLE_RATE} voice=${voice}` +
+            ` profile=${profile.name} speedEn=${profile.speedEn} speedSw=${profile.speedSw} gain=${profile.gain}`
         );
         resolve();
       });
