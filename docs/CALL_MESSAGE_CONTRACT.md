@@ -83,11 +83,13 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 | --- | --- | --- |
 | Visit captured on the call | Voice | `Hi {Name}, {Business} here. We have your {service} visit for {when}. We will confirm shortly.` |
 | Owner taps Confirm | Desk | `Hi {Name}, {Business} here. Your {service} visit for {when} is confirmed.` |
-| Visit rescheduled | Voice or desk | `Hi {Name}, {Business} here. We moved your {service} visit to {when}.` |
+| Visit rescheduled | Voice or desk (When + Save) | `Hi {Name}, {Business} here. We moved your {service} visit to {when}.` |
 | Visit cancelled | Voice or desk | `Hi {Name}, {Business} here. We cancelled your {service} visit for {when}.` |
 | Hold placed | Voice | `Hi {Name}, {Business} here. We have held {item} for you. We will confirm shortly.` |
+| Hold time changed | Desk (When + Save) | `Hi {Name}, {Business} here. Pickup for {item} is now {when}.` |
 | Order captured | Voice | `Hi {Name}, {Business} here. We have your order for {item}. We will confirm shortly.` |
 | Callback promised | Voice | `Hi {Name}, {Business} here. The team will call you back.` |
+| Owner note | Desk Polish then Send | Gemini rewrite of the owner's note. Owner must tap Send. |
 
 **Never**
 
@@ -95,11 +97,12 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 - Lead dumps, transcripts, recordings, staff directory
 - Escalation or medical detail (callback line only if a callback was actually promised)
 - Marketing or a second follow-up
-- `Done` on a visit (internal)
+- Owner taps **Send** on a polished note. Never auto-send freeform AI text.
 
 **Rules**
 
 - Owner toggle `notify_channels.caller_sms`. Off until they turn it on.
+- Desk: open the call. Change When/Where and Save. Confirm or Cancel. Note, Polish, Send.
 - One customer text per trigger. Capture then Confirm is two texts on purpose (received, then confirmed).
 - Use the captured name when it is a real name. Otherwise `Hi, {Business} here`.
 - Name the service or item.

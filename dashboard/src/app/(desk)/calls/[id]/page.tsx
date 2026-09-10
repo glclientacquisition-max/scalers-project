@@ -17,7 +17,11 @@ import {
   MarkLeadArchiveButton,
   MarkLeadDoneButton,
 } from "@/components/MarkLeadDoneButton";
+import { InboxJobEditor } from "@/components/InboxJobEditor";
+import { InboxHoldEditor } from "@/components/InboxHoldEditor";
+import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { waMeHref } from "@/components/WhatsAppLink";
+import { parseNotifyChannels } from "@/lib/notifyChannels";
 import {
   callsHref,
   followUpWhatsAppMessage,
@@ -117,19 +121,6 @@ function parseFromFilter(raw: string | undefined): string | undefined {
   return undefined;
 }
 
-function WhatsAppGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-      className={className}
-    >
-      <path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.33 4.95L2 22l5.3-1.39a9.87 9.87 0 0 0 4.73 1.2h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.65-1.03-5.14-2.9-7.01A9.83 9.83 0 0 0 12.04 2Zm0 18.13h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.11.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.37c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.22-8.24 8.22Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.13-1.05-.39-2-1.23-.73-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.51.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.13.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.29Z" />
-    </svg>
-  );
-}
-
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
 const CALL_SELECT_LEAD =
@@ -216,6 +207,7 @@ export default async function CallDetailPage({
   const resolution = parseCallResolution(row.resolution);
   const title = name || row.caller_number;
   const businessName = tenant.business_name?.trim() || "us";
+  const callerSmsOn = parseNotifyChannels(tenant.notify_channels).caller_sms;
   const waMessage = followUpWhatsAppMessage({ businessName, name, reason });
   const waHref = waMeHref(row.caller_number, waMessage);
   const escalatedTo =
@@ -333,15 +325,57 @@ export default async function CallDetailPage({
             </p>
           </section>
 
+          {job ? (
+            <section className="rounded-2xl border border-line bg-surface p-4">
+              <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                Visit
+              </h2>
+              <div className="mt-3">
+                <InboxJobEditor
+                  id={job.id}
+                  status={job.status}
+                  whenText={job.when_text}
+                  landmark={job.address_landmark}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {hold ? (
+            <section className="rounded-2xl border border-line bg-surface p-4">
+              <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                Hold
+              </h2>
+              <div className="mt-3">
+                <InboxHoldEditor
+                  id={hold.id}
+                  status={hold.status}
+                  whenText={hold.when_text}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          <section className="rounded-2xl border border-line bg-surface p-4">
+            <CallerNoteComposer
+              callId={row.id}
+              callerPhone={row.caller_number}
+              callerName={name}
+              service={job?.service_name || hold?.item}
+              when={job?.when_text || hold?.when_text}
+              landmark={job?.address_landmark}
+              callerSmsOn={callerSmsOn}
+            />
+          </section>
+
           {waHref ? (
             <a
               href={waHref}
               target="_blank"
               rel="noreferrer"
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 rounded-xl bg-[#0096FF] px-4 py-4 text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
             >
-              <WhatsAppGlyph className="h-5 w-5 shrink-0" />
-              Reply on WhatsApp
+              WhatsApp
             </a>
           ) : null}
 
