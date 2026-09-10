@@ -9,12 +9,12 @@
 - Do not greenfield a second design system or install shadcn to “look like Linear.”
 - Copy Linear/Stripe **discipline** (density, one accent, honest data, fast taps), not their pixels.
 - Highest leverage is an adaptive **shell**: one nav list, bottom tabs on phone, top links on `md+`.
-- Bottom tabs require a constitution §16 amendment before code.
+- Constitution §8: phone bottom tabs; `md+` top links; no left desk rail. Sign out in the header.
 - Inbox stays the collection benchmark; phone gets a dense stacked row, not cards.
+- Contacts stays a primary thumb tab in the shell pass (no More overflow yet).
 
 ## Not yet specified
 
-- Whether Contacts is a primary thumb tab or sits under More.
 - Exact container-query breakpoint for Inbox stacked rows.
 - Whether cmdk is Phase 5 or later.
 
@@ -26,17 +26,15 @@
 
 ### research / Shell vs constitution
 
-Constitution §16: top bar + drawer; no second desk sidebar in Phases 3 to 5. Spec argues a phone bottom bar is the same destinations, not a sidebar.
-
-**Answer:** Treat the tab bar as a presentation of `DeskNav` `LINKS`. Needs an explicit product yes, then a small constitution amendment, then shell code.
+**Answer:** Tab bar is a presentation of `DESK_LINKS`. Constitution amended. Shell code in `DeskNav` + `(desk)/layout.tsx`.
 
 ### task / Shell implementation
 
-Blocked by: constitution amendment.
+In progress on the desk phone-shell branch.
 
 ### task / Inbox phone rows
 
-Blocked by: shell (padding for the tab bar).
+Blocked by: nothing in the shell. Do not mix into the shell PR.
 
 ### task / Optimistic lead status
 

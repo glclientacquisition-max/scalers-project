@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
-import { DeskNav } from "@/components/DeskNav";
+import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
 
 /**
  * Workspace shell for authenticated business owners.
- * Structure: sticky header (brand + nav) → single content column.
+ * Sticky header (brand + md+ links + Sign out). Same DESK_LINKS as a phone tab bar.
  */
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const authUser = await getAuthUser();
@@ -43,7 +43,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <DeskNav />
         </div>
       </header>
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 py-6 sm:px-6 sm:py-10">{children}</main>
+      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom)+1.5rem)] sm:px-6 sm:pt-10 md:pb-10">
+        {children}
+      </main>
+      <DeskTabBar />
     </div>
   );
 }

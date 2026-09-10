@@ -29,7 +29,7 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 
 ## Product UX invariants
 
-1. **Strict shell split:** owners → `(desk)` (Calls / Settings / Wallet); ops → `/admin/*`. Never merge navs.
+1. **Strict shell split:** owners → `(desk)` (`DESK_LINKS` as top links on `md+` and bottom tabs below `md`); ops → `/admin/*`. Never merge navs.
 2. Brand-first marketing: Scalers must read as the hero identity on the landing first viewport.
 3. Follow repo frontend design rules (one composition, no hero cards/overlays, expressive type, atmospheric background; avoid purple-on-white / cream-serif-terracotta clichés).
 4. **Platform design mandate (always on):** Follow `.cursor/rules/scalers-design-ux.mdc` on every UI change: zero fluff copy, no em/en dashes in UI text, dense tables over stacked cards, split-pane detail views, primary CTA in `#0096FF`, sticky global Save top-right, muted secondary actions, Tailwind-only utilities, `textarea rows={2}`, focus rings `focus:ring-[#0096FF]`.

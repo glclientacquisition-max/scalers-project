@@ -1,10 +1,10 @@
 # Desk as a daily product (research)
 
-**Status:** Research. No UI ships from this file.  
+**Status:** Shell shipping. Constitution amended 2026-09-10. Inbox phone rows and cmdk stay later.  
 **Date:** 2026-09-10  
 **Lane:** Desk UI/UX  
-**Baseline:** `origin/main` DeskNav is Overview, Inbox, Contacts, Business, Wallet. Shell is a sticky top bar plus a phone hamburger drawer.  
-**Authority:** [`FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md) outranks this spec. Where this spec asks to change chrome, that is a **constitution amendment**, not a silent restyle.
+**Baseline:** `DESK_LINKS` is Overview, Inbox, Contacts, Business, Wallet. Phone uses a bottom tab bar. Desktop keeps top links.  
+**Authority:** [`FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md) outranks this spec.
 
 ---
 
@@ -38,7 +38,7 @@ Universal is not “works if you pinch-zoom the desktop site.”
 
 Kenyan SME owners will use this between jobs, often on a phone. A hamburger **Menu** that hides Inbox is the opposite of a daily app.
 
-Constitution §16 currently says: top bar + mobile drawer; do not add a second desk sidebar in Phases 3 to 5. A phone **bottom bar** is not a second sidebar. It is the same four destinations, presented for the thumb. That needs an explicit product yes before code.
+Constitution §8 is the shell law: top bar on `md+`; phone **bottom bar** of the same destinations; no left desk rail. A hamburger that hides Inbox is banned.
 
 ---
 
@@ -98,11 +98,10 @@ Vercel `react-best-practices` and `shadcn` skills will nudge toward shadcn. For 
 
 | Already good | Gap that kills daily use |
 | --- | --- |
-| Tokens, type, density 8 | Phone nav is hamburger. Five destinations hidden behind Menu |
-| Inbox table + call-detail split on `lg` | Table `min-w-[760px]` + h-scroll is not a phone layout. Constitution allows a real phone row recipe; we never shipped one |
-| One primary CTA, WhatsApp blue fill | Header + drawer eat vertical space; no `safe-area` padding |
-| Honest Line live / pending / training | No command palette; no optimistic Done/Archive |
-| Next.js 16 App Router, Server Components | Desk has almost no interaction tests. Lane gate is lint + build only |
+| Tokens, type, density 8 | Inbox table `min-w-[760px]` + h-scroll is not a phone layout |
+| Adaptive shell: one `DESK_LINKS` list, phone tabs, desktop top links | Constitution allows a real phone Inbox row recipe; we never shipped one |
+| One primary CTA, WhatsApp blue fill | No command palette; no optimistic Done/Archive |
+| Honest Line live / pending / training | Desk has almost no interaction tests. Lane gate is lint + build only |
 
 Do not replace Calls/Inbox as the collection benchmark. Extend it.
 
@@ -169,16 +168,13 @@ No new package in the shell phase unless native HTML cannot do tabs + `aria-curr
 
 A big-bang “Frontend 3.0” will produce AI slop. Ship like Linear: small, weekly, one concern.
 
-### 0. Product decision (blocking)
+### 0. Product decision
 
-Amend constitution §16: phone primary nav is a bottom tab bar of at most five items; desktop stays the top bar; still no left desk rail. Until that amendment, agents must not invent a sidebar or a tab bar.
+Done. Constitution §8: phone primary nav is a bottom tab bar of at most five items; desktop stays the top bar; still no left desk rail.
 
 ### 1. Shell only (highest leverage)
 
-- One `LINKS` list
-- Bottom tabs on small screens, safe area, main padding
-- Overflow: Sign out stays in a small header control, not a sixth tab
-- Verify Overview, Inbox, Contacts, Business, Wallet, call detail on 390 and 1280
+Shipping: one `DESK_LINKS` list, bottom tabs on small screens, safe area, main padding, Sign out in the header. Contacts stays a thumb tab in this pass.
 
 ### 2. Inbox on a phone
 
