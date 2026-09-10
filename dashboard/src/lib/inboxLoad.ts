@@ -19,7 +19,7 @@ const CALL_SELECT_LEAD =
 const HOLD_SELECT =
   "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id";
 const JOB_SELECT =
-  "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id";
+  "id, created_at, service_name, status, when_text, window_start, window_end, address_landmark, notes, caller_name, caller_phone, call_id";
 
 export const INBOX_WINDOW = 150;
 
@@ -64,7 +64,7 @@ export async function loadInboxItems(
     return { items: [], error: error.message };
   }
 
-  const [holdsRes, jobsRes] = await Promise.all([
+  const [holdsRes, jobsFirst] = await Promise.all([
     client
       .from("service_requests")
       .select(HOLD_SELECT)
@@ -79,8 +79,22 @@ export async function loadInboxItems(
       .limit(INBOX_WINDOW),
   ]);
 
+  let jobs: InboxJob[] = [];
+  if (jobsFirst.error && /window_start|window_end|column/i.test(jobsFirst.error.message)) {
+    const retry = await client
+      .from("appointments")
+      .select(
+        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
+      )
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(INBOX_WINDOW);
+    jobs = (retry.error ? [] : retry.data || []) as InboxJob[];
+  } else {
+    jobs = (jobsFirst.error ? [] : jobsFirst.data || []) as InboxJob[];
+  }
+
   const holds = (holdsRes.error ? [] : holdsRes.data || []) as InboxHold[];
-  const jobs = (jobsRes.error ? [] : jobsRes.data || []) as InboxJob[];
   const leads = (data || []).map(toLead);
   const items = assembleInboxItems({ leads, holds, jobs, vertical });
 

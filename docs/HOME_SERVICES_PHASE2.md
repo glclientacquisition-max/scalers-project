@@ -44,6 +44,7 @@ Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes
 
 ### 2C — Desk: appointments inbox
 - `/appointments` list + status filters (requested / confirmed / cancelled / done)
+- Week calendar on Inbox → Visits (`/calls?purpose=job&view=week`). Same appointment rows. No extra nav item.
 - Status toggle + nav link
 - Mirror Requests UX (no card clutter)
 
