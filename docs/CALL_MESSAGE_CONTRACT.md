@@ -161,4 +161,6 @@ The owner knows who called, what they wanted, and what happened without opening 
 
 The link is the desk call detail (`/calls/{id}`). Set `DESK_PUBLIC_URL` (or `NEXT_PUBLIC_APP_URL`) on the voice host so the link points at the right desk.
 
+Do not put live Brain dump on the SMS. Omit `general_enquiry` intent, greeting/backchannel summaries, and internal resolution notes. Prefer hangup `owner_review` when it is already on the call row. Live vs bar: [`CALL_MESSAGE_GAP.md`](./CALL_MESSAGE_GAP.md).
+
 **Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.

@@ -127,6 +127,40 @@ describe('notify events', () => {
     assert.match(text, /Recording: https:\/\/example\.com\/rec\.mp3/);
   });
 
+  it('drops greeting summaries, stuck general_enquiry, and internal outcomes', () => {
+    const {
+      displayOwnerCallerName,
+      shouldSendOwnerLead,
+    } = require('../src/notifications/events');
+    const event = ownerLeadEvent(
+      {
+        name: 'Alvin.',
+        from_number: '+254790381872',
+        reason: 'Alvin called to ask about roof cleaning services.',
+        primary_intent: 'general_enquiry',
+        brain_summary: 'Intent: general_enquiry. Goal: How are you doing, Shy?',
+        resolution_note: 'The response included a permitted end-call action.',
+        owner_review: { primary_intent: 'order_enquiry' },
+      },
+      'Done and Dusted Cleaning Services'
+    );
+    const text = renderEventText(event);
+    assert.match(text, /Name: Alvin\n/);
+    assert.match(text, /Intent: order_enquiry/);
+    assert.doesNotMatch(text, /How are you doing/);
+    assert.doesNotMatch(text, /permitted end-call/);
+    assert.equal(displayOwnerCallerName('Haijawekwa'), null);
+    assert.equal(displayOwnerCallerName('Calling'), null);
+    assert.equal(shouldSendOwnerLead({ name: 'Callings', reason: 'human' }), false);
+    assert.equal(
+      shouldSendOwnerLead({
+        name: 'Alvin',
+        reason: 'Book couch cleaning',
+      }),
+      true
+    );
+  });
+
   it('owner lead event falls back to name and reason when no summary', () => {
     const event = ownerLeadEvent(
       {
