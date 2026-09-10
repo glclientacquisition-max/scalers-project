@@ -895,6 +895,16 @@ export function TenantForm({
             onChange={setNotifyChannels}
             heading={null}
           />
+          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3">
+            <p className="text-sm font-medium text-ink">Text customers</p>
+            <ToolSwitch
+              checked={Boolean(notifyChannels.caller_sms)}
+              onChange={(next) =>
+                setNotifyChannels({ ...notifyChannels, caller_sms: next })
+              }
+              label="Text customers"
+            />
+          </div>
         </div>
 
         <div className="space-y-3">

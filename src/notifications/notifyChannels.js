@@ -7,11 +7,12 @@ const DEFAULTS = Object.freeze({
   sms: true,
   whatsapp: true,
   email: true,
+  caller_sms: false,
 });
 
 /**
  * @param {unknown} raw
- * @returns {{ sms: boolean, whatsapp: boolean, email: boolean }}
+ * @returns {{ sms: boolean, whatsapp: boolean, email: boolean, caller_sms: boolean }}
  */
 function parseNotifyChannels(raw) {
   const next = { ...DEFAULTS };
@@ -19,7 +20,8 @@ function parseNotifyChannels(raw) {
   if (typeof raw.sms === 'boolean') next.sms = raw.sms;
   if (typeof raw.whatsapp === 'boolean') next.whatsapp = raw.whatsapp;
   if (typeof raw.email === 'boolean') next.email = raw.email;
-  // At least one channel must stay opted-in so soft desk path still has intent.
+  if (typeof raw.caller_sms === 'boolean') next.caller_sms = raw.caller_sms;
+  // At least one owner channel must stay opted-in. Caller SMS stays off unless set.
   if (!next.sms && !next.whatsapp && !next.email) {
     next.sms = true;
   }

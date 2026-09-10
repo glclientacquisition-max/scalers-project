@@ -35,7 +35,7 @@ Hangup `owner_review` is already the better source. It lands 1 to 2 minutes afte
 
 This is the other recipient in the contract: the business's customer, not the Scalers owner.
 
-**Live position: none sent.** `dispatchAlert` only texts the owner and, on escalation, the teammate. `renderCallerText` exists in tests. Nothing in `server.js` calls it. TextSMS `shortcode` is a Scalers sender, not the tenant DID. There is no `tenants.caller_notify` toggle. Desk notify prefs are owner-only (`sms` / `whatsapp` / `email`).
+**Live position:** off until the owner turns on **Text customers** (`notify_channels.caller_sms`, default false). Templates and send path exist. Capture, confirm, cancel, hold, order, and callback are the only triggers.
 
 The live call is still the only thing the customer hears. That is why a booking can be saved and the caller still has no written proof.
 

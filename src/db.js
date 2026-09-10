@@ -944,7 +944,7 @@ async function getTenantProfile({ callSid, toNumber, tenantId } = {}) {
       unknownAnswerFallback: null,
       dailyBulletin: [],
       alertEmail: null,
-      notifyChannels: { sms: true, whatsapp: true, email: true },
+      notifyChannels: { sms: true, whatsapp: true, email: true, caller_sms: false },
       agentTools: { escalate: true, end_call: true },
       ttsLexicon: [],
       sonioxVoiceId: null,

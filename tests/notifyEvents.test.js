@@ -93,6 +93,18 @@ describe('notify events', () => {
       callback,
       'Hi Lynn, Aris Kenya here. The team will call you back.'
     );
+
+    const confirmed = renderCallerText({
+      kind: EVENTS.CALLER_APPOINTMENT_CONFIRMED,
+      businessName: 'Done and Dusted Cleaning Services',
+      caller: { name: 'Jane' },
+      item: 'carpet cleaning',
+      when: 'tomorrow at 10 AM',
+    });
+    assert.equal(
+      confirmed,
+      'Hi Jane, Done and Dusted Cleaning Services here. Your carpet cleaning visit for tomorrow at 10 AM is confirmed.'
+    );
   });
 
   it('caller text is not generic when the item is missing', () => {

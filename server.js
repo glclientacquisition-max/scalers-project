@@ -178,6 +178,11 @@ const {
   displayOwnerCallerName,
   shouldSendOwnerLead,
 } = require('./src/notifications/events');
+const {
+  dispatchCallerSms,
+  appointmentCallerEvent,
+  requestCallerEvent,
+} = require('./src/notifications/callerSms');
 
 /** Desk base for deep links in owner alerts. */
 function deskBaseUrl() {
@@ -3160,6 +3165,24 @@ async function maybeSendServiceRequestNotification(callSid, request) {
       `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
     );
   }
+
+  const callerEvent = requestCallerEvent({ ...request, businessName });
+  try {
+    const caller = await dispatchCallerSms({
+      to: request.caller_phone,
+      event: callerEvent,
+      channels: notifyChannels,
+    });
+    if (caller.channel) {
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: { caller_notify_body: caller.body, caller_notify_kind: callerEvent.kind },
+      });
+      console.log(`[${callSid}] Caller notify (${callerEvent.kind}) via sms → ${caller.to}`);
+    }
+  } catch (err) {
+    console.warn(`[${callSid}] Caller notify failed:`, err?.message || err);
+  }
 }
 
 /** Visit booking alert for home-services appointments. */
@@ -3231,6 +3254,27 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     console.warn(
       `[${callSid}] Appointment notify skipped (${result.reason || 'unknown'})`
     );
+  }
+
+  const callerEvent = appointmentCallerEvent(
+    { ...appointment, businessName },
+    kind
+  );
+  try {
+    const caller = await dispatchCallerSms({
+      to: appointment.caller_phone,
+      event: callerEvent,
+      channels: notifyChannels,
+    });
+    if (caller.channel) {
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: { caller_notify_body: caller.body, caller_notify_kind: callerEvent.kind },
+      });
+      console.log(`[${callSid}] Caller notify (${callerEvent.kind}) via sms → ${caller.to}`);
+    }
+  } catch (err) {
+    console.warn(`[${callSid}] Caller notify failed:`, err?.message || err);
   }
 }
 
