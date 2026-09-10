@@ -161,6 +161,12 @@ function looksLikePhaticCallerTurn(text) {
   if (/^how('?s| is| are) (you|it|things)( doing| going| been)?( today)?$/.test(t)) {
     return true;
   }
+  const howName = t.match(
+    /^how('?s| is| are) (you|it|things)( doing| going| been)?( today)? ([a-z]{2,12})$/
+  );
+  if (howName && !/^(much|many|often|long|come|soon|far|old|now|this|that|the|for|with|about)$/.test(howName[5])) {
+    return true;
+  }
   if (/^(i('?m| am) )?(fine|good|okay|ok|great)( thanks| thank you)?$/.test(t)) {
     return true;
   }

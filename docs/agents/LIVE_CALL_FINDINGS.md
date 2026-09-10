@@ -1,3 +1,22 @@
+# Spoken leaks — Done and Dusted `HD_3f7ed2a5f526` (2026-09-10)
+
+Staging DID `+254709221536` (Shy). Caller `+254790381872`. 116s. Audio stayed up (`tts-rt-v2`).
+
+What TTS actually sent (not only the desk transcript):
+
+| Heard / leaked | Source |
+| --- | --- |
+| Extra word after **Done and Dusted Cleaning Services** | Tenant lexicon `alvin` → `Al-vin`. Closer: *Thank you for calling Done and Dusted Cleaning Services, Al-vin.* Soniox speaks that as a second name. |
+| `Alright.` on *How are you doing, Shy?* | Thinking-ack. Phatic matcher missed the trailing name. |
+| `Sure.` then a new utterance | Gemini `Sure!` + question. Stream flush treated `Sure.` as a finished line. Same for `Great.` and `I'm listening.` |
+| Em dash | *I don't have that exact detail — we specialize…* Gemini leak. `polishPunctuation` did not strip `—`. |
+| Couch / carpet / mattress list | Brain 1-sentence / no-lists leftover. Voice does not rewrite prompts. |
+| `###ENDCALL###` | Stripped (95 chars in, 81 spoken). Did not leak. |
+
+Voice fix: collapse `Al-vin` to `Alvin` on the say-form sanitizer (keep `Air-tel` / `Kris-to-fa`); hold `Sure.` / `I'm listening.` until the next sentence; speak dashes as a comma; skip thinking-ack when how-are-you includes the agent name.
+
+---
+
 # Silent DID test after #238 — Done and Dusted (2026-09-10)
 
 Staging DID `+254709221536` (Shy). Caller `+254790381872`. Call `HD_0ae324d56f23` (~06:18 UTC, 48s). Staging `/healthz.gitSha=65883c8` (`#238` on `main`).

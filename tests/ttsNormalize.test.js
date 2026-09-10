@@ -14,6 +14,7 @@ const {
   applyLexicon,
   listLexiconEntries,
   parseLexiconOverrides,
+  sanitizeSayForm,
 } = require('../src/speech/pronunciationLexicon');
 const {
   expandMoney,
@@ -235,6 +236,46 @@ test('exclamation becomes a period so TTS does not punch', () => {
   const prepared = prepareForTts("I'm doing well, thank you! How can I help?");
   assert.ok(!prepared.text.includes('!'));
   assert.match(prepared.text, /thank you\./);
+});
+
+test('em dash becomes a comma so TTS does not leak dash', () => {
+  const prepared = prepareForTts(
+    "I don't have that exact detail — we specialize in couch cleaning."
+  );
+  assert.ok(!/[—–]/.test(prepared.text));
+  assert.match(prepared.text, /detail, we specialize/);
+});
+
+test('ENDCALL leftover is not spoken if it reaches TTS prep', () => {
+  const prepared = prepareForTts(
+    'Have a great day. ###ENDCALL###'
+  );
+  assert.ok(!/endcall/i.test(prepared.text));
+  assert.match(prepared.text, /Have a great day/);
+});
+
+test('Al-vin tenant say-form collapses so the name is not an extra word', () => {
+  const prepared = prepareForTts(
+    'Thank you for calling Done and Dusted Cleaning Services, Alvin.',
+    {
+      extraLexicon: [
+        {
+          match: 'alvin',
+          say: 'Al-vin',
+          langs: ['en'],
+          priority: 200,
+        },
+      ],
+    }
+  );
+  assert.match(prepared.text, /Alvin/);
+  assert.ok(!prepared.text.includes('Al-vin'));
+});
+
+test('Air-tel keep-hyphen say-form is not joined', () => {
+  assert.strictEqual(sanitizeSayForm('Air-tel'), 'Air-tel');
+  assert.strictEqual(sanitizeSayForm('Al-vin'), 'Alvin');
+  assert.strictEqual(sanitizeSayForm('Kris-to-fa'), 'Kris-to-fa');
 });
 
 console.log('speedForLanguage');

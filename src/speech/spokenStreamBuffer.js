@@ -75,6 +75,26 @@ function splitSpeakableChunks(text, opts = {}) {
   }
   let rest = src.slice(lastIndex).trim();
 
+  function isTinyLeadIn(text) {
+    const t = String(text || '')
+      .replace(/[.!]+$/g, '')
+      .trim()
+      .toLowerCase();
+    return /^(sure|great|okay|ok|alright|thanks|thank you|i'?m listening|mm-hmm|mm|sawa|poa|got it)$/.test(
+      t
+    );
+  }
+
+  // "Sure." / "Great." / "I'm listening." must not be their own Soniox utterance.
+  while (chunks.length >= 2 && isTinyLeadIn(chunks[0])) {
+    const tiny = chunks.shift();
+    chunks[0] = `${tiny} ${chunks[0]}`.replace(/\s+/g, ' ').trim();
+  }
+  if (!final && chunks.length && isTinyLeadIn(chunks[chunks.length - 1])) {
+    const tiny = chunks.pop();
+    rest = `${tiny} ${rest}`.replace(/\s+/g, ' ').trim();
+  }
+
   // Opt-in first-audio boost: flush a clause on comma before the period arrives.
   // Off by default. Flushing mid-phrase makes Soniox articulate a fragment, then restart.
   if (!final && earlyFlushChars > 0 && rest.length >= earlyFlushChars) {
