@@ -150,6 +150,21 @@ test('does not speak outcome claims or leftover prose after a tool block', () =>
   assert.strictEqual((joined.match(/We are closed right now/g) || []).length, 0);
 });
 
+test('does not speak a premature that-time-works claim', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [
+    ...buf.push('Tuesday at 10 is fine. '),
+    ...buf.push('That time works.'),
+    ...buf.push(
+      ' ###TOOL###{"create_appointment":{"when_text":"Tuesday 10 AM"}}###ENDTOOL###'
+    ),
+    ...buf.finish(),
+  ];
+  const joined = emitted.join(' ');
+  assert.strictEqual((joined.match(/is fine/g) || []).length, 0);
+  assert.strictEqual((joined.match(/That time works/g) || []).length, 0);
+});
+
 if (process.exitCode) {
   console.error(`\nFAILED (${passed} passed)`);
 } else {

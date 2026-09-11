@@ -591,6 +591,70 @@ describe('validated tool execution', () => {
     assert.equal(/confirmed/i.test(spoken), false);
   });
 
+  it('persists a visit even when another open visit sits on the same hour', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 16, 18, 0, 0)),
+      openAppointments: [
+        {
+          status: 'requested',
+          when_text: 'Tuesday 10 AM',
+          window_start: '2026-08-18T07:00:00.000Z',
+        },
+      ],
+      handlers: {
+        createAppointment: async () => {
+          calls += 1;
+          return { id: 'appt_parallel', status: 'requested' };
+        },
+      },
+    });
+    assert.equal(calls, 1);
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /saved your visit request/i);
+  });
+
+  it('persists a reschedule onto an hour that already has another visit', async () => {
+    let calls = 0;
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"update_appointment":{"when_text":"Tuesday 10 AM"}}###ENDTOOL###'
+    );
+    const execution = await executeBrainTools({
+      parsed,
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 16, 18, 0, 0)),
+      openAppointments: [
+        {
+          id: 'theirs',
+          status: 'confirmed',
+          window_start: '2026-08-18T07:00:00.000Z',
+        },
+        {
+          id: 'ours',
+          status: 'requested',
+          window_start: '2026-08-18T08:00:00.000Z',
+        },
+      ],
+      handlers: {
+        updateAppointment: async () => {
+          calls += 1;
+          return { id: 'ours', status: 'requested' };
+        },
+      },
+    });
+    assert.equal(calls, 1);
+    assert.equal(execution.results[0].action, 'update_appointment');
+    assert.equal(execution.results[0].status, 'succeeded');
+    assert.match(formatToolConfirmation(execution.results, 'en'), /moved that visit/i);
+  });
+
   it('does not claim success when createAppointment throws', async () => {
     const parsed = parseGeminiResponse(
       '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'

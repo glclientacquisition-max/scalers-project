@@ -2253,7 +2253,7 @@ mediaWss.on('connection', (ws, req) => {
           if (activeTurnTiming === turnTiming) activeTurnTiming = null;
           return;
         }
-        // Finish "let me save that" before the tool confirmation so they don't overlap.
+        // Finish the progress line before the tool confirmation so they don't overlap.
         await actionProgressSpeak;
         // Handoff name-ask already spoke the required question — skip duplicate model prose.
         const skipDuplicateAsk =
@@ -3549,6 +3549,8 @@ async function applyGeminiTools(callSid, parsed) {
       groundedProfile.businessName || process.env.BUSINESS_NAME || '',
     hoursSchedule: groundedProfile.hoursSchedule || null,
     nameConfirmed: state.caller?.nameConfirmed === true,
+    openAppointments: groundedProfile.openAppointments || [],
+    callerPhone: state.caller?.phone || '',
     handlers: {
       createServiceRequest: async (request) => {
         const created = await db.createServiceRequest({

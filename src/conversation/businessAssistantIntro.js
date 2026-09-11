@@ -168,21 +168,14 @@ function composeBusinessAssistantIntro(opts = {}) {
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
 
-  // Variant 0 = primary brand-first line; 1 = thank-you alternate (still English).
-  const variant =
-    typeof opts.variant === 'number'
-      ? opts.variant
-      : Math.floor(Math.random() * 2);
-
-  const identityPrimary = `${opener}, you've reached ${businessName}, this is ${agentName} speaking.`;
-  const identityThanks = `Thank you for calling ${businessName}, this is ${agentName} speaking.`;
-  const identity = variant === 1 ? identityThanks : identityPrimary;
+  // One steady persona. Do not randomize greetings (that reads as many characters).
+  const identity = `${opener}, this is ${agentName} at ${businessName}.`;
 
   if (closureNotice) {
     const follow =
       afterHoursMode === 'message'
         ? 'I can still take a message. May I have your name?'
-        : 'Even so, I can still help. How can I assist?';
+        : 'Even so, I can still help. How can I help you?';
     return `${identity} ${closureNotice} ${follow}`;
   }
 
@@ -191,10 +184,10 @@ function composeBusinessAssistantIntro(opts = {}) {
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. How can I assist?`;
+    return `${identity} We're closed now, but I can still help. How can I help you?`;
   }
 
-  return `${identity} How can I help?`;
+  return `${identity} How can I help you?`;
 }
 
 /**

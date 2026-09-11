@@ -131,17 +131,13 @@ export function composeBusinessAssistantIntro(
       : "serve";
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
-  const variant = opts.variant === 1 ? 1 : 0;
-
-  const identityPrimary = `${opener}, you've reached ${businessName}, this is ${agentName} speaking.`;
-  const identityThanks = `Thank you for calling ${businessName}, this is ${agentName} speaking.`;
-  const identity = variant === 1 ? identityThanks : identityPrimary;
+  const identity = `${opener}, this is ${agentName} at ${businessName}.`;
 
   if (closureNotice) {
     const follow =
       afterHoursMode === "message"
         ? "I can still take a message. May I have your name?"
-        : "Even so, I can still help. How can I assist?";
+        : "Even so, I can still help. How can I help you?";
     return `${identity} ${closureNotice} ${follow}`;
   }
 
@@ -150,8 +146,8 @@ export function composeBusinessAssistantIntro(
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. How can I assist?`;
+    return `${identity} We're closed now, but I can still help. How can I help you?`;
   }
 
-  return `${identity} How can I help?`;
+  return `${identity} How can I help you?`;
 }

@@ -19,9 +19,9 @@ describe('business assistant introduction', () => {
       now: afternoon,
       variant: 0,
     });
-    assert.match(line, /you've reached ChapterOne Bookstore/i);
-    assert.match(line, /this is Aisha speaking/i);
-    assert.match(line, /How can I help/i);
+    assert.match(line, /this is Aisha at ChapterOne Bookstore/i);
+    assert.match(line, /How can I help you/i);
+    assert.doesNotMatch(line, /you've reached/i);
     assert.doesNotMatch(line, /English or Kiswahili/i);
     assert.doesNotMatch(line, /We help with/i);
     assert.doesNotMatch(line, /^\s*Habari/i);
@@ -78,7 +78,7 @@ describe('business assistant introduction', () => {
       now: afternoon,
       variant: 0,
     });
-    assert.match(line, /you've reached ChapterOne Bookstore/i);
+    assert.match(line, /this is Aisha at ChapterOne Bookstore/i);
     assert.match(line, /How can I help/i);
     assert.doesNotMatch(line, /We help with/i);
     assert.doesNotMatch(line, /English or Kiswahili/i);
@@ -123,11 +123,11 @@ describe('business assistant introduction', () => {
       now: afternoon,
       variant: 0,
     });
-    assert.match(line, /you've reached ChapterOne Bookstore/i);
-    assert.match(line, /this is Aisha speaking/i);
+    assert.match(line, /this is Aisha at ChapterOne Bookstore/i);
+    assert.match(line, /this is Aisha at ChapterOne Bookstore/i);
     assert.match(line, /closed/i);
     assert.match(line, /still help/i);
-    assert.match(line, /How can I assist/i);
+    assert.match(line, /How can I help you/i);
     assert.doesNotMatch(line, /We help with/i);
     assert.doesNotMatch(line, /English or Kiswahili/i);
     assert.ok(introLooksValid(line, 'ChapterOne Bookstore', 'Aisha'));
@@ -185,7 +185,7 @@ describe('business assistant introduction', () => {
       now: afternoon,
       variant: 0,
     });
-    assert.match(line, /you've reached ChapterOne Bookstore/i);
+    assert.match(line, /this is Aisha at ChapterOne Bookstore/i);
     assert.equal(greetingLooksValid(line, 'ChapterOne Bookstore', 'Aisha'), true);
     assert.equal(greetingLooksValid('Habari, this is Aisha', 'ChapterOne Bookstore', 'Aisha'), false);
   });
@@ -193,7 +193,7 @@ describe('business assistant introduction', () => {
   it('rejects Habari-led first opens in validation', () => {
     assert.equal(
       introLooksValid(
-        'Habari, you have reached ChapterOne Bookstore, this is Aisha speaking.',
+        'Habari, you have reached ChapterOne Bookstore, this is Aisha at ChapterOne Bookstore.',
         'ChapterOne Bookstore',
         'Aisha'
       ),

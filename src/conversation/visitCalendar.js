@@ -89,6 +89,47 @@ function groupVisitsByDay(visits, monday, now = new Date()) {
   return { days, byDay, unscheduled };
 }
 
+const SLOT_MS = 60 * 60 * 1000;
+
+function digitsPhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+/**
+ * Same EAT day, 60-minute windows. Informational only.
+ * Teams can serve more than one visit in the same hour unless policies say otherwise.
+ */
+function visitOverlapsOpen(hours, openAppointments = [], now = new Date(), opts = {}) {
+  const startDate = hours?.resolved?.instant;
+  if (!startDate || Number.isNaN(startDate.getTime())) return null;
+  const start = startDate.getTime();
+  const end = start + SLOT_MS;
+  const day = eatYmd(startDate);
+  const ignoreId = String(opts.ignoreId || '').trim();
+  const ignorePhone = digitsPhone(opts.ignoreCallerPhone);
+  for (const row of Array.isArray(openAppointments) ? openAppointments : []) {
+    if (ignoreId && String(row?.id || '') === ignoreId) continue;
+    if (ignorePhone) {
+      const rowPhone = digitsPhone(row?.caller_phone || row?.phone);
+      if (rowPhone && rowPhone === ignorePhone) continue;
+    }
+    const status = String(row?.status || '').toLowerCase();
+    if (status && status !== 'requested' && status !== 'confirmed') continue;
+    const existing = visitInstant(row, now);
+    if (!existing) continue;
+    if (eatYmd(existing) !== day) continue;
+    const eStart = existing.getTime();
+    const eEnd = eStart + SLOT_MS;
+    if (start < eEnd && eStart < end) {
+      return {
+        error: 'That time overlaps an open visit. Offer another slot.',
+        code: 'overlap',
+      };
+    }
+  }
+  return null;
+}
+
 function formatOpenVisitsForPrompt(visits = [], now = new Date()) {
   const rows = (Array.isArray(visits) ? visits : [])
     .filter((row) => {
@@ -104,7 +145,7 @@ function formatOpenVisitsForPrompt(visits = [], now = new Date()) {
     return `- ${when} | ${service} (${status})`;
   });
   return [
-    'OPEN VISITS (already booked this week. Do not offer these exact windows. Offer another time):',
+    'OPEN VISITS (already on the book this week. Same-hour visits are allowed. You may still book this window. Mention it is already busy only if useful. Do not refuse solely because another visit sits there unless POLICIES say one at a time):',
     ...lines,
   ].join('\n');
 }
@@ -117,6 +158,7 @@ module.exports = {
   weekDayKeys,
   visitInstant,
   visitDayKey,
+  visitOverlapsOpen,
   groupVisitsByDay,
   formatOpenVisitsForPrompt,
 };

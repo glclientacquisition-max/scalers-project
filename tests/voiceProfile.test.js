@@ -17,7 +17,7 @@ describe('voiceProfile', () => {
     assert.equal(p.name, 'balanced');
     assert.equal(p.speedEn, 1);
     assert.equal(p.speedSw, 1);
-    assert.equal(p.gain, 1.22);
+    assert.equal(p.gain, 1.38);
     assert.equal(p.fillerDelayMs, 400);
   });
 
@@ -26,7 +26,7 @@ describe('voiceProfile', () => {
     assert.equal(p.name, 'snappy');
     assert.equal(p.speedEn, 1.06);
     assert.equal(p.speedSw, 1.06);
-    assert.equal(p.gain, 1.22);
+    assert.equal(p.gain, 1.38);
     assert.equal(p.fillerDelayMs, 320);
   });
 
