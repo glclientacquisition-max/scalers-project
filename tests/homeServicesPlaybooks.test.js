@@ -45,6 +45,7 @@ describe('home services playbooks', () => {
   it('formats playbook text with handoff mode', () => {
     const text = formatHomeServicesPlaybookForPrompt({ handoffMode: 'callback' });
     assert.match(text, /Handoff mode.*callback/);
+    assert.match(text, /VISIT SOP/);
     assert.match(text, /Never invent prices/);
   });
 });

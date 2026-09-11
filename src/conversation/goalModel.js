@@ -20,10 +20,7 @@ const GOAL_REQUIREMENTS = Object.freeze({
     { slot: 'name', anyOf: ['name'] },
     { slot: 'when', anyOf: ['when'] },
   ],
-  cancellation: [
-    { slot: 'name', anyOf: ['name'] },
-    { slot: 'when_or_reference', anyOf: ['when', 'reference'] },
-  ],
+  cancellation: [{ slot: 'when_or_reference', anyOf: ['when', 'reference'] }],
   human: [{ slot: 'name', anyOf: ['name'] }],
 });
 

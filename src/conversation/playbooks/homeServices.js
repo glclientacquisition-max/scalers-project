@@ -65,7 +65,7 @@ const HOME_INTENTS = [
     requiredSlots: ['service', 'name', 'when', 'landmark'],
     optionalSlots: ['notes'],
     completion:
-      'Once service + caller name + time window + landmark/address are known, append create_appointment. Never fire without all four. Speak nothing on that turn. The backend confirms.',
+      'Once service + caller name + time window + landmark/address are known, append create_appointment. Do not say the time is booked. Speak nothing on that turn. The backend confirms or offers another time.',
     tool: 'create_appointment',
     patterns: [
       /\b(book|booking|appointment|schedule|visit|come (over|by|tomorrow|today)|nitakuja|njoo|tandika|install|repair|fix)\b/i,
@@ -77,7 +77,7 @@ const HOME_INTENTS = [
     requiredSlots: ['when'],
     optionalSlots: ['service'],
     completion:
-      'Collect the new when. Append update_appointment with when_text (and status requested if needed). Match the caller’s latest open visit if id unknown.',
+      'Collect only the new when. Do not say the visit is moved yet. Append update_appointment with when_text. Match the caller’s latest open visit if id unknown. Same hours and OPEN VISITS check as a new booking.',
     tool: 'update_appointment',
     patterns: [
       /\b(reschedule|move|change (the )?(time|date|appointment|visit)|badilisha|ahirisha)\b/i,
@@ -89,7 +89,7 @@ const HOME_INTENTS = [
     requiredSlots: [],
     optionalSlots: ['service', 'reason'],
     completion:
-      'Confirm they want to cancel, then append update_appointment status=cancelled for their latest open visit.',
+      'If they clearly want to cancel, append update_appointment status=cancelled for their latest open visit. Do not say it is cancelled until the backend speaks.',
     tool: 'update_appointment',
     patterns: [
       /\b(cancel|cancelled|cancellation|sitaki|toroka|futa appointment|futa booking)\b/i,
@@ -221,9 +221,11 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '',
     'Completion rules:',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
-    '- For book_visit: only fire create_appointment after service + name + when + landmark are known. If OPEN VISITS already has that window, offer another time.',
-    '- For reschedule/cancel: use update_appointment; never invent that a visit was moved or cancelled.',
-    '- Never invent prices, coverage, ETAs, or claim booked. If a tool fires this turn, speak nothing. The backend confirms.',
+    '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots; silently check hours and OPEN VISITS; if that hour is taken or closed, offer another time now; fire the tool and speak nothing; never say booked, moved, or cancelled first.',
+    '- Book: create_appointment after service + name + when + landmark.',
+    '- Reschedule: update_appointment with the new when against their latest open visit.',
+    '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking.',
+    '- Never invent prices, coverage, or ETAs.',
     '- After a clear completion, confirm briefly and goodbye.'
   );
 

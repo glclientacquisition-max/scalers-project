@@ -101,17 +101,19 @@ async function generateDynamicGreeting(opts) {
           : 'Open/closed status is unknown; do not claim the shop is closed.';
 
   const maxWords = closureNotice ? 36 : 28;
-  const instruction = `You are ${agentName}, the live phone receptionist for ${businessName} in Kenya.
+  const instruction = `You are ${agentName}, the live phone business assistant for ${businessName} in Kenya.
 Write ONE short spoken greeting to open the call (max ${maxWords} words).
-BRAND FIRST: lead with the business — e.g. "you've reached ${businessName}" or "thank you for calling ${businessName}".
+Sound like one calm person picking up the shop phone.
+Lead with who you are at the business, for example: "${tod === 'morning' ? 'Good morning' : tod === 'evening' ? 'Good evening' : 'Hello'}, this is ${agentName} at ${businessName}."
 You MUST include the exact business name "${businessName}".
-You MUST introduce yourself as ${agentName} (e.g. "this is ${agentName} speaking").
+You MUST include your name ${agentName}.
+Do not use IVR lines like "you've reached" or "thank you for calling".
 Do not list services or prices in the greeting. Grounded offerings wait until they ask.
 Do not say they can speak in English or Kiswahili. Match language after they talk.
 It is ${tod} in Nairobi. ${openLine}
 Use clear English for this first greeting (the caller has not spoken yet — do not open with Habari).
-Sound warm and natural. No quotes, no markdown, never say "the business" as a placeholder.
-End with one question: how can I help (or the closed/message follow from the status line).`;
+No quotes, no markdown, never say "the business" as a placeholder.
+End with one open question: How can I help you? (or the closed/message follow from the status line).`;
 
   const task = opts
     .generateText({
@@ -189,13 +191,13 @@ function pickActionProgress(action, lang) {
   const sw = lang === 'sw' || lang === 'sheng';
   if (sw) {
     if (a === 'ESCALATE' || a === 'TRANSFER') return 'Sawa, ninashughulikia.';
-    if (a === 'CREATE_REQUEST') return 'Sawa, ninaokoa hiyo.';
+    if (a === 'CREATE_REQUEST') return 'Sawa, kidogo.';
     if (a === 'CAPTURE') return 'Sawa.';
     return 'Sawa, ninashughulikia.';
   }
   if (a === 'ESCALATE') return 'Okay, let me get the team on that.';
   if (a === 'TRANSFER') return 'Okay, let me connect you.';
-  if (a === 'CREATE_REQUEST') return 'Okay, let me save that.';
+  if (a === 'CREATE_REQUEST') return 'Okay, one moment.';
   if (a === 'CAPTURE') return 'Okay.';
   return "Okay, I'm on it.";
 }

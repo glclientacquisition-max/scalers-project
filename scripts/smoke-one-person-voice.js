@@ -64,7 +64,7 @@ async function smokeOperationalBooking() {
   });
   checkLine('operational greeting', greeting, {
     allowLong: true,
-    mustInclude: [/you've reached Done and Dusted/i, /this is Shy/i, /How can I help/i],
+    mustInclude: [/this is Shy at Done and Dusted/i, /How can I help you/i],
   });
 
   const progress = pickActionProgress('CREATE_REQUEST', 'en');
@@ -149,11 +149,11 @@ async function smokeOperationalBooking() {
 }
 
 function smokeGeminiRules() {
-  if (!/same person after the greeting/i.test(CONVERSATION_RULES)) {
+  if (!/one person for the whole call/i.test(CONVERSATION_RULES)) {
     fail('gemini rules', 'CONVERSATION_RULES missing same-person register');
   }
-  if (!/Kenyan receptionist/i.test(CONVERSATION_RULES)) {
-    fail('gemini rules', 'CONVERSATION_RULES missing receptionist voice');
+  if (!/VISIT COMMIT/i.test(CONVERSATION_RULES)) {
+    fail('gemini rules', 'CONVERSATION_RULES missing visit commit ladder');
   }
   console.log('✓ Gemini rules keep the same person when the model is up');
 }

@@ -1013,7 +1013,7 @@ async function listOpenAppointments(tenantId, { limit = 30 } = {}) {
   const { data, error } = await supabase
     .from('appointments')
     .select(
-      'id, service_name, status, when_text, window_start, window_end, address_landmark, caller_name'
+      'id, service_name, status, when_text, window_start, window_end, address_landmark, caller_name, caller_phone'
     )
     .eq('tenant_id', tenantId)
     .in('status', ['requested', 'confirmed'])

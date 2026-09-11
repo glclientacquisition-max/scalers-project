@@ -95,7 +95,8 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     return request.allowed
       ? {
           action: ACTIONS.CREATE_REQUEST,
-          reason: 'Collect only required details, confirm them, then request the authorized action.',
+          reason:
+            'Slots are complete. Append the tool and speak nothing. Do not tell the caller it is booked, moved, or saved; the backend speaks the outcome.',
         }
       : {
           action: ACTIONS.CAPTURE,

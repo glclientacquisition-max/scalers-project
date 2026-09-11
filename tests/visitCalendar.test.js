@@ -64,4 +64,25 @@ describe('visit calendar', () => {
     assert.match(block, /Carpet cleaning/);
     assert.doesNotMatch(block, /Sofa/);
   });
+
+  it('rejects overlapping open visits on the same EAT hour', () => {
+    const slot = eat(2026, 9, 8, 10, 0);
+    const hours = { resolved: { instant: slot } };
+    const { visitOverlapsOpen } = require('../src/conversation/visitCalendar');
+    const hit = visitOverlapsOpen(hours, [
+      {
+        id: 'a',
+        status: 'requested',
+        window_start: slot.toISOString(),
+      },
+    ]);
+    assert.equal(hit?.code, 'overlap');
+    const self = visitOverlapsOpen(
+      hours,
+      [{ id: 'a', status: 'requested', window_start: slot.toISOString() }],
+      slot,
+      { ignoreId: 'a' }
+    );
+    assert.equal(self, null);
+  });
 });

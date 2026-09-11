@@ -11,7 +11,7 @@ const {
   shouldSpeakThinkingAck,
 } = require('../src/conversation/dynamicSpeech');
 
-assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay, let me save that.');
+assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay, one moment.');
 assert.strictEqual(pickActionProgress('CAPTURE', 'en'), 'Okay.');
 assert.strictEqual(pickActionProgress('ESCALATE', 'en'), 'Okay, let me get the team on that.');
 assert.strictEqual(pickActionProgress('TRANSFER', 'en'), 'Okay, let me connect you.');

@@ -19,7 +19,7 @@ const PROFILES = {
     name: 'balanced',
     speedEn: 1.0,
     speedSw: 1.0,
-    gain: 1.22,
+    gain: 1.38,
     fillerDelayMs: 400,
   },
   // Slightly quicker. Same EN/SW pace. Still under 1.2 so Safaricom/Airtel stay clear.
@@ -27,7 +27,7 @@ const PROFILES = {
     name: 'snappy',
     speedEn: 1.06,
     speedSw: 1.06,
-    gain: 1.22,
+    gain: 1.38,
     fillerDelayMs: 320,
   },
 };

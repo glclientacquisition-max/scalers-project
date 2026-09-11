@@ -1,7 +1,7 @@
 /** Default receptionist prompt for a newly signed-up tenant (mirrors SQL helper). */
 export function defaultTenantLlmPrompt(businessName: string): string {
   const name = (businessName || "the business").trim() || "the business";
-  return `You are the live phone receptionist for ${name} in Kenya.
+  return `You are the live phone business assistant for ${name} in Kenya.
 
 BUSINESS KNOWLEDGE (update this in Scalers → Business settings):
 - Business name: ${name}

@@ -5,6 +5,7 @@ const {
   evaluateAppointmentHours,
   formatRequestedWhenLabel,
 } = require('./appointmentHours');
+const { visitOverlapsOpen } = require('./visitCalendar');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -331,7 +332,45 @@ function validateEscalation(raw, { agentName = '', businessName = '' } = {}) {
   return { valid: true, value };
 }
 
-function validateCreateAppointment(raw, { hoursSchedule = null, now = new Date() } = {}) {
+function stampVisitWindow(value, hours) {
+  if (value.windowStart) return value;
+  const instant = hours?.resolved?.instant;
+  if (!instant || Number.isNaN(instant.getTime())) return value;
+  return { ...value, windowStart: instant.toISOString() };
+}
+
+function visitTimeGate(
+  whenText,
+  {
+    hoursSchedule = null,
+    now = new Date(),
+    openAppointments = [],
+    ignoreId = '',
+    ignoreCallerPhone = '',
+  } = {}
+) {
+  const hours = evaluateAppointmentHours({
+    whenText,
+    schedule: hoursSchedule,
+    now,
+  });
+  if (!hours.valid) {
+    return { ok: false, hours, code: hours.code, reason: hours.code };
+  }
+  const overlap = visitOverlapsOpen(hours, openAppointments, now, {
+    ignoreId,
+    ignoreCallerPhone,
+  });
+  if (overlap) {
+    return { ok: false, hours, code: 'overlap', reason: overlap.error };
+  }
+  return { ok: true, hours };
+}
+
+function validateCreateAppointment(
+  raw,
+  { hoursSchedule = null, now = new Date(), openAppointments = [] } = {}
+) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing appointment payload.' };
   }
@@ -361,22 +400,22 @@ function validateCreateAppointment(raw, { hoursSchedule = null, now = new Date()
       value,
     };
   }
-  const hours = evaluateAppointmentHours({
-    whenText: value.whenText,
-    schedule: hoursSchedule,
+  const hours = visitTimeGate(value.whenText, {
+    hoursSchedule,
     now,
+    openAppointments,
   });
-  if (!hours.valid) {
+  if (!hours.ok) {
     return {
       valid: false,
-      reason: hours.code,
+      reason: hours.reason,
       code: hours.code,
       missingSlots: ['when_text'],
-      hours,
+      hours: hours.hours,
       value,
     };
   }
-  return { valid: true, value, hours };
+  return { valid: true, value: stampVisitWindow(value, hours.hours), hours: hours.hours };
 }
 
 const APPOINTMENT_UPDATE_STATUSES = new Set([
@@ -386,7 +425,15 @@ const APPOINTMENT_UPDATE_STATUSES = new Set([
   'done',
 ]);
 
-function validateUpdateAppointment(raw) {
+function validateUpdateAppointment(
+  raw,
+  {
+    hoursSchedule = null,
+    now = new Date(),
+    openAppointments = [],
+    callerPhone = '',
+  } = {}
+) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing appointment update payload.' };
   }
@@ -413,6 +460,31 @@ function validateUpdateAppointment(raw) {
       value,
     };
   }
+  if (value.whenText) {
+    let ignoreId = value.appointmentId;
+    const opens = Array.isArray(openAppointments) ? openAppointments : [];
+    if (!ignoreId && opens.length === 1 && opens[0]?.id) {
+      ignoreId = String(opens[0].id);
+    }
+    const hours = visitTimeGate(value.whenText, {
+      hoursSchedule,
+      now,
+      openAppointments,
+      ignoreId,
+      ignoreCallerPhone: callerPhone || value.phone,
+    });
+    if (!hours.ok) {
+      return {
+        valid: false,
+        reason: hours.reason,
+        code: hours.code,
+        missingSlots: ['when_text'],
+        hours: hours.hours,
+        value,
+      };
+    }
+    return { valid: true, value: stampVisitWindow(value, hours.hours), hours: hours.hours };
+  }
   return { valid: true, value };
 }
 
@@ -428,6 +500,8 @@ async function executeBrainTools({
   hoursSchedule = null,
   now = new Date(),
   nameConfirmed = true,
+  openAppointments = [],
+  callerPhone = '',
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
@@ -570,6 +644,7 @@ async function executeBrainTools({
     const validation = validateCreateAppointment(parsed.appointment, {
       hoursSchedule,
       now,
+      openAppointments,
     });
     const fingerprint = validation.valid
       ? stableFingerprint('create_appointment', validation.value)
@@ -629,7 +704,12 @@ async function executeBrainTools({
   }
 
   if (parsed?.appointmentUpdate) {
-    const validation = validateUpdateAppointment(parsed.appointmentUpdate);
+    const validation = validateUpdateAppointment(parsed.appointmentUpdate, {
+      hoursSchedule,
+      now,
+      openAppointments,
+      callerPhone,
+    });
     const fingerprint = validation.valid
       ? stableFingerprint('update_appointment', validation.value)
       : null;
@@ -640,12 +720,14 @@ async function executeBrainTools({
         reason: 'Appointment updates are not available.',
       });
     } else if (!validation.valid) {
-      results.push({
-        action: 'update_appointment',
-        status: 'invalid',
-        reason: validation.reason,
-        missingSlots: validation.missingSlots || [],
-      });
+        results.push({
+          action: 'update_appointment',
+          status: 'invalid',
+          reason: validation.reason,
+          code: validation.code || null,
+          missingSlots: validation.missingSlots || [],
+          hours: validation.hours || null,
+        });
     } else if (completed.has(fingerprint)) {
       results.push({
         action: 'update_appointment',
@@ -664,6 +746,7 @@ async function executeBrainTools({
                 id: updated.id || null,
                 appointmentStatus: updated.status || validation.value.status,
                 value: validation.value,
+                hours: validation.hours || null,
                 record: updated,
               }
             : {
@@ -789,6 +872,58 @@ async function executeBrainTools({
   };
 }
 
+function formatVisitTimeProblem(code, hours, language) {
+  const sw = language === 'sw';
+  const sheng = language === 'sheng';
+  if (code === 'closed_day') {
+    const closedDay = hours.weekdayLong || 'that day';
+    const next = hours.nextOpen?.label;
+    if (sw) {
+      return next
+        ? `Tuko closed siku ya ${closedDay}. ${next} ingefaa?`
+        : `Tuko closed siku ya ${closedDay}. Niambie siku ya kazi.`;
+    }
+    if (sheng) {
+      return next
+        ? `Tuko closed ${closedDay}. ${next} ingework?`
+        : `Tuko closed ${closedDay}. Niambie siku ya kazi.`;
+    }
+    return next
+      ? `We're closed on ${closedDay}s. Would ${next} during business hours work?`
+      : `We're closed on ${closedDay}s. What day during business hours works?`;
+  }
+  if (code === 'outside_hours') {
+    const until = hours.closeLabel || 'close';
+    if (sw) {
+      return `Tuko open hadi ${until}. Huo muda uko nje ya masaa. Ungependa muda kabla ya ${until}?`;
+    }
+    if (sheng) {
+      return `Tuko open hadi ${until}. Hiyo time iko nje ya hours. Time kabla ya ${until}?`;
+    }
+    return `We're open until ${until}. That time is outside our hours. Would you like a time before ${until}?`;
+  }
+  if (code === 'currently_closed') {
+    if (sw) {
+      return 'Tuko closed sasa. Naweza kuchukua ombi la ziara wakati wa kazi.';
+    }
+    if (sheng) {
+      return 'Tuko closed saa hii. Naweza take visit request wakati wa normal hours.';
+    }
+    return "We're closed right now. I can still take a visit during normal business hours.";
+  }
+  if (code === 'unparsed_when') {
+    if (sw) return 'Niambie siku na saa unayopendelea.';
+    if (sheng) return 'Niambie day na time unataka.';
+    return 'What day and time would you prefer?';
+  }
+  if (code === 'overlap') {
+    if (sw) return 'Hiyo saa imeshikwa. Toa nyingine.';
+    if (sheng) return 'Hiyo saa imewekwa. Toa nyingine.';
+    return 'That time is taken. Pick another.';
+  }
+  return '';
+}
+
 function formatToolConfirmation(results = [], language = 'en') {
   const meaningful = results.find((result) =>
     [
@@ -833,47 +968,8 @@ function formatToolConfirmation(results = [], language = 'en') {
     if (meaningful.status === 'invalid') {
       const code = String(meaningful.code || '');
       const hours = meaningful.hours || {};
-      if (code === 'closed_day') {
-        const closedDay = hours.weekdayLong || 'that day';
-        const next = hours.nextOpen?.label;
-        if (sw) {
-          return next
-            ? `Tuko closed siku ya ${closedDay}. ${next} ingefaa?`
-            : `Tuko closed siku ya ${closedDay}. Niambie siku ya kazi.`;
-        }
-        if (sheng) {
-          return next
-            ? `Tuko closed ${closedDay}. ${next} ingework?`
-            : `Tuko closed ${closedDay}. Niambie siku ya kazi.`;
-        }
-        return next
-          ? `We're closed on ${closedDay}s. Would ${next} during business hours work?`
-          : `We're closed on ${closedDay}s. What day during business hours works?`;
-      }
-      if (code === 'outside_hours') {
-        const until = hours.closeLabel || 'close';
-        if (sw) {
-          return `Tuko open hadi ${until}. Huo muda uko nje ya masaa. Ungependa muda kabla ya ${until}?`;
-        }
-        if (sheng) {
-          return `Tuko open hadi ${until}. Hiyo time iko nje ya hours. Time kabla ya ${until}?`;
-        }
-        return `We're open until ${until}. That time is outside our hours. Would you like a time before ${until}?`;
-      }
-      if (code === 'currently_closed') {
-        if (sw) {
-          return 'Tuko closed sasa. Naweza kuchukua ombi la ziara wakati wa kazi.';
-        }
-        if (sheng) {
-          return 'Tuko closed saa hii. Naweza take visit request wakati wa normal hours.';
-        }
-        return "We're closed right now. I can still take a visit during normal business hours.";
-      }
-      if (code === 'unparsed_when') {
-        if (sw) return 'Niambie siku na saa unayopendelea.';
-        if (sheng) return 'Niambie day na time unataka.';
-        return 'What day and time would you prefer?';
-      }
+      const timeProblem = formatVisitTimeProblem(code, hours, language);
+      if (timeProblem) return timeProblem;
       const missing = Array.isArray(meaningful.missingSlots)
         ? meaningful.missingSlots
         : [];
@@ -907,9 +1003,20 @@ function formatToolConfirmation(results = [], language = 'en') {
         if (sheng) return 'Poa, nime-cancel hiyo visit.';
         return "Okay, I've cancelled that visit.";
       }
-      if (sw) return 'Sawa, nimebadilisha ratiba ya ziara.';
-      if (sheng) return 'Poa, nime-update visit schedule.';
-      return "Okay, I've updated that visit.";
+      const whenLabel = formatRequestedWhenLabel(meaningful.hours);
+      if (sw) {
+        return whenLabel
+          ? `Sawa, nimehamisha ziara ${whenLabel}.`
+          : 'Sawa, nimebadilisha ratiba ya ziara.';
+      }
+      if (sheng) {
+        return whenLabel
+          ? `Poa, nime-move visit ${whenLabel}.`
+          : 'Poa, nime-update visit schedule.';
+      }
+      return whenLabel
+        ? `Okay, I've moved that visit to ${whenLabel}.`
+        : "Okay, I've updated that visit.";
     }
     if (meaningful.status === 'duplicate') {
       if (sw) return 'Badiliko hilo tayari limetumwa.';
@@ -917,6 +1024,12 @@ function formatToolConfirmation(results = [], language = 'en') {
       return 'That visit update was already saved.';
     }
     if (meaningful.status === 'invalid') {
+      const timeProblem = formatVisitTimeProblem(
+        String(meaningful.code || ''),
+        meaningful.hours || {},
+        language
+      );
+      if (timeProblem) return timeProblem;
       if (sw) return 'Niambie muda mpya au kama unataka kughairi.';
       if (sheng) return 'Niambie new time au kama unataka cancel.';
       return 'Tell me the new time, or say if you want to cancel.';

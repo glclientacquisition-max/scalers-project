@@ -66,3 +66,19 @@ Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes
 | emergency | name, reason | escalate (+ save_caller_info) |
 
 Never invent price bands, coverage areas, or claim booked until backend confirmation.
+
+---
+
+## Visit SOP (phone)
+
+Think this. Do not read it to the caller.
+
+1. Hear book, reschedule, cancel, or "I will be there". Do not agree a time is free yet.
+2. **Book:** collect service, name, when, landmark (one missing thing per turn).
+3. **Reschedule:** match the caller's latest open visit. Collect only the new when.
+4. Silently check hours and OPEN VISITS. If that hour is closed or taken, offer another time now.
+5. Fire `create_appointment` or `update_appointment` and speak nothing. The backend says saved, moved, taken, or closed.
+6. **Cancel:** `update_appointment` status=cancelled. Speak nothing until the backend confirms.
+7. If they only confirm they will be there, acknowledge. Do not open a second visit.
+
+The backend is the only voice that may say a visit is booked or moved. A progress line on the call is "Okay, one moment.", not a save claim.
