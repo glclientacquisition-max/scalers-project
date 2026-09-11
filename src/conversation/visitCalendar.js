@@ -96,7 +96,8 @@ function digitsPhone(value) {
 }
 
 /**
- * Same EAT day, 60-minute windows. Used before create_appointment / reschedule persist.
+ * Same EAT day, 60-minute windows. Informational only.
+ * Teams can serve more than one visit in the same hour unless policies say otherwise.
  */
 function visitOverlapsOpen(hours, openAppointments = [], now = new Date(), opts = {}) {
   const startDate = hours?.resolved?.instant;
@@ -144,7 +145,7 @@ function formatOpenVisitsForPrompt(visits = [], now = new Date()) {
     return `- ${when} | ${service} (${status})`;
   });
   return [
-    'OPEN VISITS (already booked this week. Do not offer these exact windows. Offer another time):',
+    'OPEN VISITS (already on the book this week. Same-hour visits are allowed. You may still book this window. Mention it is already busy only if useful. Do not refuse solely because another visit sits there unless POLICIES say one at a time):',
     ...lines,
   ].join('\n');
 }

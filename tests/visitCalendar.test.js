@@ -62,10 +62,11 @@ describe('visit calendar', () => {
     ]);
     assert.match(block, /OPEN VISITS/);
     assert.match(block, /Carpet cleaning/);
+    assert.match(block, /Same-hour visits are allowed/);
     assert.doesNotMatch(block, /Sofa/);
   });
 
-  it('rejects overlapping open visits on the same EAT hour', () => {
+  it('flags same-hour open visits without treating them as a lock', () => {
     const slot = eat(2026, 9, 8, 10, 0);
     const hours = { resolved: { instant: slot } };
     const { visitOverlapsOpen } = require('../src/conversation/visitCalendar');

@@ -119,7 +119,7 @@ test('buildLiveGroundTruth lists open visits for booking', () => {
   });
   assert.match(truth, /OPEN VISITS/);
   assert.match(truth, /Tue 10 AM/);
-  assert.match(truth, /Do not offer these exact windows/);
+  assert.match(truth, /Same-hour visits are allowed/);
 });
 
 console.log(`\n${passed} passed`);

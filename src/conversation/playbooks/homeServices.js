@@ -77,7 +77,7 @@ const HOME_INTENTS = [
     requiredSlots: ['when'],
     optionalSlots: ['service'],
     completion:
-      'Collect only the new when. Do not say the visit is moved yet. Append update_appointment with when_text. Match the caller’s latest open visit if id unknown. Same hours and OPEN VISITS check as a new booking.',
+      'Collect only the new when. Do not say the visit is moved yet. Append update_appointment with when_text. Match the caller’s latest open visit if id unknown. Same hours check as a new booking. Same-hour as another visit is allowed.',
     tool: 'update_appointment',
     patterns: [
       /\b(reschedule|move|change (the )?(time|date|appointment|visit)|badilisha|ahirisha)\b/i,
@@ -221,7 +221,7 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '',
     'Completion rules:',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
-    '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots; silently check hours and OPEN VISITS; if that hour is taken or closed, offer another time now; fire the tool and speak nothing; never say booked, moved, or cancelled first.',
+    '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots; silently check hours (not a one-visit lock); same-hour visits are allowed; fire the tool and speak nothing; never say booked, moved, or cancelled first.',
     '- Book: create_appointment after service + name + when + landmark.',
     '- Reschedule: update_appointment with the new when against their latest open visit.',
     '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking.',

@@ -5,7 +5,6 @@ const {
   evaluateAppointmentHours,
   formatRequestedWhenLabel,
 } = require('./appointmentHours');
-const { visitOverlapsOpen } = require('./visitCalendar');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -339,16 +338,7 @@ function stampVisitWindow(value, hours) {
   return { ...value, windowStart: instant.toISOString() };
 }
 
-function visitTimeGate(
-  whenText,
-  {
-    hoursSchedule = null,
-    now = new Date(),
-    openAppointments = [],
-    ignoreId = '',
-    ignoreCallerPhone = '',
-  } = {}
-) {
+function visitTimeGate(whenText, { hoursSchedule = null, now = new Date() } = {}) {
   const hours = evaluateAppointmentHours({
     whenText,
     schedule: hoursSchedule,
@@ -356,13 +346,6 @@ function visitTimeGate(
   });
   if (!hours.valid) {
     return { ok: false, hours, code: hours.code, reason: hours.code };
-  }
-  const overlap = visitOverlapsOpen(hours, openAppointments, now, {
-    ignoreId,
-    ignoreCallerPhone,
-  });
-  if (overlap) {
-    return { ok: false, hours, code: 'overlap', reason: overlap.error };
   }
   return { ok: true, hours };
 }
@@ -403,7 +386,6 @@ function validateCreateAppointment(
   const hours = visitTimeGate(value.whenText, {
     hoursSchedule,
     now,
-    openAppointments,
   });
   if (!hours.ok) {
     return {
@@ -461,17 +443,9 @@ function validateUpdateAppointment(
     };
   }
   if (value.whenText) {
-    let ignoreId = value.appointmentId;
-    const opens = Array.isArray(openAppointments) ? openAppointments : [];
-    if (!ignoreId && opens.length === 1 && opens[0]?.id) {
-      ignoreId = String(opens[0].id);
-    }
     const hours = visitTimeGate(value.whenText, {
       hoursSchedule,
       now,
-      openAppointments,
-      ignoreId,
-      ignoreCallerPhone: callerPhone || value.phone,
     });
     if (!hours.ok) {
       return {
@@ -915,11 +889,6 @@ function formatVisitTimeProblem(code, hours, language) {
     if (sw) return 'Niambie siku na saa unayopendelea.';
     if (sheng) return 'Niambie day na time unataka.';
     return 'What day and time would you prefer?';
-  }
-  if (code === 'overlap') {
-    if (sw) return 'Hiyo saa imeshikwa. Toa nyingine.';
-    if (sheng) return 'Hiyo saa imewekwa. Toa nyingine.';
-    return 'That time is taken. Pick another.';
   }
   return '';
 }
