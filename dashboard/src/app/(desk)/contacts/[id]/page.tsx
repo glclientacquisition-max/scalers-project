@@ -40,7 +40,7 @@ export default async function ContactDetailPage({
     <div className="max-w-6xl">
       <Link
         href="/contacts"
-        className="text-sm font-medium text-[#0096FF] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className="text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
       >
         Contacts
       </Link>
@@ -48,7 +48,7 @@ export default async function ContactDetailPage({
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
           <div>
-            <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+            <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
               {title}
             </h1>
             <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>

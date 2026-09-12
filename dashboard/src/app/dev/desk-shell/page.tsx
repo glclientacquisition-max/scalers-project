@@ -13,17 +13,8 @@ export default function DevDeskShellPage() {
   return (
     <div className="min-h-screen min-w-0">
       <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/95 backdrop-blur">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-3.5">
-          <div className="min-w-0 flex-1">
-            <BrandLockup
-              href="/dev/desk-shell"
-              name="Scalers"
-              context="Workspace"
-              size="md"
-              priority
-              className="max-w-full"
-            />
-          </div>
+        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+          <BrandLockup href="/dev/desk-shell" name="Scalers" size="sm" priority className="max-w-full" />
           <DeskNav />
         </div>
       </header>

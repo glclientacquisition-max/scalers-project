@@ -28,6 +28,8 @@ describe("desk phone shell", () => {
     assert.match(layout, /DeskTabBar/);
     assert.match(layout, /--desk-tabbar-h/);
     assert.match(layout, /safe-area-inset-bottom/);
+    assert.doesNotMatch(layout, /context=\{businessName\}/);
+    assert.match(read("dashboard/src/app/(desk)/calls/page.tsx"), /function InboxPhoneRow/);
     assert.match(root, /viewportFit:\s*"cover"/);
     assert.match(css, /--desk-tabbar-h:\s*3\.25rem/);
     assert.match(player, /--desk-tabbar-h/);

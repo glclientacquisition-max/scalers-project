@@ -26,7 +26,7 @@ export default async function WalletPage() {
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#0096FF]">
+        <Link href="/signup" className="text-[#005CCC]">
           Create one
         </Link>
         .
@@ -72,7 +72,7 @@ export default async function WalletPage() {
   return (
     <div className="max-w-3xl">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">Wallet</h1>
+        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">Wallet</h1>
         {usage.isBeta ? (
           <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-[#0096FF]/30 bg-[#0096FF]/5 px-6 py-3 text-sm font-medium text-[#005ccc]">
             Free beta

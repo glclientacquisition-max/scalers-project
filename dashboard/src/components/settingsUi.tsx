@@ -20,7 +20,7 @@ export const settingsSectionClass = "space-y-3";
 
 /** Sticks below the desk shell nav so Save stays visible while scrolling. */
 export const settingsStickyHeaderClass =
-  "sticky top-[var(--desk-header-h,4.5rem)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
+  "sticky top-[var(--desk-header-h,3.75rem)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
 
 export const settingsActionClass =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:bg-[#0096FF]/[0.04] active:scale-[0.99] active:bg-[#0096FF]/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]";
@@ -143,7 +143,7 @@ export function SettingsBackLink() {
   return (
     <Link
       href="/settings"
-      className="mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-[#0096FF] transition duration-150 hover:text-[#005ccc] active:text-[#004a99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 lg:hidden"
+      className="mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-[#005CCC] transition duration-150 hover:text-[#004a99] active:text-[#004a99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 lg:hidden"
     >
       <svg
         viewBox="0 0 20 20"

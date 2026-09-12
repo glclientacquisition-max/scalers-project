@@ -140,7 +140,7 @@ export function InboxToolbar({
           <span className="font-medium text-ink">&ldquo;{q}&rdquo;</span>.{" "}
           <Link
             href={callsHref({ purpose: active })}
-            className="font-medium text-[#0096FF] transition duration-150 hover:text-[#005ccc] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+            className="font-medium text-[#005CCC] transition duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
           >
             Clear
           </Link>

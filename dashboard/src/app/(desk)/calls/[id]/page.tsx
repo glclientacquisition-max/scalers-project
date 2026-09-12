@@ -20,7 +20,7 @@ import {
 import { InboxJobEditor } from "@/components/InboxJobEditor";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
-import { waMeHref } from "@/components/WhatsAppLink";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import {
   callsHref,
@@ -209,7 +209,6 @@ export default async function CallDetailPage({
   const businessName = tenant.business_name?.trim() || "us";
   const callerSmsOn = parseNotifyChannels(tenant.notify_channels).caller_sms;
   const waMessage = followUpWhatsAppMessage({ businessName, name, reason });
-  const waHref = waMeHref(row.caller_number, waMessage);
   const escalatedTo =
     meta.escalated_to && typeof meta.escalated_to === "object"
       ? (meta.escalated_to as { name?: string; role?: string; phone?: string })
@@ -268,16 +267,16 @@ export default async function CallDetailPage({
     <div className="max-w-6xl">
       <Link
         href={backHref}
-        className="text-sm font-medium text-[#0096FF] hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+        className="text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
       >
-        ← {backLabel}
+        {backLabel}
       </Link>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         {/* LEFT PANE: sticky context + primary CTA */}
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
           <div>
-            <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">
+            <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
               {title}
             </h1>
             <div className="mt-3">
@@ -368,15 +367,14 @@ export default async function CallDetailPage({
             />
           </section>
 
-          {waHref ? (
-            <a
-              href={waHref}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-            >
-              WhatsApp
-            </a>
+          {row.caller_number ? (
+            <WhatsAppLink
+              number={row.caller_number}
+              message={waMessage}
+              variant="primary"
+              label="Reply on WhatsApp"
+              className="w-full"
+            />
           ) : null}
 
           {leadStatusReady ? (

@@ -8,7 +8,7 @@
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
-**Chrome:** Greeting eyebrow, workspace name as `h1`, Nairobi `<time>`. One aside: today + line + docked CTA.
+**Chrome:** Greeting eyebrow, workspace name as `h1` (not in the app header). Nairobi `<time>`. One aside: today + line + docked CTA.
 
 **Data (real only):** tenant row, Nairobi-day call count, `loadInboxItems` (same window as Inbox), `assessMvpAnswerReadiness`, live bulletin. Counts match Inbox purpose, not raw `lead_status=new`.
 
