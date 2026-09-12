@@ -8,7 +8,7 @@ export default async function ContactImportPage() {
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#0096FF]">
+        <Link href="/signup" className="text-[#005CCC]">
           Create one
         </Link>
         .
@@ -29,7 +29,7 @@ export default async function ContactImportPage() {
     <div className="max-w-3xl">
       <Link
         href="/contacts"
-        className="text-sm font-medium text-[#0096FF] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className="text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
       >
         Contacts
       </Link>

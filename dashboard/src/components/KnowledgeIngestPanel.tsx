@@ -410,7 +410,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 <h3 className="text-sm font-medium text-ink">Services</h3>
                 <button
                   type="button"
-                  className="text-xs text-[#0096FF]"
+                  className="text-xs font-medium text-[#005CCC]"
                   onClick={() =>
                     setSelectedServices(
                       selectedServices.size === draft.services.length

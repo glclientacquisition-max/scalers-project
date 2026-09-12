@@ -28,7 +28,7 @@
   --foreground: var(--ink);
 
   /* Desk sticky chrome. Keep settings sticky below the header. Phone tab bar is 0 from md. */
-  --desk-header-h: 4.25rem;
+  --desk-header-h: 3.5rem;
   --desk-tabbar-h: 3.25rem;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -43,7 +43,7 @@
 
 @media (min-width: 640px) {
   :root {
-    --desk-header-h: 4.5rem;
+    --desk-header-h: 3.75rem;
   }
 }
 

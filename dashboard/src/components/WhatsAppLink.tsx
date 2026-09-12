@@ -31,6 +31,7 @@ export function WhatsAppLink({
   compact = false,
   message,
   variant = "inline",
+  className = "",
 }: {
   number: string;
   /** Optional visible text; defaults to the number itself. */
@@ -40,6 +41,7 @@ export function WhatsAppLink({
   /** Prefills the WhatsApp composer (follow-up opener). */
   message?: string;
   variant?: "inline" | "primary";
+  className?: string;
 }) {
   const href = waMeHref(number, message);
   const text = label ?? number;
@@ -55,9 +57,12 @@ export function WhatsAppLink({
         target="_blank"
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
-        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:bg-[#007ad1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
+        className={[
+          "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:bg-[#007ad1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
+          className,
+        ].join(" ")}
       >
-        <WhatsAppIcon className="h-4 w-4 text-[#25d366]" />
+        <WhatsAppIcon className="h-4 w-4 text-white" />
         {label || "WhatsApp"}
       </a>
     );

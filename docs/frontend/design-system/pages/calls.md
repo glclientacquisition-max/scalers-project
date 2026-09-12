@@ -5,7 +5,7 @@
 
 Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
 
-**Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
+**Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche. Below `md`, each row is a dense stacked block in the same table chrome (not cards). `md+` stays the table.
 
 Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Human / Answered / All.
 

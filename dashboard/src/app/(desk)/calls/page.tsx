@@ -290,6 +290,132 @@ function InboxRow({
   );
 }
 
+function InboxPhoneRow({
+  item,
+  businessName,
+  purpose,
+  vertical,
+}: {
+  item: InboxItem;
+  businessName: string;
+  purpose: InboxPurposeFilterId;
+  vertical?: string | null;
+}) {
+  const kind = inboxTableKind(purpose);
+  const message = followUpWhatsAppMessage({
+    businessName,
+    name: item.callerName,
+    reason: item.headline,
+  });
+  const openHref = item.callId
+    ? `/calls/${item.callId}?from=${purpose}`
+    : null;
+  const openLabel = item.hold || item.job ? "Call" : "Open";
+  const needed = item.hold?.when_text?.trim() || "Anytime";
+  const visit = item.job?.when_text?.trim() || "Time TBD";
+  const place = item.job?.address_landmark?.trim() || "Ask on the call";
+  const who = item.callerName || item.callerPhone || "Caller";
+
+  return (
+    <li
+      className={[
+        "border-t border-line/70 px-4 py-3.5 first:border-t-0",
+        item.urgent ? "bg-warn-soft/50" : "",
+        item.needsYou ? "" : "opacity-[0.92]",
+      ].join(" ")}
+    >
+      {kind === "hold" ? (
+        <>
+          <p className="text-base font-semibold tracking-tight text-ink">{item.headline}</p>
+          <p className="mt-1 text-sm text-ink">
+            {item.contactId ? (
+              <Link
+                href={`/contacts/${item.contactId}`}
+                className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              >
+                {item.callerName || "Caller"}
+              </Link>
+            ) : (
+              item.callerName || "Caller"
+            )}
+          </p>
+          <p className="mt-1 text-sm text-ink-soft">{needed}</p>
+        </>
+      ) : null}
+
+      {kind === "job" ? (
+        <>
+          <p className="text-base font-semibold tracking-tight text-ink">{visit}</p>
+          <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
+          <p className="mt-1 text-sm text-ink">
+            {item.contactId ? (
+              <Link
+                href={`/contacts/${item.contactId}`}
+                className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              >
+                {item.callerName || "Caller"}
+              </Link>
+            ) : (
+              item.callerName || "Caller"
+            )}
+          </p>
+          <p className="mt-1 text-sm text-ink-soft">{place}</p>
+        </>
+      ) : null}
+
+      {kind === "mixed" ? (
+        <>
+          <p className="text-base font-semibold tracking-tight text-ink">
+            {item.contactId ? (
+              <Link
+                href={`/contacts/${item.contactId}`}
+                className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              >
+                {who}
+              </Link>
+            ) : (
+              who
+            )}
+          </p>
+          <p className="mt-0.5 text-sm font-medium text-ink">{item.headline}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+            <InboxPurposeChip
+              purpose={item.purpose}
+              label={itemSignalLabel(item, vertical)}
+            />
+            <span>{formatCallWhenRelative(item.createdAt)}</span>
+          </p>
+        </>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-stretch gap-2">
+        {item.job ? (
+          <InboxJobActions id={item.job.id} status={item.job.status} />
+        ) : item.hold ? (
+          <RequestStatusToggle id={item.hold.id} status={item.hold.status} />
+        ) : item.callerPhone ? (
+          <WhatsAppLink
+            number={item.callerPhone}
+            message={message}
+            variant="primary"
+            label="WhatsApp"
+          />
+        ) : null}
+        {openHref ? (
+          <Link
+            href={openHref}
+            className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+          >
+            {openLabel}
+          </Link>
+        ) : (
+          <span className="inline-flex min-h-11 items-center text-sm text-ink-soft">No call</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export default async function CallsPage({
   searchParams,
 }: {
@@ -311,7 +437,7 @@ export default async function CallsPage({
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#0096FF]">
+        <Link href="/signup" className="text-[#005CCC]">
           Create one
         </Link>
         .
@@ -414,7 +540,18 @@ export default async function CallsPage({
         />
       ) : (
         <>
-          <div className="mt-8">
+          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+            {pageRows.map((item) => (
+              <InboxPhoneRow
+                key={item.id}
+                item={item}
+                businessName={businessName}
+                purpose={activeFilter}
+                vertical={vertical}
+              />
+            ))}
+          </ul>
+          <div className="mt-8 hidden md:block">
             <DeskDataTable minWidthClass="min-w-[880px]">
               <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                 <tr>

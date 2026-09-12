@@ -40,7 +40,7 @@ export default async function ContactsPage({
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#0096FF]">
+        <Link href="/signup" className="text-[#005CCC]">
           Create one
         </Link>
         .
@@ -151,7 +151,27 @@ export default async function ContactsPage({
         </div>
       ) : (
         <>
-          <div className="mt-8">
+          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+            {rows.map((row) => (
+              <li key={row.id} className="border-t border-line/70 px-4 py-3.5 first:border-t-0">
+                <p className="text-base font-semibold tracking-tight text-ink">
+                  {row.name?.trim() || "Unknown"}
+                </p>
+                <p className="mt-1 font-mono text-sm text-ink">{row.phone || "No phone"}</p>
+                <p className="mt-1 text-sm text-ink-soft">
+                  {row.last_reason?.trim() || "None"}
+                  {row.lastContactAt ? ` · ${formatCallWhenRelative(row.lastContactAt)}` : ""}
+                </p>
+                <Link
+                  href={`/contacts/${row.id}`}
+                  className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                >
+                  Open
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-8 hidden md:block">
             <DeskDataTable minWidthClass="min-w-[720px]">
               <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                 <tr>

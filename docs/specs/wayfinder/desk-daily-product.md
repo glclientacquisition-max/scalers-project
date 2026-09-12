@@ -9,8 +9,8 @@
 - Do not greenfield a second design system or install shadcn to “look like Linear.”
 - Copy Linear/Stripe **discipline** (density, one accent, honest data, fast taps), not their pixels.
 - Highest leverage is an adaptive **shell**: one nav list, bottom tabs on phone, top links on `md+`.
-- Constitution §8: phone bottom tabs; `md+` top links; no left desk rail. Sign out in the header.
-- Inbox stays the collection benchmark; phone gets a dense stacked row, not cards.
+- Constitution §8: phone bottom tabs; `md+` top links; no left desk rail. Sign out in the header. Header lockup is Scalers only.
+- Inbox stays the collection benchmark; phone uses a dense stacked row, not cards.
 - Contacts stays a primary thumb tab in the shell pass (no More overflow yet).
 
 ## Not yet specified
@@ -30,11 +30,11 @@
 
 ### task / Shell implementation
 
-In progress on the desk phone-shell branch.
+Shipped on `main` (#246). Header is Scalers only. Workspace name lives on Overview.
 
 ### task / Inbox phone rows
 
-Blocked by: nothing in the shell. Do not mix into the shell PR.
+Shipping: dense stacked rows below `md`. Same chrome as the table. Not cards.
 
 ### task / Optimistic lead status
 
