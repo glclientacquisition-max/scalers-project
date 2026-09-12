@@ -1,32 +1,25 @@
 import Link from "next/link";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxToolbar } from "@/components/InboxToolbar";
-import { InboxPurposeChip } from "@/components/InboxPurposeChip";
-import { InboxJobActions } from "@/components/InboxJobActions";
-import { RequestStatusToggle } from "@/components/RequestStatusToggle";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import {
-  callsHref,
-  followUpWhatsAppMessage,
-  formatCallWhenRelative,
-  sanitizeSearchQuery,
-} from "@/lib/callsTriage";
+import { callsHref, sanitizeSearchQuery } from "@/lib/callsTriage";
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import {
   countInboxPurposes,
-  holdTypeLabel,
   inboxCaption,
   itemMatchesPurpose,
   itemMatchesQuery,
-  itemSignalLabel,
   resolvePurposeFilter,
-  type InboxItem,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
+import {
+  InboxPhoneRow,
+  InboxTableRow,
+  inboxTableKind,
+} from "@/components/InboxItemRow";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import {
   parseWeekParam,
@@ -124,297 +117,6 @@ function EmptyInbox({
   );
 }
 
-function inboxTableKind(
-  purpose: InboxPurposeFilterId
-): "hold" | "job" | "mixed" {
-  if (purpose === "hold") return "hold";
-  if (purpose === "job") return "job";
-  return "mixed";
-}
-
-function InboxRow({
-  item,
-  businessName,
-  purpose,
-  vertical,
-}: {
-  item: InboxItem;
-  businessName: string;
-  purpose: InboxPurposeFilterId;
-  vertical?: string | null;
-}) {
-  const kind = inboxTableKind(purpose);
-  const message = followUpWhatsAppMessage({
-    businessName,
-    name: item.callerName,
-    reason: item.headline,
-  });
-  const openHref = item.callId
-    ? `/calls/${item.callId}?from=${purpose}`
-    : null;
-  const openLabel = item.hold || item.job ? "Call" : "Open";
-  const needed = item.hold?.when_text?.trim() || "Anytime";
-  const visit = item.job?.when_text?.trim() || "Time TBD";
-  const place = item.job?.address_landmark?.trim() || "Ask on the call";
-
-  return (
-    <tr
-      className={[
-        "group border-t border-line/70 transition duration-150",
-        "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.07]",
-        item.urgent ? "bg-warn-soft/50" : "",
-        item.needsYou ? "" : "opacity-[0.92]",
-      ].join(" ")}
-    >
-      {kind === "hold" ? (
-        <>
-          <td className="px-5 py-5 align-top">
-            <p className="text-base font-semibold tracking-tight text-ink">
-              {item.headline}
-            </p>
-            {item.hold ? (
-              <p className="mt-0.5 text-sm text-ink-soft">
-                {holdTypeLabel(item.hold.request_type, vertical)}
-              </p>
-            ) : null}
-          </td>
-          <td className="px-5 py-5 align-top">
-            <p className="font-medium text-ink">
-              {item.contactId ? (
-                <Link
-                  href={`/contacts/${item.contactId}`}
-                  className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-                >
-                  {item.callerName || "Caller"}
-                </Link>
-              ) : (
-                item.callerName || "Caller"
-              )}
-            </p>
-            {item.callerPhone ? (
-              <WhatsAppLink number={item.callerPhone} message={message} compact />
-            ) : null}
-          </td>
-          <td className="px-5 py-5 align-top text-sm text-ink-soft">{needed}</td>
-        </>
-      ) : null}
-
-      {kind === "job" ? (
-        <>
-          <td className="px-5 py-5 align-top">
-            <p className="text-base font-semibold tracking-tight text-ink">{visit}</p>
-            <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
-          </td>
-          <td className="px-5 py-5 align-top">
-            <p className="font-medium text-ink">
-              {item.contactId ? (
-                <Link
-                  href={`/contacts/${item.contactId}`}
-                  className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-                >
-                  {item.callerName || "Caller"}
-                </Link>
-              ) : (
-                item.callerName || "Caller"
-              )}
-            </p>
-            {item.callerPhone ? (
-              <WhatsAppLink number={item.callerPhone} message={message} compact />
-            ) : null}
-          </td>
-          <td className="px-5 py-5 align-top text-sm text-ink-soft">{place}</td>
-        </>
-      ) : null}
-
-      {kind === "mixed" ? (
-        <>
-          <td className="px-5 py-5 align-top">
-            <p className="text-base font-semibold tracking-tight text-ink">
-              {item.contactId ? (
-                <Link
-                  href={`/contacts/${item.contactId}`}
-                  className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-                >
-                  {item.callerName || item.callerPhone || "Caller"}
-                </Link>
-              ) : (
-                item.callerName || item.callerPhone || "Caller"
-              )}
-            </p>
-            <p className="mt-0.5 text-sm font-medium text-ink">{item.headline}</p>
-            {item.detail ? (
-              <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
-            ) : null}
-          </td>
-          <td className="px-5 py-5 align-top">
-            <InboxPurposeChip
-              purpose={item.purpose}
-              label={itemSignalLabel(item, vertical)}
-            />
-          </td>
-          <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
-            {formatCallWhenRelative(item.createdAt)}
-          </td>
-        </>
-      ) : null}
-
-      <td className="px-5 py-5 align-top">
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          {item.job ? (
-            <InboxJobActions id={item.job.id} status={item.job.status} />
-          ) : item.hold ? (
-            <RequestStatusToggle id={item.hold.id} status={item.hold.status} />
-          ) : item.callerPhone ? (
-            <WhatsAppLink
-              number={item.callerPhone}
-              message={message}
-              variant="primary"
-              label="WhatsApp"
-            />
-          ) : null}
-        </div>
-      </td>
-      <td className="px-5 py-5 align-top text-right">
-        {openHref ? (
-          <Link
-            href={openHref}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] transition duration-150 hover:text-[#004a99] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-          >
-            {openLabel}
-          </Link>
-        ) : (
-          <span className="text-sm text-ink-soft">No call</span>
-        )}
-      </td>
-    </tr>
-  );
-}
-
-function InboxPhoneRow({
-  item,
-  businessName,
-  purpose,
-  vertical,
-}: {
-  item: InboxItem;
-  businessName: string;
-  purpose: InboxPurposeFilterId;
-  vertical?: string | null;
-}) {
-  const kind = inboxTableKind(purpose);
-  const message = followUpWhatsAppMessage({
-    businessName,
-    name: item.callerName,
-    reason: item.headline,
-  });
-  const openHref = item.callId
-    ? `/calls/${item.callId}?from=${purpose}`
-    : null;
-  const openLabel = item.hold || item.job ? "Call" : "Open";
-  const needed = item.hold?.when_text?.trim() || "Anytime";
-  const visit = item.job?.when_text?.trim() || "Time TBD";
-  const place = item.job?.address_landmark?.trim() || "Ask on the call";
-  const who = item.callerName || item.callerPhone || "Caller";
-
-  return (
-    <li
-      className={[
-        "border-t border-line/70 px-4 py-3.5 first:border-t-0",
-        item.urgent ? "bg-warn-soft/50" : "",
-        item.needsYou ? "" : "opacity-[0.92]",
-      ].join(" ")}
-    >
-      {kind === "hold" ? (
-        <>
-          <p className="text-base font-semibold tracking-tight text-ink">{item.headline}</p>
-          <p className="mt-1 text-sm text-ink">
-            {item.contactId ? (
-              <Link
-                href={`/contacts/${item.contactId}`}
-                className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-              >
-                {item.callerName || "Caller"}
-              </Link>
-            ) : (
-              item.callerName || "Caller"
-            )}
-          </p>
-          <p className="mt-1 text-sm text-ink-soft">{needed}</p>
-        </>
-      ) : null}
-
-      {kind === "job" ? (
-        <>
-          <p className="text-base font-semibold tracking-tight text-ink">{visit}</p>
-          <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
-          <p className="mt-1 text-sm text-ink">
-            {item.contactId ? (
-              <Link
-                href={`/contacts/${item.contactId}`}
-                className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-              >
-                {item.callerName || "Caller"}
-              </Link>
-            ) : (
-              item.callerName || "Caller"
-            )}
-          </p>
-          <p className="mt-1 text-sm text-ink-soft">{place}</p>
-        </>
-      ) : null}
-
-      {kind === "mixed" ? (
-        <>
-          <p className="text-base font-semibold tracking-tight text-ink">
-            {item.contactId ? (
-              <Link
-                href={`/contacts/${item.contactId}`}
-                className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-              >
-                {who}
-              </Link>
-            ) : (
-              who
-            )}
-          </p>
-          <p className="mt-0.5 text-sm font-medium text-ink">{item.headline}</p>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
-            <InboxPurposeChip
-              purpose={item.purpose}
-              label={itemSignalLabel(item, vertical)}
-            />
-            <span>{formatCallWhenRelative(item.createdAt)}</span>
-          </p>
-        </>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap items-stretch gap-2">
-        {item.job ? (
-          <InboxJobActions id={item.job.id} status={item.job.status} />
-        ) : item.hold ? (
-          <RequestStatusToggle id={item.hold.id} status={item.hold.status} />
-        ) : item.callerPhone ? (
-          <WhatsAppLink
-            number={item.callerPhone}
-            message={message}
-            variant="primary"
-            label="WhatsApp"
-          />
-        ) : null}
-        {openHref ? (
-          <Link
-            href={openHref}
-            className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-          >
-            {openLabel}
-          </Link>
-        ) : (
-          <span className="inline-flex min-h-11 items-center text-sm text-ink-soft">No call</span>
-        )}
-      </div>
-    </li>
-  );
-}
 
 export default async function CallsPage({
   searchParams,
@@ -604,7 +306,7 @@ export default async function CallsPage({
               </thead>
               <tbody>
                 {pageRows.map((item) => (
-                  <InboxRow
+                  <InboxTableRow
                     key={item.id}
                     item={item}
                     businessName={businessName}

@@ -40,7 +40,7 @@ export function WhatsAppLink({
   compact?: boolean;
   /** Prefills the WhatsApp composer (follow-up opener). */
   message?: string;
-  variant?: "inline" | "primary";
+  variant?: "inline" | "primary" | "icon";
   className?: string;
 }) {
   const href = waMeHref(number, message);
@@ -48,6 +48,25 @@ export function WhatsAppLink({
 
   if (!href) {
     return <span className="font-medium">{text}</span>;
+  }
+
+  if (variant === "icon") {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        title="WhatsApp"
+        aria-label={`WhatsApp ${number}`}
+        className={[
+          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-whatsapp text-white",
+          "transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
+          className,
+        ].join(" ")}
+      >
+        <WhatsAppIcon className="h-5 w-5" />
+      </a>
+    );
   }
 
   if (variant === "primary") {

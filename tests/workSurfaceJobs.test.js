@@ -10,6 +10,7 @@ function read(rel) {
 describe("work surface jobs on unified inbox", () => {
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const inbox = read("dashboard/src/app/(desk)/calls/page.tsx");
+  const row = read("dashboard/src/components/InboxItemRow.tsx");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const nav = read("dashboard/src/components/DeskNav.tsx");
   const requests = read("dashboard/src/app/(desk)/requests/page.tsx");
@@ -59,10 +60,11 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(inbox, /copy.jobColumn/);
     assert.match(inbox, />\s*Place\s*</);
     assert.match(inbox, /inboxCaption\(searched, vertical\)/);
-    assert.match(inbox, /itemSignalLabel\(item, vertical\)/);
-    assert.match(inbox, /formatCallWhenRelative/);
+    assert.match(row, /itemSignalLabel\(item, vertical\)/);
+    assert.match(row, /formatCallWhenRelative/);
     assert.doesNotMatch(inbox, />\s*Purpose\s*</);
-    assert.match(inbox, /openLabel = item.hold \|\| item.job \? "Call" : "Open"/);
+    assert.match(row, /item.hold \|\| item.job \? "Call" : "Open"/);
+    assert.match(row, /\/contacts\/\$\{item.contactId\}/);
     const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
     assert.match(detail, /InboxJobEditor/);
     assert.match(detail, /InboxHoldEditor/);
@@ -70,7 +72,6 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(detail, /callerSmsOn/);
     const load = read("dashboard/src/lib/inboxLoad.ts");
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
-    assert.match(inbox, /\/contacts\/\$\{item.contactId\}/);
     assert.match(load, /attachContactIds/);
     assert.match(purpose, /compareInboxSignal/);
   });

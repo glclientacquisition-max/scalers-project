@@ -81,7 +81,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
 | Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` header links. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the header. |
 | Empty state | Horizontal rules, title, one action. No marketing paragraph |
-| WhatsApp | Brand-blue fill when it is the page CTA. Green glyph. Compact table icon may stay green. |
+| WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph on `#25D366`, `h-11 w-11`, `rounded-xl` (`variant="icon"`). No extra WhatsApp mark next to the name. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
 
 ---
