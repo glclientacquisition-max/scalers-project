@@ -29,6 +29,7 @@ Brand primary: `#0096FF`.
 ## 4. NAVIGATION & DECISION FATIGUE (HICK'S LAW)
 
 - **Single source of truth:** Never provide two different UI layouts for the exact same dataset.
+- **Primary destinations:** One `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail.
 - **Sidebar hierarchy:** Nested navigation must use vertical sidebars. Sidebar category titles must be non-clickable headers (`uppercase`, `tracking-wide`, `text-gray-500`, no hover state) so they are immediately distinct from clickable tabs.
 
 ## 5. TECHNICAL EXECUTION CONSTRAINTS

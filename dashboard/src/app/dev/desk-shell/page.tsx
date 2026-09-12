@@ -1,30 +1,14 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
-import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
-import { tenantNeedsOnboarding } from "@/lib/onboarding";
-import { getCurrentTenant } from "@/lib/tenant";
 
 /**
- * Workspace shell for authenticated business owners.
- * Sticky header (brand + md+ links + Sign out). Same DESK_LINKS as a phone tab bar.
+ * Local chrome harness (no desk login). DASHBOARD_OPEN=true only.
  */
-export default async function AppShell({ children }: { children: React.ReactNode }) {
-  const authUser = await getAuthUser();
-
-  if (!authUser) {
-    if (await isLegacyAuthenticated()) {
-      redirect("/admin");
-    }
-    redirect("/login");
+export default function DevDeskShellPage() {
+  if (process.env.DASHBOARD_OPEN !== "true") {
+    notFound();
   }
-
-  const tenant = await getCurrentTenant();
-  if (tenant && tenantNeedsOnboarding(tenant)) {
-    redirect("/onboarding");
-  }
-
-  const businessName = tenant?.business_name?.trim() || "Workspace";
 
   return (
     <div className="min-h-screen min-w-0">
@@ -32,9 +16,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
         <div className="relative mx-auto flex max-w-desk items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-3.5">
           <div className="min-w-0 flex-1">
             <BrandLockup
-              href="/home"
+              href="/dev/desk-shell"
               name="Scalers"
-              context={businessName}
+              context="Workspace"
               size="md"
               priority
               className="max-w-full"
@@ -44,7 +28,16 @@ export default async function AppShell({ children }: { children: React.ReactNode
         </div>
       </header>
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom)+1.5rem)] sm:px-6 sm:pt-10 md:pb-10">
-        {children}
+        <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">Desk shell</h1>
+        <ul className="mt-6 divide-y divide-line rounded-2xl border border-line bg-surface">
+          {["Amina · Confirm visit", "Otieno · Pickup", "Wanjiku · Human asked", "Last row must clear the tab bar"].map(
+            (row) => (
+              <li key={row} className="px-4 py-3.5 text-sm text-ink">
+                {row}
+              </li>
+            ),
+          )}
+        </ul>
       </main>
       <DeskTabBar />
     </div>

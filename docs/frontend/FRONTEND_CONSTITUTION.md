@@ -2,9 +2,9 @@
 
 **Status:** Authoritative for owner desk + marketing UI  
 **Lane:** Desk UI/UX  
-**Date:** 2026-09-06  
+**Date:** 2026-09-10  
 **Incorporates:** `.cursor/rules/scalers-design-ux.mdc` (does not replace it)  
-**Evidence date:** 2026-09-06  
+**Evidence date:** 2026-09-10  
 
 This document is the product design law. The mandate file stays the short always-on rule. This file explains *why*, sets measurable spacing and contrast, and binds later UI work.
 
@@ -28,10 +28,10 @@ Cross-referenced. Product rules win when sources disagree.
 
 | Principle | Source | What we take | What we reject |
 | --- | --- | --- | --- |
-| Working memory ~4 chunks | Cowan, *The Magical Number 4*, BBS 2001; Nielsen, *Cognitive Load Is a Budget* (2025) | Home answers at most four questions. Nav stays at six top items. | Miller 7±2 as a dashboard widget quota |
+| Working memory ~4 chunks | Cowan, *The Magical Number 4*, BBS 2001; Nielsen, *Cognitive Load Is a Budget* (2025) | Home answers at most four questions. Nav is the shipped destinations, at most five. | Miller 7±2 as a dashboard widget quota |
 | Cognitive load types | Sweller 1988; Sweller, van Merriënboer, Paas 1998 | Cut **extraneous** load (fluff, dual layouts, dead fetches). Spend **germane** load on “what needs me.” | Decorative mesh, glass, competing CTAs |
 | Fitts’s law | Fitts 1954; WCAG 2.2 SC 2.5.8 / 2.5.5; Apple HIG 44pt; Material 48dp + 8dp gap | Primary CTA: largest hit, `#0096FF`, docked to its field. Floor **44×44 CSS px** for primary/secondary actions. Table icon actions: **32×32** minimum (passes 24×24 AA if isolated). | Tiny adjacent ghost buttons |
-| Hick’s law | Hick 1952; Hyman 1953 | One layout per dataset. One primary action per screen. Nested nav uses a sidebar with non-clickable category headers. | A second desk sidebar while 6 top tabs already exist |
+| Hick’s law | Hick 1952; Hyman 1953 | One layout per dataset. One primary action per screen. Nested nav uses a sidebar with non-clickable category headers. | A left desk rail, or a second nav tree for phone. Bottom tabs are the same `DESK_LINKS`. |
 | Gestalt: proximity, similarity, common region, continuity | Wertheimer; Carbon spacing overview; Atlassian spacing | Related items sit on the 8px scale (8–12px). Groups use 16–24px. Sections use 32–48px. Tables share one chrome. | Card stacks for the same job as a table |
 | Von Restorff (isolation) | von Restorff 1933 | Only the primary action is saturated blue. Archive/Cancel/Remove stay ghost or icon. | Two blue buttons in one viewport |
 | Serial position / F-pattern | Nielsen Norman Group eyetracking | First line: line status + greeting. First block: work waiting. Metrics after work. | Analytics four-up that does not click into work |
@@ -55,7 +55,7 @@ From `.cursor/rules/scalers-design-ux.mdc`:
 1. **Copy:** No fluff, no instructional subheaders, no em/en dashes in UI strings. Labels are verbs or nouns the owner already knows.
 2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side; mobile may stack the same two panes.
 3. **Action:** Primary CTA `#0096FF`, largest hit. Sticky Save top-right under the desk header. Secondary actions muted.
-4. **Nav:** One layout per dataset. Sidebar category titles: `uppercase tracking-wide text-gray-500` (or `text-ink-soft`), no hover, not links.
+4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail. Sidebar category titles: `uppercase tracking-wide text-gray-500` (or `text-ink-soft`), no hover, not links.
 5. **Tech:** Tailwind utilities only for layout/chrome. Focus: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`. Container padding `p-4`–`p-6`.
 
 ---
@@ -72,7 +72,7 @@ Base unit **8px**, same as IBM Carbon, Atlassian, and Material. Tailwind already
 | Group / cell | 16 | `px-4` / `gap-4` | Table cell padding, form field stack |
 | Block | 24 | `mt-6` / `gap-6` | Title to table, filter to list |
 | Section | 32–40 | `py-8` / `mt-8` | Rare on desk. Prefer 24. |
-| Page frame | 16 / 24 | `px-4 py-6 sm:px-6 sm:py-10` | Desk `main` only. Pages do not double-pad. |
+| Page frame | 16 / 24 | `px-4 pt-6 sm:px-6 sm:pt-10` | Desk `main` only. Pages do not double-pad. Phone `main` adds `--desk-tabbar-h` plus `safe-area-inset-bottom` so the last row is not under the tab bar. |
 
 **Proximity rule:** If two controls complete one task, they sit ≤16px apart (Fitts + docking). If they are different tasks, ≥24px.
 
@@ -114,13 +114,14 @@ No Plus Jakarta Sans. No third family. No purple.
 
 ## 6. Information architecture
 
-Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointments` filter Inbox.
+Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product.
 
 | Route | Job | Layout |
 | --- | --- | --- |
 | `/home` | Exclusive map: return calls, Holds, Visits or Bookings by niche. Briefing names the next action. Line. One CTA into the sharpest queue. | Command Center. Not a second inbox. |
 | `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Dense table. Work leads. Holds and Jobs change columns. |
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
+| `/contacts` | Named callers | Existing contacts surface. Not a CRM. |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
 | `/appointments` | Confirm visits | Redirect `/calls?purpose=job` |
 | `/settings` | Configure the assistant | Destination menu. One screen. |
@@ -145,9 +146,13 @@ Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointme
 
 ## 8. Motion and chrome
 
-- Desk: state, drawer, pending spinner, existing bulletin ping.
+- **Owner desk shell:** sticky top bar (brand + Sign out; `md+` text links from `DESK_LINKS`). Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
+- Sign out stays in the header. It is never a sixth tab.
+- Do not add a left desk rail. Settings nested nav stays an inner sidebar with non-clickable category headers.
+- Primary destinations do not live in a hamburger drawer.
+- Desk motion: pending spinner, existing bulletin ping.
 - Landing may keep rise/drift behind `prefers-reduced-motion`.
-- No glass on desk. Header may keep light `backdrop-blur`.
+- No glass on desk. Header and tab bar may keep light `backdrop-blur`.
 - Radius: `rounded-xl` / `rounded-2xl` / `rounded-panel`. Not pill-everything.
 
 ---
@@ -155,7 +160,7 @@ Keep URLs. Nav is Overview, Inbox, Business, Wallet. `/requests` and `/appointme
 ## 9. What this constitution is not
 
 - Not a Super Admin redesign.
-- Not a Contacts product (no route until Platform owns the entity in UI scope).
+- Not a Contacts CRM. `/contacts` stays a destination; do not invent a second people product.
 - Not a voice, wallet-ledger, or prompt-compiler change.
 - Not permission to split `TenantForm.tsx` unless a panel cannot ship otherwise.
 

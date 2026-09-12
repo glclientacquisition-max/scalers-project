@@ -24,7 +24,7 @@ export function CallAudioPlayer({ src }: { src: string }) {
   }
 
   return (
-    <div className="sticky bottom-0 z-20 -mx-4 mt-8 border-t border-[var(--line)] bg-[var(--card)]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:rounded-t-2xl sm:px-6">
+    <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t border-[var(--line)] bg-[var(--card)]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:rounded-t-2xl sm:px-6 md:bottom-0">
       <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <audio
           ref={audioRef}

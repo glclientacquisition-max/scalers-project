@@ -1,7 +1,7 @@
 # Scalers design system (MASTER)
 
 **Status:** Canon for `dashboard/`  
-**Date:** 2026-09-06  
+**Date:** 2026-09-10  
 **Law:** [`FRONTEND_CONSTITUTION.md`](../FRONTEND_CONSTITUTION.md) + `.cursor/rules/scalers-design-ux.mdc`
 
 Page notes only record deltas. Do not copy this file into every page spec.
@@ -28,6 +28,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | WhatsApp glyph | `--whatsapp` `#25D366` | `whatsapp` |
 | Focus glow | `--shadow-focus` | `shadow-focus` |
 | Desk header | `--desk-header-h` | `top-[var(--desk-header-h)]` |
+| Desk tab bar | `--desk-tabbar-h` | `3.25rem` below `md`, `0` from `md`. Phone `main` padding and sticky bottom chrome use this plus `safe-area-inset-bottom`. |
 | Max width | | `max-w-desk` (72rem) |
 | Radius | | `rounded-panel` (0.875rem) |
 
@@ -52,7 +53,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 
 Use Tailwind utilities. CSS variables exist so sticky chrome and docs stay aligned.
 
-Page frame is owned by `(desk)/layout.tsx`: `px-4 py-6 sm:px-6 sm:py-10`. Child pages start at `mt-0`. Double padding is a defect.
+Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below `md`, `main` also clears `--desk-tabbar-h` plus `safe-area-inset-bottom`. Child pages start at `mt-0`. Double padding is a defect.
 
 ---
 
@@ -78,6 +79,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 py-6 sm:px-6 sm:py-10`. Child 
 | Pagination | `ui/Pagination.tsx` (`min-h-11` hits) |
 | Field | `settingsFieldClass` + full brand ring |
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
+| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` header links. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the header. |
 | Empty state | Horizontal rules, title, one action. No marketing paragraph |
 | WhatsApp | Brand-blue fill when it is the page CTA. Green glyph. Compact table icon may stay green. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
@@ -105,4 +107,4 @@ Landing only: `.landing-rise`, `.landing-drift`. Desk: bulletin ping already shi
 
 ## Do not add
 
-shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second desk sidebar, fake Online, `/contacts` without a Platform-owned UI contract.
+shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second desk sidebar, a hamburger drawer for primary destinations, fake Online.
