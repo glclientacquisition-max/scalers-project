@@ -65,10 +65,11 @@ const HOME_INTENTS = [
     requiredSlots: ['service', 'name', 'when', 'landmark'],
     optionalSlots: ['notes'],
     completion:
-      'Once service + caller name + time window + landmark/address are known, append create_appointment. Do not say the time is booked. Speak nothing on that turn. The backend confirms or offers another time.',
+      'Once service + caller name + time window + landmark/address are known, append create_appointment. Do not say the time is booked. Speak nothing on that turn. The backend confirms or offers another time. House, carpet, couch, mattress, and Airbnb cleans are book_visit.',
     tool: 'create_appointment',
     patterns: [
       /\b(book|booking|appointment|schedule|visit|come (over|by|tomorrow|today)|nitakuja|njoo|tandika|install|repair|fix)\b/i,
+      /\b(clean (my|the|our)|need (a |my )?(clean|carpet|couch|sofa|mattress|upholstery)|carpet clean|mattress clean|house clean|airbnb clean|sofa clean|couch clean)\b/i,
     ],
   },
   {
@@ -109,14 +110,16 @@ const HOME_INTENTS = [
   },
   {
     id: 'emergency',
-    label: 'Emergency / urgent',
+    label: 'True emergency',
     requiredSlots: ['name', 'reason'],
     optionalSlots: [],
     completion:
-      'Acknowledge urgency. Capture name + reason (save_caller_info). Follow POLICIES / HANDOFF MODE — escalate when justified. Do not invent emergency ETA.',
+      'True emergency only: burst pipe, flooding, fire, gas leak, or electric shock. Capture name + reason (save_caller_info). Follow POLICIES / HANDOFF MODE. Escalate when justified. Do not invent an ETA. Same-day, urgent, or ASAP cleaning is book_visit, not emergency.',
     tool: 'escalate',
     patterns: [
-      /\b(emergency|urgent|asap|burst|flood|leak(ing)?|no power|hatari|haraka sana|sasa hivi)\b/i,
+      /\b(burst(\s+pipe)?|flood(ing)?|gas leak|electric shock|live wire|on fire|water everywhere|hatari)\b/i,
+      /\bemergency\b.{0,40}\b(pipe|flood|leak|shock|wire|fire|gas|power)\b/i,
+      /\b(pipe|flood|leak|shock|wire|fire|gas)\b.{0,40}\bemergency\b/i,
     ],
   },
   {
@@ -226,6 +229,8 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '- Reschedule: update_appointment with the new when against their latest open visit.',
     '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking.',
     '- Never invent prices, coverage, or ETAs.',
+    '- Cleaning, repair, install, pest, and similar jobs share this spine. Use SERVICES names; do not invent a niche that is not listed.',
+    '- Bare urgent / ASAP / same-day is not emergency. Escalate only for burst, flood, fire, gas, or shock.',
     '- After a clear completion, confirm briefly and goodbye.'
   );
 
