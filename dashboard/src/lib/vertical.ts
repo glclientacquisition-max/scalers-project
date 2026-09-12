@@ -17,7 +17,7 @@ export const VERTICAL_OPTIONS: {
   {
     id: "home_services",
     label: "Home services",
-    blurb: "Repairs and visits",
+    blurb: "Cleans, repairs, visits",
   },
   {
     id: "hospitality",
