@@ -212,13 +212,8 @@ export function InboxPhoneRow({
     vertical,
     businessName
   );
-  const work =
-    kind === "hold"
-      ? item.headline
-      : kind === "job"
-        ? visit
-        : item.headline;
-  const meta = kind === "hold" ? needed : kind === "job" ? place : when;
+  const work = kind === "job" ? item.headline : kind === "hold" ? item.headline : item.headline;
+  const meta = kind === "hold" ? needed : kind === "job" ? visit : when;
   const body = (
     <>
       <div className="flex items-baseline justify-between gap-3">
@@ -226,8 +221,8 @@ export function InboxPhoneRow({
         <p className="shrink-0 text-xs text-ink-soft">{meta}</p>
       </div>
       <p className="mt-0.5 line-clamp-2 text-sm text-ink">{work}</p>
-      {kind === "job" && item.headline !== visit ? (
-        <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">{item.headline}</p>
+      {kind === "job" ? (
+        <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">{place}</p>
       ) : null}
       {kind === "mixed" ? (
         <p className="mt-1">
