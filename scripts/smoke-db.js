@@ -2,22 +2,42 @@
 // Smoke-test Supabase calls / transcripts / storage against the live schema.
 // Usage: node scripts/smoke-db.js
 
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch {
+  // Optional; CI and local installs have dotenv. Unit tests may not.
+}
 
+const SMOKE_DID = '+254200000001';
+
+/**
+ * Pick a tenant without maybeSingle() on a non-unique filter.
+ * Staging often has several is_active rows; maybeSingle then errors, the
+ * script ignores it, and insert collides on tenants_sautikit_virtual_number_key.
+ */
 async function ensureTenant(supabase) {
-  const { data: existing } = await supabase
+  const { data: byDid, error: byDidError } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('sautikit_virtual_number', SMOKE_DID)
+    .maybeSingle();
+  if (byDidError) throw byDidError;
+  if (byDid?.id) return byDid.id;
+
+  const { data: active, error: activeError } = await supabase
     .from('tenants')
     .select('id')
     .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-  if (existing?.id) return existing.id;
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (activeError) throw activeError;
+  if (active?.[0]?.id) return active[0].id;
 
   const { data, error } = await supabase
     .from('tenants')
     .insert({
       business_name: 'Phase1 Smoke Tenant',
-      sautikit_virtual_number: '+254200000001',
+      sautikit_virtual_number: SMOKE_DID,
       whatsapp_notification_number: '+254700000000',
       is_active: true,
     })
@@ -41,7 +61,7 @@ async function main() {
   const call = await db.upsertCall({
     callSid,
     fromNumber: '+254700000001',
-    toNumber: '+254200000001',
+    toNumber: SMOKE_DID,
     tenantId,
     provider: 'twilio',
   });
@@ -93,7 +113,11 @@ async function main() {
   console.log('✓ smoke-db passed');
 }
 
-main().catch((err) => {
-  console.error('✗ smoke-db failed:', err?.message || err);
-  process.exit(1);
-});
+module.exports = { ensureTenant, SMOKE_DID };
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('✗ smoke-db failed:', err?.message || err);
+    process.exit(1);
+  });
+}
