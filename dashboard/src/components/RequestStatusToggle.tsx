@@ -17,7 +17,7 @@ function ownerError(error?: string) {
 export function RequestStatusToggle({
   id,
   status,
-  extra = true,
+  extra = false,
 }: {
   id: string;
   status: string;
@@ -34,7 +34,7 @@ export function RequestStatusToggle({
   return (
     <form action={formAction} className="flex flex-col items-end gap-1">
       <input type="hidden" name="id" value={id} />
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-nowrap items-center justify-end gap-2">
         {normalized === "open" ? (
           <>
             {extra ? (

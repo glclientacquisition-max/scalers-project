@@ -66,7 +66,7 @@ export function InboxJobEditor({
         </button>
         {state.error ? <p className="text-sm text-warn">{state.error}</p> : null}
       </form>
-      <InboxJobActions id={id} status={status} />
+      <InboxJobActions id={id} status={status} extra />
     </div>
   );
 }
