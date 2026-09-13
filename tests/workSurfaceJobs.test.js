@@ -51,7 +51,8 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(toolbar, /purposeFilters/);
     assert.doesNotMatch(toolbar, /clamp\(2rem/);
     assert.match(niche, /holdEmpty: "Nothing to fulfill"/);
-    assert.match(niche, /jobEmpty: "No visits to confirm"/);
+    assert.match(niche, /jobEmpty: "No visits"/);
+    assert.match(niche, /jobEmpty: "No bookings"/);
     assert.match(niche, /jobFilter: "Visits"/);
     assert.match(niche, /jobFilter: "Bookings"/);
     assert.match(niche, /pickupStamp: "Pickup"/);
@@ -76,6 +77,8 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(purpose, /compareInboxSignal/);
     assert.match(purpose, /if \(!opts\.job\) return copy\.returnCtaOne/);
     assert.match(purpose, /if \(!opts\.hold\) return copy\.returnCtaOne/);
+    assert.match(purpose, /jobStatus === "requested"/);
+    assert.doesNotMatch(purpose, /jobStatus === "requested" \|\| jobStatus === "confirmed"/);
     const composer = read("dashboard/src/components/CallerNoteComposer.tsx");
     assert.match(composer, /Send SMS/);
     assert.match(composer, /if \(!callerSmsOn\) return null/);

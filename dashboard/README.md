@@ -64,6 +64,7 @@ Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triag
 - Caption briefing: `3 need you. 1 to confirm.`
 - Mixed columns: Work / Needed / When
 - Filters: Needs you · Holds · Visits, Jobs, or Bookings · Human · Answered · All
+- Needs you is open work only. Confirm moves a visit to Visits. Done leaves Holds.
 - Bare `/calls` defaults to Needs you when work is waiting
 - `/requests` and `/appointments` redirect into Holds / Jobs filters
 
