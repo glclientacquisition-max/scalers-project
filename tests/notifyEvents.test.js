@@ -46,11 +46,11 @@ describe('notify events', () => {
         ['Qty', ''],
         ['When', null],
       ],
-      action: 'Open Requests in Scalers desk to mark fulfilled.',
+      action: 'Open Inbox Holds to mark fulfilled.',
     });
     assert.equal(
       text,
-      ['HOLD / PICKUP', 'Item: charger', 'Open Requests in Scalers desk to mark fulfilled.'].join('\n')
+      ['HOLD / PICKUP', 'Item: charger', 'Open Inbox Holds to mark fulfilled.'].join('\n')
     );
   });
 
@@ -170,6 +170,34 @@ describe('notify events', () => {
         reason: 'Book couch cleaning',
       }),
       true
+    );
+  });
+
+  it('defers mid-call lead dumps during an open visit', () => {
+    const { shouldDeferOwnerLeadForVisit } = require('../src/notifications/events');
+    assert.equal(
+      shouldDeferOwnerLeadForVisit({
+        midCall: true,
+        brainIntent: 'booking',
+        goalStatus: 'active',
+      }),
+      true
+    );
+    assert.equal(
+      shouldDeferOwnerLeadForVisit({
+        midCall: true,
+        brainIntent: 'booking',
+        goalStatus: 'completed',
+      }),
+      false
+    );
+    assert.equal(
+      shouldDeferOwnerLeadForVisit({
+        midCall: false,
+        brainIntent: 'booking',
+        goalStatus: 'active',
+      }),
+      false
     );
   });
 

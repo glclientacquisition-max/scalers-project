@@ -302,6 +302,21 @@ function shouldSendOwnerLead(call = {}) {
   return Boolean(displayOwnerCallerName(call.name) && ownerReason(call));
 }
 
+/**
+ * Mid-call name capture during a visit must not text the owner a lead dump.
+ * Hangup still sends a lead if no visit notify marked the call.
+ */
+function shouldDeferOwnerLeadForVisit({
+  midCall = false,
+  brainIntent = '',
+  goalStatus = '',
+} = {}) {
+  if (!midCall) return false;
+  if (String(goalStatus || '').toLowerCase() === 'completed') return false;
+  const intent = String(brainIntent || '').toLowerCase();
+  return intent === 'booking' || intent === 'cancellation';
+}
+
 module.exports = {
   EVENTS,
   renderEventText,
@@ -311,4 +326,5 @@ module.exports = {
   ownerLeadEvent,
   displayOwnerCallerName,
   shouldSendOwnerLead,
+  shouldDeferOwnerLeadForVisit,
 };

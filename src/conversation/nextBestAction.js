@@ -92,11 +92,18 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
 
   if (REQUEST_INTENTS.has(intent)) {
     const request = authorizeAction(ACTIONS.CREATE_REQUEST, capabilities);
+    const homeVisit =
+      String(state?.vertical || '').toLowerCase() === 'home_services';
+    const visitReason =
+      intent === 'cancellation'
+        ? 'Slots are complete. Append update_appointment and speak nothing. Do not tell the caller it is moved or cancelled; the backend speaks the outcome.'
+        : 'Slots are complete. Append create_appointment and speak nothing. Do not tell the caller it is booked; the backend speaks the outcome.';
     return request.allowed
       ? {
           action: ACTIONS.CREATE_REQUEST,
-          reason:
-            'Slots are complete. Append the tool and speak nothing. Do not tell the caller it is booked, moved, or saved; the backend speaks the outcome.',
+          reason: homeVisit
+            ? visitReason
+            : 'Slots are complete. Append the tool and speak nothing. Do not tell the caller it is booked, moved, or saved; the backend speaks the outcome.',
         }
       : {
           action: ACTIONS.CAPTURE,

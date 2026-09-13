@@ -17,8 +17,8 @@ Caller (home_services vertical)
   → HOME SERVICES PLAYBOOK (prompt)
   → create_appointment / update_appointment markers
   → toolExecution validate → db.createAppointment / updateAppointment
-  → owner WhatsApp/email notify
-  → Desk /appointments (confirm / cancel / done)
+  → owner WhatsApp/email visit notify (not a mid-call lead dump)
+  → Desk Inbox → Visits (`/calls?purpose=job`) confirm / cancel / week run sheet
 ```
 
 Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes (enquiry/callback). Appointments are the booking SoR.

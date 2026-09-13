@@ -40,8 +40,26 @@ Every home-services DID must do this without a niche-specific playbook:
 6. **Same hour:** A second visit in the same hour is allowed unless POLICIES say one at a time.
 7. **Reschedule / cancel:** `update_appointment` on the caller’s latest open visit. Hours still gate. Attendance confirm is not a second booking.
 8. **True emergency only:** burst pipe, flooding, fire, gas leak, electric shock. Capture name + reason and escalate. Same-day, urgent, or ASAP cleaning is a **visit**.
-9. **Owner notify:** Usable reason (job + when + place). Inbox list for Confirm; week as run sheet.
+9. **Owner notify:** Visit SMS/WA/email with service, when, place. CTA is Inbox Visits. Do not send a lead dump mid-call while booking. Hangup can still send a lead if no visit was saved.
 10. **Unknown:** Fallback line. Log enquiry. Do not bluff.
+
+---
+
+## Full workflow (onboard → Inbox)
+
+```text
+Signup (DID + notify)
+  → Onboarding (vertical home_services, hours, landmark, services)
+  → Seed cleaning+trades catalog, FAQs, hours_schedule, catch-all team
+  → Compile llm_system_prompt
+  → Call: intro → playbook → slots → create_appointment
+  → Owner visit notify
+  → Inbox Visits list (Confirm) or Week (run sheet)
+```
+
+Owner-typed services keep their rows and still receive missing seed jobs (carpet/couch/mattress) unless they already named them. Recompile after Train edits.
+
+Live GO remains the DID pack below. This workflow is what that pack walks.
 
 ---
 

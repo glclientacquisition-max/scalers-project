@@ -64,8 +64,8 @@ All owner bodies are plain text, ordered label rows, no vendor names, no "techni
 | --- | --- |
 | Lead | `New missed-call lead — {Business}` + `Name:` / `Phone:` / `Reason:` / `Intent:` / `Summary:` / `Outcome:` / `Recording:` |
 | Escalation | `Escalation for {Teammate} — {Business}` + `Caller:` / `Phone:` / `Reason:` |
-| Service request | `{HOLD\|ORDER\|ENQUIRY} — {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Requests in Scalers desk to mark fulfilled.` |
-| Appointment | `VISIT REQUEST — {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Appointments in Scalers desk to confirm or cancel.` |
+| Service request | `{HOLD\|ORDER\|ENQUIRY} — {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Inbox Holds to mark fulfilled.` |
+| Appointment | `VISIT REQUEST — {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Inbox Visits to confirm or cancel.` |
 | Wallet low | `Scalers wallet running low — {Business}` + balance + threshold |
 | Wallet empty | `Scalers prepaid empty — {Business}` + on-demand state |
 | Speech outage | `{Business} line downtime. Callers heard a short message and were asked to call back.` |
