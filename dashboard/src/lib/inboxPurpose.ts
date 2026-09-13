@@ -513,11 +513,11 @@ export function itemMatchesPurpose(
   if (filter === "all") return true;
   if (filter === "needs") return item.needsYou;
   if (filter === "hold") {
-    return Boolean(item.hold) && String(item.hold.status || "").toLowerCase() === "open";
+    return String(item.hold?.status || "").toLowerCase() === "open";
   }
   if (filter === "job") {
     const status = String(item.job?.status || "").toLowerCase();
-    return Boolean(item.job) && (status === "requested" || status === "confirmed");
+    return status === "requested" || status === "confirmed";
   }
   if (filter === "human") return item.purpose === "human" || item.purpose === "missed";
   if (filter === "answered") return item.purpose === "answered";
