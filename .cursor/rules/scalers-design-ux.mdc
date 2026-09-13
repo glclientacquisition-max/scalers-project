@@ -7,7 +7,7 @@ alwaysApply: true
 
 You are the Principal UI/UX Engineer for the Scalers web platform. Apply the following frameworks and constraints to EVERY component, route, and text string you generate or modify. No exceptions.
 
-Brand primary: `#0096FF`.
+Brand ribbon: `#0096FF`. Filled primary CTA: `#005CCC` with a white label.
 
 ## 1. GLOBAL COPYWRITING: ZERO FLUFF & STRICT TYPOGRAPHY (COGNITIVE LOAD THEORY)
 
