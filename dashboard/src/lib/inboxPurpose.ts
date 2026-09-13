@@ -147,18 +147,20 @@ export function signalLabel(opts: {
 }): string {
   const copy = nicheCopy(opts.vertical);
   if (opts.purpose === "job") {
-    const status = String(opts.job?.status || "").toLowerCase();
+    if (!opts.job) return copy.returnCtaOne;
+    const status = String(opts.job.status || "").toLowerCase();
     if (status === "confirmed") return copy.visitStamp;
     if (status === "done") return copy.visitDoneStamp;
     if (status === "cancelled") return "Cancelled";
     return copy.confirmStamp;
   }
   if (opts.purpose === "hold") {
-    const status = String(opts.hold?.status || "").toLowerCase();
+    if (!opts.hold) return copy.returnCtaOne;
+    const status = String(opts.hold.status || "").toLowerCase();
     if (status === "fulfilled") return "Item done";
     if (status === "cancelled") return "Cancelled";
     return holdTypeLabel(
-      opts.hold?.request_type || opts.intent || "hold",
+      opts.hold.request_type || opts.intent || "hold",
       opts.vertical
     );
   }

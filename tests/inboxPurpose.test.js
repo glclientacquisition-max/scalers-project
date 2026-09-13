@@ -97,17 +97,19 @@ function purposeLabel(purpose) {
 
 function signalLabel({ purpose, hold, job }) {
   if (purpose === "job") {
-    const status = String(job?.status || "").toLowerCase();
+    if (!job) return "Return call";
+    const status = String(job.status || "").toLowerCase();
     if (status === "confirmed") return "Visit";
     if (status === "done") return "Visit done";
     if (status === "cancelled") return "Cancelled";
     return "Confirm visit";
   }
   if (purpose === "hold") {
-    const status = String(hold?.status || "").toLowerCase();
+    if (!hold) return "Return call";
+    const status = String(hold.status || "").toLowerCase();
     if (status === "fulfilled") return "Item done";
     if (status === "cancelled") return "Cancelled";
-    return holdTypeLabel(hold?.request_type || "hold");
+    return holdTypeLabel(hold.request_type || "hold");
   }
   return purposeLabel(purpose);
 }
@@ -263,6 +265,8 @@ describe("inbox signal", () => {
   it("names the next action instead of Job or Hold", () => {
     assert.equal(signalLabel({ purpose: "job", job: { status: "requested" } }), "Confirm visit");
     assert.equal(signalLabel({ purpose: "job", job: { status: "confirmed" } }), "Visit");
+    assert.equal(signalLabel({ purpose: "job" }), "Return call");
+    assert.equal(signalLabel({ purpose: "hold" }), "Return call");
     assert.equal(
       signalLabel({ purpose: "hold", hold: { status: "open", request_type: "order" } }),
       "Order"

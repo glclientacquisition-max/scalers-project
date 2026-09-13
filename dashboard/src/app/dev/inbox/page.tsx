@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
+import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
+import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow } from "@/components/InboxItemRow";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
 function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "headline">): InboxItem {
@@ -51,6 +54,14 @@ const ROWS: InboxItem[] = [
     },
   }),
   item({
+    id: "job-intent",
+    purpose: "job",
+    callerName: "Alvin",
+    callerPhone: "254700000004",
+    headline: "Visit",
+    intent: "book_visit",
+  }),
+  item({
     id: "hold",
     purpose: "hold",
     callerName: "Wanjiku",
@@ -90,7 +101,7 @@ export default function DevInboxPage() {
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">3 need you</p>
+        <p className="mt-1 text-[13px] text-ink-soft">4 need you</p>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface">
           {ROWS.map((row) => (
             <InboxPhoneRow
@@ -101,6 +112,40 @@ export default function DevInboxPage() {
             />
           ))}
         </ul>
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <section className="rounded-2xl border border-line bg-surface p-4">
+            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Visit</h2>
+            <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Otieno</p>
+            <div className="mt-3">
+              <InboxJobActions id="job-1" status="requested" />
+            </div>
+            <WhatsAppLink
+              number="254700000002"
+              variant="link"
+              label="Reply on WhatsApp"
+              className="mt-3 w-full"
+            />
+          </section>
+          <section className="rounded-2xl border border-line bg-surface p-4">
+            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Return call</h2>
+            <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Alvin</p>
+            <div className="mt-3">
+              <CallerNoteComposer
+                callId="call-alvin"
+                callerPhone="254700000004"
+                callerName="Alvin"
+                callerSmsOn
+                primary
+              />
+            </div>
+            <WhatsAppLink
+              number="254700000004"
+              variant="link"
+              label="Reply on WhatsApp"
+              className="mt-3 w-full"
+            />
+          </section>
+        </div>
       </main>
       <DeskTabBar />
     </div>
