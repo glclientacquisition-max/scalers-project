@@ -18,6 +18,49 @@ describe('home services playbooks', () => {
     assert.equal(classifyHomeIntent('There is a burst pipe emergency'), 'emergency');
   });
 
+  it('treats cleaning jobs as visits, not emergencies', () => {
+    assert.equal(
+      classifyHomeIntent('Urgent Airbnb clean tomorrow in Runda'),
+      'book_visit'
+    );
+    assert.equal(
+      classifyHomeIntent('I need my carpet cleaned tomorrow'),
+      'book_visit'
+    );
+    assert.equal(
+      classifyHomeIntent('Please clean my sofa near Rongai at 10 AM'),
+      'book_visit'
+    );
+    assert.equal(
+      classifyHomeIntent('Do you do mattress cleaning?'),
+      'service_inquiry'
+    );
+    assert.equal(
+      classifyHomeIntent('Do you do upholstery?'),
+      'service_inquiry'
+    );
+    assert.equal(
+      classifyHomeIntent('How much for carpet cleaning?'),
+      'price_band'
+    );
+    assert.equal(
+      classifyHomeIntent('Can you come fix my leaking tap tomorrow?'),
+      'book_visit'
+    );
+  });
+
+  it('reserves emergency for burst flood fire gas or shock', () => {
+    assert.equal(
+      classifyHomeIntent('Emergency burst pipe flooding the kitchen'),
+      'emergency'
+    );
+    assert.equal(classifyHomeIntent('There is a gas leak'), 'emergency');
+    assert.equal(
+      classifyHomeIntent('This is urgent, book house cleaning tomorrow'),
+      'book_visit'
+    );
+  });
+
   it('requires slots before book_visit completion', () => {
     assert.deepEqual(
       missingHomeSlots('book_visit', { service: 'plumbing' }),
@@ -47,5 +90,6 @@ describe('home services playbooks', () => {
     assert.match(text, /Handoff mode.*callback/);
     assert.match(text, /VISIT SOP/);
     assert.match(text, /Never invent prices/);
+    assert.match(text, /not emergency/);
   });
 });

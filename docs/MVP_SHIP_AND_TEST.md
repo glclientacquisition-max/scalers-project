@@ -129,6 +129,16 @@ Private beta claim: **the DID answers**, FAQs work, verified message/enquiry/hol
 
 **Out of private-beta claim:** perfect catalog sales, live transfer, pronunciation perfection, recording QA (nice-to-have; do not block if the five gates above pass).
 
+---
+
+## 5c. Home services GO (cleaning beachhead)
+
+Retail remains the missed-call MVP. Home services **proceeds** when the live pack in [`HOME_SERVICES_MVP_BAR.md`](./HOME_SERVICES_MVP_BAR.md) is GO.
+
+Must-pass on the home DID: opener, hours, complete book, urgent-clean-is-a-visit, true emergency, closed-day reject. Same-hour second visits save. Owner notify includes job, when, and place.
+
+Do not claim Google Calendar, live transfer, or per-niche chemicals.
+
 Operator checklist before inviting testers:
 
 1. Railway voice on latest `main` (confirm greeting + `action-progress` in logs).  
@@ -157,9 +167,10 @@ Operator checklist before inviting testers:
 | Now (MVP) | Next (main plan, not forgotten) |
 | --- | --- |
 | Onboard → line answers missed calls | Deeper job resolution rate |
-| Retail beachhead reliability | Home services / hospitality packs |
-| Message + hold + escalate | Booking / CRM systems of record |
-| Catalogue when trained | Learning loop FAQ gaps → Train |
+| Retail beachhead reliability | Hospitality pack |
+| Home visit spine + cleaning seeds | Home **live** DID pack ([`HOME_SERVICES_MVP_BAR.md`](./HOME_SERVICES_MVP_BAR.md)) |
+| Message + hold + escalate | Learning loop FAQ gaps → Train |
+| Catalogue when trained | CRM depth beyond Inbox visits |
 | Async handoff | Live transfer when runtime exists |
 
 Ship MVP when **onboarding produces a line that answers efficiently**. Grow toward full-assist without rewriting the spine (ground truth → Brain state → validated tools → confirmed outcomes).

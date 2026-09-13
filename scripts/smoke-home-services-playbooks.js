@@ -65,6 +65,46 @@ const scenarios = [
     missing: ['name', 'reason'],
     complete: false,
   },
+  {
+    name: 'Urgent Airbnb is a visit',
+    utter: 'Urgent Airbnb clean tomorrow in Runda',
+    intent: 'book_visit',
+    slots: {
+      service: 'airbnb clean',
+      name: 'Alvin',
+      when: 'tomorrow 8am',
+      landmark: 'Runda',
+    },
+    missing: [],
+    complete: true,
+    toolRaw:
+      '###TOOL###{"create_appointment":{"service_name":"Home cleaning","name":"Alvin","when_text":"tomorrow 8am","landmark":"Runda"}}###ENDTOOL###',
+  },
+  {
+    name: 'Carpet clean is a visit',
+    utter: 'I need my carpet cleaned tomorrow',
+    intent: 'book_visit',
+    complete: false,
+    missing: ['service', 'name', 'when', 'landmark'],
+  },
+  {
+    name: 'Mattress price band',
+    utter: 'How much for mattress cleaning?',
+    intent: 'price_band',
+    slots: { service: 'mattress' },
+    missing: [],
+    complete: true,
+  },
+  {
+    name: 'Reschedule visit',
+    utter: 'Please reschedule my visit to Friday 2pm',
+    intent: 'reschedule',
+    slots: { when: 'Friday 2pm' },
+    missing: [],
+    complete: true,
+    toolRaw:
+      '###TOOL###{"update_appointment":{"when_text":"Friday 2pm"}}###ENDTOOL###',
+  },
 ];
 
 let failed = 0;
@@ -83,7 +123,9 @@ for (const s of scenarios) {
     if (s.toolRaw.includes('create_appointment')) {
       okTool = Boolean(parsed.appointment?.serviceName);
     } else if (s.toolRaw.includes('update_appointment')) {
-      okTool = Boolean(parsed.appointmentUpdate?.status);
+      okTool = Boolean(
+        parsed.appointmentUpdate?.status || parsed.appointmentUpdate?.whenText
+      );
     }
   }
   const pass = okIntent && okMissing && okComplete && okTool;
@@ -169,6 +211,43 @@ async function smokeHours() {
   console.log(`${tueOk ? '✓' : '✗'} Hours smoke: Tuesday 10:00 persisted as requested`);
   if (!tueOk) {
     console.log({ tuePayloads, result: tuesday.results[0], tueSpoken });
+    process.exit(1);
+  }
+
+  const parallelPayloads = [];
+  const parallel = await executeBrainTools({
+    parsed: parseGeminiResponse(
+      '###TOOL###{"create_appointment":{"service_name":"Home cleaning","name":"Shy","when_text":"Tuesday 10 AM","landmark":"Runda"}}###ENDTOOL###'
+    ),
+    capabilities,
+    hoursSchedule,
+    now: nowTue11Eat,
+    openAppointments: [
+      {
+        service_name: 'Plumbing',
+        when_text: 'Tuesday 10 AM',
+        window_start: '2026-08-18T07:00:00.000Z',
+        status: 'requested',
+      },
+    ],
+    handlers: {
+      createAppointment: async (appointment) => {
+        parallelPayloads.push(appointment);
+        return {
+          id: 'appt_parallel',
+          service_name: appointment.serviceName,
+          status: 'requested',
+        };
+      },
+    },
+  });
+  const parallelOk =
+    parallelPayloads.length === 1 &&
+    parallel.results[0]?.status === 'succeeded' &&
+    parallel.results[0]?.code !== 'overlap';
+  console.log(`${parallelOk ? '✓' : '✗'} Hours smoke: same-hour second visit persisted`);
+  if (!parallelOk) {
+    console.log({ parallelPayloads, result: parallel.results[0] });
     process.exit(1);
   }
 }

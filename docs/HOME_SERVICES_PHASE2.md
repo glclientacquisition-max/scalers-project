@@ -1,6 +1,8 @@
 # Phase 2 — Home services pack (execution plan)
 
-**Outcome:** A trained home-services tenant can book a visit on-call (service + time window + landmark + name), answer area/price bands from catalog/policies, reschedule/cancel, and escalate true emergencies — with appointments visible in the desk.
+**Outcome:** A trained home-services tenant can book a visit on-call (service + time window + landmark + name), answer area/price bands from catalog/policies, reschedule/cancel, and escalate true emergencies, with appointments visible in the desk.
+
+**Excellence bar (MVP proceed):** [`HOME_SERVICES_MVP_BAR.md`](./HOME_SERVICES_MVP_BAR.md). Shared spine for all home niches. Cleaning is the live beachhead. Do not add per-niche verticals.
 
 **Depends on (already landed):** contacts, service_requests, vertical/`home_services`, retail request + notify pattern, playbook router.
 
@@ -50,9 +52,10 @@ Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes
 
 ### 2D — Exit criteria / verify
 - Unit tests: playbook classify + slot gating, tool invalid/success paths
-- Smoke script for home playbooks
+- Smoke script for home playbooks (cleaning vs emergency, reschedule, same-hour)
 - `npm run test:brain` + dashboard `tsc`
 - Manual: book visit → row + notify → desk confirm/cancel
+- **Proceed on home MVP only when** the live DID pack in [`HOME_SERVICES_MVP_BAR.md`](./HOME_SERVICES_MVP_BAR.md) is GO. CI cannot mark that pack done.
 
 ---
 
@@ -63,7 +66,7 @@ Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes
 | book_visit | service, name, when, landmark | create_appointment |
 | reschedule | when (+ match latest open) | update_appointment |
 | cancel | — (+ match latest open) | update_appointment status=cancelled |
-| emergency | name, reason | escalate (+ save_caller_info) |
+| emergency | name, reason | escalate (+ save_caller_info). Burst, flood, fire, gas, shock only. Same-day cleaning is book_visit. |
 
 Never invent price bands, coverage areas, or claim booked until backend confirmation.
 

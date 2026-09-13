@@ -95,6 +95,7 @@ Task: <one concrete brain / knowledge / prompt improvement>
 
 ## Good first tickets
 
+- Home services **live** DID pack: [`../HOME_SERVICES_MVP_BAR.md`](../HOME_SERVICES_MVP_BAR.md) (cleaning beachhead). Repo spine is not the GO.
 - Stronger “I don’t know” + unknown_answer_fallback behavior
 - Better name confirmation / correction loop
 - Bulletin + closed-mode reply quality

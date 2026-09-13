@@ -392,6 +392,8 @@ Keep `services_catalog`; emphasize `price_range`, lead time in `notes`, `out_of_
 
 Trained home-services tenant: book a visit with service + time + landmark + name; answer area/price bands; escalate true emergencies per policy. Resolved-rate tracked same as retail.
 
+Live proceed bar (cleaning beachhead, shared spine for other home niches): [`HOME_SERVICES_MVP_BAR.md`](./HOME_SERVICES_MVP_BAR.md).
+
 ---
 
 ### Phase 3 — Hospitality pack (hotels) — after home services
@@ -550,7 +552,7 @@ Home services script mirrors with book/reschedule/area/emergency.
 | 3. Desk Train + onboarding for new fields | **Done** | TenantForm + 4-step onboarding |
 | 4. `contacts` + `service_requests` + `create_service_request` | **Done** | `contacts_and_requests.sql`, tool + `/requests` |
 | 5. Retail playbook + richer requests UX | **Done** (playbook) | `src/conversation/playbooks/retail.js` + smoke |
-| 6. Appointments + home services pack | **Done** | `appointments.sql`, playbooks, tools, Inbox Visits list + week calendar, see `docs/HOME_SERVICES_PHASE2.md` |
+| 6. Appointments + home services pack | **Done in repo** | Playbooks, tools, Inbox Visits. Live GO is [`docs/HOME_SERVICES_MVP_BAR.md`](./HOME_SERVICES_MVP_BAR.md), not more calendar chrome. |
 | 7. Call resolution metrics + learning loop | Partial | resolution columns landed; Evalite Brain suite started (`npm run eval:brain`) |
 | 8. Returning-caller card | **Done** | `getCallerMemory` + CONTEXT HEADER; ADR-0005 |
 
