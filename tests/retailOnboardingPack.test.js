@@ -142,6 +142,8 @@ describe('retail onboarding pack (contract)', () => {
       'utf8'
     );
     assert.match(src, /hoursScheduleFromOnboardingText/);
+    assert.match(src, /mergeHomeServiceCatalog/);
+    assert.match(src, /homeDefaultServices/);
     assert.match(src, /seedOwnerCatchAllTeam/);
     assert.match(src, /General queries/);
     assert.match(src, /afterHoursMode/);

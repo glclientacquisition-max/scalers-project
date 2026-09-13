@@ -41,7 +41,9 @@ function runTurn(state, languageState, text, lastAgentText = '', opts = {}) {
   const activeCapabilities = opts.capabilities || capabilities;
   const evidence = analyzeCallerLanguage(text);
   const nextLanguage = resolveLanguageState(languageState, evidence);
-  const provisionalIntent = inferIntent(text);
+  const provisionalIntent = inferIntent(text, {
+    vertical: activeProfile.vertical,
+  });
   const entityIntent =
     provisionalIntent === 'general_enquiry' && state.goal.status === 'active'
       ? state.intent
@@ -209,6 +211,26 @@ describe('multi-turn Brain outcomes', () => {
       'I want to book carpet cleaning for tomorrow at 10 AM. My name is Alex, and my landmark is Barnabas.'
     );
     assert.equal(turn.state.intent, 'booking');
+  });
+
+  it('treats home cleaning asks as booking and burst pipes as human', () => {
+    const home = { vertical: 'home_services' };
+    assert.equal(
+      inferIntent('Urgent Airbnb clean tomorrow in Runda', home),
+      'booking'
+    );
+    assert.equal(
+      inferIntent('I need my carpet cleaned tomorrow', home),
+      'booking'
+    );
+    assert.equal(
+      inferIntent('Emergency burst pipe flooding the kitchen', home),
+      'human'
+    );
+    assert.equal(
+      inferIntent('Urgent Airbnb clean tomorrow in Runda'),
+      'general_enquiry'
+    );
   });
 
   it('does not treat a hear-again as a caller name or a save', () => {

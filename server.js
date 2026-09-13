@@ -178,6 +178,7 @@ const {
   renderEventText,
   displayOwnerCallerName,
   shouldSendOwnerLead,
+  shouldDeferOwnerLeadForVisit,
 } = require('./src/notifications/events');
 const {
   dispatchCallerSms,
@@ -1833,7 +1834,9 @@ mediaWss.on('connection', (ws, req) => {
       capabilitiesForProfile(brainProfile, callAgentTools.get(callKey) || parseAgentTools(null));
     const previousBrainState =
       callBrainStates.get(callKey) || createBrainState(brainProfile);
-    const provisionalIntent = inferIntent(clean);
+    const provisionalIntent = inferIntent(clean, {
+      vertical: brainProfile?.vertical,
+    });
     const entityIntent =
       provisionalIntent === 'general_enquiry' &&
       previousBrainState.goal.status === 'active'
@@ -3027,12 +3030,23 @@ async function maybeQueueLiveTransfer({
   return true;
 }
 
-async function maybeSendWhatsAppNotification(callSid) {
+async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   // Lead alert: WhatsApp owner number when sender is ready; email fallback otherwise.
   const call = await db.getCall(callSid);
   if (!call) return;
 
   if (!shouldSendOwnerLead(call)) return;
+
+  const brain = callBrainStates.get(callSid);
+  if (
+    shouldDeferOwnerLeadForVisit({
+      midCall: opts.midCall === true,
+      brainIntent: brain?.intent,
+      goalStatus: brain?.goal?.status,
+    })
+  ) {
+    return;
+  }
 
   if (ownerNotifyInProgress.has(callSid)) return;
   if (call.whatsapp_sent) return;
@@ -3146,7 +3160,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     request.caller_name ? `Caller: ${request.caller_name}` : null,
     request.caller_phone ? `Phone: ${request.caller_phone}` : null,
     request.notes ? `Notes: ${request.notes}` : null,
-    'Open Requests in Scalers desk to mark fulfilled.',
+    'Open Inbox Holds to mark fulfilled.',
   ].filter(Boolean);
 
   const body = lines.join('\n');
@@ -3234,7 +3248,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     appointment.caller_phone ? `Phone: ${appointment.caller_phone}` : null,
     appointment.notes ? `Notes: ${appointment.notes}` : null,
     `Status: ${status}`,
-    'Open Appointments in Scalers desk to confirm or cancel.',
+    'Open Inbox Visits to confirm or cancel.',
   ].filter(Boolean);
 
   const body = lines.join('\n');
@@ -3260,6 +3274,22 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
       `[${callSid}] Appointment notify (${kind}/${status}) via ${result.channel}` +
         (result.to ? ` → ${result.to}` : '')
     );
+    try {
+      await db.markWhatsappSent(callSid);
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: {
+          owner_notify_body: body,
+          owner_notify_channel: result.channel,
+          owner_notify_kind: 'appointment',
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `[${callSid}] appointment notify mark sent failed:`,
+        err?.message || err
+      );
+    }
   } else {
     console.warn(
       `[${callSid}] Appointment notify skipped (${result.reason || 'unknown'})`
@@ -3350,7 +3380,9 @@ wss.on('connection', (ws) => {
           capabilitiesForProfile(brainProfile, callAgentTools.get(callSid) || parseAgentTools(null));
         const previousBrainState =
           callBrainStates.get(callSid) || createBrainState(brainProfile);
-        const provisionalIntent = inferIntent(data.voicePrompt);
+        const provisionalIntent = inferIntent(data.voicePrompt, {
+          vertical: brainProfile?.vertical,
+        });
         const entityIntent =
           provisionalIntent === 'general_enquiry' &&
           previousBrainState.goal.status === 'active'
@@ -3668,8 +3700,14 @@ async function applyGeminiTools(callSid, parsed) {
   const escalationRequested = execution.results.some(
     (result) => result.action === 'escalate'
   );
-  if (savedInfo?.name && savedInfo?.reason && !escalationRequested) {
-    maybeSendWhatsAppNotification(callSid);
+  const visitSaved = execution.results.some(
+    (result) =>
+      (result.action === 'create_appointment' ||
+        result.action === 'update_appointment') &&
+      (result.status === 'succeeded' || result.status === 'updated')
+  );
+  if (savedInfo?.name && savedInfo?.reason && !escalationRequested && !visitSaved) {
+    maybeSendWhatsAppNotification(callSid, { midCall: true });
   }
 
   for (const result of execution.results) {

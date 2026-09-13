@@ -20,17 +20,17 @@ Reliability over breadth. Do not market workflows we cannot execute.
 
 How the line opens every unanswered call:
 
-1. **Brand first** — business name in the first sentence  
-2. **Agent named** — “this is {agent} speaking”  
-3. **Offering (short)** — one grounded clause from services on file; never invent  
-4. **Language invite** — “You can speak in English or Kiswahili.”  
-5. **English-default first open** — no random Kiswahili opener before the caller speaks (language match starts on their turn)  
-6. **One invite** — “How can I help?” (or message/closed honesty)  
-7. **Same line in Desk Test** — Settings → Test preview uses the same composer as live voice  
+1. Time-of-day opener (Good morning / Hello / Good evening)
+2. Agent named at the business: “this is {agent} at {business}”
+3. One invite: “How can I help you?”
+4. English-default first open. No random Kiswahili opener. Language match starts on the caller’s turn
+5. No service dump and no language invite on the opener (open or closed)
+6. Closed: honesty, then still help
+7. Same line in Desk Test (Settings → Test)
 
-Example: *“Hello, you've reached ChapterOne Bookstore, this is Aisha speaking. We help with special orders / sourcing and delivery. You can speak in English or Kiswahili. How can I help?”*
+Example: *“Hello, this is Aisha at ChapterOne Bookstore. How can I help you?”*
 
-Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `dashboard/src/lib/businessAssistantIntro.ts` (Desk).
+Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `dashboard/src/lib/businessAssistantIntro.ts` (Desk). Home-services uses the same composer.
 
 ---
 
@@ -45,10 +45,11 @@ Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `das
 | Price / stock (retail) | Only from catalogue when loaded; else admit + enquiry |
 | Hold / order (retail) | Catalogue-grounded or enquiry — never fake |
 | Leave a message / callback | Save + SMS → WhatsApp → email notify |
+| Book a visit (home_services) | Service + name + when + landmark → Inbox Visits; owner visit notify; no mid-call lead dump |
 | Speak to a human | Async escalate (name required); SMS-first notify; never fake live transfer — see `docs/ESCALATION.md` |
 | Language | en / sw / sheng match **after** the caller speaks |
 
-**Out of MVP claim (still on the long-term plan):** live transfer, calendar booking, POS sync, RAG, multi-vertical depth, “95% full assist.”
+**Out of MVP claim (still on the long-term plan):** live transfer, Google Calendar, POS sync, RAG, hospitality depth, “95% full assist.”
 
 ---
 

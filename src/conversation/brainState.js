@@ -46,7 +46,37 @@ const GOAL_BY_INTENT = Object.freeze({
   general_enquiry: 'resolve_enquiry',
 });
 
-function looksLikeBookingIntent(value) {
+function looksLikeHomeEmergency(value) {
+  if (
+    /\b(burst(\s+pipe)?|flood(ing)?|gas leak|electric shock|live wire|on fire|water everywhere|hatari)\b/.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  return (
+    /\bemergency\b/.test(value) &&
+    /\b(pipe|flood|leak|shock|wire|fire|gas|power)\b/.test(value)
+  );
+}
+
+function looksLikeHomeVisitAsk(value) {
+  if (
+    /\b(clean (my|the|our)|need (a |my )?(clean|carpet|couch|sofa|mattress|upholstery)|carpet clean|mattress clean|house clean|airbnb clean|sofa clean|couch clean)\b/.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  return (
+    /\b(come (over|by|tomorrow|today)|fix|repair|plumb|install)\b/.test(value) &&
+    /\b(tomorrow|today|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d+\s*(am|pm)|o'?clock|saa)\b/.test(
+      value
+    )
+  );
+}
+
+function looksLikeBookingIntent(value, vertical = '') {
   if (
     /\b(booking|appointment|reservation|schedule|miadi|book me)\b/.test(value)
   ) {
@@ -62,6 +92,9 @@ function looksLikeBookingIntent(value) {
   if (/\bbook (a |an |the )?(visit|appointment|slot|time|call)\b/.test(value)) {
     return true;
   }
+  if (String(vertical || '').toLowerCase() === 'home_services' && looksLikeHomeVisitAsk(value)) {
+    return true;
+  }
   // Verb "book" plus a time window. Do not steal bookstore "which book / the book".
   return (
     /\bbook\b/.test(value) &&
@@ -72,8 +105,9 @@ function looksLikeBookingIntent(value) {
   );
 }
 
-function inferIntent(text) {
+function inferIntent(text, opts = {}) {
   const value = String(text || '').trim().toLowerCase();
+  const vertical = String(opts.vertical || '').toLowerCase();
   if (!value) return 'unknown';
   // Human / complaint before other patterns so "talk to the manager" wins.
   if (
@@ -83,9 +117,12 @@ function inferIntent(text) {
   ) {
     return 'human';
   }
+  if (looksLikeHomeEmergency(value)) {
+    return 'human';
+  }
   // Appointment-style booking: check BEFORE location so "book carpet cleaning... landmark is Barnabas"
   // is classified as booking rather than being hijacked by "landmark" into location.
-  if (looksLikeBookingIntent(value)) {
+  if (looksLikeBookingIntent(value, vertical)) {
     return 'booking';
   }
   // Hours: opening/closing phrasing (avoid treating "book" noun as booking).
@@ -211,7 +248,9 @@ function createBrainState(profile = {}) {
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
   const text = String(input.text || '').trim();
-  const inferredIntent = inferIntent(text);
+  const inferredIntent = inferIntent(text, {
+    vertical: next.vertical || input.profile?.vertical,
+  });
   const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
   const fillingBookingLandmark =
     next.intent === 'booking' &&
@@ -471,6 +510,8 @@ module.exports = {
   GOAL_BY_INTENT,
   createBrainState,
   inferIntent,
+  looksLikeHomeEmergency,
+  looksLikeBookingIntent,
   observeCallerTurn,
   setNextBestAction,
   recordRepairFailure,

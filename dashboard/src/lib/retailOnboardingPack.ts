@@ -35,17 +35,17 @@ export const RETAIL_FAQ_STARTERS: FaqEntry[] = [
   {
     question: "Can you hold an item for me?",
     answer:
-      "Yes — tell us the item, your name, and when you will pick up, and we will log a hold.",
+      "Yes. Tell us the item, your name, and when you will pick up, and we will log a hold.",
   },
   {
     question: "Do you deliver?",
     answer:
-      "Yes — same-day in Nairobi for stocked items when available, and countrywide shipping.",
+      "Yes. Same-day in Nairobi for stocked items when available, and countrywide shipping.",
   },
   {
     question: "Can you source a book that is not in stock?",
     answer:
-      "Yes — request the title and we will source it, usually with a free quotation first.",
+      "Yes. Request the title and we will source it, usually with a free quotation first.",
   },
 ];
 
@@ -57,13 +57,13 @@ export function retailStarterPolicies(): BusinessPolicies {
       "Same-day Nairobi delivery for stocked items when available; countrywide shipping on request.",
     deposit:
       "We can hold items for pickup when we have the caller name and pickup time.",
-    returns: "Returns and exchanges follow shop policy — confirm details with the team if unsure.",
+    returns: "Returns and exchanges follow shop policy. Confirm details with the team if unsure.",
     other: "Prices vary by title; special orders get a free quotation before you confirm.",
   };
 }
 
 export function retailUnknownFallback(): string {
-  return "I don't have that exact detail — I can note it for the team or log a hold/enquiry for you.";
+  return "I don't have that exact detail. I can note it for the team or log a hold/enquiry for you.";
 }
 
 /**
@@ -112,14 +112,34 @@ export function defaultAgentNameForBusiness(): string {
   return "Receptionist";
 }
 
+function catalogNameKey(name: string): string {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function mergeHomeServiceCatalog(parsed: ServiceItem[]): ServiceItem[] {
+  const defaults = homeDefaultServices();
+  if (!parsed.length) return defaults;
+  const extras = defaults.filter((row) => {
+    const key = catalogNameKey(row.name);
+    return !parsed.some((item) => {
+      const other = catalogNameKey(item.name);
+      if (!key || !other) return false;
+      return other.includes(key.slice(0, 8)) || key.includes(other.slice(0, 8));
+    });
+  });
+  return [...parsed, ...extras].slice(0, 12);
+}
+
 /** Build a short services catalog from free-text onboarding (or vertical defaults). */
 export function seedServicesFromOnboardingText(
   servicesPricing: string,
   vertical: string
 ): ServiceItem[] {
   const parsed = parseBulkServices(servicesPricing).slice(0, 12);
+  if (vertical === "home_services") return mergeHomeServiceCatalog(parsed);
   if (parsed.length) return parsed;
-  if (vertical === "home_services") return homeDefaultServices();
   if (vertical !== "retail") return [];
   return [
     {
