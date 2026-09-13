@@ -74,5 +74,12 @@ describe("work surface jobs on unified inbox", () => {
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(load, /attachContactIds/);
     assert.match(purpose, /compareInboxSignal/);
+    assert.match(purpose, /if \(!opts\.job\) return copy\.returnCtaOne/);
+    assert.match(purpose, /if \(!opts\.hold\) return copy\.returnCtaOne/);
+    const composer = read("dashboard/src/components/CallerNoteComposer.tsx");
+    assert.match(composer, /Send SMS/);
+    assert.match(composer, /if \(!callerSmsOn\) return null/);
+    assert.match(detail, /smsPrimary/);
+    assert.match(detail, /waPrimary/);
   });
 });

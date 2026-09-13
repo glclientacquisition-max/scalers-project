@@ -37,12 +37,31 @@ function inboxCopy(
     reason: item.headline,
   });
   const openHref = item.callId ? `/calls/${item.callId}?from=${purpose}` : null;
+  const hasJob = Boolean(item.job);
+  const hasHold = Boolean(item.hold);
   const needed = item.hold?.when_text?.trim() || "Anytime";
   const visit = item.job?.when_text?.trim() || "Time TBD";
   const place = item.job?.address_landmark?.trim() || "Ask on the call";
   const stamp = itemSignalLabel(item, vertical);
   const when = formatCallWhenRelative(item.createdAt);
-  return { kind, who, message, openHref, needed, visit, place, stamp, when };
+  const showJob = kind === "job" && hasJob;
+  const showHold = kind === "hold" && hasHold;
+  const showMixed = !showJob && !showHold;
+  return {
+    kind,
+    who,
+    message,
+    openHref,
+    needed,
+    visit,
+    place,
+    stamp,
+    when,
+    hasJob,
+    showJob,
+    showHold,
+    showMixed,
+  };
 }
 
 function InboxTrailingAction({
@@ -108,12 +127,19 @@ export function InboxTableRow({
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
 }) {
-  const { kind, who, message, openHref, needed, visit, place, stamp, when } = inboxCopy(
-    item,
-    purpose,
-    vertical,
-    businessName
-  );
+  const {
+    kind,
+    who,
+    message,
+    openHref,
+    needed,
+    visit,
+    place,
+    stamp,
+    when,
+    hasJob,
+    showHold,
+  } = inboxCopy(item, purpose, vertical, businessName);
   const openLabel = inboxOpenLabel(item);
 
   return (
@@ -129,29 +155,33 @@ export function InboxTableRow({
         <>
           <td className="px-5 py-4 align-top">
             <p className="text-sm font-semibold tracking-tight text-ink">{item.headline}</p>
-            {item.hold ? (
-              <p className="mt-0.5 text-sm text-ink-soft">
-                {holdTypeLabel(item.hold.request_type, vertical)}
-              </p>
-            ) : null}
+            <p className="mt-0.5 text-sm text-ink-soft">
+              {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
+            </p>
           </td>
           <td className="px-5 py-4 align-top font-medium text-ink">
             <WhoName item={item} who={item.callerName || "Caller"} link />
           </td>
-          <td className="px-5 py-4 align-top text-sm text-ink-soft">{needed}</td>
+          <td className="px-5 py-4 align-top text-sm text-ink-soft">
+            {showHold ? needed : when}
+          </td>
         </>
       ) : null}
 
       {kind === "job" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <p className="text-sm font-semibold tracking-tight text-ink">{visit}</p>
+            <p className="text-sm font-semibold tracking-tight text-ink">
+              {hasJob ? visit : stamp}
+            </p>
             <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
           </td>
           <td className="px-5 py-4 align-top font-medium text-ink">
             <WhoName item={item} who={item.callerName || "Caller"} link />
           </td>
-          <td className="px-5 py-4 align-top text-sm text-ink-soft">{place}</td>
+          <td className="px-5 py-4 align-top text-sm text-ink-soft">
+            {hasJob ? place : ""}
+          </td>
         </>
       ) : null}
 
@@ -206,14 +236,10 @@ export function InboxPhoneRow({
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
 }) {
-  const { kind, who, message, openHref, needed, visit, place, stamp, when } = inboxCopy(
-    item,
-    purpose,
-    vertical,
-    businessName
-  );
-  const work = kind === "job" ? item.headline : kind === "hold" ? item.headline : item.headline;
-  const meta = kind === "hold" ? needed : kind === "job" ? visit : when;
+  const { who, message, openHref, needed, visit, place, stamp, when, showJob, showHold, showMixed } =
+    inboxCopy(item, purpose, vertical, businessName);
+  const work = item.headline;
+  const meta = showHold ? needed : showJob ? visit : when;
   const body = (
     <>
       <div className="flex items-baseline justify-between gap-3">
@@ -221,10 +247,10 @@ export function InboxPhoneRow({
         <p className="shrink-0 text-xs text-ink-soft">{meta}</p>
       </div>
       <p className="mt-0.5 line-clamp-2 text-sm text-ink">{work}</p>
-      {kind === "job" ? (
+      {showJob ? (
         <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">{place}</p>
       ) : null}
-      {kind === "mixed" ? (
+      {showMixed ? (
         <p className="mt-1">
           <InboxPurposeChip purpose={item.purpose} label={stamp} />
         </p>

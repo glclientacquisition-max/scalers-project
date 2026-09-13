@@ -262,6 +262,9 @@ export default async function CallDetailPage({
     hold,
     job,
   });
+  const workOnCall = Boolean(job || hold);
+  const smsPrimary = callerSmsOn && !workOnCall;
+  const waPrimary = !workOnCall && !callerSmsOn;
 
   return (
     <div className="max-w-6xl">
@@ -355,23 +358,26 @@ export default async function CallDetailPage({
             </section>
           ) : null}
 
-          <section className="rounded-2xl border border-line bg-surface p-4">
-            <CallerNoteComposer
-              callId={row.id}
-              callerPhone={row.caller_number}
-              callerName={name}
-              service={job?.service_name || hold?.item}
-              when={job?.when_text || hold?.when_text}
-              landmark={job?.address_landmark}
-              callerSmsOn={callerSmsOn}
-            />
-          </section>
+          {callerSmsOn ? (
+            <section className="rounded-2xl border border-line bg-surface p-4">
+              <CallerNoteComposer
+                callId={row.id}
+                callerPhone={row.caller_number}
+                callerName={name}
+                service={job?.service_name || hold?.item}
+                when={job?.when_text || hold?.when_text}
+                landmark={job?.address_landmark}
+                callerSmsOn={callerSmsOn}
+                primary={smsPrimary}
+              />
+            </section>
+          ) : null}
 
           {row.caller_number ? (
             <WhatsAppLink
               number={row.caller_number}
               message={waMessage}
-              variant="primary"
+              variant={waPrimary ? "primary" : "link"}
               label="Reply on WhatsApp"
               className="w-full"
             />

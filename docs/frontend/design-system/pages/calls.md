@@ -9,6 +9,13 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Phone: the text block opens the call. Desktop: Call or Open stays a trailing text link.
 
+Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Return call** and use WhatsApp. Same for holds without a request row.
+
+**Reply vs Confirm (not the same button):**
+- **Confirm:** Books the visit from the list or the call. If Business → Text customers is on, Scalers SMS them the confirmation. That SMS is automatic. It is not a second list button.
+- **WhatsApp:** Opens chat. List verb for return calls. On the call, primary only when there is no visit/hold and Text customers is off.
+- **Send SMS:** Write a text on the call, then send. Shows only if Text customers is on. Primary on the call when there is no visit/hold to Confirm or Done. Not a list verb (needs a body).
+
 Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Human / Answered / All.
 
 Work that needs the owner sorts above answered rows. Visits before holds. Urgent first.

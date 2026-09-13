@@ -22,6 +22,7 @@ export function CallerNoteComposer({
   when,
   landmark,
   callerSmsOn,
+  primary = false,
 }: {
   callId: string;
   callerPhone: string | null;
@@ -30,6 +31,7 @@ export function CallerNoteComposer({
   when?: string | null;
   landmark?: string | null;
   callerSmsOn: boolean;
+  primary?: boolean;
 }) {
   const [note, setNote] = useState("");
   const [polishState, polishAction, polishPending] = useActionState(
@@ -46,10 +48,11 @@ export function CallerNoteComposer({
   }, [polishState.text]);
 
   const canSend = callerSmsOn && Boolean(callerPhone) && note.trim().length > 0;
+  if (!callerSmsOn) return null;
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Note</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">SMS</p>
       <form action={polishAction}>
         <input type="hidden" name="caller_name" value={callerName || ""} />
         <input type="hidden" name="service" value={service || ""} />
@@ -80,9 +83,13 @@ export function CallerNoteComposer({
         <button
           type="submit"
           disabled={sendPending || !canSend}
-          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:bg-[#007ad1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 disabled:opacity-60"
+          className={
+            primary
+              ? "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:bg-[#007ad1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 disabled:opacity-60"
+              : "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-line px-4 text-sm font-medium text-ink transition duration-150 hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] disabled:opacity-60"
+          }
         >
-          {sendPending ? "Sending" : "Send"}
+          {sendPending ? "Sending" : "Send SMS"}
         </button>
       </form>
       {polishState.error ? <p className="text-sm text-warn">{polishState.error}</p> : null}
