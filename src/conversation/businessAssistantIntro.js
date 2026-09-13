@@ -6,15 +6,14 @@
  * 2. Agent named — callers know who is speaking.
  * 3. Offering is compiled from services on file for later turns, not spoken on
  *    the first open (callers drop during a catalog dump).
- * 4. Language match happens after the caller speaks. Do not spend the opener
- *    on an English/Kiswahili invite.
+ * 4. After identity, say they can speak English or Kiswahili (once, in English).
+ *    Then match the language they actually use. Do not open with Habari.
  * 5. English-default on first open — do not lottery-open in Kiswahili before
  *    the caller has spoken (prevents sticky language flip).
  * 6. One invite — how can I help (or message/closed honesty).
- * 7. Closed honesty — identity, closed/bulletin, one question.
+ * 7. Closed honesty — identity, closed/bulletin, language invite, one question.
  */
 
-/** Kept for desk/tests. Not spoken on the first open. */
 const LANGUAGE_INVITE =
   'You can speak in English or Kiswahili.';
 
@@ -176,18 +175,18 @@ function composeBusinessAssistantIntro(opts = {}) {
       afterHoursMode === 'message'
         ? 'I can still take a message. May I have your name?'
         : 'Even so, I can still help. How can I help you?';
-    return `${identity} ${closureNotice} ${follow}`;
+    return `${identity} ${LANGUAGE_INVITE} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === 'message') {
-    return `${identity} We're closed right now, but I can take a message. May I have your name?`;
+    return `${identity} We're closed right now, but I can take a message. ${LANGUAGE_INVITE} May I have your name?`;
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. How can I help you?`;
+    return `${identity} We're closed now, but I can still help. ${LANGUAGE_INVITE} How can I help you?`;
   }
 
-  return `${identity} How can I help you?`;
+  return `${identity} ${LANGUAGE_INVITE} How can I help you?`;
 }
 
 /**
@@ -221,8 +220,9 @@ function introLooksValid(line, businessName, agentName) {
   if (agent && agent.length >= 2 && !/^receptionist$/i.test(agent)) {
     if (!text.toLowerCase().includes(agent.toLowerCase())) return false;
   }
-  // First open must not be Kiswahili-led (language match happens after caller speaks).
+  // First open must not be Kiswahili-led. English invite is required so callers know they can switch.
   if (/^\s*habari\b/i.test(text)) return false;
+  if (!/english or kiswahili/i.test(text)) return false;
   return true;
 }
 

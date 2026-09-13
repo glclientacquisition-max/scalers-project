@@ -1,10 +1,9 @@
 /**
  * Desk mirror of src/conversation/businessAssistantIntro.js
- * Keep rules in sync: brand-first, agent named, one help question.
- * Open and closed: no services list or language invite on the first line.
+ * Keep rules in sync: brand-first, agent named, English/Kiswahili invite, one help question.
+ * Open and closed: no services list. Do not open with Habari.
  */
 
-/** Kept for desk/tests. Not spoken on the first open. */
 export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
 
 export type BusinessAssistantIntroOpts = {
@@ -138,16 +137,16 @@ export function composeBusinessAssistantIntro(
       afterHoursMode === "message"
         ? "I can still take a message. May I have your name?"
         : "Even so, I can still help. How can I help you?";
-    return `${identity} ${closureNotice} ${follow}`;
+    return `${identity} ${LANGUAGE_INVITE} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === "message") {
-    return `${identity} We're closed right now, but I can take a message. May I have your name?`;
+    return `${identity} We're closed right now, but I can take a message. ${LANGUAGE_INVITE} May I have your name?`;
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. How can I help you?`;
+    return `${identity} We're closed now, but I can still help. ${LANGUAGE_INVITE} How can I help you?`;
   }
 
-  return `${identity} How can I help you?`;
+  return `${identity} ${LANGUAGE_INVITE} How can I help you?`;
 }

@@ -22,13 +22,14 @@ How the line opens every unanswered call:
 
 1. Time-of-day opener (Good morning / Hello / Good evening)
 2. Agent named at the business: “this is {agent} at {business}”
-3. One invite: “How can I help you?”
-4. English-default first open. No random Kiswahili opener. Language match starts on the caller’s turn
-5. No service dump and no language invite on the opener (open or closed)
-6. Closed: honesty, then still help
-7. Same line in Desk Test (Settings → Test)
+3. Language invite, once, in English: “You can speak in English or Kiswahili.”
+4. One help question: “How can I help you?”
+5. English-default first open. No random Kiswahili opener. After they speak, match and stay
+6. No service dump on the opener
+7. Closed: honesty, then still help (invite still spoken)
+8. Same line in Desk Test (Settings → Test)
 
-Example: *“Hello, this is Aisha at ChapterOne Bookstore. How can I help you?”*
+Example: *“Hello, this is Aisha at ChapterOne Bookstore. You can speak in English or Kiswahili. How can I help you?”*
 
 Canonical modules: `src/conversation/businessAssistantIntro.js` (voice) and `dashboard/src/lib/businessAssistantIntro.ts` (Desk). Home-services uses the same composer.
 
