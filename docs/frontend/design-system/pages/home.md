@@ -4,7 +4,7 @@
 **Job:** At 08:00 EAT, answer four chunks only.
 
 1. **Is it working** — Line live / Number pending / Needs training. Wallet warn if KES < 200.
-2. **What needs me** — Three exclusive Inbox destinations from the same assemble as Inbox: return calls (Needs you), Holds, Visits or Bookings. Caption is a briefing. When a queue is 1, the unit is the actual job.
+2. **What needs me** — Three exclusive Inbox destinations from the same assemble as Inbox: return calls (Needs you), open Holds, visits still to confirm. Confirmed visits are the Visits book, not this briefing. Caption is a briefing. When a queue is 1, the unit is the actual job.
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 

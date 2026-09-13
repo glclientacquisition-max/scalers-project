@@ -124,7 +124,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
 | `/contacts` | Named callers | Existing contacts surface. Not a CRM. |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
-| `/appointments` | Confirm visits | Redirect `/calls?purpose=job` |
+| `/appointments` | Visits book | Redirect `/calls?purpose=job` |
 | `/settings` | Configure the assistant | Destination menu. One screen. |
 | `/wallet` | Prepaid KES | Token-only from this lane |
 
