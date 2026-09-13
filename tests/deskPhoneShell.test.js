@@ -29,7 +29,11 @@ describe("desk phone shell", () => {
     assert.match(layout, /--desk-tabbar-h/);
     assert.match(layout, /safe-area-inset-bottom/);
     assert.doesNotMatch(layout, /context=\{businessName\}/);
-    assert.match(read("dashboard/src/components/InboxItemRow.tsx"), /export function InboxPhoneRow/);
+    const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");
+    assert.match(inboxRow, /export function InboxPhoneRow/);
+    assert.equal([...inboxRow.matchAll(/InboxTrailingAction item=\{item\} message=\{message\} extra=\{false\}/g)].length, 2);
+    assert.match(read("dashboard/src/components/InboxJobEditor.tsx"), /InboxJobActions id=\{id\} status=\{status\} extra/);
+    assert.match(read("dashboard/src/components/InboxHoldEditor.tsx"), /RequestStatusToggle id=\{id\} status=\{status\} extra/);
     assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /Could not save/);
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /min-h-11/);
     assert.match(root, /viewportFit:\s*"cover"/);

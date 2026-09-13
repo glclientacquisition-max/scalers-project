@@ -203,9 +203,9 @@ export function InboxTableRow({
         </>
       ) : null}
 
-      <td className="px-5 py-4 align-top">
+      <td className="whitespace-nowrap px-5 py-4 align-middle">
         <div className="flex justify-end">
-          <InboxTrailingAction item={item} message={message} extra />
+          <InboxTrailingAction item={item} message={message} extra={false} />
         </div>
       </td>
       <td className="px-5 py-4 align-middle text-right">

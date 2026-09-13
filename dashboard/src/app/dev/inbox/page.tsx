@@ -117,7 +117,7 @@ export default function DevInboxPage() {
             <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Visit</h2>
             <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Otieno</p>
             <div className="mt-3">
-              <InboxJobActions id="job-1" status="requested" />
+              <InboxJobActions id="job-1" status="requested" extra />
             </div>
             <WhatsAppLink
               number="254700000002"
