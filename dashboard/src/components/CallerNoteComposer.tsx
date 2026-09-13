@@ -7,6 +7,7 @@ import {
   type PolishCallerNoteState,
   type SendCallerNoteState,
 } from "@/app/(desk)/calls/noteActions";
+import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
@@ -84,9 +85,7 @@ export function CallerNoteComposer({
           type="submit"
           disabled={sendPending || !canSend}
           className={
-            primary
-              ? "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:bg-[#007ad1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 disabled:opacity-60"
-              : "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-line px-4 text-sm font-medium text-ink transition duration-150 hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] disabled:opacity-60"
+            primary ? `${btnPrimary} flex-1` : `${btnGhost} flex-1 disabled:opacity-60`
           }
         >
           {sendPending ? "Sending" : "Send SMS"}

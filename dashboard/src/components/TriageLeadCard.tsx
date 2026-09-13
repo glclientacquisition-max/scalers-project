@@ -85,13 +85,13 @@ export function TriageLeadCard({
           href={waHref}
           target="_blank"
           rel="noreferrer"
-          className="mt-5 flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-[#0096FF] px-4 py-3.5 text-center text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
+          className="mt-5 flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-[#005CCC] px-4 py-3.5 text-center text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#004AAD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
         >
           <span className="inline-flex items-center gap-2 text-base font-semibold">
             <WhatsAppGlyph className="h-5 w-5 shrink-0" />
             Reply on WhatsApp
           </span>
-          <span className="text-sm font-medium text-white/90">{phone}</span>
+          <span className="text-sm font-medium text-white">{phone}</span>
         </a>
       ) : (
         <p className="mt-5 rounded-xl border border-line bg-surface-muted/50 px-4 py-3 text-center text-sm font-medium text-ink-soft">

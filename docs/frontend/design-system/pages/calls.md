@@ -30,7 +30,7 @@ Columns (`md+` table, same data as the phone row):
 **Icons (Inbox only):**
 - WhatsApp glyph, green on white, `h-11 w-11`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
-- Confirm / Done are text on `#0096FF`, 44px. Cancel lives on the call, not in the list.
+- Confirm / Done are text on `#005CCC`, 44px. Cancel lives on the call, not in the list.
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 

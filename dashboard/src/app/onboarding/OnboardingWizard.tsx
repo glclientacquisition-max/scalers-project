@@ -91,11 +91,9 @@ export function OnboardingWizard() {
               <span
                 className={[
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium transition-colors duration-300",
-                  done
-                    ? "bg-[var(--accent)] text-white"
-                    : active
-                      ? "bg-[var(--accent-deep)] text-white"
-                      : "bg-white border border-[var(--line)] text-[var(--ink-soft)]",
+                  done || active
+                    ? "bg-[var(--accent-deep)] text-white"
+                    : "bg-white border border-[var(--line)] text-[var(--ink-soft)]",
                 ].join(" ")}
               >
                 {i + 1}
@@ -317,7 +315,7 @@ export function OnboardingWizard() {
               type="button"
               disabled={!canAdvance()}
               onClick={() => goTo(step + 1)}
-              className="rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-50"
+              className="rounded-xl bg-[var(--accent-deep)] px-5 py-3 text-white font-medium hover:bg-[#004AAD] transition disabled:opacity-50"
             >
               Continue
             </button>
@@ -325,7 +323,7 @@ export function OnboardingWizard() {
             <button
               type="submit"
               disabled={!canAdvance() || pending}
-              className="rounded-xl bg-[var(--accent)] px-5 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-50"
+              className="rounded-xl bg-[var(--accent-deep)] px-5 py-3 text-white font-medium hover:bg-[#004AAD] transition disabled:opacity-50"
             >
               {pending ? "Opening your line…" : "Finish setup"}
             </button>

@@ -1119,7 +1119,7 @@ export function TenantForm({
                 type="button"
                 onClick={applyBulkServices}
                 disabled={!bulkPreview.length}
-                className="rounded-xl bg-[#0096FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#005ccc] disabled:opacity-50"
+                className="rounded-xl bg-[#005CCC] px-4 py-2 text-sm font-medium text-white hover:bg-[#004AAD] disabled:opacity-50"
               >
                 Add to services
               </button>
@@ -1352,7 +1352,7 @@ export function TenantForm({
                 type="button"
                 onClick={applyBulkProducts}
                 disabled={!bulkProductPreview.length}
-                className="rounded-xl bg-[#0096FF] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-xl bg-[#005CCC] px-4 py-2 text-sm font-medium text-white hover:bg-[#004AAD] disabled:opacity-50"
               >
                 Add to catalogue
               </button>

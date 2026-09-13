@@ -6,6 +6,7 @@ import {
   type AppointmentScheduleState,
 } from "@/app/(desk)/appointments/actions";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { btnPrimary } from "@/components/ui/deskChrome";
 
 const initial: AppointmentScheduleState = {};
 
@@ -59,7 +60,7 @@ export function InboxJobEditor({
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:bg-[#007ad1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2 disabled:opacity-60"
+          className={`${btnPrimary} w-full`}
         >
           {pending ? "Saving" : "Save"}
         </button>

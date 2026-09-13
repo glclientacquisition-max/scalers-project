@@ -3,6 +3,8 @@
  * Renders the caller number with a green WhatsApp deep link (https://wa.me/<digits>).
  */
 
+import { btnPrimary } from "@/components/ui/deskChrome";
+
 export function waMeHref(rawNumber: string, message?: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
   if (digits.length < 9) return null;
@@ -94,10 +96,7 @@ export function WhatsAppLink({
         target="_blank"
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
-        className={[
-          "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:bg-[#007ad1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
-          className,
-        ].join(" ")}
+        className={[btnPrimary, "gap-2", className].join(" ")}
       >
         <WhatsAppIcon className="h-4 w-4 text-white" />
         {label || "WhatsApp"}

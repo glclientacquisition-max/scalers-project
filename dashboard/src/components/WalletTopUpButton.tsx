@@ -37,7 +37,7 @@ export function WalletTopUpButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
+        className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl bg-[#005CCC] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#004AAD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2"
       >
         Top up
       </button>
@@ -118,7 +118,7 @@ export function WalletTopUpButton({
               <button
                 type="submit"
                 disabled={pending || !topUpEnabled}
-                className="inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-[#0096FF] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0088e8] disabled:opacity-60"
+                className="inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl bg-[#005CCC] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#004AAD] disabled:opacity-60"
               >
                 {pending
                   ? "Starting…"
