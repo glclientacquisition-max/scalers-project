@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
@@ -94,6 +95,24 @@ function InboxTrailingAction({
   return null;
 }
 
+function CallWorkLink({
+  href,
+  children,
+}: {
+  href: string | null;
+  children: ReactNode;
+}) {
+  if (!href) return <>{children}</>;
+  return (
+    <Link
+      href={href}
+      className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+    >
+      {children}
+    </Link>
+  );
+}
+
 function WhoName({
   item,
   who,
@@ -154,10 +173,12 @@ export function InboxTableRow({
       {kind === "hold" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <p className="text-sm font-semibold tracking-tight text-ink">{item.headline}</p>
-            <p className="mt-0.5 text-sm text-ink-soft">
-              {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
-            </p>
+            <CallWorkLink href={openHref}>
+              <p className="text-sm font-semibold tracking-tight text-ink">{item.headline}</p>
+              <p className="mt-0.5 text-sm text-ink-soft">
+                {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
+              </p>
+            </CallWorkLink>
           </td>
           <td className="px-5 py-4 align-top font-medium text-ink">
             <WhoName item={item} who={item.callerName || "Caller"} link />
@@ -171,10 +192,12 @@ export function InboxTableRow({
       {kind === "job" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <p className="text-sm font-semibold tracking-tight text-ink">
-              {hasJob ? visit : stamp}
-            </p>
-            <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
+            <CallWorkLink href={openHref}>
+              <p className="text-sm font-semibold tracking-tight text-ink">
+                {hasJob ? visit : stamp}
+              </p>
+              <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
+            </CallWorkLink>
           </td>
           <td className="px-5 py-4 align-top font-medium text-ink">
             <WhoName item={item} who={item.callerName || "Caller"} link />
@@ -191,10 +214,12 @@ export function InboxTableRow({
             <p className="text-sm font-semibold tracking-tight text-ink">
               <WhoName item={item} who={who} link />
             </p>
-            <p className="mt-0.5 text-sm text-ink">{item.headline}</p>
-            {item.detail ? (
-              <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
-            ) : null}
+            <CallWorkLink href={openHref}>
+              <p className="mt-0.5 text-sm text-ink">{item.headline}</p>
+              {item.detail ? (
+                <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
+              ) : null}
+            </CallWorkLink>
           </td>
           <td className="px-5 py-4 align-top">
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
