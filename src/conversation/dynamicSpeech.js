@@ -109,7 +109,7 @@ You MUST include the exact business name "${businessName}".
 You MUST include your name ${agentName}.
 Do not use IVR lines like "you've reached" or "thank you for calling".
 Do not list services or prices in the greeting. Grounded offerings wait until they ask.
-Do not say they can speak in English or Kiswahili. Match language after they talk.
+You MUST say exactly: "You can speak in English or Kiswahili."
 It is ${tod} in Nairobi. ${openLine}
 Use clear English for this first greeting (the caller has not spoken yet — do not open with Habari).
 No quotes, no markdown, never say "the business" as a placeholder.

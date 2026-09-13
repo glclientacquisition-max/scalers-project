@@ -854,8 +854,8 @@ function formatVisitTimeProblem(code, hours, language) {
     const next = hours.nextOpen?.label;
     if (sw) {
       return next
-        ? `Tuko closed siku ya ${closedDay}. ${next} ingefaa?`
-        : `Tuko closed siku ya ${closedDay}. Niambie siku ya kazi.`;
+        ? `Tuko tumefunga siku ya ${closedDay}. ${next} ingefaa?`
+        : `Tuko tumefunga siku ya ${closedDay}. Niambie siku ya kazi.`;
     }
     if (sheng) {
       return next
@@ -869,7 +869,7 @@ function formatVisitTimeProblem(code, hours, language) {
   if (code === 'outside_hours') {
     const until = hours.closeLabel || 'close';
     if (sw) {
-      return `Tuko open hadi ${until}. Huo muda uko nje ya masaa. Ungependa muda kabla ya ${until}?`;
+      return `Tuko wazi hadi ${until}. Huo muda uko nje ya masaa. Ungependa muda kabla ya ${until}?`;
     }
     if (sheng) {
       return `Tuko open hadi ${until}. Hiyo time iko nje ya hours. Time kabla ya ${until}?`;
@@ -878,7 +878,7 @@ function formatVisitTimeProblem(code, hours, language) {
   }
   if (code === 'currently_closed') {
     if (sw) {
-      return 'Tuko closed sasa. Naweza kuchukua ombi la ziara wakati wa kazi.';
+      return 'Tuko tumefunga sasa. Naweza kuchukua ombi la ziara wakati wa kazi.';
     }
     if (sheng) {
       return 'Tuko closed saa hii. Naweza take visit request wakati wa normal hours.';

@@ -22,13 +22,13 @@ describe('business assistant introduction', () => {
     assert.match(line, /this is Aisha at ChapterOne Bookstore/i);
     assert.match(line, /How can I help you/i);
     assert.doesNotMatch(line, /you've reached/i);
-    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.match(line, /You can speak in English or Kiswahili/i);
     assert.doesNotMatch(line, /We help with/i);
     assert.doesNotMatch(line, /^\s*Habari/i);
     assert.ok(introLooksValid(line, 'ChapterOne Bookstore', 'Aisha'));
   });
 
-  it('keeps the language invite constant but does not speak it on first open', () => {
+  it('speaks the English or Kiswahili invite on first open', () => {
     const { LANGUAGE_INVITE } = require('../src/conversation/businessAssistantIntro');
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',
@@ -38,8 +38,9 @@ describe('business assistant introduction', () => {
       variant: 0,
     });
     assert.equal(LANGUAGE_INVITE, 'You can speak in English or Kiswahili.');
-    assert.doesNotMatch(line, /You can speak in English or Kiswahili\./);
+    assert.match(line, /You can speak in English or Kiswahili\./);
     assert.match(line, /How can I help/);
+    assert.doesNotMatch(line, /^\s*Habari/i);
   });
 
   it('adds a short grounded offering from the services catalog', () => {
@@ -81,7 +82,7 @@ describe('business assistant introduction', () => {
     assert.match(line, /this is Aisha at ChapterOne Bookstore/i);
     assert.match(line, /How can I help/i);
     assert.doesNotMatch(line, /We help with/i);
-    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.match(line, /English or Kiswahili/i);
     assert.doesNotMatch(line, /delivery/i);
   });
 
@@ -110,7 +111,7 @@ describe('business assistant introduction', () => {
     assert.match(line, /^Good morning,/);
   });
 
-  it('states closed honestly then still helps without services or language invite', () => {
+  it('states closed honestly then still helps without a services dump', () => {
     const line = composeBusinessAssistantIntro({
       businessName: 'ChapterOne Bookstore',
       agentName: 'Aisha',
@@ -129,7 +130,7 @@ describe('business assistant introduction', () => {
     assert.match(line, /still help/i);
     assert.match(line, /How can I help you/i);
     assert.doesNotMatch(line, /We help with/i);
-    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.match(line, /English or Kiswahili/i);
     assert.ok(introLooksValid(line, 'ChapterOne Bookstore', 'Aisha'));
   });
 
@@ -146,7 +147,7 @@ describe('business assistant introduction', () => {
     assert.match(line, /take a message/i);
     assert.match(line, /May I have your name/i);
     assert.doesNotMatch(line, /We help with/i);
-    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.match(line, /English or Kiswahili/i);
   });
 
   it('closed bulletin opener stays short', () => {
@@ -161,7 +162,7 @@ describe('business assistant introduction', () => {
     });
     assert.match(line, /closed for inventory/i);
     assert.doesNotMatch(line, /We help with/i);
-    assert.doesNotMatch(line, /English or Kiswahili/i);
+    assert.match(line, /English or Kiswahili/i);
   });
 
   it('preview is deterministic for Desk Test', () => {
@@ -194,6 +195,14 @@ describe('business assistant introduction', () => {
     assert.equal(
       introLooksValid(
         'Habari, you have reached ChapterOne Bookstore, this is Aisha at ChapterOne Bookstore.',
+        'ChapterOne Bookstore',
+        'Aisha'
+      ),
+      false
+    );
+    assert.equal(
+      introLooksValid(
+        'Hello, this is Aisha at ChapterOne Bookstore. How can I help you?',
         'ChapterOne Bookstore',
         'Aisha'
       ),

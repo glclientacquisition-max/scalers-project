@@ -64,7 +64,7 @@ async function smokeOperationalBooking() {
   });
   checkLine('operational greeting', greeting, {
     allowLong: true,
-    mustInclude: [/this is Shy at Done and Dusted/i, /How can I help you/i],
+    mustInclude: [/this is Shy at Done and Dusted/i, /English or Kiswahili/i, /How can I help you/i],
   });
 
   const progress = pickActionProgress('CREATE_REQUEST', 'en');

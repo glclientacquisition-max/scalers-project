@@ -38,6 +38,12 @@ const SWAHILI_MARKERS = [
   'bei gani',
   'nina hitaji',
   'nataka msaada',
+  'kusafisha',
+  'nisaidie',
+  'njoo',
+  'kuja',
+  'ako',
+  'siku',
 ];
 
 const SHENG_MARKERS = [
@@ -57,7 +63,7 @@ const SHENG_MARKERS = [
   'msee wangu',
 ];
 
-const ENGLISH_MARKERS = [
+const ENGLISH_CORE_MARKERS = [
   'hello',
   'hi',
   'hey',
@@ -68,16 +74,6 @@ const ENGLISH_MARKERS = [
   'want',
   'looking for',
   'how much',
-  'price',
-  'cost',
-  'available',
-  'appointment',
-  'booking',
-  'service',
-  'plumber',
-  'plumbing',
-  'electrical',
-  'cleaning',
   'my name',
   'i am',
   "i'm",
@@ -91,6 +87,28 @@ const ENGLISH_MARKERS = [
   'no',
   'okay',
   'ok',
+];
+
+/** English job nouns Kenyans keep inside Kiswahili. Do not treat as English. */
+const ENGLISH_JOB_LOANWORDS = [
+  'cleaning',
+  'plumber',
+  'plumbing',
+  'electrical',
+  'appointment',
+  'booking',
+  'service',
+  'services',
+  'price',
+  'cost',
+  'available',
+  'carpet',
+  'couch',
+  'mattress',
+  'sofa',
+  'airbnb',
+  'visit',
+  'emergency',
 ];
 
 const {
@@ -181,8 +199,10 @@ function analyzeCallerLanguage(text) {
   }
 
   let swHits = countMarkers(raw, SWAHILI_MARKERS);
-  let enHits = countMarkers(raw, ENGLISH_MARKERS);
+  let enHits = countMarkers(raw, ENGLISH_CORE_MARKERS);
+  const loanHits = countMarkers(raw, ENGLISH_JOB_LOANWORDS);
   const shengHits = countMarkers(raw, SHENG_MARKERS);
+  if (swHits === 0) enHits += loanHits;
 
   if (
     !swHits &&
@@ -239,8 +259,17 @@ function createLanguageState() {
 
 function resolveLanguageState(previous, evidence) {
   const state = { ...createLanguageState(), ...(previous || {}) };
-  const detected = evidence?.language || 'unknown';
-  const confidence = Number(evidence?.confidence || 0);
+  let detected = evidence?.language || 'unknown';
+  let confidence = Number(evidence?.confidence || 0);
+  const scores = evidence?.scores || {};
+  const swScore = Number(scores.sw || 0);
+  const enScore = Number(scores.en || 0);
+  if (detected === 'mixed' && swScore > 0 && swScore >= enScore) {
+    detected = 'sw';
+    confidence = Math.max(confidence, 0.82);
+  } else if (detected === 'mixed' && enScore > swScore) {
+    detected = 'en';
+  }
   state.detected = detected;
 
   if (detected === 'unknown' || detected === 'mixed') {
@@ -365,7 +394,7 @@ function languageDirective(lang) {
     return 'Language cue: caller is using English — reply in clear Kenyan English that is easy to say on a phone.';
   }
   if (lang === 'sw') {
-    return 'Language cue: caller is using Kiswahili — reply in natural Kiswahili with short, easy-to-pronounce sentences.';
+    return 'Language cue: caller is using Kiswahili. Reply in natural Kiswahili only until they switch. Job nouns like carpet, Airbnb, or mattress may stay in English. Short easy sentences. Do not return to English for the same turn.';
   }
   if (lang === 'sheng') {
     return 'Language cue: caller is using Sheng — reply in light natural Sheng, short and clear; keep slang sparse so it stays easy to pronounce.';

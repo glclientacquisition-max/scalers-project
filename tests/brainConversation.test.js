@@ -174,7 +174,7 @@ describe('multi-turn Brain outcomes', () => {
 
     languageState = resolveLanguageState(
       languageState,
-      analyzeCallerLanguage('Nataka kujua bei gani tafadhali')
+      analyzeCallerLanguage('Nataka cleaning kesho')
     );
     assert.equal(languageState.current, 'sw');
     assert.equal(languageState.switchCount, 1);

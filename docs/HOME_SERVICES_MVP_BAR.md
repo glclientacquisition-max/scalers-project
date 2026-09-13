@@ -32,7 +32,7 @@ Hospitality (rooms, tables) is a **different vertical**. Do not fold it into thi
 
 Every home-services DID must do this without a niche-specific playbook:
 
-1. **Intro:** `{Good morning|Hello|Good evening}, this is {agent} at {business}. How can I help you?` No service dump. No language invite on the opener.
+1. **Intro:** `{Good morning|Hello|Good evening}, this is {agent} at {business}. You can speak in English or Kiswahili. How can I help you?` No service dump. English first. Then match the caller and stay.
 2. **Hours / closed:** From schedule + bulletin. Honesty, then still help.
 3. **We come to you / coverage:** From locations + policies. Outside area: decline or note a callback. Never promise a visit off-map.
 4. **Price:** `price_range` from SERVICES, or “quoted on site”. Never a made-up shilling amount.
@@ -97,7 +97,7 @@ Call the home-services DID. Log SID, pass/fail.
 
 | # | Say | Pass if |
 | --- | --- | --- |
-| 0 | *(listen)* | Brand + agent. No service list. No language invite. |
+| 0 | *(listen)* | Brand + agent. English/Kiswahili invite. No service list. No Habari. |
 | 1 | “Are you open Saturday?” | Hours from file. No forced name. |
 | 2 | “Do you cover [area you do]?” | Honest coverage. |
 | 3 | “Do you cover [area you don’t]?” | Decline or callback. No fake visit. |
@@ -110,7 +110,7 @@ Call the home-services DID. Log SID, pass/fail.
 | 10 | “Urgent Airbnb clean tomorrow” | Visit, not emergency escalate. |
 | 11 | “Burst pipe, kitchen flooding” | Escalate path. No fake ETA. |
 | 12 | Closed day / late night time | Not persisted. Offer another time. |
-| 13 | One Kiswahili turn | Language match after the caller speaks. |
+| 13 | “Nataka cleaning kesho” | Reply in Kiswahili and stay. Job nouns may stay English. |
 
 **Home GO:** `test:mvp` green + Train has real services/hours/coverage/notify + pass **0, 1, 6, 10, 11, 12** every time + ≥10/14 overall + one real owner SMS/WA/email with job + when + place.  
 **Home NO-GO:** invented price/ETA/coverage; “urgent clean” treated as emergency; false “saved/booked”; silent miss on a complete book; Sunday persisted.
