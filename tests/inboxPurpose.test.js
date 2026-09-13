@@ -261,6 +261,35 @@ describe("inbox purpose", () => {
   });
 });
 
+function inboxNeedsYou({ purpose, leadStatus, hold, job }) {
+  if (purpose === "answered") return false;
+  const jobStatus = String(job?.status || "").toLowerCase();
+  const holdStatus = String(hold?.status || "").toLowerCase();
+  if (job && jobStatus === "requested") return true;
+  if (hold && holdStatus === "open") return true;
+  const leadOpen = leadStatus !== "resolved" && leadStatus !== "archived";
+  if (purpose === "job" && !job && leadOpen) return true;
+  if (purpose === "hold" && !hold && leadOpen) return true;
+  if (purpose === "human" && leadOpen) return true;
+  if (purpose === "missed" && leadOpen) return true;
+  return false;
+}
+
+function itemMatchesPurpose(item, filter) {
+  if (filter === "all") return true;
+  if (filter === "needs") return item.needsYou;
+  if (filter === "hold") {
+    return Boolean(item.hold) && String(item.hold.status || "").toLowerCase() === "open";
+  }
+  if (filter === "job") {
+    const status = String(item.job?.status || "").toLowerCase();
+    return Boolean(item.job) && (status === "requested" || status === "confirmed");
+  }
+  if (filter === "human") return item.purpose === "human" || item.purpose === "missed";
+  if (filter === "answered") return item.purpose === "answered";
+  return true;
+}
+
 describe("inbox signal", () => {
   it("names the next action instead of Job or Hold", () => {
     assert.equal(signalLabel({ purpose: "job", job: { status: "requested" } }), "Confirm visit");
@@ -318,5 +347,47 @@ describe("inbox signal", () => {
     const now = new Date("2026-09-07T12:00:00+03:00");
     assert.match(formatCallWhenRelative("2026-09-07T08:00:00+03:00", now), /^Today /);
     assert.match(formatCallWhenRelative("2026-09-06T18:00:00+03:00", now), /^Yesterday /);
+  });
+});
+
+describe("inbox piles", () => {
+  it("keeps Needs you as open decisions only", () => {
+    assert.equal(
+      inboxNeedsYou({ purpose: "job", job: { status: "requested" } }),
+      true
+    );
+    assert.equal(
+      inboxNeedsYou({ purpose: "job", job: { status: "confirmed" } }),
+      false
+    );
+    assert.equal(
+      inboxNeedsYou({ purpose: "hold", hold: { status: "open" } }),
+      true
+    );
+    assert.equal(
+      inboxNeedsYou({ purpose: "hold", hold: { status: "fulfilled" } }),
+      false
+    );
+    assert.equal(inboxNeedsYou({ purpose: "human", leadStatus: "new" }), true);
+  });
+
+  it("puts confirmed visits in Visits not Needs you", () => {
+    const booked = { needsYou: false, job: { status: "confirmed" }, purpose: "job" };
+    const pending = { needsYou: true, job: { status: "requested" }, purpose: "job" };
+    const done = { needsYou: false, job: { status: "done" }, purpose: "job" };
+    const intentOnly = { needsYou: true, job: null, purpose: "job" };
+    assert.equal(itemMatchesPurpose(pending, "needs"), true);
+    assert.equal(itemMatchesPurpose(pending, "job"), true);
+    assert.equal(itemMatchesPurpose(booked, "needs"), false);
+    assert.equal(itemMatchesPurpose(booked, "job"), true);
+    assert.equal(itemMatchesPurpose(done, "job"), false);
+    assert.equal(itemMatchesPurpose(intentOnly, "job"), false);
+  });
+
+  it("puts open holds in Holds and leaves fulfilled out", () => {
+    const open = { hold: { status: "open" }, purpose: "hold" };
+    const fulfilled = { hold: { status: "fulfilled" }, purpose: "hold" };
+    assert.equal(itemMatchesPurpose(open, "hold"), true);
+    assert.equal(itemMatchesPurpose(fulfilled, "hold"), false);
   });
 });

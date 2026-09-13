@@ -18,6 +18,16 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 
 Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Human / Answered / All.
 
+**Piles (one question each):**
+- **Needs you:** Open work. A decision is still on you. Unconfirmed visits, open holds, return calls, human asked. Confirmed visits leave this pile.
+- **Visits / Bookings:** The live book. Requested (still to confirm) and confirmed (booked). After Confirm the row stays here, not in Needs you. Done and cancelled leave the book.
+- **Holds:** Open items to fulfill. Fulfilled and cancelled leave this pile.
+- **Human:** Person asked or missed.
+- **Answered:** The receptionist closed it. No owner action.
+- **All:** Everything, including Done.
+
+Needs you is not a history. Older open work stays until you Confirm, Done, or reply.
+
 Work that needs the owner sorts above answered rows. Visits before holds. Urgent first.
 
 `hold_or_pickup` and `order_enquiry` are Holds. `product_inquiry` is Answered, not Needs you.

@@ -261,11 +261,13 @@ export function summarizeInboxWork(items: InboxItem[]): {
   nextJob: InboxItem | null;
 } {
   const needs = items.filter((item) => item.needsYou);
-  const toReturn = needs.filter(
-    (item) => item.purpose === "human" || item.purpose === "missed"
+  const toConfirm = needs.filter(
+    (item) => item.job && String(item.job.status || "").toLowerCase() === "requested"
   );
-  const toFulfill = needs.filter((item) => item.purpose === "hold");
-  const toConfirm = needs.filter((item) => item.purpose === "job");
+  const toFulfill = needs.filter(
+    (item) => item.hold && String(item.hold.status || "").toLowerCase() === "open"
+  );
+  const toReturn = needs.filter((item) => !item.job && !item.hold);
   return {
     needs: needs.length,
     toReturn: toReturn.length,
@@ -330,9 +332,7 @@ export function inboxNeedsYou(opts: {
   if (opts.purpose === "answered") return false;
   const jobStatus = String(opts.job?.status || "").toLowerCase();
   const holdStatus = String(opts.hold?.status || "").toLowerCase();
-  if (opts.job && (jobStatus === "requested" || jobStatus === "confirmed")) {
-    return true;
-  }
+  if (opts.job && jobStatus === "requested") return true;
   if (opts.hold && holdStatus === "open") return true;
   if (opts.purpose === "job" && !opts.job && leadStillOpen(opts.leadStatus)) {
     return true;
@@ -512,8 +512,13 @@ export function itemMatchesPurpose(
 ): boolean {
   if (filter === "all") return true;
   if (filter === "needs") return item.needsYou;
-  if (filter === "hold") return item.purpose === "hold";
-  if (filter === "job") return item.purpose === "job";
+  if (filter === "hold") {
+    return String(item.hold?.status || "").toLowerCase() === "open";
+  }
+  if (filter === "job") {
+    const status = String(item.job?.status || "").toLowerCase();
+    return status === "requested" || status === "confirmed";
+  }
   if (filter === "human") return item.purpose === "human" || item.purpose === "missed";
   if (filter === "answered") return item.purpose === "answered";
   return true;
@@ -530,8 +535,8 @@ export function countInboxPurposes(items: InboxItem[]): Record<InboxPurposeFilte
   };
   for (const item of items) {
     if (item.needsYou) counts.needs += 1;
-    if (item.purpose === "hold") counts.hold += 1;
-    if (item.purpose === "job") counts.job += 1;
+    if (itemMatchesPurpose(item, "hold")) counts.hold += 1;
+    if (itemMatchesPurpose(item, "job")) counts.job += 1;
     if (item.purpose === "human" || item.purpose === "missed") counts.human += 1;
     if (item.purpose === "answered") counts.answered += 1;
   }
