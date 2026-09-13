@@ -22,7 +22,7 @@ Brand primary: `#0096FF`.
 
 ## 3. ACTION VELOCITY (FITTS'S LAW)
 
-- **Primary CTA:** The primary task-completing action on any screen (e.g. "Reply on WhatsApp", "Save") must be the largest hit area, styled in brand primary blue (`#0096FF`).
+- **Primary CTA:** The primary task-completing action on any screen (e.g. "Reply on WhatsApp", "Save") must be the largest hit area, filled `#005CCC` with a white label. `#0096FF` is the brand ribbon, focus ring, and tab underline.
 - **Action docking:** Submit buttons must be docked tightly to the input fields they control. Global save buttons must be sticky, anchored to the top right of the viewport.
 - **Secondary action muting:** Destructive or secondary actions (Cancel, Archive, Remove) must be muted ghost buttons, text links, or icon-only buttons to reduce visual noise and prevent misclicks.
 

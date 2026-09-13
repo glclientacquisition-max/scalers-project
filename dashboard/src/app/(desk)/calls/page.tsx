@@ -25,6 +25,7 @@ import {
   parseWeekParam,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
+import { btnPrimary } from "@/components/ui/deskChrome";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -86,7 +87,7 @@ function EmptyInbox({
         <p className="font-display text-2xl tracking-tight text-ink">Number being assigned</p>
         <Link
           href={businessSettingsHref("train")}
-          className="mt-6 inline-flex min-h-11 rounded-xl bg-[#0096FF] px-5 text-sm font-semibold text-white transition duration-150 hover:bg-[#0088e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+          className={`${btnPrimary} mt-6 px-5`}
         >
           Train
         </Link>

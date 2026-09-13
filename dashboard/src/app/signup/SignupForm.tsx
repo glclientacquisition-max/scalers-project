@@ -103,7 +103,7 @@ export function SignupForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-white font-medium hover:bg-[var(--accent-deep)] transition disabled:opacity-60"
+        className="w-full rounded-xl bg-[var(--accent-deep)] px-4 py-3 text-white font-medium hover:bg-[#004AAD] transition disabled:opacity-60"
       >
         {pending ? "Creating workspace…" : "Create Scalers workspace"}
       </button>

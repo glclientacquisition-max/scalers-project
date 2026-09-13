@@ -109,7 +109,7 @@ export function InboxToolbar({
             className={[
               "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
               !weekView
-                ? "bg-[#0096FF] font-semibold text-white"
+                ? "bg-[#005CCC] font-semibold text-white"
                 : "border border-line text-ink hover:border-[#0096FF]",
             ].join(" ")}
           >
@@ -125,7 +125,7 @@ export function InboxToolbar({
             className={[
               "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
               weekView
-                ? "bg-[#0096FF] font-semibold text-white"
+                ? "bg-[#005CCC] font-semibold text-white"
                 : "border border-line text-ink hover:border-[#0096FF]",
             ].join(" ")}
           >

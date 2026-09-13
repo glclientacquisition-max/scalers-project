@@ -66,7 +66,7 @@ export function OnDemandUsagePanel({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-xl bg-[#0096FF] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0088e8] disabled:opacity-60"
+          className="rounded-xl bg-[#005CCC] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#004AAD] disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save"}
         </button>

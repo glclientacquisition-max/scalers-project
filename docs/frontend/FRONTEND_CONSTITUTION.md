@@ -30,7 +30,7 @@ Cross-referenced. Product rules win when sources disagree.
 | --- | --- | --- | --- |
 | Working memory ~4 chunks | Cowan, *The Magical Number 4*, BBS 2001; Nielsen, *Cognitive Load Is a Budget* (2025) | Home answers at most four questions. Nav is the shipped destinations, at most five. | Miller 7±2 as a dashboard widget quota |
 | Cognitive load types | Sweller 1988; Sweller, van Merriënboer, Paas 1998 | Cut **extraneous** load (fluff, dual layouts, dead fetches). Spend **germane** load on “what needs me.” | Decorative mesh, glass, competing CTAs |
-| Fitts’s law | Fitts 1954; WCAG 2.2 SC 2.5.8 / 2.5.5; Apple HIG 44pt; Material 48dp + 8dp gap | Primary CTA: largest hit, `#0096FF`, docked to its field. Floor **44×44 CSS px** for primary/secondary actions. Table icon actions: **32×32** minimum (passes 24×24 AA if isolated). | Tiny adjacent ghost buttons |
+| Fitts’s law | Fitts 1954; WCAG 2.2 SC 2.5.8 / 2.5.5; Apple HIG 44pt; Material 48dp + 8dp gap | Primary CTA: largest hit, fill `#005CCC`, docked to its field. Floor **44×44 CSS px** for primary/secondary actions. Table icon actions: **32×32** minimum (passes 24×24 AA if isolated). | Tiny adjacent ghost buttons |
 | Hick’s law | Hick 1952; Hyman 1953 | One layout per dataset. One primary action per screen. Nested nav uses a sidebar with non-clickable category headers. | A left desk rail, or a second nav tree for phone. Bottom tabs are the same `DESK_LINKS`. |
 | Gestalt: proximity, similarity, common region, continuity | Wertheimer; Carbon spacing overview; Atlassian spacing | Related items sit on the 8px scale (8–12px). Groups use 16–24px. Sections use 32–48px. Tables share one chrome. | Card stacks for the same job as a table |
 | Von Restorff (isolation) | von Restorff 1933 | Only the primary action is saturated blue. Archive/Cancel/Remove stay ghost or icon. | Two blue buttons in one viewport |
@@ -41,7 +41,7 @@ Cross-referenced. Product rules win when sources disagree.
 | Aesthetic-usability | Kurosu & Kashimura 1995; Tractinsky | Calm light canvas, 1px lines, no novelty chrome. | Glassmorphism, Plus Jakarta, orange CTA |
 | Peak-end rule | Kahneman | Empty and error states must still name the next action. | Dead ends and hash links that 404 the intent |
 | Doherty threshold | Doherty & Thadhani 1982 | Pending spinners on mutations. No landing-style rise on desk. | Page-wide animation |
-| Color / contrast | WCAG 2.2 SC 1.4.3, 1.4.11 | Ink `#0A192F` on canvas. Link text `#005CCC`. `#0096FF` on white is **~3.09:1** (fails AA body text; passes AA large text). Never use `#0096FF` for small links. White on `#0096FF` is the same ratio: primary buttons use **≥16px semibold** and **min-height 44px**. | Brand-blue body copy |
+| Color / contrast | WCAG 2.2 SC 1.4.3, 1.4.11 | Ink `#0A192F` on canvas. Link text `#005CCC`. `#0096FF` on white is **~3.09:1** (fails AA body and `text-sm` button labels). Filled primaries use white on `#005CCC` (~6:1). `#0096FF` is the focus ring, tab underline, and brand wash. Never use `#0096FF` for small links. | Brand-blue body copy; white on `#0096FF` |
 | Touch / Kenya mobile | Apple 44pt; Material 48dp; WCAG 2.5.8 24px | Design for one-thumb morning triage on a mid-range Android. Container `px-4` / `sm:px-6`. | Hover-only actions |
 | Reduced motion | WCAG 2.2 SC 2.3.3 | `prefers-reduced-motion` already kills landing motion. Desk adds no new loops except the existing bulletin ping. | Orbs, drift, blobs on desk |
 | Situation awareness | Endsley 1995; Klein RPD | Stamps and captions name the **next action** (comprehension). Home units name what is at risk now (projection). | KPI tiles, conversion dashboards, taxonomy chips (Job, Hold) |
@@ -54,7 +54,7 @@ From `.cursor/rules/scalers-design-ux.mdc`:
 
 1. **Copy:** No fluff, no instructional subheaders, no em/en dashes in UI strings. Labels are verbs or nouns the owner already knows.
 2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side; mobile may stack the same two panes.
-3. **Action:** Primary CTA `#0096FF`, largest hit. Sticky Save top-right under the desk header. Secondary actions muted.
+3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted.
 4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail. Sidebar category titles: `uppercase tracking-wide text-gray-500` (or `text-ink-soft`), no hover, not links.
 5. **Tech:** Tailwind utilities only for layout/chrome. Focus: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`. Container padding `p-4`–`p-6`.
 
@@ -87,7 +87,8 @@ Base unit **8px**, same as IBM Carbon, Atlassian, and Material. Tailwind already
 | Body | DM Sans `--font-sans` | 14px (`text-sm`) default in tables |
 | Display | Sora `--font-display` | `h1`–`h3` and page titles only. Desk titles `text-3xl sm:text-4xl`, not marketing clamp explosions |
 | Meta | `text-xs uppercase tracking-wide text-ink-soft` | Non-clickable sidebar headers |
-| Primary fill | `#0096FF` | Buttons, active tab underline, focus ring |
+| Primary fill | `#005CCC` | Filled buttons and selected chips. White label. |
+| Brand ribbon | `#0096FF` | Focus ring, active tab underline, washes |
 | Primary text on light | `#005CCC` | Links, active tab label |
 | Ink | `#0A192F` | Body |
 | Canvas | `#F4F7FB` | Page |

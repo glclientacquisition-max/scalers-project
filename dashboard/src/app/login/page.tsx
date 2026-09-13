@@ -49,7 +49,7 @@ export default function LoginPage({
           <LoginError searchParams={searchParams} />
           <button
             type="submit"
-            className="w-full rounded-xl bg-accent px-4 py-3 font-medium text-white transition hover:bg-accent-deep focus-visible:outline-none focus-visible:shadow-focus"
+            className="w-full rounded-xl bg-accent-deep px-4 py-3 font-medium text-white transition hover:bg-[#004AAD] focus-visible:outline-none focus-visible:shadow-focus"
           >
             Sign in
           </button>

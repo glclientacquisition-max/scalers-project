@@ -16,7 +16,7 @@ export default function SettingsError({
       <button
         type="button"
         onClick={reset}
-        className="mt-4 rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0088e8]"
+        className="mt-4 rounded-xl bg-[#005CCC] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#004AAD]"
       >
         Try again
       </button>

@@ -32,7 +32,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Max width | | `max-w-desk` (72rem) |
 | Radius | | `rounded-panel` (0.875rem) |
 
-**Dialect:** Prefer `text-ink`, `bg-surface`, `border-line`, `bg-[#0096FF]`. Migrate `text-[var(--ink)]` when touching a file. Do not global-replace.
+**Dialect:** Prefer `text-ink`, `bg-surface`, `border-line`, filled primary `bg-[#005CCC]`. Migrate `text-[var(--ink)]` when touching a file. Do not global-replace.
 
 **Shared class strings:** `dashboard/src/components/ui/deskChrome.ts`. Settings fields stay in `settingsUi.tsx` but must use the same focus ring.
 
@@ -71,7 +71,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 
 | Pattern | Implementation |
 | --- | --- |
-| Primary button | `btnPrimary` in `deskChrome.ts`: `#0096FF`, `min-h-11`, white label |
+| Primary button | `btnPrimary` in `deskChrome.ts`: fill `#005CCC`, `min-h-11`, white label. Focus ring `#0096FF`. |
 | Ghost / secondary | `btnGhost`: border-line, ink text |
 | Focus | `focusRing`: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]` |
 | Filter tabs | Underline tabs, `min-h-11`, active `border-[#0096FF] text-[#005CCC]` |

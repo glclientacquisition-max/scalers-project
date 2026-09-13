@@ -26,7 +26,7 @@ export const settingsActionClass =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:bg-[#0096FF]/[0.04] active:scale-[0.99] active:bg-[#0096FF]/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]";
 
 export const settingsPrimaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0096FF] px-4 py-2.5 text-sm font-medium text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#0088e8] active:scale-[0.99] active:bg-[#007acc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center rounded-xl bg-[#005CCC] px-4 py-2.5 text-sm font-medium text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#004AAD] active:scale-[0.99] active:bg-[#003D99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 disabled:opacity-60";
 
 export const settingsPanelHeadingClass =
   "font-display text-xl tracking-tight text-ink";

@@ -9,10 +9,12 @@ export const focusRing =
 export const focusRingVisible =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2";
 
+/** Filled primary: white on `#005CCC` (~6:1). `#0096FF` fails AA at `text-sm`. */
 export const btnPrimary = [
-  "inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0096FF] px-4 text-sm font-semibold text-white",
-  "shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#0088e8]",
+  "inline-flex min-h-11 items-center justify-center rounded-xl bg-[#005CCC] px-4 text-sm font-semibold text-white",
+  "shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#004AAD] active:bg-[#003D99]",
   focusRingVisible,
+  "disabled:opacity-60",
 ].join(" ");
 
 export const btnGhost = [
