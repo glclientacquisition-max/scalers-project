@@ -30,21 +30,36 @@ export function RequestStatusToggle({
 
   const normalized = status === "fulfilled" || status === "cancelled" ? status : "open";
   const err = ownerError(state.error);
+  const stack = extra
+    ? "flex w-full flex-col items-stretch gap-2"
+    : "flex items-center justify-end";
 
   return (
-    <form action={formAction} className="flex flex-col items-end gap-1">
+    <form action={formAction} className={extra ? "flex w-full flex-col gap-1" : "flex flex-col items-end gap-1"}>
       <input type="hidden" name="id" value={id} />
-      <div className="flex flex-nowrap items-center justify-end gap-2">
+      <div className={stack}>
         {normalized === "open" ? (
           <>
+            <button
+              type="submit"
+              name="status"
+              value="fulfilled"
+              disabled={pending}
+              className={extra ? `${btnPrimary} w-full` : btnPrimary}
+            >
+              {pending ? "Saving" : "Done"}
+            </button>
             {extra ? (
-              <button type="submit" name="status" value="cancelled" disabled={pending} className={`${btnGhost} disabled:opacity-50`}>
+              <button
+                type="submit"
+                name="status"
+                value="cancelled"
+                disabled={pending}
+                className={`${btnGhost} w-full disabled:opacity-50`}
+              >
                 Cancel
               </button>
             ) : null}
-            <button type="submit" name="status" value="fulfilled" disabled={pending} className={`${btnPrimary} disabled:opacity-60`}>
-              {pending ? "Saving" : "Done"}
-            </button>
           </>
         ) : null}
         {normalized === "fulfilled" ? (

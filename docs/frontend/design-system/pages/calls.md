@@ -7,7 +7,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Phone: the text block opens the call. Desktop: Call or Open stays a trailing text link.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Phone: the text block opens the call. Desktop: work lines and Call/Open open the call. Name opens the contact.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Return call** and use WhatsApp. Same for holds without a request row.
 
@@ -30,7 +30,7 @@ Columns (`md+` table, same data as the phone row):
 **Icons (Inbox only):**
 - WhatsApp glyph, green on white, `h-11 w-11`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
-- Confirm / Done are text on `#005CCC`, 44px. Cancel lives on the call, not in the list.
+- Confirm / Done are text on `#005CCC`, 44px. List: that verb only. Call: Confirm or Done on top, Cancel ghost below. Transcript is the right pane.
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 

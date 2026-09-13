@@ -34,7 +34,12 @@ describe("desk phone shell", () => {
     assert.equal([...inboxRow.matchAll(/InboxTrailingAction item=\{item\} message=\{message\} extra=\{false\}/g)].length, 2);
     assert.match(read("dashboard/src/components/InboxJobEditor.tsx"), /InboxJobActions id=\{id\} status=\{status\} extra/);
     assert.match(read("dashboard/src/components/InboxHoldEditor.tsx"), /RequestStatusToggle id=\{id\} status=\{status\} extra/);
-    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /Could not save/);
+    const jobActions = read("dashboard/src/components/InboxJobActions.tsx");
+    assert.match(jobActions, /Could not save/);
+    assert.ok(
+      jobActions.indexOf('value="confirmed"') < jobActions.indexOf('value="cancelled"'),
+      "call Confirm sits above Cancel"
+    );
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /min-h-11/);
     assert.match(root, /viewportFit:\s*"cover"/);
     assert.match(css, /--desk-tabbar-h:\s*3\.25rem/);
