@@ -283,6 +283,80 @@ function expandBarePriceInContext(text, lang = 'en') {
   );
 }
 
+function speak12hTime(hour, mins, isPm, lang) {
+  if (lang === 'sw') {
+    // Keep hour numeral + clear period; full Swahili clock mapping is easy to get wrong.
+    const period = isPm ? 'jioni' : 'asubuhi';
+    if (mins && mins !== 0) {
+      return `saa ${hour} na dakika ${mins} ${period}`;
+    }
+    return `saa ${hour} ${period}`;
+  }
+  const period = isPm ? 'P M' : 'A M';
+  if (mins != null && mins !== 0) {
+    return `${hour} ${String(mins).padStart(2, '0')} ${period}`;
+  }
+  return `${hour} ${period}`;
+}
+
+const MERIDIEM = '(a\\.?m\\.?|p\\.?m\\.?)';
+
+/**
+ * Expand 12-hour clock ranges like 3pm-4pm / 3:00 p.m. - 4:30 p.m. / 3-4pm.
+ * Runs before expandTimes so the dash between two times is never left for TTS.
+ * @param {string} text
+ * @param {'en'|'sw'|string} lang
+ */
+function expandTimeRanges12h(text, lang = 'en') {
+  let out = String(text || '');
+  const ttsLang = lang === 'sw' ? 'sw' : 'en';
+  const joiner = rangeJoiner(ttsLang);
+
+  out = out.replace(
+    new RegExp(
+      `\\b(saa\\s+)?(\\d{1,2})(?::(\\d{2}))?\\s*${MERIDIEM}\\s*[-–—]\\s*(\\d{1,2})(?::(\\d{2}))?\\s*${MERIDIEM}\\b`,
+      'gi'
+    ),
+    (full, saaPrefix, h1, m1, mer1, h2, m2, mer2) => {
+      let left = speak12hTime(
+        Number(h1),
+        m1 != null ? Number(m1) : null,
+        /^p/i.test(mer1),
+        ttsLang
+      );
+      const right = speak12hTime(
+        Number(h2),
+        m2 != null ? Number(m2) : null,
+        /^p/i.test(mer2),
+        ttsLang
+      );
+      if (saaPrefix) left = left.replace(/^saa\s+/, '');
+      return `${saaPrefix || ''}${left} ${joiner} ${right}`;
+    }
+  );
+
+  // Shared meridiem: 3-4pm. Only the right side carries the period.
+  out = out.replace(
+    new RegExp(
+      `\\b(saa\\s+)?(\\d{1,2})\\s*[-–—]\\s*(\\d{1,2})(?::(\\d{2}))?\\s*${MERIDIEM}\\b`,
+      'gi'
+    ),
+    (full, saaPrefix, h1, h2, m2, mer2) => {
+      const right = speak12hTime(
+        Number(h2),
+        m2 != null ? Number(m2) : null,
+        /^p/i.test(mer2),
+        ttsLang
+      );
+      const left = ttsLang === 'sw' ? `saa ${Number(h1)}` : String(Number(h1));
+      if (saaPrefix) return `${saaPrefix}${left.replace(/^saa\s+/, '')} ${joiner} ${right}`;
+      return `${left} ${joiner} ${right}`;
+    }
+  );
+
+  return out;
+}
+
 /**
  * Expand clock times like 3pm / 3:30 a.m.
  * @param {string} text
@@ -294,25 +368,8 @@ function expandTimes(text, lang = 'en') {
 
   out = out.replace(
     /\b(saa\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/gi,
-    (full, saaPrefix, h, m, mer) => {
-      const hour = Number(h);
-      const mins = m != null ? Number(m) : null;
-      const isPm = /^p/i.test(mer);
-      if (ttsLang === 'sw') {
-        // Keep hour numeral + clear period; full Swahili clock mapping is easy to get wrong.
-        const period = isPm ? 'jioni' : 'asubuhi';
-        const head = 'saa';
-        if (mins && mins !== 0) {
-          return `${head} ${hour} na dakika ${mins} ${period}`;
-        }
-        return `${head} ${hour} ${period}`;
-      }
-      const period = isPm ? 'P M' : 'A M';
-      if (mins != null && mins !== 0) {
-        return `${hour} ${String(mins).padStart(2, '0')} ${period}`;
-      }
-      return `${hour} ${period}`;
-    }
+    (full, saaPrefix, h, m, mer) =>
+      speak12hTime(Number(h), m != null ? Number(m) : null, /^p/i.test(mer), ttsLang)
   );
 
   return out;
@@ -402,12 +459,13 @@ function expandPhones(text) {
 }
 
 /**
- * Apply money → catalog Price: numbers → AM/PM times → 24h safety net → day ranges.
+ * Apply 12h time ranges → money → catalog Price: numbers → AM/PM times → 24h safety net → day ranges.
  * @param {string} text
  * @param {'en'|'sw'|string} lang
  */
 function expandSpokenForms(text, lang = 'en') {
   let out = String(text || '');
+  out = expandTimeRanges12h(out, lang);
   out = expandMoney(out, lang);
   out = expandBarePriceInContext(out, lang);
   out = expandTimes(out, lang);
@@ -419,6 +477,7 @@ function expandSpokenForms(text, lang = 'en') {
 module.exports = {
   expandMoney,
   expandBarePriceInContext,
+  expandTimeRanges12h,
   expandTimes,
   expand24HourTime,
   expandDayRanges,

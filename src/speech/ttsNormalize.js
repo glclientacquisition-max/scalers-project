@@ -26,13 +26,34 @@ function stripMarkup(text) {
 
 /**
  * Punctuation polish for phone TTS (avoid stretched ellipsis, etc.).
+ * Runs last in the pipeline, after money/time/day/phone expanders have
+ * claimed their ranges, so any surviving dash or dot run is a leak.
  * @param {string} text
  */
 function polishPunctuation(text) {
   let t = String(text || '');
+  // Abbreviations the model leaks get spoken forms, not spelled-out dots.
+  t = t.replace(/\be\.g\./gi, 'for example');
+  t = t.replace(/\bi\.e\./gi, 'that is');
+  t = t.replace(/\band\/or\b/gi, 'and or');
+  t = t.replace(/&/g, ' and ');
+  // Numbered-list markers ("1. … 2. …") become commas so TTS does not say
+  // full stop. Lookbehind keeps decimals (3.5) and thousands (15,000.) intact.
+  t = t.replace(/(?<![\d,])(\d{1,2})\.\s+(?=\S)/g, '$1, ');
   t = t.replace(/\u2026/g, '.').replace(/\.\.\./g, '.');
+  // Spaced dot chains (". . .") are one pause, not three full stops.
+  t = t.replace(/\.(?:\s*\.)+/g, '.');
+  // A floating period ("Wait . let me") attaches to the previous word.
+  t = t.replace(/\s+\.(?=\s|$)/g, '.');
   // Em/en dash is a Gemini leak. Soniox may speak "dash" or restart the clause.
   t = t.replace(/\s*[\u2014\u2013]\s*/g, ', ');
+  // Spaced ASCII hyphen is a list/range marker the expanders did not claim.
+  // Intra-word hyphens (M-Pesa, Roo-ee-roo) carry no spaces and must survive.
+  t = t.replace(/\s+-\s*|\s*-\s+/g, ', ');
+  t = t.replace(/([:;])\s*,\s*/g, '$1 ');
+  t = t.replace(/,\s*,+/g, ',');
+  t = t.replace(/^\s*,\s*/, '');
+  t = t.replace(/\s+,/g, ',');
   t = t.replace(/([!?.,])\1+/g, '$1');
   // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
   t = t.replace(/!+/g, '.');
