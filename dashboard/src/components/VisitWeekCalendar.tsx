@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
-import { followUpWhatsAppMessage } from "@/lib/callsTriage";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import { nicheCopy } from "@/lib/inboxNiche";
 import {
@@ -30,7 +28,6 @@ export function VisitWeekCalendar({
   prevHref,
   nextHref,
   listHref,
-  businessName,
   vertical,
 }: {
   items: InboxItem[];
@@ -94,38 +91,28 @@ export function VisitWeekCalendar({
                   rows.map((visit) => {
                     const item = byId.get(visit.id);
                     if (!item?.job) return null;
-                    const message = followUpWhatsAppMessage({
-                      businessName,
-                      name: item.callerName,
-                      reason: item.headline,
-                    });
                     return (
                       <li
                         key={visit.id}
-                        className="border-t border-line/70 pt-2 first:border-t-0 first:pt-0"
+                        className="relative border-t border-line/70 pt-2 first:border-t-0 first:pt-0"
                       >
-                        <p className="text-sm font-semibold text-ink">
+                        {item.callId ? (
+                          <Link
+                            href={`/calls/${item.callId}?from=job`}
+                            aria-label="Conversation"
+                            className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
+                          />
+                        ) : null}
+                        <p className="relative z-[1] pointer-events-none text-sm font-semibold text-ink">
                           {visit.when_text || copy.jobColumn}
                         </p>
-                        <p className="text-xs text-ink-soft">{item.headline}</p>
-                        <p className="text-xs text-ink">
-                          {item.contactId ? (
-                            <Link
-                              href={`/contacts/${item.contactId}`}
-                              className="text-[#005CCC] hover:underline focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
-                            >
-                              {item.callerName || "Caller"}
-                            </Link>
-                          ) : (
-                            item.callerName || "Caller"
-                          )}
+                        <p className="relative z-[1] pointer-events-none text-xs text-ink-soft">{item.headline}</p>
+                        <p className="relative z-[1] pointer-events-none text-xs text-ink">
+                          {item.callerName || "Caller"}
                         </p>
-                        <div className="mt-1">
+                        <div className="relative z-10 mt-1">
                           <InboxJobActions id={item.job.id} status={item.job.status} />
                         </div>
-                        {item.callerPhone ? (
-                          <WhatsAppLink number={item.callerPhone} message={message} compact />
-                        ) : null}
                       </li>
                     );
                   })
@@ -146,12 +133,21 @@ export function VisitWeekCalendar({
               const item = byId.get(visit.id);
               if (!item?.job) return null;
               return (
-                <li key={visit.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div>
+                <li key={visit.id} className="relative flex flex-wrap items-center justify-between gap-3 py-3">
+                  {item.callId ? (
+                    <Link
+                      href={`/calls/${item.callId}?from=job`}
+                      aria-label="Conversation"
+                      className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
+                    />
+                  ) : null}
+                  <div className="relative z-[1] pointer-events-none">
                     <p className="text-sm font-semibold text-ink">{item.headline}</p>
                     <p className="text-xs text-ink-soft">{item.callerName || "Caller"}</p>
                   </div>
-                  <InboxJobActions id={item.job.id} status={item.job.status} />
+                  <div className="relative z-10">
+                    <InboxJobActions id={item.job.id} status={item.job.status} />
+                  </div>
                 </li>
               );
             })}

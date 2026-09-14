@@ -255,7 +255,7 @@ export default async function CallsPage({
             ))}
           </ul>
           <div className="mt-8 hidden md:block">
-            <DeskDataTable minWidthClass="min-w-[880px]">
+            <DeskDataTable minWidthClass="min-w-[720px]">
               <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                 <tr>
                   {inboxTableKind(activeFilter) === "hold" ? (
@@ -299,9 +299,6 @@ export default async function CallsPage({
                   ) : null}
                   <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
                     Action
-                  </th>
-                  <th scope="col" className="px-5 py-4">
-                    <span className="sr-only">Call</span>
                   </th>
                 </tr>
               </thead>
