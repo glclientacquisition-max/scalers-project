@@ -54,7 +54,7 @@ export function InboxHoldEditor({
         </button>
         {state.error ? <p className="text-sm text-warn">{state.error}</p> : null}
       </form>
-      <RequestStatusToggle id={id} status={status} />
+      <RequestStatusToggle id={id} status={status} extra />
     </div>
   );
 }

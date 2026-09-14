@@ -29,8 +29,18 @@ describe("desk phone shell", () => {
     assert.match(layout, /--desk-tabbar-h/);
     assert.match(layout, /safe-area-inset-bottom/);
     assert.doesNotMatch(layout, /context=\{businessName\}/);
-    assert.match(read("dashboard/src/components/InboxItemRow.tsx"), /export function InboxPhoneRow/);
-    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /Could not save/);
+    const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");
+    assert.match(inboxRow, /export function InboxPhoneRow/);
+    assert.match(inboxRow, /aria-label="Conversation"/);
+    assert.match(inboxRow, /InboxJobActions id=\{item.job.id\} status=\{item.job.status\} extra=\{false\}/);
+    assert.match(read("dashboard/src/components/InboxJobEditor.tsx"), /InboxJobActions id=\{id\} status=\{status\} extra/);
+    assert.match(read("dashboard/src/components/InboxHoldEditor.tsx"), /RequestStatusToggle id=\{id\} status=\{status\} extra/);
+    const jobActions = read("dashboard/src/components/InboxJobActions.tsx");
+    assert.match(jobActions, /Could not save/);
+    assert.ok(
+      jobActions.indexOf('value="confirmed"') < jobActions.indexOf('value="cancelled"'),
+      "call Confirm sits above Cancel"
+    );
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /min-h-11/);
     assert.match(root, /viewportFit:\s*"cover"/);
     assert.match(css, /--desk-tabbar-h:\s*3\.25rem/);

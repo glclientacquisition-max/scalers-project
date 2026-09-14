@@ -19,10 +19,6 @@ export function inboxTableKind(
   return "mixed";
 }
 
-export function inboxOpenLabel(item: InboxItem) {
-  return item.hold || item.job ? "Call" : "Open";
-}
-
 function inboxCopy(
   item: InboxItem,
   purpose: InboxPurposeFilterId,
@@ -67,53 +63,33 @@ function inboxCopy(
 function InboxTrailingAction({
   item,
   message,
-  extra,
 }: {
   item: InboxItem;
   message: string;
-  extra: boolean;
 }) {
   if (item.job) {
-    return <InboxJobActions id={item.job.id} status={item.job.status} extra={extra} />;
+    return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
   }
   if (item.hold) {
-    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={extra} />;
+    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />;
   }
   if (item.callerPhone) {
-    return extra ? (
-      <WhatsAppLink
-        number={item.callerPhone}
-        message={message}
-        variant="primary"
-        label="WhatsApp"
-      />
-    ) : (
+    return (
       <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
     );
   }
   return null;
 }
 
-function WhoName({
-  item,
-  who,
-  link,
-}: {
-  item: InboxItem;
-  who: string;
-  link: boolean;
-}) {
-  if (link && item.contactId) {
-    return (
-      <Link
-        href={`/contacts/${item.contactId}`}
-        className="text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-      >
-        {who}
-      </Link>
-    );
-  }
-  return <>{who}</>;
+function ConversationHit({ href }: { href: string | null }) {
+  if (!href) return null;
+  return (
+    <Link
+      href={href}
+      aria-label="Conversation"
+      className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
+    />
+  );
 }
 
 export function InboxTableRow({
@@ -140,12 +116,12 @@ export function InboxTableRow({
     hasJob,
     showHold,
   } = inboxCopy(item, purpose, vertical, businessName);
-  const openLabel = inboxOpenLabel(item);
 
   return (
     <tr
       className={[
-        "group border-t border-line/70 transition duration-150",
+        "group relative border-t border-line/70 transition duration-150",
+        openHref ? "cursor-pointer" : "",
         "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.07]",
         item.urgent ? "bg-warn-soft/50" : "",
         item.needsYou ? "" : "opacity-[0.92]",
@@ -154,15 +130,18 @@ export function InboxTableRow({
       {kind === "hold" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <p className="text-sm font-semibold tracking-tight text-ink">{item.headline}</p>
-            <p className="mt-0.5 text-sm text-ink-soft">
+            <ConversationHit href={openHref} />
+            <p className="relative z-[1] pointer-events-none text-sm font-semibold tracking-tight text-ink">
+              {item.headline}
+            </p>
+            <p className="relative z-[1] pointer-events-none mt-0.5 text-sm text-ink-soft">
               {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
             </p>
           </td>
-          <td className="px-5 py-4 align-top font-medium text-ink">
-            <WhoName item={item} who={item.callerName || "Caller"} link />
+          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top font-medium text-ink">
+            {item.callerName || "Caller"}
           </td>
-          <td className="px-5 py-4 align-top text-sm text-ink-soft">
+          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top text-sm text-ink-soft">
             {showHold ? needed : when}
           </td>
         </>
@@ -171,15 +150,18 @@ export function InboxTableRow({
       {kind === "job" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <p className="text-sm font-semibold tracking-tight text-ink">
+            <ConversationHit href={openHref} />
+            <p className="relative z-[1] pointer-events-none text-sm font-semibold tracking-tight text-ink">
               {hasJob ? visit : stamp}
             </p>
-            <p className="mt-0.5 text-sm text-ink-soft">{item.headline}</p>
+            <p className="relative z-[1] pointer-events-none mt-0.5 text-sm text-ink-soft">
+              {item.headline}
+            </p>
           </td>
-          <td className="px-5 py-4 align-top font-medium text-ink">
-            <WhoName item={item} who={item.callerName || "Caller"} link />
+          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top font-medium text-ink">
+            {item.callerName || "Caller"}
           </td>
-          <td className="px-5 py-4 align-top text-sm text-ink-soft">
+          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top text-sm text-ink-soft">
             {hasJob ? place : ""}
           </td>
         </>
@@ -188,43 +170,36 @@ export function InboxTableRow({
       {kind === "mixed" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <p className="text-sm font-semibold tracking-tight text-ink">
-              <WhoName item={item} who={who} link />
+            <ConversationHit href={openHref} />
+            <p className="relative z-[1] pointer-events-none text-sm font-semibold tracking-tight text-ink">
+              {who}
             </p>
-            <p className="mt-0.5 text-sm text-ink">{item.headline}</p>
+            <p className="relative z-[1] pointer-events-none mt-0.5 text-sm text-ink">{item.headline}</p>
             {item.detail ? (
-              <p className="mt-1 line-clamp-1 text-sm text-ink-soft">{item.detail}</p>
+              <p className="relative z-[1] pointer-events-none mt-1 line-clamp-1 text-sm text-ink-soft">
+                {item.detail}
+              </p>
             ) : null}
           </td>
-          <td className="px-5 py-4 align-top">
+          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top">
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
           </td>
-          <td className="whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft">{when}</td>
+          <td className="relative z-[1] pointer-events-none whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft">
+            {when}
+          </td>
         </>
       ) : null}
 
-      <td className="px-5 py-4 align-top">
+      <td className="relative z-10 whitespace-nowrap px-5 py-4 align-middle">
         <div className="flex justify-end">
-          <InboxTrailingAction item={item} message={message} extra />
+          <InboxTrailingAction item={item} message={message} />
         </div>
-      </td>
-      <td className="px-5 py-4 align-middle text-right">
-        {openHref ? (
-          <Link
-            href={openHref}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-          >
-            {openLabel}
-          </Link>
-        ) : (
-          <span className="text-sm text-ink-soft">No call</span>
-        )}
       </td>
     </tr>
   );
 }
 
-/** iOS Mail / Material list row. One primary verb. Row body opens the call. */
+/** iOS Mail / Material list row. One primary verb. Row body opens the conversation. */
 export function InboxPhoneRow({
   item,
   businessName,
@@ -269,6 +244,7 @@ export function InboxPhoneRow({
       {openHref ? (
         <Link
           href={openHref}
+          aria-label="Conversation"
           className="min-w-0 flex-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
         >
           {body}
@@ -276,8 +252,8 @@ export function InboxPhoneRow({
       ) : (
         <div className="min-w-0 flex-1">{body}</div>
       )}
-      <div className="flex shrink-0 items-center self-center">
-        <InboxTrailingAction item={item} message={message} extra={false} />
+      <div className="relative z-10 flex shrink-0 items-center self-center">
+        <InboxTrailingAction item={item} message={message} />
       </div>
     </li>
   );
