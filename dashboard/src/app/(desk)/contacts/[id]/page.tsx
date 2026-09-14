@@ -37,14 +37,6 @@ export default async function ContactDetailPage({
     lastReason: contact.last_reason,
     latestCallReason: latestCall?.ownerReason || null,
   });
-  const metadata =
-    contact.metadata &&
-    typeof contact.metadata === "object" &&
-    !Array.isArray(contact.metadata)
-      ? contact.metadata
-      : {};
-  const metaKeys = Object.keys(metadata);
-
   return (
     <div className="max-w-6xl">
       <Link
@@ -75,26 +67,6 @@ export default async function ContactDetailPage({
           <section className="rounded-2xl border border-line bg-surface p-5">
             <ContactNotesForm contactId={contact.id} initial={contact.notes || ""} />
           </section>
-
-          {metaKeys.length > 0 ? (
-            <section className="rounded-2xl border border-line bg-surface p-5">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                Metadata
-              </h2>
-              <dl className="mt-3 space-y-2 text-sm">
-                {metaKeys.map((key) => (
-                  <div key={key} className="flex justify-between gap-3">
-                    <dt className="text-ink-soft">{key}</dt>
-                    <dd className="text-right text-ink">
-                      {typeof metadata[key] === "string"
-                        ? metadata[key]
-                        : JSON.stringify(metadata[key])}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          ) : null}
         </aside>
 
         <div className="min-h-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
