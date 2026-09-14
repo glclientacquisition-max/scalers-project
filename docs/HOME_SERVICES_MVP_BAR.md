@@ -36,7 +36,7 @@ Every home-services DID must do this without a niche-specific playbook:
 2. **Hours / closed:** From schedule + bulletin. Honesty, then still help.
 3. **We come to you / coverage:** From locations + policies. Outside area: decline or note a callback. Never promise a visit off-map.
 4. **Price:** `price_range` from SERVICES, or “quoted on site”. Never a made-up shilling amount.
-5. **Book:** service + name + when + landmark → `create_appointment`. Speak nothing until the backend. Progress: “Okay, one moment.”
+5. **Book:** service + name + when + landmark → `create_appointment`. Speak nothing until the backend. Progress: “Okay, one moment.” Ask the name once. After it is on file, collect when then landmark. Do not stall on name confirm.
 6. **Same hour:** A second visit in the same hour is allowed unless POLICIES say one at a time.
 7. **Reschedule / cancel:** `update_appointment` on the caller’s latest open visit. Hours still gate. Attendance confirm is not a second booking.
 8. **True emergency only:** burst pipe, flooding, fire, gas leak, electric shock. Capture name + reason and escalate. Same-day, urgent, or ASAP cleaning is a **visit**.

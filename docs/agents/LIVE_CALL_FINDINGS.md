@@ -1,3 +1,18 @@
+# Name-ask loop vs visit SOP — Done and Dusted corpus (2026-09-14)
+
+Live and staging calls kept asking for a name after the caller had already given it (`HD_6c44c4b430d7`, `HD_6851d9481091`; Sprint B: ask name once after value). That stalled the home visit SOP (service → name → when → landmark → `create_appointment`).
+
+Causes in Brain state:
+
+1. `extractName` only matched `my name is` / `naitwa`, so `I'm Alvin` never filled the slot.
+2. `missingGoalSlots` ignored `caller.name` if the entity row lagged.
+3. CALL STATE injected “Got it, {name}. Is that right?” every unconfirmed turn, so Gemini re-asked the name instead of the next visit slot.
+4. Hear-again (`Pardon?`) told the model to repeat the last question, which was often the name ask.
+
+Fix: capture spoken name forms; treat `caller.name` as filling the name slot; never re-ask a known name; continue the visit SOP; hear-again repeats the next missing slot, not the name.
+
+---
+
 # Spoken leaks — Done and Dusted `HD_3f7ed2a5f526` (2026-09-10)
 
 Staging DID `+254709221536` (Shy). Caller `+254790381872`. 116s. Audio stayed up (`tts-rt-v2`).

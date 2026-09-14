@@ -224,7 +224,7 @@ describe('Brain state and next-best-action', () => {
     assert.equal(human.caller.name, null);
   });
 
-  it('asks to confirm a newly extracted name once, then stops', () => {
+  it('treats an explicit name as captured and does not prompt a spoken confirm loop', () => {
     const { extractConversationEntities } = require('../src/conversation/entityExtraction');
     let state = observeCallerTurn(createBrainState(), {
       text: 'My name is Jane',
@@ -233,21 +233,10 @@ describe('Brain state and next-best-action', () => {
       entities: extractConversationEntities('My name is Jane'),
     });
     assert.equal(state.caller.name, 'Jane');
-    assert.equal(state.caller.nameConfirmed, false);
-    assert.match(formatBrainStateForPrompt(state), /Got it, Jane\. Is that right\?/);
-    assert.match(formatBrainStateForPrompt(state), /Sawa, Jane\. Ni hivyo\?/);
-    assert.match(formatBrainStateForPrompt(state), /this turn only/);
-
-    state = observeCallerTurn(state, {
-      text: 'yes',
-      detectedLanguage: 'en',
-      resolvedLanguage: 'en',
-      entities: extractConversationEntities('yes', { state }),
-    });
-    assert.equal(state.caller.name, 'Jane');
     assert.equal(state.caller.nameConfirmed, true);
     assert.match(formatBrainStateForPrompt(state), /Caller name: confirmed/);
-    assert.doesNotMatch(formatBrainStateForPrompt(state), /this turn only/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /Got it, Jane/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /Is that right/);
 
     state = observeCallerTurn(state, {
       text: 'How much is the printer?',
@@ -267,7 +256,8 @@ describe('Brain state and next-best-action', () => {
       resolvedLanguage: 'sw',
       entities: extractConversationEntities('Naitwa Jane'),
     });
-    assert.equal(state.caller.nameConfirmed, false);
+    assert.equal(state.caller.name, 'Jane');
+    assert.equal(state.caller.nameConfirmed, true);
 
     state = observeCallerTurn(state, {
       text: 'Hapana, naitwa Wanjiku',
@@ -308,5 +298,51 @@ describe('Brain state and next-best-action', () => {
     assert.equal(extractCorrectedName('hapana ni Mary'), 'Mary');
     assert.equal(isNameAffirmation('ndiyo'), true);
     assert.equal(isNameNegation('hapana'), true);
+  });
+
+  it('extracts spoken names without a my-name-is prefix', () => {
+    const {
+      extractName,
+      extractConversationEntities,
+    } = require('../src/conversation/entityExtraction');
+    assert.equal(extractName('I am Alvin'), 'Alvin');
+    assert.equal(extractName("I'm Alvin"), 'Alvin');
+    assert.equal(extractName('This is Alvin'), 'Alvin');
+    assert.equal(extractName('Naitwa Alvin'), 'Alvin');
+    assert.equal(extractName('I am looking for cleaning'), null);
+    assert.equal(extractName("It's Alvin", { firstMissing: 'name' }), 'Alvin');
+
+    const contextual = extractConversationEntities('Alvin', {
+      intent: 'booking',
+      state: { goal: { missingSlots: ['name'] } },
+    });
+    assert.equal(contextual.name.value, 'Alvin');
+    assert.equal(contextual.name.source, 'contextual_slot_answer');
+  });
+
+  it('does not treat hear-again as confirming a contextual name', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    let state = createBrainState();
+    state.goal.missingSlots = ['name'];
+    state = observeCallerTurn(state, {
+      text: 'Alvin',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('Alvin', { state }),
+    });
+    assert.equal(state.caller.name, 'Alvin');
+    assert.equal(state.caller.nameConfirmed, false);
+    assert.match(formatBrainStateForPrompt(state), /Do not ask for the name again/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /Is that right/);
+
+    state = observeCallerTurn(state, {
+      text: 'Pardon?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('Pardon?', { state }),
+    });
+    assert.equal(state.caller.name, 'Alvin');
+    assert.equal(state.caller.nameConfirmed, false);
+    assert.equal(state.conversation.hearAgain, true);
   });
 });

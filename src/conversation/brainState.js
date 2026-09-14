@@ -7,7 +7,7 @@ const {
   isHearAgainSignal,
   applyCallerNameConfirmation,
 } = require('./entityExtraction');
-const { missingGoalSlots, formatGoalRequirementsForPrompt } = require('./goalModel');
+const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt } = require('./goalModel');
 const {
   isRepairSignal,
   applyRepairObservation,
@@ -332,6 +332,14 @@ function observeCallerTurn(state, input = {}) {
   next.entities = { ...next.entities, ...nameResolution.entities };
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
+  if (next.caller.name && !entityValue(next.entities.name)) {
+    next.entities.name = {
+      value: next.caller.name,
+      source: 'caller_state',
+      confidence: 0.9,
+      confirmed: next.caller.nameConfirmed,
+    };
+  }
   if (entityValue(next.entities.phone)) next.caller.phone = entityValue(next.entities.phone);
 
   const addedEntity = Object.keys(next.entities).some(
@@ -346,7 +354,10 @@ function observeCallerTurn(state, input = {}) {
     next = markRepairProgress(next);
   }
 
-  next.goal.missingSlots = missingGoalSlots(next, input.profile || {});
+  next.goal.missingSlots = missingGoalSlots(next, {
+    ...(input.profile || {}),
+    vertical: input.profile?.vertical || next.vertical,
+  });
   return next;
 }
 
@@ -463,9 +474,22 @@ function formatNameConfirmForPrompt(state) {
   const name = String(state?.caller?.name || '').trim();
   if (!name) return '';
   if (state?.caller?.nameConfirmed) {
-    return '- Caller name: confirmed. Do not ask to confirm the name again. You may append save_caller_info with this confirmed name.';
+    return '- Caller name: confirmed. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.';
   }
-  return `- Name confirmation (this turn only): add one short confirm of the name, then still answer their request. English: "Got it, ${name}. Is that right?" Kiswahili: "Sawa, ${name}. Ni hivyo?" Sheng: "Sawa, ${name}. Ni hiyo?" Do not append save_caller_info until they confirm, correct, or continue. Do not replace their actual ask.`;
+  return `- Caller name is known (${name}). Do not ask for the name again. Do not ask "is that right?". Continue the next missing slot. Do not append save_caller_info until they confirm, correct, or continue.`;
+}
+
+function formatHearAgainForPrompt(state) {
+  if (!state?.conversation?.hearAgain) return '';
+  const missing = Array.isArray(state?.goal?.missingSlots)
+    ? state.goal.missingSlots
+    : [];
+  const name = String(state?.caller?.name || '').trim();
+  const nextSlot = missing.find((slot) => slot !== 'name' || !name) || missing[0];
+  if (name && nextSlot && nextSlot !== 'name') {
+    return `- Hear-again: they missed the last line. Ask only for ${nextSlot} more clearly. Do not re-ask the name. Do not save, book, or call a tool.`;
+  }
+  return '- Hear-again: caller did not hear the last line. Repeat that question more clearly. Do not save, book, or call a tool.';
 }
 
 function formatBrainStateForPrompt(state) {
@@ -490,14 +514,13 @@ function formatBrainStateForPrompt(state) {
     `- Caller goal: ${value.goal.primary || 'unknown'} — ${value.goal.description || 'not established'}`,
     `- Goal status: ${value.goal.status}`,
     `- ${formatGoalRequirementsForPrompt(value)}`,
+    formatVisitSopForPrompt(value),
     `- Entities: ${entities || '(none confirmed)'}`,
     `- Language: ${value.language.current} (detected ${value.language.detected}, confidence ${value.language.confidence})`,
     `- Repair failures: ${value.repair.failureCount}`,
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
-    value.conversation?.hearAgain
-      ? '- Hear-again: caller did not hear the last line. Repeat that question more clearly. Do not save, book, or call a tool.'
-      : '',
+    formatHearAgainForPrompt(value),
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
     `- Resolution: ${value.resolution.status}`,
     `- NEXT BEST ACTION: ${value.resolution.nextBestAction} — ${value.resolution.reason}`,

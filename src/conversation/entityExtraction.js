@@ -58,16 +58,49 @@ function findCatalogMatch(text, profile = {}) {
   return best;
 }
 
-function extractName(text) {
-  const match =
-    /(?:\bmy name is\b|\bi am called\b|\bi'm called\b|\bnaitwa\b|\bjina langu ni\b)\s+([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})/iu.exec(
-      String(text || '')
-    );
-  if (!match) return null;
-  const value = match[1]
+function cleanNameCapture(raw) {
+  const value = String(raw || '')
     .replace(/\s+(?:and|na|calling|looking|nataka)\b.*$/i, '')
     .trim();
   return isPlausibleCallerName(value) ? value : null;
+}
+
+function extractName(text, opts = {}) {
+  const raw = String(text || '');
+  const explicit =
+    /(?:\bmy name is\b|\bi am called\b|\bi'm called\b|\bthis is\b|\bnaitwa\b|\bninaitwa\b|\bjina langu ni\b|\bjina ni\b)\s+([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})/iu.exec(
+      raw
+    );
+  if (explicit) return cleanNameCapture(explicit[1]);
+
+  const im =
+    /\b(?:i'?m|i am)\s+([\p{L}'’-]+)(?:\s+([\p{L}'’-]+))?(?:\s+([\p{L}'’-]+))?/iu.exec(
+      raw
+    );
+  if (im) {
+    const collected = [];
+    for (const word of [im[1], im[2], im[3]].filter(Boolean)) {
+      if (/^(and|na|calling|looking|from|in|at|to|for|who|that)$/i.test(word)) break;
+      collected.push(word);
+    }
+    const value = collected.join(' ');
+    const wordCount = raw.trim().split(/\s+/).length;
+    const allowIntro =
+      opts.firstMissing === 'name' ||
+      wordCount <= 6 ||
+      /^(?:hi|hello|hey|habari)[,.]?\s+(?:i'?m|i am)\b/i.test(raw.trim());
+    if (allowIntro) {
+      const captured = cleanNameCapture(value);
+      if (captured) return captured;
+    }
+  }
+
+  if (opts.firstMissing === 'name') {
+    const spoken =
+      /\b(?:it'?s|ni)\s+([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})/iu.exec(raw);
+    if (spoken) return cleanNameCapture(spoken[1]);
+  }
+  return null;
 }
 
 const NAME_AFFIRMATION =
@@ -127,6 +160,15 @@ function applyCallerNameConfirmation(previous = {}, text = '', incomingEntities 
   }
 
   if (prevConfirmed) {
+    if (isNameNegation(text)) {
+      const corrected = extractCorrectedName(text);
+      if (corrected) {
+        stamp(corrected, 'caller_correction', true, 0.98);
+        return { name: corrected, nameConfirmed: true, entities };
+      }
+      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
+      return { name: prevName, nameConfirmed: false, entities };
+    }
     if (extracted && extracted !== prevName) {
       stamp(extracted, entities.name?.source || 'caller_explicit', true);
       return { name: extracted, nameConfirmed: true, entities };
@@ -136,11 +178,17 @@ function applyCallerNameConfirmation(previous = {}, text = '', incomingEntities 
   }
 
   if (!prevName && extracted) {
-    stamp(extracted, entities.name?.source || 'caller_explicit', false, entities.name?.confidence || 0.9);
-    return { name: extracted, nameConfirmed: false, entities };
+    const source = entities.name?.source || 'caller_explicit';
+    const autoConfirm = source === 'caller_explicit';
+    stamp(extracted, source, autoConfirm, entities.name?.confidence || 0.9);
+    return { name: extracted, nameConfirmed: autoConfirm, entities };
   }
 
   if (prevName) {
+    if (isHearAgainSignal(text)) {
+      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
+      return { name: prevName, nameConfirmed: false, entities };
+    }
     const corrected = isNameNegation(text) ? extractCorrectedName(text) : null;
     if (corrected) {
       stamp(corrected, 'caller_correction', true, 0.98);
@@ -154,8 +202,12 @@ function applyCallerNameConfirmation(previous = {}, text = '', incomingEntities 
       stamp(extracted, entities.name?.source || 'caller_explicit', true);
       return { name: extracted, nameConfirmed: true, entities };
     }
-    stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
-    return { name: prevName, nameConfirmed: true, entities };
+    if (isNameAffirmation(text) || extracted === prevName || String(text || '').trim()) {
+      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
+      return { name: prevName, nameConfirmed: true, entities };
+    }
+    stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
+    return { name: prevName, nameConfirmed: false, entities };
   }
 
   return { name: extracted || null, nameConfirmed: false, entities };
@@ -194,6 +246,40 @@ const NAME_BLOCKLIST = new Set([
   'eh',
   'nini',
   'repeat',
+  'looking',
+  'available',
+  'interested',
+  'trying',
+  'going',
+  'coming',
+  'here',
+  'there',
+  'just',
+  'also',
+  'still',
+  'already',
+  'currently',
+  'booking',
+  'cleaning',
+  'tomorrow',
+  'today',
+  'kesho',
+  'leo',
+  'hivyo',
+  'hiyo',
+  'urgent',
+  'emergency',
+  'upset',
+  'angry',
+  'wrong',
+  'the',
+  'and',
+  'for',
+  'from',
+  'with',
+  'about',
+  'near',
+  'opposite',
 ]);
 
 /**
@@ -250,6 +336,7 @@ function isPlausibleCallerName(value) {
     return false;
   }
   const words = name.split(/\s+/);
+  if (words.some((word) => NAME_BLOCKLIST.has(word.toLowerCase()))) return false;
   if (words.length > 3) return false;
   if (/\d/.test(name)) return false;
   if (!/^[\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,2}$/u.test(name)) {
@@ -370,7 +457,9 @@ function extractConversationEntities(
     );
   }
 
-  const name = extractName(text);
+  const name = extractName(text, {
+    firstMissing: state?.goal?.missingSlots?.[0],
+  });
   if (name) entities.name = entity(name, 'caller_explicit', 0.95, false);
   const phone = extractPhone(text);
   if (phone) entities.phone = entity(phone, 'caller_explicit', 0.98, true);
