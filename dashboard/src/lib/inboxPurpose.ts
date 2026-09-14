@@ -252,6 +252,35 @@ export function homeBriefing(
   return `${bits.join(". ")}.`;
 }
 
+/**
+ * One-line digest of the receptionist's Nairobi day: what it closed, what it
+ * booked, what needs a look. Null when nothing happened worth saying.
+ */
+export function homeDigestLine(
+  items: InboxItem[],
+  dayStartIso: string,
+  vertical?: string | null
+): string | null {
+  const copy = nicheCopy(vertical);
+  const dayStartMs = new Date(dayStartIso).getTime();
+  const today = items.filter((item) => new Date(item.createdAt).getTime() >= dayStartMs);
+  const answered = today.filter((item) => item.purpose === "answered").length;
+  const booked = today.filter(
+    (item) => item.job && new Date(item.job.created_at).getTime() >= dayStartMs
+  ).length;
+  const complaints = today.filter(
+    (item) => canonicalInboxIntent(item.intent) === "complaint"
+  ).length;
+  const bits: string[] = [];
+  if (answered > 0) bits.push(`${answered} answered`);
+  if (booked > 0) {
+    const noun = booked === 1 ? copy.visitStamp : copy.jobFilter;
+    bits.push(`${booked} ${noun.toLowerCase()}`);
+  }
+  if (complaints > 0) bits.push(`${complaints} complaint${complaints === 1 ? "" : "s"}`);
+  return bits.length ? `Today: ${bits.join(", ")}.` : null;
+}
+
 export function summarizeInboxWork(items: InboxItem[]): {
   needs: number;
   toReturn: number;

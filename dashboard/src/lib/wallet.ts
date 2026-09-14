@@ -146,6 +146,81 @@ export function resolveWalletBalanceKes(wallets: {
   return telecom + Math.round(aiUsd * 130);
 }
 
+/** Beta workspaces are metered, never charged. One rule for every surface. */
+export function isBetaBilling(billingEnforcement?: string | null): boolean {
+  return (billingEnforcement || "off") === "off";
+}
+
+/** Month-to-date call minutes from durations or the AI minutes column. */
+function minutesFromCallRows(
+  rows: { duration_seconds: number | null; ai_processing_minutes: number | null }[]
+): { seconds: number; minutes: number } {
+  let seconds = 0;
+  let minutesFromCol = 0;
+  let usedAiCol = false;
+  for (const row of rows) {
+    seconds += Math.max(0, Number(row.duration_seconds) || 0);
+    if (
+      row.ai_processing_minutes != null &&
+      Number.isFinite(Number(row.ai_processing_minutes))
+    ) {
+      minutesFromCol += Number(row.ai_processing_minutes);
+      usedAiCol = true;
+    }
+  }
+  return {
+    seconds,
+    minutes: usedAiCol
+      ? Math.round(minutesFromCol * 10) / 10
+      : Math.round((seconds / 60) * 10) / 10,
+  };
+}
+
+/** Days the prepaid balance lasts at the current call pace. Null when no pace or no balance. */
+export function runwayDaysAtPace(opts: {
+  minutesThisMonth: number;
+  dayOfMonth: number;
+  balanceKes: number;
+}): number | null {
+  const minutesPerDay = opts.minutesThisMonth / Math.max(1, opts.dayOfMonth);
+  if (minutesPerDay <= 0 || opts.balanceKes <= 0) return null;
+  const kesPerDay = minutesPerDay * WALLET_RATE_KES_PER_MINUTE;
+  return Math.max(0, Math.round(opts.balanceKes / kesPerDay));
+}
+
+/** Light runway read for surfaces that only need the pace caption (Home). One calls query. */
+export async function getWalletRunwayDays(
+  client: SupabaseClient,
+  tenantId: string,
+  balanceKes: number
+): Promise<number | null> {
+  if (balanceKes <= 0) return null;
+  const res = await client
+    .from("calls")
+    .select("duration_seconds, ai_processing_minutes")
+    .eq("tenant_id", tenantId)
+    .gte("created_at", startOfMonthUtcIso());
+  if (res.error) return null;
+  const { minutes } = minutesFromCallRows(res.data || []);
+  return runwayDaysAtPace({
+    minutesThisMonth: minutes,
+    dayOfMonth: new Date().getUTCDate(),
+    balanceKes,
+  });
+}
+
+/** Quiet pace caption. Shown only when the answer is decision-useful (1 to 90 days). */
+export function walletRunwayLabel(days: number | null): string | null {
+  if (days == null || days <= 0 || days > 90) return null;
+  if (days < 14) return `about ${days} day${days === 1 ? "" : "s"} at this pace`;
+  if (days < 56) {
+    const weeks = Math.round(days / 7);
+    return `about ${weeks} week${weeks === 1 ? "" : "s"} at this pace`;
+  }
+  const months = Math.round(days / 30);
+  return `about ${months} month${months === 1 ? "" : "s"} at this pace`;
+}
+
 /**
  * Lazy-apply monthly line rental via service role only (owners cannot choose amount).
  * No-op when workspace is on beta (`billing_enforcement = off`).
@@ -184,7 +259,7 @@ export async function getTenantUsageSummary(
 ): Promise<TenantUsageSummary> {
   let walletBalanceKes = resolveWalletBalanceKes(wallets);
   const billingEnforcement = wallets.billingEnforcement || "off";
-  const isBeta = billingEnforcement === "off";
+  const isBeta = isBetaBilling(billingEnforcement);
 
   // Only charge line fee for prepaid workspaces.
   if (billingEnforcement !== "off") {
@@ -220,22 +295,7 @@ export async function getTenantUsageSummary(
   if (callsRes.error) throw callsRes.error;
 
   const rows = callsRes.data || [];
-  let seconds = 0;
-  let minutesFromCol = 0;
-  let usedAiCol = false;
-
-  for (const row of rows) {
-    const dur = Number(row.duration_seconds) || 0;
-    seconds += Math.max(0, dur);
-    if (row.ai_processing_minutes != null && Number.isFinite(Number(row.ai_processing_minutes))) {
-      minutesFromCol += Number(row.ai_processing_minutes);
-      usedAiCol = true;
-    }
-  }
-
-  const minutesThisMonth = usedAiCol
-    ? Math.round(minutesFromCol * 10) / 10
-    : Math.round((seconds / 60) * 10) / 10;
+  const { seconds, minutes: minutesThisMonth } = minutesFromCallRows(rows);
 
   const estimatedCostKes = Math.round(minutesThisMonth * WALLET_RATE_KES_PER_MINUTE);
 
@@ -250,12 +310,11 @@ export async function getTenantUsageSummary(
   }
 
   const dayOfMonth = Math.max(1, new Date().getUTCDate());
-  const minutesPerDay = minutesThisMonth / dayOfMonth;
-  let daysRemainingAtPace: number | null = null;
-  if (minutesPerDay > 0 && walletBalanceKes > 0) {
-    const kesPerDay = minutesPerDay * WALLET_RATE_KES_PER_MINUTE;
-    daysRemainingAtPace = Math.max(0, Math.round(walletBalanceKes / kesPerDay));
-  }
+  const daysRemainingAtPace = runwayDaysAtPace({
+    minutesThisMonth,
+    dayOfMonth,
+    balanceKes: walletBalanceKes,
+  });
 
   const recentLedger: WalletLedgerRow[] = !ledgerRes.error
     ? (ledgerRes.data || []).map((row) => ({

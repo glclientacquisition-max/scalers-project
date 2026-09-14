@@ -65,4 +65,54 @@ describe("home overview craft", () => {
     assert.match(page, /didDisplay/);
     assert.match(page, /\+254 \$1 \$2 \$3/);
   });
+
+  it("renders the day digest only from a complete window", () => {
+    assert.match(page, /homeDigestLine\(inbox\.items, dayStart, vertical\)/);
+    assert.match(page, /inbox\.callsTruncated/);
+    const purpose = read("dashboard/src/lib/inboxPurpose.ts");
+    assert.match(purpose, /export function homeDigestLine/);
+    assert.match(purpose, /canonicalInboxIntent\(item\.intent\) === "complaint"/);
+    const load = read("dashboard/src/lib/inboxLoad.ts");
+    assert.match(load, /callsTruncated/);
+  });
+
+  it("composes the digest line honestly", () => {
+    const dayStartMs = Date.parse("2026-09-14T00:00:00+03:00");
+    const at = (iso) => Date.parse(iso);
+    const item = (over) => ({
+      createdAt: "2026-09-14T10:00:00+03:00",
+      purpose: "answered",
+      intent: "hours_open",
+      job: null,
+      ...over,
+    });
+    function digestLine(items) {
+      const today = items.filter((i) => at(i.createdAt) >= dayStartMs);
+      const answered = today.filter((i) => i.purpose === "answered").length;
+      const booked = today.filter((i) => i.job && at(i.job.created_at) >= dayStartMs).length;
+      const complaints = today.filter((i) => i.intent === "complaint").length;
+      const bits = [];
+      if (answered > 0) bits.push(`${answered} answered`);
+      if (booked > 0) bits.push(`${booked} ${booked === 1 ? "visit" : "visits"}`);
+      if (complaints > 0) bits.push(`${complaints} complaint${complaints === 1 ? "" : "s"}`);
+      return bits.length ? `Today: ${bits.join(", ")}.` : null;
+    }
+    assert.equal(digestLine([]), null);
+    assert.equal(
+      digestLine([item({}), item({}), item({ purpose: "human", intent: "complaint" })]),
+      "Today: 2 answered, 1 complaint."
+    );
+    assert.equal(
+      digestLine([
+        item({}),
+        item({ purpose: "job", job: { created_at: "2026-09-14T09:00:00+03:00" } }),
+        item({ purpose: "job", job: { created_at: "2026-09-13T09:00:00+03:00" } }),
+      ]),
+      "Today: 1 answered, 1 visit."
+    );
+    assert.equal(
+      digestLine([item({ createdAt: "2026-09-13T23:00:00+03:00" })]),
+      null
+    );
+  });
 });
