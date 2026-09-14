@@ -4,6 +4,7 @@ import {
   parseBusinessSettingsTab,
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
+import { getCurrentTenant } from "@/lib/tenant";
 import { DeskError } from "@/components/ui/DeskError";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */

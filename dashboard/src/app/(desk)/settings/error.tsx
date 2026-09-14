@@ -4,7 +4,6 @@ import { btnPrimary } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
 
 export default function SettingsError({
-  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
