@@ -128,6 +128,12 @@ function numberToEn(n) {
     const head = `${numberToEn(th)} thousand`;
     return rest ? `${head} ${numberToEn(rest)}` : head;
   }
+  if (num < 1000000000) {
+    const m = Math.floor(num / 1000000);
+    const rest = num % 1000000;
+    const head = `${numberToEn(m)} million`;
+    return rest ? `${head} ${numberToEn(rest)}` : head;
+  }
   return String(num);
 }
 
@@ -160,15 +166,42 @@ function numberToSw(n) {
     if (rest < 100) return `${head} ${numberToSwUnder100(rest)}`;
     return `${head} ${numberToSw(rest)}`;
   }
+  if (num < 1000000000) {
+    const m = Math.floor(num / 1000000);
+    const rest = num % 1000000;
+    const head = `milioni ${numberToSw(m)}`;
+    return rest ? `${head} ${numberToSw(rest)}` : head;
+  }
   return String(num);
 }
 
-function speakAmount(amount, lang) {
+const MONEY_UNITS = {
+  kes: { en: 'shillings', sw: 'shilingi' },
+  usd: { en: 'dollars', sw: 'dola' },
+};
+
+/**
+ * Speak an amount with its currency unit. Cents are spoken when present:
+ * M-Pesa payments need the exact figure, so 1,200.50 is never truncated.
+ */
+function speakMoney(amount, lang, unit = 'kes') {
+  const u = MONEY_UNITS[unit] || MONEY_UNITS.kes;
   const whole = Math.floor(amount);
+  const cents = Math.round((amount - whole) * 100);
   if (lang === 'sw') {
-    return `shilingi ${numberToSw(whole)}`;
+    const parts = [];
+    if (whole > 0) parts.push(`${u.sw} ${numberToSw(whole)}`);
+    if (cents > 0) parts.push(`senti ${numberToSw(cents)}`);
+    return parts.join(' na ') || `${u.sw} sifuri`;
   }
-  return `${numberToEn(whole)} shillings`;
+  const parts = [];
+  if (whole > 0) parts.push(`${numberToEn(whole)} ${u.en}`);
+  if (cents > 0) parts.push(`${numberToEn(cents)} cents`);
+  return parts.join(' and ') || `zero ${u.en}`;
+}
+
+function speakAmount(amount, lang) {
+  return speakMoney(amount, lang, 'kes');
 }
 
 function speakNumber(amount, lang) {
@@ -192,7 +225,22 @@ function formatAmountRange(rawA, rawB, lang, withUnit) {
 }
 
 const AMOUNT_CAPTURE = '([\\d,]+(?:\\.\\d{1,2})?)';
-const RANGE_DASH = '\\s*[-–—]\\s*';
+const RANGE_DASH = '(?:\\s*[-–—]\\s*|\\s+(?:to|hadi)\\s+)';
+const KES_PREFIX = '(?:kes|kshs|ksh|shillings?|sh)';
+
+/**
+ * Kenyan shorthand thousands: 50k → 50000, 1.5k → 1500.
+ * Rewrites to digits so downstream money rules can claim them (KES 5k).
+ * Guards block 5km / 10kg.
+ * @param {string} text
+ */
+function expandKThousands(text) {
+  return String(text || '').replace(/\b(\d+(?:\.\d+)?)k(?!\w)/gi, (full, raw) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return full;
+    return String(Math.round(n * 1000));
+  });
+}
 
 /**
  * Expand KES / Ksh / bob money amounts into spoken words.
@@ -204,16 +252,16 @@ function expandMoney(text, lang = 'en') {
   let out = String(text || '');
   const ttsLang = lang === 'sw' ? 'sw' : 'en';
 
-  // Prefix range: KSh 500-800 / KES 1,500–2,000/=
+  // Prefix range: KSh 500-800 / KES 1,500–2,000/= / KSh 500 to 800
   out = out.replace(
     new RegExp(
-      `\\b(?:kes|ksh|kshs|sh)\\.?\\s*${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}(?:\\s*(?:kes|ksh|kshs|bob|shillings?)|\\/[=-])?`,
+      `\\b${KES_PREFIX}\\.?\\s*${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}(?:\\s*(?:kes|ksh|kshs|bob|shillings?)|\\/[=-])?`,
       'gi'
     ),
     (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
   );
 
-  // Suffix range: 500-800 bob / 1,500-2,000 shillings
+  // Suffix range: 500-800 bob / 1,500-2,000 shillings / 500 to 800 bob
   out = out.replace(
     new RegExp(
       `\\b${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}\\s*(?:kes|ksh|kshs|bob|shillings?)\\b`,
@@ -222,26 +270,46 @@ function expandMoney(text, lang = 'en') {
     (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
   );
 
-  // Receipt-range: 500-800/= or 500-800/-
+  // Receipt-range: 500-800/= or 500-800/- (optional currency prefix)
   out = out.replace(
     new RegExp(
-      `\\b${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}\\/[=-](?!\\w)`,
+      `\\b(?:${KES_PREFIX}\\.?\\s*)?${AMOUNT_CAPTURE}${RANGE_DASH}${AMOUNT_CAPTURE}\\/[=-](?!\\w)`,
       'gi'
     ),
     (full, a, b) => formatAmountRange(a, b, ttsLang, true) || full
   );
 
-  // Receipt shorthand: 1500/= or 500/-
+  // Receipt shorthand: 1500/= or 500/- (optional currency prefix so
+  // "KSh 500/-" never strands a spelled-out "KSh" before the words)
   out = out.replace(
-    new RegExp(`\\b${AMOUNT_CAPTURE}\\/[=-](?!\\w)`, 'gi'),
+    new RegExp(`\\b(?:${KES_PREFIX}\\.?\\s*)?${AMOUNT_CAPTURE}\\/[=-](?!\\w)`, 'gi'),
     (full, raw) => {
       const amount = parseAmount(raw);
       return amount == null ? full : speakAmount(amount, ttsLang);
     }
   );
 
+  // USD prefix: USD 100 / US$100 / $100
+  // ($ is non-word so \b cannot guard it; the digit capture anchors the match)
   out = out.replace(
-    /\b(?:kes|ksh|kshs|sh)\.?\s*([\d,]+(?:\.\d{1,2})?)\b/gi,
+    /(?:\busd\b|\bus\$|\$)\s*([\d,]+(?:\.\d{1,2})?)\b/gi,
+    (full, raw) => {
+      const amount = parseAmount(raw);
+      return amount == null ? full : speakMoney(amount, ttsLang, 'usd');
+    }
+  );
+
+  // USD suffix: 100 dollars
+  out = out.replace(
+    /\b([\d,]+(?:\.\d{1,2})?)\s*(?:us\s*)?dollars?\b/gi,
+    (full, raw) => {
+      const amount = parseAmount(raw);
+      return amount == null ? full : speakMoney(amount, ttsLang, 'usd');
+    }
+  );
+
+  out = out.replace(
+    new RegExp(`\\b${KES_PREFIX}\\.?\\s*([\\d,]+(?:\\.\\d{1,2})?)\\b`, 'gi'),
     (full, raw) => {
       const amount = parseAmount(raw);
       return amount == null ? full : speakAmount(amount, ttsLang);
@@ -518,6 +586,7 @@ function expandPhones(text) {
 function expandSpokenForms(text, lang = 'en') {
   let out = String(text || '');
   out = expandTimeRanges12h(out, lang);
+  out = expandKThousands(out);
   out = expandMoney(out, lang);
   out = expandBarePriceInContext(out, lang);
   out = expandIdentifiers(out);
@@ -531,6 +600,7 @@ function expandSpokenForms(text, lang = 'en') {
 module.exports = {
   expandMoney,
   expandBarePriceInContext,
+  expandKThousands,
   expandTimeRanges12h,
   expandIdentifiers,
   expandNumberUnitRanges,
@@ -542,4 +612,5 @@ module.exports = {
   numberToEn,
   numberToSw,
   speakAmount,
+  speakMoney,
 };

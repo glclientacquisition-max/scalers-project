@@ -28,7 +28,7 @@
       "text": "KSh 1,200.50",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "one thousand two hundred shillings"
+      "expectProductionText": "one thousand two hundred shillings and fifty cents"
     },
     {
       "id": "04-price-range",
@@ -387,6 +387,78 @@
       "callLanguage": "en",
       "expectLanguage": "en",
       "expectProductionText": "Order number 4 5 6 7 8."
+    },
+    {
+      "id": "44-currency-receipt-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "KSh 500/-",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five hundred shillings"
+    },
+    {
+      "id": "45-currency-k-thousands",
+      "group": "universal",
+      "category": "currency",
+      "text": "KES 5k",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five thousand shillings"
+    },
+    {
+      "id": "46-currency-shillings-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "Shillings 5,000 only.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five thousand shillings only."
+    },
+    {
+      "id": "47-currency-usd-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "USD 100 per night.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "one hundred dollars per night."
+    },
+    {
+      "id": "48-currency-usd-cents",
+      "group": "universal",
+      "category": "currency",
+      "text": "USD 99.99.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "ninety nine dollars and ninety nine cents."
+    },
+    {
+      "id": "49-currency-to-range",
+      "group": "universal",
+      "category": "currency",
+      "text": "KSh 500 to 800.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five hundred shillings to eight hundred shillings."
+    },
+    {
+      "id": "50-currency-millions",
+      "group": "universal",
+      "category": "currency",
+      "text": "KSh 1,000,000.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "one million shillings."
+    },
+    {
+      "id": "51-currency-sw-receipt-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "Bei ni Ksh 2,500/=.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectProductionText": "Bei ni shilingi elfu mbili mia tano."
     },
     {
       "id": "19-lexicon-brand",

@@ -1,3 +1,35 @@
+# Currency read wrong — stranded codes, k-shorthand, silent cents (2026-09-14)
+
+Owner report: before merging the figures fix, work currency deeply too.
+
+Audit of the money path in `prepareForTts` (`expandMoney` and friends), realistic Kenyan forms:
+
+| Caller heard | Text that survived the net |
+| --- | --- |
+| "kay ess aitch five hundred shillings" | `KSh 500/-`, `KSh 500/=`, `Bei ni Ksh 2,500/=` — the receipt rule claimed the amount but left the currency code stranded, spelled out letter by letter. |
+| "kay ee ess five kay" | `KES 5k` — Kenyan k-shorthand (`50k`, `1.5k`) never expanded, so the money rule saw `5` and gave up on the `k`. |
+| "shillings five thousand" | `Shillings 5,000` — `shillings` was not a recognized prefix word. |
+| "you ess dee one hundred" | `USD 100`, `$100`, `100 dollars` — no dollar handling at all (Airbnb / tour quotes). |
+| "one thousand two hundred shillings" for `KSh 1,200.50` | cents were silently truncated — wrong amount for an M-Pesa payment. |
+| "five hundred shillings to eight hundred" | `KSh 500 to 800` — only dash ranges converted; the `to` / `hadi` joiner left the right side a numeral. |
+| "1000000 shillings" | `KSh 1,000,000` — the number-to-words ladder stopped below a million. |
+
+Fix (Voice, net layer):
+
+1. Receipt shorthand and receipt ranges now absorb an optional currency prefix, so `KSh 500/-` is one match and no code is stranded.
+2. `expandKThousands` — `5k` → `5000`, `1.5k` → `1500` as digits before money runs, so `KES 5k` becomes `five thousand shillings`. Guards keep `5km` and `10kg` intact.
+3. `shillings` joins the prefix word list.
+4. USD support — `USD 100`, `US$100`, `$100`, `100 dollars` → `one hundred dollars` (SW `dola …`).
+5. Cents are spoken, never truncated: `KSh 1,200.50` → `one thousand two hundred shillings and fifty cents` (SW `… na senti hamsini`). Exact amounts matter for M-Pesa.
+6. Range joiner accepts `to` and `hadi` alongside dashes.
+7. `numberToEn` / `numberToSw` climb to a billion (`one million`, `milioni mbili …`).
+
+Protected per fixture: `5km away`, `10kg bag`, bare quantities, phones, identifiers.
+
+Regression: 7 new cases in `tests/ttsNormalize.test.js`, 8 new universal fixtures (`44`–`51`), fixture `03` updated to lock spoken cents. `npm run test:voice` green.
+
+---
+
 # Figures read wrong — till numbers, compact ranges, 24/7 (2026-09-14)
 
 Owner report: the workflow behind figures does not perform — numbers come out wrong on calls.
