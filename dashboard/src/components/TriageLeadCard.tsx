@@ -1,9 +1,9 @@
-import Link from "next/link";
 import {
   MarkLeadArchiveButton,
   MarkLeadDoneButton,
 } from "@/components/MarkLeadDoneButton";
 import { waMeHref } from "@/components/WhatsAppLink";
+import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import {
   followUpWhatsAppMessage,
   formatCallWhen,
@@ -23,23 +23,8 @@ function WhatsAppGlyph({ className }: { className?: string }) {
   );
 }
 
-function OpenGlyph({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-      className={className}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M8 7h9v9" />
-    </svg>
-  );
-}
-
 /**
- * Overview / inbox lead row: one primary WhatsApp hit target, muted secondary actions.
+ * Lead card: tap opens the conversation. WhatsApp is the only filled verb.
  */
 export function TriageLeadCard({
   lead,
@@ -63,11 +48,12 @@ export function TriageLeadCard({
   return (
     <li
       className={[
-        "rounded-2xl border bg-surface px-5 py-5",
+        "relative rounded-2xl border bg-surface px-5 py-5",
         lead.urgent ? "border-warn/45" : "border-line",
       ].join(" ")}
     >
-      <div className="space-y-1">
+      <DeskRowHit href={detailHref} label="Conversation" />
+      <div className={`${deskRowMutedClass} space-y-1`}>
         <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
           {formatCallWhen(lead.call.created_at)}
           {lead.urgent ? (
@@ -85,7 +71,7 @@ export function TriageLeadCard({
           href={waHref}
           target="_blank"
           rel="noreferrer"
-          className="mt-5 flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-[#005CCC] px-4 py-3.5 text-center text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#004AAD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2"
+          className={`${deskRowActionClass} mt-5 flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-[#005CCC] px-4 py-3.5 text-center text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition hover:bg-[#004AAD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2`}
         >
           <span className="inline-flex items-center gap-2 text-base font-semibold">
             <WhatsAppGlyph className="h-5 w-5 shrink-0" />
@@ -94,22 +80,14 @@ export function TriageLeadCard({
           <span className="text-sm font-medium text-white">{phone}</span>
         </a>
       ) : (
-        <p className="mt-5 rounded-xl border border-line bg-surface-muted/50 px-4 py-3 text-center text-sm font-medium text-ink-soft">
+        <p className={`${deskRowMutedClass} mt-5 rounded-xl border border-line bg-surface-muted/50 px-4 py-3 text-center text-sm font-medium text-ink-soft`}>
           {phone}
         </p>
       )}
 
-      <div className="mt-4 flex items-center justify-end gap-1 border-t border-line/80 pt-3">
+      <div className={`${deskRowActionClass} mt-4 flex items-center justify-end gap-1 border-t border-line/80 pt-3`}>
         <MarkLeadArchiveButton callId={lead.call.id} variant="icon" />
         <MarkLeadDoneButton callId={lead.call.id} variant="icon" />
-        <Link
-          href={detailHref}
-          aria-label="Open call"
-          title="Open call"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
-        >
-          <OpenGlyph className="h-4 w-4" />
-        </Link>
       </div>
     </li>
   );

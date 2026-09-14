@@ -17,7 +17,7 @@ Brand ribbon: `#0096FF`. Filled primary CTA: `#005CCC` with a white label.
 ## 2. ANTI-CONGESTION & SCANNABILITY (GESTALT PRINCIPLES)
 
 - **Zero vertical sprawl:** Never allow forms, cards, or lists to congest the vertical viewport. Hardcode all `textarea` defaults to `rows={2}` with auto-expand.
-- **Data density over cards:** Prefer dense, horizontal data tables or inline rows over massive, padded stacked cards for lists (Calls, Requests, Catalogs, Teams).
+- **Data density over cards:** Prefer dense, horizontal data tables or inline rows over massive, padded stacked cards for lists (Calls, Requests, Catalogs, Teams). Tap the row to open the record. Do not add Call, Open, or View columns.
 - **Split-pane enforcement:** When displaying contextual data alongside a transcript or complex detail view, always use a side-by-side grid (Summary on left, Details on right). Never stack them vertically.
 
 ## 3. ACTION VELOCITY (FITTS'S LAW)

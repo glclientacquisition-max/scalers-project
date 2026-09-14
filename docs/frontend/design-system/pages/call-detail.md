@@ -5,4 +5,6 @@
 
 **Primary CTA:** Reply on WhatsApp. Brand-blue fill, white WhatsApp glyph (green-on-blue fails WCAG 1.4.11). Compact table icons may stay green on white. `min-h-11` or larger.
 
+**Visit / Hold:** Confirm or Done full width. Cancel ghost below. Not on the list.
+
 **Stamp:** Same owner-language signal as Inbox (Confirm visit, Hold, Human asked). Not Job / Hold taxonomy.

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
+import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
@@ -124,35 +125,29 @@ export default async function ContactDetailPage({
                       >
                         What
                       </th>
-                      <th scope="col" className="px-5 py-4">
-                        <span className="sr-only">Call</span>
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {timeline.map((entry) => (
-                      <tr key={entry.id} className="border-t border-line/70">
-                        <td className="whitespace-nowrap px-5 py-4 text-ink-soft">
+                      <tr
+                        key={entry.id}
+                        className={[
+                          "relative border-t border-line/70",
+                          entry.callId ? "cursor-pointer hover:bg-[#0096FF]/[0.04]" : "",
+                        ].join(" ")}
+                      >
+                        <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 text-ink-soft`}>
+                          {entry.callId ? (
+                            <DeskRowHit href={`/calls/${entry.callId}`} label="Conversation" />
+                          ) : null}
                           {formatCallWhen(entry.createdAt)}
                         </td>
-                        <td className="px-5 py-4 text-ink">{kindLabel(entry.kind)}</td>
-                        <td className="px-5 py-4">
+                        <td className={`${deskRowMutedClass} px-5 py-4 text-ink`}>{kindLabel(entry.kind)}</td>
+                        <td className={`${deskRowMutedClass} px-5 py-4`}>
                           <p className="font-medium text-ink">{entry.headline}</p>
                           {entry.detail ? (
                             <p className="mt-0.5 text-ink-soft">{entry.detail}</p>
                           ) : null}
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          {entry.callId ? (
-                            <Link
-                              href={`/calls/${entry.callId}`}
-                              className="inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-                            >
-                              Call
-                            </Link>
-                          ) : (
-                            <span className="text-sm text-ink-soft">No call</span>
-                          )}
                         </td>
                       </tr>
                     ))}

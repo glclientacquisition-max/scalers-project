@@ -137,7 +137,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 ## 7. Copy voice
 
 - Scan, do not educate.
-- Prefer “Requests”, “Open”, “Reply on WhatsApp”, “Save”.
+- Prefer Confirm, Save, Reply on WhatsApp. Lists have no Open, Call, or View column. Tap the row to open the record.
 - Stamps name the next action in the workspace niche: Confirm visit, Pickup, Confirm booking, Human asked, Missed.
 - Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday).
 - Ban: em dash, en dash, “How to test” as a story, “Coming soon” filler.

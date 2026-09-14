@@ -35,7 +35,9 @@ describe("home overview craft", () => {
     assert.match(page, /nextReturn/);
     assert.match(page, /Next to return/);
     assert.match(page, /Reply on WhatsApp/);
-    assert.match(page, /Open call/);
+    assert.match(page, /DeskRowHit/);
+    assert.match(page, /Conversation/);
+    assert.doesNotMatch(page, /Open call/);
     assert.match(page, /lg:col-span-7/);
     assert.match(page, /lg:col-span-5/);
   });

@@ -29,6 +29,7 @@ import {
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 
 export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
@@ -257,27 +258,31 @@ export default async function HomeOverviewPage() {
           {nextReturn && (nextReturn.callerPhone || nextReturn.callId) ? (
             <section
               aria-labelledby="next-return-heading"
-              className="mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
+              className="relative mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
             >
+              <DeskRowHit
+                href={nextReturn.callId ? `/calls/${nextReturn.callId}?from=needs` : null}
+                label="Conversation"
+              />
               <h2
                 id="next-return-heading"
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft"
+                className={`${deskRowMutedClass} text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft`}
               >
                 Next to return
               </h2>
-              <p className="mt-2 text-sm font-semibold tracking-tight text-ink">
+              <p className={`${deskRowMutedClass} mt-2 text-sm font-semibold tracking-tight text-ink`}>
                 {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
                 {nextReturnWhen ? (
                   <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
                 ) : null}
               </p>
               {nextReturnReason ? (
-                <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">
+                <p className={`${deskRowMutedClass} mt-0.5 line-clamp-2 text-sm text-ink-soft`}>
                   {nextReturnReason}
                 </p>
               ) : null}
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                {nextReturn.callerPhone ? (
+              {nextReturn.callerPhone ? (
+                <div className={`${deskRowActionClass} mt-3`}>
                   <WhatsAppLink
                     number={nextReturn.callerPhone}
                     message={followUpWhatsAppMessage({
@@ -288,16 +293,8 @@ export default async function HomeOverviewPage() {
                     variant="ghost"
                     label="Reply on WhatsApp"
                   />
-                ) : null}
-                {nextReturn.callId ? (
-                  <Link
-                    href={`/calls/${nextReturn.callId}?from=needs`}
-                    className={`inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline ${focusRingVisible}`}
-                  >
-                    Open call
-                  </Link>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </section>
           ) : null}
         </section>

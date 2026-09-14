@@ -3,6 +3,11 @@ import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import {
+  DeskRowHit,
+  deskRowActionClass,
+  deskRowMutedClass,
+} from "@/components/ui/deskRowHit";
 import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
 import {
   holdTypeLabel,
@@ -81,17 +86,6 @@ function InboxTrailingAction({
   return null;
 }
 
-function ConversationHit({ href }: { href: string | null }) {
-  if (!href) return null;
-  return (
-    <Link
-      href={href}
-      aria-label="Conversation"
-      className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
-    />
-  );
-}
-
 export function InboxTableRow({
   item,
   businessName,
@@ -130,18 +124,18 @@ export function InboxTableRow({
       {kind === "hold" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <ConversationHit href={openHref} />
-            <p className="relative z-[1] pointer-events-none text-sm font-semibold tracking-tight text-ink">
+            <DeskRowHit href={openHref} label="Conversation" />
+            <p className={`${deskRowMutedClass} text-sm font-semibold tracking-tight text-ink`}>
               {item.headline}
             </p>
-            <p className="relative z-[1] pointer-events-none mt-0.5 text-sm text-ink-soft">
+            <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink-soft`}>
               {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
             </p>
           </td>
-          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top font-medium text-ink">
+          <td className={`${deskRowMutedClass} px-5 py-4 align-top font-medium text-ink`}>
             {item.callerName || "Caller"}
           </td>
-          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top text-sm text-ink-soft">
+          <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             {showHold ? needed : when}
           </td>
         </>
@@ -150,18 +144,18 @@ export function InboxTableRow({
       {kind === "job" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <ConversationHit href={openHref} />
-            <p className="relative z-[1] pointer-events-none text-sm font-semibold tracking-tight text-ink">
+            <DeskRowHit href={openHref} label="Conversation" />
+            <p className={`${deskRowMutedClass} text-sm font-semibold tracking-tight text-ink`}>
               {hasJob ? visit : stamp}
             </p>
-            <p className="relative z-[1] pointer-events-none mt-0.5 text-sm text-ink-soft">
+            <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink-soft`}>
               {item.headline}
             </p>
           </td>
-          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top font-medium text-ink">
+          <td className={`${deskRowMutedClass} px-5 py-4 align-top font-medium text-ink`}>
             {item.callerName || "Caller"}
           </td>
-          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top text-sm text-ink-soft">
+          <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             {hasJob ? place : ""}
           </td>
         </>
@@ -170,27 +164,27 @@ export function InboxTableRow({
       {kind === "mixed" ? (
         <>
           <td className="px-5 py-4 align-top">
-            <ConversationHit href={openHref} />
-            <p className="relative z-[1] pointer-events-none text-sm font-semibold tracking-tight text-ink">
+            <DeskRowHit href={openHref} label="Conversation" />
+            <p className={`${deskRowMutedClass} text-sm font-semibold tracking-tight text-ink`}>
               {who}
             </p>
-            <p className="relative z-[1] pointer-events-none mt-0.5 text-sm text-ink">{item.headline}</p>
+            <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink`}>{item.headline}</p>
             {item.detail ? (
-              <p className="relative z-[1] pointer-events-none mt-1 line-clamp-1 text-sm text-ink-soft">
+              <p className={`${deskRowMutedClass} mt-1 line-clamp-1 text-sm text-ink-soft`}>
                 {item.detail}
               </p>
             ) : null}
           </td>
-          <td className="relative z-[1] pointer-events-none px-5 py-4 align-top">
+          <td className={`${deskRowMutedClass} px-5 py-4 align-top`}>
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
           </td>
-          <td className="relative z-[1] pointer-events-none whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft">
+          <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
             {when}
           </td>
         </>
       ) : null}
 
-      <td className="relative z-10 whitespace-nowrap px-5 py-4 align-middle">
+      <td className={`${deskRowActionClass} whitespace-nowrap px-5 py-4 align-middle`}>
         <div className="flex justify-end">
           <InboxTrailingAction item={item} message={message} />
         </div>
@@ -252,7 +246,7 @@ export function InboxPhoneRow({
       ) : (
         <div className="min-w-0 flex-1">{body}</div>
       )}
-      <div className="relative z-10 flex shrink-0 items-center self-center">
+      <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
         <InboxTrailingAction item={item} message={message} />
       </div>
     </li>

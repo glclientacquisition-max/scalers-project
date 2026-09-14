@@ -3,6 +3,7 @@ import { AddContactPanel } from "@/components/AddContactPanel";
 import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
@@ -153,20 +154,20 @@ export default async function ContactsPage({
         <>
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {rows.map((row) => (
-              <li key={row.id} className="border-t border-line/70 px-4 py-3.5 first:border-t-0">
-                <p className="text-base font-semibold tracking-tight text-ink">
-                  {row.name?.trim() || "Unknown"}
-                </p>
-                <p className="mt-1 font-mono text-sm text-ink">{row.phone || "No phone"}</p>
-                <p className="mt-1 text-sm text-ink-soft">
-                  {row.lastReasonDisplay || "None"}
-                  {row.lastContactAt ? ` · ${formatCallWhenRelative(row.lastContactAt)}` : ""}
-                </p>
+              <li key={row.id} className="border-t border-line/70 first:border-t-0">
                 <Link
                   href={`/contacts/${row.id}`}
-                  className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                  aria-label={row.name?.trim() || "Contact"}
+                  className="block px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
                 >
-                  Open
+                  <p className="text-base font-semibold tracking-tight text-ink">
+                    {row.name?.trim() || "Unknown"}
+                  </p>
+                  <p className="mt-1 font-mono text-sm text-ink">{row.phone || "No phone"}</p>
+                  <p className="mt-1 text-sm text-ink-soft">
+                    {row.lastReasonDisplay || "None"}
+                    {row.lastContactAt ? ` · ${formatCallWhenRelative(row.lastContactAt)}` : ""}
+                  </p>
                 </Link>
               </li>
             ))}
@@ -199,40 +200,30 @@ export default async function ContactsPage({
                   >
                     Last contact
                   </th>
-                  <th scope="col" className="px-5 py-4">
-                    <span className="sr-only">Open</span>
-                  </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="group border-t border-line/70 transition duration-150 hover:bg-[#0096FF]/[0.04]"
+                    className="group relative cursor-pointer border-t border-line/70 transition duration-150 hover:bg-[#0096FF]/[0.04]"
                   >
                     <td className="px-5 py-5 align-top">
-                      <p className="text-base font-semibold tracking-tight text-ink">
+                      <DeskRowHit href={`/contacts/${row.id}`} label={row.name?.trim() || "Contact"} />
+                      <p className={`${deskRowMutedClass} text-base font-semibold tracking-tight text-ink`}>
                         {row.name?.trim() || "Unknown"}
                       </p>
                     </td>
-                    <td className="px-5 py-5 align-top font-mono text-sm text-ink">
+                    <td className={`${deskRowMutedClass} px-5 py-5 align-top font-mono text-sm text-ink`}>
                       {row.phone || "No phone"}
                     </td>
-                    <td className="px-5 py-5 align-top text-sm text-ink-soft">
+                    <td className={`${deskRowMutedClass} px-5 py-5 align-top text-sm text-ink-soft`}>
                       {row.lastReasonDisplay || "None"}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
+                    <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft`}>
                       {row.lastContactAt
                         ? formatCallWhenRelative(row.lastContactAt)
                         : "None"}
-                    </td>
-                    <td className="px-5 py-5 align-top text-right">
-                      <Link
-                        href={`/contacts/${row.id}`}
-                        className="inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] transition duration-150 hover:text-[#004a99] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-                      >
-                        Open
-                      </Link>
                     </td>
                   </tr>
                 ))}
