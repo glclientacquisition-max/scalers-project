@@ -96,6 +96,67 @@ function kenyaRows() {
 
 const KENYA_ROWS = kenyaRows();
 
+/**
+ * Two real names STT often swaps. Never silent-rewrite one to the other.
+ * Ask once, or keep a returning-file spelling on a near miss.
+ */
+const NAME_COLLISION_GROUPS = [
+  ['Colin', 'Collins'],
+  ['Brian', 'Bryan'],
+  ['John', 'Jon'],
+  ['Ann', 'Anne'],
+  ['Sara', 'Sarah'],
+  ['Philip', 'Phillip'],
+  ['Stephen', 'Steven'],
+  ['Catherine', 'Katherine'],
+];
+
+function collisionGroupFor(name) {
+  const key = compactNameKey(name);
+  if (!key) return null;
+  for (const group of NAME_COLLISION_GROUPS) {
+    if (group.some((option) => compactNameKey(option) === key)) {
+      return [...group];
+    }
+  }
+  return null;
+}
+
+function sameCollisionGroup(a, b) {
+  const left = compactNameKey(a);
+  const right = compactNameKey(b);
+  if (!left || !right) return false;
+  const group = collisionGroupFor(a);
+  if (!group) return false;
+  return group.some((option) => compactNameKey(option) === right);
+}
+
+function pairMember(name, group) {
+  const key = compactNameKey(name);
+  if (!key || !Array.isArray(group)) return null;
+  return group.find((option) => compactNameKey(option) === key) || null;
+}
+
+/**
+ * Caller picked one side of a collision or spelled it.
+ */
+function pickCollisionChoice(text, group) {
+  if (!Array.isArray(group) || !group.length) return null;
+  const spelled = parseSpelledCallerName(text);
+  if (spelled) {
+    const fromSpelling = pairMember(spelled, group);
+    if (fromSpelling) return fromSpelling;
+  }
+  const raw = String(text || '');
+  let hit = null;
+  for (const option of group) {
+    const re = new RegExp(`\\b${option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (!re.test(raw)) continue;
+    if (!hit || option.length > hit.length) hit = option;
+  }
+  return hit;
+}
+
 function scoreKenyaRow(heardKey, row) {
   if (!heardKey) return 0;
   if (heardKey === row.key) return 100;
@@ -130,7 +191,8 @@ function bestKnownMatch(heard, knownNames = []) {
     const name = String(row?.name || row || '').trim();
     const key = compactNameKey(name);
     if (!key) continue;
-    const score = fuzzyScore(heardKey, key);
+    const collision = sameCollisionGroup(heardKey, key) ? 90 : 0;
+    const score = Math.max(fuzzyScore(heardKey, key), collision);
     if (score <= 0) continue;
     if (!best || score > best.score) {
       best = {
@@ -218,7 +280,7 @@ function namesLikelySame(a, b) {
   if (rightKenya && compactNameKey(rightKenya.canonical) === compactNameKey(left)) {
     return true;
   }
-  return false;
+  return sameCollisionGroup(left, right);
 }
 
 function preferredContactSpelling(primary, incoming) {
@@ -226,6 +288,9 @@ function preferredContactSpelling(primary, incoming) {
   if (kenyaIncoming) return kenyaIncoming.canonical;
   const kenyaPrimary = bestKenyaMatch(primary);
   if (kenyaPrimary) return kenyaPrimary.canonical;
+  if (primary && incoming && sameCollisionGroup(primary, incoming)) {
+    return String(primary).trim();
+  }
   return String(primary || incoming || '').trim() || null;
 }
 
@@ -249,6 +314,7 @@ function collectKnownCallerNames({ profile = null, state = null } = {}) {
 
 module.exports = {
   KENYA_GIVEN_NAMES,
+  NAME_COLLISION_GROUPS,
   compactNameKey,
   parseSpelledCallerName,
   matchCallerName,
@@ -256,4 +322,7 @@ module.exports = {
   namesLikelySame,
   preferredContactSpelling,
   collectKnownCallerNames,
+  collisionGroupFor,
+  sameCollisionGroup,
+  pickCollisionChoice,
 };

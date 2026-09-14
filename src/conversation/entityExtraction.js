@@ -6,8 +6,10 @@ const { normalizeLocations } = require('./businessLocations');
 const {
   canonicalizeCallerName,
   collectKnownCallerNames,
+  collisionGroupFor,
   namesLikelySame,
   parseSpelledCallerName,
+  pickCollisionChoice,
 } = require('./callerNameMatch');
 
 function normalizeText(value) {
@@ -161,90 +163,160 @@ function extractCorrectedName(text, opts = {}) {
   });
 }
 
+function fileLockedName(name, knownNames = []) {
+  const { matchCallerName } = require('./callerNameMatch');
+  const hit = matchCallerName(name, { knownNames, preferKnown: true });
+  if (!hit || hit.score < 85) return null;
+  if (hit.source === 'memory' || hit.source === 'file') return hit.canonical;
+  return null;
+}
+
 /**
  * One-time name confirm/correct after first capture.
  * First extract stays unconfirmed. Next caller turn: negation+new name
  * overwrites; yes/continue confirms; later extracts may update without re-asking.
  * STT variants of a known name fold to that spelling instead of overwriting.
+ * Collision pairs (Colin/Collins) stay unconfirmed until the caller picks or spells.
  */
-function applyCallerNameConfirmation(previous = {}, text = '', incomingEntities = {}) {
+function applyCallerNameConfirmation(
+  previous = {},
+  text = '',
+  incomingEntities = {},
+  opts = {}
+) {
   const entities = { ...(incomingEntities || {}) };
   const prevName =
     String(previous?.caller?.name || '').trim() ||
     entityValue(previous?.entities?.name);
   const prevConfirmed = previous?.caller?.nameConfirmed === true;
   const extracted = entityValue(entities.name);
+  const source = entities.name?.source || 'caller_explicit';
+  const knownNames = opts.knownNames || [];
+  const pendingPair = Array.isArray(previous?.caller?.nameCollision)
+    ? previous.caller.nameCollision
+    : null;
+  const collisionPick = pendingPair ? pickCollisionChoice(text, pendingPair) : null;
 
   function samePerson(a, b) {
     return Boolean(a && b && namesLikelySame(a, b));
   }
 
-  function stamp(name, source, confirmed, confidence = 0.95) {
+  function stamp(name, nextSource, confirmed, confidence = 0.95) {
     if (!name) return entities;
-    entities.name = entity(name, source, confidence, confirmed);
+    entities.name = entity(name, nextSource, confidence, confirmed);
     return entities;
+  }
+
+  function done(name, confirmed, nextSource, confidence, nameCollision = null) {
+    if (name) stamp(name, nextSource || source, confirmed, confidence);
+    return {
+      name: name || null,
+      nameConfirmed: Boolean(confirmed && name),
+      entities,
+      nameCollision: confirmed || !nameCollision ? null : nameCollision,
+    };
+  }
+
+  if (collisionPick) {
+    return done(collisionPick, true, 'caller_collision_pick', 0.98);
+  }
+  if (pendingPair && source === 'caller_spelled' && extracted) {
+    return done(extracted, true, 'caller_spelled', 0.98);
+  }
+  if (pendingPair && source === 'caller_collision_pick' && extracted) {
+    return done(extracted, true, 'caller_collision_pick', 0.98);
   }
 
   if (prevConfirmed) {
     if (isNameNegation(text)) {
-      const corrected = extractCorrectedName(text);
+      const corrected = extractCorrectedName(text, { knownNames });
       if (corrected) {
-        stamp(corrected, 'caller_correction', true, 0.98);
-        return { name: corrected, nameConfirmed: true, entities };
+        const nextPair = collisionGroupFor(corrected);
+        const locked = fileLockedName(corrected, knownNames);
+        if (nextPair && !locked) {
+          return done(corrected, false, 'caller_correction', 0.98, nextPair);
+        }
+        return done(corrected, true, 'caller_correction', 0.98);
       }
-      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
-      return { name: prevName, nameConfirmed: false, entities };
+      return done(prevName, false, previous?.entities?.name?.source || 'caller_explicit', 0.9);
     }
     if (extracted && extracted !== prevName) {
       if (samePerson(extracted, prevName)) {
-        stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
-        return { name: prevName, nameConfirmed: true, entities };
+        return done(prevName, true, previous?.entities?.name?.source || 'caller_explicit', 0.95);
       }
-      stamp(extracted, entities.name?.source || 'caller_explicit', true);
-      return { name: extracted, nameConfirmed: true, entities };
+      return done(extracted, true, source, 0.95);
     }
-    if (prevName) stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
-    return { name: prevName || extracted || null, nameConfirmed: true, entities };
+    return done(
+      prevName || extracted || null,
+      true,
+      previous?.entities?.name?.source || 'caller_explicit',
+      0.95
+    );
   }
 
   if (!prevName && extracted) {
-    const source = entities.name?.source || 'caller_explicit';
-    const autoConfirm = source === 'caller_explicit' || source === 'caller_spelled';
-    stamp(extracted, source, autoConfirm, entities.name?.confidence || 0.9);
-    return { name: extracted, nameConfirmed: autoConfirm, entities };
+    const locked = fileLockedName(extracted, knownNames);
+    if (locked) {
+      return done(locked, true, 'caller_file', 0.95);
+    }
+    if (source === 'caller_spelled') {
+      return done(extracted, true, source, entities.name?.confidence || 0.98);
+    }
+    const nextPair = collisionGroupFor(extracted);
+    const autoConfirm = source === 'caller_explicit' && !nextPair;
+    return done(
+      extracted,
+      autoConfirm,
+      source,
+      entities.name?.confidence || 0.9,
+      nextPair
+    );
   }
 
   if (prevName) {
     if (isHearAgainSignal(text)) {
-      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
-      return { name: prevName, nameConfirmed: false, entities };
+      return done(
+        prevName,
+        false,
+        previous?.entities?.name?.source || 'caller_explicit',
+        0.9,
+        pendingPair || collisionGroupFor(prevName)
+      );
     }
-    const corrected = isNameNegation(text) ? extractCorrectedName(text) : null;
+    const corrected = isNameNegation(text) ? extractCorrectedName(text, { knownNames }) : null;
     if (corrected) {
-      stamp(corrected, 'caller_correction', true, 0.98);
-      return { name: corrected, nameConfirmed: true, entities };
+      const nextPair = collisionGroupFor(corrected);
+      const locked = fileLockedName(corrected, knownNames);
+      if (nextPair && !locked) {
+        return done(corrected, false, 'caller_correction', 0.98, nextPair);
+      }
+      return done(corrected, true, 'caller_correction', 0.98);
     }
     if (isNameNegation(text)) {
-      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
-      return { name: prevName, nameConfirmed: false, entities };
+      return done(
+        prevName,
+        false,
+        previous?.entities?.name?.source || 'caller_explicit',
+        0.9,
+        pendingPair || collisionGroupFor(prevName)
+      );
+    }
+    if (pendingPair) {
+      return done(prevName, false, previous?.entities?.name?.source || 'caller_explicit', 0.9, pendingPair);
     }
     if (extracted && extracted !== prevName) {
       if (samePerson(extracted, prevName)) {
-        stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
-        return { name: prevName, nameConfirmed: true, entities };
+        return done(prevName, true, previous?.entities?.name?.source || 'caller_explicit', 0.95);
       }
-      stamp(extracted, entities.name?.source || 'caller_explicit', true);
-      return { name: extracted, nameConfirmed: true, entities };
+      return done(extracted, true, source, 0.95);
     }
     if (isNameAffirmation(text) || extracted === prevName || String(text || '').trim()) {
-      stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', true);
-      return { name: prevName, nameConfirmed: true, entities };
+      return done(prevName, true, previous?.entities?.name?.source || 'caller_explicit', 0.95);
     }
-    stamp(prevName, previous?.entities?.name?.source || 'caller_explicit', false);
-    return { name: prevName, nameConfirmed: false, entities };
+    return done(prevName, false, previous?.entities?.name?.source || 'caller_explicit', 0.9);
   }
 
-  return { name: extracted || null, nameConfirmed: false, entities };
+  return done(extracted || null, false, source, 0.9);
 }
 
 const NAME_BLOCKLIST = new Set([
@@ -491,14 +563,22 @@ function extractConversationEntities(
     );
   }
 
+  const pendingPair = Array.isArray(state?.caller?.nameCollision)
+    ? state.caller.nameCollision
+    : null;
   const knownNames = collectKnownCallerNames({ profile, state });
   const correcting = isNameNegation(text);
+  const preferKnown = !correcting && !pendingPair;
+  const collisionPick = pendingPair ? pickCollisionChoice(text, pendingPair) : null;
+  if (collisionPick) {
+    entities.name = entity(collisionPick, 'caller_collision_pick', 0.98, true);
+  }
   const spelled = parseSpelledCallerName(text);
-  if (spelled) {
+  if (spelled && !entities.name) {
     entities.name = entity(
       canonicalizeCallerName(spelled, {
         knownNames,
-        preferKnown: !correcting,
+        preferKnown,
       }),
       'caller_spelled',
       0.98,
@@ -510,7 +590,7 @@ function extractConversationEntities(
     extractName(text, {
       firstMissing: state?.goal?.missingSlots?.[0],
       knownNames,
-      preferKnown: !correcting,
+      preferKnown,
     });
   if (name && !entities.name) entities.name = entity(name, 'caller_explicit', 0.95, false);
   const phone = extractPhone(text);
@@ -539,7 +619,7 @@ function extractConversationEntities(
     entities.name = entity(
       canonicalizeCallerName(shortAnswer, {
         knownNames,
-        preferKnown: !correcting,
+        preferKnown,
       }),
       'contextual_slot_answer',
       0.8,

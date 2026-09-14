@@ -3,10 +3,12 @@ const assert = require('node:assert/strict');
 const {
   canonicalizeCallerName,
   collectKnownCallerNames,
+  collisionGroupFor,
   compactNameKey,
   matchCallerName,
   namesLikelySame,
   parseSpelledCallerName,
+  pickCollisionChoice,
   preferredContactSpelling,
 } = require('../src/conversation/callerNameMatch');
 
@@ -81,5 +83,27 @@ describe('callerNameMatch', () => {
     assert.equal(preferredContactSpelling('Isha', 'Aisha'), 'Aisha');
     assert.equal(preferredContactSpelling('Aisha', 'Isha'), 'Aisha');
     assert.equal(preferredContactSpelling('Jane', 'jane'), 'Jane');
+  });
+
+  it('does not silent-rewrite Colin to Collins', () => {
+    assert.equal(canonicalizeCallerName('Colin'), 'Colin');
+    assert.equal(canonicalizeCallerName('Collins'), 'Collins');
+    assert.deepEqual(collisionGroupFor('Colin'), ['Colin', 'Collins']);
+    assert.equal(pickCollisionChoice('Collins', ['Colin', 'Collins']), 'Collins');
+    assert.equal(pickCollisionChoice('C O L L I N S', ['Colin', 'Collins']), 'Collins');
+    assert.equal(preferredContactSpelling('Collins', 'Colin'), 'Collins');
+    assert.equal(preferredContactSpelling('Colin', 'Collins'), 'Colin');
+  });
+
+  it('folds a returning-file collision near miss to the file spelling', () => {
+    assert.equal(
+      canonicalizeCallerName('Colin', {
+        knownNames: [{ name: 'Collins', source: 'memory' }],
+        preferKnown: true,
+      }),
+      'Collins'
+    );
+    assert.equal(namesLikelySame('Colin', 'Collins'), true);
+    assert.equal(namesLikelySame('Jane', 'June'), false);
   });
 });

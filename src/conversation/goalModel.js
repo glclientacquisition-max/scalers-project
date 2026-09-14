@@ -77,6 +77,12 @@ function formatVisitSopForPrompt(state) {
     const value = visitSopSlotValue(state, slot);
     return value ? `${slot}=${value}` : `${slot}=missing`;
   });
+  const pair = Array.isArray(state?.caller?.nameCollision)
+    ? state.caller.nameCollision.filter(Boolean)
+    : [];
+  if (pair.length >= 2 && state?.caller?.nameConfirmed !== true) {
+    return `- Visit SOP: ${parts.join(' | ')}. Ask once: ${pair.join(' or ')}? Do not guess the spelling.`;
+  }
   const next = order.find((slot) => !visitSopSlotValue(state, slot));
   const nextLine = next
     ? `Ask only for ${next}. Never re-ask a filled slot.`

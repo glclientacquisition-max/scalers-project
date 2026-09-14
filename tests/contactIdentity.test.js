@@ -81,4 +81,17 @@ describe('mergeContactIdentity', () => {
     assert.equal(distinct.name, 'Asha');
     assert.equal(distinct.metadata.alternate_names[0].name, 'Aisha');
   });
+
+  it('keeps the file spelling for Colin vs Collins and does not log an alternate', () => {
+    const kept = mergeContactIdentity(
+      { name: 'Collins', metadata: {} },
+      { name: 'Colin', callId: 'c6' }
+    );
+    assert.equal(kept.name, 'Collins');
+    assert.deepEqual(kept.metadata.alternate_names, []);
+
+    const first = mergeContactIdentity({ name: 'Colin', metadata: {} }, { name: 'Collins' });
+    assert.equal(first.name, 'Colin');
+    assert.deepEqual(first.metadata.alternate_names, []);
+  });
 });

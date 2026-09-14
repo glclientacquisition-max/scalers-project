@@ -213,6 +213,7 @@ const scenarios = [
       ({ state } = runTurn(state, 'I want to speak to the manager'));
       assert.equal(state.intent, 'human');
       ({ state } = runTurn(state, 'My name is Brian'));
+      ({ state } = runTurn(state, 'Brian'));
       const decision = determineNextBestAction({ state, capabilities });
       assert.equal(decision.action, 'ESCALATE');
       state = setNextBestAction(state, decision);

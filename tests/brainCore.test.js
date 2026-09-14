@@ -399,4 +399,72 @@ describe('Brain state and next-best-action', () => {
     assert.equal(state.caller.name, 'Asha');
     assert.equal(state.caller.nameConfirmed, true);
   });
+
+  it('asks Colin or Collins once and does not save until they pick', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'My name is Colin',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('My name is Colin'),
+    });
+    assert.equal(state.caller.name, 'Colin');
+    assert.equal(state.caller.nameConfirmed, false);
+    assert.deepEqual(state.caller.nameCollision, ['Colin', 'Collins']);
+    assert.match(formatBrainStateForPrompt(state), /Colin or Collins/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /Caller name: Colin \(confirmed\)/);
+    const decision = determineNextBestAction({
+      state,
+      capabilities: { createServiceRequest: true, saveCallerInfo: true, escalate: true },
+    });
+    assert.equal(decision.slot, 'name_spelling');
+
+    state = observeCallerTurn(state, {
+      text: 'Are you open tomorrow?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('Are you open tomorrow?', { state }),
+    });
+    assert.equal(state.caller.name, 'Colin');
+    assert.equal(state.caller.nameConfirmed, false);
+
+    state = observeCallerTurn(state, {
+      text: 'yes',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('yes', { state }),
+    });
+    assert.equal(state.caller.nameConfirmed, false);
+
+    state = observeCallerTurn(state, {
+      text: 'Collins',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('Collins', { state }),
+    });
+    assert.equal(state.caller.name, 'Collins');
+    assert.equal(state.caller.nameConfirmed, true);
+    assert.equal(state.caller.nameCollision, null);
+    assert.match(formatBrainStateForPrompt(state), /Collins \(confirmed\)/);
+  });
+
+  it('keeps a returning Collins file when STT says Colin', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    const card = { name: 'Collins', greetByName: true, alternateNames: [] };
+    const seeded = createBrainState({ callerMemory: card });
+    const state = observeCallerTurn(seeded, {
+      text: 'My name is Colin',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile: { callerMemory: card },
+      entities: extractConversationEntities('My name is Colin', {
+        profile: { callerMemory: card },
+        state: seeded,
+      }),
+    });
+    assert.equal(state.caller.name, 'Collins');
+    assert.equal(state.caller.nameConfirmed, true);
+    assert.equal(state.caller.nameCollision, null);
+  });
 });
