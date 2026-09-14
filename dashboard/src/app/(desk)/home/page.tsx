@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/deskChrome";
 import {
   homeBriefing,
+  homeDigestLine,
   homeQueueUnit,
   summarizeInboxWork,
 } from "@/lib/inboxPurpose";
@@ -102,6 +103,9 @@ export default async function HomeOverviewPage() {
       : getWalletRunwayDays(client, tenant.id, kes),
   ]);
   const runway = walletRunwayLabel(runwayDays);
+  const digest = inbox.callsTruncated
+    ? null
+    : homeDigestLine(inbox.items, dayStart, vertical);
 
   const todayCount = todayRes.count ?? 0;
   const work = summarizeInboxWork(inbox.items);
@@ -220,6 +224,9 @@ export default async function HomeOverviewPage() {
             </h2>
             <p className="text-[13px] text-ink-soft">{briefing}</p>
           </div>
+          {digest ? (
+            <p className="mt-1 text-[13px] text-ink-soft">{digest}</p>
+          ) : null}
 
           <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
             {queues.map((queue, index) => (

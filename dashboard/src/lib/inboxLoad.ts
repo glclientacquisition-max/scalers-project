@@ -27,7 +27,7 @@ export async function loadInboxItems(
   client: SupabaseClient,
   tenantId: string,
   vertical?: string | null
-): Promise<{ items: InboxItem[]; error: string | null }> {
+): Promise<{ items: InboxItem[]; callsTruncated: boolean; error: string | null }> {
   const first = await client
     .from("calls")
     .select(CALL_SELECT)
@@ -61,7 +61,7 @@ export async function loadInboxItems(
   }
 
   if (error) {
-    return { items: [], error: error.message };
+    return { items: [], callsTruncated: false, error: error.message };
   }
 
   const [holdsRes, jobsFirst] = await Promise.all([
@@ -119,6 +119,7 @@ export async function loadInboxItems(
 
   return {
     items: withPeople,
+    callsTruncated: (data || []).length >= INBOX_WINDOW,
     error: null,
   };
 }
