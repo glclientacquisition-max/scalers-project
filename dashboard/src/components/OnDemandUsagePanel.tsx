@@ -6,6 +6,7 @@ import {
   saveOnDemandUsage,
   type OnDemandUsageState,
 } from "@/app/(desk)/wallet/actions";
+import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
 
 const initial: OnDemandUsageState = {};
 
@@ -66,9 +67,16 @@ export function OnDemandUsagePanel({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-xl bg-[#005CCC] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#004AAD] disabled:opacity-60"
+          className={`${btnPrimary} gap-2`}
         >
-          {pending ? "Saving…" : "Save"}
+          {pending ? (
+            <>
+              <span aria-hidden="true" className={pendingSpinnerClass} />
+              Saving
+            </>
+          ) : (
+            "Save"
+          )}
         </button>
       </form>
     </section>

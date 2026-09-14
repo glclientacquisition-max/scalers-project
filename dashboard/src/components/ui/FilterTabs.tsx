@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { filterTabClass } from "@/components/ui/deskChrome";
+import { filterTabClass, filterTabCountClass } from "@/components/ui/deskChrome";
 
 export type FilterTabItem = {
   id: string;
   label: string;
   href: string;
+  count?: number;
 };
 
 export function FilterTabs({
@@ -18,17 +19,20 @@ export function FilterTabs({
 }) {
   return (
     <nav aria-label={label} className="border-b border-line">
-      <ul className="flex gap-1 overflow-x-auto">
+      <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
         {items.map((item) => {
           const isActive = active === item.id;
           return (
-            <li key={item.id}>
+            <li key={item.id} className="shrink-0">
               <Link
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
                 className={filterTabClass(isActive)}
               >
                 {item.label}
+                {typeof item.count === "number" ? (
+                  <span className={filterTabCountClass(isActive)}>{item.count}</span>
+                ) : null}
               </Link>
             </li>
           );

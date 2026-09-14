@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { parseLeadStatus, type LeadStatus } from "@/lib/supabase";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { ownerSaveFailed } from "@/lib/ownerFacingError";
 
 export type LeadStatusResult = {
   ok?: boolean;
@@ -35,23 +36,9 @@ export async function updateLeadStatus(
     .eq("tenant_id", tenant.id);
 
   if (error) {
-    if (/archived|lead_status.*check|check.*lead_status/i.test(error.message)) {
-      return {
-        error:
-          "Archive needs a one-time database update. Apply docs/supabase/lead_status_archive.sql in Supabase.",
-      };
-    }
-    if (/lead_status|column/i.test(error.message)) {
-      return {
-        error: "Lead statuses are not set up yet. Apply docs/supabase/lead_status.sql in Supabase.",
-      };
-    }
-    if (/row-level security|permission denied|rls/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/lead_status.sql (owner update policy).`,
-      };
-    }
-    return { error: error.message };
+    const fallback =
+      status === "archived" ? "Could not archive." : "Could not save.";
+    return ownerSaveFailed("lead-status", error.message, fallback);
   }
 
   revalidatePath("/home");

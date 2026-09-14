@@ -22,6 +22,7 @@ import { InboxJobEditor } from "@/components/InboxJobEditor";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { pageTitleClass } from "@/components/ui/deskChrome";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import {
   callsHref,
@@ -240,6 +241,8 @@ export default async function CallDetailPage({
   const smsPrimary = callerSmsOn && !workOnCall;
   const waPrimary = !workOnCall && !callerSmsOn;
 
+  const titleIsPhone = !name;
+
   return (
     <div className="max-w-6xl">
       <Link
@@ -250,10 +253,9 @@ export default async function CallDetailPage({
       </Link>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
-        {/* LEFT PANE: sticky context + primary CTA */}
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
           <div>
-            <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+            <h1 className={pageTitleClass}>
               {title}
             </h1>
             <div className="mt-3">
@@ -271,9 +273,19 @@ export default async function CallDetailPage({
             <p className="mt-2 text-sm text-ink-soft">
               {formatCallWhen(row.created_at, "full")}
             </p>
-            <p className="mt-1 font-mono text-sm text-ink">{row.caller_number}</p>
+            {titleIsPhone ? null : (
+              <p className="mt-1 font-mono text-sm text-ink">{row.caller_number}</p>
+            )}
             {urgent ? (
               <p className="mt-2 text-sm font-medium text-warn">Urgent</p>
+            ) : null}
+            {person?.id ? (
+              <Link
+                href={`/contacts/${person.id}`}
+                className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              >
+                Open contact
+              </Link>
             ) : null}
           </div>
 
@@ -368,71 +380,44 @@ export default async function CallDetailPage({
             </div>
           ) : null}
 
-          <div className="space-y-4 border-t border-line/80 pt-5">
-            <div className="rounded-2xl border border-line bg-surface p-4">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                Caller
-              </h2>
-              <p className="mt-2 text-lg font-medium text-ink">{row.caller_number}</p>
-              {name ? (
-                <p className="mt-1 text-sm text-ink-soft">Name: {name}</p>
+          <dl className="space-y-1 border-t border-line/80 pt-4 text-sm text-ink">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <span>
+                Duration:{" "}
+                {row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
+              </span>
+              <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
+              <span>Escalation: {meta.escalation_sent ? "sent" : "no"}</span>
+              {transferAttempt?.status ? (
+                <span>Transfer: {transferAttempt.status}</span>
               ) : null}
-              {person?.id ? (
-                <Link
-                  href={`/contacts/${person.id}`}
-                  className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-                >
-                  Open contact
-                </Link>
-              ) : null}
-              <p className="mt-2 text-xs text-ink-soft">
-                SID {row.sautikit_call_sid || "Not set"}
-              </p>
             </div>
-
-            <div className="rounded-2xl border border-line bg-surface p-4">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                Call
-              </h2>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink">
-                <span>
-                  Duration:{" "}
-                  {row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
-                </span>
-                <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
-                <span>Escalation: {meta.escalation_sent ? "sent" : "no"}</span>
-                {transferAttempt?.status ? (
-                  <span>Transfer: {transferAttempt.status}</span>
+            {row.resolution != null || row.primary_intent || row.resolution_note ? (
+              <div className="space-y-1">
+                <p>
+                  Assist:{" "}
+                  <span className="font-medium text-ink">
+                    {callResolutionLabel(resolution)}
+                  </span>
+                  {row.primary_intent ? (
+                    <span className="text-ink-soft"> · {row.primary_intent}</span>
+                  ) : null}
+                </p>
+                {row.resolution_note ? (
+                  <p className="text-ink-soft">{row.resolution_note}</p>
                 ) : null}
               </div>
-              {row.resolution != null || row.primary_intent || row.resolution_note ? (
-                <div className="mt-3 space-y-1 text-sm">
-                  <p>
-                    Assist:{" "}
-                    <span className="font-medium text-ink">
-                      {callResolutionLabel(resolution)}
-                    </span>
-                    {row.primary_intent ? (
-                      <span className="text-ink-soft"> · {row.primary_intent}</span>
-                    ) : null}
-                  </p>
-                  {row.resolution_note ? (
-                    <p className="text-ink-soft">{row.resolution_note}</p>
-                  ) : null}
-                </div>
-              ) : null}
-              {escalatedTo?.name ? (
-                <p className="mt-3 text-sm text-ink">
-                  Escalated to {escalatedTo.name}
-                  {escalatedTo.role ? ` (${escalatedTo.role})` : ""}
-                  {escalateReason ? `: ${escalateReason}` : ""}
-                </p>
-              ) : null}
-              <CallRecording recordingUrl={row.recording_url} variant="empty" />
-            </div>
-          </div>
+            ) : null}
+            {escalatedTo?.name ? (
+              <p>
+                Escalated to {escalatedTo.name}
+                {escalatedTo.role ? ` (${escalatedTo.role})` : ""}
+                {escalateReason ? `: ${escalateReason}` : ""}
+              </p>
+            ) : null}
+          </dl>
 
-          <CallRecording recordingUrl={row.recording_url} variant="player" />
+          <CallRecording recordingUrl={row.recording_url} />
         </aside>
 
         {/* RIGHT PANE: transcript + FAQ ideas */}

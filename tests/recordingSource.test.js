@@ -78,8 +78,10 @@ test("CallAudioPlayer does not render audio without a usable source", () => {
 
 test("call detail uses CallRecording and still renders transcript and metadata", () => {
   const source = fs.readFileSync(callDetailPath, "utf8");
-  assert.match(source, /<CallRecording recordingUrl=\{row\.recording_url\} variant="empty" \/>/);
-  assert.match(source, /<CallRecording recordingUrl=\{row\.recording_url\} variant="player" \/>/);
+  assert.match(source, /<CallRecording recordingUrl=\{row\.recording_url\} \/>/);
+  assert.equal((source.match(/<CallRecording/g) || []).length, 1);
+  assert.doesNotMatch(source, /variant="empty"/);
+  assert.doesNotMatch(source, /variant="player"/);
   assert.doesNotMatch(source, /CallAudioPlayer/);
   assert.match(source, /turns\.length === 0/);
   assert.match(source, /Conversation/);

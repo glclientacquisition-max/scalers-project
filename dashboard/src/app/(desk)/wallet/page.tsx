@@ -10,6 +10,8 @@ import {
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 import { WalletTopUpButton } from "@/components/WalletTopUpButton";
 import { getWalletTopUpConfig } from "@/lib/walletTopUp";
+import { DeskError } from "@/components/ui/DeskError";
+import { pageTitleClass } from "@/components/ui/deskChrome";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -36,11 +38,7 @@ export default async function WalletPage() {
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Not signed in.
-      </div>
-    );
+    return <DeskError>Not signed in.</DeskError>;
   }
 
   let usage;
@@ -53,13 +51,8 @@ export default async function WalletPage() {
       softSpendLimitEnabled: tenant.soft_spend_limit_enabled,
       softSpendLimitKes: tenant.soft_spend_limit_kes,
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Could not load usage: {message}
-      </div>
-    );
+  } catch {
+    return <DeskError>Could not load wallet.</DeskError>;
   }
 
   const billedThisMonth = usage.callChargesKes + usage.lineFeeKes;
@@ -72,7 +65,7 @@ export default async function WalletPage() {
   return (
     <div className="max-w-3xl">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">Wallet</h1>
+        <h1 className={pageTitleClass}>Wallet</h1>
         {usage.isBeta ? (
           <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-[#0096FF]/30 bg-[#0096FF]/5 px-6 py-3 text-sm font-medium text-[#005ccc]">
             Free beta
@@ -87,7 +80,7 @@ export default async function WalletPage() {
       </header>
 
       {(prepaidEmpty || prepaidLow) && !usage.isBeta ? (
-        <p className="mt-4 rounded-xl border border-warn/40 bg-white px-4 py-3 text-sm text-warn">
+        <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
           {prepaidEmpty
             ? tenant.on_demand_usage_enabled
               ? "Prepaid empty. On-demand is on."
@@ -104,7 +97,7 @@ export default async function WalletPage() {
             </p>
             <p
               className={[
-                "mt-2 font-display text-5xl tracking-tight sm:text-[3.25rem]",
+                "mt-2 font-display text-3xl tracking-tight sm:text-4xl",
                 !usage.isBeta && usage.lowBalance ? "text-warn" : "text-ink",
               ].join(" ")}
             >
@@ -119,7 +112,7 @@ export default async function WalletPage() {
               <dt className="text-xs uppercase tracking-wide text-ink-soft">
                 {usage.isBeta ? "Est. month" : "Billed month"}
               </dt>
-              <dd className="mt-1 font-display text-2xl text-ink">
+              <dd className="mt-1 text-lg font-semibold text-ink">
                 KES{" "}
                 {(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString(
                   "en-KE"
@@ -128,15 +121,15 @@ export default async function WalletPage() {
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Calls</dt>
-              <dd className="mt-1 font-display text-2xl text-ink">{usage.callsThisMonth}</dd>
+              <dd className="mt-1 text-lg font-semibold text-ink">{usage.callsThisMonth}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Minutes</dt>
-              <dd className="mt-1 font-display text-2xl text-ink">{usage.minutesThisMonth}</dd>
+              <dd className="mt-1 text-lg font-semibold text-ink">{usage.minutesThisMonth}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
-              <dd className="mt-1 font-display text-2xl text-ink">
+              <dd className="mt-1 text-lg font-semibold text-ink">
                 KES {usage.lineFeeKes.toLocaleString("en-KE")}
               </dd>
             </div>

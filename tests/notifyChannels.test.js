@@ -10,6 +10,7 @@ describe('parseNotifyChannels', () => {
       whatsapp: true,
       email: true,
       caller_sms: false,
+      missed_textback: false,
     });
   });
 
@@ -19,6 +20,7 @@ describe('parseNotifyChannels', () => {
       whatsapp: false,
       email: false,
       caller_sms: false,
+      missed_textback: false,
     });
   });
 

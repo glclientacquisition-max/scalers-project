@@ -9,6 +9,7 @@ import {
 } from "@/lib/onboarding";
 import { compileReceptionistPrompt, parseAgentTone } from "@/lib/promptCompiler";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { ownerFacingError } from "@/lib/ownerFacingError";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { formatLocationsForCompiler } from "@/lib/businessLocations";
@@ -225,7 +226,7 @@ export async function completeOnboardingAction(
             .eq("id", tenant.id);
           if (promptErr) {
             return {
-              error: `${error.message} Apply docs/supabase/business_operating_model.sql and tenant_business_profile.sql in Supabase.`,
+              error: ownerFacingError(error.message, "Could not save business details."),
               step: 3,
             };
           }
@@ -245,16 +246,14 @@ export async function completeOnboardingAction(
         .eq("id", tenant.id);
       if (promptErr) {
         return {
-          error: `${error.message} Apply docs/supabase/tenant_business_profile.sql in Supabase.`,
+          error: ownerFacingError(error.message, "Could not save business details."),
           step: 3,
         };
       }
       redirect("/home");
     }
     return {
-      error: /row-level security|permission denied|rls/i.test(error.message)
-        ? `${error.message} Apply docs/supabase/owner_rls.sql if needed.`
-        : error.message,
+      error: ownerFacingError(error.message, "Could not save business details."),
       step: 3,
     };
   }

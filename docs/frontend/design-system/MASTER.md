@@ -1,7 +1,7 @@
 # Scalers design system (MASTER)
 
 **Status:** Canon for `dashboard/`  
-**Date:** 2026-09-10  
+**Date:** 2026-09-14  
 **Law:** [`FRONTEND_CONSTITUTION.md`](../FRONTEND_CONSTITUTION.md) + `.cursor/rules/scalers-design-ux.mdc`
 
 Page notes only record deltas. Do not copy this file into every page spec.
@@ -71,16 +71,18 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 
 | Pattern | Implementation |
 | --- | --- |
-| Primary button | `btnPrimary` in `deskChrome.ts`: fill `#005CCC`, `min-h-11`, white label. Focus ring `#0096FF`. |
+| Primary button | `btnPrimary` in `deskChrome.ts`: fill `#005CCC`, `min-h-11`, white label. Focus ring `#0096FF`. Compose taller hits with `btnPrimaryFill` (sticky Save). `settingsPrimaryButtonClass` aliases `btnPrimary`. |
 | Ghost / secondary | `btnGhost`: border-line, ink text |
 | Focus | `focusRing`: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]` |
-| Filter tabs | Underline tabs, `min-h-11`, active `border-[#0096FF] text-[#005CCC]` |
+| Filter tabs | `FilterTabs` + `filterTabClass`. Underline, `min-h-11`, active `border-[#0096FF] text-[#005CCC]`. Inbox and Contacts share this. |
 | List row | `DeskRowHit` in `deskRowHit.tsx`. Parent `relative`. Body `deskRowMutedClass`. Trailing verb `deskRowActionClass`. No Call, Open, or View column. |
 | Pagination | `ui/Pagination.tsx` (`min-h-11` hits) |
-| Field | `settingsFieldClass` + full brand ring |
+| Field | `deskFieldClass`. Settings: `settingsFieldClass` = `mt-1` + `deskFieldClass` |
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
+| Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` header links. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the header. |
-| Empty state | Horizontal rules, title, one action. No marketing paragraph |
+| Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
+| Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph on `#25D366`, `h-11 w-11`, `rounded-xl` (`variant="icon"`). No extra WhatsApp mark next to the name. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
 
@@ -90,18 +92,18 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 
 | State | Treatment |
 | --- | --- |
-| Loading | None desk-wide yet. Do not fake skeletons that invent numbers |
-| Empty | Title + one link |
-| Error | `border-warn/40 bg-warn-soft text-warn` |
-| Pending mutation | Spinner on the control. Disable double submit |
+| Loading | No route `loading.tsx`. Do not fake skeletons that invent numbers |
+| Empty | `deskEmptyClass`. Title + one link |
+| Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"` |
+| Pending mutation | `pendingSpinnerClass` on the control. Disable double submit |
 | Focus | 2px brand ring, visible on keyboard |
-| Reduced motion | No new desk loops |
+| Reduced motion | No new desk loops. Primary press scale is `motion-reduce:active:scale-100` |
 
 ---
 
 ## Motion
 
-Landing only: `.landing-rise`, `.landing-drift`. Desk: bulletin ping already shipped. Nothing else.
+Landing only: `.landing-rise`, `.landing-drift`. Desk default is none. Bulletin ping already shipped. Primary buttons may press-scale (`active:scale-[0.99]`, named properties, 150ms). `DeskDialog` does not animate in.
 
 ---
 

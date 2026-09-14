@@ -24,6 +24,7 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { logDeskError, ownerSaveFailed } from "@/lib/ownerFacingError";
 
 export type ConfirmPronunciationState = {
   error?: string;
@@ -147,15 +148,13 @@ export async function screenPronunciationSuggestionsAction(
       suggestions: result.suggestions,
     };
   } catch (err) {
+    logDeskError("pronunciation-screen", err);
     const local = suggestPronunciations(input);
     return {
       ok: true,
       source: "local",
       suggestions: local.length ? local : parseSuggestionList([]),
-      error:
-        err instanceof Error
-          ? `AI screen unavailable — showing basic lines. ${err.message}`
-          : undefined,
+      error: "AI screen unavailable. Showing basic lines.",
     };
   }
 }
@@ -268,18 +267,11 @@ export async function confirmPronunciationRecording(
     .eq("id", tenant.id);
 
   if (error) {
-    if (/tts_lexicon/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
-      };
-    }
-    if (/row-level security|permission denied|rls/i.test(error.message)) {
-      return {
-        error:
-          "Couldn’t save pronunciation for this workspace. Refresh and try again — if it keeps failing, support needs to grant owner update on tts_lexicon.",
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed(
+      "pronunciation-confirm",
+      error.message,
+      "Could not save pronunciation. Refresh and try again."
+    );
   }
 
   return {
@@ -330,12 +322,11 @@ export async function persistPronunciationLexicon(
     .eq("id", tenant.id);
 
   if (error) {
-    if (/tts_lexicon/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/tts_lexicon.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed(
+      "pronunciation-lexicon",
+      error.message,
+      "Could not save pronunciation. Refresh and try again."
+    );
   }
 
   return {
@@ -386,7 +377,7 @@ export async function minePronunciationFromCallsAction(
     .limit(12);
 
   if (callErr) {
-    return { error: callErr.message };
+    return ownerSaveFailed("pronunciation-mine-calls", callErr.message, "Could not load calls.");
   }
 
   const callIds = (calls || []).map((c) => c.id).filter(Boolean);
@@ -402,7 +393,11 @@ export async function minePronunciationFromCallsAction(
     .limit(200);
 
   if (txErr) {
-    return { error: txErr.message };
+    return ownerSaveFailed(
+      "pronunciation-mine-transcripts",
+      txErr.message,
+      "Could not load transcripts."
+    );
   }
 
   const lines = (transcripts || [])
@@ -531,7 +526,11 @@ export async function quickAddPronunciationAction(
     .eq("id", tenant.id);
 
   if (error) {
-    return { error: error.message };
+    return ownerSaveFailed(
+      "pronunciation-manual",
+      error.message,
+      "Could not save pronunciation. Refresh and try again."
+    );
   }
 
   return {

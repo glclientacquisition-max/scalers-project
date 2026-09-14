@@ -5,6 +5,7 @@ import {
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { getCurrentTenant } from "@/lib/tenant";
+import { DeskError } from "@/components/ui/DeskError";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -17,13 +18,8 @@ export default async function SettingsPage({
   let tenant;
   try {
     tenant = await getCurrentTenant();
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Could not load business: {message}
-      </div>
-    );
+  } catch {
+    return <DeskError>Could not load Business settings.</DeskError>;
   }
 
   if (!tenant) {

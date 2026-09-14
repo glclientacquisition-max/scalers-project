@@ -25,7 +25,8 @@ import {
   parseWeekParam,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
+import { DeskError } from "@/components/ui/DeskError";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -47,11 +48,11 @@ function EmptyInbox({
   const copy = nicheCopy(vertical);
   if (q) {
     return (
-      <div className="mt-8 border-y border-line py-12 text-center">
+      <div className={deskEmptyClass}>
         <p className="font-display text-2xl tracking-tight text-ink">No matches</p>
         <Link
           href={callsHref({ purpose })}
-          className="mt-6 inline-flex min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-[#005ccc] transition duration-150 hover:border-[#0096FF] hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+          className={`${btnGhost} mt-6`}
         >
           Clear search
         </Link>
@@ -69,11 +70,11 @@ function EmptyInbox({
             ? "Nothing needs you"
             : "Nothing in this filter";
     return (
-      <div className="mt-8 border-y border-line py-12 text-center">
+      <div className={deskEmptyClass}>
         <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
         <Link
           href={callsHref({ purpose: "all" })}
-          className="mt-6 inline-flex min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-[#005ccc] transition duration-150 hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+          className={`${btnGhost} mt-6`}
         >
           Show all
         </Link>
@@ -110,7 +111,7 @@ function EmptyInbox({
       </p>
       <Link
         href={businessSettingsHref("test")}
-        className="mt-6 inline-flex min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-[#005ccc] transition duration-150 hover:border-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className={`${btnGhost} mt-6`}
       >
         Test line
       </Link>
@@ -150,11 +151,7 @@ export default async function CallsPage({
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Not signed in.
-      </div>
-    );
+    return <DeskError>Not signed in.</DeskError>;
   }
 
   const client = workspace.client;
@@ -169,16 +166,7 @@ export default async function CallsPage({
   );
 
   if (error) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Could not load inbox: {error}
-        {/row-level security|permission denied|rls/i.test(error) ? (
-          <p className="mt-2 text-sm text-ink-soft">
-            Apply docs/supabase/owner_rls.sql in Supabase if you have not yet.
-          </p>
-        ) : null}
-      </div>
-    );
+    return <DeskError>Could not load inbox.</DeskError>;
   }
 
   const searched = q

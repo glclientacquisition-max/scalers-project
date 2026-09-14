@@ -4,7 +4,8 @@ import Link from "next/link";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import { settingsGhostButtonClass } from "@/components/settingsUi";
+import { btnGhost, btnPrimary, deskFieldClass, pageTitleClass } from "@/components/ui/deskChrome";
+import { FilterTabs } from "@/components/ui/FilterTabs";
 
 export function InboxToolbar({
   active,
@@ -34,9 +35,7 @@ export function InboxToolbar({
     <header className="space-y-6">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-            Inbox
-          </h1>
+          <h1 className={pageTitleClass}>Inbox</h1>
           <p className="mt-1 text-[13px] text-ink-soft">{briefing}</p>
         </div>
         <form
@@ -54,64 +53,35 @@ export function InboxToolbar({
             type="search"
             defaultValue={q}
             placeholder={copy.searchPlaceholder}
-            className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-white px-4 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-[#0096FF]/40 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]"
+            className={deskFieldClass}
           />
-          <button type="submit" className={settingsGhostButtonClass}>
+          <button type="submit" className={btnGhost}>
             Search
           </button>
         </form>
       </div>
 
-      <nav aria-label="Filter by purpose" className="border-b border-line">
-        <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
-          {filters.map((item) => {
-            const isActive = active === item.id;
-            return (
-              <li key={item.id} className="shrink-0">
-                <Link
-                  href={callsHref({
-                    purpose: item.id,
-                    q: q || undefined,
-                    view: item.id === "job" && weekView ? "week" : undefined,
-                    week: item.id === "job" && weekView ? week : undefined,
-                  })}
-                  aria-current={isActive ? "page" : undefined}
-                  className={[
-                    "group inline-flex min-h-12 items-center gap-2 whitespace-nowrap border-b-2 px-3.5 text-sm font-medium transition duration-150",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
-                    isActive
-                      ? "border-[#0096FF] text-[#005ccc]"
-                      : "border-transparent text-ink-soft hover:border-line hover:text-ink active:text-[#005ccc]",
-                  ].join(" ")}
-                >
-                  {item.label}
-                  <span
-                    className={[
-                      "rounded-md px-1.5 py-0.5 text-xs tabular-nums transition duration-150",
-                      isActive
-                        ? "bg-[#0096FF]/10 text-[#005ccc]"
-                        : "bg-surface-muted text-ink-soft group-hover:bg-[#0096FF]/10 group-hover:text-ink",
-                    ].join(" ")}
-                  >
-                    {counts[item.id]}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <FilterTabs
+        label="Filter by purpose"
+        active={active}
+        items={filters.map((item) => ({
+          id: item.id,
+          label: item.label,
+          count: counts[item.id],
+          href: callsHref({
+            purpose: item.id,
+            q: q || undefined,
+            view: item.id === "job" && weekView ? "week" : undefined,
+            week: item.id === "job" && weekView ? week : undefined,
+          }),
+        }))}
+      />
 
       {active === "job" ? (
         <nav aria-label="Visit layout" className="flex gap-2">
           <Link
             href={callsHref({ purpose: "job", q: q || undefined })}
-            className={[
-              "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
-              !weekView
-                ? "bg-[#005CCC] font-semibold text-white"
-                : "border border-line text-ink hover:border-[#0096FF]",
-            ].join(" ")}
+            className={!weekView ? btnPrimary : btnGhost}
           >
             List
           </Link>
@@ -122,12 +92,7 @@ export function InboxToolbar({
               view: "week",
               week,
             })}
-            className={[
-              "inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
-              weekView
-                ? "bg-[#005CCC] font-semibold text-white"
-                : "border border-line text-ink hover:border-[#0096FF]",
-            ].join(" ")}
+            className={weekView ? btnPrimary : btnGhost}
           >
             Week
           </Link>
@@ -140,7 +105,7 @@ export function InboxToolbar({
           <span className="font-medium text-ink">&ldquo;{q}&rdquo;</span>.{" "}
           <Link
             href={callsHref({ purpose: active })}
-            className="font-medium text-[#005CCC] transition duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+            className="font-medium text-[#005CCC] transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
           >
             Clear
           </Link>
