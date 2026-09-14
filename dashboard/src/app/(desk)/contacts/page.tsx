@@ -3,8 +3,11 @@ import { AddContactPanel } from "@/components/AddContactPanel";
 import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import { DeskError } from "@/components/ui/DeskError";
+import { FilterTabs } from "@/components/ui/FilterTabs";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
+import { deskEmptyClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
   contactsHref,
@@ -51,11 +54,7 @@ export default async function ContactsPage({
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Not signed in.
-      </div>
-    );
+    return <DeskError>Not signed in.</DeskError>;
   }
 
   const { rows, total, error } = await loadContactsPage(
@@ -67,16 +66,7 @@ export default async function ContactsPage({
   );
 
   if (error) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-        Could not load contacts: {error}
-        {/relation|contacts/i.test(error) ? (
-          <p className="mt-2 text-sm text-ink-soft">
-            Apply docs/supabase/contacts_and_requests.sql in Supabase if you have not yet.
-          </p>
-        ) : null}
-      </div>
-    );
+    return <DeskError>Could not load contacts.</DeskError>;
   }
 
   return (
@@ -84,7 +74,7 @@ export default async function ContactsPage({
       <header className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+            <h1 className={pageTitleClass}>
               Contacts
             </h1>
             {total > 0 ? (
@@ -104,34 +94,19 @@ export default async function ContactsPage({
             <AddContactPanel />
           </div>
         </div>
-        <nav aria-label="Filter by name" className="border-b border-line">
-          <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
-            {SAVED_FILTERS.map((item) => {
-              const isActive = saved === item.id;
-              return (
-                <li key={item.id} className="shrink-0">
-                  <Link
-                    href={contactsHref({ saved: item.id })}
-                    aria-current={isActive ? "page" : undefined}
-                    className={[
-                      "inline-flex min-h-12 items-center whitespace-nowrap border-b-2 px-3.5 text-sm font-medium transition duration-150",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
-                      isActive
-                        ? "border-[#0096FF] text-[#005ccc]"
-                        : "border-transparent text-ink-soft hover:border-line hover:text-ink",
-                    ].join(" ")}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <FilterTabs
+          label="Filter by name"
+          active={saved}
+          items={SAVED_FILTERS.map((item) => ({
+            id: item.id,
+            label: item.label,
+            href: contactsHref({ saved: item.id }),
+          }))}
+        />
       </header>
 
       {rows.length === 0 ? (
-        <div className="mt-8 border-y border-line py-12 text-center">
+        <div className={deskEmptyClass}>
           <p className="font-display text-2xl tracking-tight text-ink">
             {emptyCopy(saved)}
           </p>

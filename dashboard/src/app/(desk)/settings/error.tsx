@@ -1,23 +1,22 @@
 "use client";
 
+import { btnPrimary } from "@/components/ui/deskChrome";
+import { DeskError } from "@/components/ui/DeskError";
+
 export default function SettingsError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
   return (
-    <div className="max-w-xl rounded-2xl border border-warn/40 bg-white p-6">
-      <h1 className="font-display text-2xl tracking-tight text-ink">Business settings</h1>
-      <p className="mt-3 text-sm text-warn" role="alert">
-        {error.message || "Something went wrong loading Business settings."}
-      </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="mt-4 rounded-xl bg-[#005CCC] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#004AAD]"
-      >
+    <div className="max-w-xl">
+      <DeskError>
+        <p className="font-display text-2xl tracking-tight text-ink">Business settings</p>
+        <p className="mt-3 text-sm">Could not load Business settings.</p>
+      </DeskError>
+      <button type="button" onClick={reset} className={`${btnPrimary} mt-4`}>
         Try again
       </button>
     </div>

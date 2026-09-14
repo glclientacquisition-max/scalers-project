@@ -14,6 +14,7 @@ import {
   type BulletinItem,
 } from "@/lib/dailyBulletin";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { ownerSaveFailed } from "@/lib/ownerFacingError";
 
 export type BulletinActionState = {
   error?: string;
@@ -51,12 +52,7 @@ async function saveBulletin(
     .eq("id", tenantId);
 
   if (error) {
-    if (/daily_bulletin/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/daily_bulletin.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed("bulletin", error.message);
   }
   revalidatePath("/settings");
   return {};

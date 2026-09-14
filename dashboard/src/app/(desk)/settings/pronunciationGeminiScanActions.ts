@@ -29,6 +29,7 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { logDeskError, ownerFacingError, ownerSaveFailed } from "@/lib/ownerFacingError";
 
 export type GeminiScanState = {
   error?: string;
@@ -65,7 +66,7 @@ function rateLimitScan(tenantId: string): string | null {
   const max = 6;
   const prev = (scanHits.get(tenantId) || []).filter((t) => now - t < windowMs);
   if (prev.length >= max) {
-    return "Gemini Scan rate limit — wait a few minutes, or review the queue you already have.";
+    return "Gemini Scan rate limit. Wait a few minutes, or review the queue you already have.";
   }
   prev.push(now);
   scanHits.set(tenantId, prev);
@@ -102,10 +103,8 @@ async function persistQueueFields(opts: {
     .update(patch)
     .eq("id", opts.tenantId);
   if (error) {
-    if (/pronunciation_review_queue|pronunciation_scan/i.test(error.message)) {
-      return `${error.message} Apply docs/supabase/pronunciation_gemini_scan.sql in Supabase.`;
-    }
-    return error.message;
+    logDeskError("pronunciation-scan", error.message);
+    return ownerFacingError(error.message, "Could not save pronunciation review.");
   }
   return null;
 }
@@ -203,8 +202,7 @@ export async function geminiScanRecentCallsAction(
 
   if (!process.env.GEMINI_API_KEY) {
     return {
-      error:
-        "GEMINI_API_KEY is not configured on this desk host — Gemini Scan cannot run.",
+      error: "Gemini Scan is not available on this workspace.",
     };
   }
 
@@ -218,7 +216,9 @@ export async function geminiScanRecentCallsAction(
     .order("created_at", { ascending: false })
     .limit(batchSize);
 
-  if (callErr) return { error: callErr.message };
+  if (callErr) {
+    return ownerSaveFailed("pronunciation-scan-calls", callErr.message, "Could not load calls.");
+  }
 
   const withRecording = (calls || []).filter((c) =>
     String((c as { recording_url?: string }).recording_url || "").trim()
@@ -313,12 +313,11 @@ export async function geminiScanRecentCallsAction(
     .eq("id", tenant.id);
 
   if (persistErr) {
-    if (/pronunciation_review_queue|pronunciation_scan|tts_lexicon/i.test(persistErr.message)) {
-      return {
-        error: `${persistErr.message} Apply docs/supabase/pronunciation_gemini_scan.sql (and tts_lexicon.sql) in Supabase.`,
-      };
-    }
-    return { error: persistErr.message };
+    return ownerSaveFailed(
+      "pronunciation-scan-persist",
+      persistErr.message,
+      "Could not save pronunciation review."
+    );
   }
 
   const pending = nextQueue.filter((c) => c.status === "pending");
@@ -332,7 +331,7 @@ export async function geminiScanRecentCallsAction(
     parts.push(`${forReview.length} left for review`);
   }
   if (!parts.length) {
-    parts.push("no new high-confidence issues");
+    parts.push("No new high-confidence issues");
   }
 
   return {
@@ -344,7 +343,7 @@ export async function geminiScanRecentCallsAction(
     errors: result.errors,
     autoAppliedCount: autoEntries.length,
     lexicon: nextLexicon,
-    message: `Scan finished — ${parts.join(" · ")}.`,
+    message: `Scan finished. ${parts.join(". ")}.`,
   };
 }
 
@@ -446,13 +445,17 @@ export async function approveGeminiScanCandidateAction(
     .eq("id", tenant.id);
 
   if (error) {
-    return { error: error.message };
+    return ownerSaveFailed(
+      "pronunciation-scan-approve",
+      error.message,
+      "Could not save pronunciation."
+    );
   }
 
   const pending = nextQueue.filter((c) => c.status === "pending");
   return {
     ok: true,
-    message: "Approved — live pronunciation updated for the next call.",
+    message: "Approved. Live pronunciation updates on the next call.",
     lexicon: merged,
     queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
     sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
@@ -583,7 +586,13 @@ export async function batchApproveHighConfidenceGeminiAction(
     })
     .eq("id", tenant.id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    return ownerSaveFailed(
+      "pronunciation-scan-batch",
+      error.message,
+      "Could not save pronunciation."
+    );
+  }
 
   const pending = nextQueue.filter((c) => c.status === "pending");
   return {
@@ -630,6 +639,6 @@ export async function queueGeminiCandidateForRecordingAction(
       (c) => c.status === "pending" && c.type === "LIKELY_MISHEARD"
     ),
     message:
-      "Queued for Practice — record real audio (more reliable than the AI phonetic guess).",
+      "Queued for Practice. Record real audio. That is more reliable than the AI phonetic guess.",
   };
 }

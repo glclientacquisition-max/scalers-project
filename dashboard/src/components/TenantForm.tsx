@@ -89,6 +89,7 @@ import {
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
+import { btnPrimary } from "@/components/ui/deskChrome";
 import {
   parseNotifyChannels,
   type NotifyChannels,
@@ -1129,7 +1130,7 @@ export function TenantForm({
                 type="button"
                 onClick={applyBulkServices}
                 disabled={!bulkPreview.length}
-                className="rounded-xl bg-[#005CCC] px-4 py-2 text-sm font-medium text-white hover:bg-[#004AAD] disabled:opacity-50"
+                className={btnPrimary}
               >
                 Add to services
               </button>
@@ -1362,7 +1363,7 @@ export function TenantForm({
                 type="button"
                 onClick={applyBulkProducts}
                 disabled={!bulkProductPreview.length}
-                className="rounded-xl bg-[#005CCC] px-4 py-2 text-sm font-medium text-white hover:bg-[#004AAD] disabled:opacity-50"
+                className={btnPrimary}
               >
                 Add to catalogue
               </button>

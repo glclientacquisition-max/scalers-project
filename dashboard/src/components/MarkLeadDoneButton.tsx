@@ -102,12 +102,7 @@ export function MarkLeadActionButton({
           startTransition(async () => {
             const res = await updateLeadStatus(callId, action);
             if (!res.ok) {
-              setError(
-                res.error ||
-                  (action === "archived"
-                    ? "Could not archive. Apply docs/supabase/lead_status_archive.sql if needed."
-                    : "Could not mark done.")
-              );
+              setError(res.error || (action === "archived" ? "Could not archive." : "Could not mark done."));
               return;
             }
             setDone(true);

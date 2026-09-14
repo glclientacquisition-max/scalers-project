@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import {
   compileReceptionistPrompt,
   parseAgentTone,
@@ -439,12 +440,7 @@ export async function applyIngestAction(
     .eq("id", tenant.id);
 
   if (error) {
-    if (/vertical|business_locations|business_policies/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/business_operating_model.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed("ingest", error.message);
   }
 
   revalidatePath("/settings");

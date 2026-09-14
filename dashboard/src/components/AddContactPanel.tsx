@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createContact } from "@/app/(desk)/contacts/actions";
 import { mapPickedContacts, isContactPickerAvailable } from "@/lib/contactImport";
@@ -13,6 +13,8 @@ import {
   settingsFieldClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
+import { DeskDialog } from "@/components/ui/DeskDialog";
+import { pendingSpinnerClass } from "@/components/ui/deskChrome";
 
 type Draft = { name: string; phone: string; notes: string };
 
@@ -86,6 +88,10 @@ export function AddContactPanel() {
     });
   }
 
+  const close = useCallback(() => {
+    if (!pending) setOpen(false);
+  }, [pending]);
+
   return (
     <>
       <button
@@ -100,35 +106,12 @@ export function AddContactPanel() {
       </button>
 
       {open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
-          role="presentation"
-          onClick={() => !pending && setOpen(false)}
+        <DeskDialog
+          title="Add contact"
+          onClose={close}
+          pending={pending}
+          panelClassName="max-w-lg"
         >
-          <div
-            role="dialog"
-            aria-labelledby="add-contact-title"
-            aria-modal="true"
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h2
-                id="add-contact-title"
-                className="font-display text-xl tracking-tight text-ink"
-              >
-                Add contact
-              </h2>
-              <button
-                type="button"
-                onClick={() => !pending && setOpen(false)}
-                className="rounded-lg px-2 py-1 text-sm text-ink-soft hover:bg-surface-canvas hover:text-ink"
-                aria-label="Close"
-              >
-                Close
-              </button>
-            </div>
-
             <form
               className="mt-5 space-y-4"
               onSubmit={(e) => {
@@ -187,8 +170,17 @@ export function AddContactPanel() {
               ))}
 
               <div className="flex flex-wrap items-center gap-2">
-                <button type="submit" disabled={pending} className={settingsPrimaryButtonClass}>
-                  {pending ? "Saving" : drafts.length > 1 ? `Save ${drafts.length}` : "Save"}
+                <button type="submit" disabled={pending} className={`${settingsPrimaryButtonClass} gap-2`}>
+                  {pending ? (
+                    <>
+                      <span aria-hidden="true" className={pendingSpinnerClass} />
+                      Saving
+                    </>
+                  ) : drafts.length > 1 ? (
+                    `Save ${drafts.length}`
+                  ) : (
+                    "Save"
+                  )}
                 </button>
                 <ContactPickButton
                   available={pickerOn}
@@ -214,8 +206,7 @@ export function AddContactPanel() {
                 </p>
               ) : null}
             </form>
-          </div>
-        </div>
+        </DeskDialog>
       ) : null}
     </>
   );

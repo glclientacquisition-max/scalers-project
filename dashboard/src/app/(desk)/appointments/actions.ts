@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { renderDeskCallerText, sendDeskCallerSms } from "@/lib/callerSms";
 
@@ -40,12 +41,7 @@ export async function updateAppointmentStatus(
     .maybeSingle();
 
   if (error) {
-    if (/appointments|relation/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/appointments.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed("appointment-status", error.message, "Could not save appointment.");
   }
 
   const prefs = parseNotifyChannels(tenant.notify_channels);
@@ -119,12 +115,7 @@ export async function updateAppointmentSchedule(
     .maybeSingle();
 
   if (error) {
-    if (/appointments|relation/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/appointments.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed("appointment-when", error.message, "Could not save appointment.");
   }
 
   const whenChanged = String(existing?.when_text || "").trim() !== whenText;

@@ -1,13 +1,14 @@
 /**
  * Shared Business Settings UI tokens and primitives.
  * Keep density, focus rings, selection, and destructive actions consistent.
+ * Primary fill and field chrome come from deskChrome.ts (one dialect).
  */
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 
-export const settingsFieldClass =
-  "mt-1 w-full min-h-11 rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]";
+export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
 
 export const settingsDenseFieldClass =
   "w-full min-h-11 min-w-0 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]";
@@ -25,8 +26,7 @@ export const settingsStickyHeaderClass =
 export const settingsActionClass =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:bg-[#0096FF]/[0.04] active:scale-[0.99] active:bg-[#0096FF]/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]";
 
-export const settingsPrimaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-xl bg-[#005CCC] px-4 py-2.5 text-sm font-medium text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition duration-150 hover:bg-[#004AAD] active:scale-[0.99] active:bg-[#003D99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 disabled:opacity-60";
+export const settingsPrimaryButtonClass = btnPrimary;
 
 export const settingsPanelHeadingClass =
   "font-display text-xl tracking-tight text-ink";

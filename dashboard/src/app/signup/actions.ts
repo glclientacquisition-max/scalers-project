@@ -85,7 +85,7 @@ export async function signupAction(
     const message = err instanceof Error ? err.message : String(err);
     console.error("[signup] ensureTenantForUser failed:", message);
     return {
-      error: `Account created, but tenant setup failed: ${message}. Apply docs/supabase/multi_tenant_onboarding.sql then retry sign-in.`,
+      error: "Account created, but workspace setup failed. Sign in to retry.",
     };
   }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { renderDeskCallerText, sendDeskCallerSms } from "@/lib/callerSms";
 
@@ -36,12 +37,7 @@ export async function updateServiceRequestStatus(
     .eq("tenant_id", tenant.id);
 
   if (error) {
-    if (/service_requests|relation/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/contacts_and_requests.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed("request", error.message, "Could not save request.");
   }
 
   revalidatePath("/requests");
@@ -89,12 +85,7 @@ export async function updateServiceRequestSchedule(
     .maybeSingle();
 
   if (error) {
-    if (/service_requests|relation/i.test(error.message)) {
-      return {
-        error: `${error.message} Apply docs/supabase/contacts_and_requests.sql in Supabase.`,
-      };
-    }
-    return { error: error.message };
+    return ownerSaveFailed("request", error.message, "Could not save request.");
   }
 
   const whenChanged = String(existing?.when_text || "").trim() !== whenText;

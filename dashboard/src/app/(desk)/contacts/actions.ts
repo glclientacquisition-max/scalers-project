@@ -9,6 +9,7 @@ import {
   type ContactCsvPlan,
 } from "@/lib/contactImport";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { ownerFacingError } from "@/lib/ownerFacingError";
 
 export type ContactNotesResult = {
   ok?: boolean;
@@ -36,13 +37,7 @@ export type ContactImportApplyState = {
 };
 
 function contactsWriteError(message: string): string {
-  if (/contacts|relation/i.test(message)) {
-    return `${message} Apply docs/supabase/contacts_and_requests.sql in Supabase.`;
-  }
-  if (/row-level security|permission denied|rls/i.test(message)) {
-    return `${message} Apply docs/supabase/contacts_owner_insert.sql in Supabase.`;
-  }
-  return message;
+  return ownerFacingError(message, "Could not save contact.");
 }
 
 async function loadWorkspace() {

@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  btnPrimaryFill,
+  focusRingVisible,
+  pendingSpinnerClass,
+} from "@/components/ui/deskChrome";
+
 export const TENANT_SETTINGS_FORM_ID = "tenant-settings-form";
 
 export function TenantSettingsSaveButton({ pending = false }: { pending?: boolean }) {
@@ -8,20 +14,23 @@ export function TenantSettingsSaveButton({ pending = false }: { pending?: boolea
       type="submit"
       form={TENANT_SETTINGS_FORM_ID}
       disabled={pending}
-      className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#005CCC] px-6 py-3.5 text-base font-semibold text-white transition duration-150 hover:bg-[#004AAD] active:scale-[0.99] active:bg-[#003D99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 focus-visible:ring-offset-2 disabled:opacity-60 sm:w-auto sm:min-w-[12rem]"
+      className={[
+        "inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base",
+        btnPrimaryFill,
+        "transition-[background-color,transform,opacity] duration-150 active:scale-[0.99] motion-reduce:active:scale-100",
+        focusRingVisible,
+        "sm:w-auto sm:min-w-[12rem]",
+      ].join(" ")}
     >
       {pending ? (
         <>
-          <span
-            aria-hidden="true"
-            className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
-          />
-          Training…
+          <span aria-hidden="true" className={pendingSpinnerClass} />
+          Training
         </>
       ) : (
         <>
           <span className="sm:hidden">Save</span>
-          <span className="hidden sm:inline">Save &amp; train assistant</span>
+          <span className="hidden sm:inline">Save and train</span>
         </>
       )}
     </button>
