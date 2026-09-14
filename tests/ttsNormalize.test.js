@@ -246,6 +246,77 @@ test('em dash becomes a comma so TTS does not leak dash', () => {
   assert.match(prepared.text, /detail, we specialize/);
 });
 
+test('spaced hyphens become commas so TTS does not say hyphen', () => {
+  const prepared = prepareForTts(
+    'We offer sofa cleaning - carpet cleaning - mattress cleaning.',
+    { callLanguage: 'en' }
+  );
+  assert.ok(!prepared.text.includes('-'));
+  assert.match(prepared.text, /sofa cleaning, carpet cleaning, mattress cleaning/);
+});
+
+test('bullet leaks flatten to a spoken list', () => {
+  const prepared = prepareForTts('Our services include: - Sofa cleaning - Carpet cleaning.', {
+    callLanguage: 'en',
+  });
+  assert.strictEqual(prepared.text, 'Our services include: Sofa cleaning, Carpet cleaning.');
+});
+
+test('intra-word hyphens survive (lexicon say-forms need them)', () => {
+  const prepared = prepareForTts('We clean check-in units near Ruiru.', { callLanguage: 'en' });
+  assert.match(prepared.text, /check-in/);
+  assert.match(prepared.text, /Roo-ee-roo/);
+});
+
+test('spaced dot chains collapse so TTS does not say full stop', () => {
+  const prepared = prepareForTts('Wait . . . let me check.', { callLanguage: 'en' });
+  assert.strictEqual(prepared.text, 'Wait. let me check.');
+});
+
+test('double period with a space collapses', () => {
+  const prepared = prepareForTts('The price is 3,000. . Thank you.', { callLanguage: 'en' });
+  assert.strictEqual(prepared.text, 'The price is 3,000. Thank you.');
+});
+
+test('12h time ranges expand both sides and drop the dash', () => {
+  assert.strictEqual(
+    prepareForTts('Visit: 3:00pm-4:00pm works.', { callLanguage: 'en' }).text,
+    'Visit: 3 P M to 4 P M works.'
+  );
+  assert.strictEqual(
+    prepareForTts('Open 3-4pm.', { callLanguage: 'en' }).text,
+    'Open 3 to 4 P M.'
+  );
+});
+
+test('SW 12h range keeps a single saa head', () => {
+  const prepared = prepareForTts('Tunafungua saa 8am - 4pm. Sawa.', { callLanguage: 'sw' });
+  assert.match(prepared.text, /saa 8 asubuhi hadi saa 4 jioni/);
+  assert.ok(!/saa saa/.test(prepared.text));
+});
+
+test('e.g. and i.e. are spoken, not spelled', () => {
+  assert.match(prepareForTts('e.g. sofas and rugs.', { callLanguage: 'en' }).text, /for example sofas/);
+  assert.match(prepareForTts('i.e. the red one.', { callLanguage: 'en' }).text, /that is the red one/);
+});
+
+test('numbered list markers become commas, not full stops', () => {
+  const prepared = prepareForTts('1. Tell me your estate 2. Pick a day.', { callLanguage: 'en' });
+  assert.strictEqual(prepared.text, '1, Tell me your estate 2, Pick a day.');
+});
+
+test('thousands and decimals are not list markers', () => {
+  assert.strictEqual(
+    prepareForTts('It is 15,000. Thank you.', { callLanguage: 'en' }).text,
+    'It is 15,000. Thank you.'
+  );
+});
+
+test('and/or and ampersand speak as words', () => {
+  assert.match(prepareForTts('Pay by M-Pesa and/or cash.', { callLanguage: 'en' }).text, /and or cash/);
+  assert.match(prepareForTts('Done & Dusted.', { callLanguage: 'en' }).text, /Done and Dusted/);
+});
+
 test('ENDCALL leftover is not spoken if it reaches TTS prep', () => {
   const prepared = prepareForTts(
     'Have a great day. ###ENDCALL###'

@@ -1,3 +1,28 @@
+# Punctuation read aloud — full stops and hyphens (2026-09-14)
+
+Owner report: the business assistant literally says "full stop" and "hyphen" on calls.
+
+Audit of the shared `prepareForTts` net (every spoken path funnels through it: `server.js` speakText, Soniox `pushText`, filler cache, desk preview). What reached Soniox verbatim before this fix:
+
+| Leak heard | Text that survived the net |
+| --- | --- |
+| "hyphen" / "dash" | Spaced ASCII hyphens: `sofa cleaning - carpet cleaning`, bullet leaks `Services: - Sofa - Carpets`. Only em/en dashes were neutralized. |
+| "hyphen" between times | `3:00pm-4:00pm` — `expandTimes` spoke each side but left the dash: `3 P M-4 P M`. |
+| "full stop full stop full stop" | Spaced dot chains `Wait . . . let me check` — the collapsers only caught adjacent dots. |
+| "full stop" | Double period with a space (`3,000. . Thank you`), numbered lists (`1. Book 2. Confirm`). |
+| "e full stop g full stop" | `e.g.` / `i.e.` leaks (prompt bans them; the net did not enforce). |
+| "slash" / "ampersand" | `and/or`, `Done & Dusted`. |
+
+Fix (Voice, net layer only — prompts untouched):
+
+1. `expandTimeRanges12h` runs first in `expandSpokenForms`: `3pm-4pm` / `3:00 p.m. - 4:30 p.m.` / `3-4pm` speak both sides with `to` / `hadi`. Optional `saa` prefix is consumed so SW never doubles (`saa 8 asubuhi hadi saa 4 jioni`).
+2. `polishPunctuation` (last pass, after expanders claimed their ranges): spaced hyphens → comma; dot chains and floating periods attach/collapse; numbered-list markers → comma (lookbehind keeps `15,000.` and `3.5` intact); `e.g.` → `for example`, `i.e.` → `that is`; `and/or` → `and or`; `&` → `and`.
+3. Intra-word hyphens (`M-Pesa`, `Roo-ee-roo`, `check-in`) carry no spaces and are untouched — lexicon say-forms depend on them. Domains (`examplebusiness.co.ke`), slash dates, `Shop No. M4`, percents unchanged per fixture.
+
+Regression: 12 new cases in `tests/ttsNormalize.test.js`, 6 new universal fixtures (`32`–`37`). `npm run test:voice` green.
+
+---
+
 # Name-ask loop vs visit SOP — Done and Dusted corpus (2026-09-14)
 
 Live and staging calls kept asking for a name after the caller had already given it (`HD_6c44c4b430d7`, `HD_6851d9481091`; Sprint B: ask name once after value). That stalled the home visit SOP (service → name → when → landmark → `create_appointment`).

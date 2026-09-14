@@ -271,6 +271,66 @@
       "expectProductionText": "examplebusiness.co.ke"
     },
     {
+      "id": "32-list-spaced-hyphens",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "Sofa cleaning - carpet cleaning - mattress cleaning.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Sofa cleaning, carpet cleaning, mattress cleaning.",
+      "source": "spaced hyphen list markers become commas so TTS never says hyphen"
+    },
+    {
+      "id": "33-list-bullet-leak",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "Services: - Sofa - Carpets.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Services: Sofa, Carpets.",
+      "source": "markdown bullet leak flattens to a spoken list"
+    },
+    {
+      "id": "34-spaced-ellipsis",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "Wait . . . let me check.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Wait. let me check.",
+      "source": "spaced dot chain is one pause, not three full stops"
+    },
+    {
+      "id": "35-time-range-12h",
+      "group": "universal",
+      "category": "time",
+      "text": "Open 3:00pm-4:00pm.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Open 3 P M to 4 P M.",
+      "source": "12h range expands both sides so the dash never reaches TTS"
+    },
+    {
+      "id": "36-abbr-eg",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "e.g. sofas and rugs.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "for example sofas and rugs.",
+      "source": "abbreviations speak as words, not spelled-out dots"
+    },
+    {
+      "id": "37-numbered-list",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "1. Book 2. Confirm.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "1, Book 2, Confirm.",
+      "source": "numbered-list markers become commas, not full stops"
+    },
+    {
       "id": "19-lexicon-brand",
       "group": "lexicon_control",
       "category": "lexicon-brand",
