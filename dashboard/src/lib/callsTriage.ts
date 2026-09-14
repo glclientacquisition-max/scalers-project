@@ -1,3 +1,4 @@
+import { pickCallOwnerReason } from "@/lib/callSummarySentence";
 import {
   leadStatusLabel,
   parseCallResolution,
@@ -36,7 +37,7 @@ export function toLead(call: CallRow): Lead {
   return {
     call,
     name: typeof meta.name === "string" ? meta.name : null,
-    reason: typeof meta.reason === "string" ? meta.reason : null,
+    reason: pickCallOwnerReason(meta),
     notified: Boolean(meta.whatsapp_sent),
     urgent: String(call.sentiment || "").toLowerCase() === "urgent",
     leadStatus: parseLeadStatus(call.lead_status),

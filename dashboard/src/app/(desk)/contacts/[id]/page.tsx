@@ -4,6 +4,7 @@ import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
+import { displayContactLastReason } from "@/lib/callSummarySentence";
 
 function kindLabel(kind: "call" | "request" | "appointment"): string {
   if (kind === "request") return "Request";
@@ -28,6 +29,13 @@ export default async function ContactDetailPage({
 
   const timeline = await loadContactTimeline(workspace.client, tenant.id, contact);
   const title = contact.name?.trim() || "Unknown";
+  const latestCall = timeline.find((entry) => entry.kind === "call");
+  const lastReason = displayContactLastReason({
+    name: contact.name,
+    phone: contact.phone,
+    lastReason: contact.last_reason,
+    latestCallReason: latestCall?.ownerReason || null,
+  });
   const metadata =
     contact.metadata &&
     typeof contact.metadata === "object" &&
@@ -59,7 +67,7 @@ export default async function ContactDetailPage({
               Last reason
             </h2>
             <p className="mt-3 text-base leading-relaxed text-ink">
-              {contact.last_reason?.trim() || "None"}
+              {lastReason || "None"}
             </p>
           </section>
 
