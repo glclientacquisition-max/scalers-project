@@ -296,6 +296,25 @@ async function getCall(callSid) {
   return shapeCall(data);
 }
 
+/**
+ * Recent calls from one caller number for one tenant. Raw rows (summary text
+ * included) so callers can inspect meta markers like missed_textback_at.
+ */
+async function listRecentCallsFromNumber({ tenantId, callerNumber, sinceIso, limit = 5 }) {
+  if (!tenantId || !callerNumber) return [];
+  let q = supabase
+    .from('calls')
+    .select('id, sautikit_call_sid, caller_number, status, summary, created_at')
+    .eq('tenant_id', tenantId)
+    .eq('caller_number', callerNumber)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (sinceIso) q = q.gte('created_at', sinceIso);
+  const { data, error } = await q;
+  throwIfError('listRecentCallsFromNumber', error);
+  return data || [];
+}
+
 async function markWhatsappSent(callSid) {
   const existing = await getCall(callSid);
   if (!existing) return false;
@@ -1589,6 +1608,7 @@ module.exports = {
   listTranscriptTurns,
   attachRecording,
   updateCallStatus,
+  listRecentCallsFromNumber,
   setCallResolution,
   chargeCallToWallet,
   uploadRecordingBuffer,
