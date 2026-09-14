@@ -30,4 +30,26 @@ describe("home overview craft", () => {
     assert.doesNotMatch(page, /TriageLeadCard/);
     assert.doesNotMatch(page, /\bOnline\b/);
   });
+
+  it("earns desktop width with a Next to return column", () => {
+    assert.match(page, /nextReturn/);
+    assert.match(page, /Next to return/);
+    assert.match(page, /Reply on WhatsApp/);
+    assert.match(page, /Open call/);
+    assert.match(page, /lg:col-span-7/);
+    assert.match(page, /lg:col-span-5/);
+  });
+
+  it("splits the aside into Today, Line, and Wallet sections", () => {
+    assert.match(page, /aria-label="Today"/);
+    assert.match(page, /aria-labelledby="line-heading"/);
+    assert.match(page, /aria-labelledby="wallet-heading"/);
+    assert.match(page, /Top up/);
+    assert.match(page, /KES \{kes\.toLocaleString/);
+  });
+
+  it("formats the DID with spaces", () => {
+    assert.match(page, /didDisplay/);
+    assert.match(page, /\+254 \$1 \$2 \$3/);
+  });
 });
