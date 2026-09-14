@@ -229,7 +229,7 @@ export default async function HomeOverviewPage() {
                   <span className="text-ink">{queue.label}</span>
                   <span className="flex min-w-0 items-center gap-3 text-ink-soft">
                     <span className="min-w-0 truncate">
-                      <span className="tabular-nums font-medium text-ink">
+                      <span className="tabular-nums text-base font-semibold text-ink">
                         {queue.count}
                       </span>{" "}
                       {queue.unit}
@@ -254,10 +254,10 @@ export default async function HomeOverviewPage() {
             ))}
           </ul>
 
-          {nextReturn ? (
+          {nextReturn && (nextReturn.callerPhone || nextReturn.callId) ? (
             <section
               aria-labelledby="next-return-heading"
-              className="mt-6 rounded-2xl border border-line bg-surface p-4"
+              className="mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
             >
               <h2
                 id="next-return-heading"
@@ -285,7 +285,7 @@ export default async function HomeOverviewPage() {
                       name: nextReturn.callerName,
                       reason: nextReturnReason,
                     })}
-                    variant="primary"
+                    variant="ghost"
                     label="Reply on WhatsApp"
                   />
                 ) : null}
@@ -319,17 +319,8 @@ export default async function HomeOverviewPage() {
               </Link>
             </section>
 
-            <section
-              aria-labelledby="line-heading"
-              className="border-t border-line px-4 py-4"
-            >
-              <h2
-                id="line-heading"
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft"
-              >
-                Line
-              </h2>
-              <p className="mt-2 text-sm font-medium text-ink">
+            <section aria-label="Line" className="border-t border-line px-4 py-4">
+              <p className="text-sm font-medium text-ink">
                 {lineStatusLabel(line)}
               </p>
               {line === "live" ? (
@@ -339,17 +330,8 @@ export default async function HomeOverviewPage() {
               ) : null}
             </section>
 
-            <section
-              aria-labelledby="wallet-heading"
-              className="border-t border-line px-4 py-4"
-            >
-              <h2
-                id="wallet-heading"
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft"
-              >
-                Wallet
-              </h2>
-              <p className="mt-2 font-mono text-sm font-medium text-ink">
+            <section aria-label="Wallet" className="border-t border-line px-4 py-4">
+              <p className="font-mono text-sm font-medium text-ink">
                 KES {kes.toLocaleString("en-KE")}
               </p>
               {lowWallet ? (

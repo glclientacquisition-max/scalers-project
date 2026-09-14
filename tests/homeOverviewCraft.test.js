@@ -42,10 +42,21 @@ describe("home overview craft", () => {
 
   it("splits the aside into Today, Line, and Wallet sections", () => {
     assert.match(page, /aria-label="Today"/);
-    assert.match(page, /aria-labelledby="line-heading"/);
-    assert.match(page, /aria-labelledby="wallet-heading"/);
+    assert.match(page, /aria-label="Line"/);
+    assert.match(page, /aria-label="Wallet"/);
     assert.match(page, /Top up/);
     assert.match(page, /KES \{kes\.toLocaleString/);
+  });
+
+  it("keeps one blue action and earns the card on desktop only", () => {
+    assert.match(page, /variant="ghost"/);
+    assert.doesNotMatch(page, /variant="primary"/);
+    assert.match(page, /hidden rounded-2xl border border-line bg-surface p-4 lg:block/);
+    assert.match(page, /nextReturn\.callerPhone \|\| nextReturn\.callId/);
+  });
+
+  it("gives queue counts visual weight", () => {
+    assert.match(page, /tabular-nums text-base font-semibold text-ink/);
   });
 
   it("formats the DID with spaces", () => {
