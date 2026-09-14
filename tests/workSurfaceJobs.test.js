@@ -64,7 +64,8 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(row, /itemSignalLabel\(item, vertical\)/);
     assert.match(row, /formatCallWhenRelative/);
     assert.doesNotMatch(inbox, />\s*Purpose\s*</);
-    assert.match(row, /aria-label="Conversation"/);
+    assert.match(row, /DeskRowHit/);
+    assert.match(row, /label="Conversation"/);
     assert.doesNotMatch(row, /item.hold \|\| item.job \? "Call" : "Open"/);
     assert.doesNotMatch(row, /\/contacts\/\$\{item.contactId\}/);
     const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");

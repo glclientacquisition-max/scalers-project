@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import { nicheCopy } from "@/lib/inboxNiche";
 import {
@@ -96,21 +97,18 @@ export function VisitWeekCalendar({
                         key={visit.id}
                         className="relative border-t border-line/70 pt-2 first:border-t-0 first:pt-0"
                       >
-                        {item.callId ? (
-                          <Link
-                            href={`/calls/${item.callId}?from=job`}
-                            aria-label="Conversation"
-                            className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
-                          />
-                        ) : null}
-                        <p className="relative z-[1] pointer-events-none text-sm font-semibold text-ink">
+                        <DeskRowHit
+                          href={item.callId ? `/calls/${item.callId}?from=job` : null}
+                          label="Conversation"
+                        />
+                        <p className={`${deskRowMutedClass} text-sm font-semibold text-ink`}>
                           {visit.when_text || copy.jobColumn}
                         </p>
-                        <p className="relative z-[1] pointer-events-none text-xs text-ink-soft">{item.headline}</p>
-                        <p className="relative z-[1] pointer-events-none text-xs text-ink">
+                        <p className={`${deskRowMutedClass} text-xs text-ink-soft`}>{item.headline}</p>
+                        <p className={`${deskRowMutedClass} text-xs text-ink`}>
                           {item.callerName || "Caller"}
                         </p>
-                        <div className="relative z-10 mt-1">
+                        <div className={`${deskRowActionClass} mt-1`}>
                           <InboxJobActions id={item.job.id} status={item.job.status} />
                         </div>
                       </li>
@@ -134,18 +132,15 @@ export function VisitWeekCalendar({
               if (!item?.job) return null;
               return (
                 <li key={visit.id} className="relative flex flex-wrap items-center justify-between gap-3 py-3">
-                  {item.callId ? (
-                    <Link
-                      href={`/calls/${item.callId}?from=job`}
-                      aria-label="Conversation"
-                      className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
-                    />
-                  ) : null}
-                  <div className="relative z-[1] pointer-events-none">
+                  <DeskRowHit
+                    href={item.callId ? `/calls/${item.callId}?from=job` : null}
+                    label="Conversation"
+                  />
+                  <div className={deskRowMutedClass}>
                     <p className="text-sm font-semibold text-ink">{item.headline}</p>
                     <p className="text-xs text-ink-soft">{item.callerName || "Caller"}</p>
                   </div>
-                  <div className="relative z-10">
+                  <div className={deskRowActionClass}>
                     <InboxJobActions id={item.job.id} status={item.job.status} />
                   </div>
                 </li>

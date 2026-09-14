@@ -75,7 +75,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Ghost / secondary | `btnGhost`: border-line, ink text |
 | Focus | `focusRing`: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]` |
 | Filter tabs | Underline tabs, `min-h-11`, active `border-[#0096FF] text-[#005CCC]` |
-| Data table | `DeskDataTable`: `rounded-2xl border border-line`, cells `px-4 py-3.5` |
+| List row | `DeskRowHit` in `deskRowHit.tsx`. Parent `relative`. Body `deskRowMutedClass`. Trailing verb `deskRowActionClass`. No Call, Open, or View column. |
 | Pagination | `ui/Pagination.tsx` (`min-h-11` hits) |
 | Field | `settingsFieldClass` + full brand ring |
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |

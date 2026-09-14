@@ -1,0 +1,8 @@
+# Contacts
+
+**Route:** `/contacts`  
+**Job:** Named callers. Not a CRM.
+
+**Row:** Same recipe as Inbox. Tap the row to open the contact. No Open column.
+
+**Detail:** `/contacts/[id]`. Notes left. Timeline right. Tap a timeline row that has a call to open the conversation. No Call column.

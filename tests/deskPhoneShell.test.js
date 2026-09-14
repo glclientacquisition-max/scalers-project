@@ -31,7 +31,8 @@ describe("desk phone shell", () => {
     assert.doesNotMatch(layout, /context=\{businessName\}/);
     const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");
     assert.match(inboxRow, /export function InboxPhoneRow/);
-    assert.match(inboxRow, /aria-label="Conversation"/);
+    assert.match(inboxRow, /DeskRowHit/);
+    assert.match(inboxRow, /label="Conversation"/);
     assert.match(inboxRow, /InboxJobActions id=\{item.job.id\} status=\{item.job.status\} extra=\{false\}/);
     assert.match(read("dashboard/src/components/InboxJobEditor.tsx"), /InboxJobActions id=\{id\} status=\{status\} extra/);
     assert.match(read("dashboard/src/components/InboxHoldEditor.tsx"), /RequestStatusToggle id=\{id\} status=\{status\} extra/);
