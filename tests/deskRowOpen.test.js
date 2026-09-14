@@ -36,4 +36,10 @@ describe("desk rows open the record", () => {
     assert.doesNotMatch(home, /Open call/);
     assert.doesNotMatch(inbox, /item.hold \|\| item.job \? "Call" : "Open"/);
   });
+
+  it("keeps internal metadata off the contact page", () => {
+    assert.doesNotMatch(contact, /metaKeys/);
+    assert.doesNotMatch(contact, /JSON\.stringify\(metadata/);
+    assert.doesNotMatch(contact, />\s*Metadata\s*</);
+  });
 });
