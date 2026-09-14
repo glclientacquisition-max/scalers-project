@@ -461,6 +461,24 @@
       "expectProductionText": "Bei ni shilingi elfu mbili mia tano."
     },
     {
+      "id": "52-sw-numeric-clock-period",
+      "group": "universal",
+      "category": "time",
+      "text": "Anwani na muda ni kesho saa 3:00 usiku hapo Panda.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectProductionText": "Anwani na muda ni kesho saa 3 usiku hapo Panda."
+    },
+    {
+      "id": "53-parenthetical-aside",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "Ilikuwa ni usafishaji wa godoro (mattress cleaning) kesho saa nane mchana.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectProductionText": "Ilikuwa ni usafishaji wa godoro, mattress cleaning, kesho saa nane mchana."
+    },
+    {
       "id": "19-lexicon-brand",
       "group": "lexicon_control",
       "category": "lexicon-brand",

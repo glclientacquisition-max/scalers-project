@@ -441,6 +441,32 @@ test('millions speak in words', () => {
   );
 });
 
+test('swahili numeric clock keeps its stated period, no doubled saa', () => {
+  assert.strictEqual(
+    prepareForTts('Anwani na muda ni kesho saa 3:00 usiku hapo Panda.', { callLanguage: 'sw' }).text,
+    'Anwani na muda ni kesho saa 3 usiku hapo Panda.'
+  );
+  assert.strictEqual(
+    prepareForTts('Tufike saa 3:30 usiku.', { callLanguage: 'sw' }).text,
+    'Tufike saa 3 na dakika 30 usiku.'
+  );
+  assert.strictEqual(
+    prepareForTts('Kuanzia 6:00 asubuhi.', { callLanguage: 'sw' }).text,
+    'Kuanzia saa 6 asubuhi.'
+  );
+});
+
+test('parenthetical asides become pauses, not spoken brackets', () => {
+  assert.strictEqual(
+    prepareForTts('Ilikuwa ni usafishaji wa godoro (mattress cleaning) kesho.', { callLanguage: 'sw' }).text,
+    'Ilikuwa ni usafishaji wa godoro, mattress cleaning, kesho.'
+  );
+  assert.strictEqual(
+    prepareForTts('We charge KSh 500 (per person) for that.', { callLanguage: 'en' }).text,
+    'We charge five hundred shillings, per person, for that.'
+  );
+});
+
 test('ENDCALL leftover is not spoken if it reaches TTS prep', () => {
   const prepared = prepareForTts(
     'Have a great day. ###ENDCALL###'

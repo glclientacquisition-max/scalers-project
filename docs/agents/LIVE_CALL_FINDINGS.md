@@ -1,3 +1,32 @@
+# Transcript verification — last-call residuals (2026-09-14)
+
+Owner ask: verify the punctuation / figure / currency fixes against the last transcript.
+
+Method: pulled both post-merge staging calls (`9f6b94d5`, 146 turns, 21:13 UTC; `a2c0c86c`, 34 turns, 21:17 UTC) and ran all 54 agent turns through the merged `prepareForTts` net, scanning for survivals (dashes, slashes, `&`/`=`, dot chains, currency codes, long digit runs, parens, exclamations).
+
+Verified fixed on real lines:
+
+| Model wrote on the call | Caller now hears |
+| --- | --- |
+| `kwa Ksh 1500 hadi 2000 kulingana na size` | `kwa shilingi elfu moja mia tano hadi shilingi elfu mbili kulingana na size` |
+| `bei ni Ksh 2000 kila moja` | `bei ni shilingi elfu mbili kila moja` |
+| `I don't have that exact detail — I can note it…` | em dash becomes a comma pause |
+| `Tuko wazi hadi 6 PM` (SW) | `Tuko wazi hadi saa 6 jioni` |
+| `from 8 AM` | `from 8 A M` |
+| `Have a good night!` | period, no punched exclamation |
+| `Sawa... Chris... Unahitaji...` (slow-down attempt) | single periods, no spoken dots |
+
+Two residuals the verification caught, now fixed:
+
+1. `saa 3:00 usiku` → `saa saa 3 asubuhi usiku` — the 24h safety net read `3:00` as a 24h clock, doubled `saa`, and contradicted the stated period (`asubuhi usiku`). New `expandSwahiliClockTimes` claims numeric clocks carrying a Swahili period word (`asubuhi|mchana|jioni|usiku|alfajiri`) before the 24h net: `saa 3:00 usiku` → `saa 3 usiku`, `saa 3:30 usiku` → `saa 3 na dakika 30 usiku`.
+2. `godoro (mattress cleaning) kesho` — parentheses survived verbatim. `polishPunctuation` now rewrites parenthetical asides as comma pauses.
+
+Regression: 2 new `tests/ttsNormalize.test.js` cases, fixtures `52`–`53`. `npm run test:voice` green.
+
+Not a TTS matter, logged for Brain: the model wrote `saa dodoma jioni` (a city name where a number belongs) while correcting hours confusion, and the `...`-between-every-word slow-down attempt means callers asking "polepole" need a real speed control, not punctuation.
+
+---
+
 # Currency read wrong — stranded codes, k-shorthand, silent cents (2026-09-14)
 
 Owner report: before merging the figures fix, work currency deeply too.
