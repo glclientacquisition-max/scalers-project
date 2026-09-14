@@ -435,6 +435,58 @@ function expandDayRanges(text, lang = 'en') {
 }
 
 /**
+ * Identifier-style digit runs (till, paybill, account, order, reference, code)
+ * must read digit-by-digit, not as one giant number. Strong keywords accept
+ * 4+ digits; weak ones (till / number / no) need 5+ so "open till 2026"
+ * stays a year.
+ * @param {string} text
+ */
+function expandIdentifiers(text) {
+  let out = String(text || '');
+  const speakDigits = (run) => {
+    const digits = String(run).replace(/\D/g, '');
+    return digits.split('').join(' ');
+  };
+
+  out = out.replace(
+    /\b(?:order|reference|ref|code|account|a\/c|pay\s?bill)\.?\s*(?:number|no\.?|#)?\s*[:#]?\s*(\d[\d\s\u2013\u2014-]{2,}\d)/gi,
+    (full, run) => {
+      const digits = String(run).replace(/\D/g, '');
+      if (digits.length < 4 || digits.length > 16) return full;
+      return full.replace(run, speakDigits(run));
+    }
+  );
+
+  out = out.replace(
+    /\b(?:till|number|no)\.?\s*(?:number|no\.?|#)?\s*[:#]?\s*(\d[\d\s\u2013\u2014-]{3,}\d)/gi,
+    (full, run) => {
+      const digits = String(run).replace(/\D/g, '');
+      if (digits.length < 5 || digits.length > 16) return full;
+      return full.replace(run, speakDigits(run));
+    }
+  );
+
+  // "open 24/7" reads as "twenty four seven", never "slash".
+  out = out.replace(/\b24\s*\/\s*7\b/g, '24 7');
+
+  return out;
+}
+
+/**
+ * Compact digit ranges with a unit word: 30-40 minutes, 1-2 days, 2-3 seaters.
+ * Money, clock, and day ranges are claimed earlier in the pipeline.
+ * @param {string} text
+ * @param {'en'|'sw'|string} lang
+ */
+function expandNumberUnitRanges(text, lang = 'en') {
+  const joiner = rangeJoiner(lang === 'sw' ? 'sw' : 'en');
+  return String(text || '').replace(
+    /\b(\d{1,3})\s*[-–—]\s*(\d{1,3})\s+(minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?|seaters?|units?|items?|km|kg|people|pax|guests?)\b/gi,
+    (full, a, b, unit) => `${a} ${joiner} ${b} ${unit}`
+  );
+}
+
+/**
  * Expand phone-ish digit runs digit-by-digit (works for EN and SW TTS).
  * Handles +254…, compact 07/01xxxxxxxx, and spaced/hyphenated local mobiles.
  * @param {string} text
@@ -468,6 +520,8 @@ function expandSpokenForms(text, lang = 'en') {
   out = expandTimeRanges12h(out, lang);
   out = expandMoney(out, lang);
   out = expandBarePriceInContext(out, lang);
+  out = expandIdentifiers(out);
+  out = expandNumberUnitRanges(out, lang);
   out = expandTimes(out, lang);
   out = expand24HourTime(out, lang);
   out = expandDayRanges(out, lang);
@@ -478,6 +532,8 @@ module.exports = {
   expandMoney,
   expandBarePriceInContext,
   expandTimeRanges12h,
+  expandIdentifiers,
+  expandNumberUnitRanges,
   expandTimes,
   expand24HourTime,
   expandDayRanges,

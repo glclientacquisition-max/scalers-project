@@ -1,3 +1,27 @@
+# Figures read wrong — till numbers, compact ranges, 24/7 (2026-09-14)
+
+Owner report: the workflow behind figures does not perform — numbers come out wrong on calls.
+
+Audit of the same `prepareForTts` net, figure forms this time:
+
+| Caller heard | Text that survived the net |
+| --- | --- |
+| "five hundred nineteen thousand four hundred eighty three" | `Pay to till number 5194830` — till / paybill / account / order / reference / code digit runs were never expanded. Broken for Kenyan payment flows. |
+| "thirty hyphen forty" | `30-40 minutes`, `1-2 days` — compact digit ranges with unit words kept the dash. |
+| "twenty four slash seven" | `24/7` — slash survived. |
+
+Fix (Voice, net layer):
+
+1. `expandIdentifiers` — keyword-led digit runs speak digit-by-digit. Strong keywords (`order`, `reference`, `ref`, `code`, `account`, `a/c`, `paybill`) accept 4+ digits; weak ones (`till`, `number`, `no`) need 5+ so `open till 2026` stays a year and `till 9pm` stays a time. `pin` is deliberately excluded — a spoken PIN is a security bug upstream, not something to pronounce clearly.
+2. `expandNumberUnitRanges` — `30-40 minutes` → `30 to 40 minutes`, `1-2 days` → `1 to 2 days` (SW `hadi`). Scoped to duration/quantity unit words; money, clock, and day ranges are claimed earlier.
+3. `24/7` → `24 7`.
+
+Protected per fixture: `We sold 100 units`, `Shop No. M4`, `Can I order 2 pizzas`, money (`KSh 45,000` → words), phones, decimals, dates.
+
+Regression: 7 new cases in `tests/ttsNormalize.test.js`, 6 new universal fixtures (`38`–`43`). `npm run test:voice` green.
+
+---
+
 # Punctuation read aloud — full stops and hyphens (2026-09-14)
 
 Owner report: the business assistant literally says "full stop" and "hyphen" on calls.

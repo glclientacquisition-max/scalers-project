@@ -331,6 +331,64 @@
       "source": "numbered-list markers become commas, not full stops"
     },
     {
+      "id": "38-identifier-till",
+      "group": "universal",
+      "category": "identifier",
+      "text": "Pay to till number 5194830.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Pay to till number 5 1 9 4 8 3 0.",
+      "source": "till numbers read digit by digit, never as one giant number"
+    },
+    {
+      "id": "39-identifier-paybill-account",
+      "group": "universal",
+      "category": "identifier",
+      "text": "Paybill 247247, account 10203040.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0.",
+      "source": "paybill and account numbers read digit by digit"
+    },
+    {
+      "id": "40-duration-range",
+      "group": "universal",
+      "category": "range",
+      "text": "It takes 30-40 minutes.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "It takes 30 to 40 minutes.",
+      "source": "compact duration ranges speak with to"
+    },
+    {
+      "id": "41-days-range",
+      "group": "universal",
+      "category": "range",
+      "text": "Delivery in 1-2 days.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Delivery in 1 to 2 days."
+    },
+    {
+      "id": "42-always-open",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "We are open 24/7.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "We are open 24 7.",
+      "source": "24/7 never says slash"
+    },
+    {
+      "id": "43-identifier-order",
+      "group": "universal",
+      "category": "identifier",
+      "text": "Order number 45678.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Order number 4 5 6 7 8."
+    },
+    {
       "id": "19-lexicon-brand",
       "group": "lexicon_control",
       "category": "lexicon-brand",
