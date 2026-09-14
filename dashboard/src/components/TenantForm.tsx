@@ -905,6 +905,16 @@ export function TenantForm({
               label="Text customers"
             />
           </div>
+          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3">
+            <p className="text-sm font-medium text-ink">Text back missed calls</p>
+            <ToolSwitch
+              checked={Boolean(notifyChannels.missed_textback)}
+              onChange={(next) =>
+                setNotifyChannels({ ...notifyChannels, missed_textback: next })
+              }
+              label="Text back missed calls"
+            />
+          </div>
         </div>
 
         <div className="space-y-3">

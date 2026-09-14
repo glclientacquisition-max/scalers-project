@@ -8,11 +8,12 @@ const DEFAULTS = Object.freeze({
   whatsapp: true,
   email: true,
   caller_sms: false,
+  missed_textback: false,
 });
 
 /**
  * @param {unknown} raw
- * @returns {{ sms: boolean, whatsapp: boolean, email: boolean, caller_sms: boolean }}
+ * @returns {{ sms: boolean, whatsapp: boolean, email: boolean, caller_sms: boolean, missed_textback: boolean }}
  */
 function parseNotifyChannels(raw) {
   const next = { ...DEFAULTS };
@@ -21,6 +22,7 @@ function parseNotifyChannels(raw) {
   if (typeof raw.whatsapp === 'boolean') next.whatsapp = raw.whatsapp;
   if (typeof raw.email === 'boolean') next.email = raw.email;
   if (typeof raw.caller_sms === 'boolean') next.caller_sms = raw.caller_sms;
+  if (typeof raw.missed_textback === 'boolean') next.missed_textback = raw.missed_textback;
   // At least one owner channel must stay opted-in. Caller SMS stays off unless set.
   if (!next.sms && !next.whatsapp && !next.email) {
     next.sms = true;

@@ -185,6 +185,14 @@ const {
   appointmentCallerEvent,
   requestCallerEvent,
 } = require('./src/notifications/callerSms');
+const {
+  TEXTBACK_META_KEY,
+  SUPPRESS_WINDOW_MS,
+  missedTextbackEnabled,
+  missedCallEligible,
+  recentlyTexted,
+  sendMissedTextback,
+} = require('./src/notifications/missedTextback');
 
 /** Desk base for deep links in owner alerts. */
 function deskBaseUrl() {
@@ -772,10 +780,56 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
     });
     // Best-effort outcome while Brain state may still be in memory.
     await persistCallResolution(callSid, source, { turns });
+    if (updated) {
+      // Fire-and-forget: SMS latency must not hold the webhook open.
+      maybeSendMissedTextback({ callSid, call: updated }).catch((err) =>
+        console.warn(`[${source}] missed text-back failed:`, err?.message || err)
+      );
+    }
     return updated;
   } catch (err) {
     console.error(`[${source}] updateCallStatus failed:`, err?.message || err);
     return null;
+  }
+}
+
+// One in-flight text-back per call; the summary marker closes the rest.
+const textbackInProgress = new Set();
+
+async function maybeSendMissedTextback({ callSid, call }) {
+  if (!callSid || !call) return;
+  if (textbackInProgress.has(callSid)) return;
+  const eligible = missedCallEligible(call);
+  if (!eligible.ok) return;
+  textbackInProgress.add(callSid);
+  try {
+    let businessName = process.env.BUSINESS_NAME || null;
+    let notifyChannels = null;
+    try {
+      const profile = await db.getTenantProfile({ callSid });
+      businessName = profile.businessName || businessName;
+      notifyChannels = profile.notifyChannels || null;
+    } catch (err) {
+      console.warn(`[${callSid}] tenant lookup for text-back failed:`, err?.message || err);
+      return;
+    }
+    if (!missedTextbackEnabled(notifyChannels)) return;
+    // A retrying caller during an outage gets one text per window, not one per attempt.
+    const recent = await db.listRecentCallsFromNumber({
+      tenantId: call.tenant_id,
+      callerNumber: call.from_number,
+      sinceIso: new Date(Date.now() - SUPPRESS_WINDOW_MS).toISOString(),
+    });
+    if (recentlyTexted(recent)) return;
+    const sent = await sendMissedTextback({ to: call.from_number, businessName });
+    if (!sent.channel) return;
+    await db.mergeCallSummaryMeta({
+      callSid,
+      patch: { [TEXTBACK_META_KEY]: new Date().toISOString() },
+    });
+    console.log(`[${callSid}] missed-call text-back sent`);
+  } finally {
+    textbackInProgress.delete(callSid);
   }
 }
 

@@ -150,7 +150,7 @@ export type TenantRow = {
   sautikit_virtual_number: string;
   whatsapp_notification_number: string;
   alert_email?: string | null;
-  /** Owner + caller notify prefs: { sms, whatsapp, email, caller_sms }. */
+  /** Owner + caller notify prefs: { sms, whatsapp, email, caller_sms, missed_textback }. */
   notify_channels?: { sms?: boolean; whatsapp?: boolean; email?: boolean } | null;
   llm_system_prompt: string | null;
   services_offered?: string | null;

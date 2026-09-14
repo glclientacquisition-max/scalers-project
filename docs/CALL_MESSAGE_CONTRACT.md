@@ -50,7 +50,7 @@ Owner alerts use the first channel that works, in this order:
 | 3 | **Email** | Resend | Fallback when SMS and WhatsApp miss. |
 | 4 | **Desk note** | Supabase call row | Always saved. Soft success if 1–3 miss. |
 
-Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email, caller_sms}`). At least one **owner** channel stays on. `caller_sms` is a separate opt-in and defaults **off**.
+Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email, caller_sms, missed_textback}`). At least one **owner** channel stays on. `caller_sms` and `missed_textback` are separate opt-ins and default **off**.
 
 Escalation adds a **teammate** step before the owner: SMS teammate → SMS owner → WhatsApp teammate/owner → owner email.
 
@@ -108,6 +108,17 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 - Name the service or item.
 - Send from the Scalers TextSMS sender, not the owner's personal number.
 - Opt-out line when required: `Reply STOP to opt out.`
+
+### Missed-call text-back (separate opt-in)
+
+When a call reaches the line but the caller gets no service (terminal webhook closes it `failed` or `no_answer`), the caller hears silence. Text-back closes that hole.
+
+- Owner toggle `notify_channels.missed_textback`. Off until they turn it on. Independent of `caller_sms`.
+- Caller text: `Hi, {Business} here. Sorry we missed your call. We will call you back.` One SMS segment, fixed template.
+- No reply invite. Inbound SMS has no route back to the desk, so the text promises only the callback. The missed call lands in Inbox Needs you as Missed, which is where the owner acts on it.
+- Never fires for: completed calls (any resolution, including abandoned), live-transfer legs, calls with a captured lead (name + reason), or a call already texted.
+- Dedup: `missed_textback_at` marker on the call summary. One caller gets at most one text-back per 6 hours, so a line outage does not spam a retrying customer.
+- Fires from the terminal webhook path (`markCallTerminalFromWebhook`), fire-and-forget so SMS latency never holds the webhook open.
 
 ---
 
