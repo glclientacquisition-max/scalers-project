@@ -8,6 +8,7 @@ import {
   type CallRow,
   type TranscriptRow,
 } from "@/lib/supabase";
+import { buildSummarySentence, pickCallOwnerReason } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { CallRecording } from "@/components/CallRecording";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
@@ -37,7 +38,6 @@ import {
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
 
-/** WhatsApp-style transcript bubble. Caller = green/left, receptionist = grey/right. */
 function ChatBubble({ turn }: { turn: TranscriptRow }) {
   const speaker = String(turn.speaker || "").toLowerCase();
   const isCaller = speaker === "caller";
@@ -75,32 +75,6 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
       </div>
     </div>
   );
-}
-
-function buildSummarySentence(opts: {
-  name: string | null;
-  reason: string | null;
-  callerNumber: string;
-  urgent: boolean;
-}): string {
-  const who = opts.name || `The caller (${opts.callerNumber})`;
-  const extra = opts.urgent ? " This sounded urgent." : "";
-  if (!opts.reason) {
-    return `${who} called.${extra}`;
-  }
-  const reason = opts.reason.replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
-  const named =
-    /^(caller|the caller)\b/i.test(reason) ||
-    (opts.name && reason.toLowerCase().startsWith(opts.name.toLowerCase()));
-  const complete =
-    reason.length >= 40 ||
-    /\b(left a hold|booked a visit|updated a visit|needs you|asked about)\b/i.test(
-      reason
-    );
-  if (named || complete) {
-    return `${reason}.${extra}`;
-  }
-  return `${who} called about ${reason}.${extra}`;
 }
 
 function parseFromFilter(raw: string | undefined): string | undefined {
@@ -201,7 +175,7 @@ export default async function CallDetailPage({
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
   const name = contactName || summaryName || null;
-  const reason = typeof meta.reason === "string" ? meta.reason : null;
+  const reason = pickCallOwnerReason(meta);
   const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
   const leadStatus = parseLeadStatus(row.lead_status);
   const resolution = parseCallResolution(row.resolution);

@@ -159,7 +159,7 @@ export default async function ContactsPage({
                 </p>
                 <p className="mt-1 font-mono text-sm text-ink">{row.phone || "No phone"}</p>
                 <p className="mt-1 text-sm text-ink-soft">
-                  {row.last_reason?.trim() || "None"}
+                  {row.lastReasonDisplay || "None"}
                   {row.lastContactAt ? ` · ${formatCallWhenRelative(row.lastContactAt)}` : ""}
                 </p>
                 <Link
@@ -219,7 +219,7 @@ export default async function ContactsPage({
                       {row.phone || "No phone"}
                     </td>
                     <td className="px-5 py-5 align-top text-sm text-ink-soft">
-                      {row.last_reason?.trim() || "None"}
+                      {row.lastReasonDisplay || "None"}
                     </td>
                     <td className="whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft">
                       {row.lastContactAt

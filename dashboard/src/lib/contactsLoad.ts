@@ -1,4 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { parseSummary } from "@/lib/supabase";
+import {
+  displayContactLastReason,
+  pickCallOwnerReason,
+} from "@/lib/callSummarySentence";
 
 export type ContactRow = {
   id: string;
@@ -14,6 +19,7 @@ export type ContactRow = {
 
 export type ContactListRow = ContactRow & {
   lastContactAt: string | null;
+  lastReasonDisplay: string | null;
 };
 
 export type ContactTimelineEntry = {
@@ -24,6 +30,7 @@ export type ContactTimelineEntry = {
   detail: string | null;
   callId: string | null;
   status: string | null;
+  ownerReason?: string | null;
 };
 
 const CONTACT_SELECT =
@@ -91,18 +98,29 @@ export async function loadContactsPage(
     return { rows: [], total, error: null };
   }
 
-  const lastByKey = await loadLastContactMap(
+  const extras = await loadLastContactMap(
     client,
     tenantId,
     contacts
   );
-  const rows = contacts.map((row) => ({
-    ...row,
-    lastContactAt:
-      lastByKey.byId.get(row.id) ||
-      (row.phone ? lastByKey.byPhone.get(row.phone) : null) ||
-      row.updated_at,
-  }));
+  const rows = contacts.map((row) => {
+    const latestCallReason = row.phone
+      ? extras.reasonByPhone.get(row.phone) ?? null
+      : null;
+    return {
+      ...row,
+      lastContactAt:
+        extras.byId.get(row.id) ||
+        (row.phone ? extras.byPhone.get(row.phone) : null) ||
+        row.updated_at,
+      lastReasonDisplay: displayContactLastReason({
+        name: row.name,
+        phone: row.phone,
+        lastReason: row.last_reason,
+        latestCallReason,
+      }),
+    };
+  });
 
   return { rows, total, error: null };
 }
@@ -111,7 +129,11 @@ async function loadLastContactMap(
   client: SupabaseClient,
   tenantId: string,
   contacts: ContactRow[]
-): Promise<{ byId: Map<string, string | null>; byPhone: Map<string, string | null> }> {
+): Promise<{
+  byId: Map<string, string | null>;
+  byPhone: Map<string, string | null>;
+  reasonByPhone: Map<string, string | null>;
+}> {
   const ids = contacts.map((c) => c.id);
   const phones = contacts.map((c) => c.phone).filter((p): p is string => Boolean(p));
 
@@ -119,9 +141,11 @@ async function loadLastContactMap(
     phones.length
       ? client
           .from("calls")
-          .select("caller_number, created_at")
+          .select("caller_number, created_at, summary")
           .eq("tenant_id", tenantId)
           .in("caller_number", phones)
+          .order("created_at", { ascending: false })
+          .limit(Math.max(phones.length * 8, 80))
       : Promise.resolve({ data: [], error: null }),
     ids.length
       ? client
@@ -155,11 +179,18 @@ async function loadLastContactMap(
 
   const byPhone = new Map<string, string | null>();
   const byId = new Map<string, string | null>();
+  const reasonByPhone = new Map<string, string | null>();
 
   for (const row of callsRes.data || []) {
     const phone = String(row.caller_number || "");
     if (!phone) continue;
     byPhone.set(phone, maxIso(byPhone.get(phone) || null, row.created_at));
+    if (!reasonByPhone.has(phone)) {
+      reasonByPhone.set(
+        phone,
+        pickCallOwnerReason(parseSummary(row.summary as string | null))
+      );
+    }
   }
   for (const row of [
     ...(reqRes.data || []),
@@ -176,7 +207,7 @@ async function loadLastContactMap(
     }
   }
 
-  return { byId, byPhone };
+  return { byId, byPhone, reasonByPhone };
 }
 
 export async function loadContactById(
@@ -254,20 +285,27 @@ export async function loadContactTimeline(
   const seenAppt = new Set<string>();
 
   for (const row of callsRes.data || []) {
-    const summary =
-      row.summary && typeof row.summary === "string"
-        ? safeJson(row.summary)
-        : {};
-    const reason =
-      typeof summary.reason === "string" ? summary.reason : null;
+    const ownerReason = pickCallOwnerReason(
+      parseSummary(typeof row.summary === "string" ? row.summary : null)
+    );
     entries.push({
       id: `call:${row.id}`,
       kind: "call",
       createdAt: row.created_at,
-      headline: reason || row.primary_intent || "Call",
+      headline:
+        displayContactLastReason({
+          name: contact.name,
+          phone: contact.phone,
+          lastReason: null,
+          latestCallReason: ownerReason,
+        }) ||
+        ownerReason ||
+        row.primary_intent ||
+        "Call",
       detail: row.status || null,
       callId: row.id,
       status: row.status || null,
+      ownerReason,
     });
   }
 
@@ -301,13 +339,4 @@ export async function loadContactTimeline(
 
   entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return entries;
-}
-
-function safeJson(raw: string): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
 }

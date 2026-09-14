@@ -462,6 +462,51 @@ describe('post-call contact persist and name extract', () => {
     assert.equal(upserts[upserts.length - 1].name, 'Amina');
   });
 
+  it('writes hangup owner reason onto contact last_reason', async () => {
+    process.env.POST_CALL_GEMINI_REVIEW = 'on';
+    const upserts = [];
+    const result = await runPostCallHangupJobs(
+      {
+        callSid: 'CA_reason',
+        turns: fatTurns,
+        summary: { name: 'Colin', reason: 'Colin asked about Ah, unajua, degrees apartments.' },
+        derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
+        toolFlags: visitFlags,
+      },
+      {
+        waitMs: 0,
+        retryMs: 0,
+        generateNameText: async () => 'Colin',
+        generateText: async () =>
+          JSON.stringify({
+            reason:
+              'Colin booked a mattress cleaning visit for tomorrow at 10 AM at Degrees Apartments in Rongai.',
+            primary_intent: 'book_visit',
+            needs_human: false,
+            needs_owner: false,
+            urgent: false,
+            confidence: 0.94,
+          }),
+        getCall: async () => ({
+          id: 'call-5',
+          tenant_id: 't1',
+          from_number: '+254119774470',
+          name: 'Colin',
+          reason: 'Colin asked about Ah, unajua, degrees apartments.',
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return row;
+        },
+        save: async () => {},
+      }
+    );
+    assert.equal(result.ok, true);
+    const last = upserts[upserts.length - 1];
+    assert.match(last.lastReason, /mattress cleaning visit/);
+    assert.doesNotMatch(last.lastReason, /unajua/);
+  });
+
   it('extractCallerNameFromTranscript maps NONE and a real name', async () => {
     const none = await extractCallerNameFromTranscript(fatTurns, {
       generateNameText: async () => 'NONE',

@@ -449,12 +449,32 @@ async function persistCompletedCallContact(ctx = {}, deps = {}) {
     ctx.extractedName !== undefined
       ? ctx.extractedName
       : ctx.summary?.name || call.name || null;
+  const meta =
+    call.summary && typeof call.summary === 'object'
+      ? call.summary
+      : (() => {
+          try {
+            return JSON.parse(String(call.summary || '')) || {};
+          } catch {
+            return {};
+          }
+        })();
+  const reviewReason =
+    meta &&
+    meta.owner_review &&
+    typeof meta.owner_review.reason === 'string'
+      ? String(meta.owner_review.reason).trim()
+      : '';
   try {
     const contact = await upsertContact({
       tenantId,
       phone,
       name: incomingName || null,
-      lastReason: ctx.summary?.reason || call.reason || null,
+      lastReason:
+        String(ctx.summary?.reason || '').trim() ||
+        reviewReason ||
+        call.reason ||
+        null,
       callId: call.id || null,
     });
     return { ok: true, contact };
@@ -570,6 +590,17 @@ async function runPostCallHangupJobs(ctx, deps = {}) {
   let review = { ok: false, skipped: true, reason: 'disabled' };
   if (isReviewEnabled()) {
     review = await runPostCallTranscriptReview({ ...ctx, turns }, deps);
+  }
+  const reviewedReason = String(review?.merged?.reason || '').trim();
+  if (reviewedReason) {
+    named = await persistCompletedCallContact(
+      {
+        ...ctx,
+        extractedName: extracted || undefined,
+        summary: { ...(ctx.summary || {}), reason: reviewedReason },
+      },
+      deps
+    );
   }
   return { ok: true, extracted, persisted: named, review };
 }
