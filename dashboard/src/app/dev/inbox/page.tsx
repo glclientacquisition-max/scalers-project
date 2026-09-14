@@ -3,7 +3,8 @@ import { BrandLockup } from "@/components/brand/BrandMark";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { InboxJobActions } from "@/components/InboxJobActions";
-import { InboxPhoneRow } from "@/components/InboxItemRow";
+import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
+import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
@@ -102,7 +103,7 @@ export default function DevInboxPage() {
           Inbox
         </h1>
         <p className="mt-1 text-[13px] text-ink-soft">4 need you</p>
-        <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface">
+        <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
           {ROWS.map((row) => (
             <InboxPhoneRow
               key={row.id}
@@ -112,6 +113,29 @@ export default function DevInboxPage() {
             />
           ))}
         </ul>
+        <div className="mt-8 hidden md:block">
+          <DeskDataTable minWidthClass="min-w-[720px]">
+            <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
+              <tr>
+                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Work</th>
+                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Caller</th>
+                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">When</th>
+                <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROWS.map((row) => (
+                <InboxTableRow
+                  key={row.id}
+                  item={row}
+                  businessName="Workspace"
+                  purpose="needs"
+                  vertical={null}
+                />
+              ))}
+            </tbody>
+          </DeskDataTable>
+        </div>
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <section className="rounded-2xl border border-line bg-surface p-4">
             <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Visit</h2>

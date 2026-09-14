@@ -6,6 +6,7 @@ import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { RowIdentity } from "@/components/ui/deskRow";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { deskEmptyClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
@@ -133,16 +134,25 @@ export default async function ContactsPage({
                 <Link
                   href={`/contacts/${row.id}`}
                   aria-label={row.name?.trim() || "Contact"}
-                  className="block px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
+                  className="flex items-center gap-3 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
                 >
-                  <p className="text-base font-semibold tracking-tight text-ink">
-                    {row.name?.trim() || "Unknown"}
-                  </p>
-                  <p className="mt-1 font-mono text-sm text-ink">{row.phone || "No phone"}</p>
-                  <p className="mt-1 text-sm text-ink-soft">
-                    {row.lastReasonDisplay || "None"}
-                    {row.lastContactAt ? ` · ${formatCallWhenRelative(row.lastContactAt)}` : ""}
-                  </p>
+                  <RowIdentity name={row.name} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">
+                        {row.name?.trim() || "Unknown"}
+                      </p>
+                      {row.lastContactAt ? (
+                        <p className="shrink-0 text-xs text-ink-soft">
+                          {formatCallWhenRelative(row.lastContactAt)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 truncate font-mono text-sm text-ink">{row.phone || "No phone"}</p>
+                    <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">
+                      {row.lastReasonDisplay || "None"}
+                    </p>
+                  </div>
                 </Link>
               </li>
             ))}
@@ -185,9 +195,12 @@ export default async function ContactsPage({
                   >
                     <td className="px-5 py-5 align-top">
                       <DeskRowHit href={`/contacts/${row.id}`} label={row.name?.trim() || "Contact"} />
-                      <p className={`${deskRowMutedClass} text-base font-semibold tracking-tight text-ink`}>
-                        {row.name?.trim() || "Unknown"}
-                      </p>
+                      <div className={`${deskRowMutedClass} flex items-center gap-3`}>
+                        <RowIdentity name={row.name} />
+                        <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">
+                          {row.name?.trim() || "Unknown"}
+                        </p>
+                      </div>
                     </td>
                     <td className={`${deskRowMutedClass} px-5 py-5 align-top font-mono text-sm text-ink`}>
                       {row.phone || "No phone"}
