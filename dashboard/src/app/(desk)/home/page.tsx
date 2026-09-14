@@ -29,6 +29,11 @@ import {
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import {
+  getWalletRunwayDays,
+  isBetaBilling,
+  walletRunwayLabel,
+} from "@/lib/wallet";
 
 export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
@@ -56,7 +61,8 @@ export default async function HomeOverviewPage() {
   const client = workspace.client;
   const dayStart = nairobiDayStartIso();
   const kes = walletKes(tenant);
-  const lowWallet = kes < 200;
+  const isBeta = isBetaBilling(tenant.billing_enforcement);
+  const lowWallet = !isBeta && kes < 200;
   const business = tenant.business_name?.trim() || "your workspace";
   const liveUpdates = liveBulletinItems(tenant.daily_bulletin);
   const primaryUpdate = liveUpdates[0] ?? null;
@@ -84,14 +90,18 @@ export default async function HomeOverviewPage() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const [todayRes, inbox] = await Promise.all([
+  const [todayRes, inbox, runwayDays] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
     loadInboxItems(client, tenant.id, vertical),
+    isBeta
+      ? Promise.resolve(null)
+      : getWalletRunwayDays(client, tenant.id, kes),
   ]);
+  const runway = walletRunwayLabel(runwayDays);
 
   const todayCount = todayRes.count ?? 0;
   const work = summarizeInboxWork(inbox.items);
@@ -330,19 +340,24 @@ export default async function HomeOverviewPage() {
               ) : null}
             </section>
 
-            <section aria-label="Wallet" className="border-t border-line px-4 py-4">
-              <p className="font-mono text-sm font-medium text-ink">
-                KES {kes.toLocaleString("en-KE")}
-              </p>
-              {lowWallet ? (
-                <Link
-                  href="/wallet"
-                  className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warn hover:underline ${focusRingVisible}`}
-                >
-                  Top up
-                </Link>
-              ) : null}
-            </section>
+            {!isBeta ? (
+              <section aria-label="Wallet" className="border-t border-line px-4 py-4">
+                <p className="font-mono text-sm font-medium text-ink">
+                  KES {kes.toLocaleString("en-KE")}
+                </p>
+                {runway ? (
+                  <p className="mt-0.5 text-xs text-ink-soft">{runway}</p>
+                ) : null}
+                {lowWallet ? (
+                  <Link
+                    href="/wallet"
+                    className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warn hover:underline ${focusRingVisible}`}
+                  >
+                    Top up
+                  </Link>
+                ) : null}
+              </section>
+            ) : null}
 
             {showCta ? (
               <div className="border-t border-line px-4 py-4">
