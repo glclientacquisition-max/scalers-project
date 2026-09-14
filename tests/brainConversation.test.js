@@ -337,6 +337,61 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(turn.decision.action, 'CREATE_REQUEST');
   });
 
+  it('runs the home visit SOP without re-asking a name already given', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'I want to book carpet cleaning',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.equal(turn.state.intent, 'booking');
+    assert.deepEqual(turn.state.goal.missingSlots, ['name', 'when', 'landmark']);
+    assert.equal(turn.decision.slot, 'name');
+    assert.match(formatBrainStateForPrompt(turn.state), /Visit SOP:/);
+    assert.match(formatBrainStateForPrompt(turn.state), /name=missing/);
+
+    turn = runTurn(turn.state, turn.languageState, 'I am Alvin', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.caller.name, 'Alvin');
+    assert.equal(entityValue(turn.state.entities.name), 'Alvin');
+    assert.equal(turn.state.goal.missingSlots.includes('name'), false);
+    assert.equal(turn.decision.slot, 'when');
+    assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /Got it, Alvin/);
+    assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /Ask only for name/);
+    assert.match(formatBrainStateForPrompt(turn.state), /name=Alvin/);
+
+    turn = runTurn(turn.state, turn.languageState, 'Pardon?', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.caller.name, 'Alvin');
+    assert.equal(turn.decision.slot, 'when');
+    assert.notEqual(turn.decision.slot, 'name');
+    assert.match(formatBrainStateForPrompt(turn.state), /Do not re-ask the name/);
+
+    turn = runTurn(turn.state, turn.languageState, 'Tomorrow at 10 AM', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.decision.slot, 'landmark');
+
+    turn = runTurn(turn.state, turn.languageState, 'Near Rongai', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.deepEqual(turn.state.goal.missingSlots, []);
+    assert.equal(turn.decision.action, 'CREATE_REQUEST');
+  });
+
   it('classifies transfer and connect requests as human intent', () => {
     const turn1 = runTurn(createBrainState(profile), createLanguageState(), 'Connect me to Alvin');
     assert.equal(turn1.state.intent, 'human');
@@ -344,21 +399,26 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(turn2.state.intent, 'human');
   });
 
-  it('confirms then corrects the caller name before save_caller_info can persist it', async () => {
+  it('defers save_caller_info for a contextual name until the caller continues', async () => {
     const { executeBrainTools } = require('../src/conversation/toolExecution');
     const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
     let state = createBrainState(profile);
     let languageState = createLanguageState();
-    let turn = runTurn(state, languageState, 'My name is Jane, how much is the HP printer?');
+    let turn = runTurn(state, languageState, 'Please hold a charger for me');
+    assert.equal(turn.decision.slot, 'name');
+
+    ({ state, languageState } = turn);
+    turn = runTurn(state, languageState, 'Jane');
     assert.equal(turn.state.caller.name, 'Jane');
     assert.equal(turn.state.caller.nameConfirmed, false);
-    assert.match(formatBrainStateForPrompt(turn.state), /Got it, Jane/);
-    assert.equal(turn.decision.action, 'ANSWER');
+    assert.match(formatBrainStateForPrompt(turn.state), /Do not ask for the name again/);
+    assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /Got it, Jane/);
+    assert.equal(turn.decision.slot, 'when');
 
     let saved = null;
     let early = await executeBrainTools({
       parsed: parseGeminiResponse(
-        '###TOOL###{"save_caller_info":{"name":"Jane","reason":"price"}}###ENDTOOL###'
+        '###TOOL###{"save_caller_info":{"name":"Jane","reason":"hold"}}###ENDTOOL###'
       ),
       capabilities: { saveCallerInfo: true },
       nameConfirmed: turn.state.caller.nameConfirmed,
@@ -373,14 +433,14 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(saved, null);
 
     ({ state, languageState } = turn);
-    turn = runTurn(state, languageState, 'No, it\'s James');
+    turn = runTurn(state, languageState, "No, it's James");
     assert.equal(turn.state.caller.name, 'James');
     assert.equal(turn.state.caller.nameConfirmed, true);
-    assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /this turn only/);
+    assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /Got it/);
 
     const persisted = await executeBrainTools({
       parsed: parseGeminiResponse(
-        '###TOOL###{"save_caller_info":{"name":"James","reason":"price"}}###ENDTOOL###'
+        '###TOOL###{"save_caller_info":{"name":"James","reason":"hold"}}###ENDTOOL###'
       ),
       capabilities: { saveCallerInfo: true },
       nameConfirmed: turn.state.caller.nameConfirmed,

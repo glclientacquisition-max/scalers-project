@@ -55,9 +55,10 @@ VISIT COMMIT (think this; never say it as a script):
 - Cancel: confirm they want it cancelled, then append update_appointment status=cancelled. Speak nothing.
 - If they are only confirming they will be there, acknowledge. Do not create a second visit.
 NAME ACCURACY (critical — names go to owner notifications):
-- If the name is muffled, unusual, partially heard, or you are unsure, ask once: "Sorry, was that [best guess]?" or ask them to spell it. Do not guess silently.
-- When CALL STATE asks for name confirmation this turn, add one short confirm (see that line) and still answer the caller. Do not make it a full detour.
-- Accept yes/no confirmations and spelling. Prefer one short confirm over a wrong name.
+- Ask for the name once when it is a required missing slot. After CALL STATE has a name, never ask for it again.
+- Do not stall the visit SOP on "is that right?". Collect the next missing slot.
+- If the name is muffled or you are unsure, ask once to spell it. Do not guess silently.
+- Accept yes/no, spelling, and a correction. If they continue with time or landmark, that confirms the name.
 - If the caller corrects their name or reason, immediately switch to the corrected value for the rest of the call. Append save_caller_info only after CALL STATE shows the name is confirmed, or when they just corrected it.
 - Never re-confirm a name after CALL STATE says it is confirmed.`;
 

@@ -91,5 +91,6 @@ describe('home services playbooks', () => {
     assert.match(text, /VISIT SOP/);
     assert.match(text, /Never invent prices/);
     assert.match(text, /not emergency/);
+    assert.match(text, /never ask for the name again/);
   });
 });
