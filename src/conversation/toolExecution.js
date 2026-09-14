@@ -5,6 +5,7 @@ const {
   evaluateAppointmentHours,
   formatRequestedWhenLabel,
 } = require('./appointmentHours');
+const { canonicalizeCallerName } = require('./callerNameMatch');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -93,6 +94,12 @@ function looksLikeUnclearTitle(item) {
   return false;
 }
 
+function canonicalCallerName(raw, knownNames = []) {
+  const cleaned = clean(raw, 120);
+  if (!cleaned) return '';
+  return canonicalizeCallerName(cleaned, { knownNames }) || cleaned;
+}
+
 function rejectBadCallerName(value, identity) {
   if (!value.name) return null;
   if (!isReservedCallerName(value.name, identity)) return null;
@@ -154,7 +161,7 @@ function whenTextIsRefinement(previous, next) {
 
 function validateServiceRequest(
   raw,
-  { productCatalog, agentName = '', businessName = '' } = {}
+  { productCatalog, agentName = '', businessName = '', knownNames = [] } = {}
 ) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing service request payload.' };
@@ -169,7 +176,7 @@ function validateServiceRequest(
         : 'enquiry';
   const value = {
     type,
-    name: clean(raw.name, 120),
+    name: canonicalCallerName(raw.name, knownNames),
     phone: clean(raw.phone, 40),
     item: clean(raw.item, 200),
     quantity: clean(raw.quantity, 80),
@@ -282,9 +289,9 @@ function validateServiceRequest(
   return { valid: true, value };
 }
 
-function validateCallerInfo(parsed, { agentName = '', businessName = '' } = {}) {
+function validateCallerInfo(parsed, { agentName = '', businessName = '', knownNames = [] } = {}) {
   const value = {
-    name: clean(parsed?.name, 120),
+    name: canonicalCallerName(parsed?.name, knownNames),
     reason: clean(parsed?.reason, 400),
   };
   if (value.name && isReservedCallerName(value.name, { agentName, businessName })) {
@@ -298,13 +305,13 @@ function validateCallerInfo(parsed, { agentName = '', businessName = '' } = {}) 
   };
 }
 
-function validateEscalation(raw, { agentName = '', businessName = '' } = {}) {
+function validateEscalation(raw, { agentName = '', businessName = '', knownNames = [] } = {}) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing escalation payload.' };
   }
   const value = {
     teammate: clean(raw.teammate, 120),
-    name: clean(raw.name, 120),
+    name: canonicalCallerName(raw.name, knownNames),
     reason: clean(raw.reason, 400),
   };
   if (!value.reason) {
@@ -352,14 +359,14 @@ function visitTimeGate(whenText, { hoursSchedule = null, now = new Date() } = {}
 
 function validateCreateAppointment(
   raw,
-  { hoursSchedule = null, now = new Date(), openAppointments = [] } = {}
+  { hoursSchedule = null, now = new Date(), openAppointments = [], knownNames = [] } = {}
 ) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing appointment payload.' };
   }
   const value = {
     serviceName: clean(raw.serviceName || raw.service_name || raw.service, 200),
-    name: clean(raw.name, 120),
+    name: canonicalCallerName(raw.name, knownNames),
     phone: clean(raw.phone, 40),
     whenText: clean(raw.whenText || raw.when_text || raw.when, 160),
     landmark: clean(
@@ -476,10 +483,11 @@ async function executeBrainTools({
   nameConfirmed = true,
   openAppointments = [],
   callerPhone = '',
+  knownNames = [],
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
-  const identityOpts = { productCatalog, agentName, businessName };
+  const identityOpts = { productCatalog, agentName, businessName, knownNames };
 
   if (Array.isArray(parsed?.errors)) {
     for (const error of parsed.errors) {
@@ -619,6 +627,7 @@ async function executeBrainTools({
       hoursSchedule,
       now,
       openAppointments,
+      knownNames,
     });
     const fingerprint = validation.valid
       ? stableFingerprint('create_appointment', validation.value)
@@ -741,7 +750,7 @@ async function executeBrainTools({
     }
   }
 
-  const callerInfo = validateCallerInfo(parsed, { agentName, businessName });
+  const callerInfo = validateCallerInfo(parsed, { agentName, businessName, knownNames });
   if (callerInfo.valid && callerInfo.value.name && nameConfirmed !== true) {
     results.push({
       action: 'save_caller_info',
@@ -784,6 +793,7 @@ async function executeBrainTools({
     const validation = validateEscalation(parsed.escalate, {
       agentName,
       businessName,
+      knownNames,
     });
     const fingerprint = validation.valid
       ? stableFingerprint('escalate', validation.value)

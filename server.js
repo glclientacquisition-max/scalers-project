@@ -72,6 +72,7 @@ const {
 } = require('./src/conversation/brainState');
 const { attachCallerMemory } = require('./src/conversation/callerMemory');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
+const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
   buildBrainCapabilities,
   formatAuthorityPolicy,
@@ -3637,6 +3638,10 @@ async function applyGeminiTools(callSid, parsed) {
     nameConfirmed: state.caller?.nameConfirmed === true,
     openAppointments: groundedProfile.openAppointments || [],
     callerPhone: state.caller?.phone || '',
+    knownNames: collectKnownCallerNames({
+      profile: groundedProfile,
+      state,
+    }),
     handlers: {
       createServiceRequest: async (request) => {
         const created = await db.createServiceRequest({

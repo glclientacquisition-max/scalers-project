@@ -85,6 +85,7 @@ function buildCallerMemoryCard({
     name,
     sharedLine,
     greetByName: Boolean(name) && !sharedLine,
+    alternateNames: alternates,
     lastReason: lastReason || null,
     notes: notes || null,
     openRequests: requests,

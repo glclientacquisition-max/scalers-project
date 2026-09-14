@@ -474,7 +474,7 @@ function formatNameConfirmForPrompt(state) {
   const name = String(state?.caller?.name || '').trim();
   if (!name) return '';
   if (state?.caller?.nameConfirmed) {
-    return '- Caller name: confirmed. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.';
+    return `- Caller name: ${name} (confirmed). Speak this spelling. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.`;
   }
   return `- Caller name is known (${name}). Do not ask for the name again. Do not ask "is that right?". Continue the next missing slot. Do not append save_caller_info until they confirm, correct, or continue.`;
 }

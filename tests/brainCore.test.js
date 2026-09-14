@@ -234,7 +234,7 @@ describe('Brain state and next-best-action', () => {
     });
     assert.equal(state.caller.name, 'Jane');
     assert.equal(state.caller.nameConfirmed, true);
-    assert.match(formatBrainStateForPrompt(state), /Caller name: confirmed/);
+    assert.match(formatBrainStateForPrompt(state), /Caller name: Jane \(confirmed\)/);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /Got it, Jane/);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /Is that right/);
 
@@ -311,6 +311,9 @@ describe('Brain state and next-best-action', () => {
     assert.equal(extractName('Naitwa Alvin'), 'Alvin');
     assert.equal(extractName('I am looking for cleaning'), null);
     assert.equal(extractName("It's Alvin", { firstMissing: 'name' }), 'Alvin');
+    assert.equal(extractName('My name is Isha'), 'Aisha');
+    assert.equal(extractName('A I S H A'), 'Aisha');
+    assert.equal(extractName('Naitwa Asha'), 'Asha');
 
     const contextual = extractConversationEntities('Alvin', {
       intent: 'booking',
@@ -344,5 +347,56 @@ describe('Brain state and next-best-action', () => {
     assert.equal(state.caller.name, 'Alvin');
     assert.equal(state.caller.nameConfirmed, false);
     assert.equal(state.conversation.hearAgain, true);
+  });
+
+  it('auto-matches STT name variants to canonical spelling during the call', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'My name is Isha',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('My name is Isha'),
+    });
+    assert.equal(state.caller.name, 'Aisha');
+    assert.equal(state.caller.nameConfirmed, true);
+
+    state = observeCallerTurn(
+      createBrainState({
+        callerMemory: { name: 'Aisha', greetByName: true, alternateNames: [] },
+      }),
+      {
+        text: 'My name is Asha',
+        detectedLanguage: 'en',
+        resolvedLanguage: 'en',
+        entities: extractConversationEntities('My name is Asha', {
+          profile: {
+            callerMemory: { name: 'Aisha', greetByName: true, alternateNames: [] },
+          },
+          state: createBrainState({
+            callerMemory: { name: 'Aisha', greetByName: true, alternateNames: [] },
+          }),
+        }),
+      }
+    );
+    assert.equal(state.caller.name, 'Aisha');
+    assert.equal(state.caller.nameConfirmed, true);
+  });
+
+  it('keeps Asha when the caller explicitly corrects away from Aisha', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'My name is Aisha',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      entities: extractConversationEntities('My name is Aisha'),
+    });
+    state = observeCallerTurn(state, {
+      text: 'Hapana, naitwa Asha',
+      detectedLanguage: 'sw',
+      resolvedLanguage: 'sw',
+      entities: extractConversationEntities('Hapana, naitwa Asha', { state }),
+    });
+    assert.equal(state.caller.name, 'Asha');
+    assert.equal(state.caller.nameConfirmed, true);
   });
 });

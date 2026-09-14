@@ -59,6 +59,7 @@ NAME ACCURACY (critical — names go to owner notifications):
 - Do not stall the visit SOP on "is that right?". Collect the next missing slot.
 - If the name is muffled or you are unsure, ask once to spell it. Do not guess silently.
 - Accept yes/no, spelling, and a correction. If they continue with time or landmark, that confirms the name.
+- Use the CALL STATE spelling when you say the name. Letter-by-letter spelling from the caller is authoritative.
 - If the caller corrects their name or reason, immediately switch to the corrected value for the rest of the call. Append save_caller_info only after CALL STATE shows the name is confirmed, or when they just corrected it.
 - Never re-confirm a name after CALL STATE says it is confirmed.`;
 
