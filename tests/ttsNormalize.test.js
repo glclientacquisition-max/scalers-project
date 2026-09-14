@@ -317,6 +317,130 @@ test('and/or and ampersand speak as words', () => {
   assert.match(prepareForTts('Done & Dusted.', { callLanguage: 'en' }).text, /Done and Dusted/);
 });
 
+test('till and paybill numbers speak digit by digit', () => {
+  assert.strictEqual(
+    prepareForTts('Pay to till number 5194830.', { callLanguage: 'en' }).text,
+    'Pay to till number 5 1 9 4 8 3 0.'
+  );
+  assert.match(
+    prepareForTts('Paybill 247247, account 10203040.', { callLanguage: 'en' }).text,
+    /pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0/
+  );
+});
+
+test('order and reference numbers speak digit by digit', () => {
+  assert.strictEqual(
+    prepareForTts('Order number 45678.', { callLanguage: 'en' }).text,
+    'Order number 4 5 6 7 8.'
+  );
+  assert.strictEqual(
+    prepareForTts('Use reference 4521.', { callLanguage: 'en' }).text,
+    'Use reference 4 5 2 1.'
+  );
+});
+
+test('weak identifier keywords need 5+ digits so years survive', () => {
+  assert.strictEqual(prepareForTts('Open till 2026.', { callLanguage: 'en' }).text, 'Open till 2026.');
+  assert.strictEqual(prepareForTts('Open till 9pm.', { callLanguage: 'en' }).text, 'Open till 9 P M.');
+});
+
+test('compact duration ranges speak with to', () => {
+  assert.strictEqual(
+    prepareForTts('It takes 30-40 minutes.', { callLanguage: 'en' }).text,
+    'It takes 30 to 40 minutes.'
+  );
+  assert.strictEqual(
+    prepareForTts('Delivery in 1-2 days.', { callLanguage: 'en' }).text,
+    'Delivery in 1 to 2 days.'
+  );
+});
+
+test('24/7 never says slash', () => {
+  assert.strictEqual(prepareForTts('We are open 24/7.', { callLanguage: 'en' }).text, 'We are open 24 7.');
+});
+
+test('quantities and shop numbers are not identifiers', () => {
+  assert.strictEqual(prepareForTts('We sold 100 units.', { callLanguage: 'en' }).text, 'We sold 100 units.');
+  assert.strictEqual(
+    prepareForTts('Shop No. M4 on the 3rd floor.', { callLanguage: 'en' }).text,
+    'Shop No. M4 on the 3rd floor.'
+  );
+  assert.strictEqual(prepareForTts('Can I order 2 pizzas.', { callLanguage: 'en' }).text, 'Can I order 2 pizzas.');
+});
+
+test('receipt shorthand with currency prefix never strands the code', () => {
+  assert.strictEqual(prepareForTts('KSh 500/-', { callLanguage: 'en' }).text, 'five hundred shillings');
+  assert.strictEqual(prepareForTts('KSh 500/=', { callLanguage: 'en' }).text, 'five hundred shillings');
+  assert.strictEqual(
+    prepareForTts('Bei ni Ksh 2,500/=.', { callLanguage: 'sw' }).text,
+    'Bei ni shilingi elfu mbili mia tano.'
+  );
+});
+
+test('k-thousands expand so money rules can claim them', () => {
+  assert.strictEqual(prepareForTts('KES 5k', { callLanguage: 'en' }).text, 'five thousand shillings');
+  assert.strictEqual(prepareForTts('It costs 1.5k.', { callLanguage: 'en' }).text, 'It costs 1500.');
+  assert.strictEqual(prepareForTts('5km away.', { callLanguage: 'en' }).text, '5km away.');
+  assert.strictEqual(prepareForTts('10kg bag.', { callLanguage: 'en' }).text, '10kg bag.');
+});
+
+test('shillings as a prefix word converts', () => {
+  assert.strictEqual(
+    prepareForTts('Shillings 5,000 only.', { callLanguage: 'en' }).text,
+    'five thousand shillings only.'
+  );
+});
+
+test('usd amounts speak as dollars with cents', () => {
+  assert.strictEqual(
+    prepareForTts('USD 100 per night.', { callLanguage: 'en' }).text,
+    'one hundred dollars per night.'
+  );
+  assert.strictEqual(
+    prepareForTts('$100 per night.', { callLanguage: 'en' }).text,
+    'one hundred dollars per night.'
+  );
+  assert.strictEqual(
+    prepareForTts('100 dollars per night.', { callLanguage: 'en' }).text,
+    'one hundred dollars per night.'
+  );
+  assert.strictEqual(
+    prepareForTts('USD 99.99.', { callLanguage: 'en' }).text,
+    'ninety nine dollars and ninety nine cents.'
+  );
+});
+
+test('cents are spoken, never truncated', () => {
+  assert.strictEqual(
+    prepareForTts('KSh 1,200.50', { callLanguage: 'en' }).text,
+    'one thousand two hundred shillings and fifty cents'
+  );
+  assert.strictEqual(prepareForTts('KSh 0.50.', { callLanguage: 'en' }).text, 'fifty cents.');
+  assert.strictEqual(
+    prepareForTts('KSh 1,200.50', { callLanguage: 'sw' }).text,
+    'shilingi elfu moja mia mbili na senti hamsini'
+  );
+});
+
+test('money ranges joined with to or hadi convert both sides', () => {
+  assert.strictEqual(
+    prepareForTts('KSh 500 to 800.', { callLanguage: 'en' }).text,
+    'five hundred shillings to eight hundred shillings.'
+  );
+  assert.strictEqual(
+    prepareForTts('KSh 500 hadi 800.', { callLanguage: 'sw' }).text,
+    'shilingi mia tano hadi shilingi mia nane.'
+  );
+});
+
+test('millions speak in words', () => {
+  assert.strictEqual(prepareForTts('KSh 1,000,000.', { callLanguage: 'en' }).text, 'one million shillings.');
+  assert.strictEqual(
+    prepareForTts('KSh 2,500,000.', { callLanguage: 'sw' }).text,
+    'shilingi milioni mbili elfu mia tano.'
+  );
+});
+
 test('ENDCALL leftover is not spoken if it reaches TTS prep', () => {
   const prepared = prepareForTts(
     'Have a great day. ###ENDCALL###'

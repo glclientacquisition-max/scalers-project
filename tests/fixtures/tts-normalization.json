@@ -28,7 +28,7 @@
       "text": "KSh 1,200.50",
       "callLanguage": "en",
       "expectLanguage": "en",
-      "expectProductionText": "one thousand two hundred shillings"
+      "expectProductionText": "one thousand two hundred shillings and fifty cents"
     },
     {
       "id": "04-price-range",
@@ -329,6 +329,136 @@
       "expectLanguage": "en",
       "expectProductionText": "1, Book 2, Confirm.",
       "source": "numbered-list markers become commas, not full stops"
+    },
+    {
+      "id": "38-identifier-till",
+      "group": "universal",
+      "category": "identifier",
+      "text": "Pay to till number 5194830.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Pay to till number 5 1 9 4 8 3 0.",
+      "source": "till numbers read digit by digit, never as one giant number"
+    },
+    {
+      "id": "39-identifier-paybill-account",
+      "group": "universal",
+      "category": "identifier",
+      "text": "Paybill 247247, account 10203040.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "pay bill 2 4 7 2 4 7, account 1 0 2 0 3 0 4 0.",
+      "source": "paybill and account numbers read digit by digit"
+    },
+    {
+      "id": "40-duration-range",
+      "group": "universal",
+      "category": "range",
+      "text": "It takes 30-40 minutes.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "It takes 30 to 40 minutes.",
+      "source": "compact duration ranges speak with to"
+    },
+    {
+      "id": "41-days-range",
+      "group": "universal",
+      "category": "range",
+      "text": "Delivery in 1-2 days.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Delivery in 1 to 2 days."
+    },
+    {
+      "id": "42-always-open",
+      "group": "universal",
+      "category": "punctuation",
+      "text": "We are open 24/7.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "We are open 24 7.",
+      "source": "24/7 never says slash"
+    },
+    {
+      "id": "43-identifier-order",
+      "group": "universal",
+      "category": "identifier",
+      "text": "Order number 45678.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "Order number 4 5 6 7 8."
+    },
+    {
+      "id": "44-currency-receipt-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "KSh 500/-",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five hundred shillings"
+    },
+    {
+      "id": "45-currency-k-thousands",
+      "group": "universal",
+      "category": "currency",
+      "text": "KES 5k",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five thousand shillings"
+    },
+    {
+      "id": "46-currency-shillings-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "Shillings 5,000 only.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five thousand shillings only."
+    },
+    {
+      "id": "47-currency-usd-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "USD 100 per night.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "one hundred dollars per night."
+    },
+    {
+      "id": "48-currency-usd-cents",
+      "group": "universal",
+      "category": "currency",
+      "text": "USD 99.99.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "ninety nine dollars and ninety nine cents."
+    },
+    {
+      "id": "49-currency-to-range",
+      "group": "universal",
+      "category": "currency",
+      "text": "KSh 500 to 800.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "five hundred shillings to eight hundred shillings."
+    },
+    {
+      "id": "50-currency-millions",
+      "group": "universal",
+      "category": "currency",
+      "text": "KSh 1,000,000.",
+      "callLanguage": "en",
+      "expectLanguage": "en",
+      "expectProductionText": "one million shillings."
+    },
+    {
+      "id": "51-currency-sw-receipt-prefix",
+      "group": "universal",
+      "category": "currency",
+      "text": "Bei ni Ksh 2,500/=.",
+      "callLanguage": "sw",
+      "expectLanguage": "sw",
+      "expectProductionText": "Bei ni shilingi elfu mbili mia tano."
     },
     {
       "id": "19-lexicon-brand",
