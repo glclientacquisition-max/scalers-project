@@ -257,6 +257,7 @@ export function summarizeInboxWork(items: InboxItem[]): {
   toReturn: number;
   toFulfill: number;
   toConfirm: number;
+  nextReturn: InboxItem | null;
   nextHold: InboxItem | null;
   nextJob: InboxItem | null;
 } {
@@ -273,6 +274,7 @@ export function summarizeInboxWork(items: InboxItem[]): {
     toReturn: toReturn.length,
     toFulfill: toFulfill.length,
     toConfirm: toConfirm.length,
+    nextReturn: toReturn[0] || null,
     nextHold: toFulfill[0] || null,
     nextJob: toConfirm[0] || null,
   };

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
   callsHref,
+  followUpWhatsAppMessage,
+  formatCallWhenRelative,
   nairobiDateLabel,
   nairobiDayStartIso,
   nairobiGreeting,
@@ -26,6 +28,7 @@ import {
 } from "@/lib/inboxPurpose";
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
 
 export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
@@ -105,6 +108,12 @@ export default async function HomeOverviewPage() {
     work.nextHold?.headline || work.nextHold?.hold?.when_text || null;
   const jobSample =
     work.nextJob?.job?.when_text || work.nextJob?.headline || null;
+  const nextReturn = work.nextReturn || null;
+  const nextReturnWhen = nextReturn ? formatCallWhenRelative(nextReturn.createdAt) : null;
+  const nextReturnReason = nextReturn?.lead?.reason || nextReturn?.headline || null;
+
+  const did = String(tenant.sautikit_virtual_number || "");
+  const didDisplay = did.replace(/^\+254(\d{3})(\d{3})(\d{3})$/, "+254 $1 $2 $3");
 
   const queues = [
     {
@@ -190,8 +199,8 @@ export default async function HomeOverviewPage() {
         </aside>
       ) : null}
 
-      <div className="mt-6 grid items-start gap-8 lg:grid-cols-12">
-        <section className="min-w-0 lg:col-span-8" aria-labelledby="work-heading">
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
+        <section className="min-w-0 lg:col-span-7" aria-labelledby="work-heading">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2
               id="work-heading"
@@ -211,7 +220,7 @@ export default async function HomeOverviewPage() {
                 <Link
                   href={queue.href}
                   className={[
-                    "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium",
+                    "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium lg:min-h-11",
                     "transition-colors duration-150",
                     "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.08]",
                     focusRingVisible,
@@ -220,7 +229,7 @@ export default async function HomeOverviewPage() {
                   <span className="text-ink">{queue.label}</span>
                   <span className="flex min-w-0 items-center gap-3 text-ink-soft">
                     <span className="min-w-0 truncate">
-                      <span className="tabular-nums font-medium text-ink">
+                      <span className="tabular-nums text-base font-semibold text-ink">
                         {queue.count}
                       </span>{" "}
                       {queue.unit}
@@ -244,9 +253,56 @@ export default async function HomeOverviewPage() {
               </li>
             ))}
           </ul>
+
+          {nextReturn && (nextReturn.callerPhone || nextReturn.callId) ? (
+            <section
+              aria-labelledby="next-return-heading"
+              className="mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
+            >
+              <h2
+                id="next-return-heading"
+                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft"
+              >
+                Next to return
+              </h2>
+              <p className="mt-2 text-sm font-semibold tracking-tight text-ink">
+                {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
+                {nextReturnWhen ? (
+                  <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
+                ) : null}
+              </p>
+              {nextReturnReason ? (
+                <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">
+                  {nextReturnReason}
+                </p>
+              ) : null}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                {nextReturn.callerPhone ? (
+                  <WhatsAppLink
+                    number={nextReturn.callerPhone}
+                    message={followUpWhatsAppMessage({
+                      businessName: business,
+                      name: nextReturn.callerName,
+                      reason: nextReturnReason,
+                    })}
+                    variant="ghost"
+                    label="Reply on WhatsApp"
+                  />
+                ) : null}
+                {nextReturn.callId ? (
+                  <Link
+                    href={`/calls/${nextReturn.callId}?from=needs`}
+                    className={`inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline ${focusRingVisible}`}
+                  >
+                    Open call
+                  </Link>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
         </section>
 
-        <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-4">
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5">
           <div className="overflow-hidden rounded-2xl border border-line bg-surface">
             <section aria-label="Today" className="px-3 py-3">
               <Link
@@ -263,33 +319,27 @@ export default async function HomeOverviewPage() {
               </Link>
             </section>
 
-            <section
-              aria-labelledby="line-heading"
-              className="border-t border-line px-4 py-4"
-            >
-              <h2
-                id="line-heading"
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft"
-              >
-                Line
-              </h2>
-              <p className="mt-2 text-sm font-medium text-ink">
+            <section aria-label="Line" className="border-t border-line px-4 py-4">
+              <p className="text-sm font-medium text-ink">
                 {lineStatusLabel(line)}
               </p>
               {line === "live" ? (
                 <p className="mt-0.5 truncate font-mono text-xs text-ink-soft">
-                  {tenant.sautikit_virtual_number}
+                  {didDisplay || tenant.sautikit_virtual_number}
                 </p>
               ) : null}
+            </section>
+
+            <section aria-label="Wallet" className="border-t border-line px-4 py-4">
+              <p className="font-mono text-sm font-medium text-ink">
+                KES {kes.toLocaleString("en-KE")}
+              </p>
               {lowWallet ? (
                 <Link
                   href="/wallet"
-                  className={`mt-2 block text-sm text-warn ${focusRingVisible}`}
+                  className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warn hover:underline ${focusRingVisible}`}
                 >
-                  Wallet low
-                  <span className="block font-mono text-xs font-normal">
-                    KES {kes.toLocaleString("en-KE")}
-                  </span>
+                  Top up
                 </Link>
               ) : null}
             </section>
