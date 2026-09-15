@@ -56,3 +56,30 @@ describe("universal row anatomy", () => {
     assert.match(row, /\^\\\+\?\[\\d\\s\(\)-\]/);
   });
 });
+
+describe("inbox call action", () => {
+  const call = read("dashboard/src/components/CallLink.tsx");
+  const inbox = read("dashboard/src/components/InboxItemRow.tsx");
+  const master = read("docs/frontend/design-system/MASTER.md");
+
+  it("is a tel: deep link with E.164 plus prefix", () => {
+    assert.match(call, /export function telHref/);
+    assert.match(call, /tel:\+\$\{digits\}/);
+    assert.match(call, /replace\(\/\\D\/g, ""\)/);
+  });
+
+  it("is a muted 44px icon button, never filled", () => {
+    assert.match(call, /h-11 w-11/);
+    assert.match(call, /border border-line text-ink/);
+    assert.match(call, /aria-label=\{`Call \$\{number\}`\}/);
+    assert.doesNotMatch(call, /bg-\[#0096FF\]|bg-whatsapp/);
+  });
+
+  it("sits left of the WhatsApp icon in the inbox trailing dock", () => {
+    assert.match(inbox, /import \{ CallLink \} from "@\/components\/CallLink"/);
+    const dock = inbox.indexOf("<CallLink number={item.callerPhone} />");
+    const wa = inbox.indexOf('variant="icon"');
+    assert.ok(dock > -1 && wa > -1 && dock < wa, "CallLink before WhatsApp icon");
+    assert.match(master, /`CallLink`/);
+  });
+});
