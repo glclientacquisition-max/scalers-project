@@ -58,4 +58,40 @@ describe('mergeContactIdentity', () => {
     assert.equal(names.length, 5);
     assert.deepEqual(names, ['G', 'F', 'E', 'D', 'C']);
   });
+
+  it('treats Isha as the same person as Aisha and upgrades the file spelling', () => {
+    const upgraded = mergeContactIdentity(
+      { name: 'Isha', metadata: {} },
+      { name: 'Aisha', callId: 'c3' }
+    );
+    assert.equal(upgraded.name, 'Aisha');
+    assert.deepEqual(upgraded.metadata.alternate_names, []);
+
+    const kept = mergeContactIdentity(
+      { name: 'Aisha', metadata: {} },
+      { name: 'Isha', callId: 'c4' }
+    );
+    assert.equal(kept.name, 'Aisha');
+    assert.deepEqual(kept.metadata.alternate_names, []);
+
+    const distinct = mergeContactIdentity(
+      { name: 'Asha', metadata: {} },
+      { name: 'Aisha', callId: 'c5' }
+    );
+    assert.equal(distinct.name, 'Asha');
+    assert.equal(distinct.metadata.alternate_names[0].name, 'Aisha');
+  });
+
+  it('keeps the file spelling for Colin vs Collins and does not log an alternate', () => {
+    const kept = mergeContactIdentity(
+      { name: 'Collins', metadata: {} },
+      { name: 'Colin', callId: 'c6' }
+    );
+    assert.equal(kept.name, 'Collins');
+    assert.deepEqual(kept.metadata.alternate_names, []);
+
+    const first = mergeContactIdentity({ name: 'Colin', metadata: {} }, { name: 'Collins' });
+    assert.equal(first.name, 'Colin');
+    assert.deepEqual(first.metadata.alternate_names, []);
+  });
 });

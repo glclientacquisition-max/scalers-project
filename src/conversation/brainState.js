@@ -190,6 +190,7 @@ function createBrainState(profile = {}) {
       name: caller.name || null,
       phone: caller.phone || null,
       nameConfirmed: Boolean(caller.nameConfirmed),
+      nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
     },
     language: {
       current: 'unknown',
@@ -321,17 +322,25 @@ function observeCallerTurn(state, input = {}) {
   if (input.entities && typeof input.entities === 'object') {
     next.entities = { ...next.entities, ...input.entities };
   }
+  const { collectKnownCallerNames } = require('./callerNameMatch');
   const nameResolution = applyCallerNameConfirmation(
     {
       caller: state?.caller || next.caller,
       entities: state?.entities || {},
     },
     text,
-    next.entities
+    next.entities,
+    {
+      knownNames: collectKnownCallerNames({
+        profile: input.profile,
+        state: state || next,
+      }),
+    }
   );
   next.entities = { ...next.entities, ...nameResolution.entities };
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
+  next.caller.nameCollision = nameResolution.nameCollision || null;
   if (next.caller.name && !entityValue(next.entities.name)) {
     next.entities.name = {
       value: next.caller.name,
@@ -472,15 +481,28 @@ function recordActionResults(state, results = []) {
 
 function formatNameConfirmForPrompt(state) {
   const name = String(state?.caller?.name || '').trim();
+  const pair = Array.isArray(state?.caller?.nameCollision)
+    ? state.caller.nameCollision.filter(Boolean)
+    : [];
+  if (pair.length >= 2) {
+    const heard = name || pair[0];
+    return `- Name collision: heard ${heard}. Ask once: ${pair.join(' or ')}? Do not guess. Do not append save_caller_info until they pick one or spell it.`;
+  }
   if (!name) return '';
   if (state?.caller?.nameConfirmed) {
-    return '- Caller name: confirmed. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.';
+    return `- Caller name: ${name} (confirmed). Speak this spelling once in the next line. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.`;
   }
   return `- Caller name is known (${name}). Do not ask for the name again. Do not ask "is that right?". Continue the next missing slot. Do not append save_caller_info until they confirm, correct, or continue.`;
 }
 
 function formatHearAgainForPrompt(state) {
   if (!state?.conversation?.hearAgain) return '';
+  const pair = Array.isArray(state?.caller?.nameCollision)
+    ? state.caller.nameCollision.filter(Boolean)
+    : [];
+  if (pair.length >= 2) {
+    return `- Hear-again: they missed the last line. Ask once: ${pair.join(' or ')}? Do not guess. Do not save, book, or call a tool.`;
+  }
   const missing = Array.isArray(state?.goal?.missingSlots)
     ? state.goal.missingSlots
     : [];

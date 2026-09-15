@@ -346,6 +346,8 @@ describe('parseExtractedCallerName', () => {
   it('accepts a plausible name', () => {
     assert.equal(parseExtractedCallerName('Amina'), 'Amina');
     assert.equal(parseExtractedCallerName('"Brian"'), 'Brian');
+    assert.equal(parseExtractedCallerName('Isha'), 'Aisha');
+    assert.equal(parseExtractedCallerName('Asha'), 'Asha');
   });
 });
 
@@ -391,6 +393,28 @@ describe('post-call contact persist and name extract', () => {
     );
     assert.equal(result.ok, false);
     assert.equal(result.reason, 'no_phone');
+  });
+
+  it('canonicalizes a mangled saved name before contact upsert', async () => {
+    const upserts = [];
+    const result = await persistCompletedCallContact(
+      { callSid: 'CA_isha' },
+      {
+        getCall: async () => ({
+          id: 'call-isha',
+          tenant_id: 't1',
+          from_number: '+254712345679',
+          name: 'Isha',
+          reason: 'Hours',
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return { id: 'ct-isha', ...row };
+        },
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(upserts[0].name, 'Aisha');
   });
 
   it('maps mocked Gemini NONE to a nameless upsert', async () => {

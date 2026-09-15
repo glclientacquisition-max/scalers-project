@@ -1,3 +1,5 @@
+const { namesLikelySame, preferredContactSpelling, compactNameKey } = require('./callerNameMatch');
+
 const ALT_CAP = 5;
 
 function trimName(raw) {
@@ -6,22 +8,18 @@ function trimName(raw) {
 }
 
 function namesMatch(a, b) {
-  const left = trimName(a);
-  const right = trimName(b);
-  if (!left || !right) return false;
-  return left.toLowerCase() === right.toLowerCase();
+  return namesLikelySame(a, b);
 }
 
 function normalizeAlternates(list, primary) {
   const seen = new Set();
   const next = [];
-  const primaryKey = trimName(primary)?.toLowerCase() || '';
   for (const row of Array.isArray(list) ? list : []) {
     const name = trimName(row?.name);
     if (!name) continue;
-    const key = name.toLowerCase();
-    if (primaryKey && key === primaryKey) continue;
-    if (seen.has(key)) continue;
+    if (primary && namesMatch(name, primary)) continue;
+    const key = compactNameKey(name);
+    if (!key || seen.has(key)) continue;
     seen.add(key);
     next.push({
       name,
@@ -50,7 +48,9 @@ function mergeContactIdentity(existing, incoming = {}) {
 
   let name = primary;
   if (incomingName && !primary) {
-    name = incomingName;
+    name = preferredContactSpelling(incomingName, incomingName) || incomingName;
+  } else if (incomingName && primary && namesMatch(incomingName, primary)) {
+    name = preferredContactSpelling(primary, incomingName) || primary;
   } else if (incomingName && primary && !namesMatch(incomingName, primary)) {
     const key = incomingName.toLowerCase();
     const already = alternates.some((row) => namesMatch(row?.name, incomingName));
