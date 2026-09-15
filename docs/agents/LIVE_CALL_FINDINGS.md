@@ -23,7 +23,16 @@ Two residuals the verification caught, now fixed:
 
 Regression: 2 new `tests/ttsNormalize.test.js` cases, fixtures `52`–`53`. `npm run test:voice` green.
 
-Not a TTS matter, logged for Brain: the model wrote `saa dodoma jioni` (a city name where a number belongs) while correcting hours confusion, and the `...`-between-every-word slow-down attempt means callers asking "polepole" need a real speed control, not punctuation.
+Not a TTS matter, logged for Brain: the model wrote `saa dodoma jioni` (a city name where a number belongs) while correcting hours confusion.
+
+Follow-up from the owner: on the `a2c0c86c` call the caller asked "slower" / "polepole" ten-plus times and the model's only pacing tool was typing `...` between words — which the net turns into staccato full-stop pauses while the word rate stays the same. Shipped real in-call speed control:
+
+1. `src/speech/speedControl.js` — `detectSpeedRequest` classifies the caller turn (`slower` / `slow down` / `too fast` / `polepole` / `ongea haraka` / `normal speed` / `kama kawaida`, …). Guards: bare `haraka` (`kuja haraka` = come quickly) and bare `slow` do not trigger.
+2. Per-call `ttsSpeedScale` in `server.js` steps 0.15 per request (floor 0.7, ceiling 1.3, reset on "normal speed"), applied on every speak path (`speakText`, LLM→TTS stream prefetch and fallback) via `beginSpeak({ speedScale })`; the Soniox start frame gets `speed = clampSpeed(profile × scale)`.
+3. Filler PCM cache bypasses once the scale leaves 1 — cached acks were rendered at the old pace.
+4. Prompt: the model is told speed adjusts by itself and to never use `...` for pacing.
+
+Regression: `tests/speedControl.test.js` (detector, stepping, wire speed) added to `npm run test:voice`.
 
 ---
 
