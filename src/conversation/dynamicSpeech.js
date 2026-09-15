@@ -180,6 +180,39 @@ function shouldSpeakThinkingAck(text) {
 }
 
 /**
+ * Local reply when the caller only greets or asks how we are.
+ * Live miss: HD_3bf5d73422fd Gemini listed couch/carpet/mattress after "How are you doing?"
+ */
+function pickPhaticReply(opts = {}) {
+  const lang = opts.language || 'en';
+  if (lang === 'sw' || lang === 'sheng') return 'Nzuri, asante. Naweza kusaidia?';
+  return "I'm well, thanks. How can I help?";
+}
+
+const SPOKEN_JOB_NOUNS =
+  /\b(carpet|couch|sofa|mattress|airbnb|upholstery|fumigation|plumbing)\b/gi;
+
+function looksLikeSpokenServiceDump(text) {
+  const raw = String(text || '');
+  const nouns = [...raw.matchAll(SPOKEN_JOB_NOUNS)].map((row) =>
+    String(row[0] || '').toLowerCase()
+  );
+  const unique = new Set(nouns);
+  if (unique.size >= 3) return true;
+  return (raw.match(/,/g) || []).length >= 3 && unique.size >= 2;
+}
+
+function trimSpokenServiceDump(text, opts = {}) {
+  const raw = String(text || '').trim();
+  if (!looksLikeSpokenServiceDump(raw)) return raw;
+  const lang = opts.language || 'en';
+  if (lang === 'sw' || lang === 'sheng') {
+    return 'Tunaweza kusaidia. Unahitaji huduma gani?';
+  }
+  return 'We can help with that. What do you need done?';
+}
+
+/**
  * Immediate progress line for action turns (order/save/escalate) so the caller
  * hears feedback while Gemini + tools run. Not a success claim — confirmation
  * still comes from the backend after tools finish.
@@ -424,6 +457,9 @@ module.exports = {
   pickLlmRecoverySaved,
   looksLikePhaticCallerTurn,
   shouldSpeakThinkingAck,
+  pickPhaticReply,
+  looksLikeSpokenServiceDump,
+  trimSpokenServiceDump,
   looksLikeCallerName,
   cleanSpokenLine,
   greetingLooksValid,

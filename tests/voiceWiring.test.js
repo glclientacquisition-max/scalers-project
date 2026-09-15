@@ -84,6 +84,18 @@ assert.match(
 
 assert.match(
   source,
+  /looksLikePhaticCallerTurn\(clean\)/,
+  'how-are-you turns must speak a local line and skip Gemini'
+);
+
+assert.match(
+  source,
+  /pickPhaticReply/,
+  'phatic local reply must come from dynamicSpeech'
+);
+
+assert.match(
+  source,
   /isIdleNudge/,
   'idle check-in must not arm another nudge from its own playback'
 );

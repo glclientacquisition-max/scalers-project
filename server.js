@@ -147,6 +147,9 @@ const {
   looksLikeCallerName,
   shouldSkipCallerTurn,
   shouldSpeakThinkingAck,
+  looksLikePhaticCallerTurn,
+  pickPhaticReply,
+  trimSpokenServiceDump,
 } = require('./src/conversation/dynamicSpeech');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -1978,6 +1981,21 @@ mediaWss.on('connection', (ws, req) => {
     let spokeThisTurn = false;
     let progressAlreadySpoken = false;
     try {
+      if (looksLikePhaticCallerTurn(clean)) {
+        const phaticLine = pickPhaticReply({ language: callLanguage });
+        console.log(
+          `[ws/media][${callKey}] phatic local reply lang=${callLanguage}: ${phaticLine}`
+        );
+        callTranscript.pushAgent(phaticLine);
+        messages.push({ role: 'assistant', content: phaticLine, local: true });
+        turnTiming.markFirstSpokenChunk();
+        await speakText(phaticLine);
+        spokeThisTurn = true;
+        logTurnTiming(turnTiming, { outcome: 'phatic' });
+        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+        return;
+      }
+
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
         nextBestAction.action
       );
@@ -3907,13 +3925,16 @@ async function runGeminiTurnStreaming(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const spokenText = spokenTextForToolTurn({
-    spoken: spokenTextWithoutToolFallback({
-      spoken: buffer.getSpokenEmitted() || parsed.spokenText,
-      actionConfirmation,
+  const spokenText = trimSpokenServiceDump(
+    spokenTextForToolTurn({
+      spoken: spokenTextWithoutToolFallback({
+        spoken: buffer.getSpokenEmitted() || parsed.spokenText,
+        actionConfirmation,
+      }),
+      toolResults: execution.results,
     }),
-    toolResults: execution.results,
-  });
+    { language: callBrainStates.get(callSid)?.language?.current || 'en' }
+  );
 
   const geminiParts = modelPartsForHistory({
     geminiParts: modelParts,
@@ -3998,13 +4019,16 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const spokenText = spokenTextForToolTurn({
-    spoken: spokenTextWithoutToolFallback({
-      spoken: parsed.spokenText,
-      actionConfirmation,
+  const spokenText = trimSpokenServiceDump(
+    spokenTextForToolTurn({
+      spoken: spokenTextWithoutToolFallback({
+        spoken: parsed.spokenText,
+        actionConfirmation,
+      }),
+      toolResults: execution.results,
     }),
-    toolResults: execution.results,
-  });
+    { language: callBrainStates.get(callSid)?.language?.current || 'en' }
+  );
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;
   messages.push({
