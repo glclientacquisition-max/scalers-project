@@ -25,6 +25,10 @@ const {
   publicVoiceProfile,
   speedForLanguage,
 } = require('./src/speech/voiceProfile');
+const {
+  detectSpeedRequest,
+  nextSpeedScale,
+} = require('./src/speech/speedControl');
 const { applyPcmGain } = require('./src/speech/pcmUtil');
 const {
   isFillerCacheEnabled,
@@ -1367,6 +1371,8 @@ mediaWss.on('connection', (ws, req) => {
   let callLanguageState = createLanguageState();
   let brainProfile = {};
   let fillerUsedThisCall = false;
+  /** Caller-requested TTS speed scale for this call (1 = profile default). */
+  let ttsSpeedScale = 1;
   /** Soniox stream id for the in-flight thinking-ack (cancel this only — keep reply prefetch). */
   let fillerStreamId = null;
   /** Only PCM from this stream id is forwarded (drops orphan filler / cancelled audio). */
@@ -1558,7 +1564,9 @@ mediaWss.on('connection', (ws, req) => {
   }
 
   async function speakThinkingAck(fillerText) {
-    if (!isFillerCacheEnabled()) {
+    // Cached filler PCM was rendered at the profile speed; once the caller
+    // asks for a different pace, render fillers fresh at the scaled speed.
+    if (!isFillerCacheEnabled() || ttsSpeedScale !== 1) {
       return speakText(fillerText, { isFiller: true });
     }
     const found = lookupFillerPcm({
@@ -1670,7 +1678,8 @@ mediaWss.on('connection', (ws, req) => {
         callLanguage,
         alreadyPrepared: true,
         speed: speedForLanguage(prepared.language),
-        capture: Boolean(opts.isFiller && isFillerCacheEnabled()),
+        speedScale: ttsSpeedScale,
+        capture: Boolean(opts.isFiller && isFillerCacheEnabled() && ttsSpeedScale === 1),
       });
       activeOutboundStreamId = session.streamId;
       if (opts.isFiller) fillerStreamId = session.streamId;
@@ -1884,6 +1893,19 @@ mediaWss.on('connection', (ws, req) => {
     const languageEvidence = analyzeCallerLanguage(clean);
     callLanguageState = resolveLanguageState(callLanguageState, languageEvidence);
     callLanguage = callLanguageState.current;
+
+    // Caller asking for slower/faster speech adjusts the actual voice speed,
+    // so the model never needs "..." chains to pace itself.
+    const speedRequest = detectSpeedRequest(clean);
+    if (speedRequest) {
+      const nextScale = nextSpeedScale(ttsSpeedScale, speedRequest.action);
+      if (nextScale !== ttsSpeedScale) {
+        ttsSpeedScale = nextScale;
+        console.log(
+          `[ws/media][${callKey}] caller speed request=${speedRequest.action} scale=${ttsSpeedScale}`
+        );
+      }
+    }
     const capabilities =
       callBrainCapabilities.get(callKey) ||
       capabilitiesForProfile(brainProfile, callAgentTools.get(callKey) || parseAgentTools(null));
@@ -2051,6 +2073,7 @@ mediaWss.on('connection', (ws, req) => {
         speakSessionReady = tts
           .beginSpeak({
             callLanguage,
+            speedScale: ttsSpeedScale,
             extraLexicon: ttsLexiconOverrides,
           })
           .then((session) => {
@@ -2100,6 +2123,7 @@ mediaWss.on('connection', (ws, req) => {
         }
         speakSession = await tts.beginSpeak({
           callLanguage,
+          speedScale: ttsSpeedScale,
           extraLexicon: ttsLexiconOverrides,
         });
         console.log(`[ws/media][${sidLabel()}] llm→tts stream open`);

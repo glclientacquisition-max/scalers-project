@@ -430,6 +430,29 @@ function expandTimeRanges12h(text, lang = 'en') {
  * @param {string} text
  * @param {'en'|'sw'|string} lang
  */
+const SW_PERIOD = '(asubuhi|mchana|jioni|usiku|alfajiri)';
+
+/**
+ * Numeric clock with a Swahili period word: "saa 3:00 usiku" / "3:30 usiku".
+ * Claims these before expand24HourTime, which would otherwise read 3:00 as a
+ * 24h clock and emit a doubled, contradictory "saa saa 3 asubuhi usiku".
+ * Keeps the hour numeral (house style) and the stated period.
+ * @param {string} text
+ */
+function expandSwahiliClockTimes(text) {
+  return String(text || '').replace(
+    new RegExp(`\\b(?:saa\\s+)?(\\d{1,2})(?::(\\d{2}))?\\s*${SW_PERIOD}\\b`, 'gi'),
+    (full, h, m, period) => {
+      const hour = Number(h);
+      if (hour < 1 || hour > 12) return full;
+      const mins = m != null ? Number(m) : 0;
+      const p = period.toLowerCase();
+      if (mins) return `saa ${hour} na dakika ${mins} ${p}`;
+      return `saa ${hour} ${p}`;
+    }
+  );
+}
+
 function expandTimes(text, lang = 'en') {
   let out = String(text || '');
   const ttsLang = lang === 'sw' ? 'sw' : 'en';
@@ -591,6 +614,7 @@ function expandSpokenForms(text, lang = 'en') {
   out = expandBarePriceInContext(out, lang);
   out = expandIdentifiers(out);
   out = expandNumberUnitRanges(out, lang);
+  out = expandSwahiliClockTimes(out);
   out = expandTimes(out, lang);
   out = expand24HourTime(out, lang);
   out = expandDayRanges(out, lang);
@@ -604,6 +628,7 @@ module.exports = {
   expandTimeRanges12h,
   expandIdentifiers,
   expandNumberUnitRanges,
+  expandSwahiliClockTimes,
   expandTimes,
   expand24HourTime,
   expandDayRanges,

@@ -1,3 +1,49 @@
+# Transcript verification — last-call residuals (2026-09-14)
+
+Owner ask: verify the punctuation / figure / currency fixes against the last transcript.
+
+Method: pulled both post-merge staging calls (`9f6b94d5`, 146 turns, 21:13 UTC; `a2c0c86c`, 34 turns, 21:17 UTC) and ran all 54 agent turns through the merged `prepareForTts` net, scanning for survivals (dashes, slashes, `&`/`=`, dot chains, currency codes, long digit runs, parens, exclamations).
+
+Verified fixed on real lines:
+
+| Model wrote on the call | Caller now hears |
+| --- | --- |
+| `kwa Ksh 1500 hadi 2000 kulingana na size` | `kwa shilingi elfu moja mia tano hadi shilingi elfu mbili kulingana na size` |
+| `bei ni Ksh 2000 kila moja` | `bei ni shilingi elfu mbili kila moja` |
+| `I don't have that exact detail — I can note it…` | em dash becomes a comma pause |
+| `Tuko wazi hadi 6 PM` (SW) | `Tuko wazi hadi saa 6 jioni` |
+| `from 8 AM` | `from 8 A M` |
+| `Have a good night!` | period, no punched exclamation |
+| `Sawa... Chris... Unahitaji...` (slow-down attempt) | single periods, no spoken dots |
+
+Two residuals the verification caught, now fixed:
+
+1. `saa 3:00 usiku` → `saa saa 3 asubuhi usiku` — the 24h safety net read `3:00` as a 24h clock, doubled `saa`, and contradicted the stated period (`asubuhi usiku`). New `expandSwahiliClockTimes` claims numeric clocks carrying a Swahili period word (`asubuhi|mchana|jioni|usiku|alfajiri`) before the 24h net: `saa 3:00 usiku` → `saa 3 usiku`, `saa 3:30 usiku` → `saa 3 na dakika 30 usiku`.
+2. `godoro (mattress cleaning) kesho` — parentheses survived verbatim. `polishPunctuation` now rewrites parenthetical asides as comma pauses.
+
+Regression: 2 new `tests/ttsNormalize.test.js` cases, fixtures `52`–`53`. `npm run test:voice` green.
+
+Not a TTS matter, logged for Brain: the model wrote `saa dodoma jioni` (a city name where a number belongs) while correcting hours confusion.
+
+Follow-up from the owner: on the `a2c0c86c` call the caller asked "slower" / "polepole" ten-plus times and the model's only pacing tool was typing `...` between words — which the net turns into staccato full-stop pauses while the word rate stays the same. Shipped real in-call speed control:
+
+1. `src/speech/speedControl.js` — `detectSpeedRequest` classifies the caller turn (`slower` / `slow down` / `too fast` / `polepole` / `ongea haraka` / `normal speed` / `kama kawaida`, …). Guards: bare `haraka` (`kuja haraka` = come quickly) and bare `slow` do not trigger.
+2. Per-call `ttsSpeedScale` in `server.js` steps 0.15 per request (floor 0.7, ceiling 1.3, reset on "normal speed"), applied on every speak path (`speakText`, LLM→TTS stream prefetch and fallback) via `beginSpeak({ speedScale })`; the Soniox start frame gets `speed = clampSpeed(profile × scale)`.
+3. Filler PCM cache bypasses once the scale leaves 1 — cached acks were rendered at the old pace.
+4. Prompt: the model is told speed adjusts by itself and to never use `...` for pacing.
+
+Default-speed guarantees (owner ask: normal speed stays the default, consistently):
+
+- Every call starts at scale 1 — the scale is per-connection state in the media handler, so a slowed pace never leaks into the next call.
+- Scale 1 is exactly the profile speed (`speedEn`/`speedSw`, both 1.0 on balanced); the wire sends the identical value as before this feature.
+- The scale only moves on an explicit caller request and holds steady between them; one stream keeps one speed, so a sentence never changes pace mid-utterance.
+- "slower" then "faster" returns to exactly 1; "normal speed" / "kama kawaida" resets to 1 from any step.
+- The legacy SautiKit prompt WebSocket has no Soniox TTS and is untouched.
+
+Regression: `tests/speedControl.test.js` (detector, stepping, wire speed) added to `npm run test:voice`.
+
+---
+
 # Currency read wrong — stranded codes, k-shorthand, silent cents (2026-09-14)
 
 Owner report: before merging the figures fix, work currency deeply too.

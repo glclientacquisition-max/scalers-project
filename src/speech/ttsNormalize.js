@@ -50,6 +50,8 @@ function polishPunctuation(text) {
   // Spaced ASCII hyphen is a list/range marker the expanders did not claim.
   // Intra-word hyphens (M-Pesa, Roo-ee-roo) carry no spaces and must survive.
   t = t.replace(/\s+-\s*|\s*-\s+/g, ', ');
+  // Parenthetical asides read as an aside, not "open parenthesis".
+  t = t.replace(/\s*\(([^()]*)\)\s*/g, ', $1, ');
   t = t.replace(/([:;])\s*,\s*/g, '$1 ');
   t = t.replace(/,\s*,+/g, ',');
   t = t.replace(/^\s*,\s*/, '');

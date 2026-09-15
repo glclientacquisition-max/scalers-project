@@ -227,7 +227,7 @@ function createSonioxTtsSession({
 
   /**
    * Open a Soniox TTS stream that accepts incremental text chunks (LLM→TTS).
-   * @param {{ language?: string, callLanguage?: string, speed?: number, alreadyPrepared?: boolean, extraLexicon?: unknown, capture?: boolean, silent?: boolean }} [opts]
+   * @param {{ language?: string, callLanguage?: string, speed?: number, speedScale?: number, alreadyPrepared?: boolean, extraLexicon?: unknown, capture?: boolean, silent?: boolean }} [opts]
    */
   async function beginSpeak(opts = {}) {
     if (closed) throw new Error('TTS session closed');
@@ -252,6 +252,9 @@ function createSonioxTtsSession({
         ? opts.language
         : null;
     const speedHint = opts.speed != null ? clampSpeed(opts.speed) : null;
+    // Per-call caller-requested scale (slower/faster). 1 = profile default.
+    const speedScale =
+      Number.isFinite(opts.speedScale) && opts.speedScale > 0 ? opts.speedScale : 1;
     let speed = speedHint;
     let configured = false;
     let ended = false;
@@ -271,7 +274,8 @@ function createSonioxTtsSession({
     function ensureConfigured(resolvedLang) {
       if (configured) return;
       language = resolvedLang === 'sw' ? 'sw' : 'en';
-      speed = speedHint != null ? speedHint : speedForLanguage(language);
+      const baseSpeed = speedHint != null ? speedHint : speedForLanguage(language);
+      speed = clampSpeed(baseSpeed * speedScale);
       // Do not send the silence-reduction flag. Unsupported models 400,
       // and the default keeps natural pauses between words.
       sendJson({
@@ -286,7 +290,8 @@ function createSonioxTtsSession({
       });
       configured = true;
       console.log(
-        `[soniox-tts][${callSid}] begin stream=${streamId} lang=${language} speed=${speed}`
+        `[soniox-tts][${callSid}] begin stream=${streamId} lang=${language} speed=${speed}` +
+          (speedScale !== 1 ? ` (scale=${speedScale})` : '')
       );
     }
 

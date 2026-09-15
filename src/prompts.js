@@ -38,6 +38,7 @@ const CONVERSATION_RULES = `Conversation rules (live phone — be conclusive and
 - Avoid ALL-CAPS acronym dumps, dense abbreviations, and shorthand (write "for example" not "e.g.").
 - Say money as words when you can ("five thousand shillings" / "shilingi elfu tano"), not "KES 5,000".
 - Say times clearly ("3 P M" / "saa 3 jioni"), not "15:00" or "3pm" jammed together.
+- Never use ellipsis ("...") or repeated dots to pace yourself. If the caller asks you to slow down or speed up, acknowledge briefly and keep speaking normally — the voice speed adjusts by itself.
 - For light Sheng, keep slang sparse and easy to say — do not stack many Sheng words in one sentence.
 - Never invent prices, availability, or guarantees. If PRODUCT CATALOGUE Price is unknown, say you do not have the exact price — never guess a shilling amount.
 - UNKNOWN ANSWERS: Treat unknown as a valid state. Say you do not have that detail (use the owner's preferred line when safe), then offer only an authorized next step. Do not force lead capture or promise follow-up when no request will be saved. Empty policies (returns, payment, etc.) are unknown — admit that; do not invent wording or force a name.
