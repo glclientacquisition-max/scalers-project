@@ -417,6 +417,28 @@ describe('post-call contact persist and name extract', () => {
     assert.equal(upserts[0].name, 'Aisha');
   });
 
+  it('does not upsert Haijawekwa as a contact name', async () => {
+    const upserts = [];
+    const result = await persistCompletedCallContact(
+      { callSid: 'CA_junk' },
+      {
+        getCall: async () => ({
+          id: 'call-junk',
+          tenant_id: 't1',
+          from_number: '+254712345680',
+          name: 'Haijawekwa',
+          reason: 'Emergency',
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return { id: 'ct-junk', ...row };
+        },
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(upserts[0].name, null);
+  });
+
   it('maps mocked Gemini NONE to a nameless upsert', async () => {
     process.env.POST_CALL_GEMINI_REVIEW = 'off';
     const upserts = [];

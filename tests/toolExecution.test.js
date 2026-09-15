@@ -797,4 +797,21 @@ describe('validated tool execution', () => {
     assert.equal(saved.results[0].status, 'succeeded');
     assert.equal(savedName, 'Aisha');
   });
+
+  it('does not persist STT placeholder names on save or visit', async () => {
+    const { validateCallerInfo, validateCreateAppointment } = require('../src/conversation/toolExecution');
+    const dropped = validateCallerInfo({ name: 'Calling', reason: 'human' });
+    assert.equal(dropped.valid, true);
+    assert.equal(dropped.value.name, '');
+    assert.equal(dropped.value.reason, 'human');
+
+    const visit = validateCreateAppointment({
+      serviceName: 'Carpet cleaning',
+      name: 'Haijawekwa',
+      whenText: 'tomorrow 10 AM',
+      landmark: 'Rongai',
+    });
+    assert.equal(visit.valid, false);
+    assert.ok(visit.missingSlots.includes('name'));
+  });
 });

@@ -4,6 +4,7 @@
 
 const { isPlausibleCallerName } = require('./entityExtraction');
 const { canonicalizeCallerName } = require('./callerNameMatch');
+const { sanitizeStoredCallerName } = require('./callerNameQuality');
 
 const REVIEW_MODEL =
   process.env.GEMINI_REVIEW_MODEL ||
@@ -449,11 +450,15 @@ async function persistCompletedCallContact(ctx = {}, deps = {}) {
   }
   const tenantId = call.tenant_id;
   if (!tenantId) return { ok: false, reason: 'no_tenant' };
-  const incomingName = canonicalizeCallerName(
-    ctx.extractedName !== undefined
-      ? ctx.extractedName
-      : ctx.summary?.name || call.name || null
+  const incomingName = sanitizeStoredCallerName(
+    canonicalizeCallerName(
+      ctx.extractedName !== undefined
+        ? ctx.extractedName
+        : ctx.summary?.name || call.name || null
+    )
   );
+  const safeIncoming =
+    incomingName && isPlausibleCallerName(incomingName) ? incomingName : null;
   const meta =
     call.summary && typeof call.summary === 'object'
       ? call.summary
@@ -474,7 +479,7 @@ async function persistCompletedCallContact(ctx = {}, deps = {}) {
     const contact = await upsertContact({
       tenantId,
       phone,
-      name: incomingName || null,
+      name: safeIncoming || null,
       lastReason:
         String(ctx.summary?.reason || '').trim() ||
         reviewReason ||

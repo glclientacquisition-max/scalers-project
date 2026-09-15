@@ -94,4 +94,20 @@ describe('mergeContactIdentity', () => {
     assert.equal(first.name, 'Colin');
     assert.deepEqual(first.metadata.alternate_names, []);
   });
+
+  it('does not store Haijawekwa or Calling on the contact file', () => {
+    const next = mergeContactIdentity(null, { name: 'Haijawekwa' });
+    assert.equal(next.name, null);
+    const healed = mergeContactIdentity(
+      { name: 'Calling', metadata: {} },
+      { name: 'Amina' }
+    );
+    assert.equal(healed.name, 'Amina');
+    const skipAlt = mergeContactIdentity(
+      { name: 'Amina', metadata: {} },
+      { name: 'Callings' }
+    );
+    assert.equal(skipAlt.name, 'Amina');
+    assert.deepEqual(skipAlt.metadata.alternate_names, []);
+  });
 });

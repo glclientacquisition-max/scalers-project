@@ -165,9 +165,11 @@ Ranked by how much they break trust on a live Kenyan call. Each is a **conversat
 
 **Bar:** One real person name on file. Shared lines confirmed. Notify never sends `Calling` / `Haijawekwa`.
 
-**Not yet:** STT fragments become names. Returning card then teaches the next call the wrong person. Spelling assist helps; it does not replace a once-and-done capture that refuses junk.
+**Now in runtime:** Junk names are refused at extract, `save_caller_info`, visit save, contact upsert, and SMS display. A junk primary on an existing contact is not kept when a real name arrives.
 
-**Lane:** Brain extract + post-call name extract. Desk notify display gate already exists; the phone must not write garbage in.
+**Still live:** STT can invent a plausible-looking name that is not the caller. Shared-line confirm is thin. Prove on the DID that `Calling is my name` does not become the file.
+
+**Lane:** Brain extract + post-call persist. Desk SMS already hid these labels; the phone must not write them in.
 
 ### F4. Language stay is not the whole Kiswahili product
 

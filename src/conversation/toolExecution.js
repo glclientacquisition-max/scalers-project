@@ -6,6 +6,7 @@ const {
   formatRequestedWhenLabel,
 } = require('./appointmentHours');
 const { canonicalizeCallerName } = require('./callerNameMatch');
+const { isJunkCallerName } = require('./callerNameQuality');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -52,6 +53,7 @@ function isReservedCallerName(name, { agentName = '', businessName = '' } = {}) 
   const key = normalizeNameKey(name);
   if (!key || key.length < 2) return true;
   if (RESERVED_CALLER_NAMES.has(key)) return true;
+  if (isJunkCallerName(name)) return true;
 
   const agentKey = normalizeNameKey(agentName);
   if (agentKey && (key === agentKey || key.includes(agentKey) || agentKey.includes(key))) {
@@ -379,7 +381,10 @@ function validateCreateAppointment(
   };
   const missing = [];
   if (!value.serviceName) missing.push('service');
-  if (!value.name) missing.push('name');
+  if (!value.name || isReservedCallerName(value.name)) {
+    value.name = '';
+    missing.push('name');
+  }
   if (!value.whenText) missing.push('when_text');
   if (!value.landmark) missing.push('landmark');
   if (missing.length) {

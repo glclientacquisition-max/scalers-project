@@ -3,6 +3,7 @@
 const { normalizeProducts } = require('./productCatalog');
 const { normalizeServices } = require('./liveKnowledge');
 const { normalizeLocations } = require('./businessLocations');
+const { isJunkCallerName } = require('./callerNameQuality');
 const {
   canonicalizeCallerName,
   collectKnownCallerNames,
@@ -352,6 +353,12 @@ const NAME_BLOCKLIST = new Set([
   'eh',
   'nini',
   'repeat',
+  'calling',
+  'callings',
+  'haijawekwa',
+  'caller',
+  'customer',
+  'unknown',
   'looking',
   'available',
   'interested',
@@ -432,6 +439,7 @@ function isBackchannelOrFragment(text) {
 function isPlausibleCallerName(value) {
   const name = String(value || '').trim();
   if (!name || name.length < 2 || name.length > 40) return false;
+  if (isJunkCallerName(name)) return false;
   if (isHearAgainSignal(name) || isBackchannelOrFragment(name)) return false;
   const lower = name.toLowerCase();
   if (

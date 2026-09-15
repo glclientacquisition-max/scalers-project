@@ -1,4 +1,5 @@
 const { namesLikelySame, preferredContactSpelling, compactNameKey } = require('./callerNameMatch');
+const { isJunkCallerName } = require('./callerNameQuality');
 
 const ALT_CAP = 5;
 
@@ -16,7 +17,7 @@ function normalizeAlternates(list, primary) {
   const next = [];
   for (const row of Array.isArray(list) ? list : []) {
     const name = trimName(row?.name);
-    if (!name) continue;
+    if (!name || isJunkCallerName(name)) continue;
     if (primary && namesMatch(name, primary)) continue;
     const key = compactNameKey(name);
     if (!key || seen.has(key)) continue;
@@ -36,8 +37,10 @@ function normalizeAlternates(list, primary) {
  * Empty incoming names never clobber. Differing names log as alternates.
  */
 function mergeContactIdentity(existing, incoming = {}) {
-  const incomingName = trimName(incoming.name);
-  const primary = trimName(existing?.name);
+  const incomingName = isJunkCallerName(incoming.name)
+    ? null
+    : trimName(incoming.name);
+  const primary = isJunkCallerName(existing?.name) ? null : trimName(existing?.name);
   const baseMeta =
     existing?.metadata && typeof existing.metadata === 'object' && !Array.isArray(existing.metadata)
       ? { ...existing.metadata }
