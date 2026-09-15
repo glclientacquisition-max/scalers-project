@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
@@ -85,7 +86,10 @@ function InboxTrailingAction({
   }
   if (item.callerPhone) {
     return (
-      <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
+      <div className="flex items-center gap-2">
+        <CallLink number={item.callerPhone} />
+        <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
+      </div>
     );
   }
   return null;

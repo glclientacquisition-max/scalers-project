@@ -84,6 +84,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph on `#25D366`, `h-11 w-11`, `rounded-xl` (`variant="icon"`). No extra WhatsApp mark next to the name. |
+| Call | `CallLink` (`tel:` deep link, the device dialer places the call). List dock only, icon-only, muted: `h-11 w-11` bordered, sits left of the WhatsApp icon. Never a column, never a filled button. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
 
 ---
