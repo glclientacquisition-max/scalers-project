@@ -58,6 +58,8 @@ function buildCallerMemoryCard({
     })
     .filter(Boolean);
   let appointment = null;
+  let nextVisitService = null;
+  let nextVisitWhen = null;
   if (nextAppointment && typeof nextAppointment === 'object') {
     const service = clip(
       nextAppointment.service_name || nextAppointment.serviceName,
@@ -67,6 +69,8 @@ function buildCallerMemoryCard({
       nextAppointment.when_text || nextAppointment.whenText,
       32
     );
+    nextVisitService = service || null;
+    nextVisitWhen = whenText || null;
     const bits = [service, whenText].filter(Boolean);
     appointment = bits.length ? bits.join(', ') : null;
   }
@@ -90,6 +94,22 @@ function buildCallerMemoryCard({
     notes: notes || null,
     openRequests: requests,
     nextAppointment: appointment,
+    nextVisitService,
+    nextVisitWhen,
+  };
+}
+
+function returningFileFromCard(card) {
+  if (!card || typeof card !== 'object') return null;
+  return {
+    sharedLine: Boolean(card.sharedLine),
+    greetByName: Boolean(card.greetByName),
+    name: card.name || null,
+    lastReason: card.lastReason || null,
+    nextVisit: card.nextAppointment || null,
+    nextVisitService: card.nextVisitService || null,
+    nextVisitWhen: card.nextVisitWhen || null,
+    openRequests: Array.isArray(card.openRequests) ? card.openRequests : [],
   };
 }
 
@@ -118,9 +138,43 @@ function formatReturningCallerForPrompt(card) {
   }
   if (card.notes) lines.push(`- Note: ${card.notes}`);
   lines.push(
-    '- Use this file. Do not invent extra history. If they have a new ask, handle that first.'
+    '- First reasoned turn must use this file. Do not start a first-meeting name SOP.'
+  );
+  if (card.sharedLine) {
+    lines.push(
+      '- Shared line: ask who is speaking before using the file name or attaching a visit.'
+    );
+  } else if (card.nextAppointment) {
+    lines.push(
+      '- Open visit on file. If they want it moved or cancelled, update that visit. Do not create_appointment unless they ask for a new job. Do not re-ask the name.'
+    );
+  } else if (card.lastReason) {
+    lines.push(
+      '- Last reason is the default job unless they name a new one. Do not re-ask the name.'
+    );
+  }
+  lines.push(
+    '- If they have a new ask, handle that first. Do not invent extra history.'
   );
   return lines.join('\n');
+}
+
+function formatReturningFileForCallState(returning) {
+  if (!returning || typeof returning !== 'object') return '';
+  if (returning.sharedLine) {
+    return '- Returning file: shared line. Ask who is speaking. Do not use the file name. Do not attach a visit yet.';
+  }
+  const bits = [];
+  if (returning.name) bits.push(`unique ${returning.name}`);
+  else bits.push('unique line');
+  if (returning.nextVisit) bits.push(`open visit ${returning.nextVisit}`);
+  else if (returning.lastReason) bits.push(`last reason ${returning.lastReason}`);
+  const duty = returning.nextVisit
+    ? 'Speak to that visit. Do not create a second visit unless they ask for a new job. Do not re-ask the name.'
+    : returning.lastReason
+      ? 'Use last reason unless they have a new ask. Do not re-ask the name.'
+      : 'Do not re-ask the name.';
+  return `- Returning file: ${bits.join('; ')}. ${duty}`;
 }
 
 function seedCallerFromMemory(caller = {}, card) {
@@ -166,6 +220,8 @@ module.exports = {
   buildCallerMemoryCard,
   clip,
   formatReturningCallerForPrompt,
+  formatReturningFileForCallState,
+  returningFileFromCard,
   looksLikeTranscript,
   seedCallerFromMemory,
 };

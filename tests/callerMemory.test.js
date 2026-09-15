@@ -49,6 +49,7 @@ describe('returning-caller card', () => {
     const block = formatReturningCallerForPrompt(card);
     assert.match(block, /RETURNING CALLER/);
     assert.match(block, /shared line/i);
+    assert.match(block, /who is speaking/i);
     assert.doesNotMatch(block, /use this name/i);
   });
 
@@ -92,12 +93,14 @@ describe('returning-caller card', () => {
     assert.match(prompt, /RETURNING CALLER/);
     assert.match(prompt, /Jane/);
     assert.match(prompt, /Atomic Habits/);
+    assert.match(prompt, /First reasoned turn/);
 
     const state = createBrainState({ callerMemory: card });
     assert.equal(state.caller.name, 'Jane');
     assert.equal(state.caller.nameConfirmed, true);
     assert.equal(state.caller.phone, '+254700000001');
     assert.match(formatBrainStateForPrompt(state), /confirmed/i);
+    assert.match(formatBrainStateForPrompt(state), /Returning file/);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /Got it, Jane/);
   });
 
@@ -138,5 +141,69 @@ describe('returning-caller card', () => {
         }),
     });
     assert.equal(named.callerMemory.name, 'Jane');
+  });
+
+  it('routes first turn to the open visit instead of a new book', () => {
+    const { observeCallerTurn, inferIntent } = require('../src/conversation/brainState');
+    const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000001',
+        name: 'Alex',
+        last_reason: 'carpet Tuesday',
+        metadata: {},
+      },
+      nextAppointment: {
+        service_name: 'carpet cleaning',
+        when_text: 'Tuesday 10 AM',
+      },
+    });
+    assert.match(formatReturningCallerForPrompt(card), /create_appointment unless they ask for a new job/);
+
+    const seeded = createBrainState({
+      vertical: 'home_services',
+      callerMemory: card,
+    });
+    assert.match(formatBrainStateForPrompt(seeded), /open visit/i);
+
+    assert.equal(
+      inferIntent('Move my visit to Friday', { returning: seeded.returning }),
+      'cancellation'
+    );
+    assert.equal(
+      inferIntent('Need carpet cleaning tomorrow Rongai', {
+        vertical: 'home_services',
+        returning: seeded.returning,
+      }),
+      'booking'
+    );
+
+    const moved = observeCallerTurn(seeded, {
+      text: 'Move my visit to Friday',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile: { vertical: 'home_services', callerMemory: card },
+    });
+    assert.equal(moved.intent, 'cancellation');
+    const decision = determineNextBestAction({
+      state: moved,
+      capabilities: { createServiceRequest: true, createAppointment: true },
+    });
+    assert.equal(decision.action, 'ASK_CLARIFICATION');
+    assert.equal(decision.slot, 'when');
+
+    const vague = observeCallerTurn(seeded, {
+      text: 'Calling about my visit',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile: { vertical: 'home_services', callerMemory: card },
+    });
+    assert.equal(vague.intent, 'general_enquiry');
+    const speakVisit = determineNextBestAction({
+      state: vague,
+      capabilities: { createServiceRequest: true },
+    });
+    assert.equal(speakVisit.action, 'ANSWER');
+    assert.match(speakVisit.reason, /open visit/i);
   });
 });

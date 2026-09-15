@@ -32,6 +32,20 @@ assert.equal(shouldSpeakThinkingAck('How are you doing, Shy?'), false);
 assert.equal(shouldSpeakThinkingAck('How much for a couch?'), true);
 assert.equal(pickPhaticReply({ language: 'en' }), "I'm well, thanks. How can I help?");
 assert.equal(pickPhaticReply({ language: 'sw' }), 'Nzuri, asante. Naweza kusaidia?');
+assert.equal(
+  pickPhaticReply({
+    language: 'en',
+    callerMemory: { nextAppointment: 'carpet, Tuesday', greetByName: true },
+  }),
+  "I'm well. I have your visit on file. Is that why you called?"
+);
+assert.equal(
+  pickPhaticReply({
+    language: 'en',
+    callerMemory: { sharedLine: true, name: 'Amina' },
+  }),
+  "I'm well. Who is calling?"
+);
 assert.doesNotMatch(pickPhaticReply({ language: 'en' }), /carpet|couch|mattress/i);
 assert.equal(
   looksLikeSpokenServiceDump(
