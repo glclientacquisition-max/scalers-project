@@ -30,11 +30,13 @@ export async function updateServiceRequestStatus(
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
 
-  const { error } = await workspace.client
+  const { data: row, error } = await workspace.client
     .from("service_requests")
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("tenant_id", tenant.id);
+    .eq("tenant_id", tenant.id)
+    .select("call_id")
+    .maybeSingle();
 
   if (error) {
     return ownerSaveFailed("request", error.message, "Could not save request.");
@@ -43,6 +45,7 @@ export async function updateServiceRequestStatus(
   revalidatePath("/requests");
   revalidatePath("/calls");
   revalidatePath("/home");
+  if (row?.call_id) revalidatePath(`/calls/${row.call_id}`);
   return { ok: true };
 }
 

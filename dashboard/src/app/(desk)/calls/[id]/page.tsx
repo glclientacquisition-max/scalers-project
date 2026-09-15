@@ -29,8 +29,11 @@ import {
   followUpWhatsAppMessage,
   formatCallWhen,
 } from "@/lib/callsTriage";
+import { nicheCopy } from "@/lib/inboxNiche";
 import {
   classifyInboxPurpose,
+  holdHeadline,
+  holdTypeLabel,
   signalLabel,
   type InboxHold,
   type InboxJob,
@@ -230,6 +233,11 @@ export default async function CallDetailPage({
   const job = jobRes.error
     ? null
     : (((jobRes.data || [])[0] || null) as InboxJob | null);
+  const visitStamp = nicheCopy(tenant.vertical).visitStamp;
+  const holdType = hold
+    ? holdTypeLabel(hold.request_type, tenant.vertical)
+    : null;
+  const holdWork = hold ? holdHeadline(hold, tenant.vertical) : null;
   const purpose = classifyInboxPurpose({
     primaryIntent: row.primary_intent,
     resolution,
@@ -316,8 +324,16 @@ export default async function CallDetailPage({
           {job ? (
             <section className="rounded-2xl border border-line bg-surface p-4">
               <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
-                Visit
+                {visitStamp}
               </h2>
+              {job.service_name?.trim() ? (
+                <p className="mt-3 text-sm font-semibold tracking-tight text-ink">
+                  {job.service_name.trim()}
+                </p>
+              ) : null}
+              {job.notes?.trim() ? (
+                <p className="mt-1 text-sm text-ink-soft">{job.notes.trim()}</p>
+              ) : null}
               <div className="mt-3">
                 <InboxJobEditor
                   id={job.id}
@@ -332,8 +348,16 @@ export default async function CallDetailPage({
           {hold ? (
             <section className="rounded-2xl border border-line bg-surface p-4">
               <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
-                Hold
+                {holdType}
               </h2>
+              {holdWork && holdWork !== holdType ? (
+                <p className="mt-3 text-sm font-semibold tracking-tight text-ink">
+                  {holdWork}
+                </p>
+              ) : null}
+              {hold.notes?.trim() ? (
+                <p className="mt-1 text-sm text-ink-soft">{hold.notes.trim()}</p>
+              ) : null}
               <div className="mt-3">
                 <InboxHoldEditor
                   id={hold.id}
@@ -392,16 +416,13 @@ export default async function CallDetailPage({
                 <span>Transfer: {transferAttempt.status}</span>
               ) : null}
             </div>
-            {row.resolution != null || row.primary_intent || row.resolution_note ? (
+            {row.resolution != null || row.resolution_note ? (
               <div className="space-y-1">
                 <p>
                   Assist:{" "}
                   <span className="font-medium text-ink">
                     {callResolutionLabel(resolution)}
                   </span>
-                  {row.primary_intent ? (
-                    <span className="text-ink-soft"> · {row.primary_intent}</span>
-                  ) : null}
                 </p>
                 {row.resolution_note ? (
                   <p className="text-ink-soft">{row.resolution_note}</p>

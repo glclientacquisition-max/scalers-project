@@ -300,7 +300,6 @@ export async function loadContactTimeline(
           latestCallReason: ownerReason,
         }) ||
         ownerReason ||
-        row.primary_intent ||
         "Call",
       detail: row.status || null,
       callId: row.id,

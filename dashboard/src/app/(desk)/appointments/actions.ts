@@ -37,7 +37,7 @@ export async function updateAppointmentStatus(
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", tenant.id)
-    .select("caller_phone, caller_name, service_name, when_text")
+    .select("caller_phone, caller_name, service_name, when_text, call_id")
     .maybeSingle();
 
   if (error) {
@@ -69,6 +69,7 @@ export async function updateAppointmentStatus(
   revalidatePath("/appointments");
   revalidatePath("/calls");
   revalidatePath("/home");
+  if (row?.call_id) revalidatePath(`/calls/${row.call_id}`);
   return { ok: true };
 }
 

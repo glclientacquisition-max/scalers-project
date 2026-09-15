@@ -9,4 +9,4 @@
 
 **Row:** Same recipe as Inbox. Tap the row to open the contact. No Open column.
 
-**Detail:** `/contacts/[id]`. Notes left. Timeline right. Tap a timeline row that has a call to open the conversation. No Call column.
+**Detail:** `/contacts/[id]`. Notes left. Timeline right. Tap a timeline row that has a call to open the conversation. No Call column. Timeline "What" is the owner sentence, request item, or Visit. Never a brain intent id.
