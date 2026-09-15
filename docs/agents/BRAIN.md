@@ -62,7 +62,7 @@ Core runtime modules:
 1. Spoken replies stay short (≈ ≤25 words, phone-friendly).
 2. Never invent prices, availability, or guarantees — use live ground truth / unknown fallback.
 3. Auto language match: en / sw / sheng; switch when the caller switches.
-4. Lead capture: name + reason only when required for a saved request or justified handoff; confirm unclear names.
+4. Lead capture: name + reason only when required for a saved request or justified handoff; confirm unclear names. STT variants auto-match to a returning-caller file name or a Kenya given-name table (`src/conversation/callerNameMatch.js`) so the spoken/saved spelling is canonical (Isha → Aisha). Collision pairs (Colin/Collins) are not silent-rewritten: ask once, or keep the returning-file spelling. Do not invent names. Do not write free-form caller names into the TTS lexicon.
 5. After-hours / bulletin: honesty first, then still help per `after_hours_mode` (serve vs message). Promo bulletins must not be volunteered off-topic.
 6. Holds and orders require catalogue-grounded titles (plus required slots); unlisted or garbled titles → enquiry / special-order quote, not a clean hold/order. Refining pickup time updates the same hold.
 7. Missing catalogue prices and empty policy fields are unknown — never invent amounts or policy wording; do not force name capture.

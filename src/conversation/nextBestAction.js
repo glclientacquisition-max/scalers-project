@@ -50,6 +50,17 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     };
   }
 
+  const nameCollision = Array.isArray(state?.caller?.nameCollision)
+    ? state.caller.nameCollision.filter(Boolean)
+    : [];
+  if (nameCollision.length >= 2 && state?.caller?.nameConfirmed !== true) {
+    return {
+      action: ACTIONS.ASK_CLARIFICATION,
+      slot: 'name_spelling',
+      reason: `Heard a collision name; ask once: ${nameCollision.join(' or ')}?`,
+    };
+  }
+
   if (intent === 'unknown') {
     return {
       action: ACTIONS.ASK_CLARIFICATION,

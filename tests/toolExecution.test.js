@@ -777,4 +777,24 @@ describe('validated tool execution', () => {
     assert.equal(saved.results[0].status, 'succeeded');
     assert.equal(calls, 1);
   });
+
+  it('canonicalizes STT name variants before save_caller_info', async () => {
+    const parsed = parseGeminiResponse(
+      '###TOOL###{"save_caller_info":{"name":"Isha","reason":"hours"}}###ENDTOOL###'
+    );
+    let savedName = null;
+    const saved = await executeBrainTools({
+      parsed,
+      capabilities,
+      nameConfirmed: true,
+      handlers: {
+        saveCallerInfo: async (info) => {
+          savedName = info.name;
+          return info;
+        },
+      },
+    });
+    assert.equal(saved.results[0].status, 'succeeded');
+    assert.equal(savedName, 'Aisha');
+  });
 });
