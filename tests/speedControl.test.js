@@ -55,6 +55,12 @@ assert.strictEqual(nextSpeedScale(0.85, 'faster'), 1);
 assert.strictEqual(nextSpeedScale(1.3, 'faster'), 1.3); // ceiling
 assert.strictEqual(nextSpeedScale(0.7, 'reset'), 1);
 assert.strictEqual(nextSpeedScale(1, 'reset'), 1);
+// Round trip returns to exactly the default — normal speed is the anchor.
+assert.strictEqual(nextSpeedScale(nextSpeedScale(1, 'slower'), 'faster'), 1);
+assert.strictEqual(
+  nextSpeedScale(nextSpeedScale(nextSpeedScale(1, 'slower'), 'slower'), 'reset'),
+  1
+);
 
 // --- session applies the scale to the wire speed ---
 const sockets = [];
@@ -115,6 +121,8 @@ async function speakSpeed(opts) {
 async function main() {
   // Default: profile speed (balanced = 1.0).
   assert.strictEqual(await speakSpeed({}), 1);
+  // Explicit default scale is exactly the profile speed — normal is the anchor.
+  assert.strictEqual(await speakSpeed({ speedScale: 1 }), 1);
   // Caller asked slower twice: scale 0.7 hits the wire.
   assert.strictEqual(await speakSpeed({ speedScale: 0.7 }), 0.7);
   // Scale multiplies an explicit hint.

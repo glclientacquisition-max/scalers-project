@@ -32,6 +32,14 @@ Follow-up from the owner: on the `a2c0c86c` call the caller asked "slower" / "po
 3. Filler PCM cache bypasses once the scale leaves 1 — cached acks were rendered at the old pace.
 4. Prompt: the model is told speed adjusts by itself and to never use `...` for pacing.
 
+Default-speed guarantees (owner ask: normal speed stays the default, consistently):
+
+- Every call starts at scale 1 — the scale is per-connection state in the media handler, so a slowed pace never leaks into the next call.
+- Scale 1 is exactly the profile speed (`speedEn`/`speedSw`, both 1.0 on balanced); the wire sends the identical value as before this feature.
+- The scale only moves on an explicit caller request and holds steady between them; one stream keeps one speed, so a sentence never changes pace mid-utterance.
+- "slower" then "faster" returns to exactly 1; "normal speed" / "kama kawaida" resets to 1 from any step.
+- The legacy SautiKit prompt WebSocket has no Soniox TTS and is untouched.
+
 Regression: `tests/speedControl.test.js` (detector, stepping, wire speed) added to `npm run test:voice`.
 
 ---
