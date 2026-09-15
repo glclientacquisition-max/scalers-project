@@ -4,9 +4,11 @@ const { findProductMatch, normalizeProducts } = require('./productCatalog');
 const {
   evaluateAppointmentHours,
   formatRequestedWhenLabel,
+  weekdaySpoken,
 } = require('./appointmentHours');
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
+const { confirmationLanguage } = require('./language');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -861,12 +863,27 @@ async function executeBrainTools({
   };
 }
 
+function spokenClosedDay(hours, language) {
+  const lang = confirmationLanguage(language);
+  const named = weekdaySpoken(hours?.weekday, lang);
+  if (named) return named;
+  if (lang === 'en') return hours?.weekdayLong || 'that day';
+  return 'siku hiyo';
+}
+
+function spokenNextOpen(hours, language) {
+  const next = hours?.nextOpen;
+  if (!next) return '';
+  return weekdaySpoken(next.weekday, language) || next.label || '';
+}
+
 function formatVisitTimeProblem(code, hours, language) {
-  const sw = language === 'sw';
-  const sheng = language === 'sheng';
+  const lang = confirmationLanguage(language);
+  const sw = lang === 'sw';
+  const sheng = lang === 'sheng';
   if (code === 'closed_day') {
-    const closedDay = hours.weekdayLong || 'that day';
-    const next = hours.nextOpen?.label;
+    const closedDay = spokenClosedDay(hours, lang);
+    const next = spokenNextOpen(hours, lang);
     if (sw) {
       return next
         ? `Tuko tumefunga siku ya ${closedDay}. ${next} ingefaa?`
@@ -920,8 +937,9 @@ function formatToolConfirmation(results = [], language = 'en') {
   );
   if (!meaningful) return '';
 
-  const sw = language === 'sw';
-  const sheng = language === 'sheng';
+  const lang = confirmationLanguage(language);
+  const sw = lang === 'sw';
+  const sheng = lang === 'sheng';
   if (meaningful.action === 'tool_request') {
     if (sw) return 'Sijaweza kukamilisha hatua hiyo.';
     if (sheng) return 'Sijaweza ku-complete hiyo action.';
@@ -929,7 +947,7 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
   if (meaningful.action === 'create_appointment') {
     if (meaningful.status === 'succeeded') {
-      const whenLabel = formatRequestedWhenLabel(meaningful.hours);
+      const whenLabel = formatRequestedWhenLabel(meaningful.hours, lang);
       if (sw) {
         return whenLabel
           ? `Sawa, nimehifadhi ombi la ziara ${whenLabel}.`
@@ -952,7 +970,7 @@ function formatToolConfirmation(results = [], language = 'en') {
     if (meaningful.status === 'invalid') {
       const code = String(meaningful.code || '');
       const hours = meaningful.hours || {};
-      const timeProblem = formatVisitTimeProblem(code, hours, language);
+      const timeProblem = formatVisitTimeProblem(code, hours, lang);
       if (timeProblem) return timeProblem;
       const missing = Array.isArray(meaningful.missingSlots)
         ? meaningful.missingSlots
@@ -987,7 +1005,7 @@ function formatToolConfirmation(results = [], language = 'en') {
         if (sheng) return 'Poa, nime-cancel hiyo visit.';
         return "Okay, I've cancelled that visit.";
       }
-      const whenLabel = formatRequestedWhenLabel(meaningful.hours);
+      const whenLabel = formatRequestedWhenLabel(meaningful.hours, lang);
       if (sw) {
         return whenLabel
           ? `Sawa, nimehamisha ziara ${whenLabel}.`
@@ -1011,7 +1029,7 @@ function formatToolConfirmation(results = [], language = 'en') {
       const timeProblem = formatVisitTimeProblem(
         String(meaningful.code || ''),
         meaningful.hours || {},
-        language
+        lang
       );
       if (timeProblem) return timeProblem;
       if (sw) return 'Niambie muda mpya au kama unataka kughairi.';

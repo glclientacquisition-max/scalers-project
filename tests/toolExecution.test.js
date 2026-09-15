@@ -814,4 +814,50 @@ describe('validated tool execution', () => {
     assert.equal(visit.valid, false);
     assert.ok(visit.missingSlots.includes('name'));
   });
+
+  it('speaks Kiswahili visit save, closed day, and escalate SMS', async () => {
+    const saved = await executeBrainTools({
+      parsed: parseGeminiResponse(
+        '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Tuesday 10 AM","landmark":"Westlands"}}###ENDTOOL###'
+      ),
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 8, 0, 0)),
+      handlers: {
+        createAppointment: async () => ({ id: 'appt_sw', status: 'requested' }),
+      },
+    });
+    const savedSpoken = formatToolConfirmation(saved.results, 'sw');
+    assert.match(savedSpoken, /nimehifadhi ombi la ziara/i);
+    assert.match(savedSpoken, /Jumanne/);
+    assert.equal(/Tuesday/.test(savedSpoken), false);
+
+    const mixedSpoken = formatToolConfirmation(saved.results, 'mixed');
+    assert.match(mixedSpoken, /nimehifadhi ombi la ziara/i);
+
+    const closed = await executeBrainTools({
+      parsed: parseGeminiResponse(
+        '###TOOL###{"create_appointment":{"service_name":"Plumbing","name":"Amina","when_text":"Sunday 9 PM","landmark":"Westlands"}}###ENDTOOL###'
+      ),
+      capabilities,
+      hoursSchedule: defaultHoursSchedule(),
+      now: new Date(Date.UTC(2026, 7, 18, 8, 0, 0)),
+      handlers: {
+        createAppointment: async () => ({ id: 'should_not' }),
+      },
+    });
+    const closedSpoken = formatToolConfirmation(closed.results, 'sw');
+    assert.match(closedSpoken, /Jumapili/);
+    assert.match(closedSpoken, /Jumatatu/);
+    assert.equal(/Sunday/.test(closedSpoken), false);
+    assert.equal(/Monday/.test(closedSpoken), false);
+
+    assert.equal(
+      formatToolConfirmation(
+        [{ action: 'escalate', status: 'succeeded', channel: 'sms' }],
+        'sw'
+      ),
+      'Sawa, nimewatumia SMS timu.'
+    );
+  });
 });

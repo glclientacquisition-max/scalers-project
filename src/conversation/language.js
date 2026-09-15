@@ -316,6 +316,20 @@ function resolveLanguageState(previous, evidence) {
 }
 
 /**
+ * Backend spoken outcomes (tool confirm, hours, progress).
+ * Mixed stays Kiswahili for Kenya home-services; Sheng keeps Sheng lines.
+ * Instant greeting and TTS codes are separate.
+ * @param {'en'|'sw'|'sheng'|'mixed'|'unknown'|null} lang
+ * @returns {'en'|'sw'|'sheng'}
+ */
+function confirmationLanguage(lang) {
+  const code = String(lang || 'en').toLowerCase();
+  if (code === 'sw' || code === 'sheng') return code;
+  if (code === 'mixed') return 'sw';
+  return 'en';
+}
+
+/**
  * Sticky session language: prefer a clear new signal, else keep prior.
  * @param {'en'|'sw'|'sheng'|'mixed'|'unknown'|null} previous
  * @param {'en'|'sw'|'sheng'|'mixed'|'unknown'} detected
@@ -336,9 +350,9 @@ function resolveCallLanguage(previous, detected) {
 function pickFillerText(lang) {
   const env = process.env.VOICE_FILLER;
   if (env && env !== 'auto' && env !== 'off') return env;
-  if (lang === 'sw') return 'Kidogo…';
-  if (lang === 'sheng') return 'One sec…';
-  if (lang === 'en') return 'One moment…';
+  const spoken = confirmationLanguage(lang);
+  if (spoken === 'sw') return 'Kidogo…';
+  if (spoken === 'sheng') return 'One sec…';
   return 'One moment…';
 }
 
@@ -411,6 +425,7 @@ module.exports = {
   createLanguageState,
   resolveLanguageState,
   resolveCallLanguage,
+  confirmationLanguage,
   pickFillerText,
   ttsLanguageFor,
   isBackchannel,

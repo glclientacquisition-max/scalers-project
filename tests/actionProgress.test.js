@@ -20,6 +20,8 @@ assert.strictEqual(pickActionProgress('ESCALATE', 'en'), 'Okay, let me get the t
 assert.strictEqual(pickActionProgress('TRANSFER', 'en'), 'Okay, let me connect you.');
 assert.match(pickActionProgress('CREATE_REQUEST', 'sw'), /Sawa/i);
 assert.match(pickActionProgress('CAPTURE', 'sw'), /^Sawa\.?$/i);
+assert.match(pickActionProgress('CREATE_REQUEST', 'mixed'), /Sawa/i);
+assert.equal(pickPhaticReply({ language: 'mixed' }), 'Nzuri, asante. Naweza kusaidia?');
 assert.ok(pickContextualAck('I want to order a book', 'en'));
 assert.equal(looksLikePhaticCallerTurn('How are you doing?'), true);
 assert.equal(looksLikePhaticCallerTurn('How are you doing, Shy?'), true);

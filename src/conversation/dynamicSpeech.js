@@ -6,6 +6,7 @@ const {
   composeBusinessAssistantIntro,
   introLooksValid,
 } = require('./businessAssistantIntro');
+const { confirmationLanguage } = require('./language');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -144,8 +145,9 @@ End with one open question: How can I help you? (or the closed/message follow fr
 function pickContextualAck(userText, lang) {
   const t = String(userText || '').toLowerCase();
   const asked = /\?|nani|gani|how|what|when|where|can you|unaweza|nataka|need|want/.test(t);
-  if (lang === 'sw') return asked ? 'Sawa.' : 'Mm.';
-  if (lang === 'sheng') return asked ? 'Poa.' : 'Mm.';
+  const spoken = confirmationLanguage(lang);
+  if (spoken === 'sw') return asked ? 'Sawa.' : 'Mm.';
+  if (spoken === 'sheng') return asked ? 'Poa.' : 'Mm.';
   return asked ? 'Alright.' : 'Mm-hmm.';
 }
 
@@ -184,7 +186,7 @@ function shouldSpeakThinkingAck(text) {
  * Live miss: HD_3bf5d73422fd Gemini listed couch/carpet/mattress after "How are you doing?"
  */
 function pickPhaticReply(opts = {}) {
-  const lang = opts.language || 'en';
+  const lang = confirmationLanguage(opts.language);
   if (lang === 'sw' || lang === 'sheng') return 'Nzuri, asante. Naweza kusaidia?';
   return "I'm well, thanks. How can I help?";
 }
@@ -205,7 +207,7 @@ function looksLikeSpokenServiceDump(text) {
 function trimSpokenServiceDump(text, opts = {}) {
   const raw = String(text || '').trim();
   if (!looksLikeSpokenServiceDump(raw)) return raw;
-  const lang = opts.language || 'en';
+  const lang = confirmationLanguage(opts.language);
   if (lang === 'sw' || lang === 'sheng') {
     return 'Tunaweza kusaidia. Unahitaji huduma gani?';
   }
@@ -221,7 +223,8 @@ function trimSpokenServiceDump(text, opts = {}) {
  */
 function pickActionProgress(action, lang) {
   const a = String(action || '').toUpperCase();
-  const sw = lang === 'sw' || lang === 'sheng';
+  const spoken = confirmationLanguage(lang);
+  const sw = spoken === 'sw' || spoken === 'sheng';
   if (sw) {
     if (a === 'ESCALATE' || a === 'TRANSFER') return 'Sawa, ninashughulikia.';
     if (a === 'CREATE_REQUEST') return 'Sawa, kidogo.';
@@ -254,7 +257,7 @@ function pickClarifyProgress(opts = {}) {
   const action = String(opts.action || '').toUpperCase();
   const slot = String(opts.slot || '').toLowerCase();
   const intent = String(opts.intent || '').toLowerCase();
-  const lang = opts.language || 'en';
+  const lang = confirmationLanguage(opts.language);
   const sw = lang === 'sw' || lang === 'sheng';
   const handoff =
     intent === 'human' || action === 'ESCALATE' || action === 'TRANSFER';
@@ -278,7 +281,7 @@ function pickClarifyProgress(opts = {}) {
  * "technical issue", "on this line", or "cannot".
  */
 function pickLlmRecoveryLine(opts = {}) {
-  const lang = opts.language || 'en';
+  const lang = confirmationLanguage(opts.language);
   const sw = lang === 'sw' || lang === 'sheng';
   if (opts.alreadyOffered) {
     if (sw) return `Sawa, bado siwezi kumaliza. ${REACH_THEM_NAME_ASK_SW}`;
@@ -293,14 +296,14 @@ function pickLlmRecoveryLine(opts = {}) {
  * Local line, not a Gemini turn. English until the caller has spoken.
  */
 function pickIdleNudgeLine(opts = {}) {
-  const lang = opts.language || 'en';
+  const lang = confirmationLanguage(opts.language);
   const sw = lang === 'sw' || lang === 'sheng';
   if (sw) return 'Naweza kusaidia?';
   return 'How can I help?';
 }
 
 function pickLlmRecoverySaved(opts = {}) {
-  const lang = opts.language || 'en';
+  const lang = confirmationLanguage(opts.language);
   const sw = lang === 'sw' || lang === 'sheng';
   if (sw) return 'Sawa, nimechukua jina lako. Nitawaambia timu wakupigie.';
   return "Okay, I have your name. I'll have the team reach you.";
