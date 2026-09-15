@@ -1,6 +1,8 @@
 // Notification event model. One shape for every post-call alert.
 // Voice builds an event; dispatch renders per channel and sends.
 
+const { sanitizeStoredCallerName } = require('../conversation/callerNameQuality');
+
 const EVENTS = Object.freeze({
   LEAD: 'lead',
   ESCALATION: 'escalation',
@@ -162,32 +164,12 @@ function leadEvent({ businessName, name, reason, callerNumber, recordingUrl } = 
   };
 }
 
-const BLOCKED_OWNER_NAMES = new Set([
-  'calling',
-  'callings',
-  'haijawekwa',
-  'caller',
-  'customer',
-  'unknown',
-  'test',
-  'user',
-]);
-
-function cleanOwnerName(raw) {
-  return String(raw || '')
-    .replace(/[.,;:]+$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 /**
  * Name that is safe to put on an owner SMS. Null means print "Caller" or skip the lead.
  */
 function displayOwnerCallerName(raw) {
-  const name = cleanOwnerName(raw);
+  const name = sanitizeStoredCallerName(raw);
   if (!name || name.length < 2 || name.length > 40) return null;
-  const lower = name.toLowerCase();
-  if (BLOCKED_OWNER_NAMES.has(lower)) return null;
   if (!/^[\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3}$/u.test(name)) {
     return null;
   }
