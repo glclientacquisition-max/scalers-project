@@ -118,7 +118,7 @@ export default async function ContactsPage({
               Call{" "}
               <a
                 href={`tel:${tenant.sautikit_virtual_number}`}
-                className="font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-2 hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                className="font-medium text-[#005CCC] underline decoration-[#0096FF]/40 underline-offset-2 hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
               >
                 {tenant.sautikit_virtual_number}
               </a>

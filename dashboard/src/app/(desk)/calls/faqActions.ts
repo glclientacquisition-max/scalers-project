@@ -23,6 +23,7 @@ import {
 } from "@/lib/faqFromTranscript";
 import type { FaqEntry, TeamDirectoryEntry, TranscriptRow } from "@/lib/supabase";
 import { parseAgentTools } from "@/lib/agentTools";
+import { ownerSaveFailed } from "@/lib/ownerFacingError";
 
 export type FaqSuggestState = {
   error?: string;
@@ -122,7 +123,7 @@ export async function suggestFaqsFromCallAction(
     .order("created_at", { ascending: true });
 
   if (txErr) {
-    return { error: txErr.message };
+    return ownerSaveFailed("faq-suggest", txErr.message, "Could not load conversation.");
   }
 
   const turns = (transcripts || []) as TranscriptRow[];
@@ -256,7 +257,9 @@ export async function applyFaqSuggestionsAction(
     })
     .eq("id", tenant.id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    return ownerSaveFailed("faq-save", error.message, "Could not save FAQ.");
+  }
 
   return {
     ok: true,

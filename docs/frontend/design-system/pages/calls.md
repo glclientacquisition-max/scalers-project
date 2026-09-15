@@ -16,7 +16,7 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 - **WhatsApp:** Opens chat. List verb for return calls. On the call, primary only when there is no visit/hold and Text customers is off.
 - **Send SMS:** Write a text on the call, then send. Shows only if Text customers is on. Primary on the call when there is no visit/hold to Confirm or Done. Not a list verb (needs a body).
 
-Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Human / Answered / All. Same `FilterTabs` as Contacts.
+Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Human / Answered / All. Same `FilterTabs` as Contacts. List/Week on the visits book is the same underline tabs, not filled `btnPrimary`.
 
 **Piles (one question each):**
 - **Needs you:** Open work. A decision is still on you. Unconfirmed visits, open holds, return calls, human asked. Confirmed visits leave this pile.

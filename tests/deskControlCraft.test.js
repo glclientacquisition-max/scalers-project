@@ -82,4 +82,32 @@ describe("desk control craft", () => {
     assert.match(prompts, /filled primary CTA `#005CCC`/);
     assert.match(prompts, /ribbon\/focus\/tab underline `#0096FF`/);
   });
+
+  it("underlines the active desk destination with the ribbon", () => {
+    const nav = read("dashboard/src/components/DeskNav.tsx");
+    assert.match(nav, /border-b-2/);
+    assert.match(nav, /border-t-2/);
+    assert.match(nav, /border-\[#0096FF\] font-semibold text-\[#005CCC\]/);
+    assert.doesNotMatch(nav, /rounded-full|bg-\[#0096FF\]/);
+  });
+
+  it("does not use filled primary for Inbox List/Week", () => {
+    const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
+    assert.match(toolbar, /label="Visit layout"/);
+    assert.doesNotMatch(toolbar, /btnPrimary/);
+  });
+
+  it("keeps Add contact as the only Contacts filled primary", () => {
+    assert.match(read("dashboard/src/components/AddContactPanel.tsx"), /settingsPrimaryButtonClass/);
+    const phonebook = read("dashboard/src/components/PhonebookImportButton.tsx");
+    assert.doesNotMatch(phonebook, /ContactPickButton available primary/);
+  });
+
+  it("traps Tab inside DeskDialog without enter animation", () => {
+    const dialog = read("dashboard/src/components/ui/DeskDialog.tsx");
+    assert.match(dialog, /event\.key !== "Tab"/);
+    assert.match(dialog, /focusableIn/);
+    assert.match(dialog, /Escape/);
+    assert.doesNotMatch(dialog, /animate-|transition-all|framer-motion/);
+  });
 });

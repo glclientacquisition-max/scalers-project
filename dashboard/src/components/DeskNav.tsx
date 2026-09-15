@@ -128,11 +128,11 @@ export function DeskNav() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={[
-                "rounded-md",
+                "inline-flex items-center border-b-2 py-1",
                 focusRingVisible,
                 active
-                  ? "font-semibold text-[#005CCC]"
-                  : "font-medium text-ink hover:text-[#005CCC]",
+                  ? "border-[#0096FF] font-semibold text-[#005CCC]"
+                  : "border-transparent font-medium text-ink hover:border-line hover:text-[#005CCC]",
               ].join(" ")}
             >
               {item.label}
@@ -163,11 +163,11 @@ export function DeskTabBar() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={[
-                  "flex min-h-12 flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[11px] leading-none",
+                  "flex min-h-12 flex-col items-center justify-center gap-0.5 border-t-2 px-1 pt-1.5 text-[11px] leading-none",
                   focusRingVisible,
                   active
-                    ? "font-semibold text-[#005CCC]"
-                    : "font-medium text-ink-soft",
+                    ? "border-[#0096FF] font-semibold text-[#005CCC]"
+                    : "border-transparent font-medium text-ink-soft",
                 ].join(" ")}
               >
                 <TabIcon name={item.label} />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import { btnGhost, btnPrimary, deskFieldClass, pageTitleClass } from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 
 export function InboxToolbar({
@@ -78,25 +78,27 @@ export function InboxToolbar({
       />
 
       {active === "job" ? (
-        <nav aria-label="Visit layout" className="flex gap-2">
-          <Link
-            href={callsHref({ purpose: "job", q: q || undefined })}
-            className={!weekView ? btnPrimary : btnGhost}
-          >
-            List
-          </Link>
-          <Link
-            href={callsHref({
-              purpose: "job",
-              q: q || undefined,
-              view: "week",
-              week,
-            })}
-            className={weekView ? btnPrimary : btnGhost}
-          >
-            Week
-          </Link>
-        </nav>
+        <FilterTabs
+          label="Visit layout"
+          active={weekView ? "week" : "list"}
+          items={[
+            {
+              id: "list",
+              label: "List",
+              href: callsHref({ purpose: "job", q: q || undefined }),
+            },
+            {
+              id: "week",
+              label: "Week",
+              href: callsHref({
+                purpose: "job",
+                q: q || undefined,
+                view: "week",
+                week,
+              }),
+            },
+          ]}
+        />
       ) : null}
 
       {q ? (

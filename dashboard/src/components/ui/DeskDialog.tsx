@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { focusRingVisible } from "@/components/ui/deskChrome";
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function focusableIn(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => el.getClientRects().length > 0
+  );
+}
 
 /**
  * Occasional overlay. No enter animation (desk motion is pending + bulletin only).
- * Escape closes. Focus moves to the panel, then returns to the opener.
+ * Escape closes. Tab stays inside. Focus returns to the opener.
  */
 export function DeskDialog({
   title,
@@ -27,18 +37,42 @@ export function DeskDialog({
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
+    const panel = panelRef.current;
+    panel?.focus();
 
-    function onKey(event: KeyboardEvent) {
+    function trap(event: KeyboardEvent) {
       if (event.key === "Escape" && !pending) {
         event.preventDefault();
         onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !panel) return;
+
+      const items = focusableIn(panel);
+      if (!items.length) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey) {
+        if (active === first || active === panel || !panel.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || active === panel || !panel.contains(active)) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", trap);
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", trap);
       previous?.focus?.();
     };
   }, [onClose, pending]);
@@ -75,7 +109,7 @@ export function DeskDialog({
             onClick={() => {
               if (!pending) onClose();
             }}
-            className="rounded-lg px-2 py-1 text-sm text-ink-soft hover:bg-surface-canvas hover:text-ink"
+            className={`rounded-lg px-2 py-1 text-sm text-ink-soft hover:bg-surface-canvas hover:text-ink ${focusRingVisible}`}
             aria-label="Close"
           >
             Close
