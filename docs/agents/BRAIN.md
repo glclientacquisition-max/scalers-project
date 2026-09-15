@@ -82,6 +82,10 @@ Core runtime modules:
 - Manual: change settings → compile → place a test call; confirm CONTEXT HEADER / ground truth behavior
 - Do not require `npm run test:voice` unless you touched media path (you shouldn’t)
 
+## Related
+
+Caller-experience excellence vs live gaps: [`CALLER_EXPERIENCE_EXCELLENCE.md`](./CALLER_EXPERIENCE_EXCELLENCE.md).
+
 ## Chat starter
 
 ```
@@ -101,3 +105,4 @@ Task: <one concrete brain / knowledge / prompt improvement>
 - Bulletin + closed-mode reply quality
 - FAQ extraction quality from transcripts
 - Split Gemini tool parsing out of `server.js` into `src/conversation/`
+- One CX factor from [`CALLER_EXPERIENCE_EXCELLENCE.md`](./CALLER_EXPERIENCE_EXCELLENCE.md) (one character, one PR)
