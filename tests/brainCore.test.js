@@ -164,6 +164,18 @@ describe('Brain state and next-best-action', () => {
     assert.equal(opening.intent, 'hours');
   });
 
+  it('does not treat how-are-you as the caller goal or a service pitch cue', () => {
+    const state = observeCallerTurn(createBrainState({ vertical: 'home_services' }), {
+      text: 'How are you doing, Shy?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    assert.equal(state.conversation.phatic, true);
+    assert.equal(state.goal.description, null);
+    assert.match(formatBrainStateForPrompt(state), /Phatic turn/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /How are you doing, Shy/);
+  });
+
   it('does not treat pardon as a booking name', () => {
     const {
       isHearAgainSignal,

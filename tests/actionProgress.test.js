@@ -9,6 +9,9 @@ const {
   looksLikeCallerName,
   looksLikePhaticCallerTurn,
   shouldSpeakThinkingAck,
+  pickPhaticReply,
+  looksLikeSpokenServiceDump,
+  trimSpokenServiceDump,
 } = require('../src/conversation/dynamicSpeech');
 
 assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay, one moment.');
@@ -25,6 +28,25 @@ assert.equal(looksLikePhaticCallerTurn('how much for a couch?'), false);
 assert.equal(shouldSpeakThinkingAck('How are you doing?'), false);
 assert.equal(shouldSpeakThinkingAck('How are you doing, Shy?'), false);
 assert.equal(shouldSpeakThinkingAck('How much for a couch?'), true);
+assert.equal(pickPhaticReply({ language: 'en' }), "I'm well, thanks. How can I help?");
+assert.equal(pickPhaticReply({ language: 'sw' }), 'Nzuri, asante. Naweza kusaidia?');
+assert.doesNotMatch(pickPhaticReply({ language: 'en' }), /carpet|couch|mattress/i);
+assert.equal(
+  looksLikeSpokenServiceDump(
+    "I'm doing well, thank you! We specialize in couch, carpet, and mattress cleaning."
+  ),
+  true
+);
+assert.equal(
+  trimSpokenServiceDump(
+    "I'm doing well, thank you! We specialize in couch, carpet, and mattress cleaning."
+  ),
+  'We can help with that. What do you need done?'
+);
+assert.equal(
+  looksLikeSpokenServiceDump('We clean carpets. What time works?'),
+  false
+);
 assert.match(
   pickClarifyProgress({
     action: 'ASK_CLARIFICATION',

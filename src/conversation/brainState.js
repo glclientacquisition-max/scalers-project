@@ -8,6 +8,7 @@ const {
   applyCallerNameConfirmation,
 } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt } = require('./goalModel');
+const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
 const {
   isRepairSignal,
   applyRepairObservation,
@@ -216,6 +217,7 @@ function createBrainState(profile = {}) {
       questionsAsked: [],
       answersReceived: [],
       hearAgain: false,
+      phatic: false,
     },
     emotion: {
       state: 'neutral',
@@ -277,6 +279,7 @@ function observeCallerTurn(state, input = {}) {
   next.conversation.turnCount += 1;
   next.conversation.stage = next.goal.status === 'unknown' ? 'discovery' : 'understanding';
   next.conversation.hearAgain = isHearAgainSignal(text);
+  next.conversation.phatic = looksLikePhaticCallerTurn(text);
   if (text) next.conversation.answersReceived.push(text);
   next.conversation.answersReceived = next.conversation.answersReceived.slice(-8);
 
@@ -305,7 +308,10 @@ function observeCallerTurn(state, input = {}) {
 
   next.intent = intent;
   next.goal.primary = GOAL_BY_INTENT[intent] || 'resolve_enquiry';
-  const usableGoalText = text && !isBackchannelOrFragment(text) ? text : '';
+  const usableGoalText =
+    text && !isBackchannelOrFragment(text) && !looksLikePhaticCallerTurn(text)
+      ? text
+      : '';
   if (
     usableGoalText &&
     (!next.goal.description ||
@@ -543,6 +549,9 @@ function formatBrainStateForPrompt(state) {
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
     formatHearAgainForPrompt(value),
+    value.conversation?.phatic
+      ? '- Phatic turn: they only greeted or asked how you are. One short well, then How can I help. Do not list services, prices, or jobs.'
+      : '',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
     `- Resolution: ${value.resolution.status}`,
     `- NEXT BEST ACTION: ${value.resolution.nextBestAction} — ${value.resolution.reason}`,
