@@ -13,6 +13,12 @@ const DIRECT_ANSWER_INTENTS = new Set([
 
 const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
 
+function looksLikeExistingVisitTalk(value) {
+  return /\b(my visit|my appointment|the visit|that visit|ziara yangu|ile ziara|still coming|confirm(ing)? (the |my )?(visit|appointment))\b/i.test(
+    String(value || '')
+  );
+}
+
 function determineNextBestAction({ state, capabilities = {} } = {}) {
   const intent = String(state?.intent || 'unknown');
   const repairCount = Number(state?.repair?.failureCount || 0);
@@ -59,6 +65,36 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       slot: 'name_spelling',
       reason: `Heard a collision name; ask once: ${nameCollision.join(' or ')}?`,
     };
+  }
+
+  if (intent === 'unknown' || intent === 'general_enquiry') {
+    const returning = state?.returning;
+    if (returning?.sharedLine && state?.caller?.nameConfirmed !== true) {
+      return {
+        action: ACTIONS.ASK_CLARIFICATION,
+        slot: 'name',
+        reason: 'Shared line. Ask who is speaking. Do not use the file name.',
+      };
+    }
+    const said = String(state?.goal?.description || '');
+    const followUp =
+      intent === 'unknown' ||
+      Boolean(state?.conversation?.phatic) ||
+      looksLikeExistingVisitTalk(said);
+    if (followUp && returning?.nextVisit && !returning.sharedLine) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'Unique returning line with an open visit. Speak to that visit. Do not start a new book or re-ask the name. If they want it moved, collect only the new when.',
+      };
+    }
+    if (intent === 'unknown' && returning?.lastReason && !returning.sharedLine) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'Unique returning line. Use last reason unless they have a new ask. Do not re-ask the name.',
+      };
+    }
   }
 
   if (intent === 'unknown') {

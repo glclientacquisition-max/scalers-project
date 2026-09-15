@@ -10,6 +10,11 @@ const {
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
 const {
+  formatReturningFileForCallState,
+  seedCallerFromMemory,
+  returningFileFromCard,
+} = require('./callerMemory');
+const {
   isRepairSignal,
   applyRepairObservation,
   markRepairProgress,
@@ -106,6 +111,18 @@ function looksLikeBookingIntent(value, vertical = '') {
   );
 }
 
+function looksLikeCancelOrReschedule(value) {
+  return /\b(cancel|cancelled|cancellation|reschedule|change my|move my|move (the |that |my )?(visit|appointment|booking|ziara)|change (the )?(time|date|appointment|visit)|badilisha|ahirisha|sitaki hiyo|futa (appointment|booking|ziara))\b/i.test(
+    value
+  );
+}
+
+function looksLikeExistingVisitTalk(value) {
+  return /\b(my visit|my appointment|the visit|that visit|ziara yangu|ile ziara|still coming|confirm(ing)? (the |my )?(visit|appointment))\b/i.test(
+    value
+  );
+}
+
 function inferIntent(text, opts = {}) {
   const value = String(text || '').trim().toLowerCase();
   const vertical = String(opts.vertical || '').toLowerCase();
@@ -120,6 +137,10 @@ function inferIntent(text, opts = {}) {
   }
   if (looksLikeHomeEmergency(value)) {
     return 'human';
+  }
+  if (looksLikeCancelOrReschedule(value)) return 'cancellation';
+  if (opts.returning?.nextVisit && looksLikeExistingVisitTalk(value)) {
+    return 'general_enquiry';
   }
   // Appointment-style booking: check BEFORE location so "book carpet cleaning... landmark is Barnabas"
   // is classified as booking rather than being hijacked by "landmark" into location.
@@ -154,7 +175,6 @@ function inferIntent(text, opts = {}) {
   if (/\b(order|buy|purchase|nataka kununua|ninaorder)\b/.test(value)) {
     return 'order';
   }
-  if (/\b(cancel|reschedule|change my|move my)\b/.test(value)) return 'cancellation';
   if (
     /\b(recommend|suggestion|which book|what book|do you sell|mnauza|children'?s? books?|genre|philosophy)\b/.test(
       value
@@ -175,7 +195,6 @@ function languageConfidence(detected) {
 }
 
 function createBrainState(profile = {}) {
-  const { seedCallerFromMemory } = require('./callerMemory');
   const caller = seedCallerFromMemory(
     {
       name: null,
@@ -193,6 +212,7 @@ function createBrainState(profile = {}) {
       nameConfirmed: Boolean(caller.nameConfirmed),
       nameCollision: Array.isArray(caller.nameCollision) ? caller.nameCollision : null,
     },
+    returning: returningFileFromCard(profile.callerMemory),
     language: {
       current: 'unknown',
       detected: 'unknown',
@@ -251,8 +271,12 @@ function createBrainState(profile = {}) {
 function observeCallerTurn(state, input = {}) {
   let next = structuredClone(state || createBrainState(input.profile));
   const text = String(input.text || '').trim();
+  if (!next.returning && input.profile?.callerMemory) {
+    next.returning = returningFileFromCard(input.profile.callerMemory);
+  }
   const inferredIntent = inferIntent(text, {
     vertical: next.vertical || input.profile?.vertical,
+    returning: next.returning,
   });
   const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
   const fillingBookingLandmark =
@@ -356,6 +380,19 @@ function observeCallerTurn(state, input = {}) {
     };
   }
   if (entityValue(next.entities.phone)) next.caller.phone = entityValue(next.entities.phone);
+
+  if (
+    next.intent === 'cancellation' &&
+    next.returning?.nextVisit &&
+    !entityValue(next.entities.reference)
+  ) {
+    next.entities.reference = {
+      value: next.returning.nextVisit,
+      source: 'caller_memory',
+      confidence: 0.9,
+      confirmed: true,
+    };
+  }
 
   const addedEntity = Object.keys(next.entities).some(
     (key) => !previousEntityKeys.has(key)
@@ -549,8 +586,13 @@ function formatBrainStateForPrompt(state) {
     `- ${formatRepairForPrompt(value)}`,
     formatNameConfirmForPrompt(value),
     formatHearAgainForPrompt(value),
+    formatReturningFileForCallState(value.returning),
     value.conversation?.phatic
-      ? '- Phatic turn: they only greeted or asked how you are. One short well, then How can I help. Do not list services, prices, or jobs.'
+      ? value.returning?.sharedLine
+        ? '- Phatic turn: one short well, then who is calling. Do not list services.'
+        : value.returning?.nextVisit
+          ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
+          : '- Phatic turn: they only greeted or asked how you are. One short well, then How can I help. Do not list services, prices, or jobs.'
       : '',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
     `- Resolution: ${value.resolution.status}`,
@@ -566,6 +608,7 @@ module.exports = {
   inferIntent,
   looksLikeHomeEmergency,
   looksLikeBookingIntent,
+  looksLikeCancelOrReschedule,
   observeCallerTurn,
   setNextBestAction,
   recordRepairFailure,
