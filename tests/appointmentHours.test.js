@@ -10,6 +10,7 @@ const {
   resolveAppointmentWhen,
   evaluateAppointmentHours,
   classifyInstant,
+  formatRequestedWhenLabel,
 } = require('../src/conversation/appointmentHours');
 
 const schedule = defaultHoursSchedule();
@@ -214,6 +215,17 @@ describe('evaluateAppointmentHours', () => {
     });
     assert.equal(out.code, 'unparsed_when');
     assert.equal(out.valid, false);
+  });
+
+  it('formats requested when in Kiswahili weekday names', () => {
+    const out = evaluateAppointmentHours({
+      whenText: 'Tuesday 10 AM',
+      schedule,
+      now: TUE_11,
+    });
+    assert.equal(formatRequestedWhenLabel(out, 'en'), 'Tuesday at 10 AM');
+    assert.equal(formatRequestedWhenLabel(out, 'sw'), 'Jumanne, 10 AM');
+    assert.equal(formatRequestedWhenLabel(out, 'mixed'), 'Jumanne, 10 AM');
   });
 });
 

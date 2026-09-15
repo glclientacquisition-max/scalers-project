@@ -8,6 +8,7 @@ const {
   openClosedStatus,
   timeToMinutes,
 } = require('./businessHours');
+const { confirmationLanguage } = require('./language');
 
 const CODES = Object.freeze({
   valid: 'valid',
@@ -26,6 +27,22 @@ const FULL_DAY = {
   fri: 'Friday',
   sat: 'Saturday',
 };
+
+const SW_FULL_DAY = {
+  sun: 'Jumapili',
+  mon: 'Jumatatu',
+  tue: 'Jumanne',
+  wed: 'Jumatano',
+  thu: 'Alhamisi',
+  fri: 'Ijumaa',
+  sat: 'Jumamosi',
+};
+
+function weekdaySpoken(weekdayKey, language = 'en') {
+  const key = String(weekdayKey || '').toLowerCase();
+  if (confirmationLanguage(language) === 'en') return FULL_DAY[key] || '';
+  return SW_FULL_DAY[key] || FULL_DAY[key] || '';
+}
 
 const WEEKDAY_RE = {
   sun: /\b(sunday|jumapili)\b/i,
@@ -264,22 +281,29 @@ function evaluateAppointmentHours({ whenText, schedule, now = new Date() } = {})
   };
 }
 
-function formatRequestedWhenLabel(hours) {
+function formatRequestedWhenLabel(hours, language = 'en') {
   const resolved = hours?.resolved;
   if (!resolved || resolved.isNow) return '';
-  const day = resolved.weekdayLong || FULL_DAY[resolved.weekday] || '';
+  const lang = confirmationLanguage(language);
+  const day =
+    weekdaySpoken(resolved.weekday, lang) ||
+    resolved.weekdayLong ||
+    FULL_DAY[resolved.weekday] ||
+    '';
   const time = minutesToHour12(resolved.minutesSinceMidnight);
   if (!day || !time) return '';
-  return `${day} at ${time}`;
+  return lang === 'en' ? `${day} at ${time}` : `${day}, ${time}`;
 }
 
 module.exports = {
   CODES,
   FULL_DAY,
+  SW_FULL_DAY,
   resolveAppointmentWhen,
   evaluateAppointmentHours,
   classifyInstant,
   nextOpenDay,
   formatRequestedWhenLabel,
+  weekdaySpoken,
   minutesToHour12,
 };

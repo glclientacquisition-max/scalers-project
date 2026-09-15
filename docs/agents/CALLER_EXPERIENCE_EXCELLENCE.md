@@ -175,7 +175,9 @@ Ranked by how much they break trust on a live Kenyan call. Each is a **conversat
 
 **Bar:** After the first Kiswahili turn, questions, hours, closed lines, and tool outcomes stay Kiswahili until they switch.
 
-**Not yet:** Invite on open is shipped. Match on job-noun turns is shipped. Outcome speech, repair, escalate confirm, and SMS are still English-shaped. Sheng is “light” in rules, not proven live.
+**Now in runtime:** After the first Kiswahili (or mixed) turn, visit save, closed-day, hours, and escalate confirm lines use Kiswahili. Weekdays in those lines are Jumapili…Jumamosi. Mixed language uses the Kiswahili outcome set. Sheng keeps Sheng lines. Instant greeting stays English-first.
+
+**Still live:** SMS templates can stay English-shaped. Model repair that bypasses backend confirm can still drift. Prove on DID pack #13.
 
 **Lane:** Brain. Live pack #13 plus SW backend lines.
 

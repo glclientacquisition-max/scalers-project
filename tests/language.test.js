@@ -5,6 +5,8 @@ const {
   resolveLanguageState,
   createLanguageState,
   languageDirective,
+  confirmationLanguage,
+  pickFillerText,
 } = require('../src/conversation/language');
 
 describe('caller language (Kiswahili)', () => {
@@ -48,5 +50,17 @@ describe('caller language (Kiswahili)', () => {
     state = resolveLanguageState(state, analyzeCallerLanguage('sawa'));
     assert.equal(state.current, 'en');
     assert.equal(state.pending, 'sw');
+  });
+});
+
+describe('confirmationLanguage', () => {
+  it('maps mixed to Kiswahili for backend spoken outcomes', () => {
+    assert.equal(confirmationLanguage('sw'), 'sw');
+    assert.equal(confirmationLanguage('sheng'), 'sheng');
+    assert.equal(confirmationLanguage('mixed'), 'sw');
+    assert.equal(confirmationLanguage('en'), 'en');
+    assert.equal(confirmationLanguage('unknown'), 'en');
+    assert.equal(pickFillerText('mixed'), 'Kidogo…');
+    assert.equal(pickFillerText('en'), 'One moment…');
   });
 });
