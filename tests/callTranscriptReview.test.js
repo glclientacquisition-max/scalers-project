@@ -80,7 +80,33 @@ describe('parseReviewJson', () => {
     assert.equal(parsed.needs_human, false);
     assert.doesNotMatch(parsed.reason, /[\u2014\u2013]/);
     assert.match(parsed.reason, /Atomic Habits/);
+    assert.equal(parsed.want, parsed.reason);
+    assert.equal(parsed.done, 'None.');
+    assert.equal(parsed.next, 'None.');
+    assert.equal(parsed.mood, 'unknown');
     assert.equal(parsed.confidence, 0.91);
+  });
+
+  it('parses want, done, mood, and next', () => {
+    const parsed = parseReviewJson(
+      JSON.stringify({
+        want: 'Colin booked a mattress cleaning visit for tomorrow at 10 AM at Degrees Apartments.',
+        done: 'Visit saved.',
+        mood: 'calm',
+        next: 'Confirm the visit.',
+        reason: 'Colin booked a visit tomorrow.',
+        primary_intent: 'book_visit',
+        needs_human: false,
+        needs_owner: false,
+        urgent: false,
+        confidence: 0.94,
+      })
+    );
+    assert.match(parsed.want, /mattress cleaning visit/);
+    assert.equal(parsed.done, 'Visit saved.');
+    assert.equal(parsed.mood, 'calm');
+    assert.equal(parsed.next, 'Confirm the visit.');
+    assert.match(parsed.reason, /booked a visit tomorrow/);
   });
 
   it('maps callback aliases onto human intent', () => {
@@ -113,6 +139,7 @@ describe('mergeTranscriptReview', () => {
     });
     assert.equal(merged.applied.reason, true);
     assert.match(merged.reason, /Atomic Habits/);
+    assert.match(merged.want, /Atomic Habits/);
     assert.equal(merged.resolution, 'resolved');
     assert.equal(merged.primaryIntent, 'hold_or_pickup');
   });
@@ -296,6 +323,9 @@ describe('runPostCallTranscriptReview', () => {
     assert.equal(result.ok, true);
     assert.equal(saved.length, 1);
     assert.match(saved[0].merged.reason, /Sunday/);
+    assert.match(saved[0].merged.want, /Sunday/);
+    assert.equal(saved[0].merged.done, 'None.');
+    assert.equal(saved[0].merged.next, 'None.');
     assert.equal(saved[0].merged.resolution, 'resolved');
   });
 
@@ -525,8 +555,11 @@ describe('post-call contact persist and name extract', () => {
         generateNameText: async () => 'Colin',
         generateText: async () =>
           JSON.stringify({
-            reason:
-              'Colin booked a mattress cleaning visit for tomorrow at 10 AM at Degrees Apartments in Rongai.',
+            want: 'Colin booked a mattress cleaning visit for tomorrow at 10 AM at Degrees Apartments in Rongai.',
+            done: 'Visit saved.',
+            mood: 'calm',
+            next: 'Confirm the visit.',
+            reason: 'Colin booked a visit tomorrow.',
             primary_intent: 'book_visit',
             needs_human: false,
             needs_owner: false,
@@ -551,6 +584,10 @@ describe('post-call contact persist and name extract', () => {
     const last = upserts[upserts.length - 1];
     assert.match(last.lastReason, /mattress cleaning visit/);
     assert.doesNotMatch(last.lastReason, /unajua/);
+    assert.doesNotMatch(last.lastReason, /booked a visit tomorrow\.$/);
+    assert.match(result.review.merged.want, /mattress cleaning visit/);
+    assert.equal(result.review.review.done, 'Visit saved.');
+    assert.equal(result.review.review.mood, 'calm');
   });
 
   it('extractCallerNameFromTranscript maps NONE and a real name', async () => {

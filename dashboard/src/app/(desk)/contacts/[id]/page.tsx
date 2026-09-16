@@ -6,6 +6,7 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
 import { displayContactLastReason } from "@/lib/callSummarySentence";
+import { CallSummaryCard } from "@/components/CallSummaryCard";
 
 function kindLabel(kind: "call" | "request" | "appointment"): string {
   if (kind === "request") return "Request";
@@ -35,7 +36,7 @@ export default async function ContactDetailPage({
     name: contact.name,
     phone: contact.phone,
     lastReason: contact.last_reason,
-    latestCallReason: latestCall?.ownerReason || null,
+    latestCallReason: latestCall?.ownerWant || latestCall?.ownerReason || null,
   });
   return (
     <div className="max-w-6xl">
@@ -59,9 +60,22 @@ export default async function ContactDetailPage({
             <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
               Last reason
             </h2>
-            <p className="mt-3 text-base leading-relaxed text-ink">
-              {lastReason || "None"}
-            </p>
+            {latestCall?.ownerCard || lastReason ? (
+              <CallSummaryCard
+                name={contact.name}
+                callerNumber={contact.phone || "unknown"}
+                want={
+                  latestCall?.ownerCard?.want ||
+                  latestCall?.ownerWant ||
+                  contact.last_reason
+                }
+                done={latestCall?.ownerCard?.done}
+                mood={latestCall?.ownerCard?.mood}
+                next={latestCall?.ownerCard?.next}
+              />
+            ) : (
+              <p className="mt-3 text-base leading-relaxed text-ink">None</p>
+            )}
           </section>
 
           <section className="rounded-2xl border border-line bg-surface p-5">

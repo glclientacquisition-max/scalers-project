@@ -2,7 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseSummary } from "@/lib/supabase";
 import {
   displayContactLastReason,
+  pickCallOwnerCard,
   pickCallOwnerReason,
+  pickCallOwnerWant,
 } from "@/lib/callSummarySentence";
 
 export type ContactRow = {
@@ -31,6 +33,13 @@ export type ContactTimelineEntry = {
   callId: string | null;
   status: string | null;
   ownerReason?: string | null;
+  ownerWant?: string | null;
+  ownerCard?: {
+    want: string | null;
+    done: string | null;
+    mood: string | null;
+    next: string | null;
+  } | null;
 };
 
 const CONTACT_SELECT =
@@ -188,7 +197,7 @@ async function loadLastContactMap(
     if (!reasonByPhone.has(phone)) {
       reasonByPhone.set(
         phone,
-        pickCallOwnerReason(parseSummary(row.summary as string | null))
+        pickCallOwnerWant(parseSummary(row.summary as string | null))
       );
     }
   }
@@ -285,9 +294,11 @@ export async function loadContactTimeline(
   const seenAppt = new Set<string>();
 
   for (const row of callsRes.data || []) {
-    const ownerReason = pickCallOwnerReason(
-      parseSummary(typeof row.summary === "string" ? row.summary : null)
+    const meta = parseSummary(
+      typeof row.summary === "string" ? row.summary : null
     );
+    const ownerWant = pickCallOwnerWant(meta);
+    const ownerReason = pickCallOwnerReason(meta);
     entries.push({
       id: `call:${row.id}`,
       kind: "call",
@@ -297,8 +308,9 @@ export async function loadContactTimeline(
           name: contact.name,
           phone: contact.phone,
           lastReason: null,
-          latestCallReason: ownerReason,
+          latestCallReason: ownerWant || ownerReason,
         }) ||
+        ownerWant ||
         ownerReason ||
         row.primary_intent ||
         "Call",
@@ -306,6 +318,8 @@ export async function loadContactTimeline(
       callId: row.id,
       status: row.status || null,
       ownerReason,
+      ownerWant,
+      ownerCard: pickCallOwnerCard(meta),
     });
   }
 
