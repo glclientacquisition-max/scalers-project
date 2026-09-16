@@ -28,7 +28,8 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | WhatsApp glyph | `--whatsapp` `#25D366` | `whatsapp` |
 | Focus glow | `--shadow-focus` | `shadow-focus` |
 | Desk header | `--desk-header-h` | `top-[var(--desk-header-h)]` |
-| Desk tab bar | `--desk-tabbar-h` | `3.25rem` below `md`, `0` from `md`. Phone `main` padding and sticky bottom chrome use this plus `safe-area-inset-bottom`. |
+| Desk tab bar | `--desk-tabbar-h` | `4rem` below `md`, `0` from `md`. Matches `DeskTabBar` min-height. |
+| Desk tab clearance | `--desk-tabbar-clearance` | Phone: tab bar plus `safe-area-inset-bottom` plus `1.5rem`. From `md`: `2.5rem`. Phone `main` padding, `scroll-padding-bottom`, and sticky bottom chrome use this. |
 | Max width | | `max-w-desk` (72rem) |
 | Radius | | `rounded-panel` (0.875rem) |
 
@@ -77,7 +78,7 @@ The desk (`app/(desk)`) ships a dark palette; marketing, auth, onboarding, and a
 
 Use Tailwind utilities. CSS variables exist so sticky chrome and docs stay aligned.
 
-Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below `md`, `main` also clears `--desk-tabbar-h` plus `safe-area-inset-bottom`. Child pages start at `mt-0`. Double padding is a defect.
+Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below `md`, `main` also clears `--desk-tabbar-clearance`. Child pages start at `mt-0`. Double padding is a defect.
 
 ---
 

@@ -72,7 +72,7 @@ Base unit **8px**, same as IBM Carbon, Atlassian, and Material. Tailwind already
 | Group / cell | 16 | `px-4` / `gap-4` | Table cell padding, form field stack |
 | Block | 24 | `mt-6` / `gap-6` | Title to table, filter to list |
 | Section | 32–40 | `py-8` / `mt-8` | Rare on desk. Prefer 24. |
-| Page frame | 16 / 24 | `px-4 pt-6 sm:px-6 sm:pt-10` | Desk `main` only. Pages do not double-pad. Phone `main` adds `--desk-tabbar-h` plus `safe-area-inset-bottom` so the last row is not under the tab bar. |
+| Page frame | 16 / 24 | `px-4 pt-6 sm:px-6 sm:pt-10` | Desk `main` only. Pages do not double-pad. Phone `main` uses `--desk-tabbar-clearance` (tab bar height plus safe area plus 1.5rem) so the last control is not under the tab bar. |
 
 **Proximity rule:** If two controls complete one task, they sit ≤16px apart (Fitts + docking). If they are different tasks, ≥24px.
 
@@ -115,7 +115,7 @@ No Plus Jakarta Sans. No third family. No purple.
 
 ## 6. Information architecture
 
-Keep URLs. Nav is Overview, Inbox, Contacts, Business Profile, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product.
+Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product. The `/settings` page identity is Business Profile.
 
 | Route | Job | Layout |
 | --- | --- | --- |

@@ -76,6 +76,31 @@ describe("business settings craft", () => {
     assert.match(form, /showBack/);
   });
 
+  it("shows catalog cards below md and the table from md up", () => {
+    assert.doesNotMatch(form, /className="hidden space-y-3 md:hidden"/);
+    assert.match(form, /className="space-y-3 md:hidden"/);
+    assert.match(form, /svc-name-m-/);
+    assert.match(form, /svc-notes-m-/);
+    assert.match(form, /svc-oos-m-/);
+    assert.match(form, /prod-name-m-/);
+    assert.match(form, /prod-cat-m-/);
+    assert.match(form, /className="hidden md:block overflow-hidden rounded-xl border border-line"/);
+    assert.match(form, /min-w-\[720px\]/);
+    assert.match(form, /min-w-\[640px\]/);
+  });
+
+  it("wraps location area and coverage so long values stay readable", () => {
+    assert.match(form, /htmlFor={`loc-address-\${index}`}/);
+    assert.match(form, /id={`loc-address-\${index}`}/);
+    assert.match(form, /id={`loc-coverage-\${index}`}/);
+    const addressIdx = form.indexOf("id={`loc-address-${index}`}");
+    const coverageIdx = form.indexOf("id={`loc-coverage-${index}`}");
+    assert.ok(addressIdx > 0 && coverageIdx > addressIdx);
+    assert.match(form.slice(addressIdx - 80, addressIdx + 40), /<ExpandTextarea/);
+    assert.match(form.slice(coverageIdx - 80, coverageIdx + 40), /<ExpandTextarea/);
+    assert.match(form, /min-w-0 break-words/);
+  });
+
   it("defines hover, focus, and active on settings primitives", () => {
     assert.match(ui, /SettingsPageHeader/);
     assert.match(ui, /settingsPrimaryButtonClass/);
