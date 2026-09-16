@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import type { OnboardingTone } from "@/lib/onboarding";
 import { TONE_LABELS } from "@/lib/onboarding";
@@ -88,12 +89,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
-import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
 import { btnPrimary } from "@/components/ui/deskChrome";
-import {
-  parseNotifyChannels,
-  type NotifyChannels,
-} from "@/lib/notifyChannels";
 import {
   ExpandTextarea,
   SettingsPageHeader,
@@ -124,7 +120,10 @@ import {
   objectUrlFromPreviewResponse,
   previewErrorCopy,
 } from "@/lib/previewAudio";
-import type { SettingsPanel } from "@/lib/businessSettingsNav";
+import {
+  businessSettingsHref,
+  type SettingsPanel,
+} from "@/lib/businessSettingsNav";
 
 export type { SettingsPanel } from "@/lib/businessSettingsNav";
 
@@ -315,13 +314,6 @@ export function TenantForm({
       ? curatedVoices
       : listCuratedSonioxVoicesSync();
   const [businessName, setBusinessName] = useState(tenant.business_name || "");
-  const [ownerWhatsapp, setOwnerWhatsapp] = useState(
-    tenant.whatsapp_notification_number || ""
-  );
-  const [alertEmail, setAlertEmail] = useState(tenant.alert_email || "");
-  const [notifyChannels, setNotifyChannels] = useState<NotifyChannels>(() =>
-    parseNotifyChannels(tenant.notify_channels)
-  );
   const [servicesNotes, setServicesNotes] = useState(() =>
     extractServicesNotes(tenant.services_offered || "")
   );
@@ -755,13 +747,6 @@ export function TenantForm({
 
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
-      <input type="hidden" name="whatsapp_notification_number" value={ownerWhatsapp} />
-      <input type="hidden" name="alert_email" value={alertEmail} />
-      <input
-        type="hidden"
-        name="notify_channels"
-        value={JSON.stringify(notifyChannels)}
-      />
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />
       <input type="hidden" name="product_catalog" value={productsJson} />
@@ -859,62 +844,6 @@ export function TenantForm({
                 );
               })}
             </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <p className={settingsBlockTitleClass}>Alerts</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-medium text-ink-soft" htmlFor="owner">
-                SMS phone
-              </label>
-              <input
-                id="owner"
-                value={ownerWhatsapp}
-                onChange={(e) => setOwnerWhatsapp(e.target.value)}
-                placeholder="+254 700 000 000"
-                className={`${denseFieldClass} mt-1`}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-soft" htmlFor="alert_email">
-                Email
-              </label>
-              <input
-                id="alert_email"
-                type="email"
-                value={alertEmail}
-                onChange={(e) => setAlertEmail(e.target.value)}
-                placeholder="owner@shop.co.ke"
-                className={`${denseFieldClass} mt-1`}
-              />
-            </div>
-          </div>
-          <NotifyChannelPicker
-            value={notifyChannels}
-            onChange={setNotifyChannels}
-            heading={null}
-          />
-          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
-            <p className="text-sm font-medium text-ink">Text customers</p>
-            <ToolSwitch
-              checked={Boolean(notifyChannels.caller_sms)}
-              onChange={(next) =>
-                setNotifyChannels({ ...notifyChannels, caller_sms: next })
-              }
-              label="Text customers"
-            />
-          </div>
-          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
-            <p className="text-sm font-medium text-ink">Text back missed calls</p>
-            <ToolSwitch
-              checked={Boolean(notifyChannels.missed_textback)}
-              onChange={(next) =>
-                setNotifyChannels({ ...notifyChannels, missed_textback: next })
-              }
-              label="Text back missed calls"
-            />
           </div>
         </div>
 
@@ -1912,24 +1841,16 @@ export function TenantForm({
         </div>
         <div className="space-y-2">
           <p className={settingsBlockTitleClass}>Handoff</p>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff">
-            {HANDOFF_OPTIONS.map((opt) => {
-              const selected = handoffMode === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  title={opt.blurb}
-                  onClick={() => setHandoffMode(opt.id)}
-                  className={choiceChipClass(selected)}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+          <p className="text-sm font-medium text-ink">
+            {HANDOFF_OPTIONS.find((opt) => opt.id === handoffMode)?.label ||
+              "Message teammate"}
+          </p>
+          <Link
+            href={businessSettingsHref("train", "team")}
+            className="inline-flex min-h-11 items-center text-sm font-medium text-accent-deep transition duration-150 hover:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            Change in Team
+          </Link>
         </div>
       </section>
 

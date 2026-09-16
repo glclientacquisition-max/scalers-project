@@ -159,7 +159,7 @@ export function SettingsBackLink() {
           strokeLinejoin="round"
         />
       </svg>
-      Business
+      Business Profile
     </Link>
   );
 }
@@ -182,7 +182,7 @@ export function SettingsPageHeader({
       <div className="min-w-0">
         {showBack ? <SettingsBackLink /> : null}
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
-          Business
+          Business Profile
         </p>
         <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink [overflow-wrap:anywhere]">
           {businessName}

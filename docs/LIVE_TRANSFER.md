@@ -194,7 +194,7 @@ Resolution: keep `needs_human`. If bridged, desk can still show `needs_human` pl
 
 ## 7. Desk UX (Train → Escalation Team)
 
-Settings already persist `handoff_mode` (`callback` | `live_transfer`). The owner control lives on **Business → Train → Escalation Team**, next to the team directory (not under Tools & voice).
+Settings already persist `handoff_mode` (`callback` | `live_transfer`). The owner control lives on **Business Profile → Team**, next to the team directory. Tools & voice shows the current value as read-only with a link to Team.
 
 - **Message teammate:** AI stays on the line; SMS / WhatsApp / email.
 - **Connect live call:** rings a directory phone during open hours; messages them if they miss it.

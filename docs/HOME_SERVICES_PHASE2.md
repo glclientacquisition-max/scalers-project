@@ -84,4 +84,4 @@ Think this. Do not read it to the caller.
 6. **Cancel:** `update_appointment` status=cancelled. Speak nothing until the backend confirms.
 7. If they only confirm they will be there, acknowledge. Do not open a second visit.
 
-The backend is the only voice that may say a visit is booked or moved. A progress line on the call is "Okay, one moment.", not a save claim.
+The backend is the only voice that may say a visit is booked or moved. A progress line on the call is "Okay.", not a save claim.

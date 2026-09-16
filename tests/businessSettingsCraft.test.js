@@ -45,6 +45,7 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "Updates"/);
     assert.match(nav, /label: "Assistant"/);
     assert.match(nav, /label: "Team"/);
+    assert.match(nav, /label: "Alerts"/);
     assert.match(nav, /label: "Catalog"/);
     assert.match(nav, /label: "FAQs"/);
     assert.match(nav, /label: "Import"/);
@@ -54,6 +55,9 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "Tools & voice"/);
     assert.match(nav, /label: "Pronunciation"/);
     assert.match(nav, /label: "Test"/);
+    assert.match(nav, /raw === "alerts"/);
+    assert.match(shell, /tab === "alerts"/);
+    assert.match(shell, /AlertsPanel/);
     assert.match(shell, /SETTINGS_NAV/);
     assert.doesNotMatch(shell, />\s*Train\s*</);
     assert.doesNotMatch(nav, /Billing|Security|Appearance/);

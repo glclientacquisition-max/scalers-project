@@ -43,7 +43,6 @@ import {
   lexiconForStorage,
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
-import { parseNotifyChannelsField } from "@/lib/notifyChannels";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 
 export type SettingsCompileState = {
@@ -71,13 +70,6 @@ export async function saveAndCompileSettings(
   }
 
   const businessName = String(formData.get("business_name") || "").trim();
-  const notificationPhone = String(
-    formData.get("whatsapp_notification_number") || ""
-  ).trim();
-  const alertEmail = String(formData.get("alert_email") || "")
-    .trim()
-    .toLowerCase();
-  const notifyChannels = parseNotifyChannelsField(formData.get("notify_channels"));
   const servicesNotes = String(formData.get("services_notes") || "").trim();
   const servicesCatalog = parseServicesCatalogField(formData.get("services_catalog"));
   const productCatalog = parseProductCatalogField(formData.get("product_catalog"));
@@ -161,9 +153,6 @@ export async function saveAndCompileSettings(
   if (!agentTone) {
     return { error: "Pick a tone of voice." };
   }
-  if (alertEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alertEmail)) {
-    return { error: "Alert email looks invalid." };
-  }
   if (teamDirectory.length > 20) {
     return { error: "Team directory is limited to 20 people." };
   }
@@ -196,9 +185,6 @@ export async function saveAndCompileSettings(
 
   const patch: Record<string, unknown> = {
     business_name: businessName,
-    whatsapp_notification_number: notificationPhone || tenant.whatsapp_notification_number,
-    alert_email: alertEmail || null,
-    notify_channels: notifyChannels,
     services_offered: servicesOffered,
     services_catalog: servicesCatalog,
     product_catalog: productCatalog,

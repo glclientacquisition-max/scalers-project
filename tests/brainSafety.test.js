@@ -28,6 +28,7 @@ describe('Brain production safety', () => {
     assert.match(CONVERSATION_RULES, /Do not force lead capture/);
     assert.match(CONVERSATION_RULES, /never guess a shilling amount/i);
     assert.match(CONVERSATION_RULES, /Empty policies/i);
+    assert.match(CONVERSATION_RULES, /CONTROL VOICE/);
     const prompt = buildSystemPrompt({
       businessName: 'Test Shop',
       servicesCatalog: [{ name: 'Printing' }],

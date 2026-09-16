@@ -12,15 +12,16 @@ const {
   pickPhaticReply,
   looksLikeSpokenServiceDump,
   trimSpokenServiceDump,
+  stripSpokenHedges,
+  polishSpokenReply,
 } = require('../src/conversation/dynamicSpeech');
 
-assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay, one moment.');
+assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay.');
 assert.strictEqual(pickActionProgress('CAPTURE', 'en'), 'Okay.');
-assert.strictEqual(pickActionProgress('ESCALATE', 'en'), 'Okay, let me get the team on that.');
-assert.strictEqual(pickActionProgress('TRANSFER', 'en'), 'Okay, let me connect you.');
-assert.match(pickActionProgress('CREATE_REQUEST', 'sw'), /Sawa/i);
-assert.match(pickActionProgress('CAPTURE', 'sw'), /^Sawa\.?$/i);
-assert.match(pickActionProgress('CREATE_REQUEST', 'mixed'), /Sawa/i);
+assert.strictEqual(pickActionProgress('ESCALATE', 'en'), 'Okay.');
+assert.strictEqual(pickActionProgress('TRANSFER', 'en'), 'Okay.');
+assert.equal(pickActionProgress('CREATE_REQUEST', 'sw'), 'Sawa.');
+assert.equal(pickActionProgress('ESCALATE', 'mixed'), 'Sawa.');
 assert.equal(pickPhaticReply({ language: 'mixed' }), 'Nzuri, asante. Naweza kusaidia?');
 assert.ok(pickContextualAck('I want to order a book', 'en'));
 assert.equal(looksLikePhaticCallerTurn('How are you doing?'), true);
@@ -58,6 +59,13 @@ assert.equal(
     "I'm doing well, thank you! We specialize in couch, carpet, and mattress cleaning."
   ),
   'We can help with that. What do you need done?'
+);
+assert.equal(stripSpokenHedges('Let me check. We are open until 6.'), 'We are open until 6.');
+assert.equal(stripSpokenHedges('One moment please.'), 'Okay.');
+assert.equal(stripSpokenHedges('Sawa nakucheckia.', { language: 'sw' }), 'Sawa.');
+assert.equal(
+  polishSpokenReply('Okay, one moment. We are open until 6 PM.'),
+  'We are open until 6 PM.'
 );
 assert.equal(
   looksLikeSpokenServiceDump('We clean carpets. What time works?'),

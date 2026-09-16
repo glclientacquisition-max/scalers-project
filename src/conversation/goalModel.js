@@ -93,23 +93,47 @@ function formatVisitSopForPrompt(state) {
     return `- Visit SOP: ${parts.join(' | ')}. Ask once: ${pair.join(' or ')}? Do not guess the spelling.`;
   }
   const next = order.find((slot) => !visitSopSlotValue(state, slot));
+  const job = visitSopSlotValue(state, 'service');
   const nextLine = next
-    ? `Ask only for ${next}. Never re-ask a filled slot.`
+    ? job
+      ? `Name ${job} in one clause, then ask only for ${next}. Never re-ask a filled slot.`
+      : `Ask only for ${next}. Never re-ask a filled slot.`
     : 'Slots complete. Append create_appointment and speak nothing.';
   return `- Visit SOP: ${parts.join(' | ')}. ${nextLine}`;
 }
 
 function clarificationForSlot(slot) {
   const hints = {
-    subject: 'Ask which exact product or service they mean.',
-    service: 'Ask which service they want.',
+    subject: 'Name the product or service you heard, then ask which exact one they mean.',
+    service: 'Name the job if you have it, then ask which service they want.',
     name: 'Ask for the caller name only if none is on file. If a name is already known, skip this slot.',
-    when: 'Ask for the preferred date or time.',
-    when_or_reference: 'Ask for the booking time or reference that identifies it.',
+    when: 'Name the job you have, then ask for the day and time.',
+    when_or_reference: 'Name the open visit if you have it, then ask for the new time or the visit to cancel.',
     branch: 'Ask which branch or location they mean.',
-    landmark: 'Ask for a nearby landmark or address so the visit can be found.',
+    landmark: 'Name the job and time you have, then ask for a nearby landmark.',
   };
   return hints[slot] || `Ask for ${slot}.`;
+}
+
+function formatControlVoiceForPrompt(state) {
+  const job =
+    visitSopSlotValue(state, 'service') ||
+    entityValue(state?.entities?.product) ||
+    entityValue(state?.entities?.requestedItem) ||
+    (state?.returning && !state.returning.sharedLine
+      ? state.returning.nextVisit || state.returning.lastReason
+      : '');
+  const missing = Array.isArray(state?.goal?.missingSlots)
+    ? state.goal.missingSlots
+    : [];
+  const next = missing[0];
+  if (job && next) {
+    return `- Control: you have ${job}. Say that, then ask only for ${next}. No holding lines.`;
+  }
+  if (job && !next) {
+    return `- Control: you have ${job}. Speak nothing if a tool will fire. Backend confirms.`;
+  }
+  return '- Control: name what you understood, then one next step. No holding lines.';
 }
 
 function formatGoalRequirementsForPrompt(state) {
@@ -133,4 +157,5 @@ module.exports = {
   clarificationForSlot,
   formatGoalRequirementsForPrompt,
   formatVisitSopForPrompt,
+  formatControlVoiceForPrompt,
 };

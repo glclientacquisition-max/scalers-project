@@ -7,7 +7,7 @@ const {
   isHearAgainSignal,
   applyCallerNameConfirmation,
 } = require('./entityExtraction');
-const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt } = require('./goalModel');
+const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
 const {
   formatReturningFileForCallState,
@@ -580,6 +580,7 @@ function formatBrainStateForPrompt(state) {
     `- Goal status: ${value.goal.status}`,
     `- ${formatGoalRequirementsForPrompt(value)}`,
     formatVisitSopForPrompt(value),
+    formatControlVoiceForPrompt(value),
     `- Entities: ${entities || '(none confirmed)'}`,
     `- Language: ${value.language.current} (detected ${value.language.detected}, confidence ${value.language.confidence})`,
     `- Repair failures: ${value.repair.failureCount}`,
