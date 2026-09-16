@@ -6,6 +6,7 @@ const {
   isGeneralQueriesRole,
   normalizeNotifyTeam,
 } = require('./teamPermissions');
+const { escalationBody } = require('../notifications/templates');
 
 function normalizeQuery(raw) {
   return String(raw || '')
@@ -164,38 +165,8 @@ function teammateLabel(teammate) {
 /**
  * Owner / teammate alert body for an escalation.
  */
-function buildEscalationText({
-  businessName,
-  teammate,
-  callerName,
-  reason,
-  callerNumber,
-  recordingUrl,
-  requested,
-  match,
-} = {}) {
-  const who = teammateLabel(teammate);
-  const isFallback = match === 'fallback' && requested;
-  const lines = [
-    isFallback
-      ? `Escalation for ${who}${businessName ? `. ${businessName}` : ''} (fallback)`
-      : `Escalation for ${who}${businessName ? `. ${businessName}` : ''}`,
-    ``,
-    `Caller: ${callerName || 'Caller'}`,
-    `Phone: ${callerNumber || 'Unknown'}`,
-    `Reason: ${reason || 'None'}`,
-  ];
-  if (isFallback) {
-    lines.push(`Caller asked for: ${requested}`);
-    lines.push(`No exact match. Routed to ${who}.`);
-  } else if (requested && match && match !== 'exact_name') {
-    lines.push(`Matched on: ${requested}`);
-  }
-  if (teammate?.phone) {
-    lines.push(`Teammate phone: ${teammate.phone}`);
-  }
-  if (recordingUrl) lines.push(`Recording: ${recordingUrl}`);
-  return lines.join('\n');
+function buildEscalationText(opts = {}) {
+  return escalationBody(opts);
 }
 
 module.exports = {

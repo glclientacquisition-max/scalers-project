@@ -2,31 +2,14 @@
 // Soft = live WhatsApp/email only. Never blocks calls by itself.
 
 const { dispatchToStaff, staffRecipients } = require('./recipients');
+const { walletEmptyBody, walletLowBody } = require('./templates');
 
-function buildLowBalanceBody({ businessName, balanceKes, lowThresholdKes }) {
-  const bal = Number(balanceKes || 0).toLocaleString('en-KE');
-  const thr = Number(lowThresholdKes || 200).toLocaleString('en-KE');
-  return [
-    `Scalers wallet running low${businessName ? `. ${businessName}` : ''}`,
-    `Prepaid balance is about KES ${bal} (alert under KES ${thr}).`,
-    `Top up soon so calls keep being covered. On-demand usage is separate. Enable it on Wallet if you want to continue after prepaid hits zero.`,
-  ].join('\n');
+function buildLowBalanceBody(opts) {
+  return walletLowBody(opts);
 }
 
-function buildEmptyBalanceBody({ businessName, onDemandEnabled }) {
-  const name = businessName ? `. ${businessName}` : '';
-  if (onDemandEnabled) {
-    return [
-      `Scalers prepaid empty${name}`,
-      `Your prepaid balance is KES 0 or below.`,
-      `On-demand usage is ON, so calls can keep going and will bill beyond prepaid. Top up when you can.`,
-    ].join('\n');
-  }
-  return [
-    `Scalers prepaid empty${name}`,
-    `Your prepaid balance is KES 0 or below.`,
-    `On-demand usage is OFF, so further call charges are paused until you top up or enable on-demand on the Wallet page.`,
-  ].join('\n');
+function buildEmptyBalanceBody(opts) {
+  return walletEmptyBody(opts);
 }
 
 /**

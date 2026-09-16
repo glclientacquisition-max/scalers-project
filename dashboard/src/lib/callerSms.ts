@@ -1,14 +1,4 @@
-/**
- * Desk-side caller SMS (owner Confirm / Cancel).
- * Uses the same TextSMS env as voice when present on Vercel.
- */
-
-type CallerKind =
-  | "caller_appointment"
-  | "caller_appointment_confirmed"
-  | "caller_appointment_cancelled"
-  | "caller_appointment_rescheduled"
-  | "caller_hold_updated";
+import { renderCallerTemplate, type CallerTemplateKind } from "@/lib/messageTemplates";
 
 function normalizeSmsTo(phone: string): string {
   let digits = String(phone || "").replace(/[^\d+]/g, "");
@@ -36,37 +26,19 @@ function cleanName(raw: string | null | undefined): string {
 }
 
 export function renderDeskCallerText(opts: {
-  kind: CallerKind;
+  kind: CallerTemplateKind;
   businessName: string;
   callerName?: string | null;
   service?: string | null;
   when?: string | null;
 }): string {
-  const business = String(opts.businessName || "").trim() || "We";
-  const name = cleanName(opts.callerName);
-  const hi = name ? `Hi ${name}, ` : "Hi, ";
-  const service = String(opts.service || "").trim();
-  const when = String(opts.when || "").trim();
-  const what = service ? `your ${service} visit` : "your visit";
-  const at = when ? ` for ${when}` : "";
-  const to = when ? ` to ${when}` : "";
-  switch (opts.kind) {
-    case "caller_appointment_confirmed":
-      return `${hi}${business} here. Your ${service ? `${service} visit` : "visit"}${at} is confirmed.`;
-    case "caller_appointment_cancelled":
-      return `${hi}${business} here. We cancelled ${what}${at}.`;
-    case "caller_appointment_rescheduled":
-      return `${hi}${business} here. We moved ${what}${to}.`;
-    case "caller_hold_updated": {
-      const item = String(opts.service || "").trim();
-      const when = String(opts.when || "").trim();
-      const what = item ? `Pickup for ${item}` : "Pickup";
-      const now = when ? ` is now ${when}` : " was updated";
-      return `${hi}${business} here. ${what}${now}.`;
-    }
-    default:
-      return `${hi}${business} here. We have ${what}${at}. We will confirm shortly.`;
-  }
+  return renderCallerTemplate({
+    kind: opts.kind,
+    businessName: opts.businessName,
+    callerName: cleanName(opts.callerName),
+    item: opts.service,
+    when: opts.when,
+  });
 }
 
 export async function sendDeskCallerSms(opts: {

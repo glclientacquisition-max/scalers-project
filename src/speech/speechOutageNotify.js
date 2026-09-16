@@ -1,4 +1,5 @@
 const { staffRecipients } = require('../conversation/teamPermissions');
+const { outageBody } = require('../notifications/templates');
 // Platform outages (speech or reasoning) hit every DID. Do not SMS per call.
 
 /** @type {Map<string, number>} */
@@ -13,17 +14,7 @@ function ownerCooldownMs() {
 }
 
 function buildOwnerOutageBody(businessName, kind = 'speech') {
-  const who = String(businessName || '').trim();
-  if (kind === 'llm') {
-    if (who) {
-      return `${who} line is taking names only. Callers are asked for a name so the team can call back.`;
-    }
-    return 'Your Scalers line is taking names only. Callers are asked for a name so the team can call back.';
-  }
-  if (who) {
-    return `${who} line downtime. Callers heard a short message and were asked to call back.`;
-  }
-  return 'Your Scalers line is on downtime. Callers heard a short message and were asked to call back.';
+  return outageBody(businessName, kind);
 }
 
 function claimOwnerSlot(tenantId, kind, now) {
