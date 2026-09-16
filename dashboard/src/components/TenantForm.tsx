@@ -1066,7 +1066,7 @@ export function TenantForm({
             </div>
           ) : null}
 
-          <div className="hidden space-y-3 md:hidden">
+          <div className="space-y-3 md:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
               return (
@@ -1115,7 +1115,7 @@ export function TenantForm({
             />
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-line">
+          <div className="hidden md:block overflow-hidden rounded-xl border border-line">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
@@ -1303,7 +1303,7 @@ export function TenantForm({
             <p className="text-sm text-ink-soft">No products yet.</p>
           ) : (
             <>
-            <div className="hidden space-y-3 md:hidden">
+            <div className="space-y-3 md:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                 return (
@@ -1347,7 +1347,7 @@ export function TenantForm({
                 onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
               />
             </div>
-            <div className="overflow-hidden rounded-xl border border-line">
+            <div className="hidden md:block overflow-hidden rounded-xl border border-line">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
@@ -1554,8 +1554,8 @@ export function TenantForm({
               key={`loc-${index}`}
               className="space-y-2 rounded-xl border border-line bg-surface/60 p-3"
             >
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                <div className="min-w-0">
                   <label
                     className="block text-xs font-medium text-ink-soft"
                     htmlFor={`loc-label-${index}`}
@@ -1580,20 +1580,21 @@ export function TenantForm({
                     className={`${denseFieldClass} mt-1`}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label
                     className="block text-xs font-medium text-ink-soft"
                     htmlFor={`loc-address-${index}`}
                   >
                     Area
                   </label>
-                  <input
+                  <ExpandTextarea
                     id={`loc-address-${index}`}
                     value={loc.address}
-                    onChange={(e) => {
-                      updateLocation(index, "address", e.target.value);
+                    maxLength={200}
+                    onChange={(value) => {
+                      updateLocation(index, "address", value);
                       if (index === 0) {
-                        const next = { ...loc, address: e.target.value };
+                        const next = { ...loc, address: value };
                         setLocationNotes(
                           [next.label, next.address, next.landmark]
                             .map((s) => s.trim())
@@ -1603,7 +1604,7 @@ export function TenantForm({
                       }
                     }}
                     placeholder="Westlands, Nairobi"
-                    className={`${denseFieldClass} mt-1`}
+                    className="min-w-0 break-words [overflow-wrap:anywhere]"
                   />
                 </div>
               </div>
@@ -1652,21 +1653,22 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 leading-relaxed`}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label
                   className="block text-xs font-medium text-ink-soft"
                   htmlFor={`loc-coverage-${index}`}
                 >
                   Coverage
                 </label>
-                <input
+                <ExpandTextarea
                   id={`loc-coverage-${index}`}
                   value={loc.coverage_notes}
-                  onChange={(e) =>
-                    updateLocation(index, "coverage_notes", e.target.value)
+                  maxLength={300}
+                  onChange={(value) =>
+                    updateLocation(index, "coverage_notes", value)
                   }
                   placeholder="Kiambu and Ruiru"
-                  className={`${denseFieldClass} mt-1`}
+                  className="min-w-0 break-words [overflow-wrap:anywhere]"
                 />
               </div>
               {locations.length > 1 ? (

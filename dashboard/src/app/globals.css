@@ -40,7 +40,8 @@
 
   /* Desk sticky chrome. Keep settings sticky below the header. Phone tab bar is 0 from md. */
   --desk-header-h: 3.5rem;
-  --desk-tabbar-h: 3.25rem;
+  --desk-tabbar-h: 4rem;
+  --desk-tabbar-clearance: calc(var(--desk-tabbar-h) + env(safe-area-inset-bottom, 0px) + 1.5rem);
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -189,12 +190,15 @@
 @media (min-width: 768px) {
   :root {
     --desk-tabbar-h: 0px;
+    --desk-tabbar-clearance: 2.5rem;
   }
 }
 
 html {
   max-width: 100%;
   overflow-x: clip;
+  scroll-padding-top: var(--desk-header-h);
+  scroll-padding-bottom: var(--desk-tabbar-clearance);
 }
 
 body {
