@@ -39,7 +39,11 @@ describe('speechOutageNotify', () => {
       sent.push(opts);
       return { channel: 'sms' };
     });
-    const profile = { id: 'tenant-a', businessName: 'Shop A' };
+    const profile = {
+      id: 'tenant-a',
+      businessName: 'Shop A',
+      whatsappNumber: '+254700000001',
+    };
     const speech = await noteSpeechOutage({ profile, kind: 'speech' });
     const llm = await noteSpeechOutage({ profile, kind: 'llm' });
     const speechAgain = await noteSpeechOutage({ profile, kind: 'speech' });
@@ -64,12 +68,45 @@ describe('speechOutageNotify', () => {
     const first = await noteSpeechOutage({ profile });
     const second = await noteSpeechOutage({ profile });
     const other = await noteSpeechOutage({
-      profile: { id: 'tenant-b', businessName: 'Shop B' },
+      profile: {
+        id: 'tenant-b',
+        businessName: 'Shop B',
+        whatsappNumber: '+254700000002',
+      },
     });
     assert.equal(first.ok, true);
     assert.equal(second.reason, 'cooldown');
     assert.equal(other.ok, true);
     assert.equal(sent.length, 2);
     assert.equal(sent[0].body.includes('Shop A'), true);
+  });
+
+  it('does not invent an owner dest when ops flags are all off', async () => {
+    const sent = [];
+    setSpeechOutageDispatch(async (opts) => {
+      sent.push(opts);
+      return { channel: 'sms' };
+    });
+    const result = await noteSpeechOutage({
+      profile: {
+        id: 'tenant-c',
+        businessName: 'Shop C',
+        whatsappNumber: '+254700000003',
+        alertEmail: 'owner@shop.co.ke',
+        teamDirectory: [
+          {
+            name: 'Peter',
+            role: 'Sales',
+            phone: '0711222222',
+            receives_escalation: false,
+            receives_inbox: false,
+            receives_ops: false,
+          },
+        ],
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'no_ops_recipient');
+    assert.equal(sent.length, 0);
   });
 });

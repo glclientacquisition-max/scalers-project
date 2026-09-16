@@ -22,6 +22,7 @@ import {
   type FaqSuggestion,
 } from "@/lib/faqFromTranscript";
 import type { FaqEntry, TeamDirectoryEntry, TranscriptRow } from "@/lib/supabase";
+import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { parseAgentTools } from "@/lib/agentTools";
 
 export type FaqSuggestState = {
@@ -68,18 +69,7 @@ function normalizeFaqs(raw: unknown): FaqEntry[] {
 }
 
 function normalizeTeam(raw: unknown): TeamDirectoryEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((row) => {
-      const r = (row || {}) as Record<string, unknown>;
-      return {
-        name: String(r.name || "").trim(),
-        role: String(r.role || "").trim(),
-        phone: String(r.phone || "").trim(),
-        email: String(r.email || "").trim().toLowerCase(),
-      };
-    })
-    .filter((t) => t.name);
+  return normalizeTeamDirectory(raw, { requireName: true, infer: false });
 }
 
 export async function suggestFaqsFromCallAction(

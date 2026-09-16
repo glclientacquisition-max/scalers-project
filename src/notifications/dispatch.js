@@ -129,10 +129,11 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels } =
 }
 
 /**
- * Escalation: SMS teammate → SMS owner → WhatsApp teammate/owner → owner email.
+ * Escalation: one permissioned teammate. Do not also SMS the workspace owner.
  */
 async function dispatchEscalationAlert({
   teammatePhone,
+  teammateEmail,
   ownerPhone,
   ownerEmail,
   body,
@@ -140,108 +141,29 @@ async function dispatchEscalationAlert({
   subject,
   channels,
 } = {}) {
-  const sent = [];
   const text = body || buildLeadText(lead);
-  const prefs = parseNotifyChannels(channels);
-
-  const ownerDestSms = normalizeSmsTo(ownerPhone);
-  const teammateDestSms = normalizeSmsTo(teammatePhone);
-  const ownerDistinctSms =
-    ownerDestSms && (!teammateDestSms || ownerDestSms !== teammateDestSms);
-
-  if (prefs.sms && smsSenderReady() && teammateDestSms) {
-    try {
-      const result = await sendSms({ to: teammateDestSms, body: text });
-      sent.push({ channel: 'sms', role: 'teammate', to: teammateDestSms, result });
-    } catch (err) {
-      console.warn(`[notify] teammate SMS failed:`, err?.message || err);
-    }
-  }
-
-  if (prefs.sms && smsSenderReady() && ownerDistinctSms) {
-    try {
-      const result = await sendSms({ to: ownerDestSms, body: text });
-      sent.push({ channel: 'sms', role: 'owner', to: ownerDestSms, result });
-    } catch (err) {
-      console.warn(`[notify] owner SMS failed:`, err?.message || err);
-    }
-  }
-
-  // If SMS already delivered to someone, skip WhatsApp duplicate (WA can layer later).
-  // If SMS missed everyone, fall through to WhatsApp then email.
-  if (prefs.whatsapp && !sent.length && whatsAppSenderReady()) {
-    if (teammatePhone) {
-      try {
-        const result = await sendOwnerWhatsApp({
-          to: teammatePhone,
-          body: text,
-          lead,
-        });
-        sent.push({
-          channel: 'whatsapp',
-          role: 'teammate',
-          to: normalizeWhatsAppTo(teammatePhone),
-          result,
-        });
-      } catch (err) {
-        console.warn(`[notify] teammate WhatsApp failed:`, err?.message || err);
-      }
-    }
-
-    const ownerDest = normalizeWhatsAppTo(ownerPhone);
-    const teammateDest = normalizeWhatsAppTo(teammatePhone);
-    const ownerDistinct = ownerDest && (!teammateDest || ownerDest !== teammateDest);
-
-    if (ownerDistinct) {
-      try {
-        const result = await sendOwnerWhatsApp({
-          to: ownerPhone,
-          body: text,
-          lead,
-        });
-        sent.push({ channel: 'whatsapp', role: 'owner', to: ownerDest, result });
-      } catch (err) {
-        console.warn(`[notify] owner WhatsApp failed:`, err?.message || err);
-      }
-    }
-  }
-
-  if (prefs.email && !sent.length) {
-    const mail = await sendEmailFallback({
-      to: ownerEmail,
-      body: text,
-      lead,
-      subject: subject || `Escalation${lead.businessName ? ` — ${lead.businessName}` : ''}`,
-    });
-    if (mail.channel) {
-      sent.push({ channel: 'email', role: 'owner', to: mail.to, result: mail.result });
-    }
-  }
-
-  // Optional second channel: owner email when a phone channel already succeeded.
-  if (
-    prefs.email &&
-    sent.length &&
-    !sent.some((s) => s.channel === 'email') &&
-    emailFallbackReady() &&
-    ownerEmail
-  ) {
-    try {
-      const mail = await sendEmailFallback({
-        to: ownerEmail,
-        body: text,
-        lead,
-        subject: subject || `Escalation${lead.businessName ? ` — ${lead.businessName}` : ''}`,
-      });
-      if (mail.channel) {
-        sent.push({ channel: 'email', role: 'owner', to: mail.to, result: mail.result });
-      }
-    } catch (err) {
-      console.warn(`[notify] owner email secondary failed:`, err?.message || err);
-    }
-  }
-
-  return sent;
+  const destPhone = teammatePhone || null;
+  const destEmail = teammateEmail || null;
+  const sameOwner =
+    destPhone &&
+    ownerPhone &&
+    String(destPhone).replace(/\D/g, '') ===
+      String(ownerPhone).replace(/\D/g, '');
+  const result = await dispatchAlert({
+    to: destPhone,
+    email: destEmail || (sameOwner ? ownerEmail : null),
+    body: text,
+    lead,
+    subject,
+    channels,
+  });
+  if (!result?.channel) return [];
+  return [
+    {
+      ...result,
+      role: 'teammate',
+    },
+  ];
 }
 
 module.exports = {

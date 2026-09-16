@@ -9,6 +9,7 @@ import { clampFaq, FAQ_MAX, FAQ_STARTERS } from "@/lib/faqs";
 import type { HoursSchedule } from "@/lib/hoursSchedule";
 import { parseHoursNotesToSchedule } from "@/lib/ingest/extract";
 import type { TeamMember } from "@/lib/onboarding";
+import { CATCH_ALL_TEAM_NOTIFY_FLAGS } from "@/lib/teamNotify";
 import {
   homeDefaultServices,
   homeStarterPolicies,
@@ -104,6 +105,7 @@ export function seedOwnerCatchAllTeam(opts: {
       role: "General queries",
       phone,
       email,
+      ...CATCH_ALL_TEAM_NOTIFY_FLAGS,
     },
   ];
 }

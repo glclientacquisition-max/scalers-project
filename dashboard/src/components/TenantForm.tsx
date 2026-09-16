@@ -121,6 +121,10 @@ import {
   previewErrorCopy,
 } from "@/lib/previewAudio";
 import {
+  EMPTY_TEAM_NOTIFY_FLAGS,
+  normalizeTeamDirectory,
+} from "@/lib/teamNotify";
+import {
   businessSettingsHref,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
@@ -169,16 +173,11 @@ function initialTone(tenant: TenantRow): OnboardingTone | "" {
   return "";
 }
 
-function normalizeTeam(raw: TenantRow["team_directory"]): TeamDirectoryEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((row) => ({
-      name: String(row?.name || "").trim(),
-      role: String(row?.role || "").trim(),
-      phone: String(row?.phone || "").trim(),
-      email: String(row?.email || "").trim().toLowerCase(),
-    }))
-    .filter((row) => row.name || row.role || row.phone || row.email);
+function normalizeTeam(
+  raw: TenantRow["team_directory"],
+  ownerPhone?: string
+): TeamDirectoryEntry[] {
+  return normalizeTeamDirectory(raw, { ownerPhone });
 }
 
 function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
@@ -196,7 +195,17 @@ const emptyMember = (): TeamDirectoryEntry => ({
   role: "",
   phone: "",
   email: "",
+  ...EMPTY_TEAM_NOTIFY_FLAGS,
 });
+
+const TEAM_NOTIFY_CHIPS: Array<{
+  key: "receives_escalation" | "receives_inbox" | "receives_ops";
+  label: string;
+}> = [
+  { key: "receives_escalation", label: "Escalate" },
+  { key: "receives_inbox", label: "Inbox" },
+  { key: "receives_ops", label: "Ops" },
+];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
@@ -393,7 +402,10 @@ export function TenantForm({
   const [voiceSampleError, setVoiceSampleError] = useState<string | null>(null);
   const [voiceSampleUrl, setVoiceSampleUrl] = useState<string | null>(null);
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
-    const rows = normalizeTeam(tenant.team_directory);
+    const rows = normalizeTeam(
+      tenant.team_directory,
+      tenant.whatsapp_notification_number
+    );
     return rows.length ? rows : [emptyMember()];
   });
   const liveDest = firstDialableTeammate(team);
@@ -568,7 +580,11 @@ export function TenantForm({
     }
   }
 
-  function updateTeam(index: number, key: keyof TeamDirectoryEntry, value: string) {
+  function updateTeam(
+    index: number,
+    key: keyof TeamDirectoryEntry,
+    value: string | boolean
+  ) {
     setTeam((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
     );
@@ -1931,68 +1947,86 @@ export function TenantForm({
 
         <div className="space-y-2">
           {team.map((member, index) => (
-            <div key={`team-${index}`} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-name-${index}`}>
-                  Name
-                </label>
-                <input
-                  id={`team-name-${index}`}
-                  value={member.name}
-                  onChange={(e) => updateTeam(index, "name", e.target.value)}
-                  placeholder="Wanjiku Mwangi"
-                  className={`${denseFieldClass} mt-1`}
-                />
+            <div key={`team-${index}`} className="space-y-2 border-b border-line pb-2 last:border-b-0 last:pb-0">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-name-${index}`}>
+                    Name
+                  </label>
+                  <input
+                    id={`team-name-${index}`}
+                    value={member.name}
+                    onChange={(e) => updateTeam(index, "name", e.target.value)}
+                    placeholder="Wanjiku Mwangi"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-role-${index}`}>
+                    Handles
+                  </label>
+                  <input
+                    id={`team-role-${index}`}
+                    value={member.role}
+                    onChange={(e) => updateTeam(index, "role", e.target.value)}
+                    placeholder="Orders and payments"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-phone-${index}`}>
+                    Phone
+                  </label>
+                  <input
+                    id={`team-phone-${index}`}
+                    value={member.phone}
+                    onChange={(e) => updateTeam(index, "phone", e.target.value)}
+                    placeholder="+254 700 000 000"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-email-${index}`}>
+                    Email
+                  </label>
+                  <input
+                    id={`team-email-${index}`}
+                    type="email"
+                    value={member.email || ""}
+                    onChange={(e) => updateTeam(index, "email", e.target.value)}
+                    placeholder="wanjiku@shop.co.ke"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTeam((prev) =>
+                      prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
+                    )
+                  }
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                  aria-label={`Remove teammate ${index + 1}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-role-${index}`}>
-                  Handles
-                </label>
-                <input
-                  id={`team-role-${index}`}
-                  value={member.role}
-                  onChange={(e) => updateTeam(index, "role", e.target.value)}
-                  placeholder="Orders and payments"
-                  className={`${denseFieldClass} mt-1`}
-                />
+              <div className="flex flex-wrap gap-2" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
+                {TEAM_NOTIFY_CHIPS.map((chip) => {
+                  const selected = member[chip.key] === true;
+                  return (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => updateTeam(index, chip.key, !selected)}
+                      className={choiceChipClass(selected)}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-phone-${index}`}>
-                  Phone
-                </label>
-                <input
-                  id={`team-phone-${index}`}
-                  value={member.phone}
-                  onChange={(e) => updateTeam(index, "phone", e.target.value)}
-                  placeholder="+254 700 000 000"
-                  className={`${denseFieldClass} mt-1`}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-email-${index}`}>
-                  Email
-                </label>
-                <input
-                  id={`team-email-${index}`}
-                  type="email"
-                  value={member.email || ""}
-                  onChange={(e) => updateTeam(index, "email", e.target.value)}
-                  placeholder="wanjiku@shop.co.ke"
-                  className={`${denseFieldClass} mt-1`}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setTeam((prev) =>
-                    prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
-                  )
-                }
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
-                aria-label={`Remove teammate ${index + 1}`}
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
             </div>
           ))}
         </div>

@@ -165,7 +165,7 @@ describe('sendSms + dispatch', () => {
     assert.equal(result.to, '254711000000');
   });
 
-  it('dispatchEscalationAlert SMS to teammate and distinct owner', async () => {
+  it('dispatchEscalationAlert SMS to teammate only, not a distinct owner', async () => {
     const mobiles = [];
     mock.method(global, 'fetch', async (_url, init) => {
       const body = JSON.parse(init.body);
@@ -195,11 +195,10 @@ describe('sendSms + dispatch', () => {
       lead: { businessName: 'ChapterOne Bookstore', name: 'Soony' },
     });
 
-    assert.equal(sent.length, 2);
+    assert.equal(sent.length, 1);
     assert.equal(sent[0].channel, 'sms');
     assert.equal(sent[0].role, 'teammate');
-    assert.equal(sent[1].role, 'owner');
-    assert.deepEqual(mobiles, ['254740442943', '254790381872']);
+    assert.deepEqual(mobiles, ['254740442943']);
   });
 
   it('dispatchEscalationAlert does not double-SMS identical owner/teammate', async () => {

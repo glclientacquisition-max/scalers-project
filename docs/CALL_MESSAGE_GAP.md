@@ -16,7 +16,7 @@ The excellence bar is not a missing channel. It is the **payload**. Owners still
 
 | Layer | Bar | Live |
 | --- | --- | --- |
-| Who to text | Owner on actionable capture; caller never, until toggled | Owner yes; caller none |
+| Who to text | Permissioned staff on actionable capture; caller never, until toggled | Inbox/ops/escalate flags; unmigrated infers; caller none |
 | When | After the ask is known, with a usable summary | On `save_caller_info` mid-call |
 | Name | Real person name | Gate: refuse `Haijawekwa`, `Calling`, `Callings` at extract/save/contact. Live still proves STT that looks like a real name. |
 | Reason | What they wanted | Usually the best line in the SMS |
