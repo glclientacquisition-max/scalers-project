@@ -30,6 +30,7 @@ import {
   type IngestDraft,
 } from "@/lib/ingest/extract";
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
+import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { parseAgentTools } from "@/lib/agentTools";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
@@ -73,18 +74,7 @@ function rateLimitExtract(tenantId: string): string | null {
 }
 
 function normalizeTeam(raw: unknown): TeamDirectoryEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((row) => {
-      const r = (row || {}) as Record<string, unknown>;
-      return {
-        name: String(r.name || "").trim(),
-        role: String(r.role || "").trim(),
-        phone: String(r.phone || "").trim(),
-        email: String(r.email || "").trim().toLowerCase(),
-      };
-    })
-    .filter((t) => t.name);
+  return normalizeTeamDirectory(raw, { requireName: true, infer: false });
 }
 
 function normalizeFaqs(raw: unknown): FaqEntry[] {

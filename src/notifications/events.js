@@ -48,7 +48,7 @@ function line(label, value) {
  */
 function renderEventText(event) {
   const title = event.title || defaultTitle(event.kind);
-  const lines = [`${title}${event.businessName ? ` — ${event.businessName}` : ''}`];
+  const lines = [`${title}${event.businessName ? `. ${event.businessName}` : ''}`];
   for (const [label, value] of event.fields || []) {
     const row = line(label, value);
     if (row) lines.push(row);
@@ -89,7 +89,7 @@ function defaultTitle(kind) {
  */
 function renderEventSubject(event) {
   const title = event.title || defaultTitle(event.kind);
-  return `${title}${event.businessName ? ` — ${event.businessName}` : ''}`;
+  return `${title}${event.businessName ? `. ${event.businessName}` : ''}`;
 }
 
 /**

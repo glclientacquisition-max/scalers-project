@@ -1,4 +1,4 @@
-// One owner alert per business per incident window.
+const { staffRecipients } = require('../conversation/teamPermissions');
 // Platform outages (speech or reasoning) hit every DID. Do not SMS per call.
 
 /** @type {Map<string, number>} */
@@ -59,9 +59,19 @@ async function noteSpeechOutage(opts = {}) {
   try {
     const dispatch =
       dispatchOverride || require('../notifications/dispatch').dispatchAlert;
+    const ops = staffRecipients('ops', {
+      teamDirectory: profile.teamDirectory,
+      ownerPhone: profile.whatsappNumber,
+      ownerEmail: profile.alertEmail,
+    });
+    const dest = ops.recipients[0];
+    if (!dest || (!dest.phone && !dest.email)) {
+      ownerNotifiedAt.delete(`${kind}:${tenantId}`);
+      return { ok: false, reason: 'no_ops_recipient' };
+    }
     const sent = await dispatch({
-      to: profile.whatsappNumber,
-      email: profile.alertEmail,
+      to: dest.phone,
+      email: dest.email,
       channels: profile.notifyChannels,
       body: buildOwnerOutageBody(profile.businessName, kind),
       subject:

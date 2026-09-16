@@ -1,6 +1,11 @@
 // Resolve team-directory escalations and format notify copy.
+// Recipients come from team permissions. Never invent a person. Never pick team[0].
 
-const { normalizeTeam } = require('./liveKnowledge');
+const {
+  findNotifyCatchAll,
+  isGeneralQueriesRole,
+  normalizeNotifyTeam,
+} = require('./teamPermissions');
 
 function normalizeQuery(raw) {
   return String(raw || '')
@@ -64,29 +69,36 @@ function resolveTeammate(teamDirectory, query) {
  *   requested: string,
  * }}
  */
-function resolveEscalation(teamDirectory, query) {
-  const team = normalizeTeam(teamDirectory);
+function resolveEscalation(teamDirectory, query, opts = {}) {
+  const team = normalizeNotifyTeam(teamDirectory, {
+    ownerPhone: opts.ownerPhone,
+  });
+  const allowed = team.filter((m) => m.receives_escalation);
   const requested = String(query || '').trim();
+  const catchAll = findNotifyCatchAll(team);
+
   if (!team.length) {
     return { teammate: null, match: null, requested };
   }
 
   const q = normalizeQuery(requested);
   if (!q) {
-    return { teammate: team[0], match: 'fallback', requested };
+    return catchAll
+      ? { teammate: catchAll, match: 'fallback', requested }
+      : { teammate: null, match: null, requested };
   }
 
-  const exactName = team.find((m) => normalizeQuery(m.name) === q);
+  const exactName = allowed.find((m) => normalizeQuery(m.name) === q);
   if (exactName) {
     return { teammate: exactName, match: 'exact_name', requested };
   }
 
-  const exactRole = team.find((m) => normalizeQuery(m.role) === q);
+  const exactRole = allowed.find((m) => normalizeQuery(m.role) === q);
   if (exactRole) {
     return { teammate: exactRole, match: 'exact_role', requested };
   }
 
-  const nameIncludes = team.find((m) => {
+  const nameIncludes = allowed.find((m) => {
     const n = normalizeQuery(m.name);
     return n && (n.includes(q) || q.includes(n));
   });
@@ -94,7 +106,7 @@ function resolveEscalation(teamDirectory, query) {
     return { teammate: nameIncludes, match: 'partial', requested };
   }
 
-  const roleIncludes = team.find((m) => {
+  const roleIncludes = allowed.find((m) => {
     const r = normalizeQuery(m.role);
     return r && (r.includes(q) || q.includes(r));
   });
@@ -102,24 +114,21 @@ function resolveEscalation(teamDirectory, query) {
     return { teammate: roleIncludes, match: 'partial', requested };
   }
 
-  // Keyword overlap (billing, refunds, manager, sales, etc.)
   const tokens = roleSeekTokens(requested);
-  // Manager/boss/owner language → prefer General queries / ownerish before random partials.
   if (
     /\b(manager|boss|owner|supervisor|director|ceo|md)\b/i.test(requested) ||
     tokens.some((t) =>
       ['manager', 'boss', 'owner', 'supervisor', 'director', 'ceo'].includes(t)
     )
   ) {
-    const general = findGeneralQueriesTeammate(team);
-    if (general) {
-      return { teammate: general, match: 'fallback', requested };
+    if (catchAll) {
+      return { teammate: catchAll, match: 'fallback', requested };
     }
   }
   if (tokens.length) {
     let best = null;
     let bestScore = 0;
-    for (const m of team) {
+    for (const m of allowed) {
       const hay = `${normalizeQuery(m.name)} ${normalizeQuery(m.role)}`;
       let score = 0;
       for (const t of tokens) {
@@ -135,39 +144,15 @@ function resolveEscalation(teamDirectory, query) {
     }
   }
 
-  // No sales / billing / etc. — prefer an explicit "General queries" catch-all,
-  // then owner/CEO-ish roles, then the first listed person.
-  const general = findGeneralQueriesTeammate(team);
-  if (general) {
-    return { teammate: general, match: 'fallback', requested };
+  if (catchAll) {
+    return { teammate: catchAll, match: 'fallback', requested };
   }
 
-  return { teammate: team[0], match: 'fallback', requested };
-}
-
-/** Roles that mean "default inbox for unmatched asks". */
-function isGeneralQueriesRole(role) {
-  const r = normalizeQuery(role);
-  if (!r) return false;
-  if (/\bgeneral\b/.test(r) && /\b(quer|inquir|request|support|help|desk|reception)\b/.test(r)) {
-    return true;
-  }
-  if (r === 'general' || r === 'general queries' || r === 'general query') return true;
-  if (r === 'front desk' || r === 'reception' || r === 'receptionist') return true;
-  return false;
-}
-
-function isOwnerishRole(role) {
-  const r = normalizeQuery(role);
-  return /\b(ceo|owner|founder|director|md|managing director)\b/.test(r);
+  return { teammate: null, match: null, requested };
 }
 
 function findGeneralQueriesTeammate(team) {
-  const general = team.find((m) => isGeneralQueriesRole(m.role));
-  if (general) return general;
-  const ownerish = team.find((m) => isOwnerishRole(m.role));
-  if (ownerish) return ownerish;
-  return null;
+  return findNotifyCatchAll(normalizeNotifyTeam(team));
 }
 
 function teammateLabel(teammate) {
@@ -193,16 +178,16 @@ function buildEscalationText({
   const isFallback = match === 'fallback' && requested;
   const lines = [
     isFallback
-      ? `Escalation for ${who}${businessName ? ` — ${businessName}` : ''} (fallback)`
-      : `Escalation for ${who}${businessName ? ` — ${businessName}` : ''}`,
+      ? `Escalation for ${who}${businessName ? `. ${businessName}` : ''} (fallback)`
+      : `Escalation for ${who}${businessName ? `. ${businessName}` : ''}`,
     ``,
-    `Caller: ${callerName || '—'}`,
-    `Phone: ${callerNumber || '—'}`,
-    `Reason: ${reason || '—'}`,
+    `Caller: ${callerName || 'Caller'}`,
+    `Phone: ${callerNumber || 'Unknown'}`,
+    `Reason: ${reason || 'None'}`,
   ];
   if (isFallback) {
     lines.push(`Caller asked for: ${requested}`);
-    lines.push(`Note: no exact match in team directory — routed to ${who}`);
+    lines.push(`No exact match. Routed to ${who}.`);
   } else if (requested && match && match !== 'exact_name') {
     lines.push(`Matched on: ${requested}`);
   }

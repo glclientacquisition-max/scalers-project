@@ -219,12 +219,15 @@ function callDeskUrl(callId) {
   return `${deskBaseUrl()}/calls/${encodeURIComponent(id)}`;
 }
 const {
-  dispatchAlert,
   dispatchEscalationAlert,
   whatsAppSenderReady,
   emailFallbackReady,
   smsSenderReady,
 } = require('./src/notifications/dispatch');
+const {
+  staffRecipients,
+  dispatchToStaff,
+} = require('./src/notifications/recipients');
 const {
   probeSmsCredentials,
   getSmsStatus,
@@ -2949,7 +2952,9 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
     }
 
-    const resolved = resolveEscalation(teamDirectory, escalate.teammate);
+    const resolved = resolveEscalation(teamDirectory, escalate.teammate, {
+      ownerPhone: ownerNumber,
+    });
     const teammate = resolved.teammate;
     const callerName =
       displayOwnerCallerName(escalate.name || call.name) || null;
@@ -2987,12 +2992,13 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     const sent = await dispatchEscalationAlert({
       teammatePhone: teammate?.phone || null,
+      teammateEmail: teammate?.email || null,
       ownerPhone: ownerNumber,
       ownerEmail,
       body,
       lead,
       channels: notifyChannels,
-      subject: `Escalation for ${teammateLabel(teammate)}${businessName ? ` — ${businessName}` : ''}`,
+      subject: `Escalation for ${teammateLabel(teammate)}${businessName ? `. ${businessName}` : ''}`,
     });
 
     const transferQueued = await maybeQueueLiveTransfer({
@@ -3158,12 +3164,14 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
     let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
     let notifyChannels = null;
+    let teamDirectory = [];
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
       notifyChannels = profile.notifyChannels || null;
+      teamDirectory = profile.teamDirectory || [];
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
@@ -3180,14 +3188,18 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
-
-    const result = await dispatchAlert({
-      to: ownerNumber,
-      email: ownerEmail,
+    const inbox = staffRecipients('inbox', {
+      teamDirectory,
+      ownerPhone: ownerNumber,
+      ownerEmail,
+    });
+    const { sent } = await dispatchToStaff({
+      recipients: inbox.recipients,
       body,
       lead,
       channels: notifyChannels,
     });
+    const result = sent[0] || { channel: null, reason: inbox.source === 'none' ? 'no_inbox_recipient' : 'send_failed' };
     if (!result.channel) {
       console.warn(`[${callSid}] Owner notify skipped (${result.reason || 'unknown'}). Lead ready:`, {
         name: call.name,
@@ -3196,6 +3208,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
         recording: call.recording_url,
         ownerNumber: ownerNumber || null,
         ownerEmail: ownerEmail || null,
+        inbox: inbox.source,
         smsSender: smsSenderReady(),
         whatsappSender: whatsAppSenderReady(),
         emailFallback: emailFallbackReady(),
@@ -3230,12 +3243,14 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
   let notifyChannels = null;
+  let teamDirectory = [];
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
     notifyChannels = profile.notifyChannels || null;
+    teamDirectory = profile.teamDirectory || [];
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for request notify failed:`,
@@ -3254,7 +3269,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
           : 'ENQUIRY';
 
   const lines = [
-    `${typeLabel} — ${businessName}`,
+    `${typeLabel}. ${businessName}`,
     request.item ? `Item: ${request.item}` : null,
     request.quantity ? `Qty: ${request.quantity}` : null,
     request.when_text ? `When: ${request.when_text}` : null,
@@ -3268,18 +3283,23 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   const lead = {
     businessName,
     name: request.caller_name || 'Caller',
-    reason: `${typeLabel}: ${[request.item, request.when_text].filter(Boolean).join(' — ')}`,
+    reason: `${typeLabel}: ${[request.item, request.when_text].filter(Boolean).join('. ')}`,
     callerNumber: request.caller_phone,
   };
 
-  const result = await dispatchAlert({
-    to: ownerNumber,
-    email: ownerEmail,
+  const inbox = staffRecipients('inbox', {
+    teamDirectory,
+    ownerPhone: ownerNumber,
+    ownerEmail,
+  });
+  const { sent } = await dispatchToStaff({
+    recipients: inbox.recipients,
     body,
     lead,
     channels: notifyChannels,
-    subject: `${typeLabel} — ${businessName}`,
+    subject: `${typeLabel}. ${businessName}`,
   });
+  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
       `[${callSid}] Request notify (${type}) via ${result.channel}` +
@@ -3317,12 +3337,14 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
   let notifyChannels = null;
+  let teamDirectory = [];
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
     notifyChannels = profile.notifyChannels || null;
+    teamDirectory = profile.teamDirectory || [];
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for appointment notify failed:`,
@@ -3339,7 +3361,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
       : 'VISIT REQUEST';
 
   const lines = [
-    `${title} — ${businessName}`,
+    `${title}. ${businessName}`,
     appointment.service_name ? `Service: ${appointment.service_name}` : null,
     appointment.when_text ? `When: ${appointment.when_text}` : null,
     appointment.address_landmark
@@ -3358,18 +3380,23 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     name: appointment.caller_name || 'Caller',
     reason: `${title}: ${[appointment.service_name, appointment.when_text]
       .filter(Boolean)
-      .join(' — ')}`,
+      .join('. ')}`,
     callerNumber: appointment.caller_phone,
   };
 
-  const result = await dispatchAlert({
-    to: ownerNumber,
-    email: ownerEmail,
+  const inbox = staffRecipients('inbox', {
+    teamDirectory,
+    ownerPhone: ownerNumber,
+    ownerEmail,
+  });
+  const { sent } = await dispatchToStaff({
+    recipients: inbox.recipients,
     body,
     lead,
-    subject: `${title} — ${businessName}`,
+    subject: `${title}. ${businessName}`,
     channels: notifyChannels,
   });
+  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
       `[${callSid}] Appointment notify (${kind}/${status}) via ${result.channel}` +

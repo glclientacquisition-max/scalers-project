@@ -3,6 +3,8 @@
  * Long-term full-assist (catalogue depth, bookings) is scored as optional polish.
  */
 
+import { directoryHasExplicitPermissions } from "@/lib/teamNotify";
+
 export type MvpReadinessItem = {
   id: string;
   label: string;
@@ -64,11 +66,14 @@ function hasFaqs(faqs: unknown): boolean {
 }
 
 function hasTeamCatchAll(team: unknown): boolean {
+  const explicit = directoryHasExplicitPermissions(team);
   return asArray(team).some((row) => {
     if (!row || typeof row !== "object") return false;
     const r = row as Record<string, unknown>;
     const role = String(r.role || "").toLowerCase();
+    const canEscalate = explicit ? r.receives_escalation === true : true;
     return (
+      canEscalate &&
       hasText(r.name) &&
       (role.includes("general") || role.includes("owner") || role.includes("ceo"))
     );

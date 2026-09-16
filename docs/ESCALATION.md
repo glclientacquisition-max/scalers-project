@@ -12,7 +12,7 @@ Canonical code: `src/conversation/escalationFeature.js`, `requiredEscalate.js`, 
 | --- | --- |
 | Async handoff: notify teammate/owner + desk note | Live cold transfer (that is a separate product: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md)) |
 | Requires **caller name + reason** before notify | Guessing a name or inventing staff |
-| Routes via `tenants.team_directory` | Sharing random phone numbers as “done” |
+| Routes via `tenants.team_directory` permissions | Sharing random phone numbers as “done”; falling back to `team[0]`; extra owner SMS |
 | Honest confirm after backend outcome | “I’ve transferred you” / “I’ve texted them” before send OK |
 
 **Live transfer** (`handoff_mode = live_transfer`) is specified, not shipped. Runtime still sets `liveTransfer: false`. Until Voice Dial exists, Brain must keep using this async escalate path even if the tenant preference says live transfer.
@@ -40,8 +40,10 @@ Helpers: `deriveEscalationStage()`, `shapeEscalationNotifyOutcome()`.
 
 1. **SMS** — TextSMS.co.ke (`TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`)
 2. **WhatsApp** — SautiKit sender (when configured)
-3. **Email** — Resend → tenant `alert_email`
+3. **Email** — Resend → teammate email (owner `alert_email` only when the teammate number is the Alerts SMS phone)
 4. **Desk note** — always saved; soft success if 1–3 miss
+
+One permissioned teammate. `receives_escalation` on the directory row. Unmatched asks go to General queries / inbox catch-all with that flag. Nobody qualifies: desk note only. Do not also SMS a distinct owner.
 
 Owner prefs live on `tenants.notify_channels` (`{sms,whatsapp,email}`) and are edited in Business Settings → Agent Persona → **Notify channels**. Desk greys channels that are not platform-live yet (WhatsApp automated alerts = coming soon). Voice dispatch skips disabled prefs.
 
@@ -79,8 +81,8 @@ Resolution: `needs_human` when escalate succeeded or handoff requested without a
 ## 6. Tenant prerequisites
 
 - `agent_tools.escalate = true` and `escalation_enabled = true`
-- Team directory with at least one reachable person (phone and/or owner alert email)
-- Prefer a **Floor Manager / General queries / owner** row with a real mobile for SMS
+- Team directory with at least one person flagged **Escalate** (or an unmigrated row with a phone)
+- Prefer a **Floor Manager / General queries / owner** row with Escalate on and a real mobile for SMS
 
 ---
 

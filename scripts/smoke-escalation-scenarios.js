@@ -20,14 +20,14 @@ const fullTeam = [
 /** @type {Array<{ name: string, team: object[], ask: string, expectMatch: string, expectName: string|null }>} */
 const scenarios = [
   {
-    name: 'Ask for sales guy — only CEO listed',
+    name: 'Ask for sales guy. only CEO listed',
     team: onlyCeo,
     ask: 'the sales guy',
     expectMatch: 'fallback',
     expectName: 'Wanjiku',
   },
   {
-    name: 'Ask for sales guy — General queries catch-all preferred over CEO',
+    name: 'Ask for sales guy. General queries catch-all preferred over CEO',
     team: ceoAndGeneral,
     ask: 'the sales guy',
     expectMatch: 'fallback',
@@ -41,7 +41,7 @@ const scenarios = [
     expectName: 'Peter',
   },
   {
-    name: 'Ask for CEO by role — only CEO',
+    name: 'Ask for CEO by role. only CEO',
     team: onlyCeo,
     ask: 'CEO',
     expectMatch: 'exact_role',
@@ -62,16 +62,56 @@ const scenarios = [
     expectName: 'Wanjiku',
   },
   {
-    name: 'Empty directory — no invent',
+    name: 'Empty directory. no invent',
     team: [],
     ask: 'sales',
     expectMatch: null,
     expectName: null,
   },
   {
-    name: 'Ask for manager — General queries catch-all',
+    name: 'Ask for manager. General queries catch-all',
     team: ceoAndGeneral,
     ask: 'the manager',
+    expectMatch: 'fallback',
+    expectName: 'Desk',
+  },
+  {
+    name: 'Explicit flags. unmatched ask does not use sales-only',
+    team: [
+      {
+        name: 'Peter',
+        role: 'Sales',
+        phone: '0711222222',
+        receives_escalation: false,
+        receives_inbox: false,
+        receives_ops: false,
+      },
+    ],
+    ask: 'sales',
+    expectMatch: null,
+    expectName: null,
+  },
+  {
+    name: 'Explicit flags. unmatched ask routes to general not team[0]',
+    team: [
+      {
+        name: 'Peter',
+        role: 'Sales',
+        phone: '0711222222',
+        receives_escalation: false,
+        receives_inbox: false,
+        receives_ops: false,
+      },
+      {
+        name: 'Desk',
+        role: 'General queries',
+        phone: '0711333333',
+        receives_escalation: true,
+        receives_inbox: true,
+        receives_ops: true,
+      },
+    ],
+    ask: 'billing',
     expectMatch: 'fallback',
     expectName: 'Desk',
   },

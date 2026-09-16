@@ -146,6 +146,7 @@ describe('retail onboarding pack (contract)', () => {
     assert.match(src, /homeDefaultServices/);
     assert.match(src, /seedOwnerCatchAllTeam/);
     assert.match(src, /General queries/);
+    assert.match(src, /CATCH_ALL_TEAM_NOTIFY_FLAGS/);
     assert.match(src, /afterHoursMode/);
     assert.match(src, /agentTools/);
   });
