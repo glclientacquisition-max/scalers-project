@@ -119,6 +119,7 @@ SONIOX_TTS_MODEL=tts-rt-v2
 - Force a filler every turn (robotic; hurts consistency).
 - Rewrite Brain prompt policy in Voice PRs (hand off content issues).
 - Optimize for lab Wi-Fi only — judge on real DID calls.
+- Treat a vague “sounds robotic” MOS as a Voice retune. Score V1–V9 on a frozen SHA first ([`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md)).
 
 ---
 

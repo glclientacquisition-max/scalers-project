@@ -1,3 +1,15 @@
+# Naturalness eval — how we will score roboticness (2026-09-16)
+
+Owner ask: evaluate naturalness and eliminate roboticness.
+
+**Method (do not retune first):** freeze staging `/healthz` `gitSha` + `voiceProfile`, run three scripted DID calls (phatic, barge, pace), score Voice IDs V1–V9 as pass/fail from recording + transcript + `spoken=` logs. Isolated TTS WAVs are a different test (`tts:listen-harness`).
+
+Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
+
+Staging freeze at write-up: SHA `23debf0e6b06ad5e59b0f98c34520927e0c2033b`, `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, DID `+254709221536`. Next action is the three N1–N3 listens on that SHA, not a speed or gain change.
+
+---
+
 # Transcript verification — last-call residuals (2026-09-14)
 
 Owner ask: verify the punctuation / figure / currency fixes against the last transcript.
