@@ -45,7 +45,7 @@ export default async function ContactsPage({
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#005CCC]">
+        <Link href="/signup" className="text-accent-deep">
           Create one
         </Link>
         .
@@ -87,7 +87,7 @@ export default async function ContactsPage({
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/contacts/import"
-              className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               Import CSV
             </Link>
@@ -119,7 +119,7 @@ export default async function ContactsPage({
               Call{" "}
               <a
                 href={`tel:${tenant.sautikit_virtual_number}`}
-                className="font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-2 hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                className="font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 {tenant.sautikit_virtual_number}
               </a>
@@ -134,7 +134,7 @@ export default async function ContactsPage({
                 <Link
                   href={`/contacts/${row.id}`}
                   aria-label={row.name?.trim() || "Contact"}
-                  className="flex items-center gap-3 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
+                  className="flex items-center gap-3 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
                 >
                   <RowIdentity name={row.name} />
                   <div className="min-w-0 flex-1">
@@ -191,7 +191,7 @@ export default async function ContactsPage({
                 {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="group relative cursor-pointer border-t border-line/70 transition duration-150 hover:bg-[#0096FF]/[0.04]"
+                    className="group relative cursor-pointer border-t border-line/70 transition duration-150 hover:bg-accent/[0.04]"
                   >
                     <td className="px-5 py-5 align-top">
                       <DeskRowHit href={`/contacts/${row.id}`} label={row.name?.trim() || "Contact"} />

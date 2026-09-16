@@ -197,7 +197,7 @@ export function AddContactPanel() {
                       {" "}
                       <a
                         href={`/contacts/${existingId}`}
-                        className="font-semibold text-[#005CCC] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                        className="font-semibold text-accent-deep underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                       >
                         Open contact
                       </a>

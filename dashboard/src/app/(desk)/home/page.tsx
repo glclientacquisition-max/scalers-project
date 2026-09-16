@@ -30,6 +30,7 @@ import {
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { LiveInbox } from "@/components/LiveInbox";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import {
   getWalletRunwayDays,
@@ -43,7 +44,7 @@ export default async function HomeOverviewPage() {
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="font-medium text-[#005CCC]">
+        <Link href="/signup" className="font-medium text-accent-deep">
           Create one
         </Link>
         .
@@ -54,7 +55,7 @@ export default async function HomeOverviewPage() {
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
     return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
+      <div className="rounded-2xl border border-warn/40 bg-surface p-6 text-warn">
         Not signed in.
       </div>
     );
@@ -174,6 +175,7 @@ export default async function HomeOverviewPage() {
 
   return (
     <div className="w-full min-w-0">
+      <LiveInbox tenantId={tenant.id} />
       <header className="min-w-0">
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           {nairobiGreeting()}
@@ -188,14 +190,14 @@ export default async function HomeOverviewPage() {
 
       {primaryUpdate ? (
         <aside aria-label="Live updates" className="mt-6 w-full min-w-0">
-          <div className="relative overflow-hidden rounded-2xl border border-[#0096FF]/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,white)] px-4 py-3">
+          <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,var(--card))] px-4 py-3">
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[#0096FF]"
+              className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-accent"
             />
             <div className="flex min-w-0 flex-col gap-3 pl-2 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#005CCC]">
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-accent-deep">
                   Updates
                   {liveUpdates.length > 1 ? ` · ${liveUpdates.length} live` : ""}
                 </p>
@@ -240,7 +242,7 @@ export default async function HomeOverviewPage() {
                   className={[
                     "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium lg:min-h-11",
                     "transition-colors duration-150",
-                    "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.08]",
+                    "hover:bg-accent/[0.04] active:bg-accent/[0.08]",
                     focusRingVisible,
                   ].join(" ")}
                 >
@@ -323,8 +325,8 @@ export default async function HomeOverviewPage() {
                 href={callsHref({ purpose: "all" })}
                 className={[
                   "flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft",
-                  "transition-colors duration-150 hover:bg-[#0096FF]/[0.04] hover:text-ink",
-                  "active:bg-[#0096FF]/[0.08]",
+                  "transition-colors duration-150 hover:bg-accent/[0.04] hover:text-ink",
+                  "active:bg-accent/[0.08]",
                   focusRingVisible,
                 ].join(" ")}
               >

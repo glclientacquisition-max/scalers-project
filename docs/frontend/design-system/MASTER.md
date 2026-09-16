@@ -14,8 +14,8 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 
 | Meaning | CSS | Tailwind |
 | --- | --- | --- |
-| Brand | `--brand` `#0096FF` | `brand` / `brand-500` / `bg-[#0096FF]` |
-| Brand deep / link | `--brand-deep` `#005CCC` | `brand-700` / `text-[#005CCC]` |
+| Brand | `--brand` `#0096FF` | `brand` / `accent` |
+| Brand deep / link | `--brand-deep` `#005CCC` | `brand-700` / `accent-deep` |
 | Navy ink | `--ink` `#0A192F` | `ink` / `brand-900` |
 | Soft ink | `--ink-soft` `#4A5B73` | `ink-soft` |
 | Canvas | `--bg` `#F4F7FB` | `surface-canvas` |
@@ -32,7 +32,31 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Max width | | `max-w-desk` (72rem) |
 | Radius | | `rounded-panel` (0.875rem) |
 
-**Dialect:** Prefer `text-ink`, `bg-surface`, `border-line`, filled primary `bg-[#005CCC]`. Migrate `text-[var(--ink)]` when touching a file. Do not global-replace.
+**Dialect:** Prefer `text-ink`, `bg-surface`, `border-line`, filled primary `bg-accent-fill text-accent-on-fill`. Never hardcode hex in desk components: `accent` (ribbon, focus, tab underline), `accent-deep` (links, small text), `accent-fill` ramp (filled buttons). Migrate `text-[var(--ink)]` when touching a file. Do not global-replace.
+
+---
+
+## Dark mode
+
+The desk (`app/(desk)`) ships a dark palette; marketing, auth, onboarding, and admin stay light.
+
+- **Token-driven.** Dark redefines the same CSS variables (`--bg`, `--card`, `--ink`, `--line`, `--accent`, fills, status colors). Components never write `dark:` variants; they reference tokens and flip for free.
+- **Scoped.** Dark tokens apply only inside `.desk-theme` (the desk layout root, mirrored on `dev/inbox` for visual tests). Activation: `<html data-theme="dark|light">` set by the pre-paint script in `app/layout.tsx`, or `prefers-color-scheme` when no explicit choice. Both selectors live in `globals.css` and must stay in sync.
+- **Choice is per-device.** `ThemePicker` (Settings menu, This device) writes `localStorage["scalers-desk-theme"]` (`system` default) and applies instantly. Never a tenant setting, never server state.
+- **Fills invert.** On bright fills (accent, warn, ok, lead) the label is `text-accent-on-fill`: white on deep blue in light, deep navy on bright fills in dark. `#0096FF` text on dark is `accent-deep` (`#6BC2FF`).
+- **Ring offsets** resolve to `--card` inside the dark scope, so focus rings never halo white.
+
+| Token role | Light | Dark |
+| --- | --- | --- |
+| Canvas `--bg` | `#F4F7FB` | `#0A1420` |
+| Card `--card` | `#FFFFFF` | `#122236` |
+| Ink `--ink` | `#0A192F` | `#E9EFF7` |
+| Soft ink `--ink-soft` | `#4A5B73` | `#9DAFC6` |
+| Line `--line` | `#D5DEE9` | `#24374F` |
+| Accent `--accent` | `#0096FF` | `#2AA8FF` |
+| Link `--accent-deep` | `#005CCC` | `#6BC2FF` |
+| Fill `--accent-fill` | `#005CCC` | `#1F9FFF` |
+| On fill `--accent-on-fill` | `#FFFFFF` | `#062033` |
 
 **Shared class strings:** `dashboard/src/components/ui/deskChrome.ts`. Settings fields stay in `settingsUi.tsx` but must use the same focus ring.
 

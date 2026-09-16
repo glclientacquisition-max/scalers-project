@@ -125,7 +125,7 @@ export function InboxTableRow({
       className={[
         "group relative border-t border-line/70 transition duration-150",
         openHref ? "cursor-pointer" : "",
-        "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.07]",
+        "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
@@ -280,7 +280,7 @@ export function InboxPhoneRow({
         <Link
           href={openHref}
           aria-label="Conversation"
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {body}
         </Link>

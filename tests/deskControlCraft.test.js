@@ -17,10 +17,13 @@ function walkFiles(dir, acc = []) {
 }
 
 describe("desk control craft", () => {
-  it("keeps filled primary on #005CCC in deskChrome", () => {
+  it("keeps filled primary on the deep-blue fill token in deskChrome", () => {
     const chrome = read("dashboard/src/components/ui/deskChrome.ts");
+    const globals = read("dashboard/src/app/globals.css");
     assert.match(chrome, /export const btnPrimaryFill/);
-    assert.match(chrome, /bg-\[#005CCC\]/);
+    assert.match(chrome, /bg-accent-fill/);
+    // Light-mode value stays the AA-passing deep blue; dark flips via the token.
+    assert.match(globals, /--accent-fill: #005ccc/);
     assert.match(chrome, /export const btnPrimary/);
     assert.match(chrome, /pendingSpinnerClass/);
     assert.match(chrome, /deskFieldClass/);

@@ -68,6 +68,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`}>
       <body className="min-h-screen bg-surface-canvas font-sans text-ink antialiased">
+        {/* Desk theme before paint: explicit choice wins, otherwise system decides. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{var t=localStorage.getItem("scalers-desk-theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}',
+          }}
+        />
         {children}
       </body>
     </html>

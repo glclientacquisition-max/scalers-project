@@ -79,10 +79,10 @@ describe("business settings craft", () => {
   it("defines hover, focus, and active on settings primitives", () => {
     assert.match(ui, /SettingsPageHeader/);
     assert.match(ui, /settingsPrimaryButtonClass/);
-    assert.match(ui, /hover:border-\[#0096FF\]\/35/);
+    assert.match(ui, /hover:border-accent\/35/);
     assert.match(ui, /active:scale-\[0\.99\]/);
-    assert.match(ui, /focus-visible:ring-\[#0096FF\]\/40/);
-    assert.match(shell, /active:bg-\[#0096FF\]\/\[0\.08\]/);
+    assert.match(ui, /focus-visible:ring-accent\/40/);
+    assert.match(shell, /active:bg-accent\/\[0\.08\]/);
     assert.match(save, /active:scale-\[0\.99\]/);
     assert.match(form, /SettingsPageHeader/);
     assert.doesNotMatch(shell, /glass|mesh|MetricCard/);

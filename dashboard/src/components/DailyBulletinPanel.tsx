@@ -119,10 +119,10 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3 sm:px-4"
+              className="flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3 sm:px-4"
             >
               <div className="min-w-0 flex-1 basis-[12rem]">
-                <p className="text-xs font-medium uppercase tracking-wide text-[#0096FF]">
+                <p className="text-xs font-medium uppercase tracking-wide text-accent">
                   Live now
                 </p>
                 <p className="mt-1 text-sm font-medium text-ink [overflow-wrap:anywhere]">
@@ -138,7 +138,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 <button
                   type="submit"
                   disabled={clearPending}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft transition duration-150 hover:text-warn active:text-[#9a3209] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft transition duration-150 hover:text-warn active:text-warn-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
                 >
                   Clear
                 </button>

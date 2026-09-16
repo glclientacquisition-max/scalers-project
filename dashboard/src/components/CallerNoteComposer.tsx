@@ -13,7 +13,7 @@ const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
 
 const fieldClass =
-  "w-full rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:outline-none focus:ring-2 focus:ring-[#0096FF]";
+  "w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent";
 
 export function CallerNoteComposer({
   callId,
@@ -71,7 +71,7 @@ export function CallerNoteComposer({
           <button
             type="submit"
             disabled={polishPending || !note.trim()}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-medium text-ink-soft transition duration-150 hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-medium text-ink-soft transition duration-150 hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
           >
             Polish
           </button>

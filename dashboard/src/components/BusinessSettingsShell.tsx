@@ -18,6 +18,7 @@ import {
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
 import { SettingsPageHeader } from "@/components/settingsUi";
+import { ThemePicker } from "@/components/ThemePicker";
 
 function SettingsChevron() {
   return (
@@ -70,10 +71,10 @@ function SettingsMenu({
                     href={settingsNavHref(item.target)}
                     aria-current={active ? "page" : undefined}
                     className={[
-                      "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]/40",
+                      "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40",
                       active
-                        ? "bg-[#0096FF]/10 text-[#005ccc]"
-                        : "text-ink hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.08]",
+                        ? "bg-accent/10 text-accent-deep"
+                        : "text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
                     ].join(" ")}
                   >
                     {item.label}
@@ -141,6 +142,17 @@ export function BusinessSettingsShell({
           lineDetail={lineDetail}
         />
         <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
+        <section className="mt-6">
+          <h2 className="pointer-events-none mb-1.5 select-none px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+            This device
+          </h2>
+          <div className="overflow-hidden rounded-2xl border border-line bg-surface px-4 py-3.5">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-medium text-ink">Appearance</p>
+              <ThemePicker />
+            </div>
+          </div>
+        </section>
       </div>
     );
   }

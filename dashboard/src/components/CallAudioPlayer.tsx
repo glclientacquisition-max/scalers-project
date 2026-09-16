@@ -46,7 +46,7 @@ export function CallAudioPlayer({ src }: { src: string }) {
               className={[
                 "rounded-full border px-2.5 py-1 text-xs font-medium transition",
                 speed === s
-                  ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                  ? "border-[var(--accent)] bg-accent-fill text-accent-on-fill"
                   : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]/60",
               ].join(" ")}
             >

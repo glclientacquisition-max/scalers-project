@@ -131,8 +131,8 @@ export function DeskNav() {
                 "rounded-md",
                 focusRingVisible,
                 active
-                  ? "font-semibold text-[#005CCC]"
-                  : "font-medium text-ink hover:text-[#005CCC]",
+                  ? "font-semibold text-accent-deep"
+                  : "font-medium text-ink hover:text-accent-deep",
               ].join(" ")}
             >
               {item.label}
@@ -166,7 +166,7 @@ export function DeskTabBar() {
                   "flex min-h-12 flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[11px] leading-none",
                   focusRingVisible,
                   active
-                    ? "font-semibold text-[#005CCC]"
+                    ? "font-semibold text-accent-deep"
                     : "font-medium text-ink-soft",
                 ].join(" ")}
               >

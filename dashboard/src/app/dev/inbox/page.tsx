@@ -91,7 +91,7 @@ export default function DevInboxPage() {
   }
 
   return (
-    <div className="min-h-screen min-w-0">
+    <div className="desk-theme min-h-screen min-w-0">
       <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/95 backdrop-blur">
         <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           <BrandLockup href="/dev/inbox" name="Scalers" size="sm" priority className="max-w-full" />
