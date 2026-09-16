@@ -149,7 +149,7 @@ const {
   shouldSpeakThinkingAck,
   looksLikePhaticCallerTurn,
   pickPhaticReply,
-  trimSpokenServiceDump,
+  polishSpokenReply,
 } = require('./src/conversation/dynamicSpeech');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -3928,7 +3928,7 @@ async function runGeminiTurnStreaming(
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const spokenText = trimSpokenServiceDump(
+  const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
         spoken: buffer.getSpokenEmitted() || parsed.spokenText,
@@ -4022,7 +4022,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
     execution.results,
     callBrainStates.get(callSid)?.language?.current || 'en'
   );
-  const spokenText = trimSpokenServiceDump(
+  const spokenText = polishSpokenReply(
     spokenTextForToolTurn({
       spoken: spokenTextWithoutToolFallback({
         spoken: parsed.spokenText,

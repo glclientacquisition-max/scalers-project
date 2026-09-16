@@ -66,6 +66,7 @@ test('CONVERSATION_RULES require admit-unknown behavior', () => {
   assert.match(CONVERSATION_RULES, /do not have that detail/i);
   assert.match(CONVERSATION_RULES, /one person for the whole call/i);
   assert.match(CONVERSATION_RULES, /VISIT COMMIT/i);
+  assert.match(CONVERSATION_RULES, /CONTROL VOICE/i);
 });
 
 test('buildSystemPrompt surfaces unknown policy via live ground truth', () => {

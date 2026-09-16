@@ -356,6 +356,7 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(turn.decision.slot, 'name');
     assert.match(formatBrainStateForPrompt(turn.state), /Visit SOP:/);
     assert.match(formatBrainStateForPrompt(turn.state), /name=missing/);
+    assert.match(formatBrainStateForPrompt(turn.state), /Control:/);
 
     turn = runTurn(turn.state, turn.languageState, 'I am Alvin', '', {
       profile: homeProfile,
@@ -368,6 +369,7 @@ describe('multi-turn Brain outcomes', () => {
     assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /Got it, Alvin/);
     assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /Ask only for name/);
     assert.match(formatBrainStateForPrompt(turn.state), /name=Alvin/);
+    assert.match(formatBrainStateForPrompt(turn.state), /Name carpet/i);
 
     turn = runTurn(turn.state, turn.languageState, 'Pardon?', '', {
       profile: homeProfile,

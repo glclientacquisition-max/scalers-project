@@ -54,7 +54,7 @@ Boot + `/healthz` expose SMS `configured` vs **`verified`** (live balance probe)
 | Situation | Caller hears |
 | --- | --- |
 | Human asked, name missing | Immediate ask for name (`pickClarifyProgress`) |
-| Escalate running | Progress: “Okay, let me get the team on that.” |
+| Escalate running | Progress: “Okay.” |
 | SMS/WA/email delivered | “Okay, I've texted/sent it to the team.” |
 | Desk-only soft success | “Okay, I've noted that for the team to follow up.” |
 | Invalid / missing name on tool | “Tell me your name so I can reach the team…” |

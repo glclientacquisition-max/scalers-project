@@ -227,6 +227,27 @@ function trimSpokenServiceDump(text, opts = {}) {
   return 'We can help with that. What do you need done?';
 }
 
+const HEDGE_OPENER =
+  /^(okay[,.]?\s+|alright[,.]?\s+|sawa[,.]?\s+)?(one moment|just a (sec|second|minute)|hold on|let me (check|see|look|save that)|take your time|nakucheckia|kidogo|i('m| am) on it)( please)?\b[,.]?\s*/i;
+const HEDGE_PHRASE =
+  /\b(let me check|one moment please|take your time|sawa nakucheckia|nakucheckia)\b/gi;
+
+function stripSpokenHedges(text, opts = {}) {
+  let raw = String(text || '').trim();
+  if (!raw) return raw;
+  raw = raw.replace(HEDGE_OPENER, '');
+  raw = raw.replace(HEDGE_PHRASE, '');
+  raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').trim();
+  if (!raw) {
+    return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
+  }
+  return raw;
+}
+
+function polishSpokenReply(text, opts = {}) {
+  return trimSpokenServiceDump(stripSpokenHedges(text, opts), opts);
+}
+
 /**
  * Immediate progress line for action turns (order/save/escalate) so the caller
  * hears feedback while Gemini + tools run. Not a success claim — confirmation
@@ -239,16 +260,16 @@ function pickActionProgress(action, lang) {
   const spoken = confirmationLanguage(lang);
   const sw = spoken === 'sw' || spoken === 'sheng';
   if (sw) {
-    if (a === 'ESCALATE' || a === 'TRANSFER') return 'Sawa, ninashughulikia.';
-    if (a === 'CREATE_REQUEST') return 'Sawa, kidogo.';
+    if (a === 'ESCALATE' || a === 'TRANSFER') return 'Sawa.';
+    if (a === 'CREATE_REQUEST') return 'Sawa.';
     if (a === 'CAPTURE') return 'Sawa.';
-    return 'Sawa, ninashughulikia.';
+    return 'Sawa.';
   }
-  if (a === 'ESCALATE') return 'Okay, let me get the team on that.';
-  if (a === 'TRANSFER') return 'Okay, let me connect you.';
-  if (a === 'CREATE_REQUEST') return 'Okay, one moment.';
+  if (a === 'ESCALATE') return 'Okay.';
+  if (a === 'TRANSFER') return 'Okay.';
+  if (a === 'CREATE_REQUEST') return 'Okay.';
   if (a === 'CAPTURE') return 'Okay.';
-  return "Okay, I'm on it.";
+  return 'Okay.';
 }
 
 /**
@@ -476,6 +497,8 @@ module.exports = {
   pickPhaticReply,
   looksLikeSpokenServiceDump,
   trimSpokenServiceDump,
+  stripSpokenHedges,
+  polishSpokenReply,
   looksLikeCallerName,
   cleanSpokenLine,
   greetingLooksValid,

@@ -207,6 +207,16 @@ Ranked by how much they break trust on a live Kenyan call. Each is a **conversat
 
 **Lane:** Brain prompt + maybe a spoken-line filter (careful: Voice owns TTS). Ban lists in post-filter if the model emits them.
 
+### Control voice
+
+**Bar:** Echo the known job in one clause, then one question or silence for the tool. Holding lines are not control.
+
+**Now in runtime:** CALL STATE has a Control line. Visit SOP names the job then the next slot. Progress is Okay / Sawa. Final spoken hedges (`let me check`, `one moment`, `nakucheckia`) are stripped.
+
+**Still live:** Streaming TTS may still start a hedge before the turn finishes. Recompile after this prompt change. Prove on Amina (new visit) and Alex (open visit).
+
+**Lane:** Brain. Live pack #5–6 and #8.
+
 ### F8. Knowledge emptiness sounds like competence
 
 **Bar:** Empty coverage, empty price, empty policy: admit, one authorized next step. Do not force a name.

@@ -59,7 +59,7 @@ function formatAuthorityPolicy(capabilities = {}) {
     `- Escalation alert: ${capabilities.escalate ? 'allowed when justified or explicitly requested' : 'not available'}.`,
     `- Live transfer: ${capabilities.liveTransfer ? 'available' : 'NOT AVAILABLE — never claim you are transferring the call'}.`,
     '- A tool marker requests an action; it does not mean the action succeeded.',
-    '- When requesting create_service_request, create_appointment, update_appointment, or escalation, speak only an attempt statement such as "Let me save that."',
+    '- When requesting create_service_request, create_appointment, update_appointment, or escalation, speak nothing, or only Okay / Sawa. Never "let me check", "one moment", or "let me save that."',
     '- NEVER say an action is done, saved, held, booked, sent, notified, transferred, or confirmed in the same response as its tool marker. The backend will provide the success or failure confirmation.',
   ].join('\n');
 }

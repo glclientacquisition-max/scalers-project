@@ -108,7 +108,7 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     return {
       action: ACTIONS.ASK_CLARIFICATION,
       slot: missingSlots[0],
-      reason: `The goal needs ${missingSlots[0]}; ask for that one slot only.`,
+      reason: `The goal needs ${missingSlots[0]}; name what you already have, then ask for that one slot only.`,
     };
   }
 
