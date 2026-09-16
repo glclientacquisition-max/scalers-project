@@ -344,6 +344,10 @@ function pickLlmRecoverySaved(opts = {}) {
 }
 
 function looksLikeCallerName(text) {
+  return Boolean(callerNameFromUtterance(text));
+}
+
+function looksLikeBareCallerName(text) {
   const t = normalizeCallerText(text);
   if (!t || PURE_NOISE.has(t) || CONFIRM_ANSWERS.has(t)) return false;
   const hearAgain = t.replace(/[?'!.,]+$/g, '').trim();
@@ -363,6 +367,19 @@ function looksLikeCallerName(text) {
   }
   const words = t.split(' ').filter(Boolean);
   return words.length >= 1 && words.length <= 3 && t.length <= 40;
+}
+
+function callerNameFromUtterance(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const { extractName } = require('./entityExtraction');
+  const { isJunkCallerName } = require('./callerNameQuality');
+  const extracted = extractName(raw, { firstMissing: 'name', preferKnown: false });
+  if (extracted && !isJunkCallerName(extracted)) return extracted;
+  if (!looksLikeBareCallerName(raw)) return '';
+  const bare = normalizeCallerText(raw).replace(/[?'!.,]+$/g, '').trim();
+  if (!bare || isJunkCallerName(bare)) return '';
+  return bare.replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
 const PURE_NOISE = new Set([
@@ -500,6 +517,7 @@ module.exports = {
   stripSpokenHedges,
   polishSpokenReply,
   looksLikeCallerName,
+  callerNameFromUtterance,
   cleanSpokenLine,
   greetingLooksValid,
   isNonSubstantiveTurn,

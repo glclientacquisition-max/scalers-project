@@ -24,6 +24,12 @@ assert.match(
 
 assert.match(
   source,
+  /planLlmRecovery/,
+  'Gemini failure must persist a name they already said, not re-ask blindly'
+);
+
+assert.match(
+  source,
   /decideCallerEvent/,
   'media path must ask the turn-taking decision table what to do with caller speech'
 );
