@@ -11,7 +11,7 @@ import { btnPrimary } from "@/components/ui/deskChrome";
 const initial: RequestScheduleState = {};
 
 const fieldClass =
-  "w-full min-h-11 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent";
+  "w-full min-h-11 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent";
 
 export function InboxHoldEditor({
   id,

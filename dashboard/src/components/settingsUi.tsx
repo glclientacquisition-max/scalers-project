@@ -11,10 +11,10 @@ import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
 
 export const settingsDenseFieldClass =
-  "w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent";
+  "w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent";
 
 export const settingsTableFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm outline-none transition duration-150 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent";
+  "w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent";
 
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
@@ -32,14 +32,14 @@ export const settingsPanelHeadingClass =
   "font-display text-xl tracking-tight text-ink";
 
 export const settingsBlockTitleClass =
-  "text-[11px] font-bold uppercase tracking-wide text-gray-500";
+  "text-[11px] font-bold uppercase tracking-wide text-ink-soft";
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
     "w-full text-left rounded-xl border px-4 py-3 transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
     selected
       ? "border-transparent bg-accent/10 ring-2 ring-accent active:bg-accent/15"
-      : "border-line bg-surface hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
+      : "border-line bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
   ].join(" ");
 }
 

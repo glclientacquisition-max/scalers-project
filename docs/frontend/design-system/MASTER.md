@@ -44,7 +44,7 @@ The desk (`app/(desk)`) ships a dark palette; marketing, auth, onboarding, and a
 - **Scoped.** Dark tokens apply only inside `.desk-theme` (the desk layout root, mirrored on `dev/inbox` for visual tests). Activation: `<html data-theme="dark|light">` set by the pre-paint script in `app/layout.tsx`, or `prefers-color-scheme` when no explicit choice. Both selectors live in `globals.css` and must stay in sync.
 - **Choice is per-device.** `ThemePicker` (Settings menu, This device) writes `localStorage["scalers-desk-theme"]` (`system` default) and applies instantly. Never a tenant setting, never server state.
 - **Fills invert.** On bright fills (accent, warn, ok, lead) the label is `text-accent-on-fill`: white on deep blue in light, deep navy on bright fills in dark. `#0096FF` text on dark is `accent-deep` (`#6BC2FF`).
-- **Ring offsets** resolve to `--card` inside the dark scope, so focus rings never halo white.
+- **Inherited ink.** `body` sits outside `.desk-theme`, so its `color` is computed from light `--ink`. `.desk-theme` sets `color` and `caret-color` from `--ink`. Form controls (input/textarea/select) pin `color` and autofill `-webkit-text-fill-color` so typed characters never inherit navy onto a dark field. Field class strings include `text-ink` and `placeholder:text-ink-soft/70`.
 
 | Token role | Light | Dark |
 | --- | --- | --- |

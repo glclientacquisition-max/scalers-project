@@ -1048,7 +1048,7 @@ export function PronunciationCoach({
                           value={editSay}
                           onChange={(e) => setEditSay(e.target.value)}
                           aria-label={`Say-as for ${label}`}
-                          className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-surface px-3 py-1.5 font-mono text-sm outline-none focus:border-[var(--accent)]"
+                          className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-surface px-3 py-1.5 font-mono text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-[var(--accent)]"
                         />
                         <button
                           type="button"
@@ -1292,7 +1292,7 @@ export function PronunciationCoach({
                   setAddError(null);
                 }}
                 placeholder="Muindi Mbingu"
-                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-[var(--accent)]"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -1328,7 +1328,7 @@ export function PronunciationCoach({
                     setAddError(null);
                   }}
                   placeholder="Moo-in-dee Mbeen-goo"
-                  className="w-full rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-[var(--accent)]"
                 />
                 <button
                   type="button"
