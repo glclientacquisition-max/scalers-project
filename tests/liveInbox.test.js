@@ -26,11 +26,23 @@ describe("LiveInbox component", () => {
     assert.match(src, /tenant_id=eq\.\$\{tenantId\}/);
   });
 
+  it("waits for an owner session before subscribe", () => {
+    assert.match(src, /auth\.getSession\(\)/);
+    assert.match(src, /if \(cancelled \|\| !data\.session\) return;/);
+  });
+
   it("debounces bursts into one server refresh and cleans up", () => {
     assert.match(src, /REFRESH_DEBOUNCE_MS = 1200/);
     assert.match(src, /clearTimeout\(timer\.current\)/);
-    assert.match(src, /router\.refresh\(\)/);
+    assert.match(src, /routerRef\.current\.refresh\(\)/);
     assert.match(src, /removeChannel\(channel\)/);
+    assert.doesNotMatch(src, /\[tenantId, router\]/);
+  });
+
+  it("revalidates Inbox and Home then refreshes, including when the tab returns", () => {
+    assert.match(src, /revalidateLiveDesk/);
+    assert.match(src, /visibilitychange/);
+    assert.match(src, /addEventListener\("focus"/);
   });
 
   it("degrades to refresh-to-update when the browser client cannot start", () => {
@@ -39,16 +51,29 @@ describe("LiveInbox component", () => {
 });
 
 describe("LiveInbox wiring", () => {
-  it("renders on the Inbox and Home pages with the tenant id", () => {
+  it("renders once in the desk shell with the tenant id", () => {
+    const layout = read("dashboard/src/app/(desk)/layout.tsx");
+    assert.match(layout, /import \{ LiveInbox \} from "@\/components\/LiveInbox";/);
+    assert.match(layout, /<LiveInbox tenantId=\{tenant\.id\} \/>/);
+  });
+
+  it("does not remount on Inbox or Home pages", () => {
     const calls = read("dashboard/src/app/(desk)/calls/page.tsx");
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
-    for (const [name, src] of [
-      ["calls", calls],
-      ["home", home],
-    ]) {
-      assert.match(src, /import \{ LiveInbox \} from "@\/components\/LiveInbox";/, `${name} imports LiveInbox`);
-      assert.match(src, /<LiveInbox tenantId=\{tenant\.id\} \/>/, `${name} renders LiveInbox`);
-    }
+    assert.doesNotMatch(calls, /LiveInbox/);
+    assert.doesNotMatch(home, /LiveInbox/);
+  });
+});
+
+describe("live desk revalidation", () => {
+  const src = read("dashboard/src/app/(desk)/liveInboxActions.ts");
+
+  it("is a server action that drops Inbox and Home caches", () => {
+    assert.match(src, /"use server"/);
+    assert.match(src, /export async function revalidateLiveDesk/);
+    assert.match(src, /revalidatePath\("\/home"\)/);
+    assert.match(src, /revalidatePath\("\/calls", "layout"\)/);
+    assert.match(src, /isAuthenticated\(\)/);
   });
 });
 
@@ -71,5 +96,35 @@ describe("realtime publication script", () => {
   it("is recorded in the SQL index and migration ledger", () => {
     assert.match(read("docs/supabase/README.md"), /realtime_inbox\.sql/);
     assert.match(read("docs/supabase/MIGRATION_LEDGER.md"), /realtime_inbox\.sql/);
+  });
+});
+
+describe("realtime replica identity script", () => {
+  const sql = read("docs/supabase/realtime_inbox_replica_identity.sql");
+
+  it("sets FULL replica identity on the three work tables", () => {
+    for (const table of ["calls", "service_requests", "appointments"]) {
+      assert.match(
+        sql,
+        new RegExp(`alter table public\\.${table} replica identity full`, "i"),
+        `FULL identity on ${table}`
+      );
+    }
+  });
+
+  it("is additive (no drops or policy changes)", () => {
+    const statements = sql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    assert.doesNotMatch(statements, /\bdrop\b/i);
+    assert.doesNotMatch(statements, /\bdelete\b/i);
+    assert.doesNotMatch(statements, /\bpolicy\b/i);
+    assert.match(statements, /replica identity full/i);
+  });
+
+  it("is recorded in the SQL index and migration ledger", () => {
+    assert.match(read("docs/supabase/README.md"), /realtime_inbox_replica_identity\.sql/);
+    assert.match(read("docs/supabase/MIGRATION_LEDGER.md"), /realtime_inbox_replica_identity\.sql/);
   });
 });

@@ -154,8 +154,11 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 31b | `contacts_owner_insert.sql` | `contacts_and_requests.sql` |
 | 32 | `product_catalog_and_social.sql` | `business_operating_model.sql` |
 | 33 | `appointments.sql` | **`contacts_and_requests.sql`** (FK to contacts) |
+| 33b | `realtime_inbox.sql` | `contacts_and_requests.sql`, `appointments.sql` |
+| 33c | `realtime_inbox_replica_identity.sql` | `realtime_inbox.sql` |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
+`realtime_inbox.sql` adds the three work tables to `supabase_realtime`. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.
 
 ---
 

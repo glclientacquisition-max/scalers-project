@@ -30,7 +30,7 @@ Needs you is not a history. Older open work stays until you Confirm, Done, or re
 
 Work that needs the owner sorts above answered rows. Visits before holds. Urgent first.
 
-**Live:** rows appear as calls land. `LiveInbox` subscribes to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives) and re-runs the server page after a 1.2s debounce, so one call's insert plus terminal update collapse into a single refresh. Without the publication or an owner session the page stays refresh-to-update.
+**Live:** rows appear as calls land. `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page, so one call's insert plus hangup collapse into a single refresh and Inbox is not stale when the owner returns to it. Coming back to the tab also refetches. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update.
 
 `hold_or_pickup` and `order_enquiry` are Holds. `product_inquiry` is Answered, not Needs you.
 
