@@ -15,12 +15,19 @@ export type BusinessSettingsTab =
   | "catalog"
   | "train"
   | "import"
-  | "test";
+  | "test"
+  | "alerts";
 
 export function parseBusinessSettingsTab(
   raw: string | undefined | null
 ): BusinessSettingsTab {
-  if (raw === "catalog" || raw === "train" || raw === "import" || raw === "test") {
+  if (
+    raw === "catalog" ||
+    raw === "train" ||
+    raw === "import" ||
+    raw === "test" ||
+    raw === "alerts"
+  ) {
     return raw;
   }
   // "today" kept as a legacy alias for bookmarked /settings?tab=today links.
@@ -85,6 +92,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       { label: "Updates", target: { tab: "updates" } },
       { label: "Assistant", target: { tab: "train", panel: "identity" } },
       { label: "Team", target: { tab: "train", panel: "team" } },
+      { label: "Alerts", target: { tab: "alerts" } },
     ],
   },
   {

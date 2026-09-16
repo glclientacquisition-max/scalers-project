@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { TenantRow } from "@/lib/supabase";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
+import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { TenantForm } from "@/components/TenantForm";
@@ -49,7 +50,7 @@ function SettingsMenu({
   const isRail = variant === "rail";
   return (
     <nav
-      aria-label="Business sections"
+      aria-label="Business Profile sections"
       className={isRail ? "min-w-0 shrink-0 lg:w-60" : "min-w-0 w-full"}
     >
       {SETTINGS_NAV.map((section, index) => (
@@ -175,6 +176,8 @@ export function BusinessSettingsShell({
             {rail}
             <div className="min-w-0 flex-1">
               {tab === "updates" ? <DailyBulletinPanel tenant={tenant} /> : null}
+
+              {tab === "alerts" ? <AlertsPanel tenant={tenant} /> : null}
 
               {tab === "import" ? (
                 <div className="space-y-6">

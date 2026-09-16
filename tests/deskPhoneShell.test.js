@@ -21,7 +21,7 @@ describe("desk phone shell", () => {
     assert.match(nav, /label: "Overview"/);
     assert.match(nav, /label: "Inbox"/);
     assert.match(nav, /label: "Contacts"/);
-    assert.match(nav, /label: "Business"/);
+    assert.match(nav, /label: "Business Profile"/);
     assert.match(nav, /label: "Wallet"/);
     assert.doesNotMatch(nav, /Menu/);
     assert.doesNotMatch(nav, /hamburger/i);
