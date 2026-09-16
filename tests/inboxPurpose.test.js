@@ -1,5 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("fs");
+const path = require("path");
 
 /**
  * Mirrors dashboard/src/lib/inboxPurpose.ts classify + signal labels.
@@ -138,8 +140,8 @@ function inboxCaption(items) {
 function compareInboxSignal(a, b) {
   function rank(item) {
     if (item.urgent && item.needsYou) return 0;
-    if (item.purpose === "job" && item.needsYou) return 1;
-    if (item.purpose === "hold" && item.needsYou) return 2;
+    if (item.purpose === "job" && item.job && item.needsYou) return 1;
+    if (item.purpose === "hold" && item.hold && item.needsYou) return 2;
     if (item.purpose === "missed" && item.needsYou) return 3;
     if (item.purpose === "human" && item.needsYou) return 4;
     if (item.needsYou) return 5;
@@ -327,10 +329,49 @@ describe("inbox signal", () => {
   });
 
   it("sorts visits ahead of holds", () => {
-    const hold = { needsYou: true, urgent: false, purpose: "hold", createdAt: "2026-09-07T12:00:00.000Z" };
-    const visit = { needsYou: true, urgent: false, purpose: "job", createdAt: "2026-09-07T08:00:00.000Z" };
+    const hold = {
+      needsYou: true,
+      urgent: false,
+      purpose: "hold",
+      hold: { status: "open" },
+      createdAt: "2026-09-07T12:00:00.000Z",
+    };
+    const visit = {
+      needsYou: true,
+      urgent: false,
+      purpose: "job",
+      job: { status: "requested" },
+      createdAt: "2026-09-07T08:00:00.000Z",
+    };
     const rows = [hold, visit].sort(compareInboxSignal);
     assert.equal(rows[0], visit);
+  });
+
+  it("ranks the newest missed call above an intent-only return", () => {
+    const intentOnly = {
+      needsYou: true,
+      urgent: false,
+      purpose: "job",
+      job: null,
+      createdAt: "2026-09-16T12:23:00.000Z",
+    };
+    const lastCall = {
+      needsYou: true,
+      urgent: false,
+      purpose: "missed",
+      createdAt: "2026-09-16T15:36:00.000Z",
+    };
+    const realVisit = {
+      needsYou: true,
+      urgent: false,
+      purpose: "job",
+      job: { status: "requested" },
+      createdAt: "2026-09-16T05:14:00.000Z",
+    };
+    const rows = [intentOnly, lastCall, realVisit].sort(compareInboxSignal);
+    assert.equal(rows[0], realVisit);
+    assert.equal(rows[1], lastCall);
+    assert.equal(rows[2], intentOnly);
   });
 
   it("briefs Home by the sharpest queue", () => {
@@ -389,5 +430,16 @@ describe("inbox piles", () => {
     const fulfilled = { hold: { status: "fulfilled" }, purpose: "hold" };
     assert.equal(itemMatchesPurpose(open, "hold"), true);
     assert.equal(itemMatchesPurpose(fulfilled, "hold"), false);
+  });
+});
+
+describe("inboxPurpose source lockstep", () => {
+  it("ranks Confirm visit only when an appointments row exists", () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, "..", "dashboard/src/lib/inboxPurpose.ts"),
+      "utf8"
+    );
+    assert.match(src, /item\.purpose === "job" && item\.job && item\.needsYou/);
+    assert.match(src, /item\.purpose === "hold" && item\.hold && item\.needsYou/);
   });
 });

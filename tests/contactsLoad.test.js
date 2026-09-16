@@ -34,16 +34,22 @@ describe("pickLastContactAt", () => {
 });
 
 describe("contactsLoad last-contact wiring", () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, "..", "dashboard/src/lib/contactsLoad.ts"),
+    "utf8"
+  );
+
   it("merges phone activity with contact-id activity instead of short-circuiting", () => {
-    const src = fs.readFileSync(
-      path.join(__dirname, "..", "dashboard/src/lib/contactsLoad.ts"),
-      "utf8"
-    );
     assert.match(src, /export function pickLastContactAt/);
     assert.match(src, /lastContactAt: pickLastContactAt\(/);
     assert.doesNotMatch(
       src,
       /lastContactAt:\s*\n\s*extras\.byId\.get\(row\.id\) \|\|/
     );
+  });
+
+  it("uses the latest call's Inbox one-liner, not hangup Want", () => {
+    assert.match(src, /pickCallOwnerReason\(parseSummary/);
+    assert.match(src, /latestCallReason: ownerReason \|\| ownerWant/);
   });
 });

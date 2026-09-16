@@ -9,4 +9,4 @@
 
 **Detail:** `/contacts/[id]`. Notes left. Timeline right. Tap a timeline row that has a call to open the conversation. No Call column.
 
-Identity is tenant + E.164 phone. The fifth call from the same number is the same contact. Last contact is the newest call or work row, not the first visit created that morning. Last reason is hangup Want. Inbox When is that call's start. Inbox headline is hangup reason.
+Identity is tenant + E.164 phone. The fifth call from the same number is the same contact. Last contact is the newest call. Last reason is the same hangup one-liner Inbox uses for that call. The Want card on the person file is the four-block summary, not the list line.
