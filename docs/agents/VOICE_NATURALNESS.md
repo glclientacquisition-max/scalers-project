@@ -99,14 +99,6 @@ Same DID, same SHA, phone speaker. Keep `VOICE_LIVE_TRANSFER` off.
 
 If N1 fails, still run N2 and N3 on the same SHA. The set is the measurement.
 
-## Freeze results (`abf6aa9`)
-
-| Call | SID | Voice | Fail IDs |
-| --- | --- | --- | --- |
-| N1 phatic | `HD_d0f042f5d960` | fail | **V5** (`Okay.` → `I'm well. Who is calling?`) |
-| N2 barge | | | |
-| N3 pace | | | |
-
 N1 detail: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md). Do not retune until N2 and N3 are scored.
 
 ## After the three calls

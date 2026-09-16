@@ -28,6 +28,27 @@ Brain notes (do not retune Voice for these): shared-line card asked who is calli
 
 Voice next candidate after N2+N3: do not run the phatic local reply when `nextBestAction` is `END`, and/or stop treating bare `Okay` as how-are-you.
 
+## Freeze call N2 — `HD_b4cb560bae33` (2026-09-16 05:11Z)
+
+166s. Same SHA `abf6aa9`. Script was barge+wait then pet stain Thursday 10. STT first turn was `Sorry. Pet stain removal.` No `wait` token. Barge still fired later on overlap.
+
+| ID | Result | Evidence |
+| --- | --- | --- |
+| V1 | pass | Sentence chunks, no fragment restart. |
+| V2 | pass | No solo `Sure.` / `I'm listening.` |
+| V3 | pass | `Alvin` in `spoken=`. |
+| V4 | pass | `10 A M` spoken form only. |
+| V5 | pass | Closer `No.` skipped as non-substantive. No how-are-you replay. |
+| V6 | pass | No idle poke. |
+| V7 | pass | `filler=1` on thinking-ack / one barge, not every turn. |
+| V8 | n/a | N3. |
+| V9 | pass (barge) / incomplete (wait) | Multiple `outcome=barge_in`, streamed reply discarded, stale TTS 400 ignored. `wait` never reached STT. |
+| Speech guarantee | **fail** | After `Yeah, I'm Alvin.` Gemini emitted 0 spoken chars (`save_caller_info` succeeded). Voice spoke `Okay, I can't finish that just now. May I have your name so I can reach them?` on `action=ANSWER`. Caller then asked why. Same canned line as N1. |
+
+Brain notes: shared-line identity loop; catalogue recitation on `Aside from carpet cleaning`; landmark saved as `SaidI`.
+
+---
+
 ---
 
 ---
