@@ -1483,7 +1483,7 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                       <span className="text-xs text-ink-soft">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
@@ -1494,7 +1494,7 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                     </div>
                   ) : (

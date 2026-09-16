@@ -56,7 +56,7 @@ function SettingsMenu({
     >
       {SETTINGS_NAV.map((section, index) => (
         <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
-          <h2 className="pointer-events-none mb-1.5 select-none px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+          <h2 className="pointer-events-none mb-1.5 select-none px-1 text-xs font-bold uppercase tracking-wide text-ink-soft">
             {section.title}
           </h2>
           <ul className="overflow-hidden rounded-2xl border border-line bg-surface">
@@ -143,7 +143,7 @@ export function BusinessSettingsShell({
         />
         <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
         <section className="mt-6">
-          <h2 className="pointer-events-none mb-1.5 select-none px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+          <h2 className="pointer-events-none mb-1.5 select-none px-1 text-xs font-bold uppercase tracking-wide text-ink-soft">
             This device
           </h2>
           <div className="overflow-hidden rounded-2xl border border-line bg-surface px-4 py-3.5">

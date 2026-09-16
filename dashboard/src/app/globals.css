@@ -139,6 +139,47 @@
   }
 }
 
+/*
+ * Body sits outside .desk-theme, so its `color` is computed from :root --ink
+ * (navy). Fields that only set a background then inherit that navy onto a dark
+ * card. Recompute ink on the desk shell, and pin form controls so typed text,
+ * carets, and autofill never disappear.
+ */
+.desk-theme {
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+
+.desk-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+.desk-theme textarea,
+.desk-theme select {
+  color: var(--ink);
+  caret-color: var(--ink);
+  color-scheme: inherit;
+}
+
+.desk-theme input::placeholder,
+.desk-theme textarea::placeholder {
+  color: color-mix(in srgb, var(--ink-soft) 70%, transparent);
+  opacity: 1;
+}
+
+.desk-theme option {
+  color: var(--ink);
+  background-color: var(--card);
+}
+
+.desk-theme input:-webkit-autofill,
+.desk-theme input:-webkit-autofill:hover,
+.desk-theme input:-webkit-autofill:focus,
+.desk-theme textarea:-webkit-autofill,
+.desk-theme select:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+  box-shadow: 0 0 0 1000px var(--card) inset;
+  border-color: var(--line);
+}
+
 @media (min-width: 640px) {
   :root {
     --desk-header-h: 3.75rem;

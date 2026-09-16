@@ -505,7 +505,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                           onChange={(e) =>
                             updateDraftFaq(i, "question", e.target.value)
                           }
-                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
+                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                         />
                       </div>
                       <div>
@@ -523,7 +523,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                           onChange={(e) =>
                             updateDraftFaq(i, "answer", e.target.value)
                           }
-                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm leading-relaxed outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
+                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink leading-relaxed outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                         />
                       </div>
                     </div>

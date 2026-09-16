@@ -12,7 +12,7 @@ import {
 } from "@/app/(desk)/calls/faqActions";
 
 const fieldClass =
-  "mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
+  "mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus-visible:shadow-focus";
 
 const suggestInitial: FaqSuggestState = {};
 const applyInitial: FaqApplyState = {};

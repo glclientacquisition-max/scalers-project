@@ -70,6 +70,12 @@ describe("dark palette", () => {
   it("offsets focus rings against the card token, never white, in dark", () => {
     assert.match(css, /--tw-ring-offset-color: var\(--card\)/);
   });
+
+  it("recomputes ink on the desk shell so typed text is not inherited navy", () => {
+    assert.match(css, /\.desk-theme \{\s*color: var\(--ink\);\s*caret-color: var\(--ink\);/);
+    assert.match(css, /\.desk-theme textarea,\s*\.desk-theme select \{\s*color: var\(--ink\);/);
+    assert.match(css, /-webkit-text-fill-color: var\(--ink\)/);
+  });
 });
 
 describe("theme activation", () => {
@@ -130,6 +136,13 @@ describe("desk token hygiene", () => {
     assert.match(chrome, /text-accent-on-fill/);
     assert.match(chrome, /hover:bg-accent-fill-hover/);
     assert.doesNotMatch(chrome, /bg-\[#005CCC\]|text-white/);
+  });
+
+  it("puts text-ink on every settings field class", () => {
+    const ui = read("dashboard/src/components/settingsUi.tsx");
+    assert.match(ui, /export const settingsDenseFieldClass =\s*"[^"]*text-ink/);
+    assert.match(ui, /export const settingsTableFieldClass =\s*"[^"]*text-ink/);
+    assert.match(ui, /deskFieldClass/);
   });
 
   it("documents the dark system in MASTER", () => {
