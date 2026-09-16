@@ -207,7 +207,7 @@ async function loadLastContactMap(
     if (!reasonByPhone.has(phone)) {
       reasonByPhone.set(
         phone,
-        pickCallOwnerWant(parseSummary(row.summary as string | null))
+        pickCallOwnerReason(parseSummary(row.summary as string | null))
       );
     }
   }
@@ -318,10 +318,10 @@ export async function loadContactTimeline(
           name: contact.name,
           phone: contact.phone,
           lastReason: null,
-          latestCallReason: ownerWant || ownerReason,
+          latestCallReason: ownerReason || ownerWant,
         }) ||
-        ownerWant ||
         ownerReason ||
+        ownerWant ||
         row.primary_intent ||
         "Call",
       detail: row.status || null,

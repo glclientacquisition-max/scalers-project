@@ -1,7 +1,8 @@
 /**
  * Same owner sentence Calls uses on the call page.
  * Inbox stays on the hangup one-liner (`reason`).
- * Contact last reason and the Summary Want block use `want`.
+ * Contact last reason uses that same `reason` so the list matches Inbox.
+ * The Summary Want block on the call and contact card uses `want`.
  *
  * @param {Record<string, unknown> | null | undefined} meta
  * @returns {Record<string, unknown> | null}
