@@ -185,7 +185,7 @@ Ranked by how much they break trust on a live Kenyan call. Each is a **conversat
 
 **Bar:** Unique line: skip name, recognize open visit, reschedule without a new book. Shared line: who is this.
 
-**Now in runtime:** Unique line seeds name and a returning file on CALL STATE. First reasoned turn (and the local how-are-you line) must speak to an open visit, not start a new book. Reschedule is classified before booking, so "move my visit to Tuesday" updates. Shared line asks who is speaking. Instant greeting stays brand-first.
+**Now in runtime:** Unique line seeds name and a returning file on CALL STATE. First reasoned turn (and the local how-are-you line) must speak to an open visit, not start a new book. Reschedule is classified before booking, so "move my visit to Tuesday" updates. Shared line asks who is speaking, then binds that phone file when they confirm a name (primary keeps the visit; alternate does not). Instant greeting stays brand-first.
 
 **Still live:** Prove on DID pack #8. Gemini can still ignore CALL STATE if the compile is stale. No spoken "welcome back" by name on the opener.
 

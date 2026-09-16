@@ -7,6 +7,7 @@ const {
   introLooksValid,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
+const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -189,12 +190,12 @@ function pickPhaticReply(opts = {}) {
   const lang = confirmationLanguage(opts.language);
   const card = opts.callerMemory;
   if (card && typeof card === 'object') {
-    if (card.sharedLine) {
+    if (card.sharedLine && !speakerKnownOnFile(card)) {
       return lang === 'en'
         ? "I'm well. Who is calling?"
         : 'Nzuri. Ni nani anayepiga?';
     }
-    if (card.nextAppointment && !card.sharedLine) {
+    if (card.nextAppointment && returningFileUsable(card)) {
       return lang === 'en'
         ? "I'm well. I have your visit on file. Is that why you called?"
         : 'Nzuri. Una ziara kwenye faili. Nisaidie na hiyo?';

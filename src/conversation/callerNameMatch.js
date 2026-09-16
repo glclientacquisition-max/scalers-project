@@ -306,6 +306,9 @@ function collectKnownCallerNames({ profile = null, state = null } = {}) {
     names.push({ name: value, source });
   }
   const card = profile?.callerMemory;
+  if (card?.fileOwnerName) {
+    push(card.fileOwnerName, card.greetByName && card.fileRole === 'primary' ? 'memory' : 'file');
+  }
   if (card?.name) push(card.name, card.greetByName ? 'memory' : 'file');
   for (const alt of card?.alternateNames || []) push(alt, 'alternate');
   push(state?.caller?.name, 'state');

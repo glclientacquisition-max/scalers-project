@@ -503,4 +503,38 @@ describe('Brain state and next-best-action', () => {
     assert.equal(decision.slot, 'name');
     assert.match(decision.reason, /shared line/i);
   });
+
+  it('pulls up the returning file once a shared-line caller confirms the file name', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    const card = {
+      name: 'Amina',
+      sharedLine: true,
+      greetByName: false,
+      alternateNames: ['Brian'],
+      lastReason: 'price on soap',
+      nextAppointment: 'carpet, Tuesday',
+    };
+    const profile = { callerMemory: card };
+    const seeded = createBrainState(profile);
+    const state = observeCallerTurn(seeded, {
+      text: 'My name is Amina',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('My name is Amina', {
+        profile,
+        state: seeded,
+      }),
+    });
+    assert.equal(state.caller.name, 'Amina');
+    assert.equal(state.caller.nameConfirmed, true);
+    assert.equal(state.returning.fileRole, 'primary');
+    assert.equal(state.returning.nextVisit, 'carpet, Tuesday');
+    const decision = determineNextBestAction({
+      state,
+      capabilities: { saveCallerInfo: true, escalate: true },
+    });
+    assert.notEqual(decision.slot, 'name');
+    assert.doesNotMatch(String(decision.reason), /who is speaking/i);
+  });
 });

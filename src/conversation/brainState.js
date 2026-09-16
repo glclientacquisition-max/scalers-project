@@ -10,8 +10,11 @@ const {
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
 const {
+  applyLiveCallerFile,
   formatReturningFileForCallState,
+  returningFileUsable,
   seedCallerFromMemory,
+  speakerKnownOnFile,
   returningFileFromCard,
 } = require('./callerMemory');
 const {
@@ -371,6 +374,7 @@ function observeCallerTurn(state, input = {}) {
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
+  applyLiveCallerFile(input.profile, next);
   if (next.caller.name && !entityValue(next.entities.name)) {
     next.entities.name = {
       value: next.caller.name,
@@ -589,9 +593,9 @@ function formatBrainStateForPrompt(state) {
     formatHearAgainForPrompt(value),
     formatReturningFileForCallState(value.returning),
     value.conversation?.phatic
-      ? value.returning?.sharedLine
+      ? value.returning?.sharedLine && !speakerKnownOnFile(value.returning)
         ? '- Phatic turn: one short well, then who is calling. Do not list services.'
-        : value.returning?.nextVisit
+        : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
           : '- Phatic turn: they only greeted or asked how you are. One short well, then How can I help. Do not list services, prices, or jobs.'
       : '',

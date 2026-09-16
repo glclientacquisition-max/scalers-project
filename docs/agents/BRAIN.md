@@ -71,7 +71,7 @@ Core runtime modules:
 10. Call summary / primary intent persist instantly from Brain state + tools (STT text). Gemini does **not** hear live audio. After hangup, a fire-and-forget hangup job (`src/conversation/callTranscriptReview.js`) upserts a `contacts` row (name may stay null) and runs a **narrow name extract** (name or `NONE`) plus the existing **transcript review** (Flash-Lite, ~6s timeout) that may rewrite `summary.reason` and only upgrade `needs_human` when merge rules agree. Kill switch for review only: `POST_CALL_GEMINI_REVIEW=off`. Contact persist still runs. Ignore STT fragments/backchannels as caller name or goal text; prefer `human` when handoff was requested.
 11. Compiled `llm_system_prompt` is written by Desk compiler; owners do not edit raw prompt in UI. Stale compiled prompts that force name capture fight resolution-first runtime — recompile after Brain policy changes.
 12. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`.
-13. Returning callers: load a compact phone file at call setup (`getCallerMemory` → CONTEXT HEADER). Never dump prior transcripts. Shared lines confirm identity; unique named lines may seed `caller.name` as confirmed. Instant greeting stays brand-first and local.
+13. Returning callers: load a compact phone file at call setup (`getCallerMemory` → CONTEXT HEADER). After a confirmed spoken name, bind that same phone card to the speaker (shared line: primary keeps the visit; alternate does not). Never dump prior transcripts. Instant greeting stays brand-first and local.
 
 ## Test / verify
 

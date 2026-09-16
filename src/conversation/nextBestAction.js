@@ -2,6 +2,7 @@
 // The LLM interprets language; this module decides the safest useful action class.
 
 const { ACTIONS, authorizeAction } = require('./brainPolicy');
+const { returningFileUsable } = require('./callerMemory');
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -77,18 +78,22 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       };
     }
     const said = String(state?.goal?.description || '');
+    const latest = String(
+      (state?.conversation?.answersReceived || []).slice(-1)[0] || ''
+    );
     const followUp =
       intent === 'unknown' ||
       Boolean(state?.conversation?.phatic) ||
-      looksLikeExistingVisitTalk(said);
-    if (followUp && returning?.nextVisit && !returning.sharedLine) {
+      looksLikeExistingVisitTalk(said) ||
+      looksLikeExistingVisitTalk(latest);
+    if (followUp && returning?.nextVisit && returningFileUsable(returning)) {
       return {
         action: ACTIONS.ANSWER,
         reason:
           'Unique returning line with an open visit. Speak to that visit. Do not start a new book or re-ask the name. If they want it moved, collect only the new when.',
       };
     }
-    if (intent === 'unknown' && returning?.lastReason && !returning.sharedLine) {
+    if (intent === 'unknown' && returning?.lastReason && returningFileUsable(returning)) {
       return {
         action: ACTIONS.ANSWER,
         reason:

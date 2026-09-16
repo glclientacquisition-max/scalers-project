@@ -2,6 +2,7 @@
 
 const { normalizeLocations } = require('./businessLocations');
 const { entityValue } = require('./entityExtraction');
+const { returningFileUsable } = require('./callerMemory');
 
 const GOAL_REQUIREMENTS = Object.freeze({
   price: [{ slot: 'subject', anyOf: ['product', 'service', 'requestedItem'] }],
@@ -120,7 +121,7 @@ function formatControlVoiceForPrompt(state) {
     visitSopSlotValue(state, 'service') ||
     entityValue(state?.entities?.product) ||
     entityValue(state?.entities?.requestedItem) ||
-    (state?.returning && !state.returning.sharedLine
+    (state?.returning && returningFileUsable(state.returning)
       ? state.returning.nextVisit || state.returning.lastReason
       : '');
   const missing = Array.isArray(state?.goal?.missingSlots)

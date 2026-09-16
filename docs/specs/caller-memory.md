@@ -6,7 +6,7 @@
 
 ## Destination
 
-The next call from a known tenant phone does not start empty. Brain receives a compact **returning-caller card** at call setup and may use the file name on a unique line.
+The next call from a known tenant phone does not start empty. Brain receives a compact **returning-caller card** at call setup and may use the file name on a unique line. Mid-call, a confirmed spoken name binds that same phone card to the speaker so CONTEXT HEADER and CALL STATE stop asking who is speaking.
 
 ## Decisions
 
@@ -17,7 +17,8 @@ The next call from a known tenant phone does not start empty. Brain receives a c
 5. **Seed Brain state** on a unique named line: `caller.name` + `nameConfirmed=true` so the model does not re-ask "Got it, Jane?" On a shared line, leave name empty.
 6. **Write path unchanged:** `upsertContact` on requests/appointments and `persistCompletedCallContact` after hangup already persist the file. This spec is the read path.
 7. **Unknown number:** no card, current cold open.
-8. **Out of scope:** mid-call RAG, fine-tuning Gemini, Twenty/CRM import into the prompt, dumping prior `transcripts` rows, Desk UI changes.
+8. **Live bind:** when `caller.nameConfirmed` is true, match the spoken name to the loaded phone card (primary vs `alternate_names`). Primary (or unique unnamed line) may use last reason / open visit. Alternate or a different name on a unique line gets identity only. Rebuild CONTEXT HEADER for that speaker. No new DB lookup. No name search.
+9. **Out of scope:** mid-call RAG, fine-tuning Gemini, Twenty/CRM import into the prompt, dumping prior `transcripts` rows, Desk UI changes, lookup by name across phones.
 
 ## Observable behavior
 
@@ -25,6 +26,7 @@ The next call from a known tenant phone does not start empty. Brain receives a c
 - That block never contains `Caller:` / `Agent:` transcript lines.
 - `createBrainState({ callerMemory })` seeds name only when `greetByName` is true.
 - `getCallerMemory` returns null when the contacts table is missing or no row matches.
+- After a confirmed name on a shared line, `bindCallerMemoryCard` / `observeCallerTurn` attach the household visit only when the speaker matches the primary file name.
 
 ## Tests
 

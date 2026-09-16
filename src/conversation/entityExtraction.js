@@ -168,7 +168,9 @@ function fileLockedName(name, knownNames = []) {
   const { matchCallerName } = require('./callerNameMatch');
   const hit = matchCallerName(name, { knownNames, preferKnown: true });
   if (!hit || hit.score < 85) return null;
-  if (hit.source === 'memory' || hit.source === 'file') return hit.canonical;
+  if (hit.source === 'memory' || hit.source === 'file' || hit.source === 'alternate') {
+    return hit.canonical;
+  }
   return null;
 }
 
