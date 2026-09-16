@@ -51,6 +51,15 @@ function maxIso(a: string | null, b: string | null): string | null {
   return a >= b ? a : b;
 }
 
+/** Newest call or work row. Do not let an older visit created_at beat a later call. */
+export function pickLastContactAt(
+  byPhone: string | null | undefined,
+  byContactId: string | null | undefined,
+  updatedAt: string | null | undefined
+): string | null {
+  return maxIso(byPhone || null, byContactId || null) || updatedAt || null;
+}
+
 export type ContactSavedFilter = "all" | "saved" | "unsaved";
 
 export function resolveContactSavedFilter(
@@ -118,10 +127,11 @@ export async function loadContactsPage(
       : null;
     return {
       ...row,
-      lastContactAt:
-        extras.byId.get(row.id) ||
-        (row.phone ? extras.byPhone.get(row.phone) : null) ||
-        row.updated_at,
+      lastContactAt: pickLastContactAt(
+        row.phone ? extras.byPhone.get(row.phone) : null,
+        extras.byId.get(row.id),
+        row.updated_at
+      ),
       lastReasonDisplay: displayContactLastReason({
         name: row.name,
         phone: row.phone,
