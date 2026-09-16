@@ -8,7 +8,8 @@ import {
   type CallRow,
   type TranscriptRow,
 } from "@/lib/supabase";
-import { buildSummarySentence, pickCallOwnerReason } from "@/lib/callSummarySentence";
+import { pickCallOwnerCard, pickCallOwnerReason, pickCallOwnerWant } from "@/lib/callSummarySentence";
+import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { CallRecording } from "@/components/CallRecording";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
@@ -177,6 +178,8 @@ export default async function CallDetailPage({
   const contactName = person?.name?.trim() || "";
   const name = contactName || summaryName || null;
   const reason = pickCallOwnerReason(meta);
+  const want = pickCallOwnerWant(meta);
+  const summaryCard = pickCallOwnerCard(meta);
   const urgent = String(row.sentiment || "").toLowerCase() === "urgent";
   const leadStatus = parseLeadStatus(row.lead_status);
   const resolution = parseCallResolution(row.resolution);
@@ -303,14 +306,15 @@ export default async function CallDetailPage({
                 <LeadStatusToggle callId={row.id} initial={leadStatus} size="md" />
               ) : null}
             </div>
-            <p className="mt-3 text-base leading-relaxed text-ink">
-              {buildSummarySentence({
-                name,
-                reason,
-                callerNumber: row.caller_number,
-                urgent,
-              })}
-            </p>
+            <CallSummaryCard
+              name={name}
+              callerNumber={row.caller_number}
+              want={summaryCard?.want || want}
+              done={summaryCard?.done}
+              mood={summaryCard?.mood}
+              next={summaryCard?.next}
+              urgent={urgent}
+            />
           </section>
 
           {job ? (
