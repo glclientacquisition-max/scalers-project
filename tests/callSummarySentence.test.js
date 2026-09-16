@@ -51,7 +51,7 @@ describe('contact last reason matches call summary', () => {
     );
   });
 
-  it('uses hangup Want for last reason and keeps Inbox on the short reason', () => {
+  it('uses the same hangup reason on Contacts last reason as Inbox', () => {
     const meta = {
       reason: 'aje asked about Bwana Ken.',
       owner_review: {
@@ -73,9 +73,10 @@ describe('contact last reason matches call summary', () => {
       name: 'Ken',
       phone: '+254790381872',
       lastReason: 'aje asked about Bwana Ken.',
-      latestCallReason: pickCallOwnerWant(meta),
+      latestCallReason: pickCallOwnerReason(meta),
     });
-    assert.match(shown, /so Shy handled/);
+    assert.match(shown, /confused about his booking/);
     assert.doesNotMatch(shown, /aje asked/);
+    assert.doesNotMatch(shown, /so Shy handled/);
   });
 });

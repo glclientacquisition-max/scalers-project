@@ -51,6 +51,15 @@ function maxIso(a: string | null, b: string | null): string | null {
   return a >= b ? a : b;
 }
 
+/** Newest call or work row. Do not let an older visit created_at beat a later call. */
+export function pickLastContactAt(
+  byPhone: string | null | undefined,
+  byContactId: string | null | undefined,
+  updatedAt: string | null | undefined
+): string | null {
+  return maxIso(byPhone || null, byContactId || null) || updatedAt || null;
+}
+
 export type ContactSavedFilter = "all" | "saved" | "unsaved";
 
 export function resolveContactSavedFilter(
@@ -118,10 +127,11 @@ export async function loadContactsPage(
       : null;
     return {
       ...row,
-      lastContactAt:
-        extras.byId.get(row.id) ||
-        (row.phone ? extras.byPhone.get(row.phone) : null) ||
-        row.updated_at,
+      lastContactAt: pickLastContactAt(
+        row.phone ? extras.byPhone.get(row.phone) : null,
+        extras.byId.get(row.id),
+        row.updated_at
+      ),
       lastReasonDisplay: displayContactLastReason({
         name: row.name,
         phone: row.phone,
@@ -197,7 +207,7 @@ async function loadLastContactMap(
     if (!reasonByPhone.has(phone)) {
       reasonByPhone.set(
         phone,
-        pickCallOwnerWant(parseSummary(row.summary as string | null))
+        pickCallOwnerReason(parseSummary(row.summary as string | null))
       );
     }
   }
@@ -308,10 +318,10 @@ export async function loadContactTimeline(
           name: contact.name,
           phone: contact.phone,
           lastReason: null,
-          latestCallReason: ownerWant || ownerReason,
+          latestCallReason: ownerReason || ownerWant,
         }) ||
-        ownerWant ||
         ownerReason ||
+        ownerWant ||
         row.primary_intent ||
         "Call",
       detail: row.status || null,

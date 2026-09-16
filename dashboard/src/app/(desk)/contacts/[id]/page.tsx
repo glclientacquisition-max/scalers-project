@@ -36,7 +36,7 @@ export default async function ContactDetailPage({
     name: contact.name,
     phone: contact.phone,
     lastReason: contact.last_reason,
-    latestCallReason: latestCall?.ownerWant || latestCall?.ownerReason || null,
+    latestCallReason: latestCall?.ownerReason || latestCall?.ownerWant || null,
   });
   return (
     <div className="max-w-6xl">
