@@ -9,18 +9,20 @@ Listen harness (`npm run tts:listen-harness`) scores **isolated** fixture string
 
 ## Freeze (do this first)
 
-Staging Voice at last check (2026-09-16T04:09Z):
+Staging Voice at last check (2026-09-16T05:01Z):
 
 | Knob | Value | Source |
 | --- | --- | --- |
-| SHA | `23debf0e6b06ad5e59b0f98c34520927e0c2033b` | `GET /healthz` `gitSha` |
-| Branch | `main` | healthz |
+| SHA | `abf6aa97329bb8df151f06d52eac78a9ef14995e` | `GET /healthz` `gitSha` |
+| Branch | `main` (`#281` holding-line copy) | healthz |
 | Profile | `balanced` | healthz `voiceProfile` |
 | EN / SW speed | `1` / `1` | healthz |
 | Gain | `1.38` | healthz |
 | Live transfer | off | healthz `liveTransfer.executor` |
 | DID | `+254709221536` | Done and Dusted, agent Shy |
 | Caller | `+254790381872` | existing test line |
+
+Prior SHA `23debf0` left staging at 05:01Z. Do not mix SIDs from before that cutover into this freeze.
 
 Re-read `/healthz` immediately before the three calls. If `gitSha` moved, that is a new freeze. Do not mix SIDs across SHAs.
 

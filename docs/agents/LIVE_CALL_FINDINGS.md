@@ -6,7 +6,7 @@ Owner ask: evaluate naturalness and eliminate roboticness.
 
 Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
 
-Staging freeze at write-up: SHA `23debf0e6b06ad5e59b0f98c34520927e0c2033b`, `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, DID `+254709221536`. Next action is the three N1–N3 listens on that SHA, not a speed or gain change.
+Staging freeze now: SHA `abf6aa97329bb8df151f06d52eac78a9ef14995e` (`main` `#281`, started 2026-09-16T05:01:16Z), `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, DID `+254709221536`. Cutover from `23debf0`. Next action is the three N1–N3 listens on this SHA, not a speed or gain change.
 
 ---
 
