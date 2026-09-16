@@ -126,6 +126,12 @@ function looksLikeExistingVisitTalk(value) {
   );
 }
 
+function looksLikePastBookingTalk(value) {
+  return /\b(last (time|visit|job|booking|appointment)|previous (visit|booking|job)|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
+    String(value || '')
+  );
+}
+
 function inferIntent(text, opts = {}) {
   const value = String(text || '').trim().toLowerCase();
   const vertical = String(opts.vertical || '').toLowerCase();
@@ -143,6 +149,13 @@ function inferIntent(text, opts = {}) {
   }
   if (looksLikeCancelOrReschedule(value)) return 'cancellation';
   if (opts.returning?.nextVisit && looksLikeExistingVisitTalk(value)) {
+    return 'general_enquiry';
+  }
+  if (
+    Array.isArray(opts.returning?.recentBookings) &&
+    opts.returning.recentBookings.length &&
+    looksLikePastBookingTalk(value)
+  ) {
     return 'general_enquiry';
   }
   // Appointment-style booking: check BEFORE location so "book carpet cleaning... landmark is Barnabas"
@@ -614,6 +627,7 @@ module.exports = {
   looksLikeHomeEmergency,
   looksLikeBookingIntent,
   looksLikeCancelOrReschedule,
+  looksLikePastBookingTalk,
   observeCallerTurn,
   setNextBestAction,
   recordRepairFailure,

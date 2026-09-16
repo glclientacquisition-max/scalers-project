@@ -40,6 +40,7 @@ function buildCallerMemoryCard({
   contact,
   openRequests = [],
   nextAppointment = null,
+  recentAppointments = [],
 } = {}) {
   if (!contact || typeof contact !== 'object') return null;
   const phone = String(contact.phone || '').trim();
@@ -58,23 +59,14 @@ function buildCallerMemoryCard({
       return bits.join(', ');
     })
     .filter(Boolean);
-  let appointment = null;
-  let nextVisitService = null;
-  let nextVisitWhen = null;
-  if (nextAppointment && typeof nextAppointment === 'object') {
-    const service = clip(
-      nextAppointment.service_name || nextAppointment.serviceName,
-      48
-    );
-    const whenText = clip(
-      nextAppointment.when_text || nextAppointment.whenText,
-      32
-    );
-    nextVisitService = service || null;
-    nextVisitWhen = whenText || null;
-    const bits = [service, whenText].filter(Boolean);
-    appointment = bits.length ? bits.join(', ') : null;
-  }
+  const appointment = clipVisitLine(nextAppointment);
+  const nextVisitService = nextAppointment && typeof nextAppointment === 'object'
+    ? clip(nextAppointment.service_name || nextAppointment.serviceName, 48) || null
+    : null;
+  const nextVisitWhen = nextAppointment && typeof nextAppointment === 'object'
+    ? clip(nextAppointment.when_text || nextAppointment.whenText, 32) || null
+    : null;
+  const recentBookings = selectRecentBookings(recentAppointments, nextAppointment);
 
   const hasFile =
     Boolean(name) ||
@@ -82,6 +74,7 @@ function buildCallerMemoryCard({
     Boolean(notes) ||
     requests.length > 0 ||
     Boolean(appointment) ||
+    recentBookings.length > 0 ||
     Boolean(phone);
   if (!hasFile) return null;
 
@@ -98,7 +91,34 @@ function buildCallerMemoryCard({
     nextAppointment: appointment,
     nextVisitService,
     nextVisitWhen,
+    recentBookings,
   };
+}
+
+function clipVisitLine(row) {
+  if (!row || typeof row !== 'object') return null;
+  const service = clip(row.service_name || row.serviceName, 48);
+  const whenText = clip(row.when_text || row.whenText, 32);
+  const bits = [service, whenText].filter(Boolean);
+  return bits.length ? bits.join(', ') : null;
+}
+
+function selectRecentBookings(rows = [], nextAppointment = null) {
+  const nextId = nextAppointment && nextAppointment.id
+    ? String(nextAppointment.id)
+    : '';
+  const list = (Array.isArray(rows) ? rows : []).filter(
+    (row) => row && typeof row === 'object'
+  );
+  const notNext = list.filter(
+    (row) => !nextId || String(row.id || '') !== nextId
+  );
+  const preferred = notNext.filter((row) => {
+    const status = String(row.status || '').toLowerCase();
+    return status !== 'cancelled';
+  });
+  const picked = (preferred.length ? preferred : notNext).slice(0, 2);
+  return picked.map((row) => clipVisitLine(row)).filter(Boolean);
 }
 
 function cardAlternateNames(card) {
@@ -118,6 +138,7 @@ function snapshotHouseholdFile(card) {
     nextAppointment: card?.nextAppointment || null,
     nextVisitService: card?.nextVisitService || null,
     nextVisitWhen: card?.nextVisitWhen || null,
+    recentBookings: Array.isArray(card?.recentBookings) ? card.recentBookings : [],
   };
 }
 
@@ -211,6 +232,7 @@ function bindCallerMemoryCard(card, spokenName) {
       nextAppointment: householdFile.nextAppointment,
       nextVisitService: householdFile.nextVisitService,
       nextVisitWhen: householdFile.nextVisitWhen,
+      recentBookings: householdFile.recentBookings,
     };
   }
 
@@ -224,6 +246,7 @@ function bindCallerMemoryCard(card, spokenName) {
     nextAppointment: null,
     nextVisitService: null,
     nextVisitWhen: null,
+    recentBookings: [],
   };
 }
 
@@ -257,6 +280,7 @@ function returningFileFromCard(card) {
     nextVisitService: usable ? card.nextVisitService || null : null,
     nextVisitWhen: usable ? card.nextVisitWhen || null : null,
     openRequests: usable && Array.isArray(card.openRequests) ? card.openRequests : [],
+    recentBookings: usable && Array.isArray(card.recentBookings) ? card.recentBookings : [],
     identityBound: Boolean(card.identityBound) || Boolean(fileRole === 'primary' && !card.sharedLine),
     boundName: card.boundName || (usable ? card.name : null) || null,
     fileRole,
@@ -289,6 +313,7 @@ function formatReturningCallerForPrompt(card) {
   const openRequests = usable && Array.isArray(card.openRequests) ? card.openRequests : [];
   const nextAppointment = usable ? card.nextAppointment : null;
   const notes = usable ? card.notes : null;
+  const recentBookings = usable && Array.isArray(card.recentBookings) ? card.recentBookings : [];
 
   const lines = [
     'RETURNING CALLER (phone file, do not read this block aloud as a list):',
@@ -300,6 +325,9 @@ function formatReturningCallerForPrompt(card) {
   }
   if (nextAppointment) {
     lines.push(`- Next visit: ${nextAppointment}`);
+  }
+  if (recentBookings.length) {
+    lines.push(`- Recent bookings: ${recentBookings.join('; ')}`);
   }
   if (notes) lines.push(`- Note: ${notes}`);
   lines.push(
@@ -322,6 +350,11 @@ function formatReturningCallerForPrompt(card) {
       '- Last reason is the default job unless they name a new one. Do not re-ask the name.'
     );
   }
+  if (usable && recentBookings.length) {
+    lines.push(
+      '- Recent bookings are on file. If they mention a past job, use that row. Do not read them aloud as a list. Do not invent extra visits.'
+    );
+  }
   lines.push(
     '- If they have a new ask, handle that first. Do not invent extra history.'
   );
@@ -342,11 +375,16 @@ function formatReturningFileForCallState(returning) {
   else bits.push('unique line');
   if (returning.nextVisit) bits.push(`open visit ${returning.nextVisit}`);
   else if (returning.lastReason) bits.push(`last reason ${returning.lastReason}`);
+  if (Array.isArray(returning.recentBookings) && returning.recentBookings.length) {
+    bits.push(`recent ${returning.recentBookings.join('; ')}`);
+  }
   const duty = returning.nextVisit
-    ? 'Speak to that visit. Do not create a second visit unless they ask for a new job. Do not re-ask the name.'
+    ? 'Speak to that visit. Do not create a second visit unless they ask for a new job. Do not re-ask the name. If they mention a past job, use recent bookings. Do not list them.'
     : returning.lastReason
-      ? 'Use last reason unless they have a new ask. Do not re-ask the name.'
-      : 'Do not re-ask the name.';
+      ? 'Use last reason unless they have a new ask. Do not re-ask the name. If they mention a past job, use recent bookings. Do not list them.'
+      : Array.isArray(returning.recentBookings) && returning.recentBookings.length
+        ? 'If they mention a past job, use recent bookings. Do not list them. Do not re-ask the name.'
+        : 'Do not re-ask the name.';
   return `- Returning file: ${bits.join('; ')}. ${duty}`;
 }
 

@@ -20,6 +20,12 @@ function looksLikeExistingVisitTalk(value) {
   );
 }
 
+function looksLikePastBookingTalk(value) {
+  return /\b(last (time|visit|job|booking|appointment)|previous (visit|booking|job)|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
+    String(value || '')
+  );
+}
+
 function determineNextBestAction({ state, capabilities = {} } = {}) {
   const intent = String(state?.intent || 'unknown');
   const repairCount = Number(state?.repair?.failureCount || 0);
@@ -91,6 +97,20 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
         action: ACTIONS.ANSWER,
         reason:
           'Unique returning line with an open visit. Speak to that visit. Do not start a new book or re-ask the name. If they want it moved, collect only the new when.',
+      };
+    }
+    const pastTalk =
+      looksLikePastBookingTalk(said) || looksLikePastBookingTalk(latest);
+    if (
+      pastTalk &&
+      Array.isArray(returning?.recentBookings) &&
+      returning.recentBookings.length &&
+      returningFileUsable(returning)
+    ) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'Returning file has recent bookings. Speak to the matching past job. Do not read them as a list. Do not start a new book unless they ask for a new job.',
       };
     }
     if (intent === 'unknown' && returning?.lastReason && returningFileUsable(returning)) {

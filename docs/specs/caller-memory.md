@@ -11,7 +11,7 @@ The next call from a known tenant phone does not start empty. Brain receives a c
 ## Decisions
 
 1. **Key:** tenant + stored phone (Kenya E.164 when possible). No embeddings. No transcript replay.
-2. **Card fields:** name, shared-line flag, last reason, up to two open service requests, one next appointment (requested or confirmed). Clip each string. Drop transcript-like notes.
+2. **Card fields:** name, shared-line flag, last reason, up to two open service requests, one next appointment (requested or confirmed), up to two recent bookings (done or earlier visits, not the next open one). Clip each string. Drop transcript-like notes.
 3. **Greet by name** only when a primary name exists and `alternate_names` is empty. Shared line: confirm who is speaking; do not assume the primary name.
 4. **Instant TTS greeting stays brand-first.** Do not wait on Gemini or lengthen the opener with history. The card is for the first Gemini turn via CONTEXT HEADER + seeded Brain state.
 5. **Seed Brain state** on a unique named line: `caller.name` + `nameConfirmed=true` so the model does not re-ask "Got it, Jane?" On a shared line, leave name empty.
@@ -27,6 +27,7 @@ The next call from a known tenant phone does not start empty. Brain receives a c
 - `createBrainState({ callerMemory })` seeds name only when `greetByName` is true.
 - `getCallerMemory` returns null when the contacts table is missing or no row matches.
 - After a confirmed name on a shared line, `bindCallerMemoryCard` / `observeCallerTurn` attach the household visit only when the speaker matches the primary file name.
+- Up to two recent bookings appear in `RETURNING CALLER` / CALL STATE when the speaker owns the file. They are not read aloud as a list.
 
 ## Tests
 
