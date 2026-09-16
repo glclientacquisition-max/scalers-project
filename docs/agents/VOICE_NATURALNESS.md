@@ -3,18 +3,16 @@
 **Lane:** Voice.  
 **Job:** Decide whether the receptionist sounds like a person on a Kenya mobile, then change **one** Voice-owned cause. Do not guess MOS. Do not crank TTS speed.
 
-Roboticness on this platform is almost never “Soniox at 1.0 sounds like a robot.” It is **turn-loop anxiety**: fragment TTS, a one-word `Sure.` as its own utterance, hyphenated say-forms, thinking-ack on “How are you?”, idle poke, or Gemini lists. Speed and gain stay frozen until three scored DID calls exist on one SHA.
+Roboticness on this platform is almost never “Soniox at 1.0 sounds like a robot.” It is **turn-loop anxiety**: fragment TTS, a one-word `Sure.` as its own utterance, hyphenated say-forms, thinking-ack on “How are you?”, idle poke, or Gemini lists. Speed and gain stay frozen until three freeze DID calls are scored.
 
 Listen harness (`npm run tts:listen-harness`) scores **isolated** fixture strings. This doc scores **conversation**. Use both. Do not substitute one for the other.
 
 ## Freeze (do this first)
 
-Staging Voice at last check (2026-09-16T05:01Z):
+Staging Voice knobs (unchanged across this freeze):
 
 | Knob | Value | Source |
 | --- | --- | --- |
-| SHA | `abf6aa97329bb8df151f06d52eac78a9ef14995e` | `GET /healthz` `gitSha` |
-| Branch | `main` (`#281` holding-line copy) | healthz |
 | Profile | `balanced` | healthz `voiceProfile` |
 | EN / SW speed | `1` / `1` | healthz |
 | Gain | `1.38` | healthz |
@@ -22,11 +20,18 @@ Staging Voice at last check (2026-09-16T05:01Z):
 | DID | `+254709221536` | Done and Dusted, agent Shy |
 | Caller | `+254790381872` | existing test line |
 
-Prior SHA `23debf0` left staging at 05:01Z. Do not mix SIDs from before that cutover into this freeze.
+SHA cutovers while the three calls ran (Railway auto-deploys `main`):
 
-Re-read `/healthz` immediately before the three calls. If `gitSha` moved, that is a new freeze. Do not mix SIDs across SHAs.
+| When | SHA | Branch | Calls |
+| --- | --- | --- | --- |
+| 05:01Z | `abf6aa97329bb8df151f06d52eac78a9ef14995e` | `main` `#281` holding-line copy | N1, N2 |
+| 05:18Z | `2c8fb51d747fe9badcc59601f1232646fe005efb` | `main` `#282` desk Alerts | N3 |
 
-**Do not change** `VOICE_PROFILE`, `SONIOX_TTS_SPEED*`, `VOICE_TTS_GAIN`, `VOICE_FILLER`, or `VOICE_STREAM_EARLY_*` until the three freeze calls are scored.
+Prior SHA `23debf0` left staging at 05:01Z. Voice knobs did not move. Do not mix SIDs from before `abf6aa9` into this freeze. N3 is scored on `2c8fb51` because `#282` is Desk-only.
+
+Re-read `/healthz` immediately before the three calls. If `gitSha` moved, that is a new freeze. Do not mix SIDs across SHAs unless Voice knobs and the media path are unchanged.
+
+**Do not change** `VOICE_PROFILE`, `SONIOX_TTS_SPEED*`, `VOICE_TTS_GAIN`, `VOICE_FILLER`, or `VOICE_STREAM_EARLY_*` to chase roboticness. Three freeze calls are scored. Next Voice PR is V5.
 
 ## Evidence triad (every call)
 
@@ -56,7 +61,7 @@ Fail the call on any Voice row that fires. Brain rows are a hand-off. They do no
 | V2 | `Sure.` / `Great.` / `Alright.` / `I'm listening.` as its own Soniox utterance | two `spoken=` lines; scanner V2 | Voice stream buffer |
 | V3 | Hyphenated given name (`Al-vin`) | `spoken=` vs closer line | Voice lexicon sanitizer |
 | V4 | TTS reads hyphen, full stop, slash, or `e.g.` | recording + `spoken=` still has the leak | Voice `polishPunctuation` |
-| V5 | Thinking-ack on “How are you doing, Shy?” | `thinking-ack` log on a phatic turn | Voice matcher |
+| V5 | Thinking-ack on “How are you doing, Shy?”, or a how-are-you local line on a closer (`Okay.`) | `thinking-ack` or `phatic local reply` log | Voice matcher |
 | V6 | Idle “Are you still there?” before the caller has spoken, or during a pause they asked for | `idle_nudge` log | Voice idle nudge |
 | V7 | Filler every turn | `filler=1` on most `voice-timing` rows | Voice filler |
 | V8 | Claims “I’ll speak louder” (Voice has no caller-driven gain) or types `...` instead of stepping `ttsSpeedScale` | next agent line vs speed-scale log | Voice speed control |
@@ -99,7 +104,17 @@ Same DID, same SHA, phone speaker. Keep `VOICE_LIVE_TRANSFER` off.
 
 If N1 fails, still run N2 and N3 on the same SHA. The set is the measurement.
 
-N1 detail: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md). Do not retune until N2 and N3 are scored.
+## Freeze results
+
+| Call | SID | SHA | Voice | Fail IDs |
+| --- | --- | --- | --- | --- |
+| N1 phatic | `HD_d0f042f5d960` | `abf6aa9` | fail | **V5** (`Okay.` → `I'm well. Who is calling?`). Same speech-guarantee name-ask as N2. |
+| N2 barge | `HD_b4cb560bae33` | `abf6aa9` | fail | Speech guarantee on ANSWER: `I can't finish that just now`. V9 barge pass; wait not in STT. |
+| N3 pace | `HD_391a57aae9e9` | `2c8fb51` | fail | **V8 pass** (scale `0.85` → `0.7` → `1`, wire matched). **V5** ×3 (`Okay.` → `I'm well. Who is calling?` at 210 / 207 / 301 ms). |
+
+Detail: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md).
+
+**Next Voice PR:** V5. Stop treating bare `Okay` / `ok` as how-are-you in `looksLikePhaticCallerTurn`. Do not crank speed or gain. Speech-guarantee on ANSWER is a later Voice ticket.
 
 ## After the three calls
 
