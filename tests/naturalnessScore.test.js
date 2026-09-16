@@ -112,6 +112,20 @@ test('clean phatic call passes Voice', () => {
   assert.deepStrictEqual(result.voiceFailIds, []);
 });
 
+test('V5 flags a closer Okay. that reopened how-are-you', () => {
+  const flags = scoreAgentTurn("I'm well. Who is calling?", { prevCaller: 'Okay.' });
+  assert.ok(flags.some((f) => f.id === 'V5' && f.lane === 'voice'));
+});
+
+test('thinking-ack Mm-hmm. in spoken= is not a hyphen name', () => {
+  const result = scoreCall({
+    turns: [{ speaker: 'agent', text: 'I can help add carpet cleaning to your visit, Alvin.' }],
+    spokenLogs: '[soniox-tts] chunk spoken="Mm-hmm."',
+  });
+  assert.ok(!result.voiceFailIds.includes('V3'));
+  assert.ok(!result.voiceFailIds.includes('V2'));
+});
+
 test('parseSpokenLogLines reads spoken= fields', () => {
   const lines = parseSpokenLogLines(
     '[soniox-tts] chunk spoken="Hello there."\n[ws/media] tts prep spoken="Sawa."'

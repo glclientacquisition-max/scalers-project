@@ -6,7 +6,29 @@ Owner ask: evaluate naturalness and eliminate roboticness.
 
 Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
 
-Staging freeze now: SHA `abf6aa97329bb8df151f06d52eac78a9ef14995e` (`main` `#281`, started 2026-09-16T05:01:16Z), `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, DID `+254709221536`. Cutover from `23debf0`. Next action is the three N1–N3 listens on this SHA, not a speed or gain change.
+Staging freeze now: SHA `abf6aa97329bb8df151f06d52eac78a9ef14995e` (`main` `#281`, started 2026-09-16T05:01:16Z), `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, DID `+254709221536`. Cutover from `23debf0`. Do not change speed or gain.
+
+## Freeze call N1 — `HD_d0f042f5d960` (2026-09-16 05:06Z)
+
+123s. Caller `+254790381872`. SHA `abf6aa9`. Recording URL empty; score from listen + desk transcript + `spoken=`.
+
+| ID | Result | Evidence |
+| --- | --- | --- |
+| V1 | pass | Sentence-only flush. Greeting one stream. |
+| V2 | pass | Filler cache warmup used `silent: true`. Thinking-ack `Mm-hmm.` cancelled when reply audio arrived. |
+| V3 | pass | `spoken="Thank you, Alvin."` not `Al-vin`. |
+| V4 | pass | `10 A M` is the AM spoken form, not a hyphen leak. |
+| V5 | **fail** | Caller closer `Okay.` matched `looksLikePhaticCallerTurn`. Local line `I'm well. Who is calling?` at 242 ms. NBA was already `END`. |
+| V6 | pass | No `idle_nudge`. |
+| V7 | pass | `filler=1` on one turn only. |
+| V8 | n/a | No slower/louder ask (that is N3). |
+| V9 | pass | `At 10:00 AM` barged TTS (`outcome=barge_in`). No `I'm listening.` |
+
+Brain notes (do not retune Voice for these): shared-line card asked who is calling on how-are-you; `Alvin.` hit speech-guarantee `Okay, I can't finish that just now. May I have your name so I can reach them?`; visit saved as carpet / Thursday 10 AM.
+
+Voice next candidate after N2+N3: do not run the phatic local reply when `nextBestAction` is `END`, and/or stop treating bare `Okay` as how-are-you.
+
+---
 
 ---
 

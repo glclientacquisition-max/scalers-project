@@ -6,7 +6,7 @@ const TINY_LEAD_IN =
   /^(sure|great|okay|ok|alright|thanks|thank you|i'?m listening|mm-hmm|mm|sawa|poa|got it)[.!]*$/i;
 
 const HYPHEN_GIVEN_NAME = /\b[A-Z][a-z]{1,5}-[a-z]{2,8}\b/;
-const KEEP_HYPHEN = /^(air-tel|m-pesa|e-citizen|kris-to-fa|sar-tu-day)$/i;
+const KEEP_HYPHEN = /^(air-tel|m-pesa|e-citizen|kris-to-fa|sar-tu-day|mm-hmm)$/i;
 
 const PUNCTUATION_LEAK =
   /(\s[-–—]\s)|(\.\s*\.\s*\.)|(\u2014)|(\be\.g\.)|(\bi\.e\.)|(\band\/or\b)|(&)/;
@@ -78,6 +78,18 @@ function scoreAgentTurn(text, opts = {}) {
       id: 'V5',
       lane: 'voice',
       detail: 'thinking-ack / listen line spoken as its own turn',
+    });
+  }
+
+  // Live miss HD_d0f042f5d960: closer "Okay." matched the how-are-you local line.
+  if (
+    /^(ok|okay)\.?$/i.test(prevCaller) &&
+    /^i'?m well\b/i.test(heard)
+  ) {
+    flags.push({
+      id: 'V5',
+      lane: 'voice',
+      detail: 'phatic local reply fired on a closer (Okay.)',
     });
   }
 
@@ -156,7 +168,7 @@ function scoreCall(input = {}) {
 
   spokenChunks.forEach((chunk, idx) => {
     const chunkFlags = scoreAgentTurn(chunk, { spoken: chunk }).filter((f) =>
-      ['V2', 'V3', 'V4', 'V5'].includes(f.id)
+      ['V3', 'V4'].includes(f.id)
     );
     for (const f of chunkFlags) {
       flags.push({ ...f, detail: `${f.detail} (spoken[${idx}])` });
