@@ -70,7 +70,7 @@ async function smokeOperationalBooking() {
   const progress = pickActionProgress('CREATE_REQUEST', 'en');
   checkLine('operational save progress', progress, {
     enMidCall: true,
-    mustInclude: [/^Okay,/],
+    mustInclude: [/^Okay/],
   });
 
   const execution = await executeBrainTools({
@@ -114,7 +114,7 @@ async function smokeOperationalBooking() {
   const escalateProgress = pickActionProgress('ESCALATE', 'en');
   checkLine('operational escalate progress', escalateProgress, {
     enMidCall: true,
-    mustInclude: [/^Okay, let me/],
+    mustInclude: [/^Okay/],
   });
 
   const escalateConfirm = formatToolConfirmation(
@@ -151,6 +151,9 @@ async function smokeOperationalBooking() {
 function smokeGeminiRules() {
   if (!/one person for the whole call/i.test(CONVERSATION_RULES)) {
     fail('gemini rules', 'CONVERSATION_RULES missing same-person register');
+  }
+  if (!/CONTROL VOICE/i.test(CONVERSATION_RULES)) {
+    fail('gemini rules', 'CONVERSATION_RULES missing control voice');
   }
   if (!/VISIT COMMIT/i.test(CONVERSATION_RULES)) {
     fail('gemini rules', 'CONVERSATION_RULES missing visit commit ladder');

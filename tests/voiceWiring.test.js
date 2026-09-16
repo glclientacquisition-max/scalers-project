@@ -90,8 +90,8 @@ assert.match(
 
 assert.match(
   source,
-  /pickPhaticReply/,
-  'phatic local reply must come from dynamicSpeech'
+  /polishSpokenReply/,
+  'final Gemini speech must strip holding lines and service dumps'
 );
 
 assert.match(

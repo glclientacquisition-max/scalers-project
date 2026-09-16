@@ -224,6 +224,7 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '',
     'Completion rules:',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
+    '- CONTROL VOICE: name the job you have, then one question or silence for the tool. No holding lines.',
     '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots in order (service, name, when, landmark); silently check hours (not a one-visit lock); same-hour visits are allowed; fire the tool and speak nothing; never say booked, moved, or cancelled first.',
     '- Once a name is in CALL STATE, never ask for the name again. Do not make "is that right?" a visit step. Move to when, then landmark, then create_appointment.',
     '- Book: create_appointment after service + name + when + landmark.',
