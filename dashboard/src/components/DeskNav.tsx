@@ -8,7 +8,7 @@ export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
   { href: "/calls", label: "Inbox" },
   { href: "/contacts", label: "Contacts" },
-  { href: "/settings", label: "Business" },
+  { href: "/settings", label: "Business Profile" },
   { href: "/wallet", label: "Wallet" },
 ] as const;
 
@@ -82,7 +82,7 @@ function TabIcon({ name, className }: { name: string; className?: string }) {
       </svg>
     );
   }
-  if (name === "Business") {
+  if (name === "Business Profile") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <path

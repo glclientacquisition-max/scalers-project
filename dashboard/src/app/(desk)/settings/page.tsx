@@ -19,14 +19,14 @@ export default async function SettingsPage({
   try {
     tenant = await getCurrentTenant();
   } catch {
-    return <DeskError>Could not load Business settings.</DeskError>;
+    return <DeskError>Could not load Business Profile.</DeskError>;
   }
 
   if (!tenant) {
     return (
       <div className="min-w-0">
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
-          Business
+          Business Profile
         </p>
         <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
           No workspace

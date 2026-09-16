@@ -14,17 +14,18 @@ describe("business settings depth", () => {
   const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
   const bulletin = read("dashboard/src/components/DailyBulletinPanel.tsx");
   const faqs = read("dashboard/src/lib/faqs.ts");
+  const alerts = read("dashboard/src/components/AlertsPanel.tsx");
+  const alertsActions = read("dashboard/src/app/(desk)/settings/alertsActions.ts");
+  const compileActions = read("dashboard/src/app/(desk)/settings/actions.ts");
 
   it("orders Assistant before Business and uses example placeholders", () => {
-    const assistant = form.indexOf(">Assistant<");
     const assistantName = form.indexOf("Assistant name");
     const businessBlock = form.indexOf(">Business<");
-    const alerts = form.indexOf(">Alerts<");
     const contacts = form.indexOf(">Public contacts<");
     assert.ok(assistantName > 0);
     assert.ok(assistantName < businessBlock);
-    assert.ok(businessBlock < alerts);
-    assert.ok(alerts < contacts);
+    assert.ok(businessBlock < contacts);
+    assert.doesNotMatch(form, />Alerts</);
     assert.match(form, /placeholder="Aisha"/);
     assert.match(form, /placeholder="Westlands Books"/);
     assert.match(form, /placeholder="\+254 700 000 000"/);
@@ -56,5 +57,27 @@ describe("business settings depth", () => {
     assert.match(faqs, /Westlands, opposite Naivas/);
     assert.doesNotMatch(ingest, /Paste your menu/);
     assert.doesNotMatch(form, /Super Admin can add them/);
+  });
+
+  it("saves alerts on their own panel to the same tenant columns", () => {
+    assert.match(alerts, />Alerts</);
+    assert.match(alerts, /SMS phone/);
+    assert.match(alerts, /Text customers/);
+    assert.match(alerts, /Text back missed calls/);
+    assert.match(alerts, /placeholder="\+254 700 000 000"/);
+    assert.match(alertsActions, /whatsapp_notification_number:/);
+    assert.match(alertsActions, /alert_email:/);
+    assert.match(alertsActions, /notify_channels: notifyChannels/);
+    assert.doesNotMatch(alertsActions, /llm_system_prompt/);
+    assert.doesNotMatch(compileActions, /notify_channels/);
+    assert.doesNotMatch(compileActions, /whatsapp_notification_number/);
+    assert.doesNotMatch(compileActions, /alert_email/);
+  });
+
+  it("edits handoff only on Team", () => {
+    assert.match(form, /aria-label="Handoff mode"/);
+    assert.match(form, /Change in Team/);
+    assert.equal((form.match(/setHandoffMode/g) || []).length, 2);
+    assert.doesNotMatch(form, /aria-label="Handoff"/);
   });
 });

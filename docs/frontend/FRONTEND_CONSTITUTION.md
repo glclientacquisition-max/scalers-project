@@ -115,7 +115,7 @@ No Plus Jakarta Sans. No third family. No purple.
 
 ## 6. Information architecture
 
-Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product.
+Keep URLs. Nav is Overview, Inbox, Contacts, Business Profile, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product.
 
 | Route | Job | Layout |
 | --- | --- | --- |
@@ -147,7 +147,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 
 ## 8. Motion and chrome
 
-- **Owner desk shell:** sticky top bar (Scalers mark + Sign out; `md+` text links from `DESK_LINKS`). Do not put the workspace name in the header. Overview `h1` and Business settings `h1` own that name. Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
+- **Owner desk shell:** sticky top bar (Scalers mark + Sign out; `md+` text links from `DESK_LINKS`). Do not put the workspace name in the header. Overview `h1` and Business Profile `h1` own that name. Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
 - Sign out stays in the header. It is never a sixth tab.
 - Do not add a left desk rail. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.
