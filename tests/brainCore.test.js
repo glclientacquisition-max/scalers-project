@@ -479,4 +479,28 @@ describe('Brain state and next-best-action', () => {
     assert.equal(state.caller.nameConfirmed, true);
     assert.equal(state.caller.nameCollision, null);
   });
+
+  it('asks who is speaking on a shared line before treating the file as the caller', () => {
+    const card = {
+      name: 'Amina',
+      sharedLine: true,
+      greetByName: false,
+      alternateNames: ['Brian'],
+      lastReason: 'price on soap',
+    };
+    const state = observeCallerTurn(createBrainState({ callerMemory: card }), {
+      text: 'Hello I need help',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile: { callerMemory: card },
+    });
+    const decision = determineNextBestAction({
+      state,
+      capabilities: { saveCallerInfo: true, escalate: true },
+    });
+    assert.equal(state.caller.name, null);
+    assert.equal(decision.action, 'ASK_CLARIFICATION');
+    assert.equal(decision.slot, 'name');
+    assert.match(decision.reason, /shared line/i);
+  });
 });

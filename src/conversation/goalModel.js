@@ -24,6 +24,12 @@ const GOAL_REQUIREMENTS = Object.freeze({
   human: [{ slot: 'name', anyOf: ['name'] }],
 });
 
+function wantsNewWhenForChange(state) {
+  const text = String(state?.goal?.description || '').toLowerCase();
+  if (/\b(cancel|cancelled|sitaki|futa)\b/i.test(text)) return false;
+  return /\b(reschedule|move|change |badilisha|ahirisha)\b/i.test(text);
+}
+
 function hasAnyEntity(entities, keys) {
   return keys.some((key) => Boolean(entityValue(entities?.[key])));
 }
@@ -47,6 +53,9 @@ function missingGoalSlots(state, profile = {}) {
   const vertical = String(profile.vertical || state?.vertical || '').toLowerCase();
   if (intent === 'booking' && vertical === 'home_services') {
     requirements.push({ slot: 'landmark', anyOf: ['landmark'] });
+  }
+  if (intent === 'cancellation' && wantsNewWhenForChange(state)) {
+    return ['when'].filter((slot) => !slotFilled(state, { slot, anyOf: ['when'] }));
   }
   return requirements
     .filter((requirement) => !slotFilled(state, requirement))

@@ -187,6 +187,19 @@ function shouldSpeakThinkingAck(text) {
  */
 function pickPhaticReply(opts = {}) {
   const lang = confirmationLanguage(opts.language);
+  const card = opts.callerMemory;
+  if (card && typeof card === 'object') {
+    if (card.sharedLine) {
+      return lang === 'en'
+        ? "I'm well. Who is calling?"
+        : 'Nzuri. Ni nani anayepiga?';
+    }
+    if (card.nextAppointment && !card.sharedLine) {
+      return lang === 'en'
+        ? "I'm well. I have your visit on file. Is that why you called?"
+        : 'Nzuri. Una ziara kwenye faili. Nisaidie na hiyo?';
+    }
+  }
   if (lang === 'sw' || lang === 'sheng') return 'Nzuri, asante. Naweza kusaidia?';
   return "I'm well, thanks. How can I help?";
 }

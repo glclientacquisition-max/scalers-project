@@ -1982,7 +1982,10 @@ mediaWss.on('connection', (ws, req) => {
     let progressAlreadySpoken = false;
     try {
       if (looksLikePhaticCallerTurn(clean)) {
-        const phaticLine = pickPhaticReply({ language: callLanguage });
+        const phaticLine = pickPhaticReply({
+          language: callLanguage,
+          callerMemory: brainProfile.callerMemory,
+        });
         console.log(
           `[ws/media][${callKey}] phatic local reply lang=${callLanguage}: ${phaticLine}`
         );
