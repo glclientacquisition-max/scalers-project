@@ -245,7 +245,9 @@ Ranked by how much they break trust on a live Kenyan call. Each is a **conversat
 
 **Bar:** Speech down: short clip, call back. Reasoning down: keep the line, take a name, do not fake a booking.
 
-**Not yet:** The names-only path is a lifeboat, not a receptionist. Callers who were mid-SOP get a different person. No spoken apology that matches the previous turn.
+**Now in runtime:** If they already said a name when Gemini is down, save it and confirm. Do not ask again.
+
+**Still live:** The names-only path is a lifeboat, not a receptionist. Callers who were mid-SOP get a different person. No spoken apology that matches the previous turn.
 
 **Lane:** Brain copy on the existing Voice outage path. Do not invent bookings.
 

@@ -144,13 +144,13 @@ const {
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
-  looksLikeCallerName,
   shouldSkipCallerTurn,
   shouldSpeakThinkingAck,
   looksLikePhaticCallerTurn,
   pickPhaticReply,
   polishSpokenReply,
 } = require('./src/conversation/dynamicSpeech');
+const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
   adaptiveFlushMs,
@@ -1829,12 +1829,16 @@ mediaWss.on('connection', (ws, req) => {
         );
       });
     }
-    if (llmRecoveryOffered && looksLikeCallerName(userText)) {
-      const name = String(userText || '').replace(/\s+/g, ' ').trim();
+    const planned = planLlmRecovery({
+      userText,
+      alreadyOffered: llmRecoveryOffered,
+      language: callLanguage,
+    });
+    if (planned.saved && planned.name) {
       try {
         await db.saveCallerInfo({
           callSid: sidLabel(),
-          name,
+          name: planned.name,
           reason: 'Live line could not complete. Team to follow up.',
         });
         maybeSendWhatsAppNotification(sidLabel());
@@ -1844,12 +1848,9 @@ mediaWss.on('connection', (ws, req) => {
           err?.message || err
         );
       }
-      llmRecoveryOffered = true;
-      return pickLlmRecoverySaved({ language: callLanguage });
     }
-    const line = currentLlmRecoveryLine();
     llmRecoveryOffered = true;
-    return line;
+    return planned.spoken;
   }
 
   async function runCallerTurn(userText) {
