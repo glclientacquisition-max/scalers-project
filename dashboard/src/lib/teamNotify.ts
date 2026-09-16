@@ -128,28 +128,28 @@ export function normalizeTeamDirectory(
   if (!Array.isArray(raw)) return [];
   const explicit = directoryHasExplicitPermissions(raw);
   const infer = opts.infer !== false;
-  return raw
-    .map((row) => {
-      if (!row || typeof row !== "object") return null;
-      const r = row as Record<string, unknown>;
-      const name = String(r.name || "").trim();
-      const role = String(r.role || "").trim();
-      const phone = String(r.phone || "").trim();
-      const email = String(r.email || "").trim().toLowerCase();
-      if (opts.requireName && !name) return null;
-      if (!name && !role && !phone && !email) return null;
-      const flags = explicit
-        ? persistTeamNotifyFlags(r)
-        : infer
-          ? inferTeamNotifyFlags({ role, phone }, opts.ownerPhone)
-          : {};
-      return {
-        name,
-        role,
-        phone,
-        email,
-        ...flags,
-      };
-    })
-    .filter((row): row is TeamDirectoryEntry => Boolean(row));
+  const out: TeamDirectoryEntry[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const name = String(r.name || "").trim();
+    const role = String(r.role || "").trim();
+    const phone = String(r.phone || "").trim();
+    const email = String(r.email || "").trim().toLowerCase();
+    if (opts.requireName && !name) continue;
+    if (!name && !role && !phone && !email) continue;
+    const flags = explicit
+      ? persistTeamNotifyFlags(r)
+      : infer
+        ? inferTeamNotifyFlags({ role, phone }, opts.ownerPhone)
+        : {};
+    out.push({
+      name,
+      role,
+      phone,
+      email,
+      ...flags,
+    });
+  }
+  return out;
 }
