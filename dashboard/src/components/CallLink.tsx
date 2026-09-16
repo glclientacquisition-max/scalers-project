@@ -39,7 +39,7 @@ export function CallLink({
       aria-label={`Call ${number}`}
       className={[
         "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line text-ink",
-        "transition hover:border-[#0096FF] hover:text-[#005CCC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
+        "transition hover:border-accent hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
         className,
       ].join(" ")}
     >

@@ -60,14 +60,14 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
         className={[
           "max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[75%]",
           isCaller
-            ? "rounded-bl-md bg-[#d9f4e2] text-ink"
+            ? "rounded-bl-md bg-bubble-caller text-ink"
             : "rounded-br-md bg-surface-muted/90 text-ink",
         ].join(" ")}
       >
         <p
           className={[
             "text-[11px] font-medium uppercase tracking-wide",
-            isCaller ? "text-[#2f6b3a]" : "text-ink-soft",
+            isCaller ? "text-bubble-caller-ink" : "text-ink-soft",
           ].join(" ")}
         >
           {isCaller ? "Caller" : "Receptionist"}
@@ -247,7 +247,7 @@ export default async function CallDetailPage({
     <div className="max-w-6xl">
       <Link
         href={backHref}
-        className="text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className="text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         {backLabel}
       </Link>
@@ -282,7 +282,7 @@ export default async function CallDetailPage({
             {person?.id ? (
               <Link
                 href={`/contacts/${person.id}`}
-                className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Open contact
               </Link>

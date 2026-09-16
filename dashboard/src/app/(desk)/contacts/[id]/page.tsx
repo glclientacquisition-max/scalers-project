@@ -41,7 +41,7 @@ export default async function ContactDetailPage({
     <div className="max-w-6xl">
       <Link
         href="/contacts"
-        className="text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className="text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         Contacts
       </Link>
@@ -105,7 +105,7 @@ export default async function ContactDetailPage({
                         key={entry.id}
                         className={[
                           "relative border-t border-line/70",
-                          entry.callId ? "cursor-pointer hover:bg-[#0096FF]/[0.04]" : "",
+                          entry.callId ? "cursor-pointer hover:bg-accent/[0.04]" : "",
                         ].join(" ")}
                       >
                         <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 text-ink-soft`}>

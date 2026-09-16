@@ -764,13 +764,13 @@ export function PronunciationCoach({
       {mode === "practice" ? (
         <div className="space-y-5">
           {!todoItems.length && !active ? (
-            <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
+            <div className="rounded-xl border border-dashed border-[var(--line)] bg-surface/60 px-4 py-5">
               <p className="text-sm font-medium text-[var(--ink)]">Nothing left to practice</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setMode("fix")}
-                  className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+                  className="rounded-xl bg-accent-fill px-4 py-2 text-sm font-medium text-accent-on-fill hover:bg-accent-fill-hover"
                 >
                   Fix a word
                 </button>
@@ -818,11 +818,11 @@ export function PronunciationCoach({
                       <button
                         type="button"
                         onClick={startRecording}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
+                        className="inline-flex items-center gap-2 rounded-xl bg-accent-fill px-5 py-3 text-sm font-medium text-accent-on-fill transition hover:bg-accent-fill-hover"
                       >
                         <span
                           aria-hidden="true"
-                          className={`h-2.5 w-2.5 rounded-full bg-white ${recording ? "animate-pulse" : ""}`}
+                          className={`h-2.5 w-2.5 rounded-full bg-surface ${recording ? "animate-pulse" : ""}`}
                         />
                         Record line
                       </button>
@@ -831,11 +831,11 @@ export function PronunciationCoach({
                       <button
                         type="button"
                         onClick={stopRecording}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-white"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-accent-on-fill"
                       >
                         <span
                           aria-hidden="true"
-                          className="h-2.5 w-2.5 animate-pulse rounded-full bg-white"
+                          className="h-2.5 w-2.5 animate-pulse rounded-full bg-surface"
                         />
                         Stop
                       </button>
@@ -851,7 +851,7 @@ export function PronunciationCoach({
                         <button
                           type="button"
                           onClick={startRecording}
-                          className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium"
+                          className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-sm font-medium"
                         >
                           Retry
                         </button>
@@ -859,7 +859,7 @@ export function PronunciationCoach({
                           type="button"
                           onClick={keepRecording}
                           disabled={confirmPending}
-                          className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                          className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-accent-on-fill disabled:opacity-60"
                         >
                           {confirmPending ? "Checking…" : "Use this take"}
                         </button>
@@ -942,7 +942,7 @@ export function PronunciationCoach({
                               "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition",
                               selected
                                 ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                                : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
+                                : "border-[var(--line)] bg-surface hover:border-[var(--accent)]/50",
                               item.status === "done" ? "opacity-60" : "",
                             ].join(" ")}
                           >
@@ -976,12 +976,12 @@ export function PronunciationCoach({
       {mode === "library" ? (
         <div className="space-y-4">
           {lexicon.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[var(--line)] bg-white/60 px-4 py-5">
+            <div className="rounded-xl border border-dashed border-[var(--line)] bg-surface/60 px-4 py-5">
               <p className="text-sm font-medium text-[var(--ink)]">Nothing trained yet</p>
               <button
                 type="button"
                 onClick={() => setMode("practice")}
-                className="mt-3 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+                className="mt-3 rounded-xl bg-accent-fill px-4 py-2 text-sm font-medium text-accent-on-fill hover:bg-accent-fill-hover"
               >
                 Start practicing
               </button>
@@ -1048,13 +1048,13 @@ export function PronunciationCoach({
                           value={editSay}
                           onChange={(e) => setEditSay(e.target.value)}
                           aria-label={`Say-as for ${label}`}
-                          className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-[var(--accent)]"
+                          className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-surface px-3 py-1.5 font-mono text-sm outline-none focus:border-[var(--accent)]"
                         />
                         <button
                           type="button"
                           onClick={() => saveEditedSay(entry.match)}
                           disabled={persistPending || !editSay.trim()}
-                          className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                          className="rounded-xl bg-accent-fill px-3 py-1.5 text-xs font-medium text-accent-on-fill disabled:opacity-60"
                         >
                           {persistPending ? "Saving…" : "Save"}
                         </button>
@@ -1211,7 +1211,7 @@ export function PronunciationCoach({
                           <button
                             type="button"
                             onClick={() => recordCandidateInstead(c)}
-                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white"
+                            className="rounded-lg bg-accent-fill px-3 py-1.5 text-xs font-medium text-accent-on-fill"
                           >
                             Record
                           </button>
@@ -1220,7 +1220,7 @@ export function PronunciationCoach({
                             type="button"
                             onClick={() => dismissCandidate(c, "rejected")}
                             disabled={dismissPending}
-                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                            className="rounded-lg bg-accent-fill px-3 py-1.5 text-xs font-medium text-accent-on-fill disabled:opacity-60"
                           >
                             Dismiss
                           </button>
@@ -1292,7 +1292,7 @@ export function PronunciationCoach({
                   setAddError(null);
                 }}
                 placeholder="Muindi Mbingu"
-                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                className="mt-1 w-full max-w-lg rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -1300,7 +1300,7 @@ export function PronunciationCoach({
                 type="button"
                 onClick={() => submitQuickAdd("record")}
                 disabled={!addPhrase.trim()}
-                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
+                className="rounded-xl bg-accent-fill px-4 py-2 text-sm font-medium text-accent-on-fill hover:bg-accent-fill-hover disabled:opacity-60"
               >
                 Record &amp; train
               </button>
@@ -1328,13 +1328,13 @@ export function PronunciationCoach({
                     setAddError(null);
                   }}
                   placeholder="Moo-in-dee Mbeen-goo"
-                  className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-xl border border-[var(--line)] bg-surface px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
                 />
                 <button
                   type="button"
                   onClick={() => submitQuickAdd("save")}
                   disabled={!addPhrase.trim() || !addSay.trim() || quickPending}
-                  className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-60"
+                  className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-60"
                 >
                   {quickPending ? "Saving…" : "Save spelling"}
                 </button>
@@ -1374,7 +1374,7 @@ export function PronunciationCoach({
                 type="button"
                 onClick={scanCalls}
                 disabled={minePending || geminiPending}
-                className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+                className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
               >
                 {minePending ? "Scanning…" : "Quick scan"}
               </button>
@@ -1384,7 +1384,7 @@ export function PronunciationCoach({
                 value={geminiBatch}
                 onChange={(e) => setGeminiBatch(Number(e.target.value))}
                 disabled={geminiPending}
-                className="rounded-xl border border-[var(--line)] bg-white px-2 py-2 text-sm"
+                className="rounded-xl border border-[var(--line)] bg-surface px-2 py-2 text-sm"
               >
                 {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
                   <option key={n} value={n}>
@@ -1396,7 +1396,7 @@ export function PronunciationCoach({
                 type="button"
                 onClick={() => runGeminiScan(false)}
                 disabled={geminiPending || minePending}
-                className="rounded-xl border border-[var(--ink)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+                className="rounded-xl border border-[var(--ink)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-60"
               >
                 {geminiPending ? "Listening…" : "AI listen"}
               </button>
@@ -1417,7 +1417,7 @@ export function PronunciationCoach({
                     type="button"
                     onClick={() => runGeminiScan(true)}
                     disabled={geminiPending}
-                    className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                    className="rounded-lg bg-accent-fill px-3 py-1.5 text-sm font-medium text-accent-on-fill disabled:opacity-60"
                   >
                     Confirm
                   </button>

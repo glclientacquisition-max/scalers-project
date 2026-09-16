@@ -46,7 +46,7 @@ export function RowStateDot({ show }: { show: boolean }) {
     <span
       role="img"
       aria-label="Needs you"
-      className="h-2 w-2 shrink-0 rounded-full bg-[#0096FF]"
+      className="h-2 w-2 shrink-0 rounded-full bg-accent"
     />
   );
 }

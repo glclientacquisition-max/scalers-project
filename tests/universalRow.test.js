@@ -31,7 +31,7 @@ describe("universal row anatomy", () => {
   });
 
   it("carries state as a blue dot plus type weight, never opacity", () => {
-    assert.match(row, /rounded-full bg-\[#0096FF\]/);
+    assert.match(row, /rounded-full bg-accent/);
     assert.match(row, /aria-label="Needs you"/);
     assert.match(row, /font-semibold text-ink/);
     assert.match(row, /font-medium text-ink/);

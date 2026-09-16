@@ -275,7 +275,7 @@ function CatalogPager({
           type="button"
           disabled={page <= 0}
           onClick={onPrev}
-          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
+          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
         >
           Previous
         </button>
@@ -286,7 +286,7 @@ function CatalogPager({
           type="button"
           disabled={page >= pageCount - 1}
           onClick={onNext}
-          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
+          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
         >
           Next
         </button>
@@ -896,7 +896,7 @@ export function TenantForm({
             onChange={setNotifyChannels}
             heading={null}
           />
-          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3">
+          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
             <p className="text-sm font-medium text-ink">Text customers</p>
             <ToolSwitch
               checked={Boolean(notifyChannels.caller_sms)}
@@ -906,7 +906,7 @@ export function TenantForm({
               label="Text customers"
             />
           </div>
-          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3">
+          <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
             <p className="text-sm font-medium text-ink">Text back missed calls</p>
             <ToolSwitch
               checked={Boolean(notifyChannels.missed_textback)}
@@ -962,7 +962,7 @@ export function TenantForm({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-white">
+                  <tbody className="divide-y divide-line bg-surface">
                     {socialHandles.channels.map((channel, index) => (
                       <tr key={`social-ch-${index}`} className="align-middle">
                         <td className="px-3 py-1.5">
@@ -1102,7 +1102,7 @@ export function TenantForm({
               </details>
 
               {bulkPreview.length > 0 ? (
-                <div className="rounded-xl border border-line bg-white px-3 py-2">
+                <div className="rounded-xl border border-line bg-surface px-3 py-2">
                   <p className="text-xs font-medium text-ink">
                     Ready to add {bulkPreview.length} service
                     {bulkPreview.length === 1 ? "" : "s"}
@@ -1141,7 +1141,7 @@ export function TenantForm({
             {visibleServices.map((service, localIndex) => {
               const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
               return (
-                <div key={`service-m-${index}`} className="space-y-2 rounded-xl border border-line bg-white p-3">
+                <div key={`service-m-${index}`} className="space-y-2 rounded-xl border border-line bg-surface p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Service {index + 1}</p>
                     <button
@@ -1200,7 +1200,7 @@ export function TenantForm({
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line bg-white">
+                <tbody className="divide-y divide-line bg-surface">
                   {visibleServices.map((service, localIndex) => {
                     const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
                     return (
@@ -1378,7 +1378,7 @@ export function TenantForm({
               {visibleProducts.map((product, localIndex) => {
                 const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                 return (
-                  <div key={`product-m-${index}`} className="space-y-2 rounded-xl border border-line bg-white p-3">
+                  <div key={`product-m-${index}`} className="space-y-2 rounded-xl border border-line bg-surface p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Product {index + 1}</p>
                       <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:text-warn" aria-label={`Remove product ${index + 1}`}>
@@ -1430,7 +1430,7 @@ export function TenantForm({
                       <th className="px-3 py-2.5 font-medium w-24">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-white">
+                  <tbody className="divide-y divide-line bg-surface">
                     {visibleProducts.map((product, localIndex) => {
                       const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                       return (
@@ -1527,7 +1527,7 @@ export function TenantForm({
               return (
                 <div
                   key={day}
-                  className="flex min-w-0 flex-col gap-2 rounded-lg border border-line/70 bg-white/60 px-3 py-2.5 sm:grid sm:grid-cols-[8.5rem_auto_1fr_1fr] sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
+                  className="flex min-w-0 flex-col gap-2 rounded-lg border border-line/70 bg-surface/60 px-3 py-2.5 sm:grid sm:grid-cols-[8.5rem_auto_1fr_1fr] sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
                 >
                   <span className="text-sm font-medium text-ink">
                     {DAY_LABELS[day]}
@@ -1538,7 +1538,7 @@ export function TenantForm({
                     className={[
                       "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium transition",
                       open
-                        ? "border-[#0096FF] bg-accent-soft text-[#0096FF]"
+                        ? "border-accent bg-accent-soft text-accent"
                         : "border-line text-ink-soft",
                     ].join(" ")}
                   >
@@ -1554,7 +1554,7 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                       <span className="text-xs text-ink-soft">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
@@ -1565,7 +1565,7 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                     </div>
                   ) : (
@@ -1623,7 +1623,7 @@ export function TenantForm({
           {locations.map((loc, index) => (
             <div
               key={`loc-${index}`}
-              className="space-y-2 rounded-xl border border-line bg-white/60 p-3"
+              className="space-y-2 rounded-xl border border-line bg-surface/60 p-3"
             >
               <div className="grid gap-2 sm:grid-cols-2">
                 <div>
@@ -1881,7 +1881,7 @@ export function TenantForm({
         </div>
         <div className="space-y-2">
           <p className={settingsBlockTitleClass}>Tools</p>
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
+          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
           {AGENT_TOOL_OPTIONS.map((opt) => {
             const on = agentTools[opt.id];
             return (
@@ -2090,14 +2090,14 @@ export function TenantForm({
               setFaqPage(Math.floor(faqs.length / FAQ_PAGE_SIZE));
             }}
             disabled={faqs.length >= FAQ_MAX}
-            className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#005ccc] hover:bg-accent-soft disabled:opacity-60"
+            className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent-deep hover:bg-accent-soft disabled:opacity-60"
           >
             Add FAQ
           </button>
         </div>
 
         {filledFaqCount === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-white/70 px-4 py-3">
+          <div className="rounded-xl border border-dashed border-line bg-surface/70 px-4 py-3">
             <p className="text-sm text-ink-soft">Common questions</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {FAQ_STARTERS.map((starter) => (
@@ -2115,7 +2115,7 @@ export function TenantForm({
                       return next;
                     })
                   }
-                  className="rounded-xl border border-line bg-white px-3 py-1.5 text-left text-xs text-ink hover:border-[#0096FF]"
+                  className="rounded-xl border border-line bg-surface px-3 py-1.5 text-left text-xs text-ink hover:border-accent"
                 >
                   {starter.question}
                 </button>
@@ -2128,7 +2128,7 @@ export function TenantForm({
           {visibleFaqs.map((faq, localIndex) => {
             const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
             return (
-            <div key={`faq-${index}`} className="space-y-1.5 rounded-xl border border-line bg-white px-3 py-2.5">
+            <div key={`faq-${index}`} className="space-y-1.5 rounded-xl border border-line bg-surface px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                   FAQ {index + 1}

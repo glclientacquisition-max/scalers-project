@@ -85,7 +85,7 @@ function EmptyInbox({
 
   if (pendingDid) {
     return (
-      <div className="mt-8 border-y border-[#0096FF]/30 bg-[#0096FF]/5 py-12 text-center">
+      <div className="mt-8 border-y border-accent/30 bg-accent/5 py-12 text-center">
         <p className="font-display text-2xl tracking-tight text-ink">Number being assigned</p>
         <Link
           href={businessSettingsHref("train")}
@@ -104,7 +104,7 @@ function EmptyInbox({
         Call{" "}
         <a
           href={`tel:${did}`}
-          className="font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-2 transition hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+          className="font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 transition hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {did}
         </a>{" "}
@@ -142,7 +142,7 @@ export default async function CallsPage({
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#005CCC]">
+        <Link href="/signup" className="text-accent-deep">
           Create one
         </Link>
         .

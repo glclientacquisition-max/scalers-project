@@ -8,7 +8,7 @@ export default async function ContactImportPage() {
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
         No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#005CCC]">
+        <Link href="/signup" className="text-accent-deep">
           Create one
         </Link>
         .
@@ -19,7 +19,7 @@ export default async function ContactImportPage() {
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
     return (
-      <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
+      <div className="rounded-2xl border border-warn/40 bg-surface p-6 text-warn">
         Not signed in.
       </div>
     );
@@ -29,7 +29,7 @@ export default async function ContactImportPage() {
     <div className="max-w-3xl">
       <Link
         href="/contacts"
-        className="text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className="text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         Contacts
       </Link>

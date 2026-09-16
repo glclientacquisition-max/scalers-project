@@ -159,7 +159,7 @@ export function ContactImportForm() {
                       {" "}
                       <Link
                         href={`/contacts/${row.existingId}`}
-                        className="font-medium text-[#005CCC] hover:underline"
+                        className="font-medium text-accent-deep hover:underline"
                       >
                         Open
                       </Link>

@@ -52,19 +52,19 @@ export function VisitWeekCalendar({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={prevHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-[#0096FF] focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Prev
           </Link>
           <Link
             href={nextHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-[#0096FF] focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Next
           </Link>
           <Link
             href={listHref}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-[#005CCC] hover:underline focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-accent-deep hover:underline focus:outline-none focus:ring-2 focus:ring-accent"
           >
             List
           </Link>
@@ -79,7 +79,7 @@ export function VisitWeekCalendar({
               key={day.key}
               className={[
                 "min-h-[11rem] bg-surface p-3",
-                day.isToday ? "bg-[#0096FF]/[0.06]" : "",
+                day.isToday ? "bg-accent/[0.06]" : "",
               ].join(" ")}
             >
               <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">

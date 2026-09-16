@@ -187,7 +187,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             {products.map((p, i) => (
               <li
                 key={`p-${i}`}
-                className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2 text-sm"
+                className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2 text-sm"
               >
                 <input
                   type="checkbox"
@@ -213,7 +213,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
           </ul>
 
           {social && socialHandlesHaveContent(social) ? (
-            <label className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+            <label className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
               <input
                 type="checkbox"
                 className="mt-1"
@@ -288,7 +288,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
       {flash ? (
         <p
           className={
-            flashIsError ? "text-sm text-warn" : "text-sm text-[#005ccc]"
+            flashIsError ? "text-sm text-warn" : "text-sm text-accent-deep"
           }
           role={flashIsError ? "alert" : "status"}
         >

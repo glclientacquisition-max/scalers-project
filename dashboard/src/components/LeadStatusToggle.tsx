@@ -15,15 +15,15 @@ const STYLES: Record<
   { active: string; idle: string }
 > = {
   new: {
-    active: "bg-warn text-white border-warn",
+    active: "bg-warn text-accent-on-fill border-warn",
     idle: "border-line text-ink-soft hover:border-warn/60",
   },
   contacted: {
-    active: "bg-lead text-white border-lead",
+    active: "bg-lead text-accent-on-fill border-lead",
     idle: "border-line text-ink-soft hover:border-lead/60",
   },
   resolved: {
-    active: "bg-ok text-white border-ok",
+    active: "bg-ok text-accent-on-fill border-ok",
     idle: "border-line text-ink-soft hover:border-ok/60",
   },
 };

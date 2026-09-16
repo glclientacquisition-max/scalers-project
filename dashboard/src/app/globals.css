@@ -16,13 +16,24 @@
   --card: #ffffff;
   --accent: #0096ff;
   --accent-deep: #005ccc;
+  --accent-deep-hover: #004a99;
   --accent-soft: #eaf6ff;
+  --accent-fill: #005ccc;
+  --accent-fill-hover: #004aad;
+  --accent-fill-active: #003d99;
+  --accent-on-fill: #ffffff;
   --warn: #c2410c;
   --warn-soft: #fdf3ec;
+  --warn-deep: #9a3209;
   --ok: #15803d;
   --ok-soft: #eaf6f0;
   --lead: #b98a1f;
   --whatsapp: #25d366;
+  --whatsapp-deep: #128c7e;
+  --bubble-caller: #d9f4e2;
+  --bubble-caller-ink: #2f6b3a;
+  --sms: #0284c7;
+  --email: #4f46e5;
 
   --background: var(--bg);
   --foreground: var(--ink);
@@ -39,6 +50,93 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
   --tap-min: 2.75rem;
+}
+
+/*
+ * Dark desk palette. Scoped to .desk-theme (the owner desk); marketing, auth,
+ * onboarding, and admin stay light. Activation: <html data-theme="dark">, or
+ * system dark with no explicit choice. The two blocks must stay in sync.
+ */
+:root[data-theme="dark"] .desk-theme {
+  --bg: #0a1420;
+  --bg-deep: #0e1a2a;
+  --ink: #e9eff7;
+  --ink-soft: #9dafc6;
+  --line: #24374f;
+  --card: #122236;
+  --accent: #2aa8ff;
+  --accent-deep: #6bc2ff;
+  --accent-deep-hover: #a8daff;
+  --accent-soft: #0e2438;
+  --accent-fill: #1f9fff;
+  --accent-fill-hover: #4db4ff;
+  --accent-fill-active: #0096ff;
+  --accent-on-fill: #062033;
+  --warn: #f4955a;
+  --warn-soft: #2b1a12;
+  --warn-deep: #fdba74;
+  --ok: #4ade80;
+  --ok-soft: #122a1c;
+  --lead: #d9a62e;
+  --whatsapp-deep: #25d366;
+  --bubble-caller: #14321f;
+  --bubble-caller-ink: #7fe3a5;
+  --sms: #38bdf8;
+  --email: #a5b4fc;
+  --brand-ink: #e9eff7;
+  --tw-ring-offset-color: var(--card);
+  color-scheme: dark;
+  background:
+    radial-gradient(1100px 520px at 0% -10%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, transparent 55%),
+    var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desk-theme {
+    --bg: #0a1420;
+    --bg-deep: #0e1a2a;
+    --ink: #e9eff7;
+    --ink-soft: #9dafc6;
+    --line: #24374f;
+    --card: #122236;
+    --accent: #2aa8ff;
+    --accent-deep: #6bc2ff;
+    --accent-deep-hover: #a8daff;
+    --accent-soft: #0e2438;
+    --accent-fill: #1f9fff;
+    --accent-fill-hover: #4db4ff;
+    --accent-fill-active: #0096ff;
+    --accent-on-fill: #062033;
+    --warn: #f4955a;
+    --warn-soft: #2b1a12;
+    --warn-deep: #fdba74;
+    --ok: #4ade80;
+    --ok-soft: #122a1c;
+    --lead: #d9a62e;
+    --whatsapp-deep: #25d366;
+    --bubble-caller: #14321f;
+    --bubble-caller-ink: #7fe3a5;
+    --sms: #38bdf8;
+    --email: #a5b4fc;
+    --brand-ink: #e9eff7;
+    --tw-ring-offset-color: var(--card);
+    color-scheme: dark;
+    background:
+      radial-gradient(1100px 520px at 0% -10%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, transparent 55%),
+      var(--bg);
+  }
+}
+
+:root[data-theme="dark"] .desk-theme ::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desk-theme ::selection {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--ink);
+  }
 }
 
 @media (min-width: 640px) {

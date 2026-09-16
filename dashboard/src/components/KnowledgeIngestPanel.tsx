@@ -245,7 +245,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-xl border border-[#0096FF]/30 bg-accent-soft px-4 py-3 text-sm text-ink">
+          <div className="rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm text-ink">
             From <span className="font-medium">{draft.sourceLabel}</span>
             {extractState.message ? (
               <span className="mt-1 block text-ink-soft">{extractState.message}</span>
@@ -268,7 +268,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               </h3>
               <ul className="space-y-2">
                 {draft.businessNameSuggestion ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -290,7 +290,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   </li>
                 ) : null}
                 {draft.vertical ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -309,7 +309,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   </li>
                 ) : null}
                 {draft.locations?.length ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -335,7 +335,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   </li>
                 ) : null}
                 {draft.hoursNotes || draft.hoursSchedule ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -356,7 +356,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 Object.values(draft.policies).some((v) =>
                   String(v || "").trim()
                 ) ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -382,7 +382,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   </li>
                 ) : null}
                 {draft.contactPhone ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -410,7 +410,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 <h3 className="text-sm font-medium text-ink">Services</h3>
                 <button
                   type="button"
-                  className="text-xs font-medium text-[#005CCC]"
+                  className="text-xs font-medium text-accent-deep"
                   onClick={() =>
                     setSelectedServices(
                       selectedServices.size === draft.services.length
@@ -428,7 +428,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 {draft.services.map((s, i) => (
                   <li
                     key={`svc-${i}`}
-                    className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5"
+                    className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
                   >
                     <input
                       type="checkbox"
@@ -460,7 +460,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 <h3 className="text-sm font-medium text-ink">FAQs</h3>
                 <button
                   type="button"
-                  className="text-xs font-medium text-[#005ccc]"
+                  className="text-xs font-medium text-accent-deep"
                   aria-label={
                     selectedFaqs.size === draft.faqs.length
                       ? `Clear all ${draft.faqs.length} FAQs`
@@ -481,7 +481,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 {draft.faqs.map((f, i) => (
                   <li
                     key={`faq-${i}`}
-                    className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5"
+                    className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
                   >
                     <input
                       type="checkbox"
@@ -505,7 +505,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                           onChange={(e) =>
                             updateDraftFaq(i, "question", e.target.value)
                           }
-                          className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
                         />
                       </div>
                       <div>
@@ -523,7 +523,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                           onChange={(e) =>
                             updateDraftFaq(i, "answer", e.target.value)
                           }
-                          className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm leading-relaxed outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
                         />
                       </div>
                     </div>
@@ -540,7 +540,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 {draft.team.map((t, i) => (
                   <li
                     key={`team-${i}`}
-                    className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5"
+                    className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
                   >
                     <input
                       type="checkbox"
@@ -565,7 +565,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
           ) : null}
 
           {draft.unknownAnswerFallback ? (
-            <label className="flex gap-3 rounded-xl border border-line bg-white px-3 py-2.5 text-sm">
+            <label className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
               <input
                 type="checkbox"
                 className="mt-1"
@@ -690,7 +690,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
         <p
           className={[
             "text-sm",
-            flashIsError ? "text-warn" : "text-[#005ccc]",
+            flashIsError ? "text-warn" : "text-accent-deep",
           ].join(" ")}
           role={flashIsError ? "alert" : "status"}
         >

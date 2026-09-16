@@ -127,7 +127,7 @@ export function BuyNumberPanel() {
                         type="button"
                         disabled={Boolean(buyingId) || !buyConfigured}
                         onClick={() => void buy(row.inventory_id, row.e164)}
-                        className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-50"
+                        className="rounded-lg bg-accent-fill px-3 py-1.5 text-xs font-medium text-accent-on-fill hover:bg-accent-fill-hover disabled:opacity-50"
                       >
                         {buyingId === row.inventory_id ? "Buying…" : "Buy"}
                       </button>

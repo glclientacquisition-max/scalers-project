@@ -2,11 +2,11 @@ import type { InboxPurpose } from "@/lib/inboxPurpose";
 import { purposeLabel } from "@/lib/inboxPurpose";
 
 const TONE: Record<InboxPurpose, string> = {
-  job: "bg-[#EAF6FF] text-[#005ccc] ring-[#0096FF]/20",
+  job: "bg-accent-soft text-accent-deep ring-accent/20",
   hold: "bg-ok-soft text-ok ring-ok/15",
   human: "bg-warn-soft text-warn ring-warn/20",
   missed: "bg-surface-muted text-ink ring-line",
-  answered: "bg-white text-ink-soft ring-line",
+  answered: "bg-surface text-ink-soft ring-line",
 };
 
 export function InboxPurposeChip({
