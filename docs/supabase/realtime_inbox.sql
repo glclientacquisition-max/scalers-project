@@ -4,6 +4,7 @@
 --          publication so the dashboard's LiveInbox subscription receives them.
 -- Run after: contacts_and_requests.sql, appointments.sql (tables must exist).
 -- Idempotent: re-runs skip tables already in the publication.
+-- Applied: staging 2026-09-16; production ALCR 2026-09-16.
 -- No schema, grant, or policy change. Existing member SELECT policies
 -- (owner_rls.sql era) govern what a subscribed owner receives; the service
 -- role voice engine is unaffected.
