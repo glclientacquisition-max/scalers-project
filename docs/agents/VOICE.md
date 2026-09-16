@@ -17,9 +17,11 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `tests/idleNudge.test.js` | Idle silence check-in after a committed question |
 | `tests/spokenStreamBuffer.test.js` | LLM→TTS chunking tests |
 | `tests/voiceWiring.test.js` | Static wiring checks for runtime voice paths |
+| `tests/naturalnessScore.test.js` | Roboticness pass/fail scanner for live transcripts |
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
 | `docs/WEBHOOK_TUNNEL.md` | Local tunnel for SautiKit media |
 | `docs/agents/VOICE_DOWNTIME_AT_SCALE.md` | Multi-tenant speech-outage contract |
+| `docs/agents/VOICE_NATURALNESS.md` | Live DID roboticness eval (pass/fail, freeze SHA) |
 | `docs/CALL_MESSAGE_CONTRACT.md` | Owner vs caller post-call message contract |
 | `docs/CALL_MESSAGE_GAP.md` | Live owner SMS vs excellence bar |
 
@@ -109,6 +111,12 @@ Task: <one concrete voice bug or improvement>
 
 Program plan: [`VOICE_SPEED_CONSISTENCY.md`](./VOICE_SPEED_CONSISTENCY.md)  
 Target: first audible audio usually **≤ 800–1200 ms** after the caller stops, with stable pacing.
+
+## Naturalness (roboticness)
+
+Do not crank TTS speed to sound more human. Freeze `/healthz` `gitSha` + `voiceProfile`, run three scripted DID listens, score Voice IDs V1–V9 as pass/fail from recording + transcript + `spoken=` logs.
+
+Protocol: [`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js --file turns.json`. Isolated-string listen pass remains `npm run tts:listen-harness`.
 
 ## Good first tickets
 

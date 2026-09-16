@@ -67,11 +67,13 @@ One sheet per call. Fill latency from `voice-timing` logs. Do not change provide
 **Date (UTC):**  
 **Env:** staging / production test DID
 
-### Voice (1–5)
+**SHA freeze:** paste `GET /healthz` `gitSha` + `voiceProfile` before the call. Naturalness is pass/fail on Voice IDs, not a 1–5 MOS. Protocol: [`../agents/VOICE_NATURALNESS.md`](../agents/VOICE_NATURALNESS.md).
+
+### Voice (1–5, except Naturalness)
 
 | Criterion | Score | Notes |
 | --- | --- | --- |
-| Naturalness | | |
+| Naturalness (V1–V9) | pass / fail | IDs that fired: |
 | Kenyan English clarity | | |
 | Swahili clarity | | |
 | Sheng (if enabled) | | |
@@ -82,6 +84,8 @@ One sheet per call. Fill latency from `voice-timing` logs. Do not change provide
 | Number pronunciation | | |
 | Names / addresses | | |
 | Business terminology | | |
+
+Scripts for the freeze (same DID, same SHA, do not retune between them): **N1** phatic then one job; **N2** barge wait then finish; **N3** slower then normal speed.
 
 ### Brain (pass / fail)
 
@@ -132,4 +136,5 @@ Use before a real business goes live.
 - [`PHASE_3H_BETA_READINESS_PLAN.md`](./PHASE_3H_BETA_READINESS_PLAN.md)
 - [`PRODUCTION_CHANGE_NOTIFY_CHANNELS.md`](./PRODUCTION_CHANGE_NOTIFY_CHANNELS.md)
 - [`../agents/VOICE_SPEED_CONSISTENCY.md`](../agents/VOICE_SPEED_CONSISTENCY.md)
+- [`../agents/VOICE_NATURALNESS.md`](../agents/VOICE_NATURALNESS.md)
 - [`STAGING_TO_PRODUCTION.md`](./STAGING_TO_PRODUCTION.md)
