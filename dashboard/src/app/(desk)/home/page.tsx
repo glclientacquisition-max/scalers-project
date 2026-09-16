@@ -30,6 +30,7 @@ import {
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { LiveInbox } from "@/components/LiveInbox";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import {
   getWalletRunwayDays,
@@ -174,6 +175,7 @@ export default async function HomeOverviewPage() {
 
   return (
     <div className="w-full min-w-0">
+      <LiveInbox tenantId={tenant.id} />
       <header className="min-w-0">
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           {nairobiGreeting()}

@@ -7,7 +7,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Confirm / Done / WhatsApp stay the only buttons. No Call, Open, or View link.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Confirm / Done / WhatsApp stay the only verbs. A muted Call icon sits left of WhatsApp when the row has a number and no visit/hold verb. No Open or View link.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Return call** and use WhatsApp. Same for holds without a request row.
 
@@ -30,6 +30,8 @@ Needs you is not a history. Older open work stays until you Confirm, Done, or re
 
 Work that needs the owner sorts above answered rows. Visits before holds. Urgent first.
 
+**Live:** rows appear as calls land. `LiveInbox` subscribes to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives) and re-runs the server page after a 1.2s debounce, so one call's insert plus terminal update collapse into a single refresh. Without the publication or an owner session the page stays refresh-to-update.
+
 `hold_or_pickup` and `order_enquiry` are Holds. `product_inquiry` is Answered, not Needs you.
 
 Columns (`md+` table, same data as the phone row):
@@ -39,6 +41,7 @@ Columns (`md+` table, same data as the phone row):
 
 **Icons (Inbox only):**
 - WhatsApp glyph, green on white, `h-11 w-11`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
+- Call glyph (`CallLink`, `tel:` deep link; the device dialer places the call). Muted bordered `h-11 w-11`, sits left of WhatsApp. Never a filled button.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
 - Confirm / Done are text on `#005CCC`, 44px. List: that verb only. Call: Confirm or Done on top, Cancel ghost below. Transcript is the right pane.
 

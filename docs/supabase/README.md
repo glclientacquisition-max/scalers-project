@@ -110,6 +110,12 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 22 | [`product_catalog_and_social.sql`](./product_catalog_and_social.sql) | `business_operating_model.sql` | `product_catalog` + `social_handles` (products separate from services) |
 | 23 | [`appointments.sql`](./appointments.sql) | `contacts_and_requests.sql` | Home-services visit bookings (`requested\|confirmed\|cancelled\|done`) + RLS |
 
+### 10. Realtime
+
+| # | File | Depends on | Notes |
+| --- | --- | --- | --- |
+| 24 | [`realtime_inbox.sql`](./realtime_inbox.sql) | `contacts_and_requests.sql`, `appointments.sql` | Adds `calls` / `service_requests` / `appointments` to the `supabase_realtime` publication (Live Inbox). Idempotent; no schema, grant, or policy change. |
+
 ---
 
 ## Legacy / do not apply

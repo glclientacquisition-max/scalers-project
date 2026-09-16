@@ -10,6 +10,8 @@
 
 **Chrome:** Greeting eyebrow, workspace name as `h1` (not in the app header). Nairobi `<time>`. One aside: today + line + wallet + docked CTA.
 
+**Live.** The same `LiveInbox` subscription as the Inbox re-runs this page when a work-table row lands, so the briefing, queues, digest, and Next to return stay current without a manual refresh.
+
 **Desktop gains a second column.** Below `lg` the page is one column: Work, then aside. At `lg` the grid is 7/5: Work (queues + Next to return) on the left, aside on the right. The aside is sticky (`top-24`). The extra width is real content, not margin.
 
 **Next to return (desktop only, `hidden lg:block`).** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one-line reason. Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link.

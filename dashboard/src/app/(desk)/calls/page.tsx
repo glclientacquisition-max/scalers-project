@@ -20,6 +20,7 @@ import {
   InboxTableRow,
   inboxTableKind,
 } from "@/components/InboxItemRow";
+import { LiveInbox } from "@/components/LiveInbox";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import {
   parseWeekParam,
@@ -190,6 +191,7 @@ export default async function CallsPage({
 
   return (
     <div>
+      <LiveInbox tenantId={tenant.id} />
       <InboxToolbar
         active={activeFilter}
         counts={counts}
