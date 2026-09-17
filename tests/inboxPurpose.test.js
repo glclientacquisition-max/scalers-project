@@ -142,10 +142,8 @@ function compareInboxSignal(a, b) {
     if (item.urgent && item.needsYou) return 0;
     if (item.purpose === "job" && item.job && item.needsYou) return 1;
     if (item.purpose === "hold" && item.hold && item.needsYou) return 2;
-    if (item.purpose === "missed" && item.needsYou) return 3;
-    if (item.purpose === "human" && item.needsYou) return 4;
-    if (item.needsYou) return 5;
-    return 6;
+    if (item.needsYou) return 3;
+    return 4;
   }
   const diff = rank(a) - rank(b);
   if (diff !== 0) return diff;
@@ -374,6 +372,24 @@ describe("inbox signal", () => {
     assert.equal(rows[2], intentOnly);
   });
 
+  it("ranks a new human-asked call above older missed hangups", () => {
+    const olderMissed = {
+      needsYou: true,
+      urgent: false,
+      purpose: "missed",
+      createdAt: "2026-09-16T15:36:00.000Z",
+    };
+    const newHuman = {
+      needsYou: true,
+      urgent: false,
+      purpose: "human",
+      createdAt: "2026-09-16T17:54:00.000Z",
+    };
+    const rows = [olderMissed, newHuman].sort(compareInboxSignal);
+    assert.equal(rows[0], newHuman);
+    assert.equal(rows[1], olderMissed);
+  });
+
   it("briefs Home by the sharpest queue", () => {
     assert.equal(
       homeBriefing({ toReturn: 1, toFulfill: 2, toConfirm: 3 }),
@@ -441,5 +457,7 @@ describe("inboxPurpose source lockstep", () => {
     );
     assert.match(src, /item\.purpose === "job" && item\.job && item\.needsYou/);
     assert.match(src, /item\.purpose === "hold" && item\.hold && item\.needsYou/);
+    assert.match(src, /if \(item\.needsYou\) return 3;/);
+    assert.doesNotMatch(src, /purpose === "missed" && item\.needsYou\) return 3/);
   });
 });
