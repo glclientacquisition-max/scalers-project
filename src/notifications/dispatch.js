@@ -82,7 +82,7 @@ async function trySendWhatsApp({ to, body, lead, kind }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger } = {}) {
+async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind } = {}) {
   const text = body || buildLeadText(lead);
   const errors = [];
   const prefs = parseNotifyChannels(channels);
@@ -130,7 +130,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
           to,
           body: text,
           lead,
-          kind: ledger && ledger.kind,
+          kind: kind || (ledger && ledger.kind),
         });
         if (wa) return accept(wa);
       } catch (err) {

@@ -204,7 +204,7 @@ describe('staff WhatsApp templates', () => {
       body: 'VISIT REQUEST. Shop\nService: Haircut\nCaller: Jane',
       lead: { businessName: 'Shop', name: 'Jane', reason: 'Visit' },
       channels: { sms: true, whatsapp: true, email: false },
-      ledger: { tenantId: 't1', callSid: 'CA1', kind: 'appointment' },
+      kind: 'appointment',
     });
     assert.equal(result.channel, 'whatsapp');
     assert.equal(calls[0].body.type, 'template');
