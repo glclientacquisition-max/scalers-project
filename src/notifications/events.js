@@ -221,6 +221,18 @@ function shouldSendOwnerLead(call = {}) {
   return Boolean(displayOwnerCallerName(call.name) && ownerReason(call));
 }
 
+const INBOX_ACTION_NOTIFY_KINDS = new Set(['appointment', 'service_request']);
+
+/**
+ * Visit / hold / order / enquiry staff SMS already went. Do not also send a lead.
+ */
+function staffInboxAlreadyNotified(call = {}) {
+  if (call.whatsapp_sent) return true;
+  return INBOX_ACTION_NOTIFY_KINDS.has(
+    String(call.owner_notify_kind || '').toLowerCase()
+  );
+}
+
 /**
  * Mid-call name capture during a visit must not text the owner a lead dump.
  * Hangup still sends a lead if no visit notify marked the call.
@@ -248,4 +260,5 @@ module.exports = {
   displayOwnerCallerName,
   shouldSendOwnerLead,
   shouldDeferOwnerLeadForVisit,
+  staffInboxAlreadyNotified,
 };

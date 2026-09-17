@@ -116,6 +116,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | --- | --- | --- | --- |
 | 24 | [`realtime_inbox.sql`](./realtime_inbox.sql) | `contacts_and_requests.sql`, `appointments.sql` | Adds `calls` / `service_requests` / `appointments` to the `supabase_realtime` publication (Live Inbox). Idempotent; no schema, grant, or policy change. |
 | 24b | [`realtime_inbox_replica_identity.sql`](./realtime_inbox_replica_identity.sql) | `realtime_inbox.sql` | `REPLICA IDENTITY FULL` on those three tables so `tenant_id` filters match hangup UPDATEs. Idempotent; no publication, grant, or policy change. |
+| 24c | [`notify_send_ledger.sql`](./notify_send_ledger.sql) | `contacts_and_requests.sql` (tenants, calls, `current_user_tenant_ids`) | Append-only `notify_sends`. Staff + caller SMS = tenant. Wallet/outage = platform. Meter only, no charge. |
 
 ---
 

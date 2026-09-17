@@ -71,6 +71,10 @@ async function noteSpeechOutage(opts = {}) {
         businessName: profile.businessName,
         reason: kind === 'llm' ? 'Reasoning downtime' : 'Speech downtime',
       },
+      ledger: {
+        tenantId,
+        kind: kind === 'llm' ? 'outage_llm' : 'outage_speech',
+      },
     });
     if (!sent?.channel) {
       ownerNotifiedAt.delete(`${kind}:${tenantId}`);

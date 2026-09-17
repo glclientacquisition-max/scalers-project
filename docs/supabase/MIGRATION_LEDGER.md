@@ -189,7 +189,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 | LEDGER-CONTACTS-INSERT | Owner INSERT on `contacts` | Desk add + CSV import | `contacts_owner_insert.sql` | this PR | YES (2026-09-09) | NO | NO | Policy `contacts_insert_member` |
 | LEDGER-REALTIME-INBOX | `supabase_realtime` publication += `calls`, `service_requests`, `appointments` | Live Inbox desk updates | `realtime_inbox.sql` | `bb6bb6c` (#279) | YES (2026-09-16) | YES (2026-09-16) | NO | Staging INSERT+UPDATE probe; production `pg_publication_tables` lists `appointments`, `calls`, `service_requests` |
 | LEDGER-REALTIME-INBOX-REPLICA | `REPLICA IDENTITY FULL` on `calls`, `service_requests`, `appointments` | Filtered hangup UPDATEs reach Live Inbox | `realtime_inbox_replica_identity.sql` | this PR | YES (2026-09-16) | YES (2026-09-16) | NO | `pg_class.relreplident = 'f'` on the three tables |
-| LEDGER-SIGNUP-FIX | Drop 1-arg prompt; 2-arg canonical | Fix signup `42725` | `voice_languages.sql`, `did_number_pool.sql` | `f61c11f` (#158) | YES (2026-08-15) | UNKNOWN | NO | Staging signup PASS |
+| LEDGER-NOTIFY-SENDS | Append-only `notify_sends` | Meter staff/caller SMS vs platform wallet/outage | `notify_send_ledger.sql` | this PR | NO | NO | NO | Table + RLS; voice insert; desk caller INSERT |
 
 ### Staging-only / proposed (not in standard Git apply)
 
