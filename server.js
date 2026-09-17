@@ -172,6 +172,13 @@ const { createVoiceTurnTiming, createCallTranscript } = require('./src/speech/vo
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
+  isWhatsAppEventKind,
+  processWhatsAppReceived,
+  platformPhoneNumberId,
+  PLATFORM_SAUTIKIT_NUMBER_ID,
+  PLATFORM_WHATSAPP_E164,
+} = require('./src/sautikit/whatsappInbound');
+const {
   consumeLiveTransferWebhook,
   queuePendingLiveTransfer,
   hasPendingLiveTransfer,
@@ -183,7 +190,7 @@ const {
   summarizeBody,
   createWsPayloadSampler,
 } = require('./src/sautikit/safeLog');
-const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
+const { isWhatsAppConfigured, sendOwnerWhatsApp, markWhatsAppRead, normalizeWhatsAppTo } = require('./src/notifications/whatsapp');
 const {
   ownerLeadEvent,
   renderEventText,
@@ -984,9 +991,47 @@ async function handleVoiceIncoming(req, res) {
   }
 }
 
-app.post('/', sautikitWebhookGuard, handleVoiceIncoming);
+async function handleWhatsAppWebhook(req, res) {
+  res.sendStatus(200);
+  try {
+    const result = await processWhatsAppReceived({
+      body: req.body || {},
+      headers: req.headers,
+      persistInbound: (row) => db.persistPlatformWhatsAppInbound(row),
+      persistStatus: (row) => db.persistWhatsAppStatus(row),
+      markRead: (wamid) => markWhatsAppRead(wamid),
+      sendText: async ({ to, body }) => {
+        const json = await sendOwnerWhatsApp({ to, body, windowOpen: true });
+        await db.persistPlatformWhatsAppOutbound({
+          identity: 'platform',
+          phoneNumberId: platformPhoneNumberId(),
+          sautikitNumberId: PLATFORM_SAUTIKIT_NUMBER_ID,
+          e164: PLATFORM_WHATSAPP_E164,
+          contactWaId: normalizeWhatsAppTo(to),
+          wamid: json?.id || json?.wamid || json?.message_id || null,
+          type: 'text',
+          body,
+          payload: json,
+        });
+        return json;
+      },
+    });
+    console.log('[whatsapp/events]', result);
+  } catch (err) {
+    console.error('[whatsapp/events] failed after ACK:', err?.message || err);
+  }
+}
+
+function handleSautikitRootPost(req, res) {
+  if (isWhatsAppEventKind(req)) return handleWhatsAppWebhook(req, res);
+  return handleVoiceIncoming(req, res);
+}
+
+app.post('/', sautikitWebhookGuard, handleSautikitRootPost);
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
+// Workspace WhatsApp inbound (whatsapp.event.received). Do not resolveTenantId(DID).
+app.post('/whatsapp/events', sautikitWebhookGuard, handleWhatsAppWebhook);
 
 function persistLiveTransferAction(callSid, transferXml) {
   if (!callSid || !transferXml?.xml) return;
@@ -1083,6 +1128,9 @@ app.post('/voice/recording-status', sautikitWebhookGuard, async (req, res) => {
 // 2b. SautiKit workspace events — call.completed / recording.ready
 // ---------------------------------------------------------------------------
 app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
+  if (isWhatsAppEventKind(req)) {
+    return handleWhatsAppWebhook(req, res);
+  }
   // Always ACK immediately so SautiKit does not retry (DB work is best-effort).
   res.sendStatus(200);
 

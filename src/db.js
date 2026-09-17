@@ -1629,6 +1629,158 @@ async function updateAppointment({
   return data || null;
 }
 
+function missingWhatsAppRelation(error) {
+  return /whatsapp_threads|whatsapp_messages|does not exist|schema cache|relation/i.test(
+    error?.message || ''
+  );
+}
+
+async function upsertWhatsAppThread(row = {}) {
+  const identity = row.identity || 'platform';
+  const phoneNumberId = String(row.phoneNumberId || '').trim();
+  const contactWaId = String(row.contactWaId || '').trim();
+  if (!phoneNumberId || !contactWaId) return { ok: false, reason: 'invalid' };
+  const now = new Date().toISOString();
+  const payload = {
+    identity,
+    phone_number_id: phoneNumberId,
+    sautikit_number_id: row.sautikitNumberId || null,
+    e164: row.e164 || null,
+    contact_wa_id: contactWaId,
+    contact_name: row.contactName || null,
+    updated_at: now,
+  };
+  if (row.direction === 'outbound') payload.last_outbound_at = now;
+  else payload.last_inbound_at = now;
+
+  const { data, error } = await supabase
+    .from('whatsapp_threads')
+    .upsert(payload, { onConflict: 'identity,phone_number_id,contact_wa_id' })
+    .select('id, last_inbound_at')
+    .maybeSingle();
+  if (error) {
+    if (missingWhatsAppRelation(error)) {
+      console.warn('[db] whatsapp_threads missing (apply docs/supabase/whatsapp_threads.sql)');
+      return { ok: false, reason: 'table_missing' };
+    }
+    console.warn('[db] upsertWhatsAppThread:', error.message);
+    return { ok: false, reason: 'upsert_failed' };
+  }
+  return { ok: true, id: data?.id || null, lastInboundAt: data?.last_inbound_at || null };
+}
+
+async function insertWhatsAppMessage(row = {}) {
+  if (!row.threadId) return { ok: false, reason: 'no_thread' };
+  const payload = {
+    thread_id: row.threadId,
+    direction: row.direction || 'inbound',
+    wamid: row.wamid || null,
+    msg_type: row.type || row.msgType || null,
+    body: row.body || null,
+    status: row.status || null,
+    payload: row.payload || null,
+  };
+  const { data, error } = await supabase
+    .from('whatsapp_messages')
+    .insert(payload)
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    if (missingWhatsAppRelation(error)) {
+      return { ok: false, reason: 'table_missing' };
+    }
+    if (error.code === '23505' || /duplicate|unique/i.test(error.message || '')) {
+      return { ok: false, reason: 'duplicate', duplicate: true };
+    }
+    console.warn('[db] insertWhatsAppMessage:', error.message);
+    return { ok: false, reason: 'insert_failed' };
+  }
+  return { ok: true, id: data?.id || null };
+}
+
+async function persistPlatformWhatsAppInbound(row = {}) {
+  const trail = {
+    identity: row.identity || 'platform',
+    phoneNumberId: row.phoneNumberId,
+    contactWaId: row.contactWaId,
+    wamid: row.wamid,
+    body: row.body,
+  };
+  const thread = await upsertWhatsAppThread({ ...row, direction: 'inbound' });
+  if (thread.reason === 'table_missing' || thread.reason === 'upsert_failed') {
+    console.log('[whatsapp] persist trail', JSON.stringify(trail));
+    return { ok: true, reason: thread.reason || 'json_trail', duplicate: false };
+  }
+  if (!thread.ok) return { ok: false, reason: thread.reason, duplicate: false };
+  const inserted = await insertWhatsAppMessage({
+    threadId: thread.id,
+    direction: 'inbound',
+    wamid: row.wamid,
+    type: row.type,
+    body: row.body,
+    status: 'received',
+    payload: row.payload || null,
+  });
+  if (inserted.duplicate) return { ok: true, duplicate: true, reason: 'duplicate' };
+  if (inserted.reason === 'table_missing') {
+    console.log('[whatsapp] persist trail', JSON.stringify(trail));
+    return { ok: true, reason: 'json_trail', duplicate: false };
+  }
+  return { ok: inserted.ok, duplicate: false, reason: inserted.reason, threadId: thread.id };
+}
+
+async function persistPlatformWhatsAppOutbound(row = {}) {
+  const thread = await upsertWhatsAppThread({ ...row, direction: 'outbound' });
+  if (!thread.ok) {
+    console.log(
+      '[whatsapp] outbound trail',
+      JSON.stringify({ to: row.contactWaId, wamid: row.wamid, body: row.body })
+    );
+    return thread;
+  }
+  return insertWhatsAppMessage({
+    threadId: thread.id,
+    direction: 'outbound',
+    wamid: row.wamid,
+    type: row.type,
+    body: row.body,
+    status: row.status || 'sent',
+    payload: row.payload || null,
+  });
+}
+
+async function persistWhatsAppStatus(row = {}) {
+  const wamid = String(row.wamid || '').trim();
+  if (!wamid) return { ok: false, reason: 'no_wamid' };
+  const { error } = await supabase
+    .from('whatsapp_messages')
+    .update({ status: row.status || null })
+    .eq('wamid', wamid);
+  if (error) {
+    if (missingWhatsAppRelation(error)) return { ok: false, reason: 'table_missing' };
+    console.warn('[db] persistWhatsAppStatus:', error.message);
+    return { ok: false, reason: 'update_failed' };
+  }
+  return { ok: true };
+}
+
+async function getWhatsAppSession({ phoneNumberId, contactWaId, identity = 'platform' } = {}) {
+  if (!phoneNumberId || !contactWaId) return null;
+  const { data, error } = await supabase
+    .from('whatsapp_threads')
+    .select('id, last_inbound_at')
+    .eq('identity', identity)
+    .eq('phone_number_id', phoneNumberId)
+    .eq('contact_wa_id', contactWaId)
+    .maybeSingle();
+  if (error) {
+    if (missingWhatsAppRelation(error)) return null;
+    console.warn('[db] getWhatsAppSession:', error.message);
+    return null;
+  }
+  return data || null;
+}
+
 async function insertNotifySend(row = {}) {
   if (!row.tenant_id || !row.kind || !row.channel || !row.idempotency_key) {
     return { ok: false, reason: 'invalid' };
@@ -1758,6 +1910,10 @@ module.exports = {
   mergeCallSummaryMeta,
   insertNotifySend,
   findNotifySend,
+  persistPlatformWhatsAppInbound,
+  persistPlatformWhatsAppOutbound,
+  persistWhatsAppStatus,
+  getWhatsAppSession,
   consumeSmsUnits,
   RECORDINGS_BUCKET,
   shapeCall,

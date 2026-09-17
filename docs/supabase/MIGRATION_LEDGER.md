@@ -192,6 +192,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 | LEDGER-NOTIFY-SENDS | Append-only `notify_sends` | Meter staff/caller SMS vs platform wallet/outage | `notify_send_ledger.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | Table + RLS; `to_regclass` = `notify_sends` |
 | LEDGER-SMS-ALLOWANCE | Included SMS + on-demand stop | Cursor-like cap. Same Wallet toggle as minutes. | `sms_allowance.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | `consume_sms_units` returns `beta` on staging (all tenants `billing_enforcement=off`) |
 | LEDGER-PACKAGE-ENTS | Email + seat included columns | Later packages write these. No gate yet. | `package_entitlements.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | Defaults 100 email / 5 seats; no gate |
+| LEDGER-WHATSAPP-THREADS | `whatsapp_threads` + `whatsapp_messages` | Platform two-way WhatsApp persist | `whatsapp_threads.sql` | this PR | YES (2026-09-17) | NO | NO | Service role only. Staging apply `whatsapp_threads`. |
 | LEDGER-LINE-RENTAL-GRACE | Line paid-through + grace | Prerequisite for SMS protect trigger | `line_rental_grace.sql` | prior | YES (2026-09-17) | NO | NO | Staging catch-up; `apply_line_rental` dropped/recreated for new OUT `line_paid_through` |
 
 ### Staging-only / proposed (not in standard Git apply)
