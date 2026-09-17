@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ContactImportForm } from "@/components/ContactImportForm";
+import { DeskError } from "@/components/ui/DeskError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export default async function ContactImportPage() {
@@ -18,11 +19,7 @@ export default async function ContactImportPage() {
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-surface p-6 text-warn">
-        Not signed in.
-      </div>
-    );
+    return <DeskError>Not signed in.</DeskError>;
   }
 
   return (

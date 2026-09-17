@@ -426,7 +426,7 @@ export default async function CallDetailPage({
         </aside>
 
         {/* RIGHT PANE: transcript + FAQ ideas */}
-        <div className="min-h-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
+        <div className="min-h-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
           <section>
             <h2 className="font-display text-2xl tracking-tight text-ink">
               Conversation

@@ -6,12 +6,11 @@ import {
   type AppointmentScheduleState,
 } from "@/app/(desk)/appointments/actions";
 import { InboxJobActions } from "@/components/InboxJobActions";
-import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 
 const initial: AppointmentScheduleState = {};
 
-const fieldClass =
-  `w-full min-h-11 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent`;
+const fieldClass = deskFieldClass;
 
 export function InboxJobEditor({
   id,
@@ -60,7 +59,7 @@ export function InboxJobEditor({
         <button
           type="submit"
           disabled={pending}
-          className={`${btnPrimary} w-full`}
+          className={`${btnGhost} w-full disabled:opacity-50`}
         >
           {pending ? "Saving" : "Save"}
         </button>
