@@ -4,6 +4,7 @@
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { EVENTS, renderCallerText, displayOwnerCallerName } = require('./events');
 const { parseNotifyChannels } = require('./notifyChannels');
+const { recordNotifySend } = require('./sendLedger');
 
 function callerSmsEnabled(channels) {
   return parseNotifyChannels(channels).caller_sms === true;
@@ -72,7 +73,7 @@ function requestCallerEvent(request) {
 /**
  * @param {{ to?: string, event?: object, channels?: object }} opts
  */
-async function dispatchCallerSms({ to, event, channels } = {}) {
+async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
   if (!callerSmsEnabled(channels)) {
     return { channel: null, reason: 'caller_sms_off' };
   }
@@ -84,7 +85,18 @@ async function dispatchCallerSms({ to, event, channels } = {}) {
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
   const body = renderCallerText(event);
   const result = await sendSms({ to: dest, body });
-  return { channel: 'sms', to: dest, result, body };
+  const sent = { channel: 'sms', to: dest, result, body };
+  await recordNotifySend({
+    tenantId: ledger?.tenantId,
+    callId: ledger?.callId,
+    callSid: ledger?.callSid,
+    kind: event.kind,
+    channel: 'sms',
+    to: dest,
+    body,
+    providerMessageId: result?.messageId || null,
+  });
+  return sent;
 }
 
 module.exports = {

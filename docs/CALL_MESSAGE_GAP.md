@@ -12,7 +12,9 @@ Bodies below are reconstructed from `calls.summary` plus `ownerLeadEvent`. The s
 
 The ladder works. Real leads and escalations fire. Greeting-only calls with no name do not text the owner. Caller SMS is correctly off.
 
-The excellence bar is not a missing channel. It is the **payload**. Staff SMS copy now lives in `src/notifications/templates.js`. Lead SMS is Name / Phone / Reason plus useful Intent and Outcome. Summary and the Want card stay on the desk.
+The excellence bar is not a missing channel. It is the **payload**. Staff SMS copy lives in `src/notifications/templates.js`. Lead SMS is Name / Phone / Reason plus useful Intent and Outcome. Summary and the Want card stay on the desk.
+
+A visit or hold/order/enquiry staff SMS now marks the call so hangup does not also send a lead. Sends write `notify_sends` when that table is applied. Wallet and outage alerts are `billed_to=platform`.
 
 Hangup `owner_review` is already the better source for Reason. It still lands after the SMS, so mid-call leads can be thin until send waits for hangup.
 
@@ -25,7 +27,7 @@ Hangup `owner_review` is already the better source for Reason. It still lands af
 | Intent | `book_visit`, `order_enquiry`, `human` | Printed when not `general_enquiry` |
 | Summary | One owner sentence | Not on SMS. Lives on the desk call card |
 | Outcome | What Scalers did | Printed when it is a real save, not a Brain note |
-| Volume | One owner text per call | Lead plus ENQUIRY or VISIT on the same call |
+| Volume | One owner text per call | Visit/hold marks `whatsapp_sent` so lead does not follow |
 | Open call | Deep link | Only if `DESK_PUBLIC_URL` is set on Railway |
 | Production | Same bar | Last real owner lead: 2026-08-14 `HD_f68f90b2c563` |
 
@@ -188,7 +190,7 @@ Do not send the lead on mid-call `save_caller_info`. Send once on hangup, after 
 
 ### Next (one text per call)
 
-If a VISIT or ENQUIRY SMS already went out, do not also send `New missed-call lead` with the same facts. Or fold item / when into the lead and skip the second kind.
+Visit and hold/order/enquiry staff SMS mark `whatsapp_sent` so hangup does not also send a lead. Mid-call lead still fires before a visit is saved. Hangup wait is the remaining close.
 
 ### Next (Brain)
 
@@ -213,6 +215,6 @@ Set `DESK_PUBLIC_URL` on Railway so owner `Open call:` works. Production voice m
 | Intent owner-grade | Fail (live field) |
 | Summary owner-grade | Fail |
 | Outcome owner-grade | Fail except visit/request saved |
-| One SMS per call | Fail when visit/enquiry also fires |
+| One SMS per call | Visit/hold now block a follow-up lead. Mid-call lead still races. |
 | Caller confirmation | Not shipped. Templates exist. No send path. Correct silence until the toggle and triggers above exist. |
 | Deep link | Unknown (env) |

@@ -9,6 +9,7 @@ import {
 } from "@/lib/polishCallerNote";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { sendDeskCallerSms } from "@/lib/callerSms";
+import { deskCallerLedgerRow } from "@/lib/sendLedger";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseSummary } from "@/lib/supabase";
 
@@ -93,8 +94,23 @@ export async function sendCallerNoteAction(
     return { error: sent.reason === "sms_not_configured" ? "SMS is not configured." : "SMS failed." };
   }
 
+  const workspace = await createWorkspaceDataClient();
+  if (workspace) {
+    const { error: ledgerErr } = await workspace.client
+      .from("notify_sends")
+      .insert(
+        deskCallerLedgerRow({
+          tenantId: tenant.id,
+          callId: callId || null,
+          kind: "caller_note",
+          to: phone,
+          body,
+        })
+      );
+    if (ledgerErr) console.warn("[notify ledger]", ledgerErr.message);
+  }
+
   if (callId) {
-    const workspace = await createWorkspaceDataClient();
     if (workspace) {
       const { data: row } = await workspace.client
         .from("calls")
