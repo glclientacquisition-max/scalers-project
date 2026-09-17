@@ -8,6 +8,8 @@ import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
+export const dynamic = "force-dynamic";
+
 function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "headline">): InboxItem {
   return {
     createdAt: "2026-09-12T05:10:00.000Z",
