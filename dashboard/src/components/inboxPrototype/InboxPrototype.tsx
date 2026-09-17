@@ -5,7 +5,6 @@ import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
   btnGhost,
-  btnPrimary,
   deskEmptyClass,
   deskFieldClass,
   filterTabClass,
