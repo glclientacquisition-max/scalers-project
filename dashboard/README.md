@@ -134,6 +134,8 @@ npm run dev
 
 Open http://localhost:3000 (or the port Next prints).
 
+Inbox design bench (does not change `/calls`): `http://localhost:3000/dev/inbox` while `npm run dev` is running.
+
 ## Env
 
 | Var | Purpose |

@@ -1,92 +1,18 @@
 import { notFound } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
-import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
-import { InboxJobActions } from "@/components/InboxJobActions";
-import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
-import type { InboxItem } from "@/lib/inboxPurpose";
+import { InboxPrototype } from "@/components/inboxPrototype/InboxPrototype";
 
-function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "headline">): InboxItem {
-  return {
-    createdAt: "2026-09-12T05:10:00.000Z",
-    needsYou: true,
-    callerName: "Amina",
-    callerPhone: "254700000001",
-    contactId: null,
-    detail: null,
-    callId: "call-1",
-    lead: null,
-    hold: null,
-    job: null,
-    intent: null,
-    urgent: false,
-    ...partial,
-  };
+function inboxPrototypeOpen(): boolean {
+  return (
+    process.env.NODE_ENV === "development" ||
+    process.env.DASHBOARD_OPEN === "true"
+  );
 }
 
-const ROWS: InboxItem[] = [
-  item({
-    id: "human",
-    purpose: "human",
-    callerName: "Amina",
-    headline: "Asked for a person",
-    intent: "human",
-  }),
-  item({
-    id: "job",
-    purpose: "job",
-    callerName: "Otieno",
-    callerPhone: "254700000002",
-    headline: "House cleaning",
-    intent: "book_visit",
-    job: {
-      id: "job-1",
-      created_at: "2026-09-12T05:10:00.000Z",
-      service_name: "House cleaning",
-      status: "requested",
-      when_text: "Tomorrow 9am",
-      address_landmark: "Kericho road",
-      notes: null,
-      caller_name: "Otieno",
-      caller_phone: "254700000002",
-      call_id: "call-1",
-    },
-  }),
-  item({
-    id: "job-intent",
-    purpose: "job",
-    callerName: "Alvin",
-    callerPhone: "254700000004",
-    headline: "Visit",
-    intent: "book_visit",
-  }),
-  item({
-    id: "hold",
-    purpose: "hold",
-    callerName: "Wanjiku",
-    callerPhone: "254700000003",
-    headline: "5L bleach",
-    intent: "hold_or_pickup",
-    hold: {
-      id: "hold-1",
-      created_at: "2026-09-12T05:10:00.000Z",
-      request_type: "hold_or_pickup",
-      status: "open",
-      item: "5L bleach",
-      quantity: "1",
-      when_text: "Today 4pm",
-      notes: null,
-      caller_name: "Wanjiku",
-      caller_phone: "254700000003",
-      call_id: "call-1",
-    },
-  }),
-];
-
+/** Visual Inbox bench. Does not replace /calls. */
 export default function DevInboxPage() {
-  if (process.env.DASHBOARD_OPEN !== "true") {
+  if (!inboxPrototypeOpen()) {
     notFound();
   }
 
@@ -99,77 +25,7 @@ export default function DevInboxPage() {
         </div>
       </header>
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
-          Inbox
-        </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">4 need you</p>
-        <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
-          {ROWS.map((row) => (
-            <InboxPhoneRow
-              key={row.id}
-              item={row}
-              businessName="Workspace"
-              purpose={row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs"}
-            />
-          ))}
-        </ul>
-        <div className="mt-8 hidden md:block">
-          <DeskDataTable minWidthClass="min-w-[720px]">
-            <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-              <tr>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Work</th>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Caller</th>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">When</th>
-                <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROWS.map((row) => (
-                <InboxTableRow
-                  key={row.id}
-                  item={row}
-                  businessName="Workspace"
-                  purpose="needs"
-                  vertical={null}
-                />
-              ))}
-            </tbody>
-          </DeskDataTable>
-        </div>
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <section className="rounded-2xl border border-line bg-surface p-4">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Visit</h2>
-            <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Otieno</p>
-            <div className="mt-3">
-              <InboxJobActions id="job-1" status="requested" extra />
-            </div>
-            <WhatsAppLink
-              number="254700000002"
-              variant="link"
-              label="Reply on WhatsApp"
-              className="mt-3 w-full"
-            />
-          </section>
-          <section className="rounded-2xl border border-line bg-surface p-4">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Return call</h2>
-            <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Alvin</p>
-            <div className="mt-3">
-              <CallerNoteComposer
-                callId="call-alvin"
-                callerPhone="254700000004"
-                callerName="Alvin"
-                callerSmsOn
-                primary
-              />
-            </div>
-            <WhatsAppLink
-              number="254700000004"
-              variant="link"
-              label="Reply on WhatsApp"
-              className="mt-3 w-full"
-            />
-          </section>
-        </div>
+        <InboxPrototype />
       </main>
       <DeskTabBar />
     </div>
