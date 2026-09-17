@@ -207,10 +207,8 @@ export function inboxCaption(
 
 function signalRank(item: InboxItem): number {
   if (item.urgent && item.needsYou) return 0;
-  if (item.purpose === "job" && item.job && item.needsYou) return 1;
-  if (item.purpose === "hold" && item.hold && item.needsYou) return 2;
-  if (item.needsYou) return 3;
-  return 4;
+  if (item.needsYou) return 1;
+  return 2;
 }
 
 export function compareInboxSignal(a: InboxItem, b: InboxItem): number {

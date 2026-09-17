@@ -140,10 +140,8 @@ function inboxCaption(items) {
 function compareInboxSignal(a, b) {
   function rank(item) {
     if (item.urgent && item.needsYou) return 0;
-    if (item.purpose === "job" && item.job && item.needsYou) return 1;
-    if (item.purpose === "hold" && item.hold && item.needsYou) return 2;
-    if (item.needsYou) return 3;
-    return 4;
+    if (item.needsYou) return 1;
+    return 2;
   }
   const diff = rank(a) - rank(b);
   if (diff !== 0) return diff;
@@ -326,7 +324,7 @@ describe("inbox signal", () => {
     assert.equal(rows[0], olderNeed);
   });
 
-  it("sorts visits ahead of holds", () => {
+  it("sorts a newer hold above an older visit", () => {
     const hold = {
       needsYou: true,
       urgent: false,
@@ -342,7 +340,7 @@ describe("inbox signal", () => {
       createdAt: "2026-09-07T08:00:00.000Z",
     };
     const rows = [hold, visit].sort(compareInboxSignal);
-    assert.equal(rows[0], visit);
+    assert.equal(rows[0], hold);
   });
 
   it("ranks the newest missed call above an intent-only return", () => {
@@ -367,9 +365,28 @@ describe("inbox signal", () => {
       createdAt: "2026-09-16T05:14:00.000Z",
     };
     const rows = [intentOnly, lastCall, realVisit].sort(compareInboxSignal);
-    assert.equal(rows[0], realVisit);
-    assert.equal(rows[1], lastCall);
-    assert.equal(rows[2], intentOnly);
+    assert.equal(rows[0], lastCall);
+    assert.equal(rows[1], intentOnly);
+    assert.equal(rows[2], realVisit);
+  });
+
+  it("ranks a new return call above older unconfirmed visits", () => {
+    const oldVisit = {
+      needsYou: true,
+      urgent: false,
+      purpose: "job",
+      job: { status: "requested" },
+      createdAt: "2026-08-16T01:15:11.000Z",
+    };
+    const newHuman = {
+      needsYou: true,
+      urgent: false,
+      purpose: "human",
+      createdAt: "2026-09-16T17:54:51.000Z",
+    };
+    const rows = [oldVisit, newHuman].sort(compareInboxSignal);
+    assert.equal(rows[0], newHuman);
+    assert.equal(rows[1], oldVisit);
   });
 
   it("ranks a new human-asked call above older missed hangups", () => {
@@ -450,14 +467,17 @@ describe("inbox piles", () => {
 });
 
 describe("inboxPurpose source lockstep", () => {
-  it("ranks Confirm visit only when an appointments row exists", () => {
+  it("ranks newest Needs you work first, under urgent", () => {
     const src = fs.readFileSync(
       path.join(__dirname, "..", "dashboard/src/lib/inboxPurpose.ts"),
       "utf8"
     );
-    assert.match(src, /item\.purpose === "job" && item\.job && item\.needsYou/);
-    assert.match(src, /item\.purpose === "hold" && item\.hold && item\.needsYou/);
-    assert.match(src, /if \(item\.needsYou\) return 3;/);
-    assert.doesNotMatch(src, /purpose === "missed" && item\.needsYou\) return 3/);
+    assert.match(src, /if \(item\.urgent && item\.needsYou\) return 0;/);
+    assert.match(src, /if \(item\.needsYou\) return 1;/);
+    assert.match(src, /return 2;/);
+    assert.doesNotMatch(
+      src,
+      /item\.purpose === "job" && item\.job && item\.needsYou/
+    );
   });
 });

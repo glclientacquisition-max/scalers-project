@@ -28,7 +28,7 @@ Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Hum
 
 Needs you is not a history. Older open work stays until you Confirm, Done, or reply.
 
-Work that needs the owner sorts above answered rows. Urgent first. Confirm visit only when an appointments row exists; those live visits stay above return calls. Open holds next. Missed, human asked, and intent-only return calls then share one recency pile, so a call that just landed is on page 1 instead of under weeks of uncleared hangups.
+Work that needs the owner sorts above answered rows. Urgent first. Then newest first, same as Contacts. A call that just landed is row 1 of Needs you, not under weeks of unconfirmed visits. Confirm visit, Holds, and Visits filters still isolate that book.
 
 **Live:** rows appear as calls land. `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page, so one call's insert plus hangup collapse into a single refresh and Inbox is not stale when the owner returns to it. Coming back to the tab also refetches. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update.
 
