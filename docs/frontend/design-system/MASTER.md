@@ -112,7 +112,8 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph on `#25D366`, `h-11 w-11`, `rounded-xl` (`variant="icon"`). No extra WhatsApp mark next to the name. |
-| Call | `CallLink` (`tel:` deep link, the device dialer places the call). List dock only, icon-only, muted: `h-11 w-11` bordered, sits left of the WhatsApp icon. Never a column, never a filled button. |
+| Inbox Action dock | Trailing cell only. Job row: Confirm. Hold row: Done. Return call with a number: Call then WhatsApp. Never Open, View, SMS, email, or Archive in this cell. |
+| Call | `CallLink` (`tel:` deep link, the device dialer places the call). List dock only. Rounded handset glyph (`data-icon="handset"`), brand `text-accent-deep`, muted tile `h-11 w-11` bordered with a light accent wash. Sits left of WhatsApp. Never a filled primary, never a desk-telephone silhouette. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
 
 ---

@@ -73,6 +73,10 @@ function inboxCopy(
   };
 }
 
+/**
+ * Inbox Action dock. One primary verb. Never Open, View, SMS, or email.
+ * Job → Confirm. Hold → Done. Else + number → Call then WhatsApp.
+ */
 function InboxTrailingAction({
   item,
   message,

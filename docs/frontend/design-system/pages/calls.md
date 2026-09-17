@@ -7,7 +7,14 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Confirm / Done / WhatsApp stay the only verbs. A muted Call icon sits left of WhatsApp when the row has a number and no visit/hold verb. No Open or View link.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link.
+
+**Action dock (that trailing cell):**
+- Visit or booking with a job row: **Confirm** (then Done). That verb only.
+- Hold or order with a request row: **Done**. That verb only.
+- Return call, missed, or human asked, with a dialable number: **Call** then **WhatsApp**. Call is `tel:` on the device dialer. WhatsApp is `wa.me` with the follow-up opener.
+- No number: empty.
+- Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Return call** and use WhatsApp. Same for holds without a request row.
 
@@ -54,7 +61,7 @@ Columns (`md+` table, same data as the phone row):
 
 **Icons (Inbox only):**
 - WhatsApp glyph, green on white, `h-11 w-11`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
-- Call glyph (`CallLink`, `tel:` deep link; the device dialer places the call). Muted bordered `h-11 w-11`, sits left of WhatsApp. Never a filled button.
+- Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-11 w-11`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
 - Confirm / Done are text on `#005CCC`, 44px. List: that verb only. Call: Confirm or Done on top, Cancel ghost below. Transcript is the right pane.
 
