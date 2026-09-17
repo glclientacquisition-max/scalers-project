@@ -1,7 +1,7 @@
 # Caller reply: SMS, email, draft, polish
 
-**Status:** Spec only. No product UI in this PR.  
-**Not this:** Inbox master-detail prototype (`docs/specs/inbox-universal-prototype.md`). Ignore that layout. This work starts from the **live Inbox row** (Call + WhatsApp icons) and the **call page** composer.
+**Status:** Implemented on live Inbox + call page. Email to the caller is still dark (no contact email).  
+**Not this:** Inbox master-detail prototype (`docs/specs/inbox-universal-prototype.md`).
 
 **Lanes later:** Desk owns the row and composer. Brain owns draft/polish copy rules. Platform owns contact email column and any new send RPC. Ops owns SMS/email meters.
 

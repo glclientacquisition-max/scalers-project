@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { generateGeminiText } from "@/lib/gemini";
 import {
+  canDraftCallerNote,
   fallbackPolishCallerNote,
   POLISH_CALLER_SMS_SYSTEM,
   stripModelSms,
@@ -26,8 +27,6 @@ export async function polishCallerNoteAction(
   if (!tenant) return { error: "Not signed in." };
 
   const note = String(formData.get("note") || "").trim();
-  if (!note) return { error: "Write a note." };
-
   const facts = {
     note,
     businessName: tenant.business_name,
@@ -35,7 +34,12 @@ export async function polishCallerNoteAction(
     service: String(formData.get("service") || "").trim() || null,
     when: String(formData.get("when") || "").trim() || null,
     landmark: String(formData.get("landmark") || "").trim() || null,
+    purpose: String(formData.get("purpose") || "").trim() || null,
   };
+
+  if (!note && !canDraftCallerNote(facts)) {
+    return { error: "Nothing to send." };
+  }
 
   const userText = [
     `Business: ${facts.businessName}`,
@@ -43,7 +47,8 @@ export async function polishCallerNoteAction(
     facts.service ? `Service or item: ${facts.service}` : null,
     facts.when ? `When: ${facts.when}` : null,
     facts.landmark ? `Where: ${facts.landmark}` : null,
-    `Owner note: ${facts.note}`,
+    facts.purpose ? `Purpose: ${facts.purpose}` : null,
+    facts.note ? `Owner note: ${facts.note}` : "Owner note: (empty). Draft from facts.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -62,7 +67,9 @@ export async function polishCallerNoteAction(
     console.warn("[polishCallerNote]", err instanceof Error ? err.message : err);
   }
 
-  return { text: fallbackPolishCallerNote(facts), source: "local" };
+  const text = fallbackPolishCallerNote(facts);
+  if (!text) return { error: "Nothing to send." };
+  return { text, source: "local" };
 }
 
 export type SendCallerNoteState = {

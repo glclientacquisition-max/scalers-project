@@ -131,7 +131,7 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 **Rules**
 
 - Owner toggle `notify_channels.caller_sms`. Off until they turn it on.
-- Desk: open the call. Change When/Where and Save. Confirm or Cancel. Note, Polish, Send.
+- Desk: open the call or the Inbox SMS control. Change When/Where and Save. Confirm or Cancel. Note, Polish (empty Polish drafts from facts), Send.
 - One customer text per trigger. Capture then Confirm is two texts on purpose (received, then confirmed).
 - Use the captured name when it is a real name. Otherwise `Hi, {Business} here`.
 - Name the service or item.

@@ -27,6 +27,7 @@ import {
 } from "@/lib/visitCalendar";
 import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
+import { parseNotifyChannels } from "@/lib/notifyChannels";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -158,6 +159,7 @@ export default async function CallsPage({
   const businessName = tenant.business_name?.trim() || "us";
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
+  const callerSmsOn = parseNotifyChannels(tenant.notify_channels).caller_sms;
 
   const { items: assembled, error } = await loadInboxItems(
     client,
@@ -239,6 +241,7 @@ export default async function CallsPage({
                 businessName={businessName}
                 purpose={activeFilter}
                 vertical={vertical}
+                callerSmsOn={callerSmsOn}
               />
             ))}
           </ul>
@@ -298,6 +301,7 @@ export default async function CallsPage({
                     businessName={businessName}
                     purpose={activeFilter}
                     vertical={vertical}
+                    callerSmsOn={callerSmsOn}
                   />
                 ))}
               </tbody>
