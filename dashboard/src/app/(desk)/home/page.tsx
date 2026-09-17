@@ -31,6 +31,7 @@ import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { LivePing } from "@/components/ui/deskRow";
 import {
   getWalletRunwayDays,
   isBetaBilling,
@@ -195,7 +196,8 @@ export default async function HomeOverviewPage() {
             />
             <div className="flex min-w-0 flex-col gap-3 pl-2 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-accent-deep">
+                <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-accent-deep">
+                  <LivePing />
                   Updates
                   {liveUpdates.length > 1 ? ` · ${liveUpdates.length} live` : ""}
                 </p>

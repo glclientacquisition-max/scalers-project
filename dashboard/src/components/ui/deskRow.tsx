@@ -39,9 +39,20 @@ export function RowIdentity({ name }: { name?: string | null }) {
   );
 }
 
-/** Brand-blue dot for rows that need the owner. Sits with the timestamp. */
-export function RowStateDot({ show }: { show: boolean }) {
+/** Brand-blue ping for a thing happening now. Live stamp and Home bulletin only. */
+export function LivePing({ label = "Live" }: { label?: string }) {
+  return (
+    <span role="img" aria-label={label} className="relative inline-flex h-2 w-2 shrink-0">
+      <span className="desk-live-ping absolute inset-0 rounded-full bg-accent" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+    </span>
+  );
+}
+
+/** Brand-blue dot for rows that need the owner. Sits with the timestamp. Live rows ping. */
+export function RowStateDot({ show, live }: { show: boolean; live?: boolean }) {
   if (!show) return null;
+  if (live) return <LivePing />;
   return (
     <span
       role="img"

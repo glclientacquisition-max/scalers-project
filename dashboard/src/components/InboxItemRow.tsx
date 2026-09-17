@@ -9,6 +9,7 @@ import {
   deskRowActionClass,
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
+import { DeskLandSurface } from "@/components/ui/DeskLand";
 import {
   RowIdentity,
   RowStateDot,
@@ -120,8 +121,12 @@ export function InboxTableRow({
     showHold,
   } = inboxCopy(item, purpose, vertical, businessName);
 
+  const live = item.purpose === "live";
+
   return (
-    <tr
+    <DeskLandSurface
+      as="tr"
+      id={item.id}
       className={[
         "group relative border-t border-line/70 transition duration-150",
         openHref ? "cursor-pointer" : "",
@@ -150,7 +155,7 @@ export function InboxTableRow({
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
-              <RowStateDot show={item.needsYou} />
+              <RowStateDot show={item.needsYou} live={live} />
               {showHold ? needed : when}
             </span>
           </td>
@@ -178,7 +183,7 @@ export function InboxTableRow({
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
-              <RowStateDot show={item.needsYou} />
+              <RowStateDot show={item.needsYou} live={live} />
               {hasJob ? place : ""}
             </span>
           </td>
@@ -209,7 +214,7 @@ export function InboxTableRow({
           </td>
           <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
-              <RowStateDot show={item.needsYou} />
+              <RowStateDot show={item.needsYou} live={live} />
               {when}
             </span>
           </td>
@@ -221,7 +226,7 @@ export function InboxTableRow({
           <InboxTrailingAction item={item} message={message} />
         </div>
       </td>
-    </tr>
+    </DeskLandSurface>
   );
 }
 
@@ -250,7 +255,7 @@ export function InboxPhoneRow({
             {who}
           </p>
           <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
-            <RowStateDot show={item.needsYou} />
+            <RowStateDot show={item.needsYou} live={item.purpose === "live"} />
             {meta}
           </p>
         </div>
@@ -270,9 +275,11 @@ export function InboxPhoneRow({
   );
 
   return (
-    <li
+    <DeskLandSurface
+      as="li"
+      id={item.id}
       className={[
-        "flex items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
@@ -290,6 +297,6 @@ export function InboxPhoneRow({
       <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
         <InboxTrailingAction item={item} message={message} />
       </div>
-    </li>
+    </DeskLandSurface>
   );
 }

@@ -28,6 +28,13 @@ function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "
 
 const ROWS: InboxItem[] = [
   item({
+    id: "live",
+    purpose: "live",
+    callerName: "Amina",
+    headline: "On the line",
+    intent: null,
+  }),
+  item({
     id: "human",
     purpose: "human",
     callerName: "Amina",
@@ -102,7 +109,7 @@ export default function DevInboxPage() {
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">4 need you</p>
+        <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
           {ROWS.map((row) => (
             <InboxPhoneRow

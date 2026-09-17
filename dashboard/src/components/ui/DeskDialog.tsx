@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
 /**
- * Occasional overlay. No enter animation (desk motion is pending + bulletin only).
+ * Occasional overlay. No enter animation.
  * Escape closes. Focus moves to the panel, then returns to the opener.
  */
 export function DeskDialog({

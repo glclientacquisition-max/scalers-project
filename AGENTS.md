@@ -70,7 +70,7 @@ Distinguish documentation work from architectural rewrites. Governance PRs must 
 
 ## Agent skills
 
-Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review). They do **not** replace lanes.
+Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review) plus **desk-motion**. They do **not** replace lanes.
 
 ### Issue tracker
 
