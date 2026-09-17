@@ -22,7 +22,6 @@ import {
 import { InboxJobEditor } from "@/components/InboxJobEditor";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { pageTitleClass } from "@/components/ui/deskChrome";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import {
@@ -348,7 +347,7 @@ export default async function CallDetailPage({
             </section>
           ) : null}
 
-          {callerSmsOn ? (
+          {row.caller_number ? (
             <section className="rounded-2xl border border-line bg-surface p-4">
               <CallerNoteComposer
                 callId={row.id}
@@ -357,20 +356,14 @@ export default async function CallDetailPage({
                 service={job?.service_name || hold?.item}
                 when={job?.when_text || hold?.when_text}
                 landmark={job?.address_landmark}
+                purpose={purpose}
                 callerSmsOn={callerSmsOn}
+                waDefault={waMessage}
+                showWhatsApp
                 primary={smsPrimary}
+                waPrimary={waPrimary}
               />
             </section>
-          ) : null}
-
-          {row.caller_number ? (
-            <WhatsAppLink
-              number={row.caller_number}
-              message={waMessage}
-              variant={waPrimary ? "primary" : "link"}
-              label="Reply on WhatsApp"
-              className="w-full"
-            />
           ) : null}
 
           {leadStatusReady ? (

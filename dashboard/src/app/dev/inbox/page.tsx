@@ -16,7 +16,7 @@ function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "
     callerPhone: "254700000001",
     contactId: null,
     detail: null,
-    callId: "call-1",
+    callId: partial.callId || partial.id,
     lead: null,
     hold: null,
     job: null,
@@ -26,7 +26,24 @@ function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "
   };
 }
 
+function inboxPreviewOpen(): boolean {
+  return (
+    process.env.NODE_ENV === "development" ||
+    process.env.DASHBOARD_OPEN === "true"
+  );
+}
+
 const ROWS: InboxItem[] = [
+  item({
+    id: "missed-alvin",
+    purpose: "missed",
+    callerName: "Alvin",
+    callerPhone: "254700000004",
+    headline: "Alvin asked about his booking update.",
+    intent: "callback",
+    callId: "call-alvin",
+    createdAt: "2026-09-16T15:36:00.000Z",
+  }),
   item({
     id: "human",
     purpose: "human",
@@ -86,7 +103,7 @@ const ROWS: InboxItem[] = [
 ];
 
 export default function DevInboxPage() {
-  if (process.env.DASHBOARD_OPEN !== "true") {
+  if (!inboxPreviewOpen()) {
     notFound();
   }
 
@@ -102,7 +119,8 @@ export default function DevInboxPage() {
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">4 need you</p>
+        <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
+        <p className="mt-2 text-xs font-medium text-ink-soft">Preview. Live Inbox is /calls.</p>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
           {ROWS.map((row) => (
             <InboxPhoneRow
@@ -110,6 +128,7 @@ export default function DevInboxPage() {
               item={row}
               businessName="Workspace"
               purpose={row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs"}
+              callerSmsOn
             />
           ))}
         </ul>
@@ -131,6 +150,7 @@ export default function DevInboxPage() {
                   businessName="Workspace"
                   purpose="needs"
                   vertical={null}
+                  callerSmsOn
                 />
               ))}
             </tbody>
@@ -158,16 +178,12 @@ export default function DevInboxPage() {
                 callId="call-alvin"
                 callerPhone="254700000004"
                 callerName="Alvin"
+                purpose="missed"
                 callerSmsOn
+                showWhatsApp
                 primary
               />
             </div>
-            <WhatsAppLink
-              number="254700000004"
-              variant="link"
-              label="Reply on WhatsApp"
-              className="mt-3 w-full"
-            />
           </section>
         </div>
       </main>

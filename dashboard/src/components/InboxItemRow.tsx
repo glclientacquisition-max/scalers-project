@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { InboxReplyDock } from "@/components/InboxReplyDock";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
   DeskRowHit,
   deskRowActionClass,
@@ -74,22 +73,47 @@ function inboxCopy(
 function InboxTrailingAction({
   item,
   message,
+  callerSmsOn,
 }: {
   item: InboxItem;
   message: string;
+  callerSmsOn: boolean;
 }) {
   if (item.job) {
-    return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />
+        <InboxReplyDock
+          item={item}
+          message={message}
+          callerSmsOn={callerSmsOn}
+          showCall={false}
+          showWhatsApp={false}
+        />
+      </div>
+    );
   }
   if (item.hold) {
-    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />;
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />
+        <InboxReplyDock
+          item={item}
+          message={message}
+          callerSmsOn={callerSmsOn}
+          showCall={false}
+          showWhatsApp={false}
+        />
+      </div>
+    );
   }
   if (item.callerPhone) {
     return (
-      <div className="flex items-center gap-2">
-        <CallLink number={item.callerPhone} />
-        <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
-      </div>
+      <InboxReplyDock
+        item={item}
+        message={message}
+        callerSmsOn={callerSmsOn}
+      />
     );
   }
   return null;
@@ -100,11 +124,13 @@ export function InboxTableRow({
   businessName,
   purpose,
   vertical,
+  callerSmsOn = false,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
+  callerSmsOn?: boolean;
 }) {
   const {
     kind,
@@ -218,7 +244,7 @@ export function InboxTableRow({
 
       <td className={`${deskRowActionClass} whitespace-nowrap px-5 py-4 align-middle`}>
         <div className="flex justify-end">
-          <InboxTrailingAction item={item} message={message} />
+          <InboxTrailingAction item={item} message={message} callerSmsOn={callerSmsOn} />
         </div>
       </td>
     </tr>
@@ -231,11 +257,13 @@ export function InboxPhoneRow({
   businessName,
   purpose,
   vertical,
+  callerSmsOn = false,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
+  callerSmsOn?: boolean;
 }) {
   const { who, message, openHref, needed, visit, place, stamp, when, showJob, showHold, showMixed } =
     inboxCopy(item, purpose, vertical, businessName);
@@ -288,7 +316,7 @@ export function InboxPhoneRow({
         <div className="flex min-w-0 flex-1 items-center gap-3">{body}</div>
       )}
       <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
-        <InboxTrailingAction item={item} message={message} />
+        <InboxTrailingAction item={item} message={message} callerSmsOn={callerSmsOn} />
       </div>
     </li>
   );

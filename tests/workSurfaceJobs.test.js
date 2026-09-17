@@ -84,7 +84,10 @@ describe("work surface jobs on unified inbox", () => {
     assert.doesNotMatch(purpose, /jobStatus === "requested" \|\| jobStatus === "confirmed"/);
     const composer = read("dashboard/src/components/CallerNoteComposer.tsx");
     assert.match(composer, /Send SMS/);
-    assert.match(composer, /if \(!callerSmsOn\) return null/);
+    assert.match(composer, /Polish/);
+    assert.doesNotMatch(composer, /if \(!callerSmsOn\) return null/);
+    assert.match(row, /InboxReplyDock/);
+    assert.match(row, /callerSmsOn/);
     assert.match(detail, /smsPrimary/);
     assert.match(detail, /waPrimary/);
   });
