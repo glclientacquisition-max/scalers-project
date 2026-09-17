@@ -46,7 +46,7 @@ describe("desk phone shell", () => {
       jobActions.indexOf('value="confirmed"') < jobActions.indexOf('value="cancelled"'),
       "call Confirm sits above Cancel"
     );
-    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /min-h-11/);
+    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
     assert.match(root, /viewportFit:\s*"cover"/);
     assert.match(css, /--desk-tabbar-h:\s*4rem/);
     assert.match(player, /--desk-tabbar-h/);

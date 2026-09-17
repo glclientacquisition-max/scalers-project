@@ -69,9 +69,12 @@ describe("inbox call action", () => {
   });
 
   it("is a muted 44px icon button, never filled", () => {
-    assert.match(call, /h-11 w-11/);
-    assert.match(call, /border border-line text-ink/);
+    assert.match(call, /deskHitClass/);
+    assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-11 w-11/);
     assert.match(call, /aria-label=\{`Call \$\{number\}`\}/);
+    assert.match(call, /data-icon="handset"/);
+    assert.match(call, /stroke="currentColor"/);
+    assert.doesNotMatch(call, /M1\.5 4\.5a3 3 0 0 1 3-3h1\.372/);
     assert.doesNotMatch(call, /bg-\[#0096FF\]|bg-whatsapp/);
   });
 
@@ -81,5 +84,18 @@ describe("inbox call action", () => {
     const wa = inbox.indexOf('variant="icon"');
     assert.ok(dock > -1 && wa > -1 && dock < wa, "CallLink before WhatsApp icon");
     assert.match(master, /`CallLink`/);
+    assert.match(master, /Inbox Action dock/);
+    assert.match(inbox, /Job → Confirm\. Hold → Done\. Else \+ number → Call then WhatsApp/);
+    const actionFn = inbox.indexOf("function InboxTrailingAction");
+    const jobFirst = inbox.indexOf("if (item.job)", actionFn);
+    const holdNext = inbox.indexOf("if (item.hold)", actionFn);
+    const phoneLast = inbox.indexOf("if (item.callerPhone)", actionFn);
+    assert.ok(jobFirst < holdNext && holdNext < phoneLast);
+    assert.doesNotMatch(inbox.slice(actionFn, actionFn + 900), /Send SMS|mailto:|Archive/);
+    assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
+    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/CallLink.tsx"), /deskHitClass/);
+    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /deskHitClass/);
   });
 });

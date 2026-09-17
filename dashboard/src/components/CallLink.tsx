@@ -1,10 +1,11 @@
 /**
  * Direct-call action. tel: deep link — the phone's own dialer places the call,
  * so it works on any device with no platform telephony involved.
- * List dock sibling of WhatsAppLink: muted, icon-only, same 44px hit area.
+ * List dock sibling of WhatsAppLink: muted tile, icon-only, same 44px hit area.
+ * Glyph is a rounded handset in brand blue, not a desk telephone.
  */
 
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import { deskHitClass, deskShiftClass } from "@/components/ui/deskChrome";
 
 export function telHref(rawNumber: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
@@ -12,15 +13,20 @@ export function telHref(rawNumber: string): string | null {
   return `tel:+${digits}`;
 }
 
-function PhoneIcon({ className }: { className?: string }) {
+function CallIcon({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
+      data-icon="handset"
       className={className || "h-5 w-5"}
     >
-      <path d="M1.5 4.5a3 3 0 0 1 3-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 0 1-.564 1.875l-.97.97a.563.563 0 0 0-.128.598 11.995 11.995 0 0 0 6.132 6.132.563.563 0 0 0 .598-.128l.97-.97a1.875 1.875 0 0 1 1.875-.564l4.423 1.105c.834.209 1.42.959 1.42 1.819V19.5a3 3 0 0 1-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5Z" />
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
     </svg>
   );
 }
@@ -40,12 +46,12 @@ export function CallLink({
       title={`Call ${number}`}
       aria-label={`Call ${number}`}
       className={[
-        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line text-ink",
-        `${deskShiftClass} hover:border-accent hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
+        `${deskHitClass} border border-line bg-accent/[0.08] text-accent-deep`,
+        `${deskShiftClass} hover:border-accent hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
         className,
       ].join(" ")}
     >
-      <PhoneIcon />
+      <CallIcon />
     </a>
   );
 }

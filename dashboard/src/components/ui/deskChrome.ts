@@ -26,6 +26,28 @@ export const btnPrimary = [
   focusRingVisible,
 ].join(" ");
 
+/** One Action-dock hit. Confirm, Done, Call, and WhatsApp share this box. */
+export const deskHitClass =
+  "box-border inline-flex h-11 w-11 min-h-11 min-w-11 max-h-11 max-w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl p-0";
+
+/** Filled list verb in `deskHitClass`. */
+export const btnDock = [
+  deskHitClass,
+  "px-0 text-[11px] font-semibold leading-none",
+  btnPrimaryFill,
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
+export const btnDockGhost = [
+  deskHitClass,
+  "border border-line px-0 text-[11px] font-medium leading-none text-ink",
+  deskShiftClass,
+  "hover:border-accent disabled:opacity-50",
+  focusRingVisible,
+].join(" ");
+
 export const btnGhost = [
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-medium text-ink",
   deskShiftClass,

@@ -25,6 +25,9 @@ describe("desk control craft", () => {
     // Light-mode value stays the AA-passing deep blue; dark flips via the token.
     assert.match(globals, /--accent-fill: #005ccc/);
     assert.match(chrome, /export const btnPrimary/);
+    assert.match(chrome, /export const deskHitClass/);
+    assert.match(chrome, /export const btnDock/);
+    assert.match(chrome, /h-11 w-11/);
     assert.match(chrome, /pendingSpinnerClass/);
     assert.match(chrome, /deskFieldClass/);
     assert.match(chrome, /filterTabClass/);

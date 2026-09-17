@@ -53,8 +53,8 @@ Cross-referenced. Product rules win when sources disagree.
 From `.cursor/rules/scalers-design-ux.mdc`:
 
 1. **Copy:** No fluff, no instructional subheaders, no em/en dashes in UI strings. Labels are verbs or nouns the owner already knows.
-2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side; mobile may stack the same two panes.
-3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted.
+2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side from `lg`; below `lg`, stack the same two panes. One composition at every width. Phone list rows. `md+` tables. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`).
+3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted. Confirm, Done, Call, and WhatsApp use `deskHitClass` (`h-11 w-11`). Label length does not change the hit.
 4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail. Sidebar category titles: `uppercase tracking-wide text-gray-500` (or `text-ink-soft`), no hover, not links.
 5. **Tech:** Tailwind utilities only for layout/chrome. Focus: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`. Container padding `p-4`–`p-6`.
 
@@ -106,6 +106,7 @@ No Plus Jakarta Sans. No third family. No purple.
 | Control | Minimum |
 | --- | --- |
 | Primary CTA | `min-h-11` (44px), full width on mobile when it is the page task |
+| List dock verb | `deskHitClass` / `btnDock`: `h-11 w-11`. Confirm, Done, Call, and WhatsApp. Label length does not change the hit. |
 | Filter tab | `min-h-11`, `px-3` |
 | Text input | `min-h-11`, `focus:ring-2 focus:ring-[#0096FF]` |
 | Icon-only (Done, Archive) | `h-8 w-8` (32px) with ≥8px gap to neighbors |
@@ -137,7 +138,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 ## 7. Copy voice
 
 - Scan, do not educate.
-- Prefer Confirm, Save, Reply on WhatsApp. Lists have no Open, Call, or View column. Tap the row to open the record.
+- Prefer Confirm, Save, Reply on WhatsApp. Lists have no Open or View column. Tap the row to open the record. Call is a muted handset in the Action dock, not its own column.
 - Stamps name the next action in the workspace niche: Confirm visit, Pickup, Confirm booking, Human asked, Missed.
 - Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday).
 - Ban: em dash, en dash, “How to test” as a story, “Coming soon” filler.
