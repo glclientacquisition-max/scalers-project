@@ -10,6 +10,7 @@ import {
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import {
   RowIdentity,
   RowStateDot,
@@ -128,7 +129,8 @@ export function InboxTableRow({
       as="tr"
       id={item.id}
       className={[
-        "group relative border-t border-line/70 transition duration-150",
+        "group relative border-t border-line/70",
+        deskShiftClass,
         openHref ? "cursor-pointer" : "",
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
         item.urgent ? "bg-warn-soft/50" : "",

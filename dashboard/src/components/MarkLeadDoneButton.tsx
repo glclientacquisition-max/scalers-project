@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 type SoftAction = "resolved" | "archived";
 
@@ -82,7 +83,7 @@ export function MarkLeadActionButton({
   }
 
   const iconButtonClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50";
+    `inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
 
   return (
     <span
@@ -113,7 +114,7 @@ export function MarkLeadActionButton({
           variant === "icon"
             ? iconButtonClass
             : [
-                "text-xs font-medium text-ink-soft underline-offset-2 transition hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50",
+                `text-xs font-medium text-ink-soft underline-offset-2 ${deskShiftClass} hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`,
               ].join(" ")
         }
       >

@@ -6,15 +6,15 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { btnPrimary, deskFieldClass, deskShiftClass } from "@/components/ui/deskChrome";
 
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
 
 export const settingsDenseFieldClass =
-  "w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent";
+  `w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
 
 export const settingsTableFieldClass =
-  "w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent";
+  `w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
 
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
@@ -24,7 +24,7 @@ export const settingsStickyHeaderClass =
   "sticky top-[var(--desk-header-h,3.75rem)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
 
 export const settingsActionClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink transition duration-150 hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+  `inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
 
 export const settingsPrimaryButtonClass = btnPrimary;
 
@@ -36,7 +36,7 @@ export const settingsBlockTitleClass =
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
-    "w-full text-left rounded-xl border px-4 py-3 transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+    `w-full text-left rounded-xl border px-4 py-3 ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
     selected
       ? "border-transparent bg-accent/10 ring-2 ring-accent active:bg-accent/15"
       : "border-line bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
@@ -45,7 +45,7 @@ export function settingsRadioCardClass(selected: boolean) {
 
 export function settingsChipClass(selected: boolean) {
   return [
-    "inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+    `inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-left text-sm font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
     selected
       ? "border-transparent bg-accent/10 text-accent-deep ring-1 ring-accent active:bg-accent/15"
       : "border-line bg-surface text-ink hover:border-accent/40 hover:bg-accent/[0.04] active:bg-accent/[0.08]",
@@ -89,7 +89,7 @@ export function TrashButton({
       onClick={onClick}
       aria-label={label}
       className={[
-        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft transition duration-150 hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+        `inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
         className,
       ].join(" ")}
     >
@@ -121,14 +121,14 @@ export function ToolSwitch({
         onChange(!checked);
       }}
       className={[
-        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition duration-150 hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+        `relative inline-flex h-7 w-12 shrink-0 items-center rounded-full ${deskShiftClass} hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
         disabled ? "cursor-not-allowed opacity-60" : "",
         checked && !disabled ? "bg-accent" : "bg-line",
       ].join(" ")}
     >
       <span
         className={[
-          "inline-block h-5 w-5 rounded-full bg-surface shadow transition",
+          `inline-block h-5 w-5 rounded-full bg-surface shadow ${deskShiftClass}`,
           checked && !disabled ? "translate-x-6" : "translate-x-1",
         ].join(" ")}
       />
@@ -137,13 +137,13 @@ export function ToolSwitch({
 }
 
 export const settingsGhostButtonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft transition duration-150 hover:bg-surface hover:text-ink active:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+  `inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink active:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
 
 export function SettingsBackLink() {
   return (
     <Link
       href="/settings"
-      className="mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent-deep transition duration-150 hover:text-accent-deep-hover active:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 lg:hidden"
+      className={`mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent-deep ${deskShiftClass} hover:text-accent-deep-hover active:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 lg:hidden`}
     >
       <svg
         viewBox="0 0 20 20"

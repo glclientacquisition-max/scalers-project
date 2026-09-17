@@ -4,7 +4,7 @@ import Link from "next/link";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import { btnGhost, btnPrimary, deskFieldClass, pageTitleClass } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskFieldClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 
 export function InboxToolbar({
@@ -125,7 +125,7 @@ export function InboxToolbar({
           <span className="font-medium text-ink">&ldquo;{q}&rdquo;</span>.{" "}
           <Link
             href={callsHref({ purpose: active })}
-            className="font-medium text-accent-deep transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className={`font-medium text-accent-deep ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
           >
             Clear
           </Link>

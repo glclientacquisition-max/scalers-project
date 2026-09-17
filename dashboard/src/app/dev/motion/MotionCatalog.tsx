@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
-import { btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskShiftClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { LivePing, RowIdentity, RowStateDot } from "@/components/ui/deskRow";
 
@@ -93,6 +93,30 @@ export function MotionCatalog() {
           {extra.length > 0 ? (
             <p className="mt-2 text-xs text-ink-soft">{extra.length} landed</p>
           ) : null}
+        </section>
+
+        <section className="mt-8" aria-labelledby="shift-heading">
+          <h2 id="shift-heading" className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+            Shift
+          </h2>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" className={btnGhost}>
+              Ghost
+            </button>
+            <button
+              type="button"
+              className={`${deskShiftClass} rounded-xl border border-line px-3 py-2 text-sm font-medium text-ink-soft hover:border-accent hover:bg-accent/[0.04] hover:text-ink`}
+            >
+              Chip
+            </button>
+          </div>
+          <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
+            <li
+              className={`${deskShiftClass} flex min-h-12 cursor-pointer items-center px-4 text-sm font-medium text-ink hover:bg-accent/[0.04]`}
+            >
+              Queue row
+            </li>
+          </ul>
         </section>
 
         <section className="mt-8" aria-labelledby="press-heading">

@@ -28,6 +28,7 @@ describe("desk control craft", () => {
     assert.match(chrome, /pendingSpinnerClass/);
     assert.match(chrome, /deskFieldClass/);
     assert.match(chrome, /filterTabClass/);
+    assert.match(chrome, /deskShiftClass/);
     assert.match(chrome, /motion-reduce:active:scale-100/);
   });
 

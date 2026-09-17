@@ -20,6 +20,7 @@ import {
   settingsPanelHeadingClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
@@ -138,7 +139,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 <button
                   type="submit"
                   disabled={clearPending}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft transition duration-150 hover:text-warn active:text-warn-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
+                  className={`inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft ${deskShiftClass} hover:text-warn active:text-warn-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`}
                 >
                   Clear
                 </button>

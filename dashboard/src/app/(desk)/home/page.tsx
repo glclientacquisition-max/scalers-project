@@ -19,6 +19,7 @@ import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import {
   btnGhost,
   btnPrimary,
+  deskShiftClass,
   focusRingVisible,
 } from "@/components/ui/deskChrome";
 import {
@@ -247,7 +248,7 @@ export default async function HomeOverviewPage() {
                   href={queue.href}
                   className={[
                     "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium lg:min-h-11",
-                    "transition-colors duration-150",
+                    deskShiftClass,
                     "hover:bg-accent/[0.04] active:bg-accent/[0.08]",
                     focusRingVisible,
                   ].join(" ")}
@@ -330,8 +331,7 @@ export default async function HomeOverviewPage() {
               <Link
                 href={callsHref({ purpose: "all" })}
                 className={[
-                  "flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft",
-                  "transition-colors duration-150 hover:bg-accent/[0.04] hover:text-ink",
+                  `flex min-h-11 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft ${deskShiftClass} hover:bg-accent/[0.04] hover:text-ink`,
                   "active:bg-accent/[0.08]",
                   focusRingVisible,
                 ].join(" ")}

@@ -4,6 +4,8 @@
  * List dock sibling of WhatsAppLink: muted, icon-only, same 44px hit area.
  */
 
+import { deskShiftClass } from "@/components/ui/deskChrome";
+
 export function telHref(rawNumber: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
   if (digits.length < 9) return null;
@@ -39,7 +41,7 @@ export function CallLink({
       aria-label={`Call ${number}`}
       className={[
         "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line text-ink",
-        "transition hover:border-accent hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+        `${deskShiftClass} hover:border-accent hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
         className,
       ].join(" ")}
     >

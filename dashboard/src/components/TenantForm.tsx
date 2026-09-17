@@ -89,7 +89,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 import {
   ExpandTextarea,
   SettingsPageHeader,
@@ -283,7 +283,7 @@ function CatalogPager({
           type="button"
           disabled={page <= 0}
           onClick={onPrev}
-          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
+          className={`min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
         >
           Previous
         </button>
@@ -294,7 +294,7 @@ function CatalogPager({
           type="button"
           disabled={page >= pageCount - 1}
           onClick={onNext}
-          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40"
+          className={`min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
         >
           Next
         </button>
@@ -964,7 +964,7 @@ export function TenantForm({
                           <button
                             type="button"
                             onClick={() => removeSocialChannel(index)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
                             aria-label={`Remove contact ${index + 1}`}
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -1216,7 +1216,7 @@ export function TenantForm({
                                   : prev.filter((_, i) => i !== index)
                               )
                             }
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
                             aria-label={`Remove service ${index + 1}`}
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -1481,7 +1481,8 @@ export function TenantForm({
                     type="button"
                     onClick={() => setDayOpen(day, !open)}
                     className={[
-                      "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium transition",
+                      "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium",
+                      deskShiftClass,
                       open
                         ? "border-accent bg-accent-soft text-accent"
                         : "border-line text-ink-soft",
@@ -1865,7 +1866,7 @@ export function TenantForm({
           </p>
           <Link
             href={businessSettingsHref("train", "team")}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-accent-deep transition duration-150 hover:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className={`inline-flex min-h-11 items-center text-sm font-medium text-accent-deep ${deskShiftClass} hover:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
           >
             Change in Team
           </Link>
@@ -2005,7 +2006,7 @@ export function TenantForm({
                       prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
                     )
                   }
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
                   aria-label={`Remove teammate ${index + 1}`}
                 >
                   <TrashIcon className="h-4 w-4" />

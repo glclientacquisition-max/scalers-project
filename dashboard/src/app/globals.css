@@ -320,4 +320,8 @@ h3,
   .desk-just-landed::after {
     animation: none;
   }
+
+  .desk-shift {
+    transition: none;
+  }
 }

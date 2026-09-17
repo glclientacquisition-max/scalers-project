@@ -127,20 +127,22 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Pending mutation | `pendingSpinnerClass` on the control. Disable double submit |
 | Live | `LivePing` on a Live stamp and the Home bulletin. One ping per region |
 | Land | `DeskLandScope` + `DeskLandSurface`. First paint never lands. Filter/page swaps do not flash |
+| Shift | `deskShiftClass`. Color, fill, border, shadow, opacity, transform, filter. 150ms. Not layout |
 | Focus | 2px brand ring, visible on keyboard |
-| Reduced motion | Kills live ping, land wash, landing rise/drift, pending spinner. Press scale is `motion-reduce:active:scale-100` |
+| Reduced motion | Kills live ping, land wash, landing rise/drift, pending spinner, and shift. Press scale is `motion-reduce:active:scale-100` |
 
 ---
 
 ## Motion
 
-Four desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`.
+Five desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`.
 
 | Verb | Primitive | Loop? |
 | --- | --- | --- |
 | **pending** | `pendingSpinnerClass` | Yes, on the control, `motion-reduce:animate-none` |
 | **live** | `LivePing` (`.desk-live-ping`) | Yes. Live call stamp and Home bulletin only |
 | **land** | `DeskLandScope` + `DeskLandSurface` (`.desk-just-landed`) | No. One-shot wash after first paint |
+| **shift** | `deskShiftClass` (`.desk-shift`) | No. Named properties, `--motion-fast` |
 | **press** | `btnPrimary` `active:scale-[0.99]` | No |
 
 Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.

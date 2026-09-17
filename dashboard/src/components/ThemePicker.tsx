@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const THEME_KEY = "scalers-desk-theme";
 const CHOICES = [
@@ -60,7 +61,7 @@ export function ThemePicker() {
             aria-checked={active}
             onClick={() => pick(option.id)}
             className={[
-              "min-h-11 rounded-lg px-3 text-sm font-medium transition-colors duration-150",
+              `min-h-11 rounded-lg px-3 text-sm font-medium ${deskShiftClass}`,
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
               active
                 ? "bg-surface text-ink shadow-sm"

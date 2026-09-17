@@ -9,7 +9,7 @@ import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { RowIdentity } from "@/components/ui/deskRow";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { deskEmptyClass, pageTitleClass } from "@/components/ui/deskChrome";
+import { deskEmptyClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
   contactsHref,
@@ -203,7 +203,7 @@ export default async function ContactsPage({
                     as="tr"
                     key={row.id}
                     id={row.id}
-                    className="group relative cursor-pointer border-t border-line/70 transition duration-150 hover:bg-accent/[0.04]"
+                    className={`group relative cursor-pointer border-t border-line/70 ${deskShiftClass} hover:bg-accent/[0.04]`}
                   >
                     <td className="px-5 py-5 align-top">
                       <DeskRowHit href={`/contacts/${row.id}`} label={row.name?.trim() || "Contact"} />

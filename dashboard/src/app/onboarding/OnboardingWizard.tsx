@@ -16,6 +16,7 @@ import {
   type HandoffMode,
 } from "@/lib/handoffMode";
 import { compactTextareaExpandHandlers } from "@/components/settingsUi";
+import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 
 const STEPS = [
   "Business type",
@@ -90,7 +91,7 @@ export function OnboardingWizard() {
             <li key={label} className="flex flex-1 items-center gap-2">
               <span
                 className={[
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium transition-colors duration-300",
+                  `flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium ${deskShiftClass}`,
                   done || active
                     ? "bg-[var(--accent-deep)] text-white"
                     : "bg-white border border-[var(--line)] text-[var(--ink-soft)]",
@@ -100,7 +101,7 @@ export function OnboardingWizard() {
               </span>
               <span
                 className={[
-                  "hidden sm:block text-sm transition-opacity duration-300",
+                  `hidden sm:block text-sm ${deskShiftClass}`,
                   active ? "text-[var(--ink)] font-medium" : "text-[var(--ink-soft)]",
                 ].join(" ")}
               >
@@ -109,7 +110,7 @@ export function OnboardingWizard() {
               {i < STEPS.length - 1 ? (
                 <span
                   className={[
-                    "mx-1 h-px flex-1 transition-colors duration-500",
+                    `mx-1 h-px flex-1 ${deskShiftClass}`,
                     done ? "bg-[var(--accent)]" : "bg-[var(--line)]",
                   ].join(" ")}
                 />
@@ -122,7 +123,7 @@ export function OnboardingWizard() {
       <form
         action={formAction}
         className={[
-          "rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 sm:p-8 shadow-[0_20px_50px_-35px_rgba(28,36,33,0.45)] transition-all duration-300",
+          `rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 sm:p-8 shadow-[0_20px_50px_-35px_rgba(28,36,33,0.45)] ${deskShiftClass}`,
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
         ].join(" ")}
       >
@@ -147,7 +148,8 @@ export function OnboardingWizard() {
                     type="button"
                     onClick={() => setVertical(opt.id)}
                     className={[
-                      "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
+                      "w-full text-left rounded-xl border px-4 py-4",
+                      deskShiftClass,
                       selected
                         ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
                         : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
@@ -250,7 +252,8 @@ export function OnboardingWizard() {
                       type="button"
                       onClick={() => setTone(opt.id)}
                       className={[
-                        "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
+                        "w-full text-left rounded-xl border px-4 py-4",
+                        deskShiftClass,
                         selected
                           ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
                           : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
@@ -275,7 +278,8 @@ export function OnboardingWizard() {
                       type="button"
                       onClick={() => setHandoffMode(opt.id)}
                       className={[
-                        "w-full text-left rounded-xl border px-4 py-4 transition duration-200",
+                        "w-full text-left rounded-xl border px-4 py-4",
+                        deskShiftClass,
                         selected
                           ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
                           : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
@@ -302,7 +306,7 @@ export function OnboardingWizard() {
               type="button"
               onClick={() => goTo(step - 1)}
               disabled={pending}
-              className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)] disabled:opacity-50"
+              className={`text-sm text-[var(--ink-soft)] ${deskShiftClass} hover:text-[var(--ink)] disabled:opacity-50`}
             >
               Back
             </button>
@@ -315,7 +319,7 @@ export function OnboardingWizard() {
               type="button"
               disabled={!canAdvance()}
               onClick={() => goTo(step + 1)}
-              className="rounded-xl bg-[var(--accent-deep)] px-5 py-3 text-white font-medium hover:bg-[#004AAD] transition disabled:opacity-50"
+              className={btnPrimary}
             >
               Continue
             </button>
@@ -323,9 +327,9 @@ export function OnboardingWizard() {
             <button
               type="submit"
               disabled={!canAdvance() || pending}
-              className="rounded-xl bg-[var(--accent-deep)] px-5 py-3 text-white font-medium hover:bg-[#004AAD] transition disabled:opacity-50"
+              className={btnPrimary}
             >
-              {pending ? "Opening your line…" : "Finish setup"}
+              {pending ? "Opening your line" : "Finish setup"}
             </button>
           )}
         </div>
