@@ -62,3 +62,19 @@ _Avoid_: full-repo rewrite, mega-thread
 **Eval**:
 A scored Brain fixture (Evalite / `npm run eval:brain`). Complements deterministic `npm run test:brain`. Does not train Gemini.
 _Avoid_: fine-tune, RLHF
+
+**Staff alert**:
+Notify the owner or a permissioned teammate (SMS, WhatsApp, email) after a lead, visit, hold, or escalate. Prefs: `notify_channels.sms` / `.whatsapp` / `.email`.
+_Avoid_: putting `alert_email` on a caller Inbox row
+
+**Caller reply**:
+Owner-authored message to the person who called. Desk Polish/Draft then Send. Auto templates on capture/confirm are also caller messages, not staff alerts.
+_Avoid_: CRM sequence, chatbot, auto-send of freeform AI
+
+**Polish**:
+Gemini rewrite of the owner's note into one SMS-shaped body. Owner must tap Send.
+_Avoid_: send-on-generate, transcript dump
+
+**Draft**:
+Same model path when the note is empty: write from saved call facts only. Refuse when there is nothing to confirm.
+_Avoid_: inventing email, time, or price
