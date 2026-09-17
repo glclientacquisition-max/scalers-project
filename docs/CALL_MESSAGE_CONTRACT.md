@@ -55,12 +55,12 @@ Permissions live on each `tenants.team_directory` row. Desk People: **Escalate**
 Unmigrated directories (no boolean flags on any row) infer so existing tenants keep working:
 
 - Escalate: any row with a phone
-- Inbox and ops: General queries / ownerish role, or the Alerts SMS phone
-- If inbox/ops still empty: the Alerts SMS phone and `alert_email` (`legacy_owner`)
+- Inbox and ops: General queries / ownerish role, or the Alerts phone
+- If inbox/ops still empty: the Alerts phone and `alert_email` (`legacy_owner`)
 
 Once any row has flags, missing flags are `false`. Ingest must not stamp inferred flags onto an unmigrated directory.
 
-Alerts **SMS phone** is the workspace fallback and the owner-phone match for inference. It is not a silent extra escalate recipient.
+Alerts **phone** is the workspace fallback and the owner-phone match for inference. It is not a silent extra escalate recipient.
 
 ---
 
@@ -71,13 +71,13 @@ Staff alerts use the first channel that works, in this order:
 | Order | Channel | Provider | When it is used |
 | --- | --- | --- | --- |
 | 1 | **SMS** | TextSMS.co.ke | Always first when configured. Works on any phone. |
-| 2 | **WhatsApp** | SautiKit | When SMS is not configured or fails. Needs `SAUTIKIT_WHATSAPP_NUMBER_ID`. |
+| 2 | **WhatsApp** | SautiKit | When SMS is not configured, fails, or is at cap. Needs `SAUTIKIT_WHATSAPP_NUMBER_ID`. Cold send is a Meta utility template ([`WHATSAPP_TEMPLATES.md`](./WHATSAPP_TEMPLATES.md)). Session text only inside an open 24h window. |
 | 3 | **Email** | Resend | Fallback when SMS and WhatsApp miss. |
 | 4 | **Desk note** | Supabase call row | Always saved. Soft success if 1–3 miss. |
 
 Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email, caller_sms, missed_textback}`). At least one **staff** channel stays on. `caller_sms` and `missed_textback` are separate opt-ins and default **off**.
 
-Escalation sends to the matched teammate only (SMS, then WhatsApp, then that teammate's email; owner email only when the teammate number is the Alerts SMS phone). No second owner SMS.
+Escalation sends to the matched teammate only (SMS, then WhatsApp, then that teammate's email; owner email only when the teammate number is the Alerts phone). No second owner SMS.
 
 ---
 
@@ -156,7 +156,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 | Angle | Owner message | Caller message |
 | --- | --- | --- |
 | **Timing** | Immediate on save / call end | Immediate on action, or after owner confirms |
-| **Channel** | SMS first, WhatsApp second, email fallback | SMS only at first; WhatsApp needs template approval |
+| **Channel** | SMS first, WhatsApp second (utility template), email fallback | SMS only at first; caller WhatsApp needs its own templates |
 | **Language** | English (owner desk language) | Match the call language when known |
 | **Content** | Name, phone, reason, recording link | Business name, what was captured, next step |
 | **Cost** | Metered on `notify_sends` (tenant SMS). Included first. Stop at cap unless on-demand. Not a KES debit yet | Same table. Caller SMS is tenant usage |

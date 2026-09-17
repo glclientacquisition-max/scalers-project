@@ -1,6 +1,6 @@
 /**
- * WhatsApp Bridge — 1-click follow-up while automated Meta messaging is pending.
- * Renders the caller number with a green WhatsApp deep link (https://wa.me/<digits>).
+ * WhatsApp follow-up to the caller from the owner's personal chat (wa.me).
+ * Not Scalers staff alerts. Those go out as Meta utility templates.
  */
 
 import { btnGhost, btnPrimary, deskHitClass, deskShiftClass } from "@/components/ui/deskChrome";

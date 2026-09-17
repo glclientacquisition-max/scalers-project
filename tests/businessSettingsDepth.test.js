@@ -61,7 +61,7 @@ describe("business settings depth", () => {
 
   it("saves alerts on their own panel to the same tenant columns", () => {
     assert.match(alerts, />Alerts</);
-    assert.match(alerts, /SMS phone/);
+    assert.match(alerts, /Alert phone/);
     assert.match(alerts, /Text customers/);
     assert.match(alerts, /Text back missed calls/);
     assert.match(alerts, /placeholder="\+254 700 000 000"/);

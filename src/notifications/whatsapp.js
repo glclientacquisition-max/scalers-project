@@ -4,9 +4,12 @@
 // (SautiKit 81424fbd-8f4c-459a-858d-98ced4393df6 / +254709221536).
 // Voice on that DID still belongs to Done and Dusted until Phase 2.
 // Do not send shop-caller chat from this number. Do not enable Calling.
+// Staff originate: Meta utility templates (docs/WHATSAPP_TEMPLATES.md).
+// Session text only inside an open 24h window (inbound ack, or a follow-up ping).
 
 const SAUTIKIT_API_BASE = process.env.SAUTIKIT_API_BASE || 'https://api.sautikit.com';
 const { isWhatsAppSessionOpen } = require('../sautikit/whatsappInbound');
+const { buildStaffWhatsAppTemplate } = require('./whatsappTemplates');
 
 function isWhatsAppConfigured() {
   return Boolean(
@@ -43,51 +46,50 @@ function senderFields() {
 
 function buildLeadText({ businessName, name, reason, callerNumber, recordingUrl }) {
   const lines = [
-    `New missed-call lead${businessName ? ` (${businessName})` : ''}`,
-    `Name: ${name || '-'}`,
-    `Phone: ${callerNumber || '-'}`,
-    `Reason: ${reason || '-'}`,
+    `New missed-call lead${businessName ? `. ${businessName}` : ''}`,
+    `Name: ${name || 'Caller'}`,
+    `Phone: ${callerNumber || '.'}`,
+    `Reason: ${reason || 'Missed call'}`,
   ];
   if (recordingUrl) lines.push(`Recording: ${recordingUrl}`);
   return lines.join('\n');
 }
 
-function buildWhatsAppSendPayload({ to, body, lead = {}, windowOpen = false } = {}) {
+function buildWhatsAppSendPayload({ to, body, lead = {}, windowOpen = false, kind } = {}) {
   const toNorm = normalizeWhatsAppTo(to);
   if (!toNorm) throw new Error('WhatsApp destination number is empty');
-  const templateName = process.env.SAUTIKIT_WHATSAPP_TEMPLATE;
-  const templateLang = process.env.SAUTIKIT_WHATSAPP_TEMPLATE_LANG || 'en';
-  const useTemplate = Boolean(templateName) && !windowOpen;
 
-  if (useTemplate) {
+  if (windowOpen) {
     return {
       ...senderFields(),
       to: toNorm,
-      type: 'template',
-      template: {
-        name: templateName,
-        language_code: templateLang,
-        components: [
-          {
-            type: 'body',
-            parameters: [
-              { type: 'text', text: String(lead.name || 'Caller') },
-              { type: 'text', text: String(lead.callerNumber || toNorm) },
-              { type: 'text', text: String(lead.reason || 'Missed call') },
-            ],
-          },
-        ],
+      type: 'text',
+      text: {
+        body: body || buildLeadText(lead),
+        preview_url: Boolean(lead.recordingUrl),
       },
     };
   }
 
+  const template = buildStaffWhatsAppTemplate({
+    kind,
+    body: body || buildLeadText(lead),
+    lead,
+    to: toNorm,
+  });
   return {
     ...senderFields(),
     to: toNorm,
-    type: 'text',
-    text: {
-      body: body || buildLeadText(lead),
-      preview_url: Boolean(lead.recordingUrl),
+    type: 'template',
+    template: {
+      name: template.name,
+      language_code: template.language_code,
+      components: [
+        {
+          type: 'body',
+          parameters: template.parameters.map((text) => ({ type: 'text', text })),
+        },
+      ],
     },
   };
 }
@@ -115,14 +117,16 @@ async function sautikitWhatsAppPost(path, payload) {
 
 /**
  * Send a WhatsApp message through SautiKit from the Scalers platform number.
- * @param {object} opts
- * @param {string} opts.to
- * @param {string} opts.body  free-form text (24h window) OR template fallback
- * @param {object} [opts.lead] structured fields for template components
- * @param {boolean} [opts.windowOpen] force session-window text
- * @param {Date|string|null} [opts.lastInboundAt]
+ * Closed 24h window: utility template. Open window: session text.
  */
-async function sendOwnerWhatsApp({ to, body, lead = {}, windowOpen, lastInboundAt } = {}) {
+async function sendOwnerWhatsApp({
+  to,
+  body,
+  lead = {},
+  kind,
+  windowOpen,
+  lastInboundAt,
+} = {}) {
   let open = windowOpen === true;
   if (windowOpen !== true && windowOpen !== false) {
     if (lastInboundAt) {
@@ -143,7 +147,7 @@ async function sendOwnerWhatsApp({ to, body, lead = {}, windowOpen, lastInboundA
       }
     }
   }
-  const payload = buildWhatsAppSendPayload({ to, body, lead, windowOpen: open });
+  const payload = buildWhatsAppSendPayload({ to, body, lead, windowOpen: open, kind });
   const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
   if (status !== 202 && status !== 200) {
     const err = new Error(`SautiKit WhatsApp send failed: ${status} ${text.slice(0, 300)}`);
