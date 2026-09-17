@@ -74,7 +74,10 @@ const {
   recordActionResults,
   formatBrainStateForPrompt,
 } = require('./src/conversation/brainState');
-const { attachCallerMemory } = require('./src/conversation/callerMemory');
+const {
+  attachCallerMemory,
+  liveCallerFileStamp,
+} = require('./src/conversation/callerMemory');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -1945,6 +1948,7 @@ mediaWss.on('connection', (ws, req) => {
       intent: entityIntent,
       state: previousBrainState,
     });
+    const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
     let brainState = observeCallerTurn(
       previousBrainState,
       {
@@ -1955,6 +1959,9 @@ mediaWss.on('connection', (ws, req) => {
         lastAgentText,
       }
     );
+    if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
+      systemPrompt = buildSystemPrompt(brainProfile);
+    }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
     callBrainStates.set(callKey, brainState);
@@ -3549,6 +3556,7 @@ wss.on('connection', (ws) => {
           intent: entityIntent,
           state: previousBrainState,
         });
+        const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
         let brainState = observeCallerTurn(
           previousBrainState,
           {
@@ -3558,6 +3566,9 @@ wss.on('connection', (ws) => {
             profile: brainProfile,
           }
         );
+        if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
+          systemPrompt = buildSystemPrompt(brainProfile);
+        }
         const decision = determineNextBestAction({ state: brainState, capabilities });
         brainState = setNextBestAction(brainState, decision);
         callBrainStates.set(callSid, brainState);

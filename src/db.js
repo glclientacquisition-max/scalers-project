@@ -1194,6 +1194,30 @@ async function listNextAppointmentForCaller(tenantId, contactId, phoneNorm) {
   return data?.[0] || null;
 }
 
+async function listRecentAppointmentsForCaller(tenantId, contactId, phoneNorm) {
+  const base = () =>
+    supabase
+      .from('appointments')
+      .select(
+        'id, service_name, status, when_text, window_start, address_landmark, created_at'
+      )
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+  if (contactId) {
+    const { data, error } = await base().eq('contact_id', contactId);
+    if (error && /appointments|relation/i.test(error.message)) return [];
+    if (error) throwIfError('getCallerMemory(recent-appointments)', error);
+    if (data?.length) return data;
+  }
+  if (!phoneNorm) return [];
+  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  if (error && /appointments|relation/i.test(error.message)) return [];
+  if (error) throwIfError('getCallerMemory(recent-appointments-phone)', error);
+  return data || [];
+}
+
 /**
  * Load the returning-caller card for a live call (read path).
  * Returns null when the number is new or the contacts table is missing.
@@ -1228,10 +1252,16 @@ async function getCallerMemory({ tenantId, phone } = {}) {
     contact.id,
     phoneNorm
   );
+  const recentAppointments = await listRecentAppointmentsForCaller(
+    tenantId,
+    contact.id,
+    phoneNorm
+  );
   return buildCallerMemoryCard({
     contact,
     openRequests,
     nextAppointment,
+    recentAppointments,
   });
 }
 

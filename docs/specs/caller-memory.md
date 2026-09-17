@@ -6,18 +6,19 @@
 
 ## Destination
 
-The next call from a known tenant phone does not start empty. Brain receives a compact **returning-caller card** at call setup and may use the file name on a unique line.
+The next call from a known tenant phone does not start empty. Brain receives a compact **returning-caller card** at call setup and may use the file name on a unique line. Mid-call, a confirmed spoken name binds that same phone card to the speaker so CONTEXT HEADER and CALL STATE stop asking who is speaking.
 
 ## Decisions
 
 1. **Key:** tenant + stored phone (Kenya E.164 when possible). No embeddings. No transcript replay.
-2. **Card fields:** name, shared-line flag, last reason, up to two open service requests, one next appointment (requested or confirmed). Clip each string. Drop transcript-like notes.
+2. **Card fields:** name, shared-line flag, last reason, up to two open service requests, one next appointment (requested or confirmed), up to two recent bookings (done or earlier visits, not the next open one). Clip each string. Drop transcript-like notes.
 3. **Greet by name** only when a primary name exists and `alternate_names` is empty. Shared line: confirm who is speaking; do not assume the primary name.
 4. **Instant TTS greeting stays brand-first.** Do not wait on Gemini or lengthen the opener with history. The card is for the first Gemini turn via CONTEXT HEADER + seeded Brain state.
 5. **Seed Brain state** on a unique named line: `caller.name` + `nameConfirmed=true` so the model does not re-ask "Got it, Jane?" On a shared line, leave name empty.
 6. **Write path unchanged:** `upsertContact` on requests/appointments and `persistCompletedCallContact` after hangup already persist the file. This spec is the read path.
 7. **Unknown number:** no card, current cold open.
-8. **Out of scope:** mid-call RAG, fine-tuning Gemini, Twenty/CRM import into the prompt, dumping prior `transcripts` rows, Desk UI changes.
+8. **Live bind:** when `caller.nameConfirmed` is true, match the spoken name to the loaded phone card (primary vs `alternate_names`). Primary (or unique unnamed line) may use last reason / open visit. Alternate or a different name on a unique line gets identity only. Rebuild CONTEXT HEADER for that speaker. No new DB lookup. No name search.
+9. **Out of scope:** mid-call RAG, fine-tuning Gemini, Twenty/CRM import into the prompt, dumping prior `transcripts` rows, Desk UI changes, lookup by name across phones.
 
 ## Observable behavior
 
@@ -25,6 +26,8 @@ The next call from a known tenant phone does not start empty. Brain receives a c
 - That block never contains `Caller:` / `Agent:` transcript lines.
 - `createBrainState({ callerMemory })` seeds name only when `greetByName` is true.
 - `getCallerMemory` returns null when the contacts table is missing or no row matches.
+- After a confirmed name on a shared line, `bindCallerMemoryCard` / `observeCallerTurn` attach the household visit only when the speaker matches the primary file name.
+- Up to two recent bookings appear in `RETURNING CALLER` / CALL STATE when the speaker owns the file. They are not read aloud as a list.
 
 ## Tests
 
