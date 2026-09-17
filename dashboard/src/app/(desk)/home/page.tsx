@@ -29,6 +29,8 @@ import {
 } from "@/lib/inboxPurpose";
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
+import { runSheetForDay } from "@/lib/runSheet";
+import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { LivePing } from "@/components/ui/deskRow";
@@ -111,6 +113,7 @@ export default async function HomeOverviewPage() {
 
   const todayCount = todayRes.count ?? 0;
   const work = summarizeInboxWork(inbox.items);
+  const todayWork = runSheetForDay(inbox.items, eatYmd()).length;
   const waitingCount = work.needs;
   const briefing = homeBriefing(
     {
@@ -166,6 +169,9 @@ export default async function HomeOverviewPage() {
   } else if (work.toReturn > 0) {
     ctaHref = callsHref({ purpose: "human" });
     ctaLabel = work.toReturn === 1 ? copy.returnCtaOne : copy.returnCtaMany;
+  } else if (todayWork > 0) {
+    ctaHref = callsHref({ purpose: "job", view: "today" });
+    ctaLabel = "Today";
   } else if (line === "needs_training") {
     ctaHref = businessSettingsHref("train");
     ctaLabel = "Train";

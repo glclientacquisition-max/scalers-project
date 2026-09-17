@@ -177,6 +177,7 @@ export function callsHref(opts: {
   q?: string;
   view?: string;
   week?: string;
+  day?: string;
 } = {}): string {
   const q = new URLSearchParams();
   if (opts.purpose) q.set("purpose", opts.purpose);
@@ -185,6 +186,7 @@ export function callsHref(opts: {
   if (opts.page && opts.page > 1) q.set("page", String(opts.page));
   if (opts.view) q.set("view", opts.view);
   if (opts.week) q.set("week", opts.week);
+  if (opts.day) q.set("day", opts.day);
   const qs = q.toString();
   return qs ? `/calls?${qs}` : "/calls";
 }

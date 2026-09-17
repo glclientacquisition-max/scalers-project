@@ -15,6 +15,7 @@ export function InboxToolbar({
   vertical,
   view,
   week,
+  day,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
@@ -23,6 +24,7 @@ export function InboxToolbar({
   vertical?: string | null;
   view?: string;
   week?: string;
+  day?: string;
 }) {
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
@@ -30,6 +32,8 @@ export function InboxToolbar({
     caption ||
     (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
   const weekView = active === "job" && view === "week";
+  const todayView = active === "job" && view === "today";
+  const boardView = weekView || todayView;
 
   return (
     <header className="space-y-6">
@@ -44,6 +48,9 @@ export function InboxToolbar({
           className="flex w-full min-w-0 gap-2 sm:max-w-sm"
         >
           <input type="hidden" name="purpose" value={active} />
+          {boardView ? <input type="hidden" name="view" value={view} /> : null}
+          {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
+          {todayView && day ? <input type="hidden" name="day" value={day} /> : null}
           <label className="sr-only" htmlFor="inbox-search">
             Search inbox
           </label>
@@ -72,8 +79,9 @@ export function InboxToolbar({
           href: callsHref({
             purpose: item.id,
             q: q || undefined,
-            view: item.id === "job" && weekView ? "week" : undefined,
+            view: item.id === "job" && boardView ? view : undefined,
             week: item.id === "job" && weekView ? week : undefined,
+            day: item.id === "job" && todayView ? day : undefined,
           }),
         }))}
       />
@@ -82,9 +90,20 @@ export function InboxToolbar({
         <nav aria-label="Visit layout" className="flex gap-2">
           <Link
             href={callsHref({ purpose: "job", q: q || undefined })}
-            className={!weekView ? btnPrimary : btnGhost}
+            className={!boardView ? btnPrimary : btnGhost}
           >
             List
+          </Link>
+          <Link
+            href={callsHref({
+              purpose: "job",
+              q: q || undefined,
+              view: "today",
+              day,
+            })}
+            className={todayView ? btnPrimary : btnGhost}
+          >
+            Today
           </Link>
           <Link
             href={callsHref({

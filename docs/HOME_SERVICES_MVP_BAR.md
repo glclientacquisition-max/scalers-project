@@ -115,7 +115,7 @@ Call the home-services DID. Log SID, pass/fail.
 **Home GO:** `test:mvp` green + Train has real services/hours/coverage/notify + pass **0, 1, 6, 10, 11, 12** every time + ≥10/14 overall + one real owner SMS/WA/email with job + when + place.  
 **Home NO-GO:** invented price/ETA/coverage; “urgent clean” treated as emergency; false “saved/booked”; silent miss on a complete book; Sunday persisted.
 
-**Private-beta home claim:** the DID books visits the owner can run. Not Google sync, not live transfer, not per-niche chemicals, not drag-on-week calendar.
+**Private-beta home claim:** the DID books visits the owner can run. Not Google sync, not live transfer, not per-niche chemicals, not drag-on-week calendar. Not timed staff/caller reminders.
 
 ---
 

@@ -23,8 +23,12 @@ import {
 } from "@/components/InboxItemRow";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
+import { RunSheetToday } from "@/components/RunSheetToday";
+import { runSheetForDay, runSheetItems } from "@/lib/runSheet";
 import {
+  parseDayParam,
   parseWeekParam,
+  shiftDayYmd,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
 import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
@@ -132,6 +136,7 @@ export default async function CallsPage({
     q?: string;
     view?: string;
     week?: string;
+    day?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -180,17 +185,24 @@ export default async function CallsPage({
     searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
     activeFilter
   );
-  const weekView = activeFilter === "job" && String(sp.view || "") === "week";
+  const view = String(sp.view || "");
+  const weekView = activeFilter === "job" && view === "week";
+  const todayView = activeFilter === "job" && view === "today";
+  const boardView = weekView || todayView;
   const monday = parseWeekParam(sp.week);
+  const day = parseDayParam(sp.day);
+  const boardItems = boardView ? runSheetItems(searched) : filtered;
+  const todayItems = todayView ? runSheetForDay(searched, day) : [];
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = weekView ? filtered : filtered.slice(from, from + PAGE_SIZE);
+  const pageRows = boardView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
     q: q || undefined,
-    view: weekView ? "week" : undefined,
+    view: weekView ? "week" : todayView ? "today" : undefined,
     week: weekView ? monday : undefined,
+    day: todayView ? day : undefined,
   };
 
   return (
@@ -201,22 +213,40 @@ export default async function CallsPage({
         q={q}
         caption={inboxCaption(searched, vertical)}
         vertical={vertical}
-        view={weekView ? "week" : undefined}
+        view={boardView ? view : undefined}
         week={weekView ? monday : undefined}
+        day={todayView ? day : undefined}
       />
 
-      {pageRows.length === 0 ? (
-        <EmptyInbox
-          total={total}
-          pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
-          did={tenant.sautikit_virtual_number}
-          purpose={activeFilter}
-          q={q}
+      {todayView ? (
+        <RunSheetToday
+          items={todayItems}
+          ymd={day}
+          prevHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, -1),
+          })}
+          nextHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, 1),
+          })}
+          listHref={callsHref({ purpose: "job", q: q || undefined })}
+          weekHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "week",
+            week: parseWeekParam(day),
+          })}
+          businessName={businessName}
           vertical={vertical}
         />
       ) : weekView ? (
         <VisitWeekCalendar
-          items={filtered}
+          items={boardItems}
           monday={monday}
           prevHref={callsHref({
             purpose: "job",
@@ -232,6 +262,15 @@ export default async function CallsPage({
           })}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
           businessName={businessName}
+          vertical={vertical}
+        />
+      ) : pageRows.length === 0 ? (
+        <EmptyInbox
+          total={total}
+          pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
+          did={tenant.sautikit_virtual_number}
+          purpose={activeFilter}
+          q={q}
           vertical={vertical}
         />
       ) : (

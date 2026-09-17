@@ -29,6 +29,7 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(appointments, /\/calls\?purpose=job/);
     assert.match(inbox, /view: "week"/);
     assert.match(toolbar, />\s*Week\s*</);
+    assert.match(toolbar, />\s*Today\s*</);
   });
 
   it("makes Overview a map into Inbox purposes", () => {
@@ -53,6 +54,7 @@ describe("work surface jobs on unified inbox", () => {
     assert.doesNotMatch(toolbar, /clamp\(2rem/);
     assert.match(niche, /holdEmpty: "Nothing to fulfill"/);
     assert.match(niche, /jobEmpty: "No visits"/);
+    assert.match(niche, /todayEmpty: "Nothing today"/);
     assert.match(niche, /jobEmpty: "No bookings"/);
     assert.match(niche, /jobFilter: "Visits"/);
     assert.match(niche, /jobFilter: "Bookings"/);
