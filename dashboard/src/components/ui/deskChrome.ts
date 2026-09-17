@@ -28,7 +28,7 @@ export const btnPrimary = [
 
 /** One Action-dock hit. Confirm, Done, Call, and WhatsApp share this box. */
 export const deskHitClass =
-  "box-border inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl";
+  "box-border inline-flex h-11 w-11 min-h-11 min-w-11 max-h-11 max-w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl p-0";
 
 /** Filled list verb in `deskHitClass`. */
 export const btnDock = [
