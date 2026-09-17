@@ -34,6 +34,9 @@
 --   on_demand_usage_enabled boolean     (default false — wallet_on_demand_alerts.sql)
 --   sms_included_units integer          (default 200; sms_allowance.sql)
 --   sms_used_units integer              (consumed tenant SMS segments; sms_allowance.sql)
+--   email_included_units integer        (default 100; package_entitlements.sql; not gated yet)
+--   email_used_units integer            (package_entitlements.sql)
+--   seat_included integer               (default 5 logins; package_entitlements.sql; not gated yet)
 --   wallet_low_alert_sent_at timestamptz
 --   wallet_empty_alert_sent_at timestamptz
 --   line_paid_through timestamptz       (line rental covered until; line_rental_grace.sql)

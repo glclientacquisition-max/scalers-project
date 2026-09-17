@@ -158,6 +158,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 33c | `realtime_inbox_replica_identity.sql` | `realtime_inbox.sql` |
 | 33d | `notify_send_ledger.sql` | `contacts_and_requests.sql` (`tenants`, `calls`, `current_user_tenant_ids`) |
 | 33e | `sms_allowance.sql` | `notify_send_ledger.sql`, **`line_rental_grace.sql`** (widens protect trigger) |
+| 33f | `package_entitlements.sql` | `sms_allowance.sql` |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
 `realtime_inbox.sql` adds the three work tables to `supabase_realtime`. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.
@@ -209,7 +210,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | `current_user_tenant_ids()` | onboarding → owner_rls | `owner_rls.sql` | Wrong RLS scope |
 | `default_tenant_llm_prompt()` | 1-arg → 2-arg | `voice_languages.sql` (after DROP 1-arg) | Signup `42725` ambiguity |
 | `handle_new_user_tenant()` | onboarding → voice_languages → did_pool | `did_number_pool.sql` | Signup/DID behavior |
-| `tenants_protect_wallet_columns()` | bootstrap → wallet_security → soft_spend → on_demand → line_rental → sms_allowance | `sms_allowance.sql` | Wallet / SMS column exposure |
+| `tenants_protect_wallet_columns()` | bootstrap → wallet_security → soft_spend → on_demand → line_rental → sms_allowance → package_entitlements | `package_entitlements.sql` | Wallet / pack column exposure |
 
 ---
 

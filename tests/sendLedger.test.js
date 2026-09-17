@@ -6,6 +6,7 @@ const {
   billedTo,
   buildLedgerRow,
   idempotencyKey,
+  allowanceDecision,
   smsAllowanceDecision,
   smsSegments,
 } = require('../src/notifications/sendLedger');
@@ -172,5 +173,32 @@ describe('notify send ledger', () => {
     });
     assert.equal(row.overage, true);
     assert.equal(billedTo('wallet_low'), 'platform');
+  });
+
+  it('reuses the same cap math for email overage and seat hard caps', () => {
+    assert.deepEqual(
+      allowanceDecision({
+        enforcement: 'soft',
+        included: 100,
+        used: 100,
+        units: 1,
+        onDemand: true,
+        overageAllowed: true,
+        exhaustedReason: 'email_allowance_exhausted',
+      }),
+      { allowed: true, reason: 'on_demand', overage: true, remaining: -1 }
+    );
+    assert.deepEqual(
+      allowanceDecision({
+        enforcement: 'soft',
+        included: 5,
+        used: 5,
+        units: 1,
+        onDemand: true,
+        overageAllowed: false,
+        exhaustedReason: 'seat_allowance_exhausted',
+      }),
+      { allowed: false, reason: 'seat_allowance_exhausted', overage: false, remaining: 0 }
+    );
   });
 });

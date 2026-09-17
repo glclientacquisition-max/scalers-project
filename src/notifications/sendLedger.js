@@ -118,14 +118,17 @@ function buildLedgerRow({
 }
 
 /**
- * Cursor-like: included first. Stop at cap unless on-demand. Beta never blocks.
+ * Package bucket math. Included first. Stop at cap unless overage is allowed
+ * and on-demand is on. Beta never blocks. Seats pass overageAllowed=false.
  */
-function smsAllowanceDecision({
+function allowanceDecision({
   enforcement,
   included,
   used,
   units,
   onDemand,
+  overageAllowed = true,
+  exhaustedReason = 'allowance_exhausted',
 } = {}) {
   const need = Math.max(1, Number(units) || 1);
   const have = Math.max(0, Number(used) || 0);
@@ -147,7 +150,7 @@ function smsAllowanceDecision({
       remaining: cap - (have + need),
     };
   }
-  if (onDemand) {
+  if (overageAllowed && onDemand) {
     return {
       allowed: true,
       reason: 'on_demand',
@@ -157,10 +160,18 @@ function smsAllowanceDecision({
   }
   return {
     allowed: false,
-    reason: 'sms_allowance_exhausted',
+    reason: exhaustedReason,
     overage: false,
     remaining: cap - have,
   };
+}
+
+function smsAllowanceDecision(opts = {}) {
+  return allowanceDecision({
+    ...opts,
+    overageAllowed: true,
+    exhaustedReason: 'sms_allowance_exhausted',
+  });
 }
 
 async function claimTenantSms(ledger, body) {
@@ -221,6 +232,7 @@ module.exports = {
   idempotencyKey,
   recordDispatchResult,
   recordNotifySend,
+  allowanceDecision,
   smsAllowanceDecision,
   smsSegments,
   unitsForChannel,

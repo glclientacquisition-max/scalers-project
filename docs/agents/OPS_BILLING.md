@@ -10,7 +10,7 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 | --- | --- |
 | `docs/supabase/wallet_*.sql`, `one_wallet_billing.sql` | Wallet schema / RPCs (coordinate Platform; apply order in [`docs/supabase/README.md`](../supabase/README.md)) |
 | `docs/supabase/did_number_pool.sql`, `super_admin_ops.sql` | DID pool + ops helpers |
-| `docs/ONE_WALLET_BILLING.md`, `BETA_WALLET_PROGRAM.md`, `PRODUCTION_DID_POOL.md`, `SUPER_ADMIN_REQUIREMENTS.md` | Ops docs |
+| `docs/ONE_WALLET_BILLING.md`, `BETA_WALLET_PROGRAM.md`, `PACKAGES.md`, `PRODUCTION_DID_POOL.md`, `SUPER_ADMIN_REQUIREMENTS.md` | Ops docs |
 | `dashboard/src/app/admin/**` | Super Admin shell + pages |
 | `dashboard/src/app/api/admin/**`, `api/did-pool/**` | Ops APIs (service role) |
 | `dashboard/src/lib/admin.ts`, `adminWallets.ts`, `didPool.ts`, `wallet.ts`, `sautikit.ts` | Ops libraries |

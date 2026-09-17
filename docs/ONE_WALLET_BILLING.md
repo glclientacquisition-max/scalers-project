@@ -58,6 +58,8 @@ Then apply `docs/supabase/line_rental_grace.sql` (line paid-through, grace windo
 
 Then apply `docs/supabase/sms_allowance.sql` after `notify_send_ledger.sql` (included SMS + same on-demand toggle).
 
+Then apply `docs/supabase/package_entitlements.sql` (reserved email + seat included columns; no gate).
+
 ## Prepaid alerts + on-demand (Cursor-like)
 
 | Piece | Behavior |
@@ -83,6 +85,8 @@ Staff SMS and caller SMS share one tenant bucket. Wallet, line-outage, and speec
 
 No KES debit for SMS yet. Missing RPC fails open so staging still sends until the SQL is applied.
 
+Package buckets (email, seats, later SKUs): [`PACKAGES.md`](./PACKAGES.md). Columns reserved in `package_entitlements.sql`. Do not gate email or invites yet.
+
 ## Line rental grace (2026-09-03)
 
 Clients pay Scalers a monthly line fee at our retail rate, not SautiKit's cost. Beta is free.
@@ -98,6 +102,7 @@ Clients pay Scalers a monthly line fee at our retail rate, not SautiKit's cost. 
 
 ## Later
 
+- Package SKUs that write included SMS / email / seats. See [`PACKAGES.md`](./PACKAGES.md)
 - M-Pesa / Paystack STK top-up → `topup` ledger rows
 - Hard enforcement on inbound when balance ≤ 0 and on-demand off
 - Automatic line-expiry alerts (T-7 / T-1) from the voice notify stack

@@ -182,7 +182,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 ## 8. Open decisions
 
 1. **Caller SMS sender:** shared Scalers sender ID vs the tenant DID. Shared is simpler; tenant DID is more trusted.
-2. **Pricing:** packages will include SMS units. Included default is 200. Stop at cap unless on-demand. Wallet and outage SMS stay Scalers-paid (`billed_to=platform`).
+2. **Pricing:** packages will include SMS, email, seats, and later minutes. Included SMS default is 200. Stop at cap unless on-demand. Wallet and outage SMS stay Scalers-paid (`billed_to=platform`). Contract: [`PACKAGES.md`](./PACKAGES.md).
 3. **Language:** match the call language, or always English?
 4. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
 
