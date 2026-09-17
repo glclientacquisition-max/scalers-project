@@ -9,6 +9,8 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link.
 
+**Preview (one line):** Work is `deskPreviewClass`. One ellipsized line. The hangup paragraph, Want, Done, mood, and next live on `/calls/[id]`. Do not stack a second detail line under Work on mixed filters. Table Work cells use `deskPreviewCellClass`. Phone uses the same one-line clamp, never `line-clamp-2` for the summary.
+
 **Action dock (that trailing cell):**
 - Visit or booking with a job row: **Confirm** (then Done). That verb only.
 - Hold or order with a request row: **Done**. That verb only.

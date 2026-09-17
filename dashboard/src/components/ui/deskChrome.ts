@@ -69,6 +69,12 @@ export const deskEmptyClass = "mt-8 border-y border-line py-12 text-center";
 export const pageTitleClass =
   "font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink";
 
+/** List preview: one ellipsized line. Full copy lives on the record. */
+export const deskPreviewClass = "min-w-0 truncate";
+
+/** Table cell that holds a preview. Takes leftover width and lets `truncate` fire. */
+export const deskPreviewCellClass = "w-full max-w-0";
+
 export const metaLabelClass =
   "text-xs font-medium uppercase tracking-wide text-ink-soft";
 

@@ -177,7 +177,7 @@ function homeBriefing({ toReturn, toFulfill, toConfirm }) {
 function homeQueueUnit(count, fallback, sample) {
   if (count === 1) {
     const text = typeof sample === "string" ? sample.trim() : "";
-    if (text) return text;
+    if (text && text.length <= 28) return text;
   }
   return fallback;
 }
@@ -504,6 +504,14 @@ describe("inbox signal", () => {
     assert.equal(homeBriefing({ toReturn: 0, toFulfill: 0, toConfirm: 0 }), "Clear");
     assert.equal(homeQueueUnit(1, "to confirm", "Tue 14:00"), "Tue 14:00");
     assert.equal(homeQueueUnit(2, "to confirm", "Tue 14:00"), "to confirm");
+    assert.equal(
+      homeQueueUnit(
+        1,
+        "to confirm",
+        "Caller wants a deep clean of the three bedroom house in Westlands this Saturday morning."
+      ),
+      "to confirm"
+    );
   });
 
   it("labels When as Today or Yesterday in Nairobi", () => {

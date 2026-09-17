@@ -10,7 +10,11 @@ import {
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import {
+  deskPreviewCellClass,
+  deskPreviewClass,
+  deskShiftClass,
+} from "@/components/ui/deskChrome";
 import {
   RowIdentity,
   RowStateDot,
@@ -142,22 +146,24 @@ export function InboxTableRow({
     >
       {kind === "hold" ? (
         <>
-          <td className="px-5 py-4 align-top">
+          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
             <DeskRowHit href={openHref} label="Conversation" />
             <div className={`${deskRowMutedClass} flex items-center gap-3`}>
               <RowIdentity name={item.callerName} />
               <div className="min-w-0">
-                <p className={`text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
+                <p
+                  className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+                >
                   {item.headline}
                 </p>
-                <p className="mt-0.5 text-sm text-ink-soft">
+                <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
                   {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
                 </p>
               </div>
             </div>
           </td>
-          <td className={`${deskRowMutedClass} px-5 py-4 align-top font-medium text-ink`}>
-            {item.callerName || "Caller"}
+          <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
+            <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
@@ -170,22 +176,24 @@ export function InboxTableRow({
 
       {kind === "job" ? (
         <>
-          <td className="px-5 py-4 align-top">
+          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
             <DeskRowHit href={openHref} label="Conversation" />
             <div className={`${deskRowMutedClass} flex items-center gap-3`}>
               <RowIdentity name={item.callerName} />
               <div className="min-w-0">
-                <p className={`text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
+                <p
+                  className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+                >
                   {hasJob ? visit : stamp}
                 </p>
-                <p className="mt-0.5 text-sm text-ink-soft">
+                <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
                   {item.headline}
                 </p>
               </div>
             </div>
           </td>
-          <td className={`${deskRowMutedClass} px-5 py-4 align-top font-medium text-ink`}>
-            {item.callerName || "Caller"}
+          <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
+            <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
@@ -198,20 +206,17 @@ export function InboxTableRow({
 
       {kind === "mixed" ? (
         <>
-          <td className="px-5 py-4 align-top">
+          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
             <DeskRowHit href={openHref} label="Conversation" />
             <div className={`${deskRowMutedClass} flex items-center gap-3`}>
               <RowIdentity name={item.callerName} />
               <div className="min-w-0">
-                <p className={`text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
+                <p
+                  className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+                >
                   {who}
                 </p>
-                <p className="mt-0.5 text-sm text-ink">{item.headline}</p>
-                {item.detail ? (
-                  <p className="mt-1 line-clamp-1 text-sm text-ink-soft">
-                    {item.detail}
-                  </p>
-                ) : null}
+                <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
               </div>
             </div>
           </td>
@@ -257,7 +262,7 @@ export function InboxPhoneRow({
       <RowIdentity name={item.callerName} />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className={`min-w-0 truncate text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
+          <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}>
             {who}
           </p>
           <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
@@ -265,11 +270,11 @@ export function InboxPhoneRow({
             {meta}
           </p>
         </div>
-        <p className={`mt-0.5 line-clamp-2 text-sm ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
+        <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
           {work}
         </p>
         {showJob ? (
-          <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">{place}</p>
+          <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>{place}</p>
         ) : null}
         {showMixed ? (
           <p className="mt-1">
