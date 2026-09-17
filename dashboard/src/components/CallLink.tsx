@@ -5,7 +5,7 @@
  * Glyph is a rounded handset in brand blue, not a desk telephone.
  */
 
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import { deskHitClass, deskShiftClass } from "@/components/ui/deskChrome";
 
 export function telHref(rawNumber: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
@@ -46,7 +46,7 @@ export function CallLink({
       title={`Call ${number}`}
       aria-label={`Call ${number}`}
       className={[
-        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line bg-accent/[0.08] text-accent-deep",
+        `${deskHitClass} border border-line bg-accent/[0.08] text-accent-deep`,
         `${deskShiftClass} hover:border-accent hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
         className,
       ].join(" ")}

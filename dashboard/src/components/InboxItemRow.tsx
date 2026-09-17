@@ -92,7 +92,7 @@ function InboxTrailingAction({
   }
   if (item.callerPhone) {
     return (
-      <div className="flex h-11 w-24 shrink-0 items-center justify-end gap-2">
+      <div className="flex shrink-0 items-center justify-end gap-2">
         <CallLink number={item.callerPhone} />
         <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
       </div>

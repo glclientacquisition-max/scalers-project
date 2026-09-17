@@ -5,7 +5,7 @@ import {
   updateAppointmentStatus,
   type AppointmentStatusState,
 } from "@/app/(desk)/appointments/actions";
-import { btnDock, btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnDock, btnDockGhost } from "@/components/ui/deskChrome";
 
 const initial: AppointmentStatusState = {};
 
@@ -33,7 +33,7 @@ export function InboxJobActions({
     : "requested";
   const err = ownerError(state.error);
   const stack = extra
-    ? "flex w-full flex-col items-stretch gap-2"
+    ? "flex w-full flex-col items-end gap-2"
     : "flex items-center justify-end";
 
   return (
@@ -47,7 +47,7 @@ export function InboxJobActions({
               name="status"
               value="confirmed"
               disabled={pending}
-              className={extra ? `${btnPrimary} w-full` : btnDock}
+              className={btnDock}
             >
               {pending ? "Saving" : "Confirm"}
             </button>
@@ -57,7 +57,7 @@ export function InboxJobActions({
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={`${btnGhost} w-full disabled:opacity-50`}
+                className={btnDockGhost}
               >
                 Cancel
               </button>
@@ -71,7 +71,7 @@ export function InboxJobActions({
               name="status"
               value="done"
               disabled={pending}
-              className={extra ? `${btnPrimary} w-full` : btnDock}
+              className={btnDock}
             >
               {pending ? "Saving" : "Done"}
             </button>
@@ -81,7 +81,7 @@ export function InboxJobActions({
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={`${btnGhost} w-full disabled:opacity-50`}
+                className={btnDockGhost}
               >
                 Cancel
               </button>
@@ -89,12 +89,12 @@ export function InboxJobActions({
           </>
         ) : null}
         {normalized === "done" ? (
-          <span className="inline-flex h-11 w-24 shrink-0 items-center justify-center rounded-xl bg-ok-soft text-sm font-medium text-ok">
+          <span className={`${btnDock} pointer-events-none bg-ok-soft text-ok shadow-none`}>
             Done
           </span>
         ) : null}
         {normalized === "cancelled" ? (
-          <button type="submit" name="status" value="requested" disabled={pending} className={`${btnGhost} disabled:opacity-50`}>
+          <button type="submit" name="status" value="requested" disabled={pending} className={btnDockGhost}>
             Reopen
           </button>
         ) : null}

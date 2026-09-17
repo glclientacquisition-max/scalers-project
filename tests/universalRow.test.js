@@ -69,8 +69,8 @@ describe("inbox call action", () => {
   });
 
   it("is a muted 44px icon button, never filled", () => {
-    assert.match(call, /h-11 w-11/);
-    assert.match(call, /border border-line bg-accent\/\[0\.08\] text-accent-deep/);
+    assert.match(call, /deskHitClass/);
+    assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-11 w-11/);
     assert.match(call, /aria-label=\{`Call \$\{number\}`\}/);
     assert.match(call, /data-icon="handset"/);
     assert.match(call, /stroke="currentColor"/);
@@ -92,8 +92,10 @@ describe("inbox call action", () => {
     const phoneLast = inbox.indexOf("if (item.callerPhone)", actionFn);
     assert.ok(jobFirst < holdNext && holdNext < phoneLast);
     assert.doesNotMatch(inbox.slice(actionFn, actionFn + 900), /Send SMS|mailto:|Archive/);
-    assert.match(inbox, /flex h-11 w-24 shrink-0 items-center justify-end gap-2/);
+    assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
     assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/CallLink.tsx"), /deskHitClass/);
+    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /deskHitClass/);
   });
 });
