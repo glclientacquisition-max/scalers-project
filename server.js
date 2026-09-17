@@ -995,14 +995,25 @@ async function handleWhatsAppWebhook(req, res) {
   res.sendStatus(200);
   try {
     const body = req.body || {};
+    const data = body.data && typeof body.data === 'object' ? body.data : null;
     console.log('[whatsapp/events] payload', {
-      kind: req.headers?.['x-sautikit-event-kind'] || null,
-      eventId: req.headers?.['x-sautikit-event-id'] || null,
+      kind: req.headers?.['x-sautikit-event-kind'] || body.kind || null,
+      eventId: req.headers?.['x-sautikit-event-id'] || body.event_id || null,
       bodyKeys: Object.keys(body),
-      hasEntry: Array.isArray(body.entry),
-      messagingProduct: body.messaging_product || body.value?.messaging_product || null,
+      dataKeys: data ? Object.keys(data) : [],
+      hasEntry: Array.isArray(body.entry) || Array.isArray(data?.entry),
+      messagingProduct:
+        body.messaging_product ||
+        body.value?.messaging_product ||
+        data?.messaging_product ||
+        data?.value?.messaging_product ||
+        null,
       phoneNumberId:
-        body.metadata?.phone_number_id || body.value?.metadata?.phone_number_id || null,
+        body.metadata?.phone_number_id ||
+        body.value?.metadata?.phone_number_id ||
+        data?.metadata?.phone_number_id ||
+        data?.value?.metadata?.phone_number_id ||
+        null,
     });
     const result = await processWhatsAppReceived({
       body,

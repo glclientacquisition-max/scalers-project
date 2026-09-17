@@ -99,6 +99,36 @@ describe('whatsapp inbound parse and route', () => {
     assert.equal(parsed.calling.length, 0);
   });
 
+  it('extracts inbound from a SautiKit workspace { kind, data } envelope', () => {
+    const parsed = parseWhatsAppReceived({
+      kind: 'whatsapp.event.received',
+      event_id: '139367a7-0bee-40e5-9d49-ed9026a93a8f',
+      workspace_id: 'ws-1',
+      occurred_at: '2026-09-17T11:40:15.000Z',
+      data: {
+        messaging_product: 'whatsapp',
+        metadata: {
+          display_phone_number: '254709221536',
+          phone_number_id: PLATFORM_PNID,
+        },
+        contacts: [{ profile: { name: 'Owner' }, wa_id: '254790381872' }],
+        messages: [
+          {
+            from: '254790381872',
+            id: 'wamid.SAUTI3',
+            timestamp: '1720000000',
+            type: 'text',
+            text: { body: 'Hi' },
+          },
+        ],
+      },
+    });
+    assert.equal(parsed.inbound.length, 1);
+    assert.equal(parsed.inbound[0].wamid, 'wamid.SAUTI3');
+    assert.equal(parsed.inbound[0].phoneNumberId, PLATFORM_PNID);
+    assert.equal(parsed.inbound[0].body, 'Hi');
+  });
+
   it('extracts inbound from a SautiKit value object (no entry wrapper)', () => {
     const value = {
       messaging_product: 'whatsapp',
@@ -191,6 +221,46 @@ describe('processWhatsAppReceived', () => {
     assert.equal(sends[0].type, 'text');
     assert.match(sends[0].body, /Scalers/);
     assert.doesNotMatch(sends[0].body, /Done and Dusted/i);
+  });
+
+  it('handles a SautiKit workspace envelope the same as a Graph envelope', async () => {
+    const persist = [];
+    const sends = [];
+    const result = await processWhatsAppReceived({
+      body: {
+        kind: 'whatsapp.event.received',
+        event_id: 'bc2ccfd7-5121-4fee-908f-94ccd02180ae',
+        data: {
+          messaging_product: 'whatsapp',
+          metadata: {
+            display_phone_number: '254709221536',
+            phone_number_id: PLATFORM_PNID,
+          },
+          contacts: [{ profile: { name: 'Owner' }, wa_id: '254790381872' }],
+          messages: [
+            {
+              from: '254790381872',
+              id: 'wamid.SAUTI4',
+              timestamp: '1720000000',
+              type: 'text',
+              text: { body: 'Hello' },
+            },
+          ],
+        },
+      },
+      persistInbound: async (row) => {
+        persist.push(row);
+        return { ok: true, duplicate: false };
+      },
+      markRead: async () => ({ ok: true }),
+      sendText: async (payload) => {
+        sends.push(payload);
+        return { ok: true };
+      },
+    });
+    assert.equal(result.handled, 1);
+    assert.equal(persist[0].wamid, 'wamid.SAUTI4');
+    assert.equal(sends[0].to, '254790381872');
   });
 
   it('handles a SautiKit value-object inbound the same as a Graph envelope', async () => {

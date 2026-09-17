@@ -121,15 +121,23 @@ function collectWhatsAppValue(value, inbound, statuses, calling) {
   }
 }
 
+function mergeParsedWhatsApp(target, extra) {
+  if (!extra) return target;
+  target.inbound.push(...(extra.inbound || []));
+  target.statuses.push(...(extra.statuses || []));
+  target.calling.push(...(extra.calling || []));
+  return target;
+}
+
 /**
- * SautiKit relays Meta's `value` object byte-for-byte (no `entry` wrapper).
- * Also accept a full Graph webhook `{ object, entry, changes }`.
+ * SautiKit workspace webhooks wrap events as `{ kind, event_id, data }`.
+ * `data` is Meta's `value` object (no Graph `entry`) or a full Graph envelope.
  */
-function parseWhatsAppReceived(body) {
+function parseWhatsAppReceived(body, _depth = 0) {
   const inbound = [];
   const statuses = [];
   const calling = [];
-  if (!body || typeof body !== 'object') {
+  if (!body || typeof body !== 'object' || _depth > 3) {
     return { inbound, statuses, calling };
   }
 
@@ -154,6 +162,18 @@ function parseWhatsAppReceived(body) {
       }
     } else if (isWhatsAppValueObject(body)) {
       collectWhatsAppValue(body, inbound, statuses, calling);
+    }
+  }
+
+  if (!inbound.length && !statuses.length && !calling.length) {
+    for (const nested of [body.data, body.payload]) {
+      if (nested && typeof nested === 'object' && nested !== body) {
+        mergeParsedWhatsApp(
+          { inbound, statuses, calling },
+          parseWhatsAppReceived(nested, _depth + 1)
+        );
+        if (inbound.length || statuses.length || calling.length) break;
+      }
     }
   }
 
