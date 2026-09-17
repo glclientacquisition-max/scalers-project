@@ -65,6 +65,7 @@ function shapeCall(row) {
     recording_path: meta.recording_path || null,
     status: row.status || null,
     whatsapp_sent: Boolean(meta.whatsapp_sent),
+    owner_notify_kind: meta.owner_notify_kind || null,
     escalation_sent: Boolean(meta.escalation_sent),
     escalated_to: meta.escalated_to || null,
     escalate_reason: meta.escalate_reason || null,
@@ -1598,6 +1599,87 @@ async function updateAppointment({
   return data || null;
 }
 
+async function insertNotifySend(row = {}) {
+  if (!row.tenant_id || !row.kind || !row.channel || !row.idempotency_key) {
+    return { ok: false, reason: 'invalid' };
+  }
+  const payload = {
+    tenant_id: row.tenant_id,
+    call_id: row.call_id || null,
+    call_sid: row.call_sid || null,
+    kind: row.kind,
+    channel: row.channel,
+    recipient: row.recipient || null,
+    audience: row.audience,
+    billed_to: row.billed_to,
+    units: Number.isFinite(Number(row.units)) ? Number(row.units) : 1,
+    body: row.body || null,
+    provider_message_id: row.provider_message_id || null,
+    idempotency_key: row.idempotency_key,
+    overage: Boolean(row.overage),
+  };
+  let { data, error } = await supabase
+    .from('notify_sends')
+    .insert(payload)
+    .select('id')
+    .maybeSingle();
+  if (error && /overage/i.test(error.message || '')) {
+    const rest = { ...payload };
+    delete rest.overage;
+    ({ data, error } = await supabase
+      .from('notify_sends')
+      .insert(rest)
+      .select('id')
+      .maybeSingle());
+  }
+  if (error) {
+    if (/notify_sends|does not exist|schema cache|relation/i.test(error.message || '')) {
+      console.warn(
+        '[db] notify_sends missing (apply docs/supabase/notify_send_ledger.sql)'
+      );
+      return { ok: false, reason: 'table_missing' };
+    }
+    if (error.code === '23505' || /duplicate|unique/i.test(error.message || '')) {
+      return { ok: false, reason: 'duplicate' };
+    }
+    console.warn('[db] insertNotifySend:', error.message);
+    return { ok: false, reason: 'insert_failed' };
+  }
+  return { ok: true, id: data?.id || null };
+}
+
+async function consumeSmsUnits({ tenantId, units } = {}) {
+  if (!tenantId) return { allowed: true, reason: 'no_tenant', overage: false };
+  const need = Math.max(1, Number(units) || 1);
+  const { data, error } = await supabase.rpc('consume_sms_units', {
+    p_tenant_id: tenantId,
+    p_units: need,
+  });
+  if (error) {
+    if (/consume_sms_units|does not exist|schema cache|sms_included_units|sms_used_units/i.test(
+      error.message || ''
+    )) {
+      console.warn(
+        '[db] consume_sms_units missing (apply docs/supabase/sms_allowance.sql)'
+      );
+      return { allowed: true, reason: 'rpc_missing', overage: false };
+    }
+    console.warn('[db] consumeSmsUnits:', error.message);
+    return { allowed: true, reason: 'rpc_failed', overage: false };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { allowed: true, reason: 'empty', overage: false };
+  return {
+    allowed: row.allowed !== false,
+    reason: row.reason || 'ok',
+    overage: Boolean(row.overage),
+    used: row.sms_used_units,
+    included: row.sms_included_units,
+    remaining: row.remaining,
+    onDemand: Boolean(row.on_demand_usage_enabled),
+  };
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -1626,6 +1708,8 @@ module.exports = {
   updateAppointment,
   listOpenAppointments,
   mergeCallSummaryMeta,
+  insertNotifySend,
+  consumeSmsUnits,
   RECORDINGS_BUCKET,
   shapeCall,
   normalizeStoredPhone,

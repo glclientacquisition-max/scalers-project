@@ -53,7 +53,7 @@ export function OnDemandUsagePanel({
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span className="text-ink">
-            Continue answering after prepaid hits zero
+            Continue after prepaid minutes or included SMS hit zero
           </span>
         </label>
 

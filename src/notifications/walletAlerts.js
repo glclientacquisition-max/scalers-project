@@ -61,6 +61,7 @@ async function maybeNotifyWalletBalanceAlerts(supabase, { tenantId } = {}) {
       subject: `Scalers prepaid empty${businessName ? `. ${businessName}` : ''}`,
       lead: { businessName, reason: 'Prepaid wallet empty' },
       channels,
+      ledger: { tenantId, kind: 'wallet_empty' },
     });
     results.push({ kind: 'empty', ...(sent[0] || { channel: null }) });
   } else if (row.should_alert_low) {
@@ -75,6 +76,7 @@ async function maybeNotifyWalletBalanceAlerts(supabase, { tenantId } = {}) {
       subject: `Scalers wallet running low${businessName ? `. ${businessName}` : ''}`,
       lead: { businessName, reason: 'Prepaid wallet low' },
       channels,
+      ledger: { tenantId, kind: 'wallet_low' },
     });
     results.push({ kind: 'low', ...(sent[0] || { channel: null }) });
   }

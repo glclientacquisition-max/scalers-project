@@ -188,6 +188,7 @@ const {
   displayOwnerCallerName,
   shouldSendOwnerLead,
   shouldDeferOwnerLeadForVisit,
+  staffInboxAlreadyNotified,
   serviceRequestEvent,
   appointmentEvent,
 } = require('./src/notifications/events');
@@ -819,10 +820,12 @@ async function maybeSendMissedTextback({ callSid, call }) {
   try {
     let businessName = process.env.BUSINESS_NAME || null;
     let notifyChannels = null;
+    let tenantId = call.tenant_id || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       businessName = profile.businessName || businessName;
       notifyChannels = profile.notifyChannels || null;
+      tenantId = profile.id || tenantId;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for text-back failed:`, err?.message || err);
       return;
@@ -835,7 +838,15 @@ async function maybeSendMissedTextback({ callSid, call }) {
       sinceIso: new Date(Date.now() - SUPPRESS_WINDOW_MS).toISOString(),
     });
     if (recentlyTexted(recent)) return;
-    const sent = await sendMissedTextback({ to: call.from_number, businessName });
+    const sent = await sendMissedTextback({
+      to: call.from_number,
+      businessName,
+      ledger: {
+        tenantId,
+        callId: call.id || null,
+        callSid,
+      },
+    });
     if (!sent.channel) return;
     await db.mergeCallSummaryMeta({
       callSid,
@@ -3002,6 +3013,12 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       lead,
       channels: notifyChannels,
       subject: `Escalation for ${teammateLabel(teammate)}${businessName ? `. ${businessName}` : ''}`,
+      ledger: {
+        tenantId: loadedProfile?.id || call.tenant_id || null,
+        callId: call.id || null,
+        callSid,
+        kind: 'escalation',
+      },
     });
 
     const transferQueued = await maybeQueueLiveTransfer({
@@ -3147,6 +3164,8 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
 
   if (!shouldSendOwnerLead(call)) return;
 
+  if (staffInboxAlreadyNotified(call)) return;
+
   const brain = callBrainStates.get(callSid);
   if (
     shouldDeferOwnerLeadForVisit({
@@ -3168,6 +3187,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
     let businessName = process.env.BUSINESS_NAME || null;
     let notifyChannels = null;
     let teamDirectory = [];
+    let tenantId = call.tenant_id || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
@@ -3175,6 +3195,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       businessName = profile.businessName || businessName;
       notifyChannels = profile.notifyChannels || null;
       teamDirectory = profile.teamDirectory || [];
+      tenantId = profile.id || tenantId;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
@@ -3201,6 +3222,12 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       body,
       lead,
       channels: notifyChannels,
+      ledger: {
+        tenantId,
+        callId: call.id || null,
+        callSid,
+        kind: 'lead',
+      },
     });
     const result = sent[0] || { channel: null, reason: inbox.source === 'none' ? 'no_inbox_recipient' : 'send_failed' };
     if (!result.channel) {
@@ -3225,6 +3252,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       patch: {
         owner_notify_body: body,
         owner_notify_channel: result.channel,
+        owner_notify_kind: 'lead',
       },
     });
     console.log(
@@ -3239,7 +3267,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   }
 }
 
-/** Dedicated hold/order/enquiry alert — does not mark lead whatsapp_sent. */
+/** Dedicated hold/order/enquiry alert. Marks the call so hangup does not also send a lead. */
 async function maybeSendServiceRequestNotification(callSid, request) {
   if (!request) return;
   let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
@@ -3247,6 +3275,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
   let businessName = process.env.BUSINESS_NAME || 'your business';
   let notifyChannels = null;
   let teamDirectory = [];
+  let tenantId = null;
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
@@ -3254,12 +3283,20 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     businessName = profile.businessName || businessName;
     notifyChannels = profile.notifyChannels || null;
     teamDirectory = profile.teamDirectory || [];
+    tenantId = profile.id || null;
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for request notify failed:`,
       err?.message || err
     );
   }
+
+  const callRow = await db.getCall(callSid).catch(() => null);
+  const ledger = {
+    tenantId: tenantId || callRow?.tenant_id || null,
+    callId: callRow?.id || null,
+    callSid,
+  };
 
   const event = serviceRequestEvent(request, businessName);
   const body = renderEventText(event);
@@ -3281,6 +3318,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     lead,
     channels: notifyChannels,
     subject: renderEventSubject(event),
+    ledger: { ...ledger, kind: 'service_request' },
   });
   const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
@@ -3288,6 +3326,22 @@ async function maybeSendServiceRequestNotification(callSid, request) {
       `[${callSid}] Request notify (${event.title}) via ${result.channel}` +
         (result.to ? ` → ${result.to}` : '')
     );
+    try {
+      await db.markWhatsappSent(callSid);
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: {
+          owner_notify_body: body,
+          owner_notify_channel: result.channel,
+          owner_notify_kind: 'service_request',
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `[${callSid}] request notify mark sent failed:`,
+        err?.message || err
+      );
+    }
   } else {
     console.warn(
       `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
@@ -3300,6 +3354,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
       to: request.caller_phone,
       event: callerEvent,
       channels: notifyChannels,
+      ledger,
     });
     if (caller.channel) {
       await db.mergeCallSummaryMeta({
@@ -3321,6 +3376,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
   let businessName = process.env.BUSINESS_NAME || 'your business';
   let notifyChannels = null;
   let teamDirectory = [];
+  let tenantId = null;
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
@@ -3328,12 +3384,20 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     businessName = profile.businessName || businessName;
     notifyChannels = profile.notifyChannels || null;
     teamDirectory = profile.teamDirectory || [];
+    tenantId = profile.id || null;
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for appointment notify failed:`,
       err?.message || err
     );
   }
+
+  const callRow = await db.getCall(callSid).catch(() => null);
+  const ledger = {
+    tenantId: tenantId || callRow?.tenant_id || null,
+    callId: callRow?.id || null,
+    callSid,
+  };
 
   const event = appointmentEvent(appointment, businessName, kind);
   const body = renderEventText(event);
@@ -3357,6 +3421,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     lead,
     subject: renderEventSubject(event),
     channels: notifyChannels,
+    ledger: { ...ledger, kind: 'appointment' },
   });
   const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
@@ -3395,6 +3460,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
       to: appointment.caller_phone,
       event: callerEvent,
       channels: notifyChannels,
+      ledger,
     });
     if (caller.channel) {
       await db.mergeCallSummaryMeta({

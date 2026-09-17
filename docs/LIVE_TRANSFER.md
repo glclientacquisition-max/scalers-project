@@ -227,7 +227,7 @@ Rules:
 3. **Unanswered outbound is free** at SautiKit and must stay 0 minutes on our ledger (`no_answer` / `busy` / `failed` / `canceled`).
 4. **Beta (`billing_enforcement=off`)** meters inbound only and **must not** `POST /v1/calls` in production. Otherwise Scalers eats outbound PSTN. Lab exception: `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on` on staging only.
 5. **Hard enforcement:** do not originate if prepaid cannot cover one outbound minute. Soft still originates (wallet may go negative). Fallback is callback SMS.
-6. **SMS** stays best-effort and is not a wallet debit today.
+6. **SMS** is metered on `notify_sends` (tenant vs platform). It is not a KES wallet debit.
 7. Destination authorization: same allow-list as `POST /v1/calls`. Confirm Kenya mobiles before enabling the executor.
 
 Helpers: `src/billing/liveTransferLegs.js`, `db.persistOutboundTransferLeg`. No new SQL. Ledger kind stays `call_charge` with metadata `role=outbound_transfer` once the outbound row completes via `/voice/events`.

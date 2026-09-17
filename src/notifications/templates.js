@@ -147,7 +147,7 @@ function walletLowBody({ businessName, balanceKes, lowThresholdKes } = {}) {
   return [
     titled('Scalers wallet running low', businessName),
     `Prepaid balance is about KES ${bal} (alert under KES ${thr}).`,
-    'Top up soon so calls keep being covered. On-demand usage is separate. Enable it on Wallet if you want to continue after prepaid hits zero.',
+    'Top up soon so calls keep being covered. On-demand usage is separate. Enable it on Wallet if you want to continue after prepaid minutes or included SMS hit zero.',
   ].join('\n');
 }
 
@@ -157,13 +157,13 @@ function walletEmptyBody({ businessName, onDemandEnabled } = {}) {
     return [
       head,
       'Your prepaid balance is KES 0 or below.',
-      'On-demand usage is ON, so calls can keep going and will bill beyond prepaid. Top up when you can.',
+      'On-demand usage is ON, so calls and tenant SMS can keep going beyond included limits. Top up when you can.',
     ].join('\n');
   }
   return [
     head,
     'Your prepaid balance is KES 0 or below.',
-    'On-demand usage is OFF, so further call charges are paused until you top up or enable on-demand on the Wallet page.',
+    'On-demand usage is OFF, so further call charges and tenant SMS stop until you top up or enable on-demand on the Wallet page.',
   ].join('\n');
 }
 

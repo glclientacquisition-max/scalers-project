@@ -20,6 +20,7 @@ const {
 } = require('./email');
 const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
+const { claimTenantSms, recordDispatchResult } = require('./sendLedger');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -76,25 +77,44 @@ async function trySendWhatsApp({ to, body, lead }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels } = {}) {
+async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger } = {}) {
   const text = body || buildLeadText(lead);
   const errors = [];
   const prefs = parseNotifyChannels(channels);
 
+  async function accept(result) {
+    if (result?.channel) {
+      await recordDispatchResult(ledger, result, text);
+    }
+    return result;
+  }
+
   if (prefs.sms) {
-    try {
-      const sms = await trySendSms({ to, body: text });
-      if (sms) return sms;
-    } catch (err) {
-      errors.push(`sms:${err?.message || err}`);
-      console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+    const dest = normalizeSmsTo(to);
+    if (smsSenderReady() && dest) {
+      const claim = await claimTenantSms(ledger, text);
+      if (!claim.allowed) {
+        errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
+        console.warn(
+          `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
+        );
+      } else {
+        if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
+        try {
+          const sms = await trySendSms({ to, body: text });
+          if (sms) return accept(sms);
+        } catch (err) {
+          errors.push(`sms:${err?.message || err}`);
+          console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+        }
+      }
     }
   }
 
   if (prefs.whatsapp) {
     try {
       const wa = await trySendWhatsApp({ to, body: text, lead });
-      if (wa) return wa;
+      if (wa) return accept(wa);
     } catch (err) {
       errors.push(`whatsapp:${err?.message || err}`);
       if (!prefs.email || !emailFallbackReady()) {
@@ -114,7 +134,7 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels } =
       lead,
       subject,
     });
-    if (mail.channel) return mail;
+    if (mail.channel) return accept(mail);
 
     if (!smsSenderReady() && !whatsAppSenderReady()) {
       return { channel: null, reason: 'no_notify_channel_configured', errors };
@@ -140,6 +160,7 @@ async function dispatchEscalationAlert({
   lead = {},
   subject,
   channels,
+  ledger,
 } = {}) {
   const text = body || buildLeadText(lead);
   const destPhone = teammatePhone || null;
@@ -156,6 +177,7 @@ async function dispatchEscalationAlert({
     lead,
     subject,
     channels,
+    ledger,
   });
   if (!result?.channel) return [];
   return [

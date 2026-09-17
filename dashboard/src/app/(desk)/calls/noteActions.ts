@@ -8,7 +8,7 @@ import {
   stripModelSms,
 } from "@/lib/polishCallerNote";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
-import { sendDeskCallerSms } from "@/lib/callerSms";
+import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseSummary } from "@/lib/supabase";
 
@@ -88,40 +88,51 @@ export async function sendCallerNoteAction(
   if (!phone) return { error: "No customer number." };
   if (!body) return { error: "Write a note." };
 
-  const sent = await sendDeskCallerSms({ to: phone, body });
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) return { error: "Not signed in." };
+
+  const sent = await sendRecordedDeskCallerSms({
+    client: workspace.client,
+    tenantId: tenant.id,
+    callId: callId || null,
+    kind: "caller_note",
+    to: phone,
+    body,
+  });
   if (!sent.ok) {
-    return { error: sent.reason === "sms_not_configured" ? "SMS is not configured." : "SMS failed." };
+    if (sent.reason === "sms_not_configured") return { error: "SMS is not configured." };
+    if (sent.reason === "sms_allowance_exhausted") {
+      return { error: "Included SMS used. Enable on-demand on Wallet." };
+    }
+    return { error: "SMS failed." };
   }
 
   if (callId) {
-    const workspace = await createWorkspaceDataClient();
-    if (workspace) {
-      const { data: row } = await workspace.client
-        .from("calls")
-        .select("summary")
-        .eq("id", callId)
-        .eq("tenant_id", tenant.id)
-        .maybeSingle();
-      const raw = row?.summary as unknown;
-      const meta =
-        raw && typeof raw === "object" && !Array.isArray(raw)
-          ? (raw as Record<string, unknown>)
-          : parseSummary(typeof raw === "string" ? raw : null);
-      const next = {
-        ...meta,
-        caller_reply_body: body,
-        caller_reply_at: new Date().toISOString(),
-      };
-      const { error: sumErr } = await workspace.client
-        .from("calls")
-        .update({ summary: JSON.stringify(next) })
-        .eq("id", callId)
-        .eq("tenant_id", tenant.id);
-      if (sumErr) {
-        console.warn("[caller note summary]", sumErr.message);
-      }
-      revalidatePath(`/calls/${callId}`);
+    const { data: row } = await workspace.client
+      .from("calls")
+      .select("summary")
+      .eq("id", callId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    const raw = row?.summary as unknown;
+    const meta =
+      raw && typeof raw === "object" && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>)
+        : parseSummary(typeof raw === "string" ? raw : null);
+    const next = {
+      ...meta,
+      caller_reply_body: body,
+      caller_reply_at: new Date().toISOString(),
+    };
+    const { error: sumErr } = await workspace.client
+      .from("calls")
+      .update({ summary: JSON.stringify(next) })
+      .eq("id", callId)
+      .eq("tenant_id", tenant.id);
+    if (sumErr) {
+      console.warn("[caller note summary]", sumErr.message);
     }
+    revalidatePath(`/calls/${callId}`);
   }
 
   revalidatePath("/calls");

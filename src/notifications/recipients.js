@@ -12,6 +12,7 @@ async function dispatchToStaff({
   lead,
   subject,
   channels,
+  ledger,
 } = {}) {
   const people = uniqueDestinations(recipients || []);
   const sent = [];
@@ -25,6 +26,7 @@ async function dispatchToStaff({
         lead,
         subject,
         channels,
+        ledger,
       });
       if (result?.channel) {
         sent.push({

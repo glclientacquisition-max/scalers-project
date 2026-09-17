@@ -38,7 +38,7 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `caller_order` | Order captured | — | Yes, if on |
 | `caller_callback` | Callback promised | — | Yes, if on |
 
-One event = one staff message per call per kind, sent to every unique permissioned destination (except escalate, which is one person). `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation marks it so the lead path does not re-send.
+One event = one staff message per call per kind, sent to every unique permissioned destination (except escalate, which is one person). `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation, visit, and hold/order/enquiry mark it so the lead path does not re-send.
 
 ---
 
@@ -159,7 +159,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 | **Channel** | SMS first, WhatsApp second, email fallback | SMS only at first; WhatsApp needs template approval |
 | **Language** | English (owner desk language) | Match the call language when known |
 | **Content** | Name, phone, reason, recording link | Business name, what was captured, next step |
-| **Cost** | Platform cost today; bundle into subscription later | Platform cost; per-text or bundle |
+| **Cost** | Metered on `notify_sends` (tenant SMS). Included first. Stop at cap unless on-demand. Not a KES debit yet | Same table. Caller SMS is tenant usage |
 | **Opt-out** | Owner toggles `notify_channels` | Caller STOP; owner toggle |
 | **Failure** | Log and leave desk note; do not retry storm | Log; do not retry on the same call |
 
@@ -170,7 +170,8 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 - Do not text the caller on every call. Only when there is an action to confirm.
 - Do not send the caller a transcript or recording link.
 - Do not let the caller text reveal internal notes (`resolution_note`, staff directory).
-- Do not charge the tenant per owner SMS without a product decision.
+- Do not debit the prepaid KES wallet for SMS. Meter on `notify_sends`. Stop tenant SMS at included unless on-demand.
+- Do not gate platform wallet or outage SMS on the tenant allowance.
 - Do not send marketing to the caller. The first text is a confirmation, not a campaign.
 - Do not add a fourth owner channel without adding it to the ladder and the event model.
 - Do not invent a staff recipient. No `team[0]`. No extra owner SMS on escalate.
@@ -181,7 +182,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 ## 8. Open decisions
 
 1. **Caller SMS sender:** shared Scalers sender ID vs the tenant DID. Shared is simpler; tenant DID is more trusted.
-2. **Pricing:** is caller SMS bundled in the line fee, metered per text, or an add-on?
+2. **Pricing:** packages will include SMS, email, seats, and later minutes. Included SMS default is 200. Stop at cap unless on-demand. Wallet and outage SMS stay Scalers-paid (`billed_to=platform`). Contract: [`PACKAGES.md`](./PACKAGES.md).
 3. **Language:** match the call language, or always English?
 4. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
 
@@ -207,5 +208,30 @@ The owner knows who called, what they wanted, and what happened without opening 
 The link is the desk call detail (`/calls/{id}`). Set `DESK_PUBLIC_URL` (or `NEXT_PUBLIC_APP_URL`) on the voice host so the link points at the right desk.
 
 Do not put live Brain dump on the SMS. Omit `general_enquiry` intent, greeting/backchannel summaries, and internal resolution notes. Prefer hangup `owner_review` when it is already on the call row. Live vs bar: [`CALL_MESSAGE_GAP.md`](./CALL_MESSAGE_GAP.md).
+
+## 10. Send ledger
+
+Every accepted SMS, WhatsApp, or email writes `notify_sends` (`docs/supabase/notify_send_ledger.sql`). Apply that SQL before counts are durable. Missing table: send still goes, insert is skipped.
+
+| `billed_to` | What |
+| --- | --- |
+| `tenant` | Staff lead, escalate, visit, hold, order, enquiry, callback. Caller visit/hold/order/callback/note. Missed text-back. |
+| `platform` | Wallet low/empty. Speech or reasoning outage. Scalers pays. |
+
+SMS units are segments (GSM-7 160 / 153, UCS-2 70 / 67). Email and WhatsApp count as 1 unit on their own channel. No KES debit. Duplicate dest + kind + call is idempotent.
+
+### Stop at included (same on-demand toggle as minutes)
+
+Apply `docs/supabase/sms_allowance.sql` after the ledger SQL. Default included is 200 segments. `consume_sms_units` claims before send.
+
+| State | Tenant SMS |
+| --- | --- |
+| Beta (`billing_enforcement = off`) | Send. Meter `sms_used_units`. Never block. |
+| Paid, under cap | Send. `overage = false`. |
+| Paid, at cap, on-demand off | Skip SMS. Staff WhatsApp / email / desk note still try. Escalate still saves. |
+| Paid, at cap, on-demand on | Send. `overage = true`. |
+| Platform (`wallet_*`, `outage_*`) | Always send. Never consume tenant units. |
+
+Missing RPC or table: send still goes (staging before apply). Desk caller note at cap returns an error. Appointment / request / escalate saves anyway.
 
 **Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.

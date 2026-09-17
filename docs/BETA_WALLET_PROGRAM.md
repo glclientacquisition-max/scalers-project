@@ -20,7 +20,7 @@ When moving to beta, ops can **waive negative balance** (trial credit) so soft-e
 Optional monthly budget columns may exist (`wallet_soft_spend_limit.sql`) but are **not** the primary control. Preferred Cursor-like model:
 
 1. **Automatic live alerts** when prepaid is running low / empty (WhatsApp/email — no soft-limit setup).
-2. **On-demand usage** opt-in on Desk → Wallet when prepaid hits zero (`wallet_on_demand_alerts.sql`).
+2. **On-demand usage** opt-in on Desk → Wallet when prepaid hits zero (`wallet_on_demand_alerts.sql`). The same toggle continues tenant SMS after included units (`sms_allowance.sql`).
 
 ## Security (wallet_security_beta.sql)
 
