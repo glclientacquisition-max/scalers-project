@@ -59,6 +59,11 @@ describe("home overview craft", () => {
 
   it("gives queue counts visual weight", () => {
     assert.match(page, /tabular-nums text-base font-semibold text-ink/);
+    assert.match(page, /deskPreviewClass/);
+    assert.doesNotMatch(page, /nextHold\?\.headline/);
+    assert.doesNotMatch(page, /nextJob\?\.headline/);
+    assert.doesNotMatch(page, /overflow-wrap:anywhere/);
+    assert.doesNotMatch(page, /line-clamp-2/);
   });
 
   it("formats the DID with spaces", () => {
@@ -71,6 +76,7 @@ describe("home overview craft", () => {
     assert.match(page, /inbox\.callsTruncated/);
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(purpose, /export function homeDigestLine/);
+    assert.match(purpose, /HOME_QUEUE_SAMPLE_MAX/);
     assert.match(purpose, /canonicalInboxIntent\(item\.intent\) === "complaint"/);
     const load = read("dashboard/src/lib/inboxLoad.ts");
     assert.match(load, /callsTruncated/);

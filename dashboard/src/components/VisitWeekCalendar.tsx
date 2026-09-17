@@ -2,6 +2,7 @@ import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { deskPreviewClass } from "@/components/ui/deskChrome";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { groupRunSheetForWeek } from "@/lib/runSheet";
@@ -100,8 +101,8 @@ export function VisitWeekCalendar({
                         <p className={`${deskRowMutedClass} text-sm font-semibold text-ink`}>
                           {visit.when_text || copy.jobColumn}
                         </p>
-                        <p className={`${deskRowMutedClass} text-xs text-ink-soft`}>{item.headline}</p>
-                        <p className={`${deskRowMutedClass} text-xs text-ink`}>
+                        <p className={`${deskRowMutedClass} text-xs text-ink-soft ${deskPreviewClass}`}>{item.headline}</p>
+                        <p className={`${deskRowMutedClass} text-xs text-ink ${deskPreviewClass}`}>
                           {item.callerName || "Caller"}
                         </p>
                         <div className={`${deskRowActionClass} mt-1`}>
@@ -133,8 +134,8 @@ export function VisitWeekCalendar({
                     label="Conversation"
                   />
                   <div className={deskRowMutedClass}>
-                    <p className="text-sm font-semibold text-ink">{item.headline}</p>
-                    <p className="text-xs text-ink-soft">{item.callerName || "Caller"}</p>
+                    <p className={`text-sm font-semibold text-ink ${deskPreviewClass}`}>{item.headline}</p>
+                    <p className={`text-xs text-ink-soft ${deskPreviewClass}`}>{item.callerName || "Caller"}</p>
                   </div>
                   <div className={deskRowActionClass}>
                     <RowAction item={item} />

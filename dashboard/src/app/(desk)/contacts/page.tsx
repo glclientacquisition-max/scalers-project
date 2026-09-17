@@ -9,7 +9,7 @@ import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { RowIdentity } from "@/components/ui/deskRow";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { deskEmptyClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
+import { deskEmptyClass, deskPreviewCellClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
   contactsHref,
@@ -149,7 +149,7 @@ export default async function ContactsPage({
                   <RowIdentity name={row.name} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">
+                      <p className={`min-w-0 text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
                         {row.name?.trim() || "Unknown"}
                       </p>
                       {row.lastContactAt ? (
@@ -159,7 +159,7 @@ export default async function ContactsPage({
                       ) : null}
                     </div>
                     <p className="mt-0.5 truncate font-mono text-sm text-ink">{row.phone || "No phone"}</p>
-                    <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">
+                    <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
                       {row.lastReasonDisplay || "None"}
                     </p>
                   </div>
@@ -209,7 +209,7 @@ export default async function ContactsPage({
                       <DeskRowHit href={`/contacts/${row.id}`} label={row.name?.trim() || "Contact"} />
                       <div className={`${deskRowMutedClass} flex items-center gap-3`}>
                         <RowIdentity name={row.name} />
-                        <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">
+                        <p className={`min-w-0 text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
                           {row.name?.trim() || "Unknown"}
                         </p>
                       </div>
@@ -217,8 +217,8 @@ export default async function ContactsPage({
                     <td className={`${deskRowMutedClass} px-5 py-5 align-top font-mono text-sm text-ink`}>
                       {row.phone || "No phone"}
                     </td>
-                    <td className={`${deskRowMutedClass} px-5 py-5 align-top text-sm text-ink-soft`}>
-                      {row.lastReasonDisplay || "None"}
+                    <td className={`${deskRowMutedClass} ${deskPreviewCellClass} px-5 py-5 align-top text-sm text-ink-soft`}>
+                      <p className={deskPreviewClass}>{row.lastReasonDisplay || "None"}</p>
                     </td>
                     <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft`}>
                       {row.lastContactAt

@@ -19,8 +19,10 @@ import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import {
   btnGhost,
   btnPrimary,
+  deskPreviewClass,
   deskShiftClass,
   focusRingVisible,
+  pageTitleClass,
 } from "@/components/ui/deskChrome";
 import {
   homeBriefing,
@@ -124,10 +126,8 @@ export default async function HomeOverviewPage() {
     },
     vertical
   );
-  const holdSample =
-    work.nextHold?.headline || work.nextHold?.hold?.when_text || null;
-  const jobSample =
-    work.nextJob?.job?.when_text || work.nextJob?.headline || null;
+  const holdSample = work.nextHold?.hold?.when_text || null;
+  const jobSample = work.nextJob?.job?.when_text || null;
   const nextReturn = work.nextReturn || null;
   const nextReturnWhen = nextReturn ? formatCallWhenRelative(nextReturn.createdAt) : null;
   const nextReturnReason = nextReturn?.lead?.reason || nextReturn?.headline || null;
@@ -186,7 +186,7 @@ export default async function HomeOverviewPage() {
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           {nairobiGreeting()}
         </p>
-        <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink [overflow-wrap:anywhere]">
+        <h1 className={`mt-1 ${pageTitleClass}`}>
           {business}
         </h1>
         <p className="mt-1 font-sans text-[13px] text-ink-soft">
@@ -208,7 +208,7 @@ export default async function HomeOverviewPage() {
                   Updates
                   {liveUpdates.length > 1 ? ` · ${liveUpdates.length} live` : ""}
                 </p>
-                <p className="mt-1 font-display text-base tracking-tight text-ink [overflow-wrap:anywhere]">
+                <p className={`mt-1 font-display text-base tracking-tight text-ink ${deskPreviewClass}`}>
                   {primaryUpdate.text}
                 </p>
                 <p className="mt-1 text-xs text-ink-soft">
@@ -232,10 +232,10 @@ export default async function HomeOverviewPage() {
             >
               Work
             </h2>
-            <p className="text-[13px] text-ink-soft">{briefing}</p>
+            <p className={`text-[13px] text-ink-soft ${deskPreviewClass}`}>{briefing}</p>
           </div>
           {digest ? (
-            <p className="mt-1 text-[13px] text-ink-soft">{digest}</p>
+            <p className={`mt-1 text-[13px] text-ink-soft ${deskPreviewClass}`}>{digest}</p>
           ) : null}
 
           <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface">
@@ -255,7 +255,7 @@ export default async function HomeOverviewPage() {
                 >
                   <span className="text-ink">{queue.label}</span>
                   <span className="flex min-w-0 items-center gap-3 text-ink-soft">
-                    <span className="min-w-0 truncate">
+                    <span className={`min-w-0 ${deskPreviewClass}`}>
                       <span className="tabular-nums text-base font-semibold text-ink">
                         {queue.count}
                       </span>{" "}
@@ -296,14 +296,14 @@ export default async function HomeOverviewPage() {
               >
                 Next to return
               </h2>
-              <p className={`${deskRowMutedClass} mt-2 text-sm font-semibold tracking-tight text-ink`}>
+              <p className={`${deskRowMutedClass} mt-2 text-sm font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
                 {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
                 {nextReturnWhen ? (
                   <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
                 ) : null}
               </p>
               {nextReturnReason ? (
-                <p className={`${deskRowMutedClass} mt-0.5 line-clamp-2 text-sm text-ink-soft`}>
+                <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
                   {nextReturnReason}
                 </p>
               ) : null}

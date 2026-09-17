@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
@@ -129,10 +130,10 @@ export default async function ContactDetailPage({
                           {formatCallWhen(entry.createdAt)}
                         </td>
                         <td className={`${deskRowMutedClass} px-5 py-4 text-ink`}>{kindLabel(entry.kind)}</td>
-                        <td className={`${deskRowMutedClass} px-5 py-4`}>
-                          <p className="font-medium text-ink">{entry.headline}</p>
+                        <td className={`${deskRowMutedClass} ${deskPreviewCellClass} px-5 py-4`}>
+                          <p className={`font-medium text-ink ${deskPreviewClass}`}>{entry.headline}</p>
                           {entry.detail ? (
-                            <p className="mt-0.5 text-ink-soft">{entry.detail}</p>
+                            <p className={`mt-0.5 text-ink-soft ${deskPreviewClass}`}>{entry.detail}</p>
                           ) : null}
                         </td>
                       </tr>

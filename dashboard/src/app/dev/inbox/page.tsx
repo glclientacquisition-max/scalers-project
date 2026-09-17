@@ -92,6 +92,16 @@ const ROWS: InboxItem[] = [
       call_id: "call-1",
     },
   }),
+  item({
+    id: "long-reason",
+    purpose: "answered",
+    needsYou: false,
+    callerName: "Mwangi",
+    callerPhone: "254700000005",
+    headline:
+      "Caller wants a deep clean of the three bedroom house in Westlands this Saturday morning and asked the receptionist to confirm the team and send the quote on WhatsApp.",
+    intent: "book_visit",
+  }),
 ];
 
 export default function DevInboxPage() {

@@ -3,7 +3,7 @@ import { InboxJobActions } from "@/components/InboxJobActions";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { btnGhost } from "@/components/ui/deskChrome";
+import { btnGhost, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { dayHeading } from "@/lib/visitCalendar";
@@ -93,8 +93,8 @@ export function RunSheetToday({
                 <p className={`${deskRowMutedClass} text-sm font-semibold text-ink`}>
                   {formatSlotClock(item)}
                 </p>
-                <p className={`${deskRowMutedClass} text-sm text-ink`}>{item.headline}</p>
-                <p className={`${deskRowMutedClass} text-xs text-ink-soft`}>
+                <p className={`${deskRowMutedClass} text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
+                <p className={`${deskRowMutedClass} text-xs text-ink-soft ${deskPreviewClass}`}>
                   {item.callerName || "Caller"}
                   {placeFor(item) ? ` · ${placeFor(item)}` : ""}
                 </p>
@@ -135,9 +135,15 @@ export function RunSheetToday({
                       />
                       {formatSlotClock(item)}
                     </td>
-                    <td className="px-5 py-3 text-sm text-ink">{item.headline}</td>
-                    <td className="px-5 py-3 text-sm text-ink">{item.callerName || "Caller"}</td>
-                    <td className="px-5 py-3 text-sm text-ink-soft">{placeFor(item)}</td>
+                    <td className={`px-5 py-3 text-sm text-ink ${deskPreviewCellClass}`}>
+                      <p className={deskPreviewClass}>{item.headline}</p>
+                    </td>
+                    <td className="max-w-[10rem] px-5 py-3 text-sm text-ink">
+                      <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
+                    </td>
+                    <td className={`px-5 py-3 text-sm text-ink-soft ${deskPreviewCellClass}`}>
+                      <p className={deskPreviewClass}>{placeFor(item)}</p>
+                    </td>
                     <td className="px-5 py-3 text-right">
                       <div className={deskRowActionClass}>
                         <RowAction item={item} />

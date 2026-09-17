@@ -32,7 +32,9 @@ describe("desk control craft", () => {
     assert.match(chrome, /deskFieldClass/);
     assert.match(chrome, /filterTabClass/);
     assert.match(chrome, /deskShiftClass/);
-    assert.match(chrome, /motion-reduce:active:scale-100/);
+    assert.match(chrome, /export const deskPreviewClass/);
+    assert.match(chrome, /export const deskPreviewCellClass/);
+    assert.match(chrome, /min-w-0 truncate/);
   });
 
   it("aliases settings primary to btnPrimary", () => {

@@ -17,3 +17,4 @@ Frontend 2.0: `docs/frontend/FRONTEND_RECONNAISSANCE.md`. Constitution: `docs/fr
 - Never expose service-role keys to the client. Run `cd dashboard && npm run lint` / `build`.
 - Motion: `.cursor/skills/desk-motion/SKILL.md`. Only pending, live, land, shift, press.
 - Fluid: one composition. List verbs use `btnDock`. Phone stacks. `md+` tables. Hits stay 44px.
+- Preview truncate: lists are one ellipsized line (`deskPreviewClass`). Full hangup copy lives on the record.

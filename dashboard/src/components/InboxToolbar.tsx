@@ -4,7 +4,14 @@ import Link from "next/link";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import { btnGhost, btnPrimary, deskFieldClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
+import {
+  btnGhost,
+  btnPrimary,
+  deskFieldClass,
+  deskPreviewClass,
+  deskShiftClass,
+  pageTitleClass,
+} from "@/components/ui/deskChrome";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 
 export function InboxToolbar({
@@ -40,7 +47,7 @@ export function InboxToolbar({
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className={pageTitleClass}>Inbox</h1>
-          <p className="mt-1 text-[13px] text-ink-soft">{briefing}</p>
+          <p className={`mt-1 text-[13px] text-ink-soft ${deskPreviewClass}`}>{briefing}</p>
         </div>
         <form
           action="/calls"

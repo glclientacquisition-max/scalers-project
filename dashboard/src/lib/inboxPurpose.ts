@@ -241,14 +241,17 @@ export function orderInboxItems(
   return rows;
 }
 
+/** Queue labels stay nouns. A single short slot may replace the unit. Never a paragraph. */
+export const HOME_QUEUE_SAMPLE_MAX = 28;
+
 export function homeQueueUnit(
   count: number,
   fallback: string,
   sample?: string | null
 ): string {
   if (count === 1) {
-    const text = sample?.trim();
-    if (text) return text;
+    const text = sample?.trim() || "";
+    if (text && text.length <= HOME_QUEUE_SAMPLE_MAX) return text;
   }
   return fallback;
 }

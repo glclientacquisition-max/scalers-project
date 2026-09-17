@@ -43,8 +43,10 @@ describe("universal row anatomy", () => {
     assert.ok(uses.length >= 4, `RowIdentity in phone + 3 table kinds, got ${uses.length}`);
     assert.match(inbox, /RowStateDot show=\{item\.needsYou\}/);
     assert.match(inbox, /deskRowWeightClass\(item\.needsYou\)/);
-    assert.match(inbox, /DeskRowHit/);
-    assert.match(inbox, /label="Conversation"/);
+    assert.match(inbox, /deskPreviewClass/);
+    assert.match(inbox, /deskPreviewCellClass/);
+    assert.doesNotMatch(inbox, /line-clamp-2/);
+    assert.doesNotMatch(inbox, /item\.detail/);
   });
 
   it("applies the identity circle to Contacts mobile and desktop", () => {
