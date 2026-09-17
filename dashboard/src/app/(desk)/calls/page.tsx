@@ -27,7 +27,7 @@ import {
   parseWeekParam,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
-import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskEmptyClass, deskShiftClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
@@ -105,7 +105,7 @@ function EmptyInbox({
         Call{" "}
         <a
           href={`tel:${did}`}
-          className="font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 transition hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className={`font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 ${deskShiftClass} hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
         >
           {did}
         </a>{" "}

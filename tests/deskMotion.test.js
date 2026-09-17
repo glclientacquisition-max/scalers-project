@@ -72,10 +72,11 @@ describe("desk motion canon", () => {
     assert.match(motion, /if \(seen === null \|\| reset\)/);
     assert.match(motion, /landed\.length > DESK_LAND_MAX_FRESH/);
     assert.match(motion, /export const deskLivePingClass = "desk-live-ping"/);
+    assert.match(motion, /export const deskShiftClass/);
     assert.match(motion, /export const deskJustLandedClass = "desk-just-landed"/);
   });
 
-  it("names four desk verbs and kills them under reduced motion", () => {
+  it("names desk verbs and kills them under reduced motion", () => {
     assert.match(css, /--motion-fast: 150ms/);
     assert.match(css, /--motion-land: 900ms/);
     assert.match(css, /@keyframes desk-live-ping/);
@@ -86,14 +87,16 @@ describe("desk motion canon", () => {
     const reduce = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
     assert.match(reduce, /\.desk-live-ping/);
     assert.match(reduce, /\.desk-just-landed/);
+    assert.match(reduce, /\.desk-shift/);
     assert.match(reduce, /\.landing-rise/);
     assert.match(reduce, /\.landing-drift/);
     assert.match(master, /\*\*pending\*\*/);
     assert.match(master, /\*\*live\*\*/);
     assert.match(master, /\*\*land\*\*/);
+    assert.match(master, /\*\*shift\*\*/);
     assert.match(master, /\*\*press\*\*/);
     assert.match(constitution, /Desk motion verbs/);
-    assert.match(skill, /pending.*live.*land.*press/s);
+    assert.match(skill, /pending.*live.*land.*shift.*press/s);
   });
 
   it("ships LivePing, land scope, and pending spinner", () => {
@@ -103,6 +106,7 @@ describe("desk motion canon", () => {
     assert.match(land, /export function DeskLandSurface/);
     assert.match(land, /scopeKey/);
     assert.match(chrome, /pendingSpinnerClass/);
+    assert.match(chrome, /deskShiftClass/);
     assert.match(chrome, /motion-reduce:animate-none/);
     assert.match(chrome, /motion-reduce:active:scale-100/);
   });
@@ -143,11 +147,33 @@ describe("desk motion wiring", () => {
     assert.doesNotMatch(dialog, /landing-rise|animate-|transition-opacity|scale-/);
   });
 
-  it("exposes a gated catalog of the four verbs", () => {
+  it("exposes a gated catalog of the motion verbs", () => {
     assert.match(catalogPage, /DASHBOARD_OPEN/);
     assert.match(catalog, /pendingSpinnerClass/);
     assert.match(catalog, /LivePing/);
     assert.match(catalog, /DeskLandScope/);
+    assert.match(catalog, /Shift/);
+    assert.match(catalog, /deskShiftClass/);
     assert.match(catalog, /btnPrimary/);
+  });
+
+  it("shifts Inbox and Home chrome with named properties", () => {
+    assert.match(inbox, /deskShiftClass/);
+    assert.doesNotMatch(inbox, /transition duration-150/);
+    assert.match(home, /deskShiftClass/);
+    assert.match(contacts, /deskShiftClass/);
+    const nav = read("dashboard/src/components/DeskNav.tsx");
+    assert.match(nav, /deskShiftClass/);
+  });
+
+  it("replaces leftover duration-150 and transition-all with deskShiftClass", () => {
+    const tenant = read("dashboard/src/components/TenantForm.tsx");
+    const onboard = read("dashboard/src/app/onboarding/OnboardingWizard.tsx");
+    assert.match(tenant, /deskShiftClass/);
+    assert.doesNotMatch(tenant, /transition duration-150/);
+    assert.match(onboard, /deskShiftClass/);
+    assert.doesNotMatch(onboard, /transition-all/);
+    assert.match(read("dashboard/src/components/LeadStatusToggle.tsx"), /deskShiftClass/);
+    assert.match(read("dashboard/src/components/CallFaqSuggestions.tsx"), /btnPrimary/);
   });
 });

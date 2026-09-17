@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { focusRingVisible } from "@/components/ui/deskChrome";
+import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
 export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
@@ -23,6 +23,7 @@ function SignOutButton() {
         type="submit"
         className={[
           "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
+          deskShiftClass,
           focusRingVisible,
         ].join(" ")}
       >
@@ -129,6 +130,7 @@ export function DeskNav() {
               aria-current={active ? "page" : undefined}
               className={[
                 "rounded-md",
+                deskShiftClass,
                 focusRingVisible,
                 active
                   ? "font-semibold text-accent-deep"
@@ -164,6 +166,7 @@ export function DeskTabBar() {
                 aria-current={active ? "page" : undefined}
                 className={[
                   "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[11px] leading-none",
+                  deskShiftClass,
                   focusRingVisible,
                   active
                     ? "font-semibold text-accent-deep"

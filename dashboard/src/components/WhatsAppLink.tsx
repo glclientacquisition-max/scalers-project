@@ -3,7 +3,7 @@
  * Renders the caller number with a green WhatsApp deep link (https://wa.me/<digits>).
  */
 
-import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 
 export function waMeHref(rawNumber: string, message?: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
@@ -62,7 +62,7 @@ export function WhatsAppLink({
         aria-label={`WhatsApp ${number}`}
         className={[
           "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-whatsapp text-white",
-          "transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+          `${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
           className,
         ].join(" ")}
       >
@@ -127,7 +127,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
       >
         <WhatsAppIcon className="h-4 w-4" />
       </a>
@@ -143,7 +143,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
       >
         <WhatsAppIcon className="h-3.5 w-3.5" />
       </a>

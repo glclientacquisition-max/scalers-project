@@ -3,6 +3,10 @@
  * Focus ring matches the platform mandate exactly.
  */
 
+import { deskShiftClass } from "@/lib/deskMotion";
+
+export { deskShiftClass };
+
 export const focusRing =
   "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2";
 
@@ -17,13 +21,15 @@ export const btnPrimaryFill =
 export const btnPrimary = [
   "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm",
   btnPrimaryFill,
-  "transition-[background-color,transform,opacity] duration-150 active:scale-[0.99] motion-reduce:active:scale-100",
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
   focusRingVisible,
 ].join(" ");
 
 export const btnGhost = [
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-medium text-ink",
-  "transition-[border-color,background-color,color] duration-150 hover:border-accent",
+  deskShiftClass,
+  "hover:border-accent",
   focusRingVisible,
 ].join(" ");
 
@@ -31,7 +37,7 @@ export const pendingSpinnerClass =
   "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent-on-fill/40 border-t-accent-on-fill motion-reduce:animate-none";
 
 export const deskFieldClass =
-  "w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent";
+  `w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
 
 export const deskErrorClass =
   "rounded-2xl border border-warn/40 bg-warn-soft p-6 text-warn";
@@ -51,7 +57,7 @@ export const tableCellClass = "px-4 py-3.5";
 export function filterTabClass(active: boolean) {
   return [
     "group inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium",
-    "transition-[color,border-color] duration-150",
+    deskShiftClass,
     focusRingVisible,
     active
       ? "border-accent text-accent-deep"
@@ -62,6 +68,7 @@ export function filterTabClass(active: boolean) {
 export function filterTabCountClass(active: boolean) {
   return [
     "rounded-md px-1.5 py-0.5 text-xs tabular-nums",
+    deskShiftClass,
     active
       ? "bg-accent/10 text-accent-deep"
       : "bg-surface-muted text-ink-soft group-hover:bg-accent/10 group-hover:text-ink",

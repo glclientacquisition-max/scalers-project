@@ -7,13 +7,13 @@ import {
   type PolishCallerNoteState,
   type SendCallerNoteState,
 } from "@/app/(desk)/calls/noteActions";
-import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
 
 const fieldClass =
-  "w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none transition duration-150 placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent";
+  `w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent`;
 
 export function CallerNoteComposer({
   callId,
@@ -71,7 +71,7 @@ export function CallerNoteComposer({
           <button
             type="submit"
             disabled={polishPending || !note.trim()}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-medium text-ink-soft transition duration-150 hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+            className={`inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-medium text-ink-soft ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50`}
           >
             Polish
           </button>

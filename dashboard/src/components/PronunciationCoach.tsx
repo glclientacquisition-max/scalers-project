@@ -49,6 +49,7 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 type CoachItem = PronunciationSuggestion & {
   status: "todo" | "done" | "skipped";
@@ -746,7 +747,7 @@ export function PronunciationCoach({
               aria-selected={selected}
               onClick={() => setMode(m.id)}
               className={[
-                "-mb-px border-b-2 px-3 py-2 text-sm transition",
+                `-mb-px border-b-2 px-3 py-2 text-sm ${deskShiftClass}`,
                 selected
                   ? "border-[var(--accent)] font-medium text-[var(--ink)]"
                   : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]",
@@ -818,7 +819,7 @@ export function PronunciationCoach({
                       <button
                         type="button"
                         onClick={startRecording}
-                        className="inline-flex items-center gap-2 rounded-xl bg-accent-fill px-5 py-3 text-sm font-medium text-accent-on-fill transition hover:bg-accent-fill-hover"
+                        className={`inline-flex items-center gap-2 rounded-xl bg-accent-fill px-5 py-3 text-sm font-medium text-accent-on-fill ${deskShiftClass} hover:bg-accent-fill-hover`}
                       >
                         <span
                           aria-hidden="true"
@@ -939,7 +940,8 @@ export function PronunciationCoach({
                               clearTake();
                             }}
                             className={[
-                              "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition",
+                              "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm",
+                              deskShiftClass,
                               selected
                                 ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                                 : "border-[var(--line)] bg-surface hover:border-[var(--accent)]/50",

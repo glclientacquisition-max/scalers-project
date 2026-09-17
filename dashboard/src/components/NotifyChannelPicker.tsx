@@ -7,6 +7,7 @@ import {
   type NotifyChannels,
 } from "@/lib/notifyChannels";
 import { ToolSwitch } from "@/components/settingsUi";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 function SmsLogo({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -68,7 +69,8 @@ export function NotifyChannelPicker({
             <li
               key={meta.id}
               className={[
-                "flex items-center gap-3 rounded-xl border px-3 py-3 transition",
+                "flex items-center gap-3 rounded-xl border px-3 py-3",
+                deskShiftClass,
                 locked
                   ? "border-line/70 bg-surface/60 opacity-55 grayscale"
                   : enabled

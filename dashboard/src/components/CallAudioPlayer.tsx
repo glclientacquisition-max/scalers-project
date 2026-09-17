@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { usableRecordingUrl } from "@/lib/recordingSource";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const SPEEDS = [1, 1.5, 2] as const;
 
@@ -44,7 +45,8 @@ export function CallAudioPlayer({ src }: { src: string }) {
               onClick={() => applySpeed(s)}
               aria-pressed={speed === s}
               className={[
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition",
+                "rounded-full border px-2.5 py-1 text-xs font-medium",
+                deskShiftClass,
                 speed === s
                   ? "border-[var(--accent)] bg-accent-fill text-accent-on-fill"
                   : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]/60",

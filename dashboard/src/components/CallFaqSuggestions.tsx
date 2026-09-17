@@ -10,9 +10,9 @@ import {
   type FaqApplyState,
   type FaqSuggestState,
 } from "@/app/(desk)/calls/faqActions";
+import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 
-const fieldClass =
-  "mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus-visible:shadow-focus";
+const fieldClass = `mt-1 ${deskFieldClass}`;
 
 const suggestInitial: FaqSuggestState = {};
 const applyInitial: FaqApplyState = {};
@@ -136,9 +136,9 @@ export function CallFaqSuggestions({
             aria-describedby={
               !hasTranscript ? "call-faq-no-transcript" : "call-faq-help"
             }
-            className="rounded-xl bg-accent-fill px-4 py-2.5 text-sm font-medium text-accent-on-fill transition hover:brightness-105 disabled:opacity-60"
+            className={btnPrimary}
           >
-            {suggestPending ? "Looking through the call…" : "Find FAQ ideas"}
+            {suggestPending ? "Looking through the call" : "Find FAQ ideas"}
           </button>
           {!hasTranscript ? (
             <p
@@ -292,7 +292,7 @@ export function CallFaqSuggestions({
               type="submit"
               disabled={applyPending || selectedReady === 0}
               aria-describedby="call-faq-add-help"
-              className="rounded-xl bg-accent-fill px-4 py-2.5 text-sm font-medium text-accent-on-fill transition hover:brightness-105 disabled:opacity-60"
+              className={btnPrimary}
             >
               {applyPending
                 ? "Adding…"

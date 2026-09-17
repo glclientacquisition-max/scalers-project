@@ -151,7 +151,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 - Sign out stays in the header. It is never a sixth tab.
 - Do not add a left desk rail. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.
-- Desk motion verbs: **pending** (spinner on the control), **live** (ping on a Live stamp and the Home bulletin), **land** (one-shot wash on a row that just appeared), **press** (`active:scale-[0.99]` on `btnPrimary`). Skill: `.cursor/skills/desk-motion/SKILL.md`. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
+- Desk motion verbs: **pending** (spinner on the control), **live** (ping on a Live stamp and the Home bulletin), **land** (one-shot wash on a row that just appeared), **shift** (named-property 150ms on hover and selected), **press** (`active:scale-[0.99]` on `btnPrimary`). Skill: `.cursor/skills/desk-motion/SKILL.md`. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
 - Landing may keep rise/drift behind `prefers-reduced-motion`. Desk never uses `.landing-rise`.
 - No glass on desk. Header and tab bar may keep light `backdrop-blur`.
 - Radius: `rounded-xl` / `rounded-2xl` / `rounded-panel`. Not pill-everything.

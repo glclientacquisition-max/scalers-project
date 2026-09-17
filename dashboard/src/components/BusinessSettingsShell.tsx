@@ -19,6 +19,7 @@ import {
 } from "@/lib/businessSettingsNav";
 import { SettingsPageHeader } from "@/components/settingsUi";
 import { ThemePicker } from "@/components/ThemePicker";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 function SettingsChevron() {
   return (
@@ -71,7 +72,7 @@ function SettingsMenu({
                     href={settingsNavHref(item.target)}
                     aria-current={active ? "page" : undefined}
                     className={[
-                      "flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40",
+                      `flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40`,
                       active
                         ? "bg-accent/10 text-accent-deep"
                         : "text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",

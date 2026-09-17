@@ -10,6 +10,10 @@ export const DESK_LAND_MAX_FRESH = 3;
 export const deskLivePingClass = "desk-live-ping";
 export const deskJustLandedClass = "desk-just-landed";
 
+/** Named-property 150ms shift. Not layout, not `transition-all`. */
+export const deskShiftClass =
+  "desk-shift transition-[color,background-color,border-color,box-shadow,opacity,transform,filter] duration-[var(--motion-fast)] ease-out motion-reduce:transition-none";
+
 export function nextLandedIds(
   seen: Set<string> | null,
   incoming: readonly string[],
