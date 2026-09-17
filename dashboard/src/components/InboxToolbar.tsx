@@ -68,6 +68,7 @@ export function InboxToolbar({
           id: item.id,
           label: item.label,
           count: counts[item.id],
+          divide: item.divide,
           href: callsHref({
             purpose: item.id,
             q: q || undefined,

@@ -63,7 +63,7 @@ Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triag
 - Niche stamps: Pickup (retail), Confirm visit (home services), Confirm booking (hospitality)
 - Caption briefing: `3 need you. 1 to confirm.`
 - Mixed columns: Work / Needed / When
-- Filters: Needs you · Holds · Visits, Jobs, or Bookings · Human · Answered · All
+- Filters: Needs you · All · Visits, Jobs, or Bookings · Holds · Human · Answered
 - Needs you is open work only. Confirm moves a visit to Visits. Done leaves Holds.
 - Bare `/calls` defaults to Needs you when work is waiting
 - `/requests` and `/appointments` redirect into Holds / Jobs filters
