@@ -131,7 +131,7 @@ async function sendOwnerWhatsApp({
   if (windowOpen !== true && windowOpen !== false) {
     if (lastInboundAt) {
       open = isWhatsAppSessionOpen(lastInboundAt, new Date());
-    } else {
+    } else if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const db = require('../db');
         const session = await db.getWhatsAppSession({
