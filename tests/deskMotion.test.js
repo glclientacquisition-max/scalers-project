@@ -81,7 +81,8 @@ describe("desk motion canon", () => {
     assert.match(css, /@keyframes desk-live-ping/);
     assert.match(css, /@keyframes desk-land-fade/);
     assert.match(css, /\.desk-live-ping/);
-    assert.match(css, /\.desk-just-landed/);
+    assert.match(css, /background: var\(--accent-soft\)/);
+    assert.match(css, /box-shadow: inset 3px 0 0 var\(--accent\)/);
     const reduce = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
     assert.match(reduce, /\.desk-live-ping/);
     assert.match(reduce, /\.desk-just-landed/);

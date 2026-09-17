@@ -286,10 +286,11 @@ h3,
 }
 
 @keyframes desk-land-fade {
-  from {
+  0%,
+  35% {
     opacity: 1;
   }
-  to {
+  100% {
     opacity: 0;
   }
 }
@@ -307,7 +308,8 @@ h3,
   pointer-events: none;
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
   animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
 }
 
