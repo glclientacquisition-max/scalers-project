@@ -28,7 +28,7 @@ Ops:
 - Explicit platform sender in `sendOwnerWhatsApp`
 - `POST /whatsapp/events` plus demux on `/` and `/voice/events` via `X-Sautikit-Event-Kind`
 - Persist `whatsapp_threads` / `whatsapp_messages` (apply `docs/supabase/whatsapp_threads.sql`)
-- Inbound: mark read, text ack from Scalers inside the 24h window
+- Inbound: mark read, text ack from Scalers inside the 24h window. `parseWhatsAppReceived` accepts a Graph `{ object, entry, changes }` envelope **and** a SautiKit `whatsapp.event.received` body that is Meta's `value` object only (no `entry` wrapper). Staging webhooks are the latter.
 - Originate: template when `SAUTIKIT_WHATSAPP_TEMPLATE` is set and the window is closed
 - Desk `NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE` stays false until a live send works
 - Keep `wa.me` follow-up

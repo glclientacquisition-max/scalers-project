@@ -79,11 +79,61 @@ function isWhatsAppSessionOpen(lastInboundAt, now = new Date()) {
   return ts.getTime() - then.getTime() < WINDOW_MS;
 }
 
+function isWhatsAppValueObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (value.messaging_product === 'whatsapp') return true;
+  if (value.metadata && typeof value.metadata === 'object') return true;
+  if (Array.isArray(value.messages) || Array.isArray(value.statuses)) return true;
+  if (Array.isArray(value.calls) || Array.isArray(value.contacts)) return true;
+  return false;
+}
+
+function collectWhatsAppValue(value, inbound, statuses, calling) {
+  if (!isWhatsAppValueObject(value)) return;
+  if (Array.isArray(value.calls) && value.calls.length) {
+    calling.push({ field: 'calls', value });
+    return;
+  }
+  const phoneNumberId = String(value.metadata?.phone_number_id || '').trim();
+  const display = String(value.metadata?.display_phone_number || '').trim();
+  for (const msg of Array.isArray(value.messages) ? value.messages : []) {
+    inbound.push({
+      phoneNumberId,
+      displayPhone: display,
+      wamid: String(msg.id || '').trim(),
+      from: String(msg.from || '').trim(),
+      timestamp: msg.timestamp || null,
+      type: msg.type || 'text',
+      body: msg.text?.body || msg.button?.text || '',
+      contactName: value.contacts?.[0]?.profile?.name || null,
+      raw: msg,
+    });
+  }
+  for (const st of Array.isArray(value.statuses) ? value.statuses : []) {
+    statuses.push({
+      phoneNumberId,
+      wamid: String(st.id || '').trim(),
+      status: st.status || null,
+      recipientId: String(st.recipient_id || '').trim(),
+      timestamp: st.timestamp || null,
+      raw: st,
+    });
+  }
+}
+
+/**
+ * SautiKit relays Meta's `value` object byte-for-byte (no `entry` wrapper).
+ * Also accept a full Graph webhook `{ object, entry, changes }`.
+ */
 function parseWhatsAppReceived(body) {
   const inbound = [];
   const statuses = [];
   const calling = [];
-  const entries = Array.isArray(body?.entry) ? body.entry : [];
+  if (!body || typeof body !== 'object') {
+    return { inbound, statuses, calling };
+  }
+
+  const entries = Array.isArray(body.entry) ? body.entry : [];
   for (const entry of entries) {
     const changes = Array.isArray(entry?.changes) ? entry.changes : [];
     for (const change of changes) {
@@ -91,34 +141,22 @@ function parseWhatsAppReceived(body) {
         calling.push(change);
         continue;
       }
-      const value = change?.value || {};
-      const phoneNumberId = String(value.metadata?.phone_number_id || '').trim();
-      const display = String(value.metadata?.display_phone_number || '').trim();
-      for (const msg of Array.isArray(value.messages) ? value.messages : []) {
-        inbound.push({
-          phoneNumberId,
-          displayPhone: display,
-          wamid: String(msg.id || '').trim(),
-          from: String(msg.from || '').trim(),
-          timestamp: msg.timestamp || null,
-          type: msg.type || 'text',
-          body: msg.text?.body || msg.button?.text || '',
-          contactName: value.contacts?.[0]?.profile?.name || null,
-          raw: msg,
-        });
-      }
-      for (const st of Array.isArray(value.statuses) ? value.statuses : []) {
-        statuses.push({
-          phoneNumberId,
-          wamid: String(st.id || '').trim(),
-          status: st.status || null,
-          recipientId: String(st.recipient_id || '').trim(),
-          timestamp: st.timestamp || null,
-          raw: st,
-        });
-      }
+      collectWhatsAppValue(change?.value || {}, inbound, statuses, calling);
     }
   }
+
+  if (!inbound.length && !statuses.length && !calling.length) {
+    if (isWhatsAppValueObject(body.value)) {
+      if (isWhatsAppCallingChange({ field: 'calls', value: body.value })) {
+        calling.push({ field: 'calls', value: body.value });
+      } else {
+        collectWhatsAppValue(body.value, inbound, statuses, calling);
+      }
+    } else if (isWhatsAppValueObject(body)) {
+      collectWhatsAppValue(body, inbound, statuses, calling);
+    }
+  }
+
   return { inbound, statuses, calling };
 }
 

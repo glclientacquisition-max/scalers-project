@@ -994,8 +994,18 @@ async function handleVoiceIncoming(req, res) {
 async function handleWhatsAppWebhook(req, res) {
   res.sendStatus(200);
   try {
+    const body = req.body || {};
+    console.log('[whatsapp/events] payload', {
+      kind: req.headers?.['x-sautikit-event-kind'] || null,
+      eventId: req.headers?.['x-sautikit-event-id'] || null,
+      bodyKeys: Object.keys(body),
+      hasEntry: Array.isArray(body.entry),
+      messagingProduct: body.messaging_product || body.value?.messaging_product || null,
+      phoneNumberId:
+        body.metadata?.phone_number_id || body.value?.metadata?.phone_number_id || null,
+    });
     const result = await processWhatsAppReceived({
-      body: req.body || {},
+      body,
       headers: req.headers,
       persistInbound: (row) => db.persistPlatformWhatsAppInbound(row),
       persistStatus: (row) => db.persistWhatsAppStatus(row),
