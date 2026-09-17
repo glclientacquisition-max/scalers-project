@@ -20,7 +20,12 @@ const {
 } = require('./email');
 const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
-const { claimTenantSms, recordDispatchResult } = require('./sendLedger');
+const {
+  beginInstanceSend,
+  claimTenantSms,
+  recordDispatchResult,
+  releaseInstanceFlight,
+} = require('./sendLedger');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -81,6 +86,13 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
   const text = body || buildLeadText(lead);
   const errors = [];
   const prefs = parseNotifyChannels(channels);
+  const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(
+    Boolean
+  );
+  const gate = await beginInstanceSend(ledger, dests);
+  if (!gate.ok) {
+    return { channel: null, reason: gate.reason };
+  }
 
   async function accept(result) {
     if (result?.channel) {
@@ -89,63 +101,66 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
     return result;
   }
 
-  if (prefs.sms) {
-    const dest = normalizeSmsTo(to);
-    if (smsSenderReady() && dest) {
-      const claim = await claimTenantSms(ledger, text);
-      if (!claim.allowed) {
-        errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
-        console.warn(
-          `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
-        );
-      } else {
-        if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
-        try {
-          const sms = await trySendSms({ to, body: text });
-          if (sms) return accept(sms);
-        } catch (err) {
-          errors.push(`sms:${err?.message || err}`);
-          console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+  try {
+    if (prefs.sms) {
+      const smsTo = normalizeSmsTo(to);
+      if (smsSenderReady() && smsTo) {
+        const claim = await claimTenantSms(ledger, text);
+        if (!claim.allowed) {
+          errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
+          console.warn(
+            `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
+          );
+        } else {
+          if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
+          try {
+            const sms = await trySendSms({ to, body: text });
+            if (sms) return accept(sms);
+          } catch (err) {
+            errors.push(`sms:${err?.message || err}`);
+            console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+          }
         }
       }
     }
-  }
 
-  if (prefs.whatsapp) {
-    try {
-      const wa = await trySendWhatsApp({ to, body: text, lead });
-      if (wa) return accept(wa);
-    } catch (err) {
-      errors.push(`whatsapp:${err?.message || err}`);
-      if (!prefs.email || !emailFallbackReady()) {
-        // Keep prior behavior: rethrow when email cannot absorb the failure.
-        throw err;
+    if (prefs.whatsapp) {
+      try {
+        const wa = await trySendWhatsApp({ to, body: text, lead });
+        if (wa) return accept(wa);
+      } catch (err) {
+        errors.push(`whatsapp:${err?.message || err}`);
+        if (!prefs.email || !emailFallbackReady()) {
+          throw err;
+        }
+        console.warn(
+          `[notify] WhatsApp send failed (${err?.message || err}); falling back to email`
+        );
       }
-      console.warn(
-        `[notify] WhatsApp send failed (${err?.message || err}); falling back to email`
-      );
     }
+
+    if (prefs.email) {
+      const mail = await sendEmailFallback({
+        to: email,
+        body: text,
+        lead,
+        subject,
+      });
+      if (mail.channel) return accept(mail);
+
+      if (!smsSenderReady() && !whatsAppSenderReady()) {
+        return { channel: null, reason: 'no_notify_channel_configured', errors };
+      }
+      if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
+        return { channel: null, reason: mail.reason || 'no_destination_number', errors };
+      }
+      return { channel: null, reason: 'send_failed', errors };
+    }
+
+    return { channel: null, reason: 'channels_disabled_by_tenant', errors };
+  } finally {
+    releaseInstanceFlight(gate.key);
   }
-
-  if (prefs.email) {
-    const mail = await sendEmailFallback({
-      to: email,
-      body: text,
-      lead,
-      subject,
-    });
-    if (mail.channel) return accept(mail);
-
-    if (!smsSenderReady() && !whatsAppSenderReady()) {
-      return { channel: null, reason: 'no_notify_channel_configured', errors };
-    }
-    if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
-      return { channel: null, reason: mail.reason || 'no_destination_number', errors };
-    }
-    return { channel: null, reason: 'send_failed', errors };
-  }
-
-  return { channel: null, reason: 'channels_disabled_by_tenant', errors };
 }
 
 /**

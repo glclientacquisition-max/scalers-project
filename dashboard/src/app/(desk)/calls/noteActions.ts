@@ -104,6 +104,7 @@ export async function sendCallerNoteAction(
     if (sent.reason === "sms_allowance_exhausted") {
       return { error: "Included SMS used. Enable on-demand on Wallet." };
     }
+    if (sent.reason === "instance_already_sent") return { error: "Already sent." };
     return { error: "SMS failed." };
   }
 

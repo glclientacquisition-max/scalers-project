@@ -38,7 +38,7 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `caller_order` | Order captured | — | Yes, if on |
 | `caller_callback` | Callback promised | — | Yes, if on |
 
-One event = one staff message per call per kind, sent to every unique permissioned destination (except escalate, which is one person). `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation, visit, and hold/order/enquiry mark it so the lead path does not re-send.
+One event = one staff message per call per kind, sent to every unique permissioned destination (except escalate, which is one person). The channel ladder is one success, not SMS plus WhatsApp plus email. `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation, visit, and hold/order/enquiry mark it so the lead path does not re-send. Per-instance caps: §11.
 
 ---
 
@@ -176,6 +176,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 - Do not add a fourth owner channel without adding it to the ladder and the event model.
 - Do not invent a staff recipient. No `team[0]`. No extra owner SMS on escalate.
 - Do not text anyone who is not permissioned once flags exist.
+- Do not fire a second channel or a second SMS for the same dest + kind + call. Skip. Do not consume SMS units on that skip.
 
 ---
 
@@ -235,3 +236,22 @@ Apply `docs/supabase/sms_allowance.sql` after the ledger SQL. Default included i
 Missing RPC or table: send still goes (staging before apply). Desk caller note at cap returns an error. Appointment / request / escalate saves anyway.
 
 **Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.
+
+## 11. Per-instance send limits
+
+Monthly included SMS is a package cap (`sms_allowance.sql`). This section is the other limit: how many messages one call or desk action may fire. Beta does not lift these. They are anti-storm, not billing.
+
+| Rule | What |
+| --- | --- |
+| One success per dest per kind per call | SMS or WhatsApp or email. Not a stack. |
+| Channel ladder | First working channel wins. A retry does not add a second channel. |
+| Escalate | One teammate. Never a second owner SMS. |
+| Inbox / ops | Every unique permissioned dest. Do not cap dests. |
+| In-flight | Same dest + kind + call while a send is running is skipped (`instance_in_flight`). |
+| Already sent | A `notify_sends` row for that dest + kind + call on any channel is skipped (`instance_already_sent`). No SMS units consumed. |
+| Missed text-back | Marker on the call, plus one caller per 6 hours. |
+| Outage | One owner alert per cooldown. |
+| Wallet | Claim RPC: one low, one empty. |
+| Desk caller SMS | Same idempotency key. Double tap returns `Already sent.` Appointment and request rows still save. |
+
+Gate is `beginInstanceSend` before `consume_sms_units`. Missing `notify_sends` table: send still goes (fail open), same as the ledger insert.

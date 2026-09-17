@@ -166,6 +166,88 @@ function allowanceDecision({
   };
 }
 
+const INSTANCE_CHANNELS = ['sms', 'whatsapp', 'email'];
+const instanceFlights = new Set();
+
+function destKeys(to) {
+  const raw = Array.isArray(to) ? to : [to];
+  const seen = new Set();
+  const out = [];
+  for (const value of raw) {
+    const dest = normalizeDest(value);
+    if (!dest || seen.has(dest)) continue;
+    seen.add(dest);
+    out.push(dest);
+  }
+  return out;
+}
+
+function instanceFlightKey(ledger, to) {
+  const dests = destKeys(to);
+  if (!ledger?.tenantId || !dests.length) return null;
+  const call = String(ledger.callSid || ledger.callId || '').trim() || 'ops';
+  return `${ledger.tenantId}:${call}:${String(ledger.kind || 'unknown')}:${dests
+    .slice()
+    .sort()
+    .join(',')}`;
+}
+
+function claimInstanceFlight(ledger, to) {
+  const key = instanceFlightKey(ledger, to);
+  if (!key) return { ok: true, key: null };
+  if (instanceFlights.has(key)) {
+    return { ok: false, reason: 'instance_in_flight', key };
+  }
+  instanceFlights.add(key);
+  return { ok: true, key };
+}
+
+function releaseInstanceFlight(key) {
+  if (key) instanceFlights.delete(key);
+}
+
+function resetInstanceFlights() {
+  instanceFlights.clear();
+}
+
+async function instanceAlreadyDelivered(ledger, to) {
+  const dests = destKeys(to);
+  if (!ledger?.tenantId || !dests.length) return false;
+  try {
+    const db = require('../db');
+    for (const dest of dests) {
+      for (const channel of INSTANCE_CHANNELS) {
+        const key = idempotencyKey({
+          tenantId: ledger.tenantId,
+          callSid: ledger.callSid,
+          callId: ledger.callId,
+          kind: ledger.kind,
+          channel,
+          to: dest,
+        });
+        const found = await db.findNotifySend({
+          tenantId: ledger.tenantId,
+          idempotencyKey: key,
+        });
+        if (found) return true;
+      }
+    }
+  } catch (err) {
+    console.warn('[notify-ledger] instance check skipped:', err?.message || err);
+  }
+  return false;
+}
+
+async function beginInstanceSend(ledger, to) {
+  const flight = claimInstanceFlight(ledger, to);
+  if (!flight.ok) return { ok: false, reason: flight.reason, key: null };
+  if (await instanceAlreadyDelivered(ledger, to)) {
+    releaseInstanceFlight(flight.key);
+    return { ok: false, reason: 'instance_already_sent', key: null };
+  }
+  return { ok: true, reason: 'ok', key: flight.key };
+}
+
 function smsAllowanceDecision(opts = {}) {
   return allowanceDecision({
     ...opts,
@@ -228,8 +310,13 @@ module.exports = {
   billedTo,
   buildLedgerRow,
   classify,
+  beginInstanceSend,
+  claimInstanceFlight,
   claimTenantSms,
+  instanceFlightKey,
   idempotencyKey,
+  releaseInstanceFlight,
+  resetInstanceFlights,
   recordDispatchResult,
   recordNotifySend,
   allowanceDecision,

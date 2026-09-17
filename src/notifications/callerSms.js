@@ -4,7 +4,7 @@
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { EVENTS, renderCallerText, displayOwnerCallerName } = require('./events');
 const { parseNotifyChannels } = require('./notifyChannels');
-const { claimTenantSms, recordNotifySend } = require('./sendLedger');
+const { beginInstanceSend, claimTenantSms, recordNotifySend, releaseInstanceFlight } = require('./sendLedger');
 
 function callerSmsEnabled(channels) {
   return parseNotifyChannels(channels).caller_sms === true;
@@ -84,24 +84,32 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
   const dest = normalizeSmsTo(to || event.caller?.phone);
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
   const body = renderCallerText(event);
-  const claim = await claimTenantSms({ ...ledger, kind: event.kind }, body);
-  if (!claim.allowed) {
-    return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
+  const gate = await beginInstanceSend({ ...ledger, kind: event.kind }, dest);
+  if (!gate.ok) {
+    return { channel: null, reason: gate.reason };
   }
-  const result = await sendSms({ to: dest, body });
-  const sent = { channel: 'sms', to: dest, result, body };
-  await recordNotifySend({
-    tenantId: ledger?.tenantId,
-    callId: ledger?.callId,
-    callSid: ledger?.callSid,
-    kind: event.kind,
-    channel: 'sms',
-    to: dest,
-    body,
-    providerMessageId: result?.messageId || null,
-    overage: Boolean(claim.overage),
-  });
-  return sent;
+  try {
+    const claim = await claimTenantSms({ ...ledger, kind: event.kind }, body);
+    if (!claim.allowed) {
+      return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
+    }
+    const result = await sendSms({ to: dest, body });
+    const sent = { channel: 'sms', to: dest, result, body };
+    await recordNotifySend({
+      tenantId: ledger?.tenantId,
+      callId: ledger?.callId,
+      callSid: ledger?.callSid,
+      kind: event.kind,
+      channel: 'sms',
+      to: dest,
+      body,
+      providerMessageId: result?.messageId || null,
+      overage: Boolean(claim.overage),
+    });
+    return sent;
+  } finally {
+    releaseInstanceFlight(gate.key);
+  }
 }
 
 module.exports = {
