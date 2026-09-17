@@ -8,6 +8,7 @@
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
 const { missedTextbackBody } = require('./templates');
+const { recordNotifySend } = require('./sendLedger');
 
 const TEXTBACK_META_KEY = 'missed_textback_at';
 
@@ -63,12 +64,22 @@ function recentlyTexted(rows, nowMs = Date.now()) {
   });
 }
 
-async function sendMissedTextback({ to, businessName } = {}) {
+async function sendMissedTextback({ to, businessName, ledger } = {}) {
   if (!isSmsConfigured()) return { channel: null, reason: 'sms_not_configured' };
   const dest = normalizeSmsTo(to);
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
   const body = missedTextbackBody(businessName);
   const result = await sendSms({ to: dest, body });
+  await recordNotifySend({
+    tenantId: ledger?.tenantId,
+    callId: ledger?.callId,
+    callSid: ledger?.callSid,
+    kind: 'missed_textback',
+    channel: 'sms',
+    to: dest,
+    body,
+    providerMessageId: result?.messageId || null,
+  });
   return { channel: 'sms', to: dest, result, body };
 }
 

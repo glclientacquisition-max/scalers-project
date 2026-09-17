@@ -65,6 +65,7 @@ function shapeCall(row) {
     recording_path: meta.recording_path || null,
     status: row.status || null,
     whatsapp_sent: Boolean(meta.whatsapp_sent),
+    owner_notify_kind: meta.owner_notify_kind || null,
     escalation_sent: Boolean(meta.escalation_sent),
     escalated_to: meta.escalated_to || null,
     escalate_reason: meta.escalate_reason || null,
@@ -1598,6 +1599,44 @@ async function updateAppointment({
   return data || null;
 }
 
+async function insertNotifySend(row = {}) {
+  if (!row.tenant_id || !row.kind || !row.channel || !row.idempotency_key) {
+    return { ok: false, reason: 'invalid' };
+  }
+  const { data, error } = await supabase
+    .from('notify_sends')
+    .insert({
+      tenant_id: row.tenant_id,
+      call_id: row.call_id || null,
+      call_sid: row.call_sid || null,
+      kind: row.kind,
+      channel: row.channel,
+      recipient: row.recipient || null,
+      audience: row.audience,
+      billed_to: row.billed_to,
+      units: Number.isFinite(Number(row.units)) ? Number(row.units) : 1,
+      body: row.body || null,
+      provider_message_id: row.provider_message_id || null,
+      idempotency_key: row.idempotency_key,
+    })
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    if (/notify_sends|does not exist|schema cache|relation/i.test(error.message || '')) {
+      console.warn(
+        '[db] notify_sends missing (apply docs/supabase/notify_send_ledger.sql)'
+      );
+      return { ok: false, reason: 'table_missing' };
+    }
+    if (error.code === '23505' || /duplicate|unique/i.test(error.message || '')) {
+      return { ok: false, reason: 'duplicate' };
+    }
+    console.warn('[db] insertNotifySend:', error.message);
+    return { ok: false, reason: 'insert_failed' };
+  }
+  return { ok: true, id: data?.id || null };
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -1626,6 +1665,7 @@ module.exports = {
   updateAppointment,
   listOpenAppointments,
   mergeCallSummaryMeta,
+  insertNotifySend,
   RECORDINGS_BUCKET,
   shapeCall,
   normalizeStoredPhone,
