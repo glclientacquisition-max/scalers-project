@@ -159,7 +159,7 @@ export default async function CallsPage({
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const { items: assembled, error } = await loadInboxItems(
+  const { items: assembled, error, partialError } = await loadInboxItems(
     client,
     tenant.id,
     vertical
@@ -210,6 +210,12 @@ export default async function CallsPage({
         week={weekView ? monday : undefined}
         day={todayView ? day : undefined}
       />
+
+      {partialError ? (
+        <div className="mt-6">
+          <DeskError>{partialError}</DeskError>
+        </div>
+      ) : null}
 
       {todayView ? (
         <RunSheetToday

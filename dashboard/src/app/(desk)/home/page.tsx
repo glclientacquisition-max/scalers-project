@@ -187,6 +187,12 @@ export default async function HomeOverviewPage() {
         </p>
       </header>
 
+      {inbox.partialError ? (
+        <div className="mt-6">
+          <DeskError>{inbox.partialError}</DeskError>
+        </div>
+      ) : null}
+
       {primaryUpdate ? (
         <aside aria-label="Live updates" className="mt-6 w-full min-w-0">
           <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,var(--card))] px-4 py-3">

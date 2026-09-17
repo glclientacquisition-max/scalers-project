@@ -127,7 +127,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | --- | --- |
 | Loading | `(desk)/loading.tsx`: `pendingSpinnerInkClass` only. No skeletons, no invented numbers |
 | Empty | `deskEmptyClass`. Title + one link. No workspace: `DeskNoWorkspace` |
-| Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"`. Home inbox load failure uses this, not a zero queue. Call/contact query failure uses this, not 404. |
+| Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"`. Home inbox load failure uses this, not a zero queue. Call/contact query failure uses this, not 404. Holds or visits failing while calls load: same banner, lists stay. |
 | Crash | `DeskCrash`. Try again. Never a stack trace |
 | Offline | `DeskOffline` under the desk header. `No connection.` Hidden when online. |
 | Pending mutation | `pendingSpinnerClass` on the control. Disable double submit |

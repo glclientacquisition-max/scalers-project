@@ -52,6 +52,8 @@ describe("desk resilience and anti-slop", () => {
     const layout = read("dashboard/src/app/(desk)/layout.tsx");
     const call = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
+    const load = read("dashboard/src/lib/inboxLoad.ts");
+    const callsPage = read("dashboard/src/app/(desk)/calls/page.tsx");
     assert.match(home, /inbox\.error/);
     assert.match(home, /Could not load Overview/);
     assert.match(home, /DeskNoWorkspace/);
@@ -65,6 +67,10 @@ describe("desk resilience and anti-slop", () => {
     assert.match(call, /if \(!call\) notFound/);
     assert.match(contact, /Could not load this contact/);
     assert.match(contact, /if \(!contact\) notFound/);
+    assert.match(load, /partialError/);
+    assert.match(load, /Could not load some inbox rows/);
+    assert.match(home, /inbox\.partialError/);
+    assert.match(callsPage, /partialError/);
   });
 
   it("keeps one filled primary on visit and hold editors", () => {
