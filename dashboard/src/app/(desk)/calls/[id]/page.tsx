@@ -24,6 +24,7 @@ import { InboxHoldEditor } from "@/components/InboxHoldEditor";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { pageTitleClass } from "@/components/ui/deskChrome";
+import { DeskError } from "@/components/ui/DeskError";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import {
   callsHref,
@@ -165,7 +166,10 @@ export default async function CallDetailPage({
     error = retry.error;
   }
 
-  if (error || !call) notFound();
+  if (error) {
+    return <DeskError>Could not load this call.</DeskError>;
+  }
+  if (!call) notFound();
   const row = call;
   const { data: person } = await workspace.client
     .from("contacts")

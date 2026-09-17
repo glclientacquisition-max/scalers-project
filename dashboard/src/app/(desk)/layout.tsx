@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { LiveInbox } from "@/components/LiveInbox";
+import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -34,6 +35,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <DeskNav />
         </div>
       </header>
+      <DeskOffline />
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
         {children}
       </main>

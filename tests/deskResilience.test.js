@@ -45,6 +45,34 @@ describe("desk resilience and anti-slop", () => {
     assert.match(css, /--email: #005ccc;/);
   });
 
+  it("treats Home inbox failure and missing workspace as designed states", () => {
+    const home = read("dashboard/src/app/(desk)/home/page.tsx");
+    const empty = read("dashboard/src/components/ui/DeskNoWorkspace.tsx");
+    const offline = read("dashboard/src/components/ui/DeskOffline.tsx");
+    const layout = read("dashboard/src/app/(desk)/layout.tsx");
+    const call = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
+    const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
+    const load = read("dashboard/src/lib/inboxLoad.ts");
+    const callsPage = read("dashboard/src/app/(desk)/calls/page.tsx");
+    assert.match(home, /inbox\.error/);
+    assert.match(home, /Could not load Overview/);
+    assert.match(home, /DeskNoWorkspace/);
+    assert.doesNotMatch(home, /No workspace linked to this account yet/);
+    assert.match(empty, /No workspace/);
+    assert.match(empty, /href="\/signup"/);
+    assert.match(offline, /No connection/);
+    assert.match(offline, /navigator\.onLine/);
+    assert.match(layout, /DeskOffline/);
+    assert.match(call, /Could not load this call/);
+    assert.match(call, /if \(!call\) notFound/);
+    assert.match(contact, /Could not load this contact/);
+    assert.match(contact, /if \(!contact\) notFound/);
+    assert.match(load, /partialError/);
+    assert.match(load, /Could not load some inbox rows/);
+    assert.match(home, /inbox\.partialError/);
+    assert.match(callsPage, /partialError/);
+  });
+
   it("keeps one filled primary on visit and hold editors", () => {
     const hold = read("dashboard/src/components/InboxHoldEditor.tsx");
     const job = read("dashboard/src/components/InboxJobEditor.tsx");

@@ -36,6 +36,7 @@ import { runSheetForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { LivePing } from "@/components/ui/deskRow";
 import {
@@ -47,15 +48,7 @@ import {
 export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="font-medium text-accent-deep">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -106,12 +99,15 @@ export default async function HomeOverviewPage() {
       ? Promise.resolve(null)
       : getWalletRunwayDays(client, tenant.id, kes),
   ]);
+  if (inbox.error) {
+    return <DeskError>Could not load Overview.</DeskError>;
+  }
   const runway = walletRunwayLabel(runwayDays);
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
 
-  const todayCount = todayRes.count ?? 0;
+  const todayCount = todayRes.error ? null : todayRes.count ?? 0;
   const work = summarizeInboxWork(inbox.items);
   const todayWork = runSheetForDay(inbox.items, eatYmd()).length;
   const waitingCount = work.needs;
@@ -190,6 +186,12 @@ export default async function HomeOverviewPage() {
           <time dateTime={today.iso}>{today.label}</time>
         </p>
       </header>
+
+      {inbox.partialError ? (
+        <div className="mt-6">
+          <DeskError>{inbox.partialError}</DeskError>
+        </div>
+      ) : null}
 
       {primaryUpdate ? (
         <aside aria-label="Live updates" className="mt-6 w-full min-w-0">
@@ -330,7 +332,9 @@ export default async function HomeOverviewPage() {
                 ].join(" ")}
               >
                 <span>Calls today</span>
-                <span className="tabular-nums font-medium text-ink">{todayCount}</span>
+                {todayCount === null ? null : (
+                  <span className="tabular-nums font-medium text-ink">{todayCount}</span>
+                )}
               </Link>
             </section>
 

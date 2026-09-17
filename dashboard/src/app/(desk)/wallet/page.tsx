@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import {
   WALLET_LINE_FEE_KES_PER_MONTH,
@@ -11,6 +10,7 @@ import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 import { WalletTopUpButton } from "@/components/WalletTopUpButton";
 import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { pageTitleClass } from "@/components/ui/deskChrome";
 
 function kindLabel(kind: string): string {
@@ -25,15 +25,7 @@ function kindLabel(kind: string): string {
 export default async function WalletPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-accent-deep">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();
