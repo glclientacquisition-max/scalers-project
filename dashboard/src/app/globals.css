@@ -51,6 +51,12 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
   --tap-min: 2.75rem;
+
+  /* Desk motion verbs. Canon: MASTER.md Motion. Skill: desk-motion. */
+  --motion-fast: 150ms;
+  --motion-land: 900ms;
+  --motion-live: 1.4s;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /*
@@ -271,9 +277,47 @@ h3,
   animation: landing-drift 18s ease-in-out alternate infinite;
 }
 
+@keyframes desk-live-ping {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes desk-land-fade {
+  0%,
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.desk-live-ping {
+  animation: desk-live-ping var(--motion-live) cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.desk-just-landed {
+  position: relative;
+}
+
+.desk-just-landed::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+  animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-rise,
-  .landing-drift {
+  .landing-drift,
+  .desk-live-ping,
+  .desk-just-landed::after {
     animation: none;
   }
 }

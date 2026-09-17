@@ -1,7 +1,7 @@
 # Scalers design system (MASTER)
 
 **Status:** Canon for `dashboard/`  
-**Date:** 2026-09-14  
+**Date:** 2026-09-17  
 **Law:** [`FRONTEND_CONSTITUTION.md`](../FRONTEND_CONSTITUTION.md) + `.cursor/rules/scalers-design-ux.mdc`
 
 Page notes only record deltas. Do not copy this file into every page spec.
@@ -32,6 +32,9 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Desk tab clearance | `--desk-tabbar-clearance` | Phone: tab bar plus `safe-area-inset-bottom` plus `1.5rem`. From `md`: `2.5rem`. Phone `main` padding, `scroll-padding-bottom`, and sticky bottom chrome use this. |
 | Max width | | `max-w-desk` (72rem) |
 | Radius | | `rounded-panel` (0.875rem) |
+| Motion fast | `--motion-fast` | 150ms named transitions |
+| Motion land | `--motion-land` | 900ms one-shot wash |
+| Motion live | `--motion-live` | 1.4s live ping loop |
 
 **Dialect:** Prefer `text-ink`, `bg-surface`, `border-line`, filled primary `bg-accent-fill text-accent-on-fill`. Never hardcode hex in desk components: `accent` (ribbon, focus, tab underline), `accent-deep` (links, small text), `accent-fill` ramp (filled buttons). Migrate `text-[var(--ink)]` when touching a file. Do not global-replace.
 
@@ -100,7 +103,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Ghost / secondary | `btnGhost`: border-line, ink text |
 | Focus | `focusRing`: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]` |
 | Filter tabs | `FilterTabs` + `filterTabClass`. Underline, `min-h-11`, active `border-[#0096FF] text-[#005CCC]`. Inbox and Contacts share this. |
-| List row | `DeskRowHit` in `deskRowHit.tsx`. Parent `relative`. Body `deskRowMutedClass`. Trailing verb `deskRowActionClass`. No Call, Open, or View column. Anatomy: `RowIdentity` circle (neutral, initials or person glyph, never tinted by state), two-line body, timestamp right. Needs-you state is `RowStateDot` (brand blue, sits with the timestamp) plus `deskRowWeightClass` (semibold while open, medium once handled). No opacity dimming. |
+| List row | `DeskRowHit` in `deskRowHit.tsx`. Parent `relative`. Body `deskRowMutedClass`. Trailing verb `deskRowActionClass`. No Call, Open, or View column. Anatomy: `RowIdentity` circle (neutral, initials or person glyph, never tinted by state), two-line body, timestamp right. Needs-you state is `RowStateDot` (brand blue, sits with the timestamp; `LivePing` when the row is live) plus `deskRowWeightClass` (semibold while open, medium once handled). A row that appears while watching uses `DeskLandSurface`. No opacity dimming. |
 | Pagination | `ui/Pagination.tsx` (`min-h-11` hits) |
 | Field | `deskFieldClass`. Settings: `settingsFieldClass` = `mt-1` + `deskFieldClass` |
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
@@ -122,17 +125,28 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Empty | `deskEmptyClass`. Title + one link |
 | Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"` |
 | Pending mutation | `pendingSpinnerClass` on the control. Disable double submit |
+| Live | `LivePing` on a Live stamp and the Home bulletin. One ping per region |
+| Land | `DeskLandScope` + `DeskLandSurface`. First paint never lands. Filter/page swaps do not flash |
 | Focus | 2px brand ring, visible on keyboard |
-| Reduced motion | No new desk loops. Primary press scale is `motion-reduce:active:scale-100` |
+| Reduced motion | Kills live ping, land wash, landing rise/drift, pending spinner. Press scale is `motion-reduce:active:scale-100` |
 
 ---
 
 ## Motion
 
-Landing only: `.landing-rise`, `.landing-drift`. Desk default is none. Bulletin ping already shipped. Primary buttons may press-scale (`active:scale-[0.99]`, named properties, 150ms). `DeskDialog` does not animate in.
+Four desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`.
+
+| Verb | Primitive | Loop? |
+| --- | --- | --- |
+| **pending** | `pendingSpinnerClass` | Yes, on the control, `motion-reduce:animate-none` |
+| **live** | `LivePing` (`.desk-live-ping`) | Yes. Live call stamp and Home bulletin only |
+| **land** | `DeskLandScope` + `DeskLandSurface` (`.desk-just-landed`) | No. One-shot wash after first paint |
+| **press** | `btnPrimary` `active:scale-[0.99]` | No |
+
+Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
 
 ---
 
 ## Do not add
 
-shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second desk sidebar, a hamburger drawer for primary destinations, fake Online.
+shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second desk sidebar, a hamburger drawer for primary destinations, fake Online, Lottie, Framer Motion, GSAP, landing-rise on desk.

@@ -7,6 +7,7 @@ import { DeskError } from "@/components/ui/DeskError";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { RowIdentity } from "@/components/ui/deskRow";
+import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { deskEmptyClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
@@ -128,9 +129,18 @@ export default async function ContactsPage({
         </div>
       ) : (
         <>
+          <DeskLandScope
+            ids={rows.map((row) => row.id)}
+            scopeKey={`${saved}:${page}`}
+          >
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {rows.map((row) => (
-              <li key={row.id} className="border-t border-line/70 first:border-t-0">
+              <DeskLandSurface
+                as="li"
+                key={row.id}
+                id={row.id}
+                className="relative border-t border-line/70 first:border-t-0"
+              >
                 <Link
                   href={`/contacts/${row.id}`}
                   aria-label={row.name?.trim() || "Contact"}
@@ -154,7 +164,7 @@ export default async function ContactsPage({
                     </p>
                   </div>
                 </Link>
-              </li>
+              </DeskLandSurface>
             ))}
           </ul>
           <div className="mt-8 hidden md:block">
@@ -189,8 +199,10 @@ export default async function ContactsPage({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr
+                  <DeskLandSurface
+                    as="tr"
                     key={row.id}
+                    id={row.id}
                     className="group relative cursor-pointer border-t border-line/70 transition duration-150 hover:bg-accent/[0.04]"
                   >
                     <td className="px-5 py-5 align-top">
@@ -213,11 +225,12 @@ export default async function ContactsPage({
                         ? formatCallWhenRelative(row.lastContactAt)
                         : "None"}
                     </td>
-                  </tr>
+                  </DeskLandSurface>
                 ))}
               </tbody>
             </DeskDataTable>
           </div>
+          </DeskLandScope>
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}

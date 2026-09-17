@@ -21,6 +21,7 @@ import {
   InboxTableRow,
   inboxTableKind,
 } from "@/components/InboxItemRow";
+import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import {
   parseWeekParam,
@@ -235,6 +236,10 @@ export default async function CallsPage({
         />
       ) : (
         <>
+          <DeskLandScope
+            ids={pageRows.map((item) => item.id)}
+            scopeKey={`${activeFilter}:${page}:${q}`}
+          >
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {pageRows.map((item) => (
               <InboxPhoneRow
@@ -307,6 +312,7 @@ export default async function CallsPage({
               </tbody>
             </DeskDataTable>
           </div>
+          </DeskLandScope>
 
           <Pagination
             page={page}
