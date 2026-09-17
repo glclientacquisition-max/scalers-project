@@ -2,6 +2,14 @@
 // Voice builds an event; dispatch renders per channel and sends.
 
 const { sanitizeStoredCallerName } = require('../conversation/callerNameQuality');
+const {
+  appointmentTitle,
+  renderCallerText: renderCallerTemplate,
+  renderStaffSubject,
+  renderStaffText,
+  serviceRequestTitle,
+  staffAction,
+} = require('./templates');
 
 const EVENTS = Object.freeze({
   LEAD: 'lead',
@@ -17,6 +25,7 @@ const EVENTS = Object.freeze({
   CALLER_APPOINTMENT_CANCELLED: 'caller_appointment_cancelled',
   CALLER_APPOINTMENT_RESCHEDULED: 'caller_appointment_rescheduled',
   CALLER_HOLD: 'caller_hold',
+  CALLER_HOLD_UPDATED: 'caller_hold_updated',
   CALLER_ORDER: 'caller_order',
   CALLER_CALLBACK: 'caller_callback',
 });
@@ -36,50 +45,13 @@ const EVENTS = Object.freeze({
  * @property {string} [item]      Held item for caller confirmations
  */
 
-function line(label, value) {
-  if (value == null || String(value).trim() === '') return null;
-  return `${label}: ${String(value).trim()}`;
-}
-
 /**
  * Render an event as plain text for SMS / WhatsApp / email body.
  * @param {NotifyEvent} event
  * @returns {string}
  */
 function renderEventText(event) {
-  const title = event.title || defaultTitle(event.kind);
-  const lines = [`${title}${event.businessName ? `. ${event.businessName}` : ''}`];
-  for (const [label, value] of event.fields || []) {
-    const row = line(label, value);
-    if (row) lines.push(row);
-  }
-  if (event.recordingUrl) lines.push(`Recording: ${event.recordingUrl}`);
-  if (event.callUrl) lines.push(`Open call: ${event.callUrl}`);
-  if (event.action) lines.push(event.action);
-  return lines.filter(Boolean).join('\n');
-}
-
-function defaultTitle(kind) {
-  switch (kind) {
-    case EVENTS.LEAD:
-      return 'New missed-call lead';
-    case EVENTS.ESCALATION:
-      return 'Escalation';
-    case EVENTS.SERVICE_REQUEST:
-      return 'Request';
-    case EVENTS.APPOINTMENT:
-      return 'Visit request';
-    case EVENTS.WALLET_LOW:
-      return 'Scalers wallet running low';
-    case EVENTS.WALLET_EMPTY:
-      return 'Scalers prepaid empty';
-    case EVENTS.OUTAGE_SPEECH:
-      return 'Scalers line downtime';
-    case EVENTS.OUTAGE_LLM:
-      return 'Scalers line taking names only';
-    default:
-      return 'Scalers alert';
-  }
+  return renderStaffText(event);
 }
 
 /**
@@ -88,63 +60,20 @@ function defaultTitle(kind) {
  * @returns {string}
  */
 function renderEventSubject(event) {
-  const title = event.title || defaultTitle(event.kind);
-  return `${title}${event.businessName ? `. ${event.businessName}` : ''}`;
+  return renderStaffSubject(event);
 }
 
 /**
- * Render a caller confirmation. Not generic: business name, the specific
- * thing captured, and the next step. No "your call was important".
+ * Render a caller confirmation. Name is gated. No "your call was important".
  * @param {NotifyEvent} event
  * @returns {string}
  */
 function renderCallerText(event) {
-  const business = String(event.businessName || '').trim() || 'We';
-  const name = displayOwnerCallerName(event.caller?.name) || '';
-  const hi = name ? `Hi ${name}, ` : 'Hi, ';
-  switch (event.kind) {
-    case EVENTS.CALLER_APPOINTMENT: {
-      const when = String(event.when || '').trim();
-      const service = String(event.item || '').trim();
-      const what = service ? `your ${service} visit` : 'your visit';
-      const at = when ? ` for ${when}` : '';
-      return `${hi}${business} here. We have ${what}${at}. We will confirm shortly.`;
-    }
-    case EVENTS.CALLER_APPOINTMENT_CONFIRMED: {
-      const when = String(event.when || '').trim();
-      const service = String(event.item || '').trim();
-      const at = when ? ` for ${when}` : '';
-      return `${hi}${business} here. Your ${service ? `${service} visit` : 'visit'}${at} is confirmed.`;
-    }
-    case EVENTS.CALLER_APPOINTMENT_CANCELLED: {
-      const when = String(event.when || '').trim();
-      const service = String(event.item || '').trim();
-      const what = service ? `your ${service} visit` : 'your visit';
-      const at = when ? ` for ${when}` : '';
-      return `${hi}${business} here. We cancelled ${what}${at}.`;
-    }
-    case EVENTS.CALLER_APPOINTMENT_RESCHEDULED: {
-      const when = String(event.when || '').trim();
-      const service = String(event.item || '').trim();
-      const what = service ? `your ${service} visit` : 'your visit';
-      const to = when ? ` to ${when}` : '';
-      return `${hi}${business} here. We moved ${what}${to}.`;
-    }
-    case EVENTS.CALLER_HOLD: {
-      const item = String(event.item || '').trim();
-      const what = item ? `we have held ${item} for you` : 'we have held your item';
-      return `${hi}${business} here. ${what}. We will confirm shortly.`;
-    }
-    case EVENTS.CALLER_ORDER: {
-      const item = String(event.item || '').trim();
-      const what = item ? `your order for ${item}` : 'your order';
-      return `${hi}${business} here. We have ${what}. We will confirm shortly.`;
-    }
-    case EVENTS.CALLER_CALLBACK:
-      return `${hi}${business} here. The team will call you back.`;
-    default:
-      return `${hi}${business} here. We have your request. We will confirm shortly.`;
-  }
+  const name = displayOwnerCallerName(event?.caller?.name) || '';
+  return renderCallerTemplate({
+    ...event,
+    caller: { ...(event.caller || {}), name },
+  });
 }
 
 /**
@@ -200,40 +129,6 @@ function ownerReason(call) {
   );
 }
 
-function isWeakBrainSummary(text) {
-  const raw = String(text || '').trim();
-  if (!raw) return true;
-  const lower = raw.toLowerCase();
-  if (
-    /how are you doing|mm-hm|mbona unakwama|still there|is there anything else|which cleaning service do i need|i'd like to make a booking for tomorrow, but/i.test(
-      lower
-    )
-  ) {
-    return true;
-  }
-  const goalMatch = /goal:\s*(.*)$/i.exec(raw);
-  const goal = goalMatch
-    ? goalMatch[1]
-        .replace(/\.\s*products:.*$/i, '')
-        .replace(/\.\s*actions:.*$/i, '')
-        .trim()
-    : '';
-  if (goal && /^(uh|um|eh|best|evening|hello|hi|mm-hm|mm hm)\b/i.test(goal)) {
-    return true;
-  }
-  if (goal && goal.split(/\s+/).length <= 3 && /[?]$/.test(goal)) return true;
-  return false;
-}
-
-function ownerSummary(call, reason) {
-  const review = reviewOf(call);
-  const raw = String(call.brain_summary || '').trim();
-  if (!raw || isWeakBrainSummary(raw)) return null;
-  const reasonLc = String(reason || review.reason || '').trim().toLowerCase();
-  if (reasonLc && raw.toLowerCase().includes(reasonLc)) return null;
-  return raw;
-}
-
 function isInternalResolutionNote(text) {
   const raw = String(text || '').trim();
   if (!raw) return true;
@@ -249,8 +144,7 @@ function ownerOutcome(call) {
 }
 
 /**
- * Build an owner lead event that is actionable without opening the desk.
- * Prefers hangup owner_review. Drops live Brain dump that repeats greetings.
+ * Staff lead. Reason is the owner sentence. No Summary dump. No Want card.
  */
 function ownerLeadEvent(call = {}, businessName) {
   const name = displayOwnerCallerName(call.name) || null;
@@ -262,8 +156,6 @@ function ownerLeadEvent(call = {}, businessName) {
   ];
   const intent = ownerIntent(call);
   if (intent) fields.push(['Intent', intent]);
-  const summary = ownerSummary(call, reason);
-  if (summary) fields.push(['Summary', summary]);
   const outcome = ownerOutcome(call);
   if (outcome) fields.push(['Outcome', outcome]);
   return {
@@ -276,6 +168,51 @@ function ownerLeadEvent(call = {}, businessName) {
       name,
       phone: call.from_number || call.caller_number,
       reason,
+    },
+  };
+}
+
+function serviceRequestEvent(request = {}, businessName) {
+  const type = String(request.request_type || 'enquiry').toLowerCase();
+  return {
+    kind: EVENTS.SERVICE_REQUEST,
+    title: serviceRequestTitle(type),
+    businessName,
+    fields: [
+      ['Item', request.item],
+      ['Qty', request.quantity],
+      ['When', request.when_text],
+      ['Caller', request.caller_name],
+      ['Phone', request.caller_phone],
+      ['Notes', request.notes],
+    ],
+    action: staffAction(EVENTS.SERVICE_REQUEST),
+    caller: {
+      name: request.caller_name,
+      phone: request.caller_phone,
+    },
+  };
+}
+
+function appointmentEvent(appointment = {}, businessName, kind = 'created') {
+  const status = String(appointment.status || 'requested').toLowerCase();
+  return {
+    kind: EVENTS.APPOINTMENT,
+    title: appointmentTitle(kind, status),
+    businessName,
+    fields: [
+      ['Service', appointment.service_name],
+      ['When', appointment.when_text],
+      ['Where', appointment.address_landmark],
+      ['Caller', appointment.caller_name],
+      ['Phone', appointment.caller_phone],
+      ['Notes', appointment.notes],
+      ['Status', status],
+    ],
+    action: staffAction(EVENTS.APPOINTMENT),
+    caller: {
+      name: appointment.caller_name,
+      phone: appointment.caller_phone,
     },
   };
 }
@@ -306,6 +243,8 @@ module.exports = {
   renderCallerText,
   leadEvent,
   ownerLeadEvent,
+  serviceRequestEvent,
+  appointmentEvent,
   displayOwnerCallerName,
   shouldSendOwnerLead,
   shouldDeferOwnerLeadForVisit,

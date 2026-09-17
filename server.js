@@ -184,9 +184,12 @@ const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
 const {
   ownerLeadEvent,
   renderEventText,
+  renderEventSubject,
   displayOwnerCallerName,
   shouldSendOwnerLead,
   shouldDeferOwnerLeadForVisit,
+  serviceRequestEvent,
+  appointmentEvent,
 } = require('./src/notifications/events');
 const {
   dispatchCallerSms,
@@ -3258,32 +3261,12 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     );
   }
 
-  const type = String(request.request_type || 'enquiry').toLowerCase();
-  const typeLabel =
-    type === 'hold'
-      ? 'HOLD / PICKUP'
-      : type === 'order'
-        ? 'ORDER'
-        : type === 'callback'
-          ? 'CALLBACK'
-          : 'ENQUIRY';
-
-  const lines = [
-    `${typeLabel}. ${businessName}`,
-    request.item ? `Item: ${request.item}` : null,
-    request.quantity ? `Qty: ${request.quantity}` : null,
-    request.when_text ? `When: ${request.when_text}` : null,
-    request.caller_name ? `Caller: ${request.caller_name}` : null,
-    request.caller_phone ? `Phone: ${request.caller_phone}` : null,
-    request.notes ? `Notes: ${request.notes}` : null,
-    'Open Inbox Holds to mark fulfilled.',
-  ].filter(Boolean);
-
-  const body = lines.join('\n');
+  const event = serviceRequestEvent(request, businessName);
+  const body = renderEventText(event);
   const lead = {
     businessName,
     name: request.caller_name || 'Caller',
-    reason: `${typeLabel}: ${[request.item, request.when_text].filter(Boolean).join('. ')}`,
+    reason: `${event.title}: ${[request.item, request.when_text].filter(Boolean).join('. ')}`,
     callerNumber: request.caller_phone,
   };
 
@@ -3297,12 +3280,12 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     body,
     lead,
     channels: notifyChannels,
-    subject: `${typeLabel}. ${businessName}`,
+    subject: renderEventSubject(event),
   });
   const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
-      `[${callSid}] Request notify (${type}) via ${result.channel}` +
+      `[${callSid}] Request notify (${event.title}) via ${result.channel}` +
         (result.to ? ` → ${result.to}` : '')
     );
   } else {
@@ -3352,33 +3335,12 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     );
   }
 
-  const status = String(appointment.status || 'requested').toLowerCase();
-  const title =
-    kind === 'updated'
-      ? status === 'cancelled'
-        ? 'VISIT CANCELLED'
-        : 'VISIT UPDATED'
-      : 'VISIT REQUEST';
-
-  const lines = [
-    `${title}. ${businessName}`,
-    appointment.service_name ? `Service: ${appointment.service_name}` : null,
-    appointment.when_text ? `When: ${appointment.when_text}` : null,
-    appointment.address_landmark
-      ? `Where: ${appointment.address_landmark}`
-      : null,
-    appointment.caller_name ? `Caller: ${appointment.caller_name}` : null,
-    appointment.caller_phone ? `Phone: ${appointment.caller_phone}` : null,
-    appointment.notes ? `Notes: ${appointment.notes}` : null,
-    `Status: ${status}`,
-    'Open Inbox Visits to confirm or cancel.',
-  ].filter(Boolean);
-
-  const body = lines.join('\n');
+  const event = appointmentEvent(appointment, businessName, kind);
+  const body = renderEventText(event);
   const lead = {
     businessName,
     name: appointment.caller_name || 'Caller',
-    reason: `${title}: ${[appointment.service_name, appointment.when_text]
+    reason: `${event.title}: ${[appointment.service_name, appointment.when_text]
       .filter(Boolean)
       .join('. ')}`,
     callerNumber: appointment.caller_phone,
@@ -3393,13 +3355,13 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     recipients: inbox.recipients,
     body,
     lead,
-    subject: `${title}. ${businessName}`,
+    subject: renderEventSubject(event),
     channels: notifyChannels,
   });
   const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
-      `[${callSid}] Appointment notify (${kind}/${status}) via ${result.channel}` +
+      `[${callSid}] Appointment notify (${kind}) via ${result.channel}` +
         (result.to ? ` → ${result.to}` : '')
     );
     try {

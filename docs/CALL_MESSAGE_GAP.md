@@ -12,22 +12,24 @@ Bodies below are reconstructed from `calls.summary` plus `ownerLeadEvent`. The s
 
 The ladder works. Real leads and escalations fire. Greeting-only calls with no name do not text the owner. Caller SMS is correctly off.
 
-The excellence bar is not a missing channel. It is the **payload**. Owners still get a label dump of live Brain fields, taken **before** hangup review. Reason is often already good. Intent, Summary, and Outcome usually make the text worse.
+The excellence bar is not a missing channel. It is the **payload**. Staff SMS copy now lives in `src/notifications/templates.js`. Lead SMS is Name / Phone / Reason plus useful Intent and Outcome. Summary and the Want card stay on the desk.
+
+Hangup `owner_review` is already the better source for Reason. It still lands after the SMS, so mid-call leads can be thin until send waits for hangup.
 
 | Layer | Bar | Live |
 | --- | --- | --- |
 | Who to text | Permissioned staff on actionable capture; caller never, until toggled | Inbox/ops/escalate flags; unmigrated infers; caller none |
 | When | After the ask is known, with a usable summary | On `save_caller_info` mid-call |
 | Name | Real person name | Gate: refuse `Haijawekwa`, `Calling`, `Callings` at extract/save/contact. Live still proves STT that looks like a real name. |
-| Reason | What they wanted | Usually the best line in the SMS |
-| Intent | `book_visit`, `order_enquiry`, `human` | Stuck `general_enquiry` at send time |
-| Summary | One owner sentence | Last-turn STT (`How are you doing, Shy?`, `Mm-hm.`) |
-| Outcome | What Scalers did | Internal Brain notes (`permitted end-call action`) |
+| Reason | What they wanted | The staff SMS sentence |
+| Intent | `book_visit`, `order_enquiry`, `human` | Printed when not `general_enquiry` |
+| Summary | One owner sentence | Not on SMS. Lives on the desk call card |
+| Outcome | What Scalers did | Printed when it is a real save, not a Brain note |
 | Volume | One owner text per call | Lead plus ENQUIRY or VISIT on the same call |
 | Open call | Deep link | Only if `DESK_PUBLIC_URL` is set on Railway |
 | Production | Same bar | Last real owner lead: 2026-08-14 `HD_f68f90b2c563` |
 
-Hangup `owner_review` is already the better source. It lands 1 to 2 minutes after the SMS, so it never makes the text.
+Hangup `owner_review` is already the better Reason source. It lands 1 to 2 minutes after a mid-call SMS, so that send still cannot wait on it.
 
 ---
 

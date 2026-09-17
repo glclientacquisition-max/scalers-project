@@ -81,7 +81,7 @@ describe('notify events', () => {
     });
     assert.equal(
       hold,
-      'Hi Soony, ChapterOne Bookstore here. we have held two chargers for you. We will confirm shortly.'
+      'Hi Soony, ChapterOne Bookstore here. We have held two chargers for you. We will confirm shortly.'
     );
 
     const callback = renderCallerText({
@@ -118,7 +118,7 @@ describe('notify events', () => {
     assert.doesNotMatch(text, /your call was important/i);
   });
 
-  it('owner lead event carries intent, summary, and outcome when present', () => {
+  it('owner lead event carries intent and outcome, not a Summary dump', () => {
     const event = ownerLeadEvent(
       {
         name: 'Jane',
@@ -134,7 +134,8 @@ describe('notify events', () => {
     const text = renderEventText(event);
     assert.match(text, /New missed-call lead\. Done and Dusted Cleaning Services/);
     assert.match(text, /Intent: book_visit/);
-    assert.match(text, /Summary: Intent: book_visit/);
+    assert.doesNotMatch(text, /Summary:/);
+    assert.doesNotMatch(text, /Want:/);
     assert.match(text, /Outcome: Visit request saved/);
     assert.match(text, /Recording: https:\/\/example\.com\/rec\.mp3/);
   });

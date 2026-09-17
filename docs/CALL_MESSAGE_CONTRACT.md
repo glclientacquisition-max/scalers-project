@@ -17,11 +17,11 @@ Do not invent staff. Do not fall back to `team[0]`. Do not also SMS the Alerts p
 
 ## 1. Event model
 
-Every post-call notification is one typed event. Voice builds the event; `src/notifications/events.js` renders it; `dispatch.js` sends it on the best channel.
+Every post-call notification is one typed event. Voice builds the event; `src/notifications/templates.js` is the copy catalog; `events.js` builds the payload; `dispatch.js` sends it on the best channel.
 
 | Event | When it fires | Owner title | Caller text? |
 | --- | --- | --- | --- |
-| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` + Intent / Summary / Outcome when known | No |
+| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` + Intent / Outcome when useful | No |
 | `escalation` | Caller asks for a human; name + reason captured | `Escalation for {Teammate}` | No |
 | `service_request` | Hold / order / enquiry created | `HOLD / ORDER / ENQUIRY` | Yes, when shipped |
 | `appointment` | Visit requested / updated / cancelled | `VISIT REQUEST` | Yes, when shipped |
@@ -34,6 +34,7 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `caller_appointment_cancelled` | Owner or caller cancels | — | Yes, if on |
 | `caller_appointment_rescheduled` | Visit time changes | — | Yes, if on |
 | `caller_hold` | Hold placed | — | Yes, if on |
+| `caller_hold_updated` | Desk changes hold pickup time | — | Yes, if on |
 | `caller_order` | Order captured | — | Yes, if on |
 | `caller_callback` | Callback promised | — | Yes, if on |
 
@@ -82,11 +83,13 @@ Escalation sends to the matched teammate only (SMS, then WhatsApp, then that tea
 
 ## 4. Staff message shapes
 
-All owner bodies are plain text, ordered label rows, no vendor names, no "technical issue".
+Canonical copy: `src/notifications/templates.js`. Desk caller SMS: `dashboard/src/lib/messageTemplates.ts`. Scalers owns both. Owners do not edit staff templates. Caller copy stays Scalers-owned until a later owner tweak for **Text customers**.
+
+All staff bodies are plain text, ordered label rows, no vendor names, no "technical issue", no em dashes, no Want / Done / Mood card.
 
 | Event | Body |
 | --- | --- |
-| Lead | `New missed-call lead. {Business}` + `Name:` / `Phone:` / `Reason:` / `Intent:` / `Summary:` / `Outcome:` / `Recording:` |
+| Lead | `New missed-call lead. {Business}` + `Name:` / `Phone:` / `Reason:` / `Intent:` when useful / `Outcome:` when real / `Open call:` |
 | Escalation | `Escalation for {Teammate}. {Business}` + `Caller:` / `Phone:` / `Reason:` |
 | Service request | `{HOLD\|ORDER\|ENQUIRY}. {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Inbox Holds to mark fulfilled.` |
 | Appointment | `VISIT REQUEST. {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Inbox Visits to confirm or cancel.` |
@@ -94,6 +97,8 @@ All owner bodies are plain text, ordered label rows, no vendor names, no "techni
 | Wallet empty | `Scalers prepaid empty. {Business}` + on-demand state |
 | Speech outage | `{Business} line downtime. Callers heard a short message and were asked to call back.` |
 | Reasoning outage | `{Business} line is taking names only. Callers are asked for a name so the team can call back.` |
+
+Lead omits `Summary`. Live Brain dump is not the owner sentence. `Intent` is omitted when it is only `general_enquiry`. `Outcome` is omitted when it is an internal Brain note. Hangup Want card stays on the desk call, not on SMS.
 
 ---
 
@@ -184,7 +189,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 
 ## 9. Owner insight without the dashboard
 
-The owner lead text is not a label dump. When the Brain has persisted intent, summary, and resolution, the SMS carries them:
+The owner lead text is not a label dump. When the Brain has persisted intent and a real outcome, the SMS carries them:
 
 ```
 New missed-call lead. Done and Dusted Cleaning Services
@@ -192,7 +197,6 @@ Name: Jane
 Phone: +254790381872
 Reason: Book carpet cleaning
 Intent: book_visit
-Summary: Intent: book_visit. Caller: Jane. Goal: carpet cleaning tomorrow.
 Outcome: Visit request saved
 Recording: https://…
 Open call: https://scalers-project.vercel.app/calls/{call_id}

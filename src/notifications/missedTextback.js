@@ -7,6 +7,7 @@
 
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
+const { missedTextbackBody } = require('./templates');
 
 const TEXTBACK_META_KEY = 'missed_textback_at';
 
@@ -15,17 +16,6 @@ const SUPPRESS_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 function missedTextbackEnabled(channels) {
   return parseNotifyChannels(channels).missed_textback === true;
-}
-
-/**
- * One fixed template. No reply invite: inbound SMS has no route back to the
- * desk, so the only promise made is the callback, which the Inbox "Missed"
- * queue already surfaces to the owner.
- */
-function missedTextbackBody(businessName) {
-  const business = String(businessName || '').trim();
-  const who = business ? `${business} here` : 'the business you called';
-  return `Hi, ${who}. Sorry we missed your call. We will call you back.`;
 }
 
 function parseMeta(summary) {
