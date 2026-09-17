@@ -78,6 +78,8 @@ describe("work surface jobs on unified inbox", () => {
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(load, /attachContactIds/);
     assert.match(purpose, /compareInboxSignal/);
+    assert.match(purpose, /orderInboxItems/);
+    assert.match(inbox, /orderInboxItems/);
     assert.match(purpose, /if \(!opts\.job\) return copy\.returnCtaOne/);
     assert.match(purpose, /if \(!opts\.hold\) return copy\.returnCtaOne/);
     assert.match(purpose, /jobStatus === "requested"/);

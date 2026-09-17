@@ -35,7 +35,7 @@ Needs you is not a history. Older open work stays until you Confirm, Done, or re
 4. **Needs you.** Missed, Human asked, unconfirmed visits, and open holds stay. Answered leaves Needs you and sits on Answered. It does not leave All, and it does not drop under a backlog of old visits.
 5. **Debounce.** Insert plus hangup within 1.2s collapse to one refresh. A short call may only show the final stamp. A longer call shows Live, then the hangup stamp on the same row.
 
-All is newest first (urgent open work still pins). Needs you is the same order with closed rows removed. Confirm visit, Holds, and Visits filters still isolate that book.
+All is newest first. No visit backlog, no urgent pin. Needs you still pins urgent, then newest open work. Confirm visit, Holds, and Visits filters still isolate that book.
 
 `hold_or_pickup` and `order_enquiry` are Holds. `product_inquiry` is Answered, not Needs you.
 

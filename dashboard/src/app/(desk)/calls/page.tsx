@@ -12,6 +12,7 @@ import {
   inboxCaption,
   itemMatchesPurpose,
   itemMatchesQuery,
+  orderInboxItems,
   resolvePurposeFilter,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
@@ -174,7 +175,10 @@ export default async function CallsPage({
     : assembled;
   const counts = countInboxPurposes(searched);
   const activeFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
-  const filtered = searched.filter((item) => itemMatchesPurpose(item, activeFilter));
+  const filtered = orderInboxItems(
+    searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
+    activeFilter
+  );
   const weekView = activeFilter === "job" && String(sp.view || "") === "week";
   const monday = parseWeekParam(sp.week);
   const total = filtered.length;

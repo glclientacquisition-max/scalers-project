@@ -141,6 +141,12 @@ function inboxCaption(items) {
   return bits.length === 1 ? bits[0] : `${bits[0]}. ${bits[1]}.`;
 }
 
+function compareInboxRecency(a, b) {
+  if (a.createdAt < b.createdAt) return 1;
+  if (a.createdAt > b.createdAt) return -1;
+  return 0;
+}
+
 function compareInboxSignal(a, b) {
   function rank(item) {
     if (item.urgent && item.needsYou) return 0;
@@ -148,9 +154,15 @@ function compareInboxSignal(a, b) {
   }
   const diff = rank(a) - rank(b);
   if (diff !== 0) return diff;
-  if (a.createdAt < b.createdAt) return 1;
-  if (a.createdAt > b.createdAt) return -1;
-  return 0;
+  return compareInboxRecency(a, b);
+}
+
+function orderInboxItems(items, filter) {
+  const rows = [...items];
+  if (filter === "all" || filter === "answered") {
+    rows.sort(compareInboxRecency);
+  }
+  return rows;
 }
 
 function homeBriefing({ toReturn, toFulfill, toConfirm }) {
@@ -345,6 +357,24 @@ describe("inbox signal", () => {
       ]),
       "2 need you. 1 to confirm."
     );
+  });
+
+  it("orders All by latest, including answered hangups", () => {
+    const olderUrgent = {
+      needsYou: true,
+      urgent: true,
+      purpose: "human",
+      createdAt: "2026-09-16T17:54:51.000Z",
+    };
+    const latestAnswered = {
+      needsYou: false,
+      urgent: false,
+      purpose: "answered",
+      createdAt: "2026-09-17T07:01:47.000Z",
+    };
+    const rows = orderInboxItems([olderUrgent, latestAnswered], "all");
+    assert.equal(rows[0], latestAnswered);
+    assert.equal(rows[1], olderUrgent);
   });
 
   it("keeps a just-ended answered call on All above older visits", () => {
@@ -548,9 +578,16 @@ describe("inboxPurpose source lockstep", () => {
       path.join(__dirname, "..", "dashboard/src/lib/inboxPurpose.ts"),
       "utf8"
     );
+    const page = fs.readFileSync(
+      path.join(__dirname, "..", "dashboard/src/app/(desk)/calls/page.tsx"),
+      "utf8"
+    );
     assert.match(src, /if \(item\.urgent && item\.needsYou\) return 0;/);
     assert.match(src, /if \(isLiveCallStatus\(opts\.callStatus\)\) return "live";/);
     assert.match(src, /if \(opts\.purpose === "live"\) return true;/);
+    assert.match(src, /export function compareInboxRecency/);
+    assert.match(src, /filter === "all" \|\| filter === "answered"/);
+    assert.match(page, /orderInboxItems\(/);
     assert.doesNotMatch(src, /if \(item\.needsYou\) return 1;/);
   });
 });

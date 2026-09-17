@@ -217,12 +217,28 @@ function signalRank(item: InboxItem): number {
   return 1;
 }
 
-export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
-  const rank = signalRank(a) - signalRank(b);
-  if (rank !== 0) return rank;
+export function compareInboxRecency(a: InboxItem, b: InboxItem): number {
   if (a.createdAt < b.createdAt) return 1;
   if (a.createdAt > b.createdAt) return -1;
   return 0;
+}
+
+export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
+  const rank = signalRank(a) - signalRank(b);
+  if (rank !== 0) return rank;
+  return compareInboxRecency(a, b);
+}
+
+/** All is a tape: newest first. Other piles keep work ranking. */
+export function orderInboxItems(
+  items: InboxItem[],
+  filter: InboxPurposeFilterId
+): InboxItem[] {
+  const rows = [...items];
+  if (filter === "all" || filter === "answered") {
+    rows.sort(compareInboxRecency);
+  }
+  return rows;
 }
 
 export function homeQueueUnit(
