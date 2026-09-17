@@ -86,7 +86,7 @@ export function parseWeekParam(raw: string | undefined, now = new Date()): strin
   return mondayYmd(now);
 }
 
-function visitInstant(visit: CalendarVisit, now: Date): Date | null {
+export function visitInstant(visit: CalendarVisit, now: Date): Date | null {
   if (visit.window_start) {
     const parsed = Date.parse(visit.window_start);
     if (!Number.isNaN(parsed)) return new Date(parsed);
@@ -166,6 +166,27 @@ export function groupVisitsForWeek(
     });
   }
   return { days, byDay, unscheduled };
+}
+
+export function parseDayParam(raw: string | undefined, now = new Date()): string {
+  const value = String(raw || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return eatYmd(now);
+}
+
+export function shiftDayYmd(ymd: string, deltaDays: number): string {
+  const start = ymdToEatMidnight(ymd);
+  return eatYmd(new Date(start.getTime() + deltaDays * 86400000));
+}
+
+export function dayHeading(ymd: string): string {
+  const instant = ymdToEatMidnight(ymd);
+  return new Intl.DateTimeFormat("en-KE", {
+    timeZone: EAT,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(instant);
 }
 
 export function weekHeading(monday: string): string {

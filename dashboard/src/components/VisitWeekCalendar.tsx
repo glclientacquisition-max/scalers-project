@@ -1,26 +1,20 @@
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import { nicheCopy } from "@/lib/inboxNiche";
-import {
-  groupVisitsForWeek,
-  weekHeading,
-  type CalendarVisit,
-} from "@/lib/visitCalendar";
+import { groupRunSheetForWeek } from "@/lib/runSheet";
+import { weekHeading } from "@/lib/visitCalendar";
 
-function jobToVisit(item: InboxItem): CalendarVisit | null {
-  if (!item.job) return null;
-  return {
-    id: item.job.id,
-    status: item.job.status,
-    service_name: item.job.service_name,
-    when_text: item.job.when_text,
-    window_start: item.job.window_start,
-    window_end: item.job.window_end,
-    address_landmark: item.job.address_landmark,
-    caller_name: item.callerName,
-  };
+function RowAction({ item }: { item: InboxItem }) {
+  if (item.job) {
+    return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
+  }
+  if (item.hold) {
+    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />;
+  }
+  return null;
 }
 
 export function VisitWeekCalendar({
@@ -40,9 +34,12 @@ export function VisitWeekCalendar({
   vertical?: string | null;
 }) {
   const copy = nicheCopy(vertical);
-  const byId = new Map(items.filter((item) => item.job).map((item) => [item.job!.id, item]));
-  const visits = items.map(jobToVisit).filter((row): row is CalendarVisit => Boolean(row));
-  const { days, byDay, unscheduled } = groupVisitsForWeek(visits, monday);
+  const byId = new Map<string, InboxItem>();
+  for (const item of items) {
+    if (item.job) byId.set(item.job.id, item);
+    if (item.hold) byId.set(item.hold.id, item);
+  }
+  const { days, byDay, unscheduled } = groupRunSheetForWeek(items, monday);
   const heading = weekHeading(monday);
 
   return (
@@ -77,10 +74,9 @@ export function VisitWeekCalendar({
           return (
             <section
               key={day.key}
-              className={[
-                "min-h-[11rem] bg-surface p-3",
-                day.isToday ? "bg-accent/[0.06]" : "",
-              ].join(" ")}
+              className={["min-h-[11rem] bg-surface p-3", day.isToday ? "bg-accent/[0.06]" : ""].join(
+                " "
+              )}
             >
               <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                 {day.weekdayShort} {day.dayNum}
@@ -91,7 +87,7 @@ export function VisitWeekCalendar({
                 ) : (
                   rows.map((visit) => {
                     const item = byId.get(visit.id);
-                    if (!item?.job) return null;
+                    if (!item) return null;
                     return (
                       <li
                         key={visit.id}
@@ -109,7 +105,7 @@ export function VisitWeekCalendar({
                           {item.callerName || "Caller"}
                         </p>
                         <div className={`${deskRowActionClass} mt-1`}>
-                          <InboxJobActions id={item.job.id} status={item.job.status} />
+                          <RowAction item={item} />
                         </div>
                       </li>
                     );
@@ -129,7 +125,7 @@ export function VisitWeekCalendar({
           <ul className="mt-2 divide-y divide-line border-y border-line">
             {unscheduled.map((visit) => {
               const item = byId.get(visit.id);
-              if (!item?.job) return null;
+              if (!item) return null;
               return (
                 <li key={visit.id} className="relative flex flex-wrap items-center justify-between gap-3 py-3">
                   <DeskRowHit
@@ -141,7 +137,7 @@ export function VisitWeekCalendar({
                     <p className="text-xs text-ink-soft">{item.callerName || "Caller"}</p>
                   </div>
                   <div className={deskRowActionClass}>
-                    <InboxJobActions id={item.job.id} status={item.job.status} />
+                    <RowAction item={item} />
                   </div>
                 </li>
               );

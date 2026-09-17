@@ -20,6 +20,7 @@ export type InboxNicheCopy = {
   pickupStamp: string;
   holdEmpty: string;
   jobEmpty: string;
+  todayEmpty: string;
   searchPlaceholder: string;
   jobColumn: string;
 };
@@ -43,6 +44,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     pickupStamp: "Pickup",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, hold",
     jobColumn: "Visit",
   },
@@ -64,6 +66,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, visit",
     jobColumn: "Visit",
   },
@@ -85,6 +88,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No bookings",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, booking",
     jobColumn: "Booking",
   },
@@ -106,6 +110,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, job",
     jobColumn: "Visit",
   },
