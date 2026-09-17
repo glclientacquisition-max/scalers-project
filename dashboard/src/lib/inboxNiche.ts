@@ -115,17 +115,19 @@ export function nicheCopy(vertical?: string | null): InboxNicheCopy {
   return NICHE[parseVertical(vertical)];
 }
 
+/** Act, tape, book, closed. 08:00 owner, live watcher, visit confirmer. */
 export function purposeFilters(vertical?: string | null): {
   id: InboxPurposeFilterId;
   label: string;
+  divide?: boolean;
 }[] {
   const copy = nicheCopy(vertical);
   return [
     { id: "needs", label: "Needs you" },
-    { id: "hold", label: copy.holdFilter },
-    { id: "job", label: copy.jobFilter },
-    { id: "human", label: "Human" },
-    { id: "answered", label: "Answered" },
     { id: "all", label: "All" },
+    { id: "job", label: copy.jobFilter, divide: true },
+    { id: "hold", label: copy.holdFilter },
+    { id: "human", label: "Human", divide: true },
+    { id: "answered", label: "Answered" },
   ];
 }

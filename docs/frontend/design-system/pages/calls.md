@@ -16,15 +16,21 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 - **WhatsApp:** Opens chat. List verb for return calls. On the call, primary only when there is no visit/hold and Text customers is off.
 - **Send SMS:** Write a text on the call, then send. Shows only if Text customers is on. Primary on the call when there is no visit/hold to Confirm or Done. Not a list verb (needs a body).
 
-Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Human / Answered / All. Same `FilterTabs` as Contacts.
+Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. Same `FilterTabs` as Contacts. Quiet hairline groups: act (Needs you, All), book (Visits, Holds), closed (Human, Answered).
+
+**Bar order (owner characters):**
+- **08:00 owner:** Needs you first. What still needs a decision.
+- **Live watcher:** All second. Newest tape, one hop from Needs you. Hangup stays here.
+- **Visit confirmer:** Visits before Holds. Home services money book. Retail still has Holds next to it.
+- **Closed:** Human then Answered. Missed and finished sit after the tape, not between work and All.
 
 **Piles (one question each):**
 - **Needs you:** Open work. A decision is still on you. Unconfirmed visits, open holds, return calls, human asked. Confirmed visits leave this pile.
+- **All:** Everything, including Done. Newest first.
 - **Visits / Bookings:** The live book. Requested (still to confirm) and confirmed (booked). After Confirm the row stays here, not in Needs you. Done and cancelled leave the book.
 - **Holds:** Open items to fulfill. Fulfilled and cancelled leave this pile.
 - **Human:** Person asked or missed.
 - **Answered:** The receptionist closed it. No owner action.
-- **All:** Everything, including Done.
 
 Needs you is not a history. Older open work stays until you Confirm, Done, or reply.
 

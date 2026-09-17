@@ -6,6 +6,7 @@ export type FilterTabItem = {
   label: string;
   href: string;
   count?: number;
+  divide?: boolean;
 };
 
 export function FilterTabs({
@@ -23,7 +24,14 @@ export function FilterTabs({
         {items.map((item) => {
           const isActive = active === item.id;
           return (
-            <li key={item.id} className="shrink-0">
+            <li
+              key={item.id}
+              className={
+                item.divide
+                  ? "ml-2 shrink-0 border-l border-line pl-3"
+                  : "shrink-0"
+              }
+            >
               <Link
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}

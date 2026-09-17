@@ -42,6 +42,16 @@ describe("desk control craft", () => {
     assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /filterTabClass/);
   });
 
+  it("orders Inbox filters as act, tape, book, closed", () => {
+    const niche = read("dashboard/src/lib/inboxNiche.ts");
+    assert.match(
+      niche,
+      /id: "needs"[\s\S]*id: "all"[\s\S]*id: "job"[\s\S]*id: "hold"[\s\S]*id: "human"[\s\S]*id: "answered"/
+    );
+    assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /item\.divide/);
+    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /divide: item\.divide/);
+  });
+
   it("does not keep the unused TriageLeadCard", () => {
     assert.equal(
       fs.existsSync(path.join(__dirname, "../dashboard/src/components/TriageLeadCard.tsx")),
