@@ -33,6 +33,7 @@ import {
 } from "@/lib/visitCalendar";
 import { btnGhost, btnPrimary, deskEmptyClass, deskShiftClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -145,15 +146,7 @@ export default async function CallsPage({
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-accent-deep">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();

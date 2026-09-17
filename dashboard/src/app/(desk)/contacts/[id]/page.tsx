@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { DeskError } from "@/components/ui/DeskError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
@@ -28,7 +29,10 @@ export default async function ContactDetailPage({
   if (!workspace) notFound();
 
   const { contact, error } = await loadContactById(workspace.client, tenant.id, id);
-  if (error || !contact) notFound();
+  if (error) {
+    return <DeskError>Could not load this contact.</DeskError>;
+  }
+  if (!contact) notFound();
 
   const timeline = await loadContactTimeline(workspace.client, tenant.id, contact);
   const title = contact.name?.trim() || "Unknown";

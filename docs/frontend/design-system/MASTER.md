@@ -126,9 +126,10 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | State | Treatment |
 | --- | --- |
 | Loading | `(desk)/loading.tsx`: `pendingSpinnerInkClass` only. No skeletons, no invented numbers |
-| Empty | `deskEmptyClass`. Title + one link |
-| Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"` |
+| Empty | `deskEmptyClass`. Title + one link. No workspace: `DeskNoWorkspace` |
+| Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"`. Home inbox load failure uses this, not a zero queue. Call/contact query failure uses this, not 404. |
 | Crash | `DeskCrash`. Try again. Never a stack trace |
+| Offline | `DeskOffline` under the desk header. `No connection.` Hidden when online. |
 | Pending mutation | `pendingSpinnerClass` on the control. Disable double submit |
 | Live | `LivePing` on a Live stamp and the Home bulletin. One ping per region |
 | Land | `DeskLandScope` + `DeskLandSurface`. First paint never lands. Filter/page swaps do not flash |
