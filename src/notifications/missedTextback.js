@@ -8,7 +8,7 @@
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
 const { missedTextbackBody } = require('./templates');
-const { claimTenantSms, recordNotifySend } = require('./sendLedger');
+const { beginInstanceSend, claimTenantSms, recordNotifySend, releaseInstanceFlight } = require('./sendLedger');
 
 const TEXTBACK_META_KEY = 'missed_textback_at';
 
@@ -69,23 +69,31 @@ async function sendMissedTextback({ to, businessName, ledger } = {}) {
   const dest = normalizeSmsTo(to);
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
   const body = missedTextbackBody(businessName);
-  const claim = await claimTenantSms({ ...ledger, kind: 'missed_textback' }, body);
-  if (!claim.allowed) {
-    return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
+  const gate = await beginInstanceSend({ ...ledger, kind: 'missed_textback' }, dest);
+  if (!gate.ok) {
+    return { channel: null, reason: gate.reason };
   }
-  const result = await sendSms({ to: dest, body });
-  await recordNotifySend({
-    tenantId: ledger?.tenantId,
-    callId: ledger?.callId,
-    callSid: ledger?.callSid,
-    kind: 'missed_textback',
-    channel: 'sms',
-    to: dest,
-    body,
-    providerMessageId: result?.messageId || null,
-    overage: Boolean(claim.overage),
-  });
-  return { channel: 'sms', to: dest, result, body };
+  try {
+    const claim = await claimTenantSms({ ...ledger, kind: 'missed_textback' }, body);
+    if (!claim.allowed) {
+      return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
+    }
+    const result = await sendSms({ to: dest, body });
+    await recordNotifySend({
+      tenantId: ledger?.tenantId,
+      callId: ledger?.callId,
+      callSid: ledger?.callSid,
+      kind: 'missed_textback',
+      channel: 'sms',
+      to: dest,
+      body,
+      providerMessageId: result?.messageId || null,
+      overage: Boolean(claim.overage),
+    });
+    return { channel: 'sms', to: dest, result, body };
+  } finally {
+    releaseInstanceFlight(gate.key);
+  }
 }
 
 module.exports = {

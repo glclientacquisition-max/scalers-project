@@ -1648,6 +1648,24 @@ async function insertNotifySend(row = {}) {
   return { ok: true, id: data?.id || null };
 }
 
+async function findNotifySend({ tenantId, idempotencyKey } = {}) {
+  if (!tenantId || !idempotencyKey) return null;
+  const { data, error } = await supabase
+    .from('notify_sends')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+  if (error) {
+    if (/notify_sends|does not exist|schema cache|relation/i.test(error.message || '')) {
+      return null;
+    }
+    console.warn('[db] findNotifySend:', error.message);
+    return null;
+  }
+  return data || null;
+}
+
 async function consumeSmsUnits({ tenantId, units } = {}) {
   if (!tenantId) return { allowed: true, reason: 'no_tenant', overage: false };
   const need = Math.max(1, Number(units) || 1);
@@ -1709,6 +1727,7 @@ module.exports = {
   listOpenAppointments,
   mergeCallSummaryMeta,
   insertNotifySend,
+  findNotifySend,
   consumeSmsUnits,
   RECORDINGS_BUCKET,
   shapeCall,

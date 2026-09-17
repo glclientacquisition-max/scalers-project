@@ -1,12 +1,17 @@
 // Run: node --test tests/sendLedger.test.js
-const { describe, it } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   audience,
   billedTo,
   buildLedgerRow,
+  beginInstanceSend,
+  claimInstanceFlight,
   idempotencyKey,
+  instanceFlightKey,
   allowanceDecision,
+  releaseInstanceFlight,
+  resetInstanceFlights,
   smsAllowanceDecision,
   smsSegments,
 } = require('../src/notifications/sendLedger');
@@ -200,5 +205,146 @@ describe('notify send ledger', () => {
       }),
       { allowed: false, reason: 'seat_allowance_exhausted', overage: false, remaining: 0 }
     );
+  });
+});
+
+function stubDb(exports) {
+  const dbPath = require.resolve('../src/db');
+  const prev = require.cache[dbPath];
+  require.cache[dbPath] = {
+    id: dbPath,
+    filename: dbPath,
+    loaded: true,
+    exports,
+  };
+  return () => {
+    if (prev) require.cache[dbPath] = prev;
+    else delete require.cache[dbPath];
+  };
+}
+
+describe('per-instance send limits', () => {
+  const ledger = {
+    tenantId: 't1',
+    callSid: 'HD_abc',
+    callId: 'call-1',
+    kind: 'lead',
+  };
+
+  beforeEach(() => {
+    resetInstanceFlights();
+  });
+
+  afterEach(() => {
+    resetInstanceFlights();
+  });
+
+  it('is a no-op without a tenant or dest', async () => {
+    const none = await beginInstanceSend({}, '254711000000');
+    assert.equal(none.ok, true);
+    assert.equal(none.key, null);
+    const noDest = await beginInstanceSend(ledger, '');
+    assert.equal(noDest.ok, true);
+  });
+
+  it('blocks a second in-flight send to the same dest on the same call', async () => {
+    const restore = stubDb({
+      findNotifySend: async () => null,
+    });
+    try {
+      const first = await beginInstanceSend(ledger, '254711000000');
+      assert.equal(first.ok, true);
+      const again = await beginInstanceSend(ledger, '+254711000000');
+      assert.equal(again.ok, false);
+      assert.equal(again.reason, 'instance_in_flight');
+      releaseInstanceFlight(first.key);
+      const after = await beginInstanceSend(ledger, '254711000000');
+      assert.equal(after.ok, true);
+      releaseInstanceFlight(after.key);
+    } finally {
+      restore();
+    }
+  });
+
+  it('lets inbox fan-out to two dests on the same call', async () => {
+    const restore = stubDb({
+      findNotifySend: async () => null,
+    });
+    try {
+      const a = await beginInstanceSend(ledger, '254711000000');
+      const b = await beginInstanceSend(ledger, '254722000000');
+      assert.equal(a.ok, true);
+      assert.equal(b.ok, true);
+      assert.notEqual(a.key, b.key);
+      releaseInstanceFlight(a.key);
+      releaseInstanceFlight(b.key);
+    } finally {
+      restore();
+    }
+  });
+
+  it('skips when any channel already delivered, without consuming SMS', async () => {
+    let consumed = 0;
+    const restore = stubDb({
+      findNotifySend: async () => ({ id: 'row-1' }),
+      consumeSmsUnits: async () => {
+        consumed += 1;
+        return { allowed: true, reason: 'included', overage: false };
+      },
+    });
+    try {
+      const gate = await beginInstanceSend(ledger, '254711000000');
+      assert.equal(gate.ok, false);
+      assert.equal(gate.reason, 'instance_already_sent');
+      assert.equal(consumed, 0);
+      assert.equal(claimInstanceFlight(ledger, '254711000000').ok, true);
+    } finally {
+      restore();
+    }
+  });
+
+  it('treats phone and email as one instance so a ladder retry cannot add a channel', async () => {
+    const restore = stubDb({
+      findNotifySend: async ({ idempotencyKey: key }) =>
+        String(key).includes('email:owner@example.com') ? { id: 'mail-1' } : null,
+    });
+    try {
+      const gate = await beginInstanceSend(ledger, [
+        '254711000000',
+        'owner@example.com',
+      ]);
+      assert.equal(gate.ok, false);
+      assert.equal(gate.reason, 'instance_already_sent');
+    } finally {
+      restore();
+    }
+  });
+
+  it('keys the same dest with or without plus', () => {
+    assert.equal(
+      instanceFlightKey(ledger, '+254711000000'),
+      instanceFlightKey(ledger, '254711000000')
+    );
+  });
+
+  it('dispatchAlert returns instance_in_flight and does not send', async () => {
+    const restore = stubDb({
+      findNotifySend: async () => null,
+    });
+    try {
+      const { dispatchAlert } = require('../src/notifications/dispatch');
+      const first = await beginInstanceSend(ledger, '254711000000');
+      assert.equal(first.ok, true);
+      const result = await dispatchAlert({
+        to: '254711000000',
+        body: 'New lead',
+        ledger,
+      });
+      assert.equal(result.channel, null);
+      assert.equal(result.reason, 'instance_in_flight');
+      releaseInstanceFlight(first.key);
+    } finally {
+      restore();
+    }
   });
 });

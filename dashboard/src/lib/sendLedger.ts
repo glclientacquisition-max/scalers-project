@@ -113,6 +113,34 @@ export async function claimDeskSms(
   };
 }
 
+async function deskInstanceAlreadySent(
+  client: SupabaseClient,
+  opts: {
+    tenantId: string;
+    callId?: string | null;
+    kind: string;
+    to: string;
+  }
+): Promise<boolean> {
+  if (!opts.tenantId || !opts.to) return false;
+  const { data, error } = await client
+    .from("notify_sends")
+    .select("id")
+    .eq("tenant_id", opts.tenantId)
+    .eq("idempotency_key", deskCallerIdempotencyKey(opts))
+    .maybeSingle();
+  if (error) {
+    if (
+      /notify_sends|does not exist|schema cache|relation/i.test(error.message || "")
+    ) {
+      return false;
+    }
+    console.warn("[notify ledger] instance check", error.message);
+    return false;
+  }
+  return Boolean(data);
+}
+
 export async function sendRecordedDeskCallerSms(opts: {
   client: SupabaseClient;
   tenantId: string;
@@ -121,6 +149,9 @@ export async function sendRecordedDeskCallerSms(opts: {
   to: string;
   body: string;
 }): Promise<{ ok: boolean; reason?: string; overage?: boolean }> {
+  if (await deskInstanceAlreadySent(opts.client, opts)) {
+    return { ok: false, reason: "instance_already_sent" };
+  }
   const claim = await claimDeskSms(opts.client, opts.tenantId, opts.body);
   if (!claim.allowed) {
     return { ok: false, reason: claim.reason || "sms_allowance_exhausted" };
