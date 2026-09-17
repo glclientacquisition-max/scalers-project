@@ -129,6 +129,9 @@ function smsAllowanceDecision({
 } = {}) {
   const need = Math.max(1, Number(units) || 1);
   const have = Math.max(0, Number(used) || 0);
+  if (included == null || included === '') {
+    return { allowed: true, reason: 'unlimited', overage: false, remaining: null };
+  }
   const cap = Number(included);
   if (String(enforcement || 'off').toLowerCase() === 'off') {
     return { allowed: true, reason: 'beta', overage: false, remaining: cap - (have + need) };

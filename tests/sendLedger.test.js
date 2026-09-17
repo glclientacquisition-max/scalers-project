@@ -139,6 +139,16 @@ describe('notify send ledger', () => {
       }),
       { allowed: true, reason: 'on_demand', overage: true, remaining: -1 }
     );
+    assert.deepEqual(
+      smsAllowanceDecision({
+        enforcement: 'soft',
+        included: 0,
+        used: 0,
+        units: 1,
+        onDemand: false,
+      }),
+      { allowed: false, reason: 'sms_allowance_exhausted', overage: false, remaining: 0 }
+    );
     assert.equal(
       smsAllowanceDecision({
         enforcement: 'soft',
