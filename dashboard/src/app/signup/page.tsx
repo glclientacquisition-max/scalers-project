@@ -4,7 +4,7 @@ import { SignupForm } from "./SignupForm";
 
 export default function SignupPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 py-16">
+    <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
         <BrandWordmark href="/" context="New workspace" variant="lockup" priority />
         <h1 className="sr-only">Create a Scalers workspace</h1>

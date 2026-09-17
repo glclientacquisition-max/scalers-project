@@ -67,7 +67,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`}>
-      <body className="min-h-screen bg-surface-canvas font-sans text-ink antialiased">
+      <body className="min-h-dvh bg-surface-canvas font-sans text-ink antialiased">
         {/* Desk theme before paint: explicit choice wins, otherwise system decides. */}
         <script
           dangerouslySetInnerHTML={{

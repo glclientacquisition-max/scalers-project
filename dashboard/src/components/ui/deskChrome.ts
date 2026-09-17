@@ -58,6 +58,10 @@ export const btnGhost = [
 export const pendingSpinnerClass =
   "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent-on-fill/40 border-t-accent-on-fill motion-reduce:animate-none";
 
+/** Spinner on canvas (loading routes). Ink track, not on-fill. */
+export const pendingSpinnerInkClass =
+  "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink/20 border-t-ink motion-reduce:animate-none";
+
 export const deskFieldClass =
   `w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
 

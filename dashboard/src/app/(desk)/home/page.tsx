@@ -35,6 +35,7 @@ import { nicheCopy } from "@/lib/inboxNiche";
 import { runSheetForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { DeskError } from "@/components/ui/DeskError";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { LivePing } from "@/components/ui/deskRow";
 import {
@@ -59,11 +60,7 @@ export default async function HomeOverviewPage() {
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-surface p-6 text-warn">
-        Not signed in.
-      </div>
-    );
+    return <DeskError>Not signed in.</DeskError>;
   }
 
   const client = workspace.client;
@@ -197,16 +194,12 @@ export default async function HomeOverviewPage() {
       {primaryUpdate ? (
         <aside aria-label="Live updates" className="mt-6 w-full min-w-0">
           <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,var(--card))] px-4 py-3">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-accent"
-            />
-            <div className="flex min-w-0 flex-col gap-3 pl-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-accent-deep">
                   <LivePing />
                   Updates
-                  {liveUpdates.length > 1 ? ` · ${liveUpdates.length} live` : ""}
+                  {liveUpdates.length > 1 ? ` ${liveUpdates.length} live` : ""}
                 </p>
                 <p className={`mt-1 font-display text-base tracking-tight text-ink ${deskPreviewClass}`}>
                   {primaryUpdate.text}
