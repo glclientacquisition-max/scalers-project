@@ -20,7 +20,7 @@ describe("desk preview truncate", () => {
 
   it("ships one preview class and a table cell that can ellipsize", () => {
     assert.match(chrome, /export const deskPreviewClass = "min-w-0 truncate"/);
-    assert.match(chrome, /export const deskPreviewCellClass = "max-w-0"/);
+    assert.match(chrome, /export const deskPreviewCellClass = "w-full max-w-0"/);
     assert.match(master, /deskPreviewClass/);
     assert.match(master, /deskPreviewCellClass/);
   });

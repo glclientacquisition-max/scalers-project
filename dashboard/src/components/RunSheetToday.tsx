@@ -141,7 +141,7 @@ export function RunSheetToday({
                     <td className="max-w-[10rem] px-5 py-3 text-sm text-ink">
                       <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
                     </td>
-                    <td className={`px-5 py-3 text-sm text-ink-soft ${deskPreviewCellClass}`}>
+                    <td className="max-w-[12rem] px-5 py-3 text-sm text-ink-soft">
                       <p className={deskPreviewClass}>{placeFor(item)}</p>
                     </td>
                     <td className="px-5 py-3 text-right">
