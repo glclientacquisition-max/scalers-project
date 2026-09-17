@@ -1,9 +1,8 @@
 /**
  * Turn an owner scratch note into one customer SMS.
  * Empty note: draft from saved call facts. Never invent a next step.
+ * Draft lines stay in lockstep with renderCallerTemplate in messageTemplates.ts.
  */
-
-import { renderCallerTemplate } from "./messageTemplates.ts";
 
 export type CallerReplyPurpose = "missed" | "human" | "job" | "hold" | "answered" | "";
 
@@ -70,33 +69,21 @@ export function fallbackPolishCallerNote(input: PolishCallerNoteInput): string {
 export function draftCallerNoteFromFacts(input: PolishCallerNoteInput): string {
   if (!canDraftCallerNote(input)) return "";
   const purpose = callerReplyPurpose(input.purpose);
-  const businessName = String(input.businessName || "").trim() || "We";
-  const callerName = cleanCallerFirstName(input.callerName);
+  const business = String(input.businessName || "").trim() || "We";
+  const name = cleanCallerFirstName(input.callerName);
+  const hi = name ? `Hi ${name}, ` : "Hi, ";
   const item = String(input.service || "").trim();
   const when = String(input.when || "").trim();
   if (purpose === "job") {
-    return renderCallerTemplate({
-      kind: "caller_appointment",
-      businessName,
-      callerName,
-      item,
-      when,
-    }).slice(0, 320);
+    const visit = item ? `your ${item} visit` : "your visit";
+    const slot = when ? ` for ${when}` : "";
+    return `${hi}${business} here. We have ${visit}${slot}. We will confirm shortly.`.slice(0, 320);
   }
   if (purpose === "hold") {
-    return renderCallerTemplate({
-      kind: "caller_hold",
-      businessName,
-      callerName,
-      item,
-      when,
-    }).slice(0, 320);
+    const what = item ? `We have held ${item} for you` : "We have held your item";
+    return `${hi}${business} here. ${what}. We will confirm shortly.`.slice(0, 320);
   }
-  return renderCallerTemplate({
-    kind: "caller_callback",
-    businessName,
-    callerName,
-  }).slice(0, 320);
+  return `${hi}${business} here. The team will call you back.`.slice(0, 320);
 }
 
 export function stripModelSms(raw: string): string {
