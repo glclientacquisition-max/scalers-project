@@ -32,6 +32,8 @@
 --   soft_spend_limit_enabled boolean    (optional; wallet_soft_spend_limit.sql)
 --   soft_spend_limit_kes numeric
 --   on_demand_usage_enabled boolean     (default false — wallet_on_demand_alerts.sql)
+--   sms_included_units integer          (default 200; sms_allowance.sql)
+--   sms_used_units integer              (consumed tenant SMS segments; sms_allowance.sql)
 --   wallet_low_alert_sent_at timestamptz
 --   wallet_empty_alert_sent_at timestamptz
 --   line_paid_through timestamptz       (line rental covered until; line_rental_grace.sql)

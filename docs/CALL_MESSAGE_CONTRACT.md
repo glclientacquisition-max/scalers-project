@@ -159,7 +159,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 | **Channel** | SMS first, WhatsApp second, email fallback | SMS only at first; WhatsApp needs template approval |
 | **Language** | English (owner desk language) | Match the call language when known |
 | **Content** | Name, phone, reason, recording link | Business name, what was captured, next step |
-| **Cost** | Metered on `notify_sends` (tenant SMS). Not a KES debit yet | Same table. Caller SMS is tenant usage |
+| **Cost** | Metered on `notify_sends` (tenant SMS). Included first. Stop at cap unless on-demand. Not a KES debit yet | Same table. Caller SMS is tenant usage |
 | **Opt-out** | Owner toggles `notify_channels` | Caller STOP; owner toggle |
 | **Failure** | Log and leave desk note; do not retry storm | Log; do not retry on the same call |
 
@@ -170,7 +170,8 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 - Do not text the caller on every call. Only when there is an action to confirm.
 - Do not send the caller a transcript or recording link.
 - Do not let the caller text reveal internal notes (`resolution_note`, staff directory).
-- Do not debit the prepaid KES wallet for SMS. Meter on `notify_sends` until packages ship.
+- Do not debit the prepaid KES wallet for SMS. Meter on `notify_sends`. Stop tenant SMS at included unless on-demand.
+- Do not gate platform wallet or outage SMS on the tenant allowance.
 - Do not send marketing to the caller. The first text is a confirmation, not a campaign.
 - Do not add a fourth owner channel without adding it to the ladder and the event model.
 - Do not invent a staff recipient. No `team[0]`. No extra owner SMS on escalate.
@@ -181,7 +182,7 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 ## 8. Open decisions
 
 1. **Caller SMS sender:** shared Scalers sender ID vs the tenant DID. Shared is simpler; tenant DID is more trusted.
-2. **Pricing:** packages will include SMS units. This slice meters only. Wallet and outage SMS stay Scalers-paid (`billed_to=platform`).
+2. **Pricing:** packages will include SMS units. Included default is 200. Stop at cap unless on-demand. Wallet and outage SMS stay Scalers-paid (`billed_to=platform`).
 3. **Language:** match the call language, or always English?
 4. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
 
@@ -217,6 +218,20 @@ Every accepted SMS, WhatsApp, or email writes `notify_sends` (`docs/supabase/not
 | `tenant` | Staff lead, escalate, visit, hold, order, enquiry, callback. Caller visit/hold/order/callback/note. Missed text-back. |
 | `platform` | Wallet low/empty. Speech or reasoning outage. Scalers pays. |
 
-SMS units are segments (GSM-7 160 / 153, UCS-2 70 / 67). Email and WhatsApp count as 1 unit on their own channel. No KES debit. No quota stop. Duplicate dest + kind + call is idempotent.
+SMS units are segments (GSM-7 160 / 153, UCS-2 70 / 67). Email and WhatsApp count as 1 unit on their own channel. No KES debit. Duplicate dest + kind + call is idempotent.
+
+### Stop at included (same on-demand toggle as minutes)
+
+Apply `docs/supabase/sms_allowance.sql` after the ledger SQL. Default included is 200 segments. `consume_sms_units` claims before send.
+
+| State | Tenant SMS |
+| --- | --- |
+| Beta (`billing_enforcement = off`) | Send. Meter `sms_used_units`. Never block. |
+| Paid, under cap | Send. `overage = false`. |
+| Paid, at cap, on-demand off | Skip SMS. Staff WhatsApp / email / desk note still try. Escalate still saves. |
+| Paid, at cap, on-demand on | Send. `overage = true`. |
+| Platform (`wallet_*`, `outage_*`) | Always send. Never consume tenant units. |
+
+Missing RPC or table: send still goes (staging before apply). Desk caller note at cap returns an error. Appointment / request / escalate saves anyway.
 
 **Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.

@@ -190,6 +190,7 @@ Every database change merged to `main` must add a row to the **Change registry**
 | LEDGER-REALTIME-INBOX | `supabase_realtime` publication += `calls`, `service_requests`, `appointments` | Live Inbox desk updates | `realtime_inbox.sql` | `bb6bb6c` (#279) | YES (2026-09-16) | YES (2026-09-16) | NO | Staging INSERT+UPDATE probe; production `pg_publication_tables` lists `appointments`, `calls`, `service_requests` |
 | LEDGER-REALTIME-INBOX-REPLICA | `REPLICA IDENTITY FULL` on `calls`, `service_requests`, `appointments` | Filtered hangup UPDATEs reach Live Inbox | `realtime_inbox_replica_identity.sql` | this PR | YES (2026-09-16) | YES (2026-09-16) | NO | `pg_class.relreplident = 'f'` on the three tables |
 | LEDGER-NOTIFY-SENDS | Append-only `notify_sends` | Meter staff/caller SMS vs platform wallet/outage | `notify_send_ledger.sql` | this PR | NO | NO | NO | Table + RLS; voice insert; desk caller INSERT |
+| LEDGER-SMS-ALLOWANCE | Included SMS + on-demand stop | Cursor-like cap. Same Wallet toggle as minutes. | `sms_allowance.sql` | this PR | NO | NO | NO | `consume_sms_units`; tenant SMS skip at cap unless on-demand; beta never blocks |
 
 ### Staging-only / proposed (not in standard Git apply)
 

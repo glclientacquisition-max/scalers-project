@@ -3,7 +3,7 @@
 --          Staff and caller SMS are tenant usage. Wallet and line-outage
 --          alerts are billed_to = platform (Scalers pays).
 -- Run after: contacts_and_requests.sql (tenants, calls, current_user_tenant_ids).
--- Idempotent. Does not charge. Quota enforcement is a later Ops slice.
+-- Idempotent. Does not charge. Quota: docs/supabase/sms_allowance.sql.
 -- Voice writes via service_role. Owners may INSERT caller rows for their tenant
 -- (desk confirm / reschedule / note). Owners SELECT their own rows.
 

@@ -56,16 +56,32 @@ Then apply `docs/supabase/wallet_on_demand_alerts.sql` (automatic low-balance li
 
 Then apply `docs/supabase/line_rental_grace.sql` (line paid-through, grace window, suspend RPC).
 
+Then apply `docs/supabase/sms_allowance.sql` after `notify_send_ledger.sql` (included SMS + same on-demand toggle).
+
 ## Prepaid alerts + on-demand (Cursor-like)
 
 | Piece | Behavior |
 |---|---|
 | Prepaid balance | Paid wallet money used first for call + line charges |
 | Automatic live alerts | WhatsApp/email when balance drops under `wallet_low_balance_kes` (default 200) and again at ≤ 0. No owner soft-limit setup required. |
-| On-demand usage (opt-in) | Default **off**. When prepaid ≤ 0 and on-demand off → further call charges pause until top-up. When on → keep charging (overdraft). |
+| On-demand usage (opt-in) | Default **off**. When prepaid ≤ 0 and on-demand off → further call charges pause until top-up. When on → keep charging (overdraft). Same toggle: included SMS stops at cap unless on. |
 | Soft inbound block | Separate hard-enforcement step (not this migration) |
 
-Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit.
+Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit. The same toggle covers included SMS (`sms_allowance.sql`).
+
+## SMS included + stop at cap (Cursor-like)
+
+Staff SMS and caller SMS share one tenant bucket. Wallet, line-outage, and speech/LLM outage SMS stay Scalers-paid and are never gated.
+
+| Piece | Behavior |
+|---|---|
+| Included SMS | Default **200** segments (`tenants.sms_included_units`). Packages later replace this number. |
+| Meter | `sms_used_units` increments via `consume_sms_units` before each tenant SMS. Ledger `notify_sends.overage` is true when the send is past included. |
+| Stop at cap | Paid + on-demand **off**: skip tenant SMS. Staff WhatsApp / email / desk note still try. Escalate still saves. |
+| On-demand | Same Wallet toggle as prepaid minutes. Tenant SMS continues past included. |
+| Beta (`billing_enforcement = off`) | Meter only. Never block. |
+
+No KES debit for SMS yet. Missing RPC fails open so staging still sends until the SQL is applied.
 
 ## Line rental grace (2026-09-03)
 

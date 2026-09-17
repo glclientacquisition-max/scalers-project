@@ -3,6 +3,9 @@
  * Staff sends are recorded by the voice engine.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { sendDeskCallerSms } from "@/lib/callerSms";
+
 export type CallerLedgerKind =
   | "caller_appointment_confirmed"
   | "caller_appointment_cancelled"
@@ -47,6 +50,7 @@ export function deskCallerLedgerRow(opts: {
   kind: CallerLedgerKind | string;
   to: string;
   body: string;
+  overage?: boolean;
 }): {
   tenant_id: string;
   call_id: string | null;
@@ -57,6 +61,7 @@ export function deskCallerLedgerRow(opts: {
   billed_to: "tenant";
   units: number;
   body: string;
+  overage: boolean;
   idempotency_key: string;
 } {
   return {
@@ -69,6 +74,73 @@ export function deskCallerLedgerRow(opts: {
     billed_to: "tenant",
     units: smsSegments(opts.body),
     body: String(opts.body || "").slice(0, 2000),
+    overage: Boolean(opts.overage),
     idempotency_key: deskCallerIdempotencyKey(opts),
   };
+}
+
+export async function claimDeskSms(
+  client: SupabaseClient,
+  tenantId: string,
+  body: string
+): Promise<{ allowed: boolean; reason: string; overage: boolean }> {
+  if (!tenantId) return { allowed: true, reason: "no_tenant", overage: false };
+  const need = Math.max(1, smsSegments(body) || 1);
+  const { data, error } = await client.rpc("consume_sms_units", {
+    p_tenant_id: tenantId,
+    p_units: need,
+  });
+  if (error) {
+    if (
+      /consume_sms_units|does not exist|schema cache|sms_included_units|sms_used_units/i.test(
+        error.message || ""
+      )
+    ) {
+      console.warn("[sms allowance] consume_sms_units missing");
+      return { allowed: true, reason: "rpc_missing", overage: false };
+    }
+    console.warn("[sms allowance]", error.message);
+    return { allowed: true, reason: "rpc_failed", overage: false };
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { allowed?: boolean; reason?: string; overage?: boolean }
+    | null;
+  if (!row) return { allowed: true, reason: "empty", overage: false };
+  return {
+    allowed: row.allowed !== false,
+    reason: row.reason || "ok",
+    overage: Boolean(row.overage),
+  };
+}
+
+export async function sendRecordedDeskCallerSms(opts: {
+  client: SupabaseClient;
+  tenantId: string;
+  callId?: string | null;
+  kind: CallerLedgerKind | string;
+  to: string;
+  body: string;
+}): Promise<{ ok: boolean; reason?: string; overage?: boolean }> {
+  const claim = await claimDeskSms(opts.client, opts.tenantId, opts.body);
+  if (!claim.allowed) {
+    return { ok: false, reason: claim.reason || "sms_allowance_exhausted" };
+  }
+  const sent = await sendDeskCallerSms({ to: opts.to, body: opts.body });
+  if (!sent.ok) return sent;
+  const row = deskCallerLedgerRow({
+    tenantId: opts.tenantId,
+    callId: opts.callId,
+    kind: opts.kind,
+    to: opts.to,
+    body: opts.body,
+    overage: claim.overage,
+  });
+  let { error } = await opts.client.from("notify_sends").insert(row);
+  if (error && /overage/i.test(error.message || "")) {
+    const rest = { ...row };
+    delete (rest as { overage?: boolean }).overage;
+    ({ error } = await opts.client.from("notify_sends").insert(rest));
+  }
+  if (error) console.warn("[notify ledger]", error.message);
+  return { ok: true, overage: claim.overage };
 }

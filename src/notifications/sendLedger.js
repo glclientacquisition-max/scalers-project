@@ -1,6 +1,7 @@
 // Notify send ledger. Records every SMS / WhatsApp / email that left.
 // Staff and caller SMS count as tenant usage. Wallet and line-outage
-// alerts stay platform-billed. No quota enforcement in this slice.
+// alerts stay platform-billed. Tenant SMS stops at included unless
+// on-demand (same Wallet toggle as prepaid minutes). Beta never blocks.
 
 const PLATFORM_KINDS = new Set([
   'wallet_low',
@@ -54,7 +55,7 @@ function normalizeDest(value) {
     .replace(/[^\d@._a-z-]/g, '');
 }
 
-function idempotencyKey({ tenantId, callSid, kind, channel, to, at } = {}) {
+function idempotencyKey({ tenantId, callSid, callId, kind, channel, to, at } = {}) {
   const dest = normalizeDest(to) || 'none';
   const ch = String(channel || 'sms');
   const k = String(kind || 'unknown');
@@ -87,6 +88,7 @@ function buildLedgerRow({
   body,
   providerMessageId,
   at,
+  overage,
 } = {}) {
   const cls = classify(kind);
   const ch = String(channel || '').trim();
@@ -102,6 +104,7 @@ function buildLedgerRow({
     units: unitsForChannel(ch, body),
     body: String(body || '').slice(0, 2000),
     provider_message_id: providerMessageId || null,
+    overage: Boolean(overage),
     idempotency_key: idempotencyKey({
       tenantId,
       callSid,
@@ -112,6 +115,66 @@ function buildLedgerRow({
       at,
     }),
   };
+}
+
+/**
+ * Cursor-like: included first. Stop at cap unless on-demand. Beta never blocks.
+ */
+function smsAllowanceDecision({
+  enforcement,
+  included,
+  used,
+  units,
+  onDemand,
+} = {}) {
+  const need = Math.max(1, Number(units) || 1);
+  const have = Math.max(0, Number(used) || 0);
+  const cap = Number(included);
+  if (String(enforcement || 'off').toLowerCase() === 'off') {
+    return { allowed: true, reason: 'beta', overage: false, remaining: cap - (have + need) };
+  }
+  if (!Number.isFinite(cap)) {
+    return { allowed: true, reason: 'unlimited', overage: false, remaining: null };
+  }
+  if (have + need <= cap) {
+    return {
+      allowed: true,
+      reason: 'included',
+      overage: false,
+      remaining: cap - (have + need),
+    };
+  }
+  if (onDemand) {
+    return {
+      allowed: true,
+      reason: 'on_demand',
+      overage: true,
+      remaining: cap - (have + need),
+    };
+  }
+  return {
+    allowed: false,
+    reason: 'sms_allowance_exhausted',
+    overage: false,
+    remaining: cap - have,
+  };
+}
+
+async function claimTenantSms(ledger, body) {
+  if (!ledger?.tenantId) return { allowed: true, reason: 'no_tenant', overage: false };
+  if (billedTo(ledger.kind) === 'platform') {
+    return { allowed: true, reason: 'platform', overage: false };
+  }
+  try {
+    const db = require('../db');
+    return await db.consumeSmsUnits({
+      tenantId: ledger.tenantId,
+      units: smsSegments(body),
+    });
+  } catch (err) {
+    console.warn('[notify-ledger] consume SMS skipped:', err?.message || err);
+    return { allowed: true, reason: 'consume_skipped', overage: false };
+  }
 }
 
 /**
@@ -140,6 +203,7 @@ async function recordDispatchResult(ledger, result, body) {
     to: result.to,
     body,
     providerMessageId: result.result?.messageId || null,
+    overage: Boolean(ledger.overage),
   });
 }
 
@@ -150,9 +214,11 @@ module.exports = {
   billedTo,
   buildLedgerRow,
   classify,
+  claimTenantSms,
   idempotencyKey,
   recordDispatchResult,
   recordNotifySend,
+  smsAllowanceDecision,
   smsSegments,
   unitsForChannel,
 };

@@ -20,7 +20,7 @@ const {
 } = require('./email');
 const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
-const { recordDispatchResult } = require('./sendLedger');
+const { claimTenantSms, recordDispatchResult } = require('./sendLedger');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -90,12 +90,24 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
   }
 
   if (prefs.sms) {
-    try {
-      const sms = await trySendSms({ to, body: text });
-      if (sms) return accept(sms);
-    } catch (err) {
-      errors.push(`sms:${err?.message || err}`);
-      console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+    const dest = normalizeSmsTo(to);
+    if (smsSenderReady() && dest) {
+      const claim = await claimTenantSms(ledger, text);
+      if (!claim.allowed) {
+        errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
+        console.warn(
+          `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
+        );
+      } else {
+        if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
+        try {
+          const sms = await trySendSms({ to, body: text });
+          if (sms) return accept(sms);
+        } catch (err) {
+          errors.push(`sms:${err?.message || err}`);
+          console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+        }
+      }
     }
   }
 

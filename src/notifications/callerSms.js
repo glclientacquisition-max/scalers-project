@@ -4,7 +4,7 @@
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { EVENTS, renderCallerText, displayOwnerCallerName } = require('./events');
 const { parseNotifyChannels } = require('./notifyChannels');
-const { recordNotifySend } = require('./sendLedger');
+const { claimTenantSms, recordNotifySend } = require('./sendLedger');
 
 function callerSmsEnabled(channels) {
   return parseNotifyChannels(channels).caller_sms === true;
@@ -84,6 +84,10 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
   const dest = normalizeSmsTo(to || event.caller?.phone);
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
   const body = renderCallerText(event);
+  const claim = await claimTenantSms({ ...ledger, kind: event.kind }, body);
+  if (!claim.allowed) {
+    return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
+  }
   const result = await sendSms({ to: dest, body });
   const sent = { channel: 'sms', to: dest, result, body };
   await recordNotifySend({
@@ -95,6 +99,7 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
     to: dest,
     body,
     providerMessageId: result?.messageId || null,
+    overage: Boolean(claim.overage),
   });
   return sent;
 }

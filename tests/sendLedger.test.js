@@ -6,6 +6,7 @@ const {
   billedTo,
   buildLedgerRow,
   idempotencyKey,
+  smsAllowanceDecision,
   smsSegments,
 } = require('../src/notifications/sendLedger');
 const {
@@ -95,5 +96,71 @@ describe('notify send ledger', () => {
       name: 'Jane',
       reason: 'Book carpet cleaning',
     }), true);
+  });
+
+  it('stops tenant SMS at included unless on-demand; beta never blocks', () => {
+    assert.deepEqual(
+      smsAllowanceDecision({
+        enforcement: 'off',
+        included: 200,
+        used: 500,
+        units: 2,
+        onDemand: false,
+      }),
+      { allowed: true, reason: 'beta', overage: false, remaining: -302 }
+    );
+    assert.deepEqual(
+      smsAllowanceDecision({
+        enforcement: 'soft',
+        included: 200,
+        used: 199,
+        units: 1,
+        onDemand: false,
+      }),
+      { allowed: true, reason: 'included', overage: false, remaining: 0 }
+    );
+    assert.deepEqual(
+      smsAllowanceDecision({
+        enforcement: 'hard',
+        included: 200,
+        used: 200,
+        units: 1,
+        onDemand: false,
+      }),
+      { allowed: false, reason: 'sms_allowance_exhausted', overage: false, remaining: 0 }
+    );
+    assert.deepEqual(
+      smsAllowanceDecision({
+        enforcement: 'soft',
+        included: 200,
+        used: 200,
+        units: 1,
+        onDemand: true,
+      }),
+      { allowed: true, reason: 'on_demand', overage: true, remaining: -1 }
+    );
+    assert.equal(
+      smsAllowanceDecision({
+        enforcement: 'soft',
+        included: null,
+        used: 0,
+        units: 1,
+        onDemand: false,
+      }).reason,
+      'unlimited'
+    );
+  });
+
+  it('marks overage on the ledger row', () => {
+    const row = buildLedgerRow({
+      tenantId: 't1',
+      kind: 'lead',
+      channel: 'sms',
+      to: '254711000000',
+      body: 'Hi',
+      overage: true,
+    });
+    assert.equal(row.overage, true);
+    assert.equal(billedTo('wallet_low'), 'platform');
   });
 });

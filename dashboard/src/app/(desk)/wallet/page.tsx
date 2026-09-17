@@ -61,6 +61,14 @@ export default async function WalletPage() {
   const prepaidLow =
     !usage.isBeta && usage.walletBalanceKes > 0 && usage.walletBalanceKes < lowThreshold;
   const topUpConfig = getWalletTopUpConfig();
+  const smsIncluded = Number(tenant.sms_included_units);
+  const smsUsed = Math.max(0, Number(tenant.sms_used_units ?? 0));
+  const hasSmsMeter = Number.isFinite(smsIncluded);
+  const smsExhausted =
+    !usage.isBeta &&
+    hasSmsMeter &&
+    smsUsed >= smsIncluded &&
+    !tenant.on_demand_usage_enabled;
 
   return (
     <div className="max-w-3xl">
@@ -79,14 +87,23 @@ export default async function WalletPage() {
         )}
       </header>
 
-      {(prepaidEmpty || prepaidLow) && !usage.isBeta ? (
-        <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
-          {prepaidEmpty
-            ? tenant.on_demand_usage_enabled
-              ? "Prepaid empty. On-demand is on."
-              : "Prepaid empty. Top up or enable on-demand below."
-            : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
-        </p>
+      {(prepaidEmpty || prepaidLow || smsExhausted) && !usage.isBeta ? (
+        <div className="mt-4 space-y-3">
+          {prepaidEmpty || prepaidLow ? (
+            <p className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
+              {prepaidEmpty
+                ? tenant.on_demand_usage_enabled
+                  ? "Prepaid empty. On-demand is on."
+                  : "Prepaid empty. Top up or enable on-demand below."
+                : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
+            </p>
+          ) : null}
+          {smsExhausted ? (
+            <p className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
+              Included SMS used. Enable on-demand or wait for the next pack.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <section className="mt-8 rounded-2xl border border-line bg-surface p-6 sm:p-8">
@@ -133,6 +150,14 @@ export default async function WalletPage() {
                 KES {usage.lineFeeKes.toLocaleString("en-KE")}
               </dd>
             </div>
+            {hasSmsMeter ? (
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">SMS</dt>
+                <dd className="mt-1 text-lg font-semibold text-ink">
+                  {smsUsed.toLocaleString("en-KE")} / {smsIncluded.toLocaleString("en-KE")}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </div>
 

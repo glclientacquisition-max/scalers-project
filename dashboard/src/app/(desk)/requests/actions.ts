@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
-import { renderDeskCallerText, sendDeskCallerSms } from "@/lib/callerSms";
-import { deskCallerLedgerRow } from "@/lib/sendLedger";
+import { renderDeskCallerText } from "@/lib/callerSms";
+import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
 
 export type RequestStatusState = {
   error?: string;
@@ -105,23 +105,15 @@ export async function updateServiceRequestSchedule(
       service: row.item,
       when: row.when_text,
     });
-    const sent = await sendDeskCallerSms({ to: row.caller_phone, body });
-    if (!sent.ok) {
-      console.warn("[request caller sms]", sent.reason);
-    } else {
-      const { error: ledgerErr } = await workspace.client
-        .from("notify_sends")
-        .insert(
-          deskCallerLedgerRow({
-            tenantId: tenant.id,
-            callId: row.call_id,
-            kind: "caller_hold_updated",
-            to: row.caller_phone,
-            body,
-          })
-        );
-      if (ledgerErr) console.warn("[notify ledger]", ledgerErr.message);
-    }
+    const sent = await sendRecordedDeskCallerSms({
+      client: workspace.client,
+      tenantId: tenant.id,
+      callId: row.call_id,
+      kind: "caller_hold_updated",
+      to: row.caller_phone,
+      body,
+    });
+    if (!sent.ok) console.warn("[request caller sms]", sent.reason);
   }
 
   revalidatePath("/requests");
