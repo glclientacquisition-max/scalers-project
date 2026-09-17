@@ -121,6 +121,61 @@ Do not reply to this chat.
 
 `{{1}}` the line-status sentence. `{{2}}` what callers heard or were asked. `{{3}}` `Open the desk to act.`
 
+## How to get them approved
+
+SautiKit only **sends** templates. Meta **approves** them. There is no SautiKit create-template API in our send path.
+
+Do this in **WhatsApp Manager** on the **Scalers** WABA (Cloud `phone_number_id` `1237105982825100`, number `+254709221536`). Do not submit on a shop WABA.
+
+1. Open [Meta Business Suite](https://business.facebook.com/). Top left: the Scalers business portfolio.
+2. Settings (gear) → Accounts → WhatsApp accounts → the Scalers account → **WhatsApp Manager**.
+3. Account tools → **Message templates** → **Create template**.
+4. Category: **Utility**. Not Marketing. Not Authentication.
+5. Name: exact table name (`scalers_staff_alert` first). Lowercase, underscores, no spaces.
+6. Language: **English (US)** in Manager. If sends then fail on language, set Railway `SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en_US`.
+7. Header: **None**. Footer: `Scalers`. Buttons: **None**.
+8. Body: paste from this file. Keep `{{1}}` `{{2}}` `{{3}}` as numbered variables.
+9. **Add sample** before submit. Meta rejects templates with empty samples.
+
+| Var | Sample for `scalers_staff_alert` |
+| --- | --- |
+| `{{1}}` | `New missed-call lead. Done and Dusted Cleaning Services` |
+| `{{2}}` | `Name: Jane. Phone: 254790381872` |
+| `{{3}}` | `Reason: Book carpet cleaning` |
+
+10. Submit. Status starts **Pending**. Decision is often minutes, can take up to 24 hours. Email goes to Business Suite admins. Usable status is **Active** (API `APPROVED`).
+11. Repeat for the other six names. Do not wait to start `scalers_staff_alert`. Once that one is Active, point Railway `SAUTIKIT_WHATSAPP_TEMPLATE=scalers_staff_alert` and smoke one lead.
+
+If Meta recategorizes as Marketing, appeal as Utility: these are staff operational alerts the business already asked for, not promos. If rejected: add samples, drop any URL, keep Utility wording, resubmit.
+
+Until Active, leave `SAUTIKIT_WHATSAPP_TEMPLATE=missed_call_lead` so existing sends keep using the old name.
+
+## How unsaved contacts see "Scalers"
+
+That is **not** a template header. A template header is a line inside the bubble. The name at the top of the chat (and in the chat list) is the **phone number display name** on this WABA.
+
+Three layers. Only the last one guarantees the name without saving the contact.
+
+| Layer | Where | What the staff phone shows |
+| --- | --- | --- |
+| 1. Display name set to `Scalers` | WhatsApp Manager → Account tools → Phone numbers → this number → Profile → Display name | Required. Must be **APPROVED**. |
+| 2. Meta Business verification | Business Suite → Settings → Business info → verification | Helps. Without it, many phones still show `+254 709 221 536` in the chat list. |
+| 3. Official Business Account | Meta notability / OBA on this number | Name (and blue tick) in the **chat list and chat thread even if the number is not saved**. This is the only Meta-guaranteed unsaved-name behaviour. |
+
+Do this now (layers 1 and 2):
+
+1. Same WhatsApp Manager → Account tools → **Phone numbers** → `+254709221536` (Scalers Cloud number, not a shop DID).
+2. Profile → Display name → **Scalers**. Not `Done and Dusted`. Not `0709221536`. Not `Scalers Alerts`.
+3. Wait until name status is **APPROVED**. If you **change** the name after it is already approved, wait for approval again, then **re-register** the number (SautiKit / Meta register). Re-registering before approval does nothing.
+4. Set a **profile photo** (Scalers mark) and a short **About**. Unsaved users who open the thread still see these on the profile even when the chat list shows the number.
+5. Complete **Business verification** on the Scalers portfolio (legal name, site, docs). Display name should match how Scalers is named on the public site.
+
+Template **Footer: `Scalers`** is already in every body we submit. That brands the message itself. It does not replace the chat title.
+
+Do not add a template HEADER called Scalers thinking that fills the chat list. It does not.
+
+Voice on this E.164 is still Done and Dusted until a second DID exists. WhatsApp Cloud identity on the same number is Scalers. Keep those split. Park Calling.
+
 ## Inbound is not these templates
 
 Platform inbound already exists: someone texts the Scalers WhatsApp number, we mark read and send a short session-window ack. That is not a desk action. It does not confirm a visit. It does not list calls. Do not add buttons to these templates until that changes.
