@@ -63,7 +63,7 @@ Columns (`md+` table, same data as the phone row):
 - WhatsApp glyph, green on white, `h-11 w-11`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
 - Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-11 w-11`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
-- Confirm / Done are text on `#005CCC`, 44px. List: that verb only. Call: Confirm or Done on top, Cancel ghost below. Transcript is the right pane.
+- Confirm / Done are `btnDock` (`h-11 w-24`), same box as Call+WhatsApp. List: that verb only. Call: Confirm or Done full width, Cancel ghost below. Transcript is the right pane from `lg`; stack below `lg`.
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 

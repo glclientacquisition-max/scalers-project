@@ -26,6 +26,15 @@ export const btnPrimary = [
   focusRingVisible,
 ].join(" ");
 
+/** List Action dock. Confirm and Done share this box with the Call+WhatsApp pair (`h-11 w-24`). */
+export const btnDock = [
+  "inline-flex h-11 w-24 shrink-0 items-center justify-center rounded-xl px-2 text-sm",
+  btnPrimaryFill,
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
 export const btnGhost = [
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-medium text-ink",
   deskShiftClass,

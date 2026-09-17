@@ -92,5 +92,8 @@ describe("inbox call action", () => {
     const phoneLast = inbox.indexOf("if (item.callerPhone)", actionFn);
     assert.ok(jobFirst < holdNext && holdNext < phoneLast);
     assert.doesNotMatch(inbox.slice(actionFn, actionFn + 900), /Send SMS|mailto:|Archive/);
+    assert.match(inbox, /flex h-11 w-24 shrink-0 items-center justify-end gap-2/);
+    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
   });
 });

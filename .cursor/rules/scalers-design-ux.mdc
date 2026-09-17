@@ -18,7 +18,8 @@ Brand ribbon: `#0096FF`. Filled primary CTA: `#005CCC` with a white label.
 
 - **Zero vertical sprawl:** Never allow forms, cards, or lists to congest the vertical viewport. Hardcode all `textarea` defaults to `rows={2}` with auto-expand.
 - **Data density over cards:** Prefer dense, horizontal data tables or inline rows over massive, padded stacked cards for lists (Calls, Requests, Catalogs, Teams). Tap the row to open the record. Do not add Call, Open, or View columns.
-- **Split-pane enforcement:** When displaying contextual data alongside a transcript or complex detail view, always use a side-by-side grid (Summary on left, Details on right). Never stack them vertically.
+- **Split-pane enforcement:** When displaying contextual data alongside a transcript or complex detail view, use a side-by-side grid from `lg` (Summary left, Details right). Below `lg`, stack the same two panes. Never invent a second layout for that dataset.
+- **Fluid viewports:** One composition at every width. Phone uses the list row. `md+` uses the table. Text columns `min-w-0`. Hits never shrink below 44px. List verbs share one box (`btnDock`, `h-11 w-24`) so Confirm and Done match the Call+WhatsApp pair. Page-task primaries go full width. Do not clip, pinch-zoom, or ship a desktop-only control on phone.
 
 ## 3. ACTION VELOCITY (FITTS'S LAW)
 

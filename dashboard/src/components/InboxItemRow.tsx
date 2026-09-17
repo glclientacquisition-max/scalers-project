@@ -92,7 +92,7 @@ function InboxTrailingAction({
   }
   if (item.callerPhone) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex h-11 w-24 shrink-0 items-center justify-end gap-2">
         <CallLink number={item.callerPhone} />
         <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
       </div>
@@ -285,7 +285,7 @@ export function InboxPhoneRow({
       as="li"
       id={item.id}
       className={[
-        "relative flex items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >

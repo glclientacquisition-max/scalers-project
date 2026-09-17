@@ -5,7 +5,7 @@ import {
   updateAppointmentStatus,
   type AppointmentStatusState,
 } from "@/app/(desk)/appointments/actions";
-import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnDock, btnGhost, btnPrimary } from "@/components/ui/deskChrome";
 
 const initial: AppointmentStatusState = {};
 
@@ -47,7 +47,7 @@ export function InboxJobActions({
               name="status"
               value="confirmed"
               disabled={pending}
-              className={extra ? `${btnPrimary} w-full` : btnPrimary}
+              className={extra ? `${btnPrimary} w-full` : btnDock}
             >
               {pending ? "Saving" : "Confirm"}
             </button>
@@ -71,7 +71,7 @@ export function InboxJobActions({
               name="status"
               value="done"
               disabled={pending}
-              className={extra ? `${btnPrimary} w-full` : btnPrimary}
+              className={extra ? `${btnPrimary} w-full` : btnDock}
             >
               {pending ? "Saving" : "Done"}
             </button>
@@ -89,7 +89,7 @@ export function InboxJobActions({
           </>
         ) : null}
         {normalized === "done" ? (
-          <span className="inline-flex min-h-11 items-center rounded-md bg-ok-soft px-3 text-sm font-medium text-ok">
+          <span className="inline-flex h-11 w-24 shrink-0 items-center justify-center rounded-xl bg-ok-soft text-sm font-medium text-ok">
             Done
           </span>
         ) : null}
