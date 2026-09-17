@@ -239,6 +239,7 @@ export default async function CallDetailPage({
     leadStatus,
     hold,
     job,
+    callStatus: row.status,
   });
   const workOnCall = Boolean(job || hold);
   const smsPrimary = callerSmsOn && !workOnCall;

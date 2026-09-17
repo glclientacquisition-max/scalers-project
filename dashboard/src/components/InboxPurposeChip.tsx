@@ -2,6 +2,7 @@ import type { InboxPurpose } from "@/lib/inboxPurpose";
 import { purposeLabel } from "@/lib/inboxPurpose";
 
 const TONE: Record<InboxPurpose, string> = {
+  live: "bg-accent-soft text-accent-deep ring-accent/20",
   job: "bg-accent-soft text-accent-deep ring-accent/20",
   hold: "bg-ok-soft text-ok ring-ok/15",
   human: "bg-warn-soft text-warn ring-warn/20",

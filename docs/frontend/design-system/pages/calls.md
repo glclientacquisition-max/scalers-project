@@ -28,11 +28,18 @@ Filters: Needs you / Holds or niche hold label / Visits, Jobs, or Bookings / Hum
 
 Needs you is not a history. Older open work stays until you Confirm, Done, or reply.
 
-Work that needs the owner sorts above answered rows. Urgent first. Then newest first, same as Contacts. A call that just landed is row 1 of Needs you, not under weeks of unconfirmed visits. Confirm visit, Holds, and Visits filters still isolate that book.
+**Live tape (one row, never a vanishing act):**
+1. **Insert.** The call row appears at the top of All, stamp **Live**. Needs you also shows it while it is on the line.
+2. **Talking.** The same row stays. Name or reason may fill in. Stamp stays Live.
+3. **Hangup.** The same row stays at the top of All. Stamp becomes the outcome: Live becomes Missed, Human asked, Confirm visit, Hold, or Answered.
+4. **Needs you.** Missed, Human asked, unconfirmed visits, and open holds stay. Answered leaves Needs you and sits on Answered. It does not leave All, and it does not drop under a backlog of old visits.
+5. **Debounce.** Insert plus hangup within 1.2s collapse to one refresh. A short call may only show the final stamp. A longer call shows Live, then the hangup stamp on the same row.
 
-**Live:** rows appear as calls land. `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page, so one call's insert plus hangup collapse into a single refresh and Inbox is not stale when the owner returns to it. Coming back to the tab also refetches. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update.
+All is newest first. No visit backlog, no urgent pin. Needs you still pins urgent, then newest open work. Confirm visit, Holds, and Visits filters still isolate that book.
 
 `hold_or_pickup` and `order_enquiry` are Holds. `product_inquiry` is Answered, not Needs you.
+
+**Live subscribe:** `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page. Coming back to the tab also refetches. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update.
 
 Columns (`md+` table, same data as the phone row):
 - Mixed filters: Work / Needed / When / Action.

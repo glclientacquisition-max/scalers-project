@@ -2,7 +2,7 @@ import type { CallResolution, LeadStatus } from "@/lib/supabase";
 import type { Lead } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 
-export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered";
+export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered" | "live";
 
 export type InboxPurposeFilterId =
   | "needs"
@@ -121,9 +121,16 @@ export type InboxItem = {
   urgent: boolean;
 };
 
+export function isLiveCallStatus(status?: string | null): boolean {
+  const s = String(status || "").toLowerCase();
+  return s === "in_progress" || s === "ringing" || s === "queued";
+}
+
 export function purposeLabel(purpose: InboxPurpose, vertical?: string | null): string {
   const copy = nicheCopy(vertical);
   switch (purpose) {
+    case "live":
+      return "Live";
     case "job":
       return copy.visitStamp;
     case "hold":
@@ -207,16 +214,31 @@ export function inboxCaption(
 
 function signalRank(item: InboxItem): number {
   if (item.urgent && item.needsYou) return 0;
-  if (item.needsYou) return 1;
-  return 2;
+  return 1;
+}
+
+export function compareInboxRecency(a: InboxItem, b: InboxItem): number {
+  if (a.createdAt < b.createdAt) return 1;
+  if (a.createdAt > b.createdAt) return -1;
+  return 0;
 }
 
 export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
   const rank = signalRank(a) - signalRank(b);
   if (rank !== 0) return rank;
-  if (a.createdAt < b.createdAt) return 1;
-  if (a.createdAt > b.createdAt) return -1;
-  return 0;
+  return compareInboxRecency(a, b);
+}
+
+/** All is a tape: newest first. Other piles keep work ranking. */
+export function orderInboxItems(
+  items: InboxItem[],
+  filter: InboxPurposeFilterId
+): InboxItem[] {
+  const rows = [...items];
+  if (filter === "all" || filter === "answered") {
+    rows.sort(compareInboxRecency);
+  }
+  return rows;
 }
 
 export function homeQueueUnit(
@@ -330,7 +352,9 @@ export function classifyInboxPurpose(opts: {
   leadStatus?: LeadStatus | null;
   hold?: InboxHold | null;
   job?: InboxJob | null;
+  callStatus?: string | null;
 }): InboxPurpose {
+  if (isLiveCallStatus(opts.callStatus)) return "live";
   if (opts.job) return "job";
   if (opts.hold) return "hold";
 
@@ -356,6 +380,7 @@ export function inboxNeedsYou(opts: {
   hold?: InboxHold | null;
   job?: InboxJob | null;
 }): boolean {
+  if (opts.purpose === "live") return true;
   if (opts.purpose === "answered") return false;
   const jobStatus = String(opts.job?.status || "").toLowerCase();
   const holdStatus = String(opts.hold?.status || "").toLowerCase();
@@ -406,6 +431,7 @@ export function buildInboxItem(opts: {
     leadStatus: lead?.leadStatus,
     hold,
     job,
+    callStatus: lead?.call.status,
   });
   const needsYou = inboxNeedsYou({
     purpose,

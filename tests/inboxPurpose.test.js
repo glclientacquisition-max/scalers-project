@@ -54,7 +54,9 @@ function canonicalInboxIntent(raw) {
   return INTENT_ALIASES[key] || key;
 }
 
-function classify({ primaryIntent, resolution, leadStatus, hold, job }) {
+function classify({ primaryIntent, resolution, leadStatus, hold, job, callStatus }) {
+  const s = String(callStatus || "").toLowerCase();
+  if (s === "in_progress" || s === "ringing" || s === "queued") return "live";
   if (job) return "job";
   if (hold) return "hold";
   const intent = canonicalInboxIntent(primaryIntent);
@@ -84,6 +86,8 @@ function holdTypeLabel(type) {
 
 function purposeLabel(purpose) {
   switch (purpose) {
+    case "live":
+      return "Live";
     case "job":
       return "Visit";
     case "hold":
@@ -137,17 +141,28 @@ function inboxCaption(items) {
   return bits.length === 1 ? bits[0] : `${bits[0]}. ${bits[1]}.`;
 }
 
-function compareInboxSignal(a, b) {
-  function rank(item) {
-    if (item.urgent && item.needsYou) return 0;
-    if (item.needsYou) return 1;
-    return 2;
-  }
-  const diff = rank(a) - rank(b);
-  if (diff !== 0) return diff;
+function compareInboxRecency(a, b) {
   if (a.createdAt < b.createdAt) return 1;
   if (a.createdAt > b.createdAt) return -1;
   return 0;
+}
+
+function compareInboxSignal(a, b) {
+  function rank(item) {
+    if (item.urgent && item.needsYou) return 0;
+    return 1;
+  }
+  const diff = rank(a) - rank(b);
+  if (diff !== 0) return diff;
+  return compareInboxRecency(a, b);
+}
+
+function orderInboxItems(items, filter) {
+  const rows = [...items];
+  if (filter === "all" || filter === "answered") {
+    rows.sort(compareInboxRecency);
+  }
+  return rows;
 }
 
 function homeBriefing({ toReturn, toFulfill, toConfirm }) {
@@ -210,6 +225,32 @@ function formatCallWhenRelative(iso, now = new Date()) {
 }
 
 describe("inbox purpose", () => {
+  it("stamps an in-progress call as live", () => {
+    assert.equal(classify({ callStatus: "in_progress", leadStatus: "new" }), "live");
+    assert.equal(classify({ callStatus: "in_progress", primaryIntent: "product_inquiry" }), "live");
+  });
+
+  it("stamps hangup product inquiry as answered", () => {
+    assert.equal(
+      classify({
+        callStatus: "complete",
+        primaryIntent: "product_inquiry",
+        resolution: "resolved",
+        leadStatus: "new",
+      }),
+      "answered"
+    );
+    assert.equal(
+      classify({
+        callStatus: "complete",
+        primaryIntent: "general_enquiry",
+        resolution: "resolved",
+        leadStatus: "new",
+      }),
+      "answered"
+    );
+  });
+
   it("stamps a visit row as job over hold", () => {
     assert.equal(
       classify({
@@ -260,6 +301,7 @@ describe("inbox purpose", () => {
 });
 
 function inboxNeedsYou({ purpose, leadStatus, hold, job }) {
+  if (purpose === "live") return true;
   if (purpose === "answered") return false;
   const jobStatus = String(job?.status || "").toLowerCase();
   const holdStatus = String(hold?.status || "").toLowerCase();
@@ -317,11 +359,58 @@ describe("inbox signal", () => {
     );
   });
 
-  it("sorts work that needs the owner first", () => {
-    const answered = { needsYou: false, urgent: false, purpose: "answered", createdAt: "2026-09-07T12:00:00.000Z" };
-    const olderNeed = { needsYou: true, urgent: false, purpose: "missed", createdAt: "2026-09-07T08:00:00.000Z" };
-    const rows = [answered, olderNeed].sort(compareInboxSignal);
-    assert.equal(rows[0], olderNeed);
+  it("orders All by latest, including answered hangups", () => {
+    const olderUrgent = {
+      needsYou: true,
+      urgent: true,
+      purpose: "human",
+      createdAt: "2026-09-16T17:54:51.000Z",
+    };
+    const latestAnswered = {
+      needsYou: false,
+      urgent: false,
+      purpose: "answered",
+      createdAt: "2026-09-17T07:01:47.000Z",
+    };
+    const rows = orderInboxItems([olderUrgent, latestAnswered], "all");
+    assert.equal(rows[0], latestAnswered);
+    assert.equal(rows[1], olderUrgent);
+  });
+
+  it("keeps a just-ended answered call on All above older visits", () => {
+    const visit = {
+      needsYou: true,
+      urgent: false,
+      purpose: "job",
+      job: { status: "requested" },
+      createdAt: "2026-09-16T05:14:00.000Z",
+    };
+    const justEnded = {
+      needsYou: false,
+      urgent: false,
+      purpose: "answered",
+      createdAt: "2026-09-17T07:01:47.000Z",
+    };
+    const rows = [visit, justEnded].sort(compareInboxSignal);
+    assert.equal(rows[0], justEnded);
+    assert.equal(rows[1], visit);
+  });
+
+  it("pins urgent Needs you above a newer answered call", () => {
+    const urgent = {
+      needsYou: true,
+      urgent: true,
+      purpose: "human",
+      createdAt: "2026-09-16T08:00:00.000Z",
+    };
+    const justEnded = {
+      needsYou: false,
+      urgent: false,
+      purpose: "answered",
+      createdAt: "2026-09-17T07:01:47.000Z",
+    };
+    const rows = [justEnded, urgent].sort(compareInboxSignal);
+    assert.equal(rows[0], urgent);
   });
 
   it("sorts a newer hold above an older visit", () => {
@@ -443,6 +532,8 @@ describe("inbox piles", () => {
       false
     );
     assert.equal(inboxNeedsYou({ purpose: "human", leadStatus: "new" }), true);
+    assert.equal(inboxNeedsYou({ purpose: "live" }), true);
+    assert.equal(inboxNeedsYou({ purpose: "answered" }), false);
   });
 
   it("puts confirmed visits in Visits not Needs you", () => {
@@ -464,20 +555,39 @@ describe("inbox piles", () => {
     assert.equal(itemMatchesPurpose(open, "hold"), true);
     assert.equal(itemMatchesPurpose(fulfilled, "hold"), false);
   });
+
+  it("keeps a live call on Needs you and All, not Human or Answered", () => {
+    const live = { purpose: "live", needsYou: true };
+    assert.equal(itemMatchesPurpose(live, "needs"), true);
+    assert.equal(itemMatchesPurpose(live, "all"), true);
+    assert.equal(itemMatchesPurpose(live, "human"), false);
+    assert.equal(itemMatchesPurpose(live, "answered"), false);
+  });
+
+  it("drops answered hangup from Needs you and keeps it on All", () => {
+    const answered = { purpose: "answered", needsYou: false };
+    assert.equal(itemMatchesPurpose(answered, "needs"), false);
+    assert.equal(itemMatchesPurpose(answered, "all"), true);
+    assert.equal(itemMatchesPurpose(answered, "answered"), true);
+  });
 });
 
 describe("inboxPurpose source lockstep", () => {
-  it("ranks newest Needs you work first, under urgent", () => {
+  it("keeps All newest-first and stamps in-progress as Live", () => {
     const src = fs.readFileSync(
       path.join(__dirname, "..", "dashboard/src/lib/inboxPurpose.ts"),
       "utf8"
     );
-    assert.match(src, /if \(item\.urgent && item\.needsYou\) return 0;/);
-    assert.match(src, /if \(item\.needsYou\) return 1;/);
-    assert.match(src, /return 2;/);
-    assert.doesNotMatch(
-      src,
-      /item\.purpose === "job" && item\.job && item\.needsYou/
+    const page = fs.readFileSync(
+      path.join(__dirname, "..", "dashboard/src/app/(desk)/calls/page.tsx"),
+      "utf8"
     );
+    assert.match(src, /if \(item\.urgent && item\.needsYou\) return 0;/);
+    assert.match(src, /if \(isLiveCallStatus\(opts\.callStatus\)\) return "live";/);
+    assert.match(src, /if \(opts\.purpose === "live"\) return true;/);
+    assert.match(src, /export function compareInboxRecency/);
+    assert.match(src, /filter === "all" \|\| filter === "answered"/);
+    assert.match(page, /orderInboxItems\(/);
+    assert.doesNotMatch(src, /if \(item\.needsYou\) return 1;/);
   });
 });
