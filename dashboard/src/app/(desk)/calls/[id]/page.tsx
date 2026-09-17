@@ -197,10 +197,6 @@ export default async function CallDetailPage({
       : null;
   const escalateReason =
     typeof meta.escalate_reason === "string" ? meta.escalate_reason : null;
-  const transferAttempt =
-    meta.transfer_attempt && typeof meta.transfer_attempt === "object"
-      ? (meta.transfer_attempt as { status?: string })
-      : null;
 
   const { data: transcripts } = await workspace.client
     .from("transcripts")
@@ -237,6 +233,7 @@ export default async function CallDetailPage({
   const job = jobRes.error
     ? null
     : (((jobRes.data || [])[0] || null) as InboxJob | null);
+  const workLoadError = Boolean(holdRes.error || jobRes.error);
   const purpose = classifyInboxPurpose({
     primaryIntent: row.primary_intent,
     resolution,
@@ -262,9 +259,21 @@ export default async function CallDetailPage({
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
+          {workLoadError ? (
+            <DeskError>Could not load visit or hold.</DeskError>
+          ) : null}
           <div>
             <h1 className={pageTitleClass}>
-              {title}
+              {person?.id ? (
+                <Link
+                  href={`/contacts/${person.id}`}
+                  className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  {title}
+                </Link>
+              ) : (
+                title
+              )}
             </h1>
             <div className="mt-3">
               <InboxPurposeChip
@@ -284,17 +293,6 @@ export default async function CallDetailPage({
             {titleIsPhone ? null : (
               <p className="mt-1 font-mono text-sm text-ink">{row.caller_number}</p>
             )}
-            {urgent ? (
-              <p className="mt-2 text-sm font-medium text-warn">Urgent</p>
-            ) : null}
-            {person?.id ? (
-              <Link
-                href={`/contacts/${person.id}`}
-                className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                Open contact
-              </Link>
-            ) : null}
           </div>
 
           <section
@@ -390,27 +388,17 @@ export default async function CallDetailPage({
           ) : null}
 
           <dl className="space-y-1 border-t border-line/80 pt-4 text-sm text-ink">
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <span>
-                Duration:{" "}
-                {row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
-              </span>
-              <span>Alert sent: {meta.whatsapp_sent ? "yes" : "no"}</span>
-              <span>Escalation: {meta.escalation_sent ? "sent" : "no"}</span>
-              {transferAttempt?.status ? (
-                <span>Transfer: {transferAttempt.status}</span>
-              ) : null}
-            </div>
-            {row.resolution != null || row.primary_intent || row.resolution_note ? (
+            <p>
+              Duration:{" "}
+              {row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
+            </p>
+            {row.resolution != null || row.resolution_note ? (
               <div className="space-y-1">
                 <p>
                   Assist:{" "}
                   <span className="font-medium text-ink">
                     {callResolutionLabel(resolution)}
                   </span>
-                  {row.primary_intent ? (
-                    <span className="text-ink-soft"> · {row.primary_intent}</span>
-                  ) : null}
                 </p>
                 {row.resolution_note ? (
                   <p className="text-ink-soft">{row.resolution_note}</p>
@@ -438,7 +426,7 @@ export default async function CallDetailPage({
             <div className="mt-4 rounded-2xl border border-line bg-surface px-2 py-4 sm:px-4">
               {turns.length === 0 ? (
                 <p className="px-3 py-6 text-center text-sm text-ink-soft">
-                  No transcript rows for this call.
+                  No conversation.
                 </p>
               ) : (
                 <div className="space-y-2.5">

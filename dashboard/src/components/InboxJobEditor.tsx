@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import {
   updateAppointmentSchedule,
   type AppointmentScheduleState,
@@ -27,10 +27,6 @@ export function InboxJobEditor({
     updateAppointmentSchedule,
     initial
   );
-
-  useEffect(() => {
-    if (state.error) console.warn("[InboxJobEditor]", state.error);
-  }, [state.error]);
 
   return (
     <div className="space-y-3">
@@ -63,7 +59,7 @@ export function InboxJobEditor({
         >
           {pending ? "Saving" : "Save"}
         </button>
-        {state.error ? <p className="text-sm text-warn">{state.error}</p> : null}
+        {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
       <InboxJobActions id={id} status={status} extra />
     </div>

@@ -3,17 +3,23 @@
 **Route:** `/calls`  
 **Job:** One work surface. Brain intent ids are mapped onto owner stamps. Copy follows `tenants.vertical`.
 
+**Outside vs inside.** `/calls` is recognition. `/calls/[id]` is decision. Jakob: who plus one ellipsized preview, like Mail or WhatsApp. Progressive disclosure: hangup copy stays on the record. Working memory: four chunks on a row (who, work, stamp or time, one verb). Von Restorff: that verb is the only fill. Hick: Holds and Visits change columns; they do not grow a second list. Fitts: the dock is `h-11 w-11`. Tesler: Brain taxonomy stays off the row.
+
 Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
 
 **Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
 **Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link.
 
-**Preview (one line):** Work is `deskPreviewClass`. One ellipsized line. The hangup paragraph, Want, Done, mood, and next live on `/calls/[id]`. Do not stack a second detail line under Work on mixed filters. Table Work cells use `deskPreviewCellClass`. Phone uses the same one-line clamp, never `line-clamp-2` for the summary.
+**Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column.
+
+**Phone Holds / Visits:** Same two-line row. Isolated Place or hold-type is a table column, not a third phone line.
+
+**Preview (one line):** Work is `deskPreviewClass`. One ellipsized line. The hangup paragraph, Want, Done, mood, and next live on `/calls/[id]`. Do not stack a second detail line under Work on mixed filters. Table Work cells use `deskPreviewCellClass`. Phone uses the same one-line clamp, never `line-clamp-2` for the summary. Isolated Holds and Visits table cells are also one line (Item or slot, not a stacked subtype).
 
 **Action dock (that trailing cell):**
 - Visit or booking with a job row: **Confirm** (then Done). That verb only.
-- Hold or order with a request row: **Done**. That verb only.
+- Hold or order with a request row: **Done**. That verb only. Reopen lives on the call, never beside Done on the list.
 - Return call, missed, or human asked, with a dialable number: **Call** then **WhatsApp**. Call is `tel:` on the device dialer. WhatsApp is `wa.me` with the follow-up opener.
 - No number: empty.
 - Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
@@ -26,6 +32,10 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 - **Send SMS:** Write a text on the call, then send. Shows only if Text customers is on. Primary on the call when there is no visit/hold to Confirm or Done. Not a list verb (needs a body).
 
 Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. Same `FilterTabs` as Contacts. Quiet hairline groups: act (Needs you, All), book (Visits, Holds), closed (Human, Answered).
+
+**Visit layout:** When Visits is isolated, List / Today / Week is a second `FilterTabs` row (underline, not filled). That row is the only layout switcher. List is the Inbox table. Today and Week are the run sheet. Their chrome is Prev / Next for the date, not a second List / Week control. Visit layout uses FilterTabs so Confirm on the row stays the only filled verb.
+
+**Run sheet phone:** Same two-line recipe as Inbox. Time is meta. Place stays a table column. Week cells are time plus one work line.
 
 **Bar order (owner characters):**
 - **08:00 owner:** Needs you first. What still needs a decision.

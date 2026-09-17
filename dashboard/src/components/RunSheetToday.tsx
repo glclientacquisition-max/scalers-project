@@ -25,7 +25,6 @@ export function RunSheetToday({
   prevHref,
   nextHref,
   listHref,
-  weekHref,
   vertical,
 }: {
   items: InboxItem[];
@@ -33,7 +32,6 @@ export function RunSheetToday({
   prevHref: string;
   nextHref: string;
   listHref: string;
-  weekHref: string;
   businessName: string;
   vertical?: string | null;
 }) {
@@ -59,18 +57,6 @@ export function RunSheetToday({
           >
             Next
           </Link>
-          <Link
-            href={weekHref}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-accent-deep hover:underline focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            Week
-          </Link>
-          <Link
-            href={listHref}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-accent-deep hover:underline focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            List
-          </Link>
         </div>
       </div>
 
@@ -83,22 +69,28 @@ export function RunSheetToday({
         </div>
       ) : (
         <>
-          <ul className="mt-4 divide-y divide-line border-y border-line md:hidden">
+          <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {items.map((item) => (
-              <li key={item.id} className="relative py-3">
+              <li
+                key={item.id}
+                className="relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0"
+              >
                 <DeskRowHit
                   href={item.callId ? `/calls/${item.callId}?from=job` : null}
                   label="Conversation"
                 />
-                <p className={`${deskRowMutedClass} text-sm font-semibold text-ink`}>
-                  {formatSlotClock(item)}
-                </p>
-                <p className={`${deskRowMutedClass} text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
-                <p className={`${deskRowMutedClass} text-xs text-ink-soft ${deskPreviewClass}`}>
-                  {item.callerName || "Caller"}
-                  {placeFor(item) ? ` · ${placeFor(item)}` : ""}
-                </p>
-                <div className={`${deskRowActionClass} mt-2`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className={`${deskRowMutedClass} text-sm font-semibold tracking-tight ${deskPreviewClass}`}>
+                      {item.callerName || "Caller"}
+                    </p>
+                    <p className="shrink-0 text-xs text-ink-soft">{formatSlotClock(item)}</p>
+                  </div>
+                  <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink ${deskPreviewClass}`}>
+                    {item.headline}
+                  </p>
+                </div>
+                <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
                   <RowAction item={item} />
                 </div>
               </li>
