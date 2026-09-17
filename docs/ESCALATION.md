@@ -39,7 +39,7 @@ Helpers: `deriveEscalationStage()`, `shapeEscalationNotifyOutcome()`.
 ## 3. Notify channel order (private beta)
 
 1. **SMS** — TextSMS.co.ke (`TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`)
-2. **WhatsApp** — SautiKit sender (when configured)
+2. **WhatsApp** — SautiKit **platform** sender on `+254709221536` (when `SAUTIKIT_WHATSAPP_NUMBER_ID` is set). Chat identity is Scalers, not the shop on that DID. Inbound replies: `POST /whatsapp/events`. Calling stays parked.
 3. **Email** — Resend → teammate email (owner `alert_email` only when the teammate number is the Alerts SMS phone)
 4. **Desk note** — always saved; soft success if 1–3 miss
 

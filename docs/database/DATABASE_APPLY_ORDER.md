@@ -159,6 +159,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 33d | `notify_send_ledger.sql` | `contacts_and_requests.sql` (`tenants`, `calls`, `current_user_tenant_ids`) |
 | 33e | `sms_allowance.sql` | `notify_send_ledger.sql`, **`line_rental_grace.sql`** (widens protect trigger) |
 | 33f | `package_entitlements.sql` | `sms_allowance.sql` |
+| 33g | `whatsapp_threads.sql` | `notify_send_ledger.sql` |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
 `realtime_inbox.sql` adds the three work tables to `supabase_realtime`. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.
