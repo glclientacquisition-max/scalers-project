@@ -189,9 +189,10 @@ Every database change merged to `main` must add a row to the **Change registry**
 | LEDGER-CONTACTS-INSERT | Owner INSERT on `contacts` | Desk add + CSV import | `contacts_owner_insert.sql` | this PR | YES (2026-09-09) | NO | NO | Policy `contacts_insert_member` |
 | LEDGER-REALTIME-INBOX | `supabase_realtime` publication += `calls`, `service_requests`, `appointments` | Live Inbox desk updates | `realtime_inbox.sql` | `bb6bb6c` (#279) | YES (2026-09-16) | YES (2026-09-16) | NO | Staging INSERT+UPDATE probe; production `pg_publication_tables` lists `appointments`, `calls`, `service_requests` |
 | LEDGER-REALTIME-INBOX-REPLICA | `REPLICA IDENTITY FULL` on `calls`, `service_requests`, `appointments` | Filtered hangup UPDATEs reach Live Inbox | `realtime_inbox_replica_identity.sql` | this PR | YES (2026-09-16) | YES (2026-09-16) | NO | `pg_class.relreplident = 'f'` on the three tables |
-| LEDGER-NOTIFY-SENDS | Append-only `notify_sends` | Meter staff/caller SMS vs platform wallet/outage | `notify_send_ledger.sql` | this PR | NO | NO | NO | Table + RLS; voice insert; desk caller INSERT |
-| LEDGER-SMS-ALLOWANCE | Included SMS + on-demand stop | Cursor-like cap. Same Wallet toggle as minutes. | `sms_allowance.sql` | this PR | NO | NO | NO | `consume_sms_units`; tenant SMS skip at cap unless on-demand; beta never blocks |
-| LEDGER-PACKAGE-ENTS | Email + seat included columns | Later packages write these. No gate yet. | `package_entitlements.sql` | this PR | NO | NO | NO | RPC-only columns; seats hard cap when gated |
+| LEDGER-NOTIFY-SENDS | Append-only `notify_sends` | Meter staff/caller SMS vs platform wallet/outage | `notify_send_ledger.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | Table + RLS; `to_regclass` = `notify_sends` |
+| LEDGER-SMS-ALLOWANCE | Included SMS + on-demand stop | Cursor-like cap. Same Wallet toggle as minutes. | `sms_allowance.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | `consume_sms_units` returns `beta` on staging (all tenants `billing_enforcement=off`) |
+| LEDGER-PACKAGE-ENTS | Email + seat included columns | Later packages write these. No gate yet. | `package_entitlements.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | Defaults 100 email / 5 seats; no gate |
+| LEDGER-LINE-RENTAL-GRACE | Line paid-through + grace | Prerequisite for SMS protect trigger | `line_rental_grace.sql` | prior | YES (2026-09-17) | NO | NO | Staging catch-up; `apply_line_rental` dropped/recreated for new OUT `line_paid_through` |
 
 ### Staging-only / proposed (not in standard Git apply)
 
