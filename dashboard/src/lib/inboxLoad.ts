@@ -216,13 +216,13 @@ export async function loadInboxItems(
         .order("created_at", { ascending: false })
         .range(from, to)
     );
-    tapeJobs = await client
+    tapeJobs = (await client
       .from("appointments")
       .select(JOB_SELECT_LEGACY)
       .eq("tenant_id", tenantId)
       .in("status", [...TAPE_JOB_STATUSES])
       .order("created_at", { ascending: false })
-      .limit(INBOX_WINDOW);
+      .limit(INBOX_WINDOW)) as typeof tapeJobsFirst;
   }
 
   const holdsFailed = Boolean(openHoldsRes.error);

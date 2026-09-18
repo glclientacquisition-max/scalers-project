@@ -122,11 +122,6 @@ export function InboxRowShell({
   useEffect(() => () => clearPress(), [clearPress]);
 
   const run = async (id: ActionId) => {
-    if (id === "select") {
-      ui?.enter(item.id);
-      close();
-      return;
-    }
     if (!item.callId) {
       setError("Missing call.");
       return;
