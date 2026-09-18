@@ -9,6 +9,7 @@ import {
   nairobiGreeting,
   walletKes,
 } from "@/lib/callsTriage";
+import { inboxRecordHref } from "@/lib/inboxHref";
 import {
   formatBulletinEndLabel,
   liveBulletinItems,
@@ -282,7 +283,7 @@ export default async function HomeOverviewPage() {
               className="relative mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
             >
               <DeskRowHit
-                href={nextReturn.callId ? `/calls/${nextReturn.callId}?from=needs` : null}
+                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { purpose: "needs" }) : null}
                 label="Conversation"
               />
               <h2

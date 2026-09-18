@@ -5,7 +5,6 @@ import {
   updateServiceRequestSchedule,
   type RequestScheduleState,
 } from "@/app/(desk)/requests/actions";
-import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 
 const initial: RequestScheduleState = {};
@@ -14,11 +13,9 @@ const fieldClass = deskFieldClass;
 
 export function InboxHoldEditor({
   id,
-  status,
   whenText,
 }: {
   id: string;
-  status: string;
   whenText: string | null;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -49,7 +46,6 @@ export function InboxHoldEditor({
         </button>
         {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
-      <RequestStatusToggle id={id} status={status} extra />
     </div>
   );
 }

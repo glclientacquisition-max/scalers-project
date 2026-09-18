@@ -4,6 +4,7 @@ import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { deskPreviewClass } from "@/components/ui/deskChrome";
 import type { InboxItem } from "@/lib/inboxPurpose";
+import { inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { groupRunSheetForWeek } from "@/lib/runSheet";
 import { weekHeading } from "@/lib/visitCalendar";
@@ -23,12 +24,14 @@ export function VisitWeekCalendar({
   monday,
   prevHref,
   nextHref,
+  ret,
   vertical,
 }: {
   items: InboxItem[];
   monday: string;
   prevHref: string;
   nextHref: string;
+  ret?: InboxReturn;
   businessName: string;
   vertical?: string | null;
 }) {
@@ -87,7 +90,7 @@ export function VisitWeekCalendar({
                         className="relative border-t border-line/70 pt-2 first:border-t-0 first:pt-0"
                       >
                         <DeskRowHit
-                          href={item.callId ? `/calls/${item.callId}?from=job` : null}
+                          href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
                           label="Conversation"
                         />
                         <p className={`${deskRowMutedClass} text-sm font-semibold text-ink ${deskPreviewClass}`}>
@@ -119,7 +122,7 @@ export function VisitWeekCalendar({
               return (
                 <li key={visit.id} className="relative flex flex-wrap items-center justify-between gap-3 py-3">
                   <DeskRowHit
-                    href={item.callId ? `/calls/${item.callId}?from=job` : null}
+                    href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
                     label="Conversation"
                   />
                   <div className={deskRowMutedClass}>

@@ -5,6 +5,7 @@ import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { btnGhost, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import type { InboxItem } from "@/lib/inboxPurpose";
+import { inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { dayHeading } from "@/lib/visitCalendar";
 import { formatSlotClock } from "@/lib/runSheet";
@@ -25,6 +26,7 @@ export function RunSheetToday({
   prevHref,
   nextHref,
   listHref,
+  ret,
   vertical,
 }: {
   items: InboxItem[];
@@ -32,6 +34,7 @@ export function RunSheetToday({
   prevHref: string;
   nextHref: string;
   listHref: string;
+  ret?: InboxReturn;
   businessName: string;
   vertical?: string | null;
 }) {
@@ -76,7 +79,7 @@ export function RunSheetToday({
                 className="relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0"
               >
                 <DeskRowHit
-                  href={item.callId ? `/calls/${item.callId}?from=job` : null}
+                  href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
                   label="Conversation"
                 />
                 <div className="min-w-0 flex-1">
@@ -122,7 +125,7 @@ export function RunSheetToday({
                   <tr key={item.id} className="relative border-b border-line last:border-b-0">
                     <td className="px-5 py-3 text-sm font-semibold text-ink">
                       <DeskRowHit
-                        href={item.callId ? `/calls/${item.callId}?from=job` : null}
+                        href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
                         label="Conversation"
                       />
                       {formatSlotClock(item)}

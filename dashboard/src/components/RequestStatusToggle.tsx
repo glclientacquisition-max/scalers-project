@@ -5,7 +5,7 @@ import {
   updateServiceRequestStatus,
   type RequestStatusState,
 } from "@/app/(desk)/requests/actions";
-import { btnDock, btnDockGhost, btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnDock, btnDockGhost, btnGhost, btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
 
 const initial: RequestStatusState = {};
 
@@ -46,8 +46,17 @@ export function RequestStatusToggle({
               value="fulfilled"
               disabled={pending}
               className={extra ? `${btnPrimary} w-full` : btnDock}
+              aria-label={pending ? "Saving" : "Done"}
             >
-              {pending ? "Saving" : "Done"}
+              {pending ? (
+                extra ? (
+                  "Saving"
+                ) : (
+                  <span aria-hidden="true" className={pendingSpinnerClass} />
+                )
+              ) : (
+                "Done"
+              )}
             </button>
             {extra ? (
               <button

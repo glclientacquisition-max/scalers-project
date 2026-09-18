@@ -21,16 +21,23 @@ import {
 } from "@/components/MarkLeadDoneButton";
 import { InboxJobEditor } from "@/components/InboxJobEditor";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
+import { InboxJobActions } from "@/components/InboxJobActions";
+import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { pageTitleClass } from "@/components/ui/deskChrome";
+import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import {
-  callsHref,
   followUpWhatsAppMessage,
   formatCallWhen,
 } from "@/lib/callsTriage";
+import {
+  contactFromCallHref,
+  inboxReturnFromSearch,
+  inboxReturnHref,
+} from "@/lib/inboxHref";
 import {
   classifyInboxPurpose,
   signalLabel,
@@ -80,24 +87,6 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
   );
 }
 
-function parseFromFilter(raw: string | undefined): string | undefined {
-  if (
-    raw === "needs" ||
-    raw === "hold" ||
-    raw === "job" ||
-    raw === "human" ||
-    raw === "answered" ||
-    raw === "all" ||
-    raw === "new" ||
-    raw === "contacted" ||
-    raw === "resolved" ||
-    raw === "archived"
-  ) {
-    return raw;
-  }
-  return undefined;
-}
-
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
 const CALL_SELECT_LEAD =
@@ -110,22 +99,19 @@ export default async function CallDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{
+    from?: string;
+    view?: string;
+    week?: string;
+    day?: string;
+    q?: string;
+    page?: string;
+  }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const fromFilter = parseFromFilter(sp.from);
-  const backHref = fromFilter
-    ? fromFilter === "new" ||
-      fromFilter === "contacted" ||
-      fromFilter === "resolved" ||
-      fromFilter === "archived"
-      ? callsHref({
-          status: fromFilter as "new" | "contacted" | "resolved" | "archived",
-        })
-      : callsHref({ purpose: fromFilter })
-    : "/calls";
-  const backLabel = "Inbox";
+  const inboxReturn = inboxReturnFromSearch(sp);
+  const backHref = inboxReturnHref(inboxReturn);
 
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
@@ -250,12 +236,7 @@ export default async function CallDetailPage({
 
   return (
     <div className="max-w-6xl">
-      <Link
-        href={backHref}
-        className="text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      >
-        {backLabel}
-      </Link>
+      <DeskBack href={backHref}>Inbox</DeskBack>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
@@ -266,7 +247,7 @@ export default async function CallDetailPage({
             <h1 className={pageTitleClass}>
               {person?.id ? (
                 <Link
-                  href={`/contacts/${person.id}`}
+                  href={contactFromCallHref(person.id, row.id, inboxReturn)}
                   className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   {title}
@@ -294,6 +275,28 @@ export default async function CallDetailPage({
               <p className="mt-1 font-mono text-sm text-ink">{row.caller_number}</p>
             )}
           </div>
+
+          {job ? (
+            <InboxJobActions id={job.id} status={job.status} extra />
+          ) : hold ? (
+            <RequestStatusToggle id={hold.id} status={hold.status} extra />
+          ) : smsPrimary ? (
+            <CallerNoteComposer
+              callId={row.id}
+              callerPhone={row.caller_number}
+              callerName={name}
+              callerSmsOn={callerSmsOn}
+              primary
+            />
+          ) : waPrimary && row.caller_number ? (
+            <WhatsAppLink
+              number={row.caller_number}
+              message={waMessage}
+              variant="primary"
+              label="Reply on WhatsApp"
+              className="w-full"
+            />
+          ) : null}
 
           <section
             className={[
@@ -328,7 +331,6 @@ export default async function CallDetailPage({
               <div className="mt-3">
                 <InboxJobEditor
                   id={job.id}
-                  status={job.status}
                   whenText={job.when_text}
                   landmark={job.address_landmark}
                 />
@@ -344,14 +346,13 @@ export default async function CallDetailPage({
               <div className="mt-3">
                 <InboxHoldEditor
                   id={hold.id}
-                  status={hold.status}
                   whenText={hold.when_text}
                 />
               </div>
             </section>
           ) : null}
 
-          {callerSmsOn ? (
+          {callerSmsOn && !smsPrimary ? (
             <section className="rounded-2xl border border-line bg-surface p-4">
               <CallerNoteComposer
                 callId={row.id}
@@ -361,16 +362,16 @@ export default async function CallDetailPage({
                 when={job?.when_text || hold?.when_text}
                 landmark={job?.address_landmark}
                 callerSmsOn={callerSmsOn}
-                primary={smsPrimary}
+                primary={false}
               />
             </section>
           ) : null}
 
-          {row.caller_number ? (
+          {row.caller_number && !waPrimary ? (
             <WhatsAppLink
               number={row.caller_number}
               message={waMessage}
-              variant={waPrimary ? "primary" : "link"}
+              variant="link"
               label="Reply on WhatsApp"
               className="w-full"
             />

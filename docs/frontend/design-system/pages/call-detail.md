@@ -11,7 +11,9 @@
 
 **Stamp:** Same owner-language signal as Inbox (Confirm visit, Hold, Human asked). Not Job / Hold taxonomy.
 
-**Left pane order:** identity, Summary, Visit/Hold if present, SMS if on, WhatsApp, Done/Archive, supporting facts (`dl`), recording.
+**Left pane order:** identity, current task (Confirm, Done, Reply on WhatsApp, or SMS), Summary, Visit/Hold schedule if present, SMS if not the task, muted WhatsApp, Done/Archive, supporting facts (`dl`), recording.
+
+**Back:** `DeskBack`, 44px. Label is Inbox. Restores pile, search, page, and visit layout. Contact opened from this page uses `DeskBack` Call.
 
 **Full copy lives here.** Inbox and Contacts show one truncated preview. Want, Done, mood, and next unwrap on this page. Do not truncate the Summary card.
 

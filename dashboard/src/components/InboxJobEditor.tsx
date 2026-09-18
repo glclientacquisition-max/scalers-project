@@ -5,7 +5,6 @@ import {
   updateAppointmentSchedule,
   type AppointmentScheduleState,
 } from "@/app/(desk)/appointments/actions";
-import { InboxJobActions } from "@/components/InboxJobActions";
 import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 
 const initial: AppointmentScheduleState = {};
@@ -14,12 +13,10 @@ const fieldClass = deskFieldClass;
 
 export function InboxJobEditor({
   id,
-  status,
   whenText,
   landmark,
 }: {
   id: string;
-  status: string;
   whenText: string | null;
   landmark: string | null;
 }) {
@@ -61,7 +58,6 @@ export function InboxJobEditor({
         </button>
         {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
-      <InboxJobActions id={id} status={status} extra />
     </div>
   );
 }
