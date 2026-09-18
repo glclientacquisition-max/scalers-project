@@ -80,7 +80,7 @@ describe("inbox outside and inside anatomy", () => {
   });
 
   it("defines the call as decide and reply, not operator telemetry", () => {
-    assert.match(callDetail, /stack below `xl`/);
+    assert.match(callDetail, /The call pane stacks/);
     assert.match(callDetail, /that `h1` is the contact link/);
     assert.match(callDetail, /Confirm or Done full width/);
     assert.match(callDetail, /Reopen lives here/);
@@ -98,11 +98,12 @@ describe("inbox outside and inside anatomy", () => {
         .filter((i) => i >= 0)
     );
     assert.ok(summaryAt >= 0 && summaryAt < actionsAt, "Summary sits before Actions");
-    assert.match(markup, /order-1 min-w-0 xl:order-none/);
-    assert.match(markup, /order-2 min-w-0 rounded-2xl border p-5 xl:order-none/);
-    assert.match(markup, /order-3 min-w-0 space-y-5 xl:order-none/);
-    assert.match(markup, /order-4 min-h-0 min-w-0 space-y-8 xl:order-none/);
-    assert.match(markup, /order-5 min-w-0 space-y-4[\s\S]*Duration:/);
+    const transcriptAt = markup.indexOf("<CallTranscript");
+    const durationAt = markup.indexOf("Duration:");
+    assert.ok(actionsAt < transcriptAt, "Conversation sits after Actions");
+    assert.ok(transcriptAt < durationAt, "Facts sit after Conversation");
+    assert.doesNotMatch(markup, /display: contents|className="contents /);
+    assert.doesNotMatch(detail, /InboxWorkspace/);
   });
 
   it("makes Confirm and Done full width on the call, dock-sized on the list", () => {
@@ -135,20 +136,26 @@ describe("inbox outside and inside anatomy", () => {
 
   it("opens the call beside Inbox on md and closes with Esc", () => {
     const workspace = read("dashboard/src/components/InboxWorkspace.tsx");
+    const layout = read("dashboard/src/app/(desk)/calls/layout.tsx");
+    const slot = read("dashboard/src/app/(desk)/calls/@inbox/[id]/page.tsx");
     const esc = read("dashboard/src/components/InboxEscClose.tsx");
-    assert.match(detail, /md:grid md:grid-cols-12/);
-    assert.match(detail, /hidden min-w-0 md:col-span-5 md:block/);
-    assert.match(detail, /<InboxWorkspace/);
-    assert.match(detail, /openCallId=\{id\}/);
+    assert.match(layout, /inbox: React.ReactNode/);
+    assert.match(layout, /aria-label="Inbox"/);
+    assert.match(layout, /md:empty:hidden/);
+    assert.match(slot, /<InboxWorkspace/);
+    assert.match(slot, /openCallId=\{id\}/);
+    assert.doesNotMatch(detail, /InboxWorkspace/);
     assert.match(detail, /<InboxEscClose href=\{backHref\} \/>/);
+    assert.match(detail, /aria-label="Close call"/);
     assert.match(detail, />\s*Close\s*</);
     assert.match(detail, /md:hidden/);
-    assert.match(detail, /xl:grid-cols-12/);
     assert.match(esc, /event.key !== "Escape"/);
     assert.match(esc, /role='dialog'/);
     assert.match(workspace, /openCallId/);
     assert.match(workspace, /current=\{rowIsOpen\(item, openCallId\)\}/);
+    assert.match(workspace, /overflow-x-hidden overflow-y-auto/);
     assert.match(row, /current\?: boolean/);
     assert.match(callDetail, /Esc and Close return to Inbox/);
+    assert.match(callDetail, /parallel `@inbox` slot/);
   });
 });

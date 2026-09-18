@@ -3,15 +3,15 @@
 **Route:** `/calls/[id]`  
 **Job:** Decide and reply. The list is who plus one preview. This page is the full record.
 
-**Inside vs outside.** Gestalt: `md+` keeps Inbox beside the call, like WhatsApp. Inner split is Summary left, Conversation right, stack below `xl`. Situation awareness: the stamp names the next action, not a brain id. Von Restorff: one filled verb for the current task. Fitts: that verb is full width. Progressive disclosure unwraps Want, Done, mood, and next here. Peak-end: empty transcript is `No conversation.`
+**Inside vs outside.** Gestalt: `md+` keeps Inbox beside the call, like WhatsApp. The call pane stacks: identity, Summary, Actions, Conversation, facts. Situation awareness: the stamp names the next action, not a brain id. Von Restorff: one filled verb for the current task. Fitts: that verb is full width. Progressive disclosure unwraps Want, Done, mood, and next here. Peak-end: empty transcript is `No conversation.`
 
-**Layout:** Phone (`<md`) is a full call. `md+` is Inbox list left, call right. Compact Mail rows in that list pane. Inner Summary | transcript from `xl` only, because the call is already half the desk. Below `xl` the call stacks: identity, Summary, Actions, Conversation, then a de-emphasized facts footer. Esc and Close return to Inbox. Filter tabs stay on the open call.
+**Layout:** Phone (`<md`) is a full call. `md+` is Inbox list left, call right. The list is a parallel `@inbox` slot, not nested in the call page. Compact Mail rows in that list pane. One named scroll on the list, one on the call. Esc and Close return to Inbox. Filter tabs stay on the open call.
 
 **Identity once.** `h1` is the caller. If a contact file exists, that `h1` is the contact link. Status pills sit with the stamp. Phone repeats only when the title is a name. No "Open contact". No second Caller card or SID block.
 
 **Stamp:** Same owner-language signal as Inbox (Confirm visit, Hold, Human asked). Not Job / Hold taxonomy.
 
-**Left pane order:** identity (name, stamp, status pills, time, phone), Summary, Actions (one filled next step, then WhatsApp / SMS / Done / Archive), Visit/Hold schedule if present. Supporting facts (`dl`) and recording are a de-emphasized footer. Conversation sits in the right pane on `xl+`; below `xl` it stacks after Actions and before the footer.
+**Left pane order:** identity (name, stamp, status pills, time, phone), Summary, Actions (one filled next step, then WhatsApp / SMS / Done / Archive), Visit/Hold schedule if present, Conversation, then a de-emphasized facts footer. Same source order as the screen. No `display: contents`.
 
 **Back:** `DeskBack` Inbox on the phone. `md+` uses Close plus Esc. Restores pile, search, page, and visit layout. Contact opened from this page uses `DeskBack` Call.
 

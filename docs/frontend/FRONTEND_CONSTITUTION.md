@@ -53,7 +53,7 @@ Cross-referenced. Product rules win when sources disagree.
 From `.cursor/rules/scalers-design-ux.mdc`:
 
 1. **Copy:** No fluff, no instructional subheaders, no em/en dashes in UI strings. Labels are verbs or nouns the owner already knows.
-2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Inbox on `md+` opens a call beside the list (WhatsApp). Phone is a full call. Inner call split: summary left, transcript right from `xl`; below `xl`, stack those two panes. One composition at every width. Phone list rows. `md+` tables on `/calls`. Compact Mail rows when the list shares the viewport with a call. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`). List preview is one truncated line (`deskPreviewClass`). Full Want / Done / mood / next stay on `/calls/[id]`.
+2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Inbox on `md+` opens a call beside the list (WhatsApp). Phone is a full call. The call pane stacks. One composition at every width. Phone list rows. `md+` tables on `/calls`. Compact Mail rows when the list shares the viewport with a call. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`). List preview is one truncated line (`deskPreviewClass`). Full Want / Done / mood / next stay on `/calls/[id]`.
 3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted. Confirm, Done, Call, and WhatsApp use `deskHitClass` (`h-12 w-12`). Label length does not change the hit.
 4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail. Sidebar category titles: `uppercase tracking-wide text-gray-500` (or `text-ink-soft`), no hover, not links.
 5. **Tech:** Tailwind utilities only for layout/chrome. Focus: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`. Container padding `p-4`–`p-6`.
@@ -122,7 +122,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 | --- | --- | --- |
 | `/home` | Exclusive map: return calls, Holds, Visits or Bookings by niche. Briefing names the next action. Line. One CTA into the sharpest queue. | Command Center. Not a second inbox. |
 | `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Dense table. Work leads. Holds and Jobs change columns. |
-| `/calls/[id]` | Decide + reply | `md+` list beside call; inner summary/transcript from `xl`; WhatsApp CTA brand-blue fill, green glyph |
+| `/calls/[id]` | Decide + reply | `md+` list beside stacked call; WhatsApp CTA brand-blue fill, green glyph |
 | `/contacts` | Named callers | Existing contacts surface. Not a CRM. |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
 | `/appointments` | Visits book | Redirect `/calls?purpose=job` |

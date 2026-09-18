@@ -46,10 +46,17 @@ export function InboxToolbar({
   }) => inboxKeepHref(openCallId, ret);
 
   return (
-    <header className="space-y-6">
-      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <header className="min-w-0 space-y-4">
+      {openCallId ? <h2 className="sr-only">Inbox</h2> : null}
+      <div
+        className={
+          openCallId
+            ? "flex min-w-0 flex-col gap-3"
+            : "flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
+        }
+      >
         {openCallId ? (
-          <p className={`min-w-0 text-[13px] text-ink-soft ${deskPreviewClass}`}>{briefing}</p>
+          <p className="min-w-0 text-[13px] leading-5 text-ink-soft">{briefing}</p>
         ) : (
           <div className="min-w-0">
             <h1 className={pageTitleClass}>Inbox</h1>
@@ -67,18 +74,20 @@ export function InboxToolbar({
           ) : null}
           {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
           {(todayView || holdToday) && day ? <input type="hidden" name="day" value={day} /> : null}
-          <label className="sr-only" htmlFor="inbox-search">
+          <label className="sr-only" htmlFor={openCallId ? "inbox-search-pane" : "inbox-search"}>
             Search inbox
           </label>
-          <input
-            id="inbox-search"
-            name="q"
-            type="search"
-            defaultValue={q}
-            placeholder={copy.searchPlaceholder}
-            className={deskFieldClass}
-          />
-          <button type="submit" className={btnGhost}>
+          <div className="min-w-0 flex-1">
+            <input
+              id={openCallId ? "inbox-search-pane" : "inbox-search"}
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder={copy.searchPlaceholder}
+              className={deskFieldClass}
+            />
+          </div>
+          <button type="submit" className={`${btnGhost} shrink-0`}>
             Search
           </button>
         </form>
@@ -87,6 +96,7 @@ export function InboxToolbar({
       <FilterTabs
         label="Filter by purpose"
         active={active}
+        wrap={Boolean(openCallId)}
         items={filters.map((item) => ({
           id: item.id,
           label: item.label,
@@ -116,6 +126,7 @@ export function InboxToolbar({
         <FilterTabs
           label="Visit sort"
           active={workView ? "work" : "list"}
+          wrap={Boolean(openCallId)}
           items={[
             {
               id: "list",
@@ -141,6 +152,7 @@ export function InboxToolbar({
         <FilterTabs
           label="Hold sort"
           active={holdToday ? "work" : "list"}
+          wrap={Boolean(openCallId)}
           items={[
             {
               id: "list",
@@ -165,6 +177,7 @@ export function InboxToolbar({
         <FilterTabs
           label="Work date"
           active={weekView ? "week" : "today"}
+          wrap={Boolean(openCallId)}
           items={[
             {
               id: "today",

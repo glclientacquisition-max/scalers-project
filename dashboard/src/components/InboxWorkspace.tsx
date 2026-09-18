@@ -227,11 +227,10 @@ export async function InboxWorkspace({
   return (
     <div
       className={
-        split
-          ? "min-w-0 md:max-h-[calc(100dvh-var(--desk-header-h)-5rem)] md:overflow-auto"
-          : undefined
+        split ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : undefined
       }
     >
+      <div className={split ? "min-w-0 shrink-0" : undefined}>
       <InboxToolbar
         active={activeFilter}
         counts={counts}
@@ -243,6 +242,15 @@ export async function InboxWorkspace({
         day={todayView || holdTodayView ? day : undefined}
         openCallId={openCallId}
       />
+      </div>
+
+      <div
+        className={
+          split
+            ? "mt-4 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
+            : undefined
+        }
+      >
 
       {partialError ? (
         <div className="mt-6">
@@ -331,6 +339,7 @@ export async function InboxWorkspace({
             scopeKey={`${activeFilter}:${page}:${q}`}
           >
             <ul
+              aria-label="Conversations"
               className={
                 split
                   ? "mt-6 overflow-hidden rounded-2xl border border-line bg-surface"
@@ -455,6 +464,7 @@ export async function InboxWorkspace({
           />
         </>
       )}
+      </div>
     </div>
   );
 }
