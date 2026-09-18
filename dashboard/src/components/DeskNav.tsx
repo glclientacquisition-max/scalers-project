@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
+import { DeskHint } from "@/components/ui/DeskHint";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
 export const DESK_LINKS = [
@@ -135,33 +136,38 @@ export function DeskRail() {
   return (
     <div className="hidden h-dvh w-[4.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex">
       <div className="flex h-14 items-center justify-center">
-        <BrandLockup href="/home" name="Scalers" size="sm" markOnly priority />
+        <DeskHint label="Scalers">
+          <BrandLockup href="/home" name="Scalers" size="sm" markOnly priority />
+        </DeskHint>
       </div>
       <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1.5 pt-1">
         {DESK_LINKS.map((item) => {
           const active = pathActive(pathname, item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              aria-current={active ? "page" : undefined}
-              className={[
-                "inline-flex h-12 w-12 items-center justify-center rounded-xl",
-                deskShiftClass,
-                focusRingVisible,
-                active
-                  ? "bg-accent/10 text-accent-deep"
-                  : "text-ink-soft hover:bg-surface-muted hover:text-ink",
-              ].join(" ")}
-            >
-              <TabIcon name={item.label} />
-            </Link>
+            <DeskHint key={item.href} label={item.label}>
+              <Link
+                href={item.href}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                className={[
+                  "inline-flex h-12 w-12 items-center justify-center rounded-xl",
+                  deskShiftClass,
+                  focusRingVisible,
+                  active
+                    ? "bg-accent/10 text-accent-deep"
+                    : "text-ink-soft hover:bg-surface-muted hover:text-ink",
+                ].join(" ")}
+              >
+                <TabIcon name={item.label} />
+              </Link>
+            </DeskHint>
           );
         })}
       </nav>
       <div className="flex justify-center pb-3">
-        <SignOutButton compact />
+        <DeskHint label="Sign out">
+          <SignOutButton compact />
+        </DeskHint>
       </div>
     </div>
   );

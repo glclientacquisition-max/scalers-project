@@ -19,6 +19,11 @@ describe("desk phone shell", () => {
     assert.match(nav, /export const DESK_LINKS/);
     assert.match(nav, /export function DeskTabBar/);
     assert.match(nav, /export function DeskRail/);
+    assert.match(nav, /DeskHint/);
+    assert.doesNotMatch(nav, /title=\{item.label\}/);
+    assert.doesNotMatch(nav, /title="Sign out"/);
+    assert.match(nav, /label="Sign out"/);
+    assert.match(nav, /label="Scalers"/);
     assert.match(nav, /markOnly/);
     assert.match(nav, /w-\[4\.5rem\]/);
     assert.match(nav, /SignOutButton compact/);
@@ -63,5 +68,16 @@ describe("desk phone shell", () => {
     assert.match(constitution, /bottom tab bar/);
     assert.match(constitution, /icon rail is `DESK_LINKS`/);
     assert.match(constitution, /do not live in a hamburger drawer/);
+    const hint = read("dashboard/src/components/ui/DeskHint.tsx");
+    assert.match(hint, /createPortal/);
+    assert.doesNotMatch(hint, /title=\{label\}/);
+    assert.match(hint, /onPointerEnter/);
+    assert.match(hint, /role="tooltip"/);
+    assert.match(hint, /data-desk-hint=\{label\}/);
+    assert.match(hint, /bg-\[#0A192F\]/);
+    assert.match(hint, /onMouseEnter/);
+    assert.match(hint, /onFocusCapture/);
+    assert.match(hint, /Escape/);
+    assert.match(hint, /side === "end"/);
   });
 });
