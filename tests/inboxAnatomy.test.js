@@ -64,10 +64,23 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(callDetail, /Reopen lives here/);
     assert.match(callDetail, /Could not save\./);
     assert.doesNotMatch(detail, />\s*Open contact\s*</);
-    assert.match(detail, /No conversation\./);
+    assert.match(read("dashboard/src/components/CallTranscript.tsx"), /No conversation\./);
     assert.doesNotMatch(detail, / · \{row\.primary_intent\}/);
     assert.doesNotMatch(detail, /Alert sent:/);
     assert.doesNotMatch(detail, /No transcript rows for this call/);
+    const markup = detail.slice(detail.indexOf("return ("));
+    const summaryAt = markup.indexOf("Summary");
+    const actionsAt = Math.min(
+      ...["<InboxJobActions", "<RequestStatusToggle", "<CallerNoteComposer"]
+        .map((token) => markup.indexOf(token))
+        .filter((i) => i >= 0)
+    );
+    assert.ok(summaryAt >= 0 && summaryAt < actionsAt, "Summary sits before Actions");
+    assert.match(markup, /order-1 min-w-0 lg:order-none/);
+    assert.match(markup, /order-2 min-w-0 rounded-2xl border p-5 lg:order-none/);
+    assert.match(markup, /order-3 min-w-0 space-y-5 lg:order-none/);
+    assert.match(markup, /order-4 min-h-0 min-w-0 space-y-8 lg:order-none/);
+    assert.match(markup, /order-5 min-w-0 space-y-4[\s\S]*Duration:/);
   });
 
   it("makes Confirm and Done full width on the call, dock-sized on the list", () => {

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import { btnGhost, deskShiftClass } from "@/components/ui/deskChrome";
 
 type SoftAction = "resolved" | "archived";
 
@@ -55,7 +55,7 @@ export function MarkLeadActionButton({
   callId: string;
   action: SoftAction;
   disabled?: boolean;
-  variant?: "default" | "icon";
+  variant?: "default" | "icon" | "button";
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -79,18 +79,30 @@ export function MarkLeadActionButton({
   }
 
   if (done) {
+    if (variant === "button") {
+      return (
+        <span className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-sm font-semibold text-ok">
+          {successLabel}
+        </span>
+      );
+    }
     return <span className="text-xs font-medium text-ok">{successLabel}</span>;
   }
 
   const iconButtonClass =
     `inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
+  const chromeButtonClass = `${btnGhost} w-full gap-2`;
+  const linkButtonClass =
+    `text-xs font-medium text-ink-soft underline-offset-2 ${deskShiftClass} hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
 
   return (
     <span
       className={
         variant === "icon"
           ? "inline-flex flex-col items-center"
-          : "inline-flex flex-col items-start gap-1"
+          : variant === "button"
+            ? "flex w-full flex-col items-stretch gap-1"
+            : "inline-flex flex-col items-start gap-1"
       }
     >
       <button
@@ -113,9 +125,9 @@ export function MarkLeadActionButton({
         className={
           variant === "icon"
             ? iconButtonClass
-            : [
-                `text-xs font-medium text-ink-soft underline-offset-2 ${deskShiftClass} hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`,
-              ].join(" ")
+            : variant === "button"
+              ? chromeButtonClass
+              : linkButtonClass
         }
       >
         {variant === "icon" ? (
@@ -124,6 +136,15 @@ export function MarkLeadActionButton({
           ) : (
             <DoneGlyph className="h-4 w-4" />
           )
+        ) : variant === "button" ? (
+          <>
+            {action === "archived" ? (
+              <ArchiveGlyph className="h-4 w-4" />
+            ) : (
+              <DoneGlyph className="h-4 w-4" />
+            )}
+            {pending ? busyLabel : label}
+          </>
         ) : pending ? (
           busyLabel
         ) : (
@@ -134,7 +155,11 @@ export function MarkLeadActionButton({
         <span
           className={[
             "text-xs text-warn",
-            variant === "icon" ? "mt-1 max-w-[9rem] text-center" : "max-w-[14rem]",
+            variant === "icon"
+              ? "mt-1 max-w-[9rem] text-center"
+              : variant === "button"
+                ? "text-center"
+                : "max-w-[14rem]",
           ].join(" ")}
         >
           {error}
@@ -151,7 +176,7 @@ export function MarkLeadDoneButton({
 }: {
   callId: string;
   disabled?: boolean;
-  variant?: "default" | "icon";
+  variant?: "default" | "icon" | "button";
 }) {
   return (
     <MarkLeadActionButton
@@ -170,7 +195,7 @@ export function MarkLeadArchiveButton({
 }: {
   callId: string;
   disabled?: boolean;
-  variant?: "default" | "icon";
+  variant?: "default" | "icon" | "button";
 }) {
   return (
     <MarkLeadActionButton

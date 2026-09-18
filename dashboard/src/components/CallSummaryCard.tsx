@@ -71,12 +71,12 @@ export function CallSummaryCard({
   return (
     <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
       <Field label="Want" value={wantText} wide />
-      <Field label="Done" value={displayLine(done, "None")} />
+      <Field label="Do next" value={displayLine(next, "None")} wide />
       <Field
         label="Mood"
         value={MOOD_LABEL[moodKey] || MOOD_LABEL.unknown}
       />
-      <Field label="Do next" value={displayLine(next, "None")} />
+      <Field label="Done" value={displayLine(done, "None")} />
     </dl>
   );
 }
