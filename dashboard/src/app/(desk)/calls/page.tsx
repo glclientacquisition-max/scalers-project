@@ -25,7 +25,7 @@ import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/Inbox
 import type { InboxReturn } from "@/lib/inboxHref";
 import { inboxTeammateOptions } from "@/lib/inboxTriage";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
-import { InboxBulkBar } from "@/components/InboxRowSelect";
+import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
@@ -217,7 +217,9 @@ export default async function CallsPage({
   };
 
   return (
+    <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
     <div>
+      <InboxSelectChrome items={boardView || holdTodayView ? [] : pageRows}>
       <InboxToolbar
         active={activeFilter}
         counts={counts}
@@ -230,6 +232,7 @@ export default async function CallsPage({
         week={weekView ? monday : undefined}
         day={todayView || holdTodayView ? day : undefined}
       />
+      </InboxSelectChrome>
 
       {partialError ? (
         <div className="mt-6">
@@ -316,8 +319,6 @@ export default async function CallsPage({
             ids={pageRows.map((item) => item.id)}
             scopeKey={`${activeFilter}:${page}:${q}`}
           >
-          <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
-          <InboxBulkBar items={pageRows} />
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {showArchivedEntry ? <InboxArchivedPhoneRow count={counts.archived} q={q} /> : null}
             {pageRows.map((item) => (
@@ -394,7 +395,6 @@ export default async function CallsPage({
               </tbody>
             </DeskDataTable>
           </div>
-          </InboxRowUiProvider>
           </DeskLandScope>
 
           <Pagination
@@ -407,5 +407,6 @@ export default async function CallsPage({
         </>
       )}
     </div>
+    </InboxRowUiProvider>
   );
 }

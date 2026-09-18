@@ -8,7 +8,7 @@ import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
-import { InboxBulkBar } from "@/components/InboxRowSelect";
+import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { ThemePicker } from "@/components/ThemePicker";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
@@ -55,6 +55,7 @@ const ROWS: InboxItem[] = [
     callerName: "Amina",
     headline: "Asked for a person",
     intent: "human",
+    pinnedAt: "2026-09-18T08:00:00.000Z",
   }),
   item({
     id: "job",
@@ -186,6 +187,8 @@ export default function DevInboxPage() {
         </div>
       </header>
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
+        <InboxRowUiProvider>
+        <InboxSelectChrome items={ROWS}>
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
@@ -196,8 +199,7 @@ export default function DevInboxPage() {
             <ThemePicker />
           </div>
         </div>
-        <InboxRowUiProvider>
-        <InboxBulkBar items={ROWS} />
+        </InboxSelectChrome>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
           <InboxArchivedPhoneRow count={14} />
           {ROWS.map((row) => (

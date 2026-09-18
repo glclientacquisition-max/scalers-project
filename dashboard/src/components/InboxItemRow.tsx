@@ -4,7 +4,7 @@ import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { InboxRowAvatar } from "@/components/InboxRowAvatar";
 import { InboxRowMore, InboxRowShell } from "@/components/InboxRowOverflow";
-import { InboxPhoneOpen, InboxRowCheck, InboxRowHit } from "@/components/InboxRowSelect";
+import { InboxPhoneOpen, InboxRowCheck, InboxRowHit, InboxDockIdle } from "@/components/InboxRowSelect";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
@@ -84,6 +84,17 @@ function inboxContactHref(item: InboxItem, purpose: InboxPurposeFilterId, ret?: 
   return item.contactId ? contactFromInboxHref(item.contactId, ret || { purpose }) : null;
 }
 
+function InboxPinMark({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span aria-label="Pinned" className="inline-flex shrink-0 text-ink-soft">
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+        <path d="M10.2 1.6 8.4 3.4 5.8 2.6 4.4 4l3.2 3.2-1 3.6 1.4 1.4 3.6-1 3.2 3.2 1.4-1.4-.8-2.6 1.8-1.8-1.8-1.8z" />
+      </svg>
+    </span>
+  );
+}
+
 function InboxRowWho({
   item,
   purpose,
@@ -104,6 +115,7 @@ function InboxRowWho({
           phone={item.callerPhone}
           contactHref={inboxContactHref(item, purpose, ret)}
           ret={ret}
+          itemId={item.id}
         />
       </div>
       <div className={`${deskRowMutedClass} min-w-0`}>{children}</div>
@@ -123,17 +135,27 @@ function InboxTrailingAction({
   message: string;
 }) {
   if (item.job) {
-    return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
+    return (
+      <InboxDockIdle>
+        <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />
+      </InboxDockIdle>
+    );
   }
   if (item.hold) {
-    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />;
+    return (
+      <InboxDockIdle>
+        <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />
+      </InboxDockIdle>
+    );
   }
   if (item.callerPhone) {
     return (
-      <div className="flex shrink-0 items-center justify-end gap-2">
-        <CallLink number={item.callerPhone} />
-        <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
-      </div>
+      <InboxDockIdle>
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          <CallLink number={item.callerPhone} />
+          <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
+        </div>
+      </InboxDockIdle>
     );
   }
   return null;
@@ -198,6 +220,7 @@ export function InboxTableRow({
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
               <RowStateDot show={item.needsYou} live={live} />
+              <InboxPinMark show={Boolean(item.pinnedAt)} />
               {showHold ? needed : when}
             </span>
           </td>
@@ -222,6 +245,7 @@ export function InboxTableRow({
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
               <RowStateDot show={item.needsYou} live={live} />
+              <InboxPinMark show={Boolean(item.pinnedAt)} />
               {hasJob ? place : ""}
             </span>
           </td>
@@ -247,6 +271,7 @@ export function InboxTableRow({
           <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
               <RowStateDot show={item.needsYou} live={live} />
+              <InboxPinMark show={Boolean(item.pinnedAt)} />
               {when}
             </span>
           </td>
@@ -289,6 +314,7 @@ export function InboxPhoneRow({
         </p>
         <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
           <RowStateDot show={item.needsYou} live={item.purpose === "live"} />
+          <InboxPinMark show={Boolean(item.pinnedAt)} />
           {meta}
         </p>
       </div>
@@ -314,6 +340,7 @@ export function InboxPhoneRow({
           phone={item.callerPhone}
           contactHref={inboxContactHref(item, purpose, ret)}
           ret={ret}
+          itemId={item.id}
         />
       </div>
       <InboxPhoneOpen href={openHref} itemId={item.id}>

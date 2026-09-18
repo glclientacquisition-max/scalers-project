@@ -46,7 +46,7 @@ describe("universal row anatomy", () => {
     assert.match(phone, /<InboxRowAvatar/);
     assert.match(avatar, /RowIdentity name=\{name\}/);
     assert.match(inbox, /RowStateDot show=\{item\.needsYou\}/);
-    assert.match(inbox, /deskRowWeightClass\(item\.needsYou\)/);
+    assert.match(inbox, /deskRowWeightClass\(item\.needsYou \|\| item\.unread\)/);
     assert.match(inbox, /deskPreviewClass/);
     assert.match(inbox, /deskPreviewCellClass/);
     assert.doesNotMatch(inbox, /line-clamp-2/);
