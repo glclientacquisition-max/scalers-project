@@ -3,7 +3,7 @@
 **Route:** `/calls`  
 **Job:** One work surface. Brain intent ids are mapped onto owner stamps. Copy follows `tenants.vertical`.
 
-**Outside vs inside.** `/calls` is recognition. `/calls/[id]` is decision. Jakob: who plus one ellipsized preview, like Mail or WhatsApp. Progressive disclosure: hangup copy stays on the record. Working memory: four chunks on a row (who, work, stamp or time, one verb). Von Restorff: that verb is the only fill. Hick: Holds and Visits change columns; they do not grow a second list. Fitts: the dock is `h-11 w-11`. Tesler: Brain taxonomy stays off the row.
+**Outside vs inside.** `/calls` is recognition. `/calls/[id]` is decision. Jakob: who plus one ellipsized preview, like Mail or WhatsApp. Progressive disclosure: hangup copy stays on the record. Working memory: four chunks on a row (who, work, stamp or time, one verb). Von Restorff: that verb is the only fill. Hick: Holds and Visits change columns; they do not grow a second list. Fitts: the dock is `h-12 w-12`. Tesler: Brain taxonomy stays off the row.
 
 Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
 
@@ -36,6 +36,8 @@ Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Huma
 **Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). Visit sort uses FilterTabs so Confirm stays the only filled verb. List is the Inbox table: requested and confirmed, newest work. Work is the diary of that same book. Date is visible there. Confirm lives on List and on Work.
 
 **Work date:** Today / Week appears only under Work. Today is this EAT day by clock, with the day heading and slot time. Requested slots for that day sit here. Week is the same book by day. Phone shows only days with work. Desktop keeps the seven-day grid. Prev / Next moves the day or week. Holds stay on Holds. Done and cancelled stay off this book.
+
+**Hold sort:** When Holds is isolated, List / Work is a second `FilterTabs` row. List is newest open holds. Pickup, order, and enquiry sit together. Anytime stays on List. Work is this EAT day by pickup clock. Open holds whose slot is today sit here. You Done there. No week grid.
 
 **Bar order (owner characters):**
 - **08:00 owner:** Needs you first. What still needs a decision.
@@ -72,10 +74,10 @@ Columns (`md+` table, same data as the phone row):
 - Jobs: Visit or Booking / Who / Place. Verb **Confirm**.
 
 **Icons (Inbox only):**
-- WhatsApp glyph, green on white, `h-11 w-11`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
-- Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-11 w-11`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
+- WhatsApp glyph, green on white, `h-12 w-12`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
+- Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-12 w-12`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
-- Confirm / Done / Call / WhatsApp are `h-11 w-11`. List: that verb only. Call detail uses the same hit. Transcript is the right pane from `lg`; stack below `lg`.
+- Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit. Transcript is the right pane from `lg`; stack below `lg`.
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 

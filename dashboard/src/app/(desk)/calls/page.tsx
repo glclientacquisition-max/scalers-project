@@ -26,6 +26,7 @@ import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
 import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
+import { holdBoardForDay } from "@/lib/holdSheet";
 import {
   parseDayParam,
   parseWeekParam,
@@ -176,29 +177,31 @@ export default async function CallsPage({
   const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";
   const todayView = activeFilter === "job" && view === "today";
+  const holdTodayView = activeFilter === "hold" && view === "today";
   const boardView = weekView || todayView;
   const monday = parseWeekParam(sp.week);
   const day = parseDayParam(sp.day);
   const boardItems = boardView ? visitBoardItems(searched) : filtered;
   const todayItems = todayView ? visitBoardForDay(searched, day) : [];
+  const holdTodayItems = holdTodayView ? holdBoardForDay(searched, day) : [];
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = boardView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
+  const pageRows = boardView || holdTodayView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
     q: q || undefined,
-    view: weekView ? "week" : todayView ? "today" : undefined,
+    view: weekView ? "week" : todayView || holdTodayView ? "today" : undefined,
     week: weekView ? monday : undefined,
-    day: todayView ? day : undefined,
+    day: todayView || holdTodayView ? day : undefined,
   };
   const inboxRet: InboxReturn = {
     purpose: activeFilter,
     q: q || undefined,
-    page: boardView ? undefined : page,
-    view: boardView ? view : undefined,
+    page: boardView || holdTodayView ? undefined : page,
+    view: boardView || holdTodayView ? view : undefined,
     week: weekView ? monday : undefined,
-    day: todayView ? day : undefined,
+    day: todayView || holdTodayView ? day : undefined,
   };
 
   return (
@@ -209,9 +212,9 @@ export default async function CallsPage({
         q={q}
         caption={inboxCaption(searched, vertical)}
         vertical={vertical}
-        view={boardView ? view : undefined}
+        view={boardView || holdTodayView ? view : undefined}
         week={weekView ? monday : undefined}
-        day={todayView ? day : undefined}
+        day={todayView || holdTodayView ? day : undefined}
       />
 
       {partialError ? (
@@ -238,6 +241,28 @@ export default async function CallsPage({
           })}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
           ret={{ purpose: "job", q: q || undefined, view: "today", day }}
+          businessName={businessName}
+          vertical={vertical}
+        />
+      ) : holdTodayView ? (
+        <RunSheetToday
+          items={holdTodayItems}
+          ymd={day}
+          purpose="hold"
+          prevHref={callsHref({
+            purpose: "hold",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, -1),
+          })}
+          nextHref={callsHref({
+            purpose: "hold",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, 1),
+          })}
+          listHref={callsHref({ purpose: "hold", q: q || undefined })}
+          ret={{ purpose: "hold", q: q || undefined, view: "today", day }}
           businessName={businessName}
           vertical={vertical}
         />

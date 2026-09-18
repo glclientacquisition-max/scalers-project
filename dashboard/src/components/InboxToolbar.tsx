@@ -33,6 +33,7 @@ export function InboxToolbar({
     (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
   const weekView = active === "job" && view === "week";
   const todayView = active === "job" && (view === "today" || view === "work");
+  const holdToday = active === "hold" && (view === "today" || view === "work");
   const workView = weekView || todayView;
 
   return (
@@ -48,9 +49,11 @@ export function InboxToolbar({
           className="flex w-full min-w-0 gap-2 sm:max-w-sm"
         >
           <input type="hidden" name="purpose" value={active} />
-          {workView ? <input type="hidden" name="view" value={weekView ? "week" : "today"} /> : null}
+          {workView || holdToday ? (
+            <input type="hidden" name="view" value={weekView ? "week" : "today"} />
+          ) : null}
           {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
-          {todayView && day ? <input type="hidden" name="day" value={day} /> : null}
+          {(todayView || holdToday) && day ? <input type="hidden" name="day" value={day} /> : null}
           <label className="sr-only" htmlFor="inbox-search">
             Search inbox
           </label>
@@ -79,9 +82,19 @@ export function InboxToolbar({
           href: callsHref({
             purpose: item.id,
             q: q || undefined,
-            view: item.id === "job" && workView ? (weekView ? "week" : "today") : undefined,
+            view:
+              item.id === "job" && workView
+                ? weekView
+                  ? "week"
+                  : "today"
+                : item.id === "hold" && holdToday
+                  ? "today"
+                  : undefined,
             week: item.id === "job" && weekView ? week : undefined,
-            day: item.id === "job" && todayView ? day : undefined,
+            day:
+              (item.id === "job" && todayView) || (item.id === "hold" && holdToday)
+                ? day
+                : undefined,
           }),
         }))}
       />
@@ -105,6 +118,30 @@ export function InboxToolbar({
                 view: weekView ? "week" : "today",
                 week: weekView ? week : undefined,
                 day: weekView ? undefined : day,
+              }),
+            },
+          ]}
+        />
+      ) : null}
+
+      {active === "hold" ? (
+        <FilterTabs
+          label="Hold sort"
+          active={holdToday ? "work" : "list"}
+          items={[
+            {
+              id: "list",
+              label: "List",
+              href: callsHref({ purpose: "hold", q: q || undefined }),
+            },
+            {
+              id: "work",
+              label: "Work",
+              href: callsHref({
+                purpose: "hold",
+                q: q || undefined,
+                view: "today",
+                day,
               }),
             },
           ]}

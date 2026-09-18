@@ -159,7 +159,7 @@ function compareInboxSignal(a, b) {
 
 function orderInboxItems(items, filter) {
   const rows = [...items];
-  if (filter === "all" || filter === "answered") {
+  if (filter === "all" || filter === "answered" || filter === "hold") {
     rows.sort(compareInboxRecency);
   }
   return rows;
@@ -594,7 +594,7 @@ describe("inboxPurpose source lockstep", () => {
     assert.match(src, /if \(isLiveCallStatus\(opts\.callStatus\)\) return "live";/);
     assert.match(src, /if \(opts\.purpose === "live"\) return true;/);
     assert.match(src, /export function compareInboxRecency/);
-    assert.match(src, /filter === "all" \|\| filter === "answered"/);
+    assert.match(src, /filter === "all" \|\| filter === "answered" \|\| filter === "hold"/);
     assert.match(page, /orderInboxItems\(/);
     assert.doesNotMatch(src, /if \(item\.needsYou\) return 1;/);
   });

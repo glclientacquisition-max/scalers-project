@@ -72,7 +72,7 @@ describe("inbox call action", () => {
 
   it("is a muted 44px icon button, never filled", () => {
     assert.match(call, /deskHitClass/);
-    assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-11 w-11/);
+    assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-12 w-12/);
     assert.match(call, /aria-label=\{`Call \$\{number\}`\}/);
     assert.match(call, /data-icon="handset"/);
     assert.match(call, /stroke="currentColor"/);

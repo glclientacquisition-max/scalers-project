@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { btnGhost, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
@@ -7,9 +8,14 @@ import type { InboxItem } from "@/lib/inboxPurpose";
 import { inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { dayHeading } from "@/lib/visitCalendar";
+import { formatHoldClock } from "@/lib/holdSheet";
 import { formatSlotClock } from "@/lib/runSheet";
 
-function RowAction({ item }: { item: InboxItem }) {
+function RowAction({ item, purpose }: { item: InboxItem; purpose: "job" | "hold" }) {
+  if (purpose === "hold") {
+    if (!item.hold) return null;
+    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />;
+  }
   if (!item.job) return null;
   return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
 }
@@ -22,6 +28,7 @@ export function RunSheetToday({
   listHref,
   ret,
   vertical,
+  purpose = "job",
 }: {
   items: InboxItem[];
   ymd: string;
@@ -31,10 +38,14 @@ export function RunSheetToday({
   ret?: InboxReturn;
   businessName: string;
   vertical?: string | null;
+  purpose?: "job" | "hold";
 }) {
   const copy = nicheCopy(vertical);
   const heading = dayHeading(ymd);
   const placeFor = (item: InboxItem) => item.job?.address_landmark?.trim() || "";
+  const clockFor = (item: InboxItem) =>
+    purpose === "hold" ? formatHoldClock(item) : formatSlotClock(item);
+  const pile = purpose === "hold" ? "hold" : "job";
 
   return (
     <div className="mt-8">
@@ -72,7 +83,7 @@ export function RunSheetToday({
                 className="relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0"
               >
                 <DeskRowHit
-                  href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
+                  href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: pile }) : null}
                   label="Conversation"
                 />
                 <div className="min-w-0 flex-1">
@@ -80,14 +91,14 @@ export function RunSheetToday({
                     <p className={`${deskRowMutedClass} text-sm font-semibold tracking-tight ${deskPreviewClass}`}>
                       {item.callerName || "Caller"}
                     </p>
-                    <p className="shrink-0 text-xs text-ink-soft">{formatSlotClock(item)}</p>
+                    <p className="shrink-0 text-xs text-ink-soft">{clockFor(item)}</p>
                   </div>
                   <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink ${deskPreviewClass}`}>
                     {item.headline}
                   </p>
                 </div>
                 <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
-                  <RowAction item={item} />
+                  <RowAction item={item} purpose={purpose} />
                 </div>
               </li>
             ))}
@@ -100,14 +111,16 @@ export function RunSheetToday({
                     When
                   </th>
                   <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                    Work
+                    {purpose === "hold" ? "Item" : "Work"}
                   </th>
                   <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
                     Who
                   </th>
-                  <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                    Place
-                  </th>
+                  {purpose === "job" ? (
+                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                      Place
+                    </th>
+                  ) : null}
                   <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
                     Action
                   </th>
@@ -118,10 +131,10 @@ export function RunSheetToday({
                   <tr key={item.id} className="relative border-b border-line last:border-b-0">
                     <td className="px-5 py-3 text-sm font-semibold text-ink">
                       <DeskRowHit
-                        href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
+                        href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: pile }) : null}
                         label="Conversation"
                       />
-                      {formatSlotClock(item)}
+                      {clockFor(item)}
                     </td>
                     <td className={`px-5 py-3 text-sm text-ink ${deskPreviewCellClass}`}>
                       <p className={deskPreviewClass}>{item.headline}</p>
@@ -129,12 +142,14 @@ export function RunSheetToday({
                     <td className="max-w-[10rem] px-5 py-3 text-sm text-ink">
                       <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
                     </td>
-                    <td className="max-w-[12rem] px-5 py-3 text-sm text-ink-soft">
-                      <p className={deskPreviewClass}>{placeFor(item)}</p>
-                    </td>
+                    {purpose === "job" ? (
+                      <td className="max-w-[12rem] px-5 py-3 text-sm text-ink-soft">
+                        <p className={deskPreviewClass}>{placeFor(item)}</p>
+                      </td>
+                    ) : null}
                     <td className="px-5 py-3 text-right">
                       <div className={deskRowActionClass}>
-                        <RowAction item={item} />
+                        <RowAction item={item} purpose={purpose} />
                       </div>
                     </td>
                   </tr>
