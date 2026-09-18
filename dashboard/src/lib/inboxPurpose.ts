@@ -1,7 +1,7 @@
 import type { CallResolution, LeadStatus } from "@/lib/supabase";
 import type { Lead } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
-import { normalizeKenyaE164 } from "@/lib/handoffMode";
+import { storedPhoneCandidates, storedPhoneJoinKey } from "@/lib/handoffMode";
 
 export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered" | "live";
 
@@ -61,7 +61,6 @@ const ANSWER_INTENTS = new Set([
   "price_band",
   "availability",
   "policy",
-  "product_inquiry",
   "service_inquiry",
   "service_area",
   "general_enquiry",
@@ -162,7 +161,7 @@ export function signalLabel(opts: {
 }): string {
   const copy = nicheCopy(opts.vertical);
   if (opts.purpose === "job") {
-    if (!opts.job) return copy.returnCtaOne;
+    if (!opts.job) return copy.visitGhostStamp;
     const status = String(opts.job.status || "").toLowerCase();
     if (status === "confirmed") return copy.visitStamp;
     if (status === "done") return copy.visitDoneStamp;
@@ -170,7 +169,7 @@ export function signalLabel(opts: {
     return copy.confirmStamp;
   }
   if (opts.purpose === "hold") {
-    if (!opts.hold) return copy.returnCtaOne;
+    if (!opts.hold) return copy.holdGhostStamp;
     const status = String(opts.hold.status || "").toLowerCase();
     if (status === "fulfilled") return "Item done";
     if (status === "cancelled") return "Cancelled";
@@ -393,6 +392,8 @@ export function classifyInboxPurpose(opts: {
   if (JOB_INTENTS.has(intent)) return "job";
   if (HOLD_INTENTS.has(intent)) return "hold";
   if (resolution === "abandoned" || resolution === "unresolved") return "missed";
+  // Product inquiry is an active lead unless a job or hold row already attached.
+  if (intent === "product_inquiry") return "missed";
   if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
   if (opts.leadStatus === "new") return "missed";
   return "answered";
@@ -585,10 +586,9 @@ export function attachContactIds(
 ): InboxItem[] {
   const byPhone = new Map<string, { id: string; name: string | null }>();
   const remember = (phone: string | null | undefined, person: { id: string; name: string | null }) => {
-    if (!phone) return;
-    byPhone.set(phone, person);
-    const e164 = normalizeKenyaE164(phone);
-    if (e164) byPhone.set(e164, person);
+    for (const key of storedPhoneCandidates(phone)) {
+      byPhone.set(key, person);
+    }
   };
   for (const row of contacts) {
     if (!row.phone) continue;
@@ -599,10 +599,9 @@ export function attachContactIds(
   }
   return items.map((item) => {
     const person =
-      (item.callerPhone && byPhone.get(item.callerPhone)) ||
-      (item.callerPhone && normalizeKenyaE164(item.callerPhone)
-        ? byPhone.get(normalizeKenyaE164(item.callerPhone) as string)
-        : null) ||
+      (item.callerPhone &&
+        (byPhone.get(item.callerPhone) ||
+          byPhone.get(storedPhoneJoinKey(item.callerPhone) || ""))) ||
       null;
     return {
       ...item,

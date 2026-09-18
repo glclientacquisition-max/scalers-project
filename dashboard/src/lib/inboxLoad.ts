@@ -1,6 +1,6 @@
 import { type CallRow } from "@/lib/supabase";
 import { toLead } from "@/lib/callsTriage";
-import { normalizeKenyaE164 } from "@/lib/handoffMode";
+import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
   assembleInboxItems,
   attachContactIds,
@@ -21,19 +21,86 @@ const HOLD_SELECT =
   "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id";
 const JOB_SELECT =
   "id, created_at, service_name, status, when_text, window_start, window_end, address_landmark, notes, caller_name, caller_phone, call_id";
+const JOB_SELECT_LEGACY =
+  "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id";
 
+/** Closed/history tape for calls plus recent fulfilled/cancelled work. Open queues do not use this cap. */
 export const INBOX_WINDOW = 150;
 
-export async function loadInboxItems(
-  client: SupabaseClient,
-  tenantId: string,
-  vertical?: string | null
-): Promise<{
-  items: InboxItem[];
-  callsTruncated: boolean;
+/**
+ * Safety stop for unbounded open-work pagination. Indexes already exist:
+ * `service_requests_tenant_status_idx`, `appointments_tenant_status_idx`.
+ * Hitting this cap means Needs you may be incomplete; we surface partialError.
+ */
+export const OPEN_WORK_SAFETY_CAP = 10_000;
+const OPEN_WORK_PAGE = 1_000;
+
+export const OPEN_HOLD_STATUS = "open";
+export const OPEN_JOB_STATUSES = ["requested", "confirmed"] as const;
+export const TAPE_HOLD_STATUSES = ["fulfilled", "cancelled"] as const;
+export const TAPE_JOB_STATUSES = ["cancelled", "done"] as const;
+
+export function mergeOpenAndTapeRows<T extends { id: string }>(
+  open: T[],
+  tape: T[]
+): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of [...open, ...tape]) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
+}
+
+export function inboxContactPhoneQueryValues(phones: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const phone of phones) {
+    for (const candidate of storedPhoneCandidates(phone)) {
+      if (seen.has(candidate)) continue;
+      seen.add(candidate);
+      out.push(candidate);
+    }
+  }
+  return out;
+}
+
+type PageResult<T> = {
+  rows: T[];
   error: string | null;
-  partialError: string | null;
-}> {
+  truncated: boolean;
+};
+
+async function fetchPagedOpenWork<T>(
+  page: (from: number, to: number) => PromiseLike<{
+    data: T[] | null;
+    error: { message: string } | null;
+  }>
+): Promise<PageResult<T>> {
+  const rows: T[] = [];
+  let from = 0;
+  while (from < OPEN_WORK_SAFETY_CAP) {
+    const to = Math.min(from + OPEN_WORK_PAGE - 1, OPEN_WORK_SAFETY_CAP - 1);
+    const res = await page(from, to);
+    if (res.error) {
+      return { rows, error: res.error.message, truncated: false };
+    }
+    const batch = res.data || [];
+    rows.push(...batch);
+    if (batch.length < OPEN_WORK_PAGE) {
+      return { rows, error: null, truncated: false };
+    }
+    from += OPEN_WORK_PAGE;
+  }
+  return { rows, error: null, truncated: rows.length >= OPEN_WORK_SAFETY_CAP };
+}
+
+async function fetchCallsTape(
+  client: SupabaseClient,
+  tenantId: string
+): Promise<{ data: CallRow[] | null; error: { message: string } | null }> {
   const first = await client
     .from("calls")
     .select(CALL_SELECT)
@@ -79,62 +146,109 @@ export async function loadInboxItems(
     error = retry.error;
   }
 
-  if (error) {
-    return { items: [], callsTruncated: false, error: error.message, partialError: null };
+  return { data, error };
+}
+
+export async function loadInboxItems(
+  client: SupabaseClient,
+  tenantId: string,
+  vertical?: string | null
+): Promise<{
+  items: InboxItem[];
+  callsTruncated: boolean;
+  error: string | null;
+  partialError: string | null;
+}> {
+  const callsRes = await fetchCallsTape(client, tenantId);
+  if (callsRes.error) {
+    return {
+      items: [],
+      callsTruncated: false,
+      error: callsRes.error.message,
+      partialError: null,
+    };
   }
 
-  const [holdsRes, jobsFirst] = await Promise.all([
+  const [openHoldsRes, tapeHoldsRes, openJobsFirst, tapeJobsFirst] = await Promise.all([
+    fetchPagedOpenWork<InboxHold>((from, to) =>
+      client
+        .from("service_requests")
+        .select(HOLD_SELECT)
+        .eq("tenant_id", tenantId)
+        .eq("status", OPEN_HOLD_STATUS)
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
     client
       .from("service_requests")
       .select(HOLD_SELECT)
       .eq("tenant_id", tenantId)
+      .in("status", [...TAPE_HOLD_STATUSES])
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW),
+    fetchPagedOpenWork<InboxJob>((from, to) =>
+      client
+        .from("appointments")
+        .select(JOB_SELECT)
+        .eq("tenant_id", tenantId)
+        .in("status", [...OPEN_JOB_STATUSES])
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
     client
       .from("appointments")
       .select(JOB_SELECT)
       .eq("tenant_id", tenantId)
+      .in("status", [...TAPE_JOB_STATUSES])
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW),
   ]);
 
-  let jobs: InboxJob[] = [];
-  let jobsFailed = false;
-  if (jobsFirst.error && /window_start|window_end|column/i.test(jobsFirst.error.message)) {
-    const retry = await client
+  let openJobs = openJobsFirst;
+  let tapeJobs = tapeJobsFirst;
+  if (openJobs.error && /window_start|window_end|column/i.test(openJobs.error)) {
+    openJobs = await fetchPagedOpenWork<InboxJob>((from, to) =>
+      client
+        .from("appointments")
+        .select(JOB_SELECT_LEGACY)
+        .eq("tenant_id", tenantId)
+        .in("status", [...OPEN_JOB_STATUSES])
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    );
+    tapeJobs = await client
       .from("appointments")
-      .select(
-        "id, created_at, service_name, status, when_text, address_landmark, notes, caller_name, caller_phone, call_id"
-      )
+      .select(JOB_SELECT_LEGACY)
       .eq("tenant_id", tenantId)
+      .in("status", [...TAPE_JOB_STATUSES])
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW);
-    if (retry.error) {
-      jobsFailed = true;
-    } else {
-      jobs = (retry.data || []) as InboxJob[];
-    }
-  } else if (jobsFirst.error) {
-    jobsFailed = true;
-  } else {
-    jobs = (jobsFirst.data || []) as InboxJob[];
   }
 
-  const holdsFailed = Boolean(holdsRes.error);
-  const holds = (holdsFailed ? [] : holdsRes.data || []) as InboxHold[];
-  const leads = (data || []).map(toLead);
+  const holdsFailed = Boolean(openHoldsRes.error);
+  const jobsFailed = Boolean(openJobs.error);
+  const tapeFailed = Boolean(tapeHoldsRes.error || tapeJobs.error);
+  const openWorkTruncated = Boolean(openHoldsRes.truncated || openJobs.truncated);
+  const holds = holdsFailed
+    ? []
+    : mergeOpenAndTapeRows(
+        openHoldsRes.rows,
+        tapeHoldsRes.error ? [] : ((tapeHoldsRes.data || []) as InboxHold[])
+      );
+  const jobs = jobsFailed
+    ? []
+    : mergeOpenAndTapeRows(
+        openJobs.rows,
+        tapeJobs.error ? [] : ((tapeJobs.data || []) as InboxJob[])
+      );
+  const leads = (callsRes.data || []).map(toLead);
   const items = assembleInboxItems({ leads, holds, jobs, vertical });
 
-  const phones = [
-    ...new Set(
-      items.flatMap((item) => {
-        const phone = item.callerPhone;
-        if (!phone || phone === "unknown") return [];
-        const e164 = normalizeKenyaE164(phone);
-        return e164 && e164 !== phone ? [phone, e164] : [phone];
-      })
-    ),
-  ];
+  const phones = inboxContactPhoneQueryValues(
+    items
+      .map((item) => item.callerPhone)
+      .filter((phone): phone is string => Boolean(phone && phone !== "unknown"))
+  );
   let withPeople = items;
   if (phones.length) {
     const people = await client
@@ -147,11 +261,16 @@ export async function loadInboxItems(
     }
   }
 
+  const openWorkIncomplete = holdsFailed || jobsFailed || openWorkTruncated;
+
   return {
     items: withPeople,
-    callsTruncated: (data || []).length >= INBOX_WINDOW,
+    // Tape only. Open holds/visits are fetched separately and must not vanish.
+    callsTruncated: (callsRes.data || []).length >= INBOX_WINDOW,
     error: null,
     partialError:
-      holdsFailed || jobsFailed ? "Could not load some inbox rows." : null,
+      openWorkIncomplete || tapeFailed
+        ? "Could not load some inbox rows."
+        : null,
   };
 }

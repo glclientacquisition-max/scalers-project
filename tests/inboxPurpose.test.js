@@ -25,7 +25,6 @@ const ANSWER_INTENTS = new Set([
   "price_band",
   "availability",
   "policy",
-  "product_inquiry",
   "service_inquiry",
   "service_area",
   "general_enquiry",
@@ -64,6 +63,7 @@ function classify({ primaryIntent, resolution, leadStatus, hold, job, callStatus
   if (JOB_INTENTS.has(intent)) return "job";
   if (HOLD_INTENTS.has(intent)) return "hold";
   if (resolution === "abandoned" || resolution === "unresolved") return "missed";
+  if (intent === "product_inquiry") return "missed";
   if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
   if (leadStatus === "new") return "missed";
   return "answered";
@@ -101,9 +101,9 @@ function purposeLabel(purpose) {
   }
 }
 
-function signalLabel({ purpose, hold, job }) {
+function signalLabel({ purpose, hold, job, vertical }) {
   if (purpose === "job") {
-    if (!job) return "Return call";
+    if (!job) return vertical === "hospitality" ? "Booking not booked" : "Visit not booked";
     const status = String(job.status || "").toLowerCase();
     if (status === "confirmed") return "Visit";
     if (status === "done") return "Visit done";
@@ -111,7 +111,7 @@ function signalLabel({ purpose, hold, job }) {
     return "Confirm visit";
   }
   if (purpose === "hold") {
-    if (!hold) return "Return call";
+    if (!hold) return "Hold not saved";
     const status = String(hold.status || "").toLowerCase();
     if (status === "fulfilled") return "Item done";
     if (status === "cancelled") return "Cancelled";
@@ -238,7 +238,7 @@ describe("inbox purpose", () => {
     assert.equal(classify({ callStatus: "in_progress", primaryIntent: "product_inquiry" }), "live");
   });
 
-  it("stamps hangup product inquiry as answered", () => {
+  it("stamps hangup product inquiry as an active lead, not answered", () => {
     assert.equal(
       classify({
         callStatus: "complete",
@@ -246,7 +246,7 @@ describe("inbox purpose", () => {
         resolution: "resolved",
         leadStatus: "new",
       }),
-      "answered"
+      "missed"
     );
     assert.equal(
       classify({
@@ -291,10 +291,26 @@ describe("inbox purpose", () => {
     assert.equal(classify({ primaryIntent: "order_enquiry" }), "hold");
   });
 
-  it("does not treat a new product inquiry as missed", () => {
+  it("treats a new product inquiry as Needs you unless a booking or hold exists", () => {
     assert.equal(
       classify({ primaryIntent: "product_inquiry", leadStatus: "new" }),
-      "answered"
+      "missed"
+    );
+    assert.equal(
+      classify({
+        primaryIntent: "product_inquiry",
+        resolution: "resolved",
+        job: { id: "a1", status: "requested" },
+      }),
+      "job"
+    );
+    assert.equal(
+      classify({
+        primaryIntent: "product_inquiry",
+        resolution: "resolved",
+        hold: { id: "r1", status: "open" },
+      }),
+      "hold"
     );
     assert.equal(
       classify({ primaryIntent: "hours_open", leadStatus: "new" }),
@@ -345,8 +361,12 @@ describe("inbox signal", () => {
   it("names the next action instead of Job or Hold", () => {
     assert.equal(signalLabel({ purpose: "job", job: { status: "requested" } }), "Confirm visit");
     assert.equal(signalLabel({ purpose: "job", job: { status: "confirmed" } }), "Visit");
-    assert.equal(signalLabel({ purpose: "job" }), "Return call");
-    assert.equal(signalLabel({ purpose: "hold" }), "Return call");
+    assert.equal(signalLabel({ purpose: "job" }), "Visit not booked");
+    assert.equal(
+      signalLabel({ purpose: "job", vertical: "hospitality" }),
+      "Booking not booked"
+    );
+    assert.equal(signalLabel({ purpose: "hold" }), "Hold not saved");
     assert.equal(
       signalLabel({ purpose: "hold", hold: { status: "open", request_type: "order" } }),
       "Order"
@@ -553,6 +573,18 @@ describe("inbox piles", () => {
     assert.equal(inboxNeedsYou({ purpose: "human", leadStatus: "new" }), true);
     assert.equal(inboxNeedsYou({ purpose: "live" }), true);
     assert.equal(inboxNeedsYou({ purpose: "answered" }), false);
+    assert.equal(
+      inboxNeedsYou({ purpose: "missed", leadStatus: "new" }),
+      true
+    );
+    assert.equal(
+      inboxNeedsYou({ purpose: "job", job: null, leadStatus: "new" }),
+      true
+    );
+    assert.equal(
+      inboxNeedsYou({ purpose: "hold", hold: null, leadStatus: "new" }),
+      true
+    );
   });
 
   it("puts confirmed visits in Visits not Needs you", () => {
@@ -603,6 +635,57 @@ describe("inbox piles", () => {
   });
 });
 
+describe("inbox phone join", () => {
+  const { normalizeKenyaE164 } = require("../src/conversation/liveTransferReady");
+
+  function storedPhoneCandidates(raw) {
+    const trimmed = String(raw || "").trim();
+    if (!trimmed) return [];
+    const seen = new Set();
+    const out = [];
+    const e164 = normalizeKenyaE164(trimmed);
+    const stored = e164 || trimmed;
+    for (const phone of [trimmed, stored, e164, e164 ? e164.slice(1) : null]) {
+      if (!phone || seen.has(phone)) continue;
+      seen.add(phone);
+      out.push(phone);
+    }
+    return out;
+  }
+
+  function attachContactIds(items, contacts) {
+    const byPhone = new Map();
+    for (const row of contacts) {
+      if (!row.phone) continue;
+      const person = { id: row.id, name: row.name || null };
+      for (const key of storedPhoneCandidates(row.phone)) {
+        byPhone.set(key, person);
+      }
+    }
+    return items.map((item) => {
+      const person =
+        (item.callerPhone &&
+          (byPhone.get(item.callerPhone) ||
+            byPhone.get(normalizeKenyaE164(item.callerPhone) || ""))) ||
+        null;
+      return { ...item, contactId: person?.id || null };
+    });
+  }
+
+  it("joins +254 call phones to 254 contacts and the reverse", () => {
+    const plus = attachContactIds(
+      [{ callerPhone: "+254712345678" }],
+      [{ id: "c1", phone: "254712345678", name: "Amina" }]
+    );
+    assert.equal(plus[0].contactId, "c1");
+    const national = attachContactIds(
+      [{ callerPhone: "254712345678" }],
+      [{ id: "c2", phone: "+254712345678", name: "Brian" }]
+    );
+    assert.equal(national[0].contactId, "c2");
+  });
+});
+
 describe("inboxPurpose source lockstep", () => {
   it("keeps All newest-first and stamps in-progress as Live", () => {
     const src = fs.readFileSync(
@@ -620,5 +703,10 @@ describe("inboxPurpose source lockstep", () => {
     assert.match(src, /filter === "all" \|\| filter === "answered" \|\| filter === "archived" \|\| filter === "hold"/);
     assert.match(page, /orderInboxItems\(/);
     assert.doesNotMatch(src, /if \(item\.needsYou\) return 1;/);
+    assert.match(src, /if \(intent === "product_inquiry"\) return "missed";/);
+    assert.doesNotMatch(src, /"product_inquiry",\s*"service_inquiry"/);
+    assert.match(src, /if \(!opts\.job\) return copy\.visitGhostStamp;/);
+    assert.match(src, /if \(!opts\.hold\) return copy\.holdGhostStamp;/);
+    assert.match(src, /storedPhoneCandidates/);
   });
 });

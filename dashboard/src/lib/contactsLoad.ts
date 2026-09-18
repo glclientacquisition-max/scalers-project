@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseSummary } from "@/lib/supabase";
+import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
   displayContactLastReason,
   pickCallOwnerCard,
@@ -122,13 +123,19 @@ export async function loadContactsPage(
     contacts
   );
   const rows = contacts.map((row) => {
-    const latestCallReason = row.phone
-      ? extras.reasonByPhone.get(row.phone) ?? null
-      : null;
+    const phoneKeys = row.phone ? storedPhoneCandidates(row.phone) : [];
+    const latestCallReason =
+      phoneKeys
+        .map((key) => extras.reasonByPhone.get(key))
+        .find((value) => value != null) ?? null;
+    const lastByPhone =
+      phoneKeys
+        .map((key) => extras.byPhone.get(key) || null)
+        .reduce<string | null>((best, value) => maxIso(best, value || null), null);
     return {
       ...row,
       lastContactAt: pickLastContactAt(
-        row.phone ? extras.byPhone.get(row.phone) : null,
+        lastByPhone,
         extras.byId.get(row.id),
         row.updated_at
       ),
@@ -154,7 +161,11 @@ async function loadLastContactMap(
   reasonByPhone: Map<string, string | null>;
 }> {
   const ids = contacts.map((c) => c.id);
-  const phones = contacts.map((c) => c.phone).filter((p): p is string => Boolean(p));
+  const phones = [
+    ...new Set(
+      contacts.flatMap((c) => (c.phone ? storedPhoneCandidates(c.phone) : []))
+    ),
+  ];
 
   const [callsRes, reqRes, reqPhoneRes, apptRes, apptPhoneRes] = await Promise.all([
     phones.length
@@ -203,12 +214,15 @@ async function loadLastContactMap(
   for (const row of callsRes.data || []) {
     const phone = String(row.caller_number || "");
     if (!phone) continue;
-    byPhone.set(phone, maxIso(byPhone.get(phone) || null, row.created_at));
-    if (!reasonByPhone.has(phone)) {
-      reasonByPhone.set(
-        phone,
-        pickCallOwnerReason(parseSummary(row.summary as string | null))
-      );
+    const at = maxIso(byPhone.get(phone) || null, row.created_at);
+    const reason = reasonByPhone.has(phone)
+      ? null
+      : pickCallOwnerReason(parseSummary(row.summary as string | null));
+    for (const key of storedPhoneCandidates(phone)) {
+      byPhone.set(key, maxIso(byPhone.get(key) || null, at));
+      if (reason != null && !reasonByPhone.has(key)) {
+        reasonByPhone.set(key, reason);
+      }
     }
   }
   for (const row of [
@@ -222,7 +236,9 @@ async function loadLastContactMap(
       byId.set(row.contact_id, maxIso(byId.get(row.contact_id) || null, at));
     }
     if (row.caller_phone) {
-      byPhone.set(row.caller_phone, maxIso(byPhone.get(row.caller_phone) || null, at));
+      for (const key of storedPhoneCandidates(row.caller_phone)) {
+        byPhone.set(key, maxIso(byPhone.get(key) || null, at));
+      }
     }
   }
 
@@ -250,15 +266,16 @@ export async function loadContactTimeline(
   contact: ContactRow
 ): Promise<ContactTimelineEntry[]> {
   const phone = contact.phone;
+  const phoneKeys = phone ? storedPhoneCandidates(phone) : [];
   const [callsRes, reqById, reqByPhone, apptById, apptByPhone] = await Promise.all([
-    phone
+    phoneKeys.length
       ? client
           .from("calls")
           .select(
             "id, created_at, caller_number, status, summary, primary_intent, resolution"
           )
           .eq("tenant_id", tenantId)
-          .eq("caller_number", phone)
+          .in("caller_number", phoneKeys)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     client
@@ -269,14 +286,14 @@ export async function loadContactTimeline(
       .eq("tenant_id", tenantId)
       .eq("contact_id", contact.id)
       .order("created_at", { ascending: false }),
-    phone
+    phoneKeys.length
       ? client
           .from("service_requests")
           .select(
             "id, created_at, request_type, status, item, notes, call_id, contact_id, caller_phone"
           )
           .eq("tenant_id", tenantId)
-          .eq("caller_phone", phone)
+          .in("caller_phone", phoneKeys)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     client
@@ -287,14 +304,14 @@ export async function loadContactTimeline(
       .eq("tenant_id", tenantId)
       .eq("contact_id", contact.id)
       .order("created_at", { ascending: false }),
-    phone
+    phoneKeys.length
       ? client
           .from("appointments")
           .select(
             "id, created_at, service_name, status, when_text, notes, call_id, contact_id, caller_phone"
           )
           .eq("tenant_id", tenantId)
-          .eq("caller_phone", phone)
+          .in("caller_phone", phoneKeys)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
   ]);

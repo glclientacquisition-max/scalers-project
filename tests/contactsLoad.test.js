@@ -52,4 +52,10 @@ describe("contactsLoad last-contact wiring", () => {
     assert.match(src, /pickCallOwnerReason\(parseSummary/);
     assert.match(src, /latestCallReason: ownerReason \|\| ownerWant/);
   });
+
+  it("joins last-reason maps on normalized phone candidates", () => {
+    assert.match(src, /storedPhoneCandidates/);
+    assert.match(src, /\.in\("caller_number", phoneKeys\)/);
+    assert.match(src, /\.in\("caller_phone", phoneKeys\)/);
+  });
 });

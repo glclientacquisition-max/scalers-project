@@ -48,6 +48,22 @@ function normalizeStoredPhone(raw) {
   return normalizeKenyaE164(trimmed) || trimmed;
 }
 
+/** Lookup variants so +254… still matches a dirty 254… row until backfill. */
+function storedPhoneLookupKeys(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return [];
+  const seen = new Set();
+  const out = [];
+  const e164 = normalizeKenyaE164(trimmed);
+  const stored = normalizeStoredPhone(trimmed);
+  for (const phone of [trimmed, stored, e164, e164 ? e164.slice(1) : null]) {
+    if (!phone || seen.has(phone)) continue;
+    seen.add(phone);
+    out.push(phone);
+  }
+  return out;
+}
+
 /** Map a live `calls` row to the shape server.js historically expected from SQLite. */
 function shapeCall(row) {
   if (!row) return null;
@@ -303,11 +319,13 @@ async function getCall(callSid) {
  */
 async function listRecentCallsFromNumber({ tenantId, callerNumber, sinceIso, limit = 5 }) {
   if (!tenantId || !callerNumber) return [];
+  const phones = storedPhoneLookupKeys(callerNumber);
+  if (!phones.length) return [];
   let q = supabase
     .from('calls')
     .select('id, sautikit_call_sid, caller_number, status, summary, created_at')
     .eq('tenant_id', tenantId)
-    .eq('caller_number', callerNumber)
+    .in('caller_number', phones)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (sinceIso) q = q.gte('created_at', sinceIso);
@@ -1075,11 +1093,14 @@ async function upsertContact({
   delete incomingMeta.alternate_names;
 
   if (phoneNorm) {
+    const phoneKeys = storedPhoneLookupKeys(phoneNorm);
     const { data: existing, error: findErr } = await supabase
       .from('contacts')
-      .select('id, name, notes, last_reason, metadata')
+      .select('id, name, notes, last_reason, metadata, phone')
       .eq('tenant_id', tenantId)
-      .eq('phone', phoneNorm)
+      .in('phone', phoneKeys)
+      .order('phone', { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (findErr && /contacts|relation/i.test(findErr.message)) {
       console.warn('[db] upsertContact skipped (apply contacts_and_requests.sql):', findErr.message);
@@ -1104,12 +1125,22 @@ async function upsertContact({
           alternate_names: identity.metadata.alternate_names,
         },
       };
-      const { data, error } = await supabase
+      if (existing.phone !== phoneNorm) patch.phone = phoneNorm;
+      let { data, error } = await supabase
         .from('contacts')
         .update(patch)
         .eq('id', existing.id)
         .select('*')
         .maybeSingle();
+      if (error && patch.phone && /duplicate|unique/i.test(error.message || '')) {
+        delete patch.phone;
+        ({ data, error } = await supabase
+          .from('contacts')
+          .update(patch)
+          .eq('id', existing.id)
+          .select('*')
+          .maybeSingle());
+      }
       throwIfError('upsertContact(update)', error);
       return data || null;
     }
@@ -1162,8 +1193,9 @@ async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
     if (error) throwIfError('getCallerMemory(requests)', error);
     if (data?.length) return data;
   }
-  if (!phoneNorm) return [];
-  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return [];
+  const { data, error } = await base().in('caller_phone', phoneKeys);
   if (error && /service_requests|relation/i.test(error.message)) return [];
   if (error) throwIfError('getCallerMemory(requests-phone)', error);
   return data || [];
@@ -1187,8 +1219,9 @@ async function listNextAppointmentForCaller(tenantId, contactId, phoneNorm) {
     if (error) throwIfError('getCallerMemory(appointment)', error);
     if (data?.[0]) return data[0];
   }
-  if (!phoneNorm) return null;
-  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return null;
+  const { data, error } = await base().in('caller_phone', phoneKeys);
   if (error && /appointments|relation/i.test(error.message)) return null;
   if (error) throwIfError('getCallerMemory(appointment-phone)', error);
   return data?.[0] || null;
@@ -1211,8 +1244,9 @@ async function listRecentAppointmentsForCaller(tenantId, contactId, phoneNorm) {
     if (error) throwIfError('getCallerMemory(recent-appointments)', error);
     if (data?.length) return data;
   }
-  if (!phoneNorm) return [];
-  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return [];
+  const { data, error } = await base().in('caller_phone', phoneKeys);
   if (error && /appointments|relation/i.test(error.message)) return [];
   if (error) throwIfError('getCallerMemory(recent-appointments-phone)', error);
   return data || [];
@@ -1226,11 +1260,14 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   const phoneNorm = normalizeStoredPhone(phone);
   if (!tenantId || !phoneNorm) return null;
 
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
   const { data: contact, error: findErr } = await supabase
     .from('contacts')
     .select('id, name, notes, last_reason, phone, metadata')
     .eq('tenant_id', tenantId)
-    .eq('phone', phoneNorm)
+    .in('phone', phoneKeys)
+    .order('phone', { ascending: true })
+    .limit(1)
     .maybeSingle();
   if (findErr && /contacts|relation/i.test(findErr.message)) {
     console.warn(
@@ -1590,7 +1627,7 @@ async function updateAppointment({
       .order('created_at', { ascending: false })
       .limit(1);
     if (callerPhone) {
-      findQuery = findQuery.eq('caller_phone', callerPhone);
+      findQuery = findQuery.in('caller_phone', storedPhoneLookupKeys(callerPhone));
     } else if (callRow?.id) {
       findQuery = findQuery.eq('call_id', callRow.id);
     } else {
@@ -1918,5 +1955,6 @@ module.exports = {
   RECORDINGS_BUCKET,
   shapeCall,
   normalizeStoredPhone,
+  storedPhoneLookupKeys,
   mergeContactIdentity,
 };

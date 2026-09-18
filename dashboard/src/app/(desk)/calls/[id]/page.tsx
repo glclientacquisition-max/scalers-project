@@ -46,6 +46,7 @@ import {
   type InboxHold,
   type InboxJob,
 } from "@/lib/inboxPurpose";
+import { storedPhoneCandidates } from "@/lib/handoffMode";
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
@@ -120,12 +121,17 @@ export default async function CallDetailPage({
   }
   if (!call) notFound();
   const row = call;
-  const { data: person } = await workspace.client
-    .from("contacts")
-    .select("id, name")
-    .eq("tenant_id", tenant.id)
-    .eq("phone", row.caller_number)
-    .maybeSingle();
+  const phoneKeys = storedPhoneCandidates(row.caller_number);
+  const { data: person } = phoneKeys.length
+    ? await workspace.client
+        .from("contacts")
+        .select("id, name")
+        .eq("tenant_id", tenant.id)
+        .in("phone", phoneKeys)
+        .order("phone", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
   const meta = parseSummary(row.summary);
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
