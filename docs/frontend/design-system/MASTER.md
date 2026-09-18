@@ -116,7 +116,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | 404 | `app/not-found.tsx`. Overview is the recovery link. |
 | WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph on `#25D366`, `h-12 w-12`, `rounded-xl` (`variant="icon"`). No extra WhatsApp mark next to the name. |
 | Inbox Action dock | Trailing cell only. Job row: Confirm. Hold row: Done. Return call with a number: Call then WhatsApp. Every control is `h-12 w-12`. Never Open, View, SMS, email, or Archive in this cell. |
-| Inbox overflow | More, long-press, right-click. One list: Select, Mark unread, Mark done, Archive, Pin, Snooze. Desktop menu right-aligns to More (`placeInboxOverflowMenu`) so it does not cover the dock. Mute, Assign, Label, and Delete stay off this list. |
+| Inbox overflow | More, long-press, right-click. One list: Select, then Mark unread / Pin / Snooze, then Mark done / Archive. Hairline separators between those groups. Desktop menu right-aligns to More (`placeInboxOverflowMenu`) so it does not cover the dock. Mute, Assign, Label, and Delete stay off this list. Archive sits on the Archived pile. |
 | Call | `CallLink` (`tel:` deep link, the device dialer places the call). List dock only. Rounded handset glyph (`data-icon="handset"`), brand `text-accent-deep`, muted tile `h-12 w-12` bordered with a light accent wash. Sits left of WhatsApp. Never a filled primary, never a desk-telephone silhouette. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
 

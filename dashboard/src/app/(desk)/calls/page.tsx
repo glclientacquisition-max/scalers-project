@@ -80,7 +80,9 @@ function EmptyInbox({
           ? copy.jobEmpty
           : purpose === "needs"
             ? "Nothing needs you"
-            : "Nothing in this filter";
+            : purpose === "archived"
+              ? "None archived"
+              : "Nothing in this filter";
     return (
       <div className={deskEmptyClass}>
         <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
@@ -292,7 +294,7 @@ export default async function CallsPage({
         />
       ) : pageRows.length === 0 ? (
         <EmptyInbox
-          total={total}
+          total={assembled.length}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
           did={tenant.sautikit_virtual_number}
           purpose={activeFilter}

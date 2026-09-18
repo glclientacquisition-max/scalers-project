@@ -52,7 +52,7 @@ describe("desk control craft", () => {
     const niche = read("dashboard/src/lib/inboxNiche.ts");
     assert.match(
       niche,
-      /id: "needs"[\s\S]*id: "all"[\s\S]*id: "job"[\s\S]*id: "hold"[\s\S]*id: "human"[\s\S]*id: "answered"/
+      /id: "needs"[\s\S]*id: "all"[\s\S]*id: "job"[\s\S]*id: "hold"[\s\S]*id: "human"[\s\S]*id: "answered"[\s\S]*id: "archived"/
     );
     assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /item\.divide/);
     assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /divide: item\.divide/);

@@ -18,6 +18,9 @@ describe("inbox filters and empty states", () => {
     assert.match(niche, /label: "Needs you"/);
     assert.match(niche, /label: "All"/);
     assert.match(niche, /label: "Human"/);
+    assert.match(niche, /label: "Archived"/);
+    assert.match(purpose, /export function itemIsArchived/);
+    assert.doesNotMatch(purpose, /if \(lead\.leadStatus === "archived"\) continue/);
     assert.doesNotMatch(niche, /Unread/);
     assert.doesNotMatch(niche, /Assigned to me/);
     assert.match(toolbar, /<FilterTabs/);
@@ -32,6 +35,7 @@ describe("inbox filters and empty states", () => {
   it("keeps search-empty, filter-empty, and inbox-empty distinct", () => {
     assert.match(page, /No matches/);
     assert.match(page, /Nothing needs you/);
+    assert.match(page, /None archived/);
     assert.match(page, /Inbox is empty/);
     assert.match(page, /inboxCaption\(searched, vertical\)/);
     assert.match(purpose, /\$\{needs\} need you/);

@@ -134,5 +134,6 @@ export function purposeFilters(vertical?: string | null): {
     { id: "hold", label: copy.holdFilter },
     { id: "human", label: "Human", divide: true },
     { id: "answered", label: "Answered" },
+    { id: "archived", label: "Archived" },
   ];
 }

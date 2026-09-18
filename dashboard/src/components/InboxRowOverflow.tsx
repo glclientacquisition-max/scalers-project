@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  Fragment,
   useCallback,
   useContext,
   useEffect,
@@ -66,6 +67,7 @@ function isInteractiveTarget(target: EventTarget | null, root: HTMLElement | nul
 }
 
 type ActionId = "select" | "unread" | "done" | "archive" | "pin" | "snooze";
+type OverflowAction = { id: ActionId; label: string; divide?: boolean };
 
 export function InboxRowShell({
   item,
@@ -142,13 +144,13 @@ export function InboxRowShell({
     router.refresh();
   };
 
-  const actions: { id: ActionId; label: string }[] = [
+  const actions: OverflowAction[] = [
     { id: "select", label: "Select" },
-    { id: "unread", label: item.unread ? "Mark read" : "Mark unread" },
-    { id: "done", label: "Mark done" },
-    { id: "archive", label: "Archive" },
+    { id: "unread", label: item.unread ? "Mark read" : "Mark unread", divide: true },
     { id: "pin", label: item.pinnedAt ? "Unpin" : "Pin" },
     { id: "snooze", label: "Snooze" },
+    { id: "done", label: "Mark done", divide: true },
+    { id: "archive", label: "Archive" },
   ];
 
   if (local.hidden) return null;
@@ -258,7 +260,7 @@ function InboxOverflowSurface({
   item: InboxItem;
   mode: MenuMode;
   anchor: InboxOverflowAnchor;
-  actions: { id: ActionId; label: string }[];
+  actions: OverflowAction[];
   busy: boolean;
   error: string | null;
   onRun: (id: ActionId) => void;
@@ -383,21 +385,23 @@ function InboxOverflowSurface({
         </button>
       ) : null}
       {actions.map((action) => (
-        <button
-          key={action.id}
-          type="button"
-          role="menuitem"
-          disabled={busy}
-          onClick={() => onRun(action.id)}
-          className={[
-            "flex w-full items-center px-4 text-left text-sm text-ink",
-            mode === "sheet" ? "min-h-11" : "min-h-10",
-            focusRingVisible,
-            "hover:bg-surface-muted disabled:opacity-50",
-          ].join(" ")}
-        >
-          {busy ? "Saving" : action.label}
-        </button>
+        <Fragment key={action.id}>
+          {action.divide ? <div role="separator" className="my-1 border-t border-line" /> : null}
+          <button
+            type="button"
+            role="menuitem"
+            disabled={busy}
+            onClick={() => onRun(action.id)}
+            className={[
+              "flex w-full items-center px-4 text-left text-sm text-ink",
+              mode === "sheet" ? "min-h-11" : "min-h-10",
+              focusRingVisible,
+              "hover:bg-surface-muted disabled:opacity-50",
+            ].join(" ")}
+          >
+            {busy ? "Saving" : action.label}
+          </button>
+        </Fragment>
       ))}
       {error ? (
         <p className="px-4 py-2 text-xs text-warn" role="alert">

@@ -68,9 +68,18 @@ describe("inbox row overflow menu", () => {
     assert.match(row, /InboxRowMore/);
     assert.match(row, /InboxTrailingAction/);
     assert.ok(row.indexOf("<InboxRowMore") < row.indexOf("<InboxTrailingAction"), "more sits left of dock");
-    for (const label of ["Select", "Mark unread", "Mark done", "Archive", "Pin", "Snooze"]) {
+    for (const label of ["Select", "Mark unread", "Pin", "Snooze", "Mark done", "Archive"]) {
       assert.match(overflow, new RegExp(label));
     }
+    const selectAt = overflow.indexOf('id: "select"');
+    const unreadAt = overflow.indexOf('id: "unread"');
+    const pinAt = overflow.indexOf('id: "pin"');
+    const snoozeAt = overflow.indexOf('id: "snooze"');
+    const doneAt = overflow.indexOf('id: "done"');
+    const archiveAt = overflow.indexOf('id: "archive"');
+    assert.ok(selectAt < unreadAt && unreadAt < pinAt && pinAt < snoozeAt && snoozeAt < doneAt && doneAt < archiveAt);
+    assert.match(overflow, /role="separator"/);
+    assert.equal([...overflow.matchAll(/divide: true/g)].length, 2);
     assert.doesNotMatch(overflow, /Mute/);
     assert.doesNotMatch(overflow, /Assign to teammate/);
     assert.doesNotMatch(overflow, /Add label/);

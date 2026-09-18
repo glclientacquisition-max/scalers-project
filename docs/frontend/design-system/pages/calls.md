@@ -24,16 +24,19 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 - No number: empty.
 - Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
 
-**Overflow (More, long-press, right-click):** One short list on every row. Same verbs as Mail or WhatsApp. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
+**Overflow (More, long-press, right-click):** One short list on every row. Same verbs as Mail or WhatsApp. Hairline separators group stay vs leave. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
 
+Stay:
 - Select
 - Mark unread (Mark read when unread)
-- Mark done
-- Archive
 - Pin (Unpin when pinned)
 - Snooze (24h; the row leaves until due)
 
-Not in this list: Mute (does not stop notify), Assign (no login membership picker or Assigned pile), Label (no Labels pile), Delete (owners cannot hard-delete; Archive is the leave verb). Bulk bar: Mark done, Archive, Cancel.
+Leave:
+- Mark done
+- Archive (leaves the work piles; sits on Archived)
+
+Not in this list: Mute (does not stop notify), Assign (a label, not a login teammate; no Labels pile), Label, Delete (owners cannot hard-delete; Archive is the leave verb). Bulk bar: Mark done, Archive, Cancel.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Return call** and use WhatsApp. Same for holds without a request row.
 
@@ -42,7 +45,7 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 - **WhatsApp:** Opens chat. List verb for return calls. On the call, primary only when there is no visit/hold and Text customers is off.
 - **Send SMS:** Write a text on the call, then send. Shows only if Text customers is on. Primary on the call when there is no visit/hold to Confirm or Done. Not a list verb (needs a body).
 
-Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. Same `FilterTabs` as Contacts. Quiet hairline groups: act (Needs you, All), book (Visits, Holds), closed (Human, Answered).
+Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered / Archived. Same `FilterTabs` as Contacts. Quiet hairline groups: act (Needs you, All), book (Visits, Holds), closed (Human, Answered, Archived).
 
 **Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). Visit sort uses FilterTabs so Confirm stays the only filled verb. List is the Inbox table: requested and confirmed, newest work. Work is the diary of that same book. Date is visible there. Confirm lives on List and on Work.
 
@@ -54,7 +57,7 @@ Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Huma
 - **08:00 owner:** Needs you first. What still needs a decision.
 - **Live watcher:** All second. Newest tape, one hop from Needs you. Hangup stays here.
 - **Visit confirmer:** Visits before Holds. Home services money book. Retail still has Holds next to it.
-- **Closed:** Human then Answered. Missed and finished sit after the tape, not between work and All.
+- **Closed:** Human, Answered, then Archived. Missed and finished sit after the tape. Archive is not a black hole.
 
 **Piles (one question each):**
 - **Needs you:** Open work. A decision is still on you. Unconfirmed visits, open holds, return calls, human asked. Confirmed visits leave this pile.
@@ -63,6 +66,7 @@ Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Huma
 - **Holds:** Open items to fulfill. Fulfilled and cancelled leave this pile.
 - **Human:** Person asked or missed.
 - **Answered:** The receptionist closed it. No owner action.
+- **Archived:** You hid it. Same row, off the work piles. Open it from here. Mark done stays on All and Answered. Archive does not.
 
 Needs you is not a history. Older open work stays until you Confirm, Done, or reply.
 

@@ -1,6 +1,7 @@
 /** Visits List, Today, and Week. One book: requested and confirmed visits. */
 
 import type { InboxItem, InboxJob } from "@/lib/inboxPurpose";
+import { itemIsArchived } from "@/lib/inboxPurpose";
 import {
   eatYmd,
   groupVisitsForWeek,
@@ -35,7 +36,7 @@ function slotInstantFromJob(job: InboxJob, now: Date): Date | null {
 }
 
 export function visitBoardItems(items: InboxItem[]): InboxItem[] {
-  return (items || []).filter((item) => isVisitBoardJob(item.job));
+  return (items || []).filter((item) => !itemIsArchived(item) && isVisitBoardJob(item.job));
 }
 
 export function visitBoardInstant(item: InboxItem, now = new Date()): Date | null {
