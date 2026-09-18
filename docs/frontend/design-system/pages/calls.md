@@ -7,9 +7,9 @@
 
 Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
 
-**Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
+**Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche. List starts at `20rem` (`24rem` `lg`, `28rem` `xl`). Drag the separator or use arrow keys. 18rem list floor, 20rem thread floor, 40rem list cap. 1px gutter with a 24px hit. Icon-only Call and WhatsApp name themselves on hover.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link. On `md+` Inbox is always this list beside the thread or an empty pane. List starts at `20rem` (`24rem` `lg`, `28rem` `xl`). Drag the separator or use arrow keys. Phone is a full list, then a full call.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link. On `md+` Inbox is always this list beside the thread or an empty pane. Phone is a full list, then a full call.
 
 **Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the phone table Needed column only when the list is full width. The Mail row is the `md+` Inbox list.
 

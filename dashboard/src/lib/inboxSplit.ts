@@ -11,8 +11,11 @@ export const INBOX_LIST_MAX = 640;
 /** 20rem. Confirm stack and Summary stay readable. */
 export const INBOX_THREAD_MIN = 320;
 
+/** 1px gutter. The drag hit is a 24px overlay, not extra flex width. */
+export const INBOX_SPLIT_GUTTER = 1;
+
 export function clampInboxListWidth(px: number, parentWidth: number): number {
-  const room = parentWidth - INBOX_THREAD_MIN;
+  const room = parentWidth - INBOX_THREAD_MIN - INBOX_SPLIT_GUTTER;
   const max = Math.min(INBOX_LIST_MAX, Math.max(INBOX_LIST_MIN, room));
   return Math.round(Math.min(max, Math.max(INBOX_LIST_MIN, px)));
 }

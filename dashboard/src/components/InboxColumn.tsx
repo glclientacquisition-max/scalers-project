@@ -48,8 +48,8 @@ export function InboxThread({ children }: { children: ReactNode }) {
     <div
       className={
         listOnly
-          ? "hidden min-w-0 flex-1 md:block md:min-h-0 md:min-w-[20rem] md:overflow-x-hidden md:overflow-y-auto"
-          : "min-w-0 flex-1 md:min-h-0 md:min-w-[20rem] md:overflow-x-hidden md:overflow-y-auto"
+          ? "hidden min-w-0 flex-1 md:block md:min-h-0 md:overflow-x-hidden md:overflow-y-auto"
+          : "min-w-0 flex-1 md:min-h-0 md:overflow-x-hidden md:overflow-y-auto"
       }
     >
       {children}

@@ -20,8 +20,8 @@ describe("desk phone shell", () => {
     assert.match(nav, /export function DeskTabBar/);
     assert.match(nav, /export function DeskRail/);
     assert.match(nav, /DeskHint/);
-    assert.match(nav, /title=\{item.label\}/);
-    assert.match(nav, /title="Sign out"/);
+    assert.doesNotMatch(nav, /title=\{item.label\}/);
+    assert.doesNotMatch(nav, /title="Sign out"/);
     assert.match(nav, /label="Sign out"/);
     assert.match(nav, /label="Scalers"/);
     assert.match(nav, /markOnly/);
@@ -70,11 +70,14 @@ describe("desk phone shell", () => {
     assert.match(constitution, /do not live in a hamburger drawer/);
     const hint = read("dashboard/src/components/ui/DeskHint.tsx");
     assert.match(hint, /createPortal/);
-    assert.match(hint, /title=\{label\}/);
+    assert.doesNotMatch(hint, /title=\{label\}/);
     assert.match(hint, /onPointerEnter/);
     assert.match(hint, /role="tooltip"/);
+    assert.match(hint, /data-desk-hint=\{label\}/);
+    assert.match(hint, /bg-\[#0A192F\]/);
     assert.match(hint, /onMouseEnter/);
     assert.match(hint, /onFocusCapture/);
     assert.match(hint, /Escape/);
+    assert.match(hint, /side === "end"/);
   });
 });

@@ -155,7 +155,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(column, /lg:w-\[24rem\]/);
     assert.match(column, /xl:w-\[28rem\]/);
     assert.match(column, /--inbox-list-w/);
-    assert.match(column, /md:min-w-\[20rem\]/);
+    assert.match(column, /md:overflow-x-hidden md:overflow-y-auto/);
     assert.match(slot, /<InboxWorkspace/);
     assert.match(slot, /pane/);
     assert.match(slot, /openCallId=\{id\}/);
