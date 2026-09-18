@@ -6,6 +6,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { ensureInboxContact } from "@/app/(desk)/contacts/actions";
 import { DeskDialog } from "@/components/ui/DeskDialog";
+import { useInboxRowUi } from "@/components/InboxRowUi";
 import { RowIdentity } from "@/components/ui/deskRow";
 import { focusRingVisible, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 import { contactFromInboxHref, type InboxReturn } from "@/lib/inboxHref";
@@ -30,22 +31,47 @@ export function InboxRowAvatar({
   phone,
   contactHref,
   ret,
+  itemId,
 }: {
   name: string | null;
   phone: string | null;
   contactHref: string | null;
   ret?: InboxReturn;
+  itemId?: string;
 }) {
   const router = useRouter();
+  const ui = useInboxRowUi();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const who = name?.trim() || "Caller";
+  const selected = Boolean(itemId && ui?.selected.includes(itemId));
   const face = busy ? (
     <span aria-hidden="true" className={pendingSpinnerInkClass} />
   ) : (
     <RowIdentity name={name} />
   );
+
+  if (ui?.selecting && itemId) {
+    return (
+      <button
+        type="button"
+        aria-label="Toggle selection"
+        aria-pressed={selected}
+        className={`${hitClass} relative`}
+        onClick={() => ui.toggle(itemId)}
+      >
+        <RowIdentity name={name} />
+        {selected ? (
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#005CCC] text-white">
+            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" aria-hidden="true">
+              <path d="M3.4 8.2 6.4 11.2 12.6 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
+        ) : null}
+      </button>
+    );
+  }
   const stub = open
     ? createPortal(
         <DeskDialog title={who} onClose={() => setOpen(false)}>

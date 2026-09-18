@@ -53,14 +53,15 @@ describe("inbox row overflow menu", () => {
     assert.match(overflow, /inboxArchive/);
   });
 
-  it("opens a custom menu on hover and a sheet on long-press", () => {
+  it("opens a custom menu on hover and selects on long-press", () => {
     assert.match(overflow, /LONG_PRESS_MS = 500/);
-    assert.match(overflow, /role=\{mode === "sheet" \? "dialog" : "menu"\}/);
     assert.match(overflow, /role="menuitem"/);
     assert.match(overflow, /aria-haspopup="menu"/);
     assert.match(overflow, /onContextMenu/);
     assert.match(overflow, /pointerType !== "touch"/);
-    assert.match(overflow, /min-h-11/);
+    assert.match(overflow, /ui\?\.enter\(item\.id\)/);
+    assert.match(overflow, /onClickCapture/);
+    assert.doesNotMatch(overflow, /openAt\("sheet"/);
     assert.doesNotMatch(overflow, /onContextMenu=\{undefined\}/);
   });
 
@@ -88,6 +89,12 @@ describe("inbox row overflow menu", () => {
     assert.equal([...overflow.matchAll(/label: "Archive"/g)].length, 1);
   });
 
+  it("marks pinned rows without adding a FilterTabs pile", () => {
+    assert.match(row, /InboxPinMark/);
+    assert.match(row, /item\.pinnedAt/);
+    assert.doesNotMatch(row, /Favorites/);
+  });
+
   it("right-aligns More to the trigger instead of covering Call and WhatsApp", () => {
     assert.match(overflow, /placeInboxOverflowMenu/);
     assert.match(overflow, /align: "end"/);
@@ -95,11 +102,9 @@ describe("inbox row overflow menu", () => {
     assert.match(overflow, /offsetHeight/);
     assert.match(overflow, /md:inline-flex/);
     assert.match(overflow, /max-h-\[min\(24rem/);
-    assert.match(overflow, /flex-col justify-end/);
-    assert.match(overflow, /h-dvh/);
-    assert.match(place, /triggerRight - panel.width/);
     assert.doesNotMatch(overflow, /innerHeight - 320/);
     assert.doesNotMatch(overflow, /max-h-\[80vh\]/);
+    assert.match(place, /triggerRight - panel.width/);
     const panel = { width: 224, height: 248 };
     const more = placeInboxOverflowMenu(
       panel,

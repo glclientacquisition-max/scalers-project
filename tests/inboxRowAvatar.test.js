@@ -19,6 +19,8 @@ describe("inbox row avatar vs conversation hit", () => {
     assert.match(avatar, /No history yet/);
     assert.match(avatar, /DeskDialog/);
     assert.match(avatar, /createPortal/);
+    assert.match(avatar, /Toggle selection/);
+    assert.match(avatar, /itemId/);
   });
 
   it("opens a contact file when one exists, otherwise the stub", () => {

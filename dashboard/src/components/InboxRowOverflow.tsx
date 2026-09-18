@@ -84,10 +84,16 @@ export function InboxRowShell({
   const ui = useInboxRowUi();
   const router = useRouter();
   const rootRef = useRef<HTMLElement | null>(null);
-  const pressRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number }>({
+  const pressRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null;
+    x: number;
+    y: number;
+    armed: boolean;
+  }>({
     timer: null,
     x: 0,
     y: 0,
+    armed: false,
   });
   const [open, setOpen] = useState<MenuMode | null>(null);
   const [anchor, setAnchor] = useState<InboxOverflowAnchor>({ x: 0, y: 0, align: "point" });
@@ -160,12 +166,28 @@ export function InboxRowShell({
       <DeskLandSurface
         as={as}
         id={item.id}
-        className={[className, "group"].filter(Boolean).join(" ")}
+        className={[
+          className,
+          "group",
+          ui?.selected.includes(item.id) ? "bg-accent/[0.06]" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         rowRef={rootRef}
+        onClickCapture={(event: MouseEvent) => {
+          if (!pressRef.current.armed) return;
+          event.preventDefault();
+          event.stopPropagation();
+          pressRef.current.armed = false;
+        }}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           if (ui?.selecting) return;
-          openAt(isFinePointer() ? "menu" : "sheet", {
+          if (!isFinePointer()) {
+            ui?.enter(item.id);
+            return;
+          }
+          openAt("menu", {
             x: event.clientX,
             y: event.clientY,
             align: "point",
@@ -176,11 +198,13 @@ export function InboxRowShell({
           if (event.pointerType !== "touch") return;
           if (isInteractiveTarget(event.target, rootRef.current)) return;
           clearPress();
+          pressRef.current.armed = false;
           pressRef.current.x = event.clientX;
           pressRef.current.y = event.clientY;
           pressRef.current.timer = setTimeout(() => {
             pressRef.current.timer = null;
-            openAt("sheet", { x: event.clientX, y: event.clientY, align: "point" });
+            pressRef.current.armed = true;
+            ui?.enter(item.id);
           }, LONG_PRESS_MS);
         }}
         onPointerMove={(event: ReactPointerEvent) => {
