@@ -297,17 +297,21 @@ describe("inbox verb workflows: archive and unarchive", () => {
     assert.deepEqual(pilesOf(unarchive(visit, "new")), ["needs", "all", "job"]);
   });
 
-  it("Unarchive is lead_status back to new, contacted, or resolved. There is no list verb", () => {
+  it("Unarchive writes lead_status new and restores Needs you", () => {
     const hidden = archive(humanReturn());
     assert.deepEqual(pilesOf(unarchive(hidden, "new")), ["needs", "all", "human"]);
     assert.deepEqual(pilesOf(unarchive(hidden, "contacted")), ["needs", "all", "human"]);
     assert.deepEqual(pilesOf(unarchive(hidden, "resolved")), ["all", "human"]);
   });
 
-  it("Mark done on an archived row is an accidental Unarchive into resolved", () => {
+  it("Mark done on an archived row would still resolve it if called. Overflow must not offer it", () => {
     const after = markDone(archive(humanReturn()));
     assert.deepEqual(pilesOf(after), ["all", "human"]);
     assert.equal(after.lead.leadStatus, "resolved");
+    assert.deepEqual(
+      inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
+      ["select", "pin", "unarchive"]
+    );
   });
 });
 
@@ -387,39 +391,101 @@ describe("inbox verb workflows: mark unread", () => {
   });
 });
 
-describe("inbox verb workflows: surfaces as shipped", () => {
-  it("overflow is six verbs. Unread and Snooze sit in the stay group", () => {
-    const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
-    for (const label of ["Select", "Mark unread", "Pin", "Snooze", "Mark done", "Archive"]) {
-      assert.match(overflow, new RegExp(label));
-    }
-    assert.doesNotMatch(overflow, /Unarchive/);
-    assert.match(overflow, /id === "snooze" \|\| id === "archive"/);
-    assert.doesNotMatch(overflow, /id === "done" \|\| id === "archive"/);
+function inboxCanMarkDone(item) {
+  if (itemIsArchived(item)) return false;
+  if (item.purpose === "live") return false;
+  if (item.job || item.hold) return false;
+  if (item.lead?.leadStatus === "resolved") return false;
+  return true;
+}
+
+function inboxOverflowActions(item) {
+  const archived = itemIsArchived(item);
+  const canDone = inboxCanMarkDone(item);
+  const actions = [
+    { id: "select", label: "Select" },
+    { id: "pin", label: item.pinnedAt ? "Unpin" : "Pin" },
+  ];
+  if (canDone) actions.push({ id: "done", label: "Mark done", divide: true });
+  actions.push({
+    id: archived ? "unarchive" : "archive",
+    label: archived ? "Unarchive" : "Archive",
+    divide: !canDone,
+  });
+  return actions;
+}
+
+describe("inbox verb workflows: overflow menu", () => {
+  it("keeps Select and Pin, files with Archive, and drops unread and snooze", () => {
+    assert.deepEqual(
+      inboxOverflowActions(humanReturn()).map((row) => row.id),
+      ["select", "pin", "done", "archive"]
+    );
+    assert.deepEqual(
+      inboxOverflowActions(requestedVisit()).map((row) => row.id),
+      ["select", "pin", "archive"]
+    );
+    assert.deepEqual(
+      inboxOverflowActions(openHold()).map((row) => row.id),
+      ["select", "pin", "archive"]
+    );
+    assert.deepEqual(
+      inboxOverflowActions(answeredRow()).map((row) => row.id),
+      ["select", "pin", "archive"]
+    );
+    assert.deepEqual(
+      inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
+      ["select", "pin", "unarchive"]
+    );
   });
 
-  it("phone More exists only to park unread and snooze. Desktop bulk already omits them", () => {
+  it("puts one hairline between stay and leave", () => {
+    const returnCall = inboxOverflowActions(humanReturn());
+    assert.equal(returnCall.filter((row) => row.divide).map((row) => row.id).join(), "done");
+    const visit = inboxOverflowActions(requestedVisit());
+    assert.equal(visit.filter((row) => row.divide).map((row) => row.id).join(), "archive");
+  });
+});
+
+describe("inbox verb workflows: surfaces as shipped", () => {
+  it("overflow drops unread and snooze and calls inboxOverflowActions", () => {
+    const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
+    const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
+    assert.match(overflow, /inboxOverflowActions\(item\)/);
+    assert.match(verbs, /export function inboxOverflowActions/);
+    assert.match(verbs, /Unarchive/);
+    assert.doesNotMatch(overflow, /id: "unread"/);
+    assert.doesNotMatch(overflow, /id: "snooze"/);
+    assert.doesNotMatch(overflow, /Mark unread/);
+    assert.doesNotMatch(overflow, /["']Snooze["']/);
+  });
+
+  it("phone select bar has no More sheet. Bulk does not hide Mark done", () => {
     const select = read("dashboard/src/components/InboxRowSelect.tsx");
-    assert.match(select, /id: "unread" as const/);
-    assert.match(select, /id: "snooze" as const/);
-    assert.match(select, /kind === "done" \|\| kind === "archive" \|\| kind === "snooze"/);
+    assert.doesNotMatch(select, /aria-label="More"/);
+    assert.doesNotMatch(select, /id: "unread"/);
+    assert.doesNotMatch(select, /id: "snooze"/);
+    assert.match(select, /kind === "archive" \|\| kind === "unarchive"/);
+    assert.doesNotMatch(select, /kind === "done" \|\| kind === "archive" \|\| kind === "snooze"/);
     const desktop = select.slice(select.indexOf("hidden min-h-11"));
     assert.match(desktop, /Mark done/);
     assert.match(desktop, /Archive/);
     assert.match(desktop, /Pin/);
     assert.match(desktop, /Cancel/);
+    assert.match(desktop, /Unarchive/);
     assert.doesNotMatch(desktop, /Mark unread|Snooze/);
   });
 
-  it("ticket Archive hides when archived. Unarchive is only LeadStatusToggle chips", () => {
+  it("ticket offers Unarchive when archived and hides Mark done on visits and holds", () => {
     const ticket = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
     const toggle = read("dashboard/src/components/LeadStatusToggle.tsx");
-    assert.match(ticket, /leadStatus !== "archived"/);
+    assert.match(ticket, /MarkLeadUnarchiveButton/);
+    assert.match(ticket, /leadStatus === "archived"/);
+    assert.match(ticket, /!job && !hold/);
     assert.match(toggle, /id: "new"/);
     assert.match(toggle, /id: "contacted"/);
     assert.match(toggle, /id: "resolved"/);
     assert.doesNotMatch(toggle, /id: "archived"/);
-    assert.match(toggle, /status === "archived"/);
   });
 
   it("FilterTabs have no Unread or Snoozed. Archived is a folder row", () => {

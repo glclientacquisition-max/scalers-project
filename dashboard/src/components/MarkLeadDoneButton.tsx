@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { btnGhost, deskShiftClass } from "@/components/ui/deskChrome";
 
-type SoftAction = "resolved" | "archived";
+type SoftAction = "resolved" | "archived" | "new";
 
 function ArchiveGlyph({ className }: { className?: string }) {
   return (
@@ -21,6 +21,25 @@ function ArchiveGlyph({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M3 7h18M5 7l1 12h12l1-12M9 7V5h6v2"
+      />
+    </svg>
+  );
+}
+
+function UnarchiveGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 7h18M5 7l1 12h12l1-12M9 7V5h6v2M12 18v-6m0 0-2.5 2.5M12 12l2.5 2.5"
       />
     </svg>
   );
@@ -45,6 +64,7 @@ function DoneGlyph({ className }: { className?: string }) {
  * Soft clear / hide: owners cannot hard-delete calls (RLS).
  * Done = resolved (finished follow-up).
  * Archive = archived (leaves Needs you, All, Visits, Holds, Human, Answered; sits on Archived).
+ * Unarchive = new (back on Needs you).
  */
 export function MarkLeadActionButton({
   callId,
@@ -62,9 +82,9 @@ export function MarkLeadActionButton({
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const label = action === "archived" ? "Archive" : "Mark done";
+  const label = action === "archived" ? "Archive" : action === "new" ? "Unarchive" : "Mark done";
   const busyLabel = action === "archived" ? "Archiving" : "Saving";
-  const successLabel = action === "archived" ? "Archived" : "Done";
+  const successLabel = action === "archived" ? "Archived" : action === "new" ? "Unarchived" : "Done";
 
   if (done && variant === "icon") {
     return (
@@ -115,7 +135,7 @@ export function MarkLeadActionButton({
           startTransition(async () => {
             const res = await updateLeadStatus(callId, action);
             if (!res.ok) {
-              setError(res.error || (action === "archived" ? "Could not archive." : "Could not mark done."));
+              setError(res.error || (action === "archived" ? "Could not archive." : action === "new" ? "Could not unarchive." : "Could not mark done."));
               return;
             }
             setDone(true);
@@ -133,6 +153,8 @@ export function MarkLeadActionButton({
         {variant === "icon" ? (
           action === "archived" ? (
             <ArchiveGlyph className="h-4 w-4" />
+          ) : action === "new" ? (
+            <UnarchiveGlyph className="h-4 w-4" />
           ) : (
             <DoneGlyph className="h-4 w-4" />
           )
@@ -140,6 +162,8 @@ export function MarkLeadActionButton({
           <>
             {action === "archived" ? (
               <ArchiveGlyph className="h-4 w-4" />
+            ) : action === "new" ? (
+              <UnarchiveGlyph className="h-4 w-4" />
             ) : (
               <DoneGlyph className="h-4 w-4" />
             )}
@@ -201,6 +225,25 @@ export function MarkLeadArchiveButton({
     <MarkLeadActionButton
       callId={callId}
       action="archived"
+      disabled={disabled}
+      variant={variant}
+    />
+  );
+}
+
+export function MarkLeadUnarchiveButton({
+  callId,
+  disabled = false,
+  variant = "default",
+}: {
+  callId: string;
+  disabled?: boolean;
+  variant?: "default" | "icon" | "button";
+}) {
+  return (
+    <MarkLeadActionButton
+      callId={callId}
+      action="new"
       disabled={disabled}
       variant={variant}
     />

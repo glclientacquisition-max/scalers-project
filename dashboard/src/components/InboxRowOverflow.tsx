@@ -22,10 +22,14 @@ import { deskHitClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   inboxArchive,
   inboxMarkDone,
-  inboxSnooze,
   inboxTogglePin,
-  inboxToggleRead,
+  inboxUnarchive,
 } from "@/lib/inboxLeadActions";
+import {
+  inboxOverflowActions,
+  type InboxListAction,
+  type InboxListActionId,
+} from "@/lib/inboxListVerbs";
 import {
   placeInboxOverflowMenu,
   type InboxOverflowAnchor,
@@ -66,8 +70,8 @@ function isInteractiveTarget(target: EventTarget | null, root: HTMLElement | nul
   return Boolean(hit && root.contains(hit) && hit !== root);
 }
 
-type ActionId = "select" | "unread" | "done" | "archive" | "pin" | "snooze";
-type OverflowAction = { id: ActionId; label: string; divide?: boolean };
+type ActionId = InboxListActionId;
+type OverflowAction = InboxListAction;
 
 export function InboxRowShell({
   item,
@@ -133,31 +137,23 @@ export function InboxRowShell({
     setBusy(true);
     setError(null);
     let res: { error?: string; ok?: boolean } = { ok: true };
-    if (id === "unread") res = await inboxToggleRead(item);
-    else if (id === "pin") res = await inboxTogglePin(item);
-    else if (id === "snooze") res = await inboxSnooze(item);
+    if (id === "pin") res = await inboxTogglePin(item);
     else if (id === "done") res = await inboxMarkDone(item);
     else if (id === "archive") res = await inboxArchive(item);
+    else if (id === "unarchive") res = await inboxUnarchive(item);
     setBusy(false);
     if (res.error) {
       setError(res.error);
       return;
     }
-    if (id === "snooze" || id === "archive") {
+    if (id === "archive" || id === "unarchive") {
       patch({ hidden: true });
     }
     close();
     router.refresh();
   };
 
-  const actions: OverflowAction[] = [
-    { id: "select", label: "Select" },
-    { id: "unread", label: item.unread ? "Mark read" : "Mark unread", divide: true },
-    { id: "pin", label: item.pinnedAt ? "Unpin" : "Pin" },
-    { id: "snooze", label: "Snooze" },
-    { id: "done", label: "Mark done", divide: true },
-    { id: "archive", label: "Archive" },
-  ];
+  const actions: OverflowAction[] = inboxOverflowActions(item);
 
   if (local.hidden) return null;
 
