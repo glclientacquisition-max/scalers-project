@@ -7,6 +7,7 @@ import {
   type NotifyChannels,
 } from "@/lib/notifyChannels";
 import { ToolSwitch } from "@/components/settingsUi";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 function SmsLogo({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -40,9 +41,9 @@ const LOGO: Record<NotifyChannelId, (p: { className?: string }) => ReactNode> = 
 };
 
 const LOGO_TONE: Record<NotifyChannelId, string> = {
-  sms: "bg-[#0ea5e9]/15 text-[#0284c7]",
-  whatsapp: "bg-[#25D366]/15 text-[#128C7E]",
-  email: "bg-[#6366f1]/15 text-[#4f46e5]",
+  sms: "bg-sms/15 text-sms",
+  whatsapp: "bg-whatsapp/15 text-whatsapp-deep",
+  email: "bg-email/15 text-email",
 };
 
 export function NotifyChannelPicker({
@@ -68,12 +69,13 @@ export function NotifyChannelPicker({
             <li
               key={meta.id}
               className={[
-                "flex items-center gap-3 rounded-xl border px-3 py-3 transition",
+                "flex items-center gap-3 rounded-xl border px-3 py-3",
+                deskShiftClass,
                 locked
                   ? "border-line/70 bg-surface/60 opacity-55 grayscale"
                   : enabled
-                    ? "border-[#0096FF]/35 bg-[#0096FF]/5"
-                    : "border-line bg-white",
+                    ? "border-accent/35 bg-accent/5"
+                    : "border-line bg-surface",
               ].join(" ")}
             >
               <span

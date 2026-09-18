@@ -1,8 +1,9 @@
 import type { CallResolution, LeadStatus } from "@/lib/supabase";
 import type { Lead } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
+import { storedPhoneCandidates, storedPhoneJoinKey } from "@/lib/handoffMode";
 
-export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered";
+export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered" | "live";
 
 export type InboxPurposeFilterId =
   | "needs"
@@ -10,6 +11,7 @@ export type InboxPurposeFilterId =
   | "job"
   | "human"
   | "answered"
+  | "archived"
   | "all";
 
 export const PURPOSE_FILTERS = purposeFilters("general");
@@ -59,7 +61,6 @@ const ANSWER_INTENTS = new Set([
   "price_band",
   "availability",
   "policy",
-  "product_inquiry",
   "service_inquiry",
   "service_area",
   "general_enquiry",
@@ -119,11 +120,24 @@ export type InboxItem = {
   job: InboxJob | null;
   intent: string | null;
   urgent: boolean;
+  unread: boolean;
+  muted: boolean;
+  pinnedAt: string | null;
+  assignee: string | null;
+  labels: string[];
+  snoozedUntil: string | null;
 };
+
+export function isLiveCallStatus(status?: string | null): boolean {
+  const s = String(status || "").toLowerCase();
+  return s === "in_progress" || s === "ringing" || s === "queued";
+}
 
 export function purposeLabel(purpose: InboxPurpose, vertical?: string | null): string {
   const copy = nicheCopy(vertical);
   switch (purpose) {
+    case "live":
+      return "Live";
     case "job":
       return copy.visitStamp;
     case "hold":
@@ -147,7 +161,7 @@ export function signalLabel(opts: {
 }): string {
   const copy = nicheCopy(opts.vertical);
   if (opts.purpose === "job") {
-    if (!opts.job) return copy.returnCtaOne;
+    if (!opts.job) return copy.visitGhostStamp;
     const status = String(opts.job.status || "").toLowerCase();
     if (status === "confirmed") return copy.visitStamp;
     if (status === "done") return copy.visitDoneStamp;
@@ -155,7 +169,7 @@ export function signalLabel(opts: {
     return copy.confirmStamp;
   }
   if (opts.purpose === "hold") {
-    if (!opts.hold) return copy.returnCtaOne;
+    if (!opts.hold) return copy.holdGhostStamp;
     const status = String(opts.hold.status || "").toLowerCase();
     if (status === "fulfilled") return "Item done";
     if (status === "cancelled") return "Cancelled";
@@ -185,12 +199,13 @@ export function inboxCaption(
   vertical?: string | null
 ): string {
   const copy = nicheCopy(vertical);
-  const needs = items.filter((item) => item.needsYou).length;
+  const live = items.filter((item) => !itemIsArchived(item));
+  const needs = live.filter((item) => item.needsYou).length;
   if (needs === 0) return "Clear";
-  const toConfirm = items.filter(
+  const toConfirm = live.filter(
     (item) => item.job && String(item.job.status || "").toLowerCase() === "requested"
   ).length;
-  const toFulfill = items.filter(
+  const toFulfill = live.filter(
     (item) => item.hold && String(item.hold.status || "").toLowerCase() === "open"
   ).length;
   if (toConfirm === needs) {
@@ -207,21 +222,51 @@ export function inboxCaption(
 
 function signalRank(item: InboxItem): number {
   if (item.urgent && item.needsYou) return 0;
-  if (item.purpose === "job" && item.needsYou) return 1;
-  if (item.purpose === "hold" && item.needsYou) return 2;
-  if (item.purpose === "missed" && item.needsYou) return 3;
-  if (item.purpose === "human" && item.needsYou) return 4;
-  if (item.needsYou) return 5;
-  return 6;
+  return 1;
+}
+
+export function compareInboxRecency(a: InboxItem, b: InboxItem): number {
+  if (a.createdAt < b.createdAt) return 1;
+  if (a.createdAt > b.createdAt) return -1;
+  return 0;
 }
 
 export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
   const rank = signalRank(a) - signalRank(b);
   if (rank !== 0) return rank;
-  if (a.createdAt < b.createdAt) return 1;
-  if (a.createdAt > b.createdAt) return -1;
+  return compareInboxRecency(a, b);
+}
+
+export function compareInboxPin(a: InboxItem, b: InboxItem): number {
+  const ap = a.pinnedAt || "";
+  const bp = b.pinnedAt || "";
+  if (ap && !bp) return -1;
+  if (!ap && bp) return 1;
+  if (ap && bp && ap !== bp) return ap < bp ? 1 : -1;
   return 0;
 }
+
+export function itemIsSnoozed(item: InboxItem, now = Date.now()): boolean {
+  if (!item.snoozedUntil) return false;
+  const until = Date.parse(item.snoozedUntil);
+  return Number.isFinite(until) && until > now;
+}
+
+/** All, Answered, Archived, and Holds List are a tape: newest first. Pinned rows stay on top of the current pile. */
+export function orderInboxItems(
+  items: InboxItem[],
+  filter: InboxPurposeFilterId
+): InboxItem[] {
+  const rows = [...items];
+  if (filter === "all" || filter === "answered" || filter === "archived" || filter === "hold") {
+    rows.sort(compareInboxRecency);
+  }
+  rows.sort(compareInboxPin);
+  return rows;
+}
+
+/** Queue labels stay nouns. A single short slot may replace the unit. Never a paragraph. */
+export const HOME_QUEUE_SAMPLE_MAX = 28;
 
 export function homeQueueUnit(
   count: number,
@@ -229,8 +274,8 @@ export function homeQueueUnit(
   sample?: string | null
 ): string {
   if (count === 1) {
-    const text = sample?.trim();
-    if (text) return text;
+    const text = sample?.trim() || "";
+    if (text && text.length <= HOME_QUEUE_SAMPLE_MAX) return text;
   }
   return fallback;
 }
@@ -334,7 +379,9 @@ export function classifyInboxPurpose(opts: {
   leadStatus?: LeadStatus | null;
   hold?: InboxHold | null;
   job?: InboxJob | null;
+  callStatus?: string | null;
 }): InboxPurpose {
+  if (isLiveCallStatus(opts.callStatus)) return "live";
   if (opts.job) return "job";
   if (opts.hold) return "hold";
 
@@ -345,6 +392,8 @@ export function classifyInboxPurpose(opts: {
   if (JOB_INTENTS.has(intent)) return "job";
   if (HOLD_INTENTS.has(intent)) return "hold";
   if (resolution === "abandoned" || resolution === "unresolved") return "missed";
+  // Product inquiry is an active lead unless a job or hold row already attached.
+  if (intent === "product_inquiry") return "missed";
   if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
   if (opts.leadStatus === "new") return "missed";
   return "answered";
@@ -360,6 +409,7 @@ export function inboxNeedsYou(opts: {
   hold?: InboxHold | null;
   job?: InboxJob | null;
 }): boolean {
+  if (opts.purpose === "live") return true;
   if (opts.purpose === "answered") return false;
   const jobStatus = String(opts.job?.status || "").toLowerCase();
   const holdStatus = String(opts.hold?.status || "").toLowerCase();
@@ -410,6 +460,7 @@ export function buildInboxItem(opts: {
     leadStatus: lead?.leadStatus,
     hold,
     job,
+    callStatus: lead?.call.status,
   });
   const needsYou = inboxNeedsYou({
     purpose,
@@ -437,6 +488,9 @@ export function buildInboxItem(opts: {
   const createdAt =
     lead?.call.created_at || job?.created_at || hold?.created_at || new Date().toISOString();
   const id = lead?.call.id || job?.id || hold?.id || createdAt;
+  const labels = Array.isArray(lead?.call.inbox_labels)
+    ? lead.call.inbox_labels.filter((row): row is string => typeof row === "string")
+    : [];
 
   return {
     id,
@@ -454,6 +508,12 @@ export function buildInboxItem(opts: {
     job,
     intent: intent || canonicalInboxIntent(hold?.request_type) || null,
     urgent: Boolean(lead?.urgent),
+    unread: lead?.call.inbox_read_at === null,
+    muted: Boolean(lead?.call.inbox_muted),
+    pinnedAt: lead?.call.inbox_pinned_at || null,
+    assignee: lead?.call.inbox_assignee?.trim() || null,
+    labels,
+    snoozedUntil: lead?.call.inbox_snoozed_until || null,
   };
 }
 
@@ -481,13 +541,19 @@ export function assembleInboxItems(opts: {
   }
 
   const items: InboxItem[] = [];
+  const now = Date.now();
   for (const lead of opts.leads) {
-    if (lead.leadStatus === "archived") continue;
     const hold = holdByCall.get(lead.call.id) || null;
     const job = jobByCall.get(lead.call.id) || null;
+    const draft = buildInboxItem({ lead, hold, job, vertical });
+    if (itemIsSnoozed(draft, now)) {
+      if (hold) usedHold.add(hold.id);
+      if (job) usedJob.add(job.id);
+      continue;
+    }
     if (hold) usedHold.add(hold.id);
     if (job) usedJob.add(job.id);
-    items.push(buildInboxItem({ lead, hold, job, vertical }));
+    items.push(draft);
   }
 
   for (const hold of opts.holds) {
@@ -519,16 +585,24 @@ export function attachContactIds(
   contacts: Array<{ id: string; phone: string | null; name?: string | null }>
 ): InboxItem[] {
   const byPhone = new Map<string, { id: string; name: string | null }>();
-  for (const row of contacts) {
-    if (row.phone) {
-      byPhone.set(row.phone, {
-        id: row.id,
-        name: row.name?.trim() || null,
-      });
+  const remember = (phone: string | null | undefined, person: { id: string; name: string | null }) => {
+    for (const key of storedPhoneCandidates(phone)) {
+      byPhone.set(key, person);
     }
+  };
+  for (const row of contacts) {
+    if (!row.phone) continue;
+    remember(row.phone, {
+      id: row.id,
+      name: row.name?.trim() || null,
+    });
   }
   return items.map((item) => {
-    const person = item.callerPhone ? byPhone.get(item.callerPhone) || null : null;
+    const person =
+      (item.callerPhone &&
+        (byPhone.get(item.callerPhone) ||
+          byPhone.get(storedPhoneJoinKey(item.callerPhone) || ""))) ||
+      null;
     return {
       ...item,
       contactId: person?.id || null,
@@ -537,10 +611,16 @@ export function attachContactIds(
   });
 }
 
+export function itemIsArchived(item: InboxItem): boolean {
+  return item.lead?.leadStatus === "archived";
+}
+
 export function itemMatchesPurpose(
   item: InboxItem,
   filter: InboxPurposeFilterId
 ): boolean {
+  if (filter === "archived") return itemIsArchived(item);
+  if (itemIsArchived(item)) return false;
   if (filter === "all") return true;
   if (filter === "needs") return item.needsYou;
   if (filter === "hold") {
@@ -562,9 +642,15 @@ export function countInboxPurposes(items: InboxItem[]): Record<InboxPurposeFilte
     job: 0,
     human: 0,
     answered: 0,
-    all: items.length,
+    archived: 0,
+    all: 0,
   };
   for (const item of items) {
+    if (itemIsArchived(item)) {
+      counts.archived += 1;
+      continue;
+    }
+    counts.all += 1;
     if (item.needsYou) counts.needs += 1;
     if (itemMatchesPurpose(item, "hold")) counts.hold += 1;
     if (itemMatchesPurpose(item, "job")) counts.job += 1;
@@ -591,9 +677,10 @@ export function itemMatchesQuery(item: InboxItem, q: string): boolean {
   return hay.includes(q.toLowerCase());
 }
 
-const PURPOSE_IDS = new Set<InboxPurposeFilterId>(
-  PURPOSE_FILTERS.map((f) => f.id)
-);
+const PURPOSE_IDS = new Set<InboxPurposeFilterId>([
+  ...PURPOSE_FILTERS.map((f) => f.id),
+  "archived",
+]);
 
 /** Map legacy lead-status bookmarks onto purpose filters. */
 export function resolvePurposeFilter(
@@ -609,6 +696,6 @@ export function resolvePurposeFilter(
   if (statusRaw === "new") return "needs";
   if (statusRaw === "contacted") return "human";
   if (statusRaw === "resolved") return "answered";
-  if (statusRaw === "archived") return "all";
+  if (statusRaw === "archived") return "archived";
   return needsCount > 0 ? "needs" : "all";
 }

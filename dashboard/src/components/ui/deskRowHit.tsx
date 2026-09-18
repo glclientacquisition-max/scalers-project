@@ -5,7 +5,7 @@ import Link from "next/link";
  * Canon: docs/frontend/design-system/MASTER.md (list rows).
  */
 export const deskRowHitClass =
-  "absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]";
+  "absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent";
 
 export const deskRowMutedClass = "relative z-[1] pointer-events-none";
 

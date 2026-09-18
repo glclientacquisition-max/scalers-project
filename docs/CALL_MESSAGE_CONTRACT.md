@@ -8,18 +8,20 @@ Two recipients. Never confuse them.
 
 | Recipient | Who | Job of the message |
 | --- | --- | --- |
-| **Owner** | The business that pays Scalers | Know a caller needs action. Open the desk. |
+| **Staff** | Teammates on `team_directory` with the matching permission | Know a caller needs action. Open the desk. |
 | **Caller** | The business's customer | Know the business got their ask. Know what happens next. |
+
+Do not invent staff. Do not fall back to `team[0]`. Do not also SMS the Alerts phone when a teammate already got the escalate.
 
 ---
 
 ## 1. Event model
 
-Every post-call notification is one typed event. Voice builds the event; `src/notifications/events.js` renders it; `dispatch.js` sends it on the best channel.
+Every post-call notification is one typed event. Voice builds the event; `src/notifications/templates.js` is the copy catalog; `events.js` builds the payload; `dispatch.js` sends it on the best channel.
 
 | Event | When it fires | Owner title | Caller text? |
 | --- | --- | --- | --- |
-| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` + Intent / Summary / Outcome when known | No |
+| `lead` | `save_caller_info` with name + reason, or call ends with both | `New missed-call lead` + Intent / Outcome when useful | No |
 | `escalation` | Caller asks for a human; name + reason captured | `Escalation for {Teammate}` | No |
 | `service_request` | Hold / order / enquiry created | `HOLD / ORDER / ENQUIRY` | Yes, when shipped |
 | `appointment` | Visit requested / updated / cancelled | `VISIT REQUEST` | Yes, when shipped |
@@ -32,48 +34,75 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `caller_appointment_cancelled` | Owner or caller cancels | — | Yes, if on |
 | `caller_appointment_rescheduled` | Visit time changes | — | Yes, if on |
 | `caller_hold` | Hold placed | — | Yes, if on |
+| `caller_hold_updated` | Desk changes hold pickup time | — | Yes, if on |
 | `caller_order` | Order captured | — | Yes, if on |
 | `caller_callback` | Callback promised | — | Yes, if on |
 
-One event = one owner message per call per kind. `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation marks it so the lead path does not re-send.
+One event = one staff message per call per kind, sent to every unique permissioned destination (except escalate, which is one person). The channel ladder is one success, not SMS plus WhatsApp plus email. `whatsapp_sent` on the call row prevents a duplicate lead text. Escalation, visit, and hold/order/enquiry mark it so the lead path does not re-send. Per-instance caps: §11.
 
 ---
 
-## 2. Channel ladder
+## 2. Who gets the staff message
 
-Owner alerts use the first channel that works, in this order:
+Permissions live on each `tenants.team_directory` row. Desk People: **Escalate**, **Inbox**, **Ops**. Save writes booleans. Runtime never guesses a person who is not allowed.
+
+| Flag | Events |
+| --- | --- |
+| `receives_escalation` | One teammate from `resolveEscalation`. Unmatched asks go to a catch-all with this flag (General queries, else inbox+escalate). Nobody qualifies: desk note only. |
+| `receives_inbox` | Lead, visit, hold / order / enquiry. Every unique phone or email. |
+| `receives_ops` | Wallet low/empty, speech/reasoning outage. Unique dests; outage sends to the first ops dest. |
+
+Unmigrated directories (no boolean flags on any row) infer so existing tenants keep working:
+
+- Escalate: any row with a phone
+- Inbox and ops: General queries / ownerish role, or the Alerts phone
+- If inbox/ops still empty: the Alerts phone and `alert_email` (`legacy_owner`)
+
+Once any row has flags, missing flags are `false`. Ingest must not stamp inferred flags onto an unmigrated directory.
+
+Alerts **phone** is the workspace fallback and the owner-phone match for inference. It is not a silent extra escalate recipient.
+
+---
+
+## 3. Channel ladder
+
+Staff alerts use the first channel that works, in this order:
 
 | Order | Channel | Provider | When it is used |
 | --- | --- | --- | --- |
 | 1 | **SMS** | TextSMS.co.ke | Always first when configured. Works on any phone. |
-| 2 | **WhatsApp** | SautiKit | When SMS is not configured or fails. Needs `SAUTIKIT_WHATSAPP_NUMBER_ID`. |
+| 2 | **WhatsApp** | SautiKit | When SMS is not configured, fails, or is at cap. Needs `SAUTIKIT_WHATSAPP_NUMBER_ID`. Cold send is a Meta utility template ([`WHATSAPP_TEMPLATES.md`](./WHATSAPP_TEMPLATES.md)). Session text only inside an open 24h window. |
 | 3 | **Email** | Resend | Fallback when SMS and WhatsApp miss. |
 | 4 | **Desk note** | Supabase call row | Always saved. Soft success if 1–3 miss. |
 
-Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email, caller_sms, missed_textback}`). At least one **owner** channel stays on. `caller_sms` and `missed_textback` are separate opt-ins and default **off**.
+Owner channel prefs live on `tenants.notify_channels` (`{sms, whatsapp, email, caller_sms, missed_textback}`). At least one **staff** channel stays on. `caller_sms` and `missed_textback` are separate opt-ins and default **off**.
 
-Escalation adds a **teammate** step before the owner: SMS teammate → SMS owner → WhatsApp teammate/owner → owner email.
+Escalation sends to the matched teammate only (SMS, then WhatsApp, then that teammate's email; owner email only when the teammate number is the Alerts phone). No second owner SMS.
 
 ---
 
-## 3. Owner message shapes
+## 4. Staff message shapes
 
-All owner bodies are plain text, ordered label rows, no vendor names, no "technical issue".
+Canonical copy: `src/notifications/templates.js`. Desk caller SMS: `dashboard/src/lib/messageTemplates.ts`. Scalers owns both. Owners do not edit staff templates. Caller copy stays Scalers-owned until a later owner tweak for **Text customers**.
+
+All staff bodies are plain text, ordered label rows, no vendor names, no "technical issue", no em dashes, no Want / Done / Mood card.
 
 | Event | Body |
 | --- | --- |
-| Lead | `New missed-call lead — {Business}` + `Name:` / `Phone:` / `Reason:` / `Intent:` / `Summary:` / `Outcome:` / `Recording:` |
-| Escalation | `Escalation for {Teammate} — {Business}` + `Caller:` / `Phone:` / `Reason:` |
-| Service request | `{HOLD\|ORDER\|ENQUIRY} — {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Inbox Holds to mark fulfilled.` |
-| Appointment | `VISIT REQUEST — {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Inbox Visits to confirm or cancel.` |
-| Wallet low | `Scalers wallet running low — {Business}` + balance + threshold |
-| Wallet empty | `Scalers prepaid empty — {Business}` + on-demand state |
+| Lead | `New missed-call lead. {Business}` + `Name:` / `Phone:` / `Reason:` / `Intent:` when useful / `Outcome:` when real / `Open call:` |
+| Escalation | `Escalation for {Teammate}. {Business}` + `Caller:` / `Phone:` / `Reason:` |
+| Service request | `{HOLD\|ORDER\|ENQUIRY}. {Business}` + `Item:` / `Qty:` / `When:` / `Caller:` / `Phone:` + `Open Inbox Holds to mark fulfilled.` |
+| Appointment | `VISIT REQUEST. {Business}` + `Service:` / `When:` / `Where:` / `Caller:` / `Status:` + `Open Inbox Visits to confirm or cancel.` |
+| Wallet low | `Scalers wallet running low. {Business}` + balance + threshold |
+| Wallet empty | `Scalers prepaid empty. {Business}` + on-demand state |
 | Speech outage | `{Business} line downtime. Callers heard a short message and were asked to call back.` |
 | Reasoning outage | `{Business} line is taking names only. Callers are asked for a name so the team can call back.` |
 
+Lead omits `Summary`. Live Brain dump is not the owner sentence. `Intent` is omitted when it is only `general_enquiry`. `Outcome` is omitted when it is an internal Brain note. Hangup Want card stays on the desk call, not on SMS.
+
 ---
 
-## 4. Caller messages (opt-in)
+## 5. Caller messages (opt-in)
 
 The customer is not texted unless the owner turns **Text customers** on in Business Settings. Default is off. Existing workspaces stay off until they flip it.
 
@@ -122,51 +151,54 @@ When a call reaches the line but the caller gets no service (terminal webhook cl
 
 ---
 
-## 5. Angles that decide each message
+## 6. Angles that decide each message
 
 | Angle | Owner message | Caller message |
 | --- | --- | --- |
 | **Timing** | Immediate on save / call end | Immediate on action, or after owner confirms |
-| **Channel** | SMS first, WhatsApp second, email fallback | SMS only at first; WhatsApp needs template approval |
+| **Channel** | SMS first, WhatsApp second (utility template), email fallback | SMS only at first; caller WhatsApp needs its own templates |
 | **Language** | English (owner desk language) | Match the call language when known |
 | **Content** | Name, phone, reason, recording link | Business name, what was captured, next step |
-| **Cost** | Platform cost today; bundle into subscription later | Platform cost; per-text or bundle |
+| **Cost** | Metered on `notify_sends` (tenant SMS). Included first. Stop at cap unless on-demand. Not a KES debit yet | Same table. Caller SMS is tenant usage |
 | **Opt-out** | Owner toggles `notify_channels` | Caller STOP; owner toggle |
 | **Failure** | Log and leave desk note; do not retry storm | Log; do not retry on the same call |
 
 ---
 
-## 6. What not to do
+## 7. What not to do
 
 - Do not text the caller on every call. Only when there is an action to confirm.
 - Do not send the caller a transcript or recording link.
 - Do not let the caller text reveal internal notes (`resolution_note`, staff directory).
-- Do not charge the tenant per owner SMS without a product decision.
+- Do not debit the prepaid KES wallet for SMS. Meter on `notify_sends`. Stop tenant SMS at included unless on-demand.
+- Do not gate platform wallet or outage SMS on the tenant allowance.
 - Do not send marketing to the caller. The first text is a confirmation, not a campaign.
 - Do not add a fourth owner channel without adding it to the ladder and the event model.
+- Do not invent a staff recipient. No `team[0]`. No extra owner SMS on escalate.
+- Do not text anyone who is not permissioned once flags exist.
+- Do not fire a second channel or a second SMS for the same dest + kind + call. Skip. Do not consume SMS units on that skip.
 
 ---
 
-## 7. Open decisions
+## 8. Open decisions
 
 1. **Caller SMS sender:** shared Scalers sender ID vs the tenant DID. Shared is simpler; tenant DID is more trusted.
-2. **Pricing:** is caller SMS bundled in the line fee, metered per text, or an add-on?
+2. **Pricing:** packages will include SMS, email, seats, and later minutes. Included SMS default is 200. Stop at cap unless on-demand. Wallet and outage SMS stay Scalers-paid (`billed_to=platform`). Contract: [`PACKAGES.md`](./PACKAGES.md).
 3. **Language:** match the call language, or always English?
 4. **Opt-out:** is `Reply STOP` enough for Kenya, or do we need a registered sender with DLR?
 
 ---
 
-## 8. Owner insight without the dashboard
+## 9. Owner insight without the dashboard
 
-The owner lead text is not a label dump. When the Brain has persisted intent, summary, and resolution, the SMS carries them:
+The owner lead text is not a label dump. When the Brain has persisted intent and a real outcome, the SMS carries them:
 
 ```
-New missed-call lead — Done and Dusted Cleaning Services
+New missed-call lead. Done and Dusted Cleaning Services
 Name: Jane
 Phone: +254790381872
 Reason: Book carpet cleaning
 Intent: book_visit
-Summary: Intent: book_visit. Caller: Jane. Goal: carpet cleaning tomorrow.
 Outcome: Visit request saved
 Recording: https://…
 Open call: https://scalers-project.vercel.app/calls/{call_id}
@@ -178,4 +210,48 @@ The link is the desk call detail (`/calls/{id}`). Set `DESK_PUBLIC_URL` (or `NEX
 
 Do not put live Brain dump on the SMS. Omit `general_enquiry` intent, greeting/backchannel summaries, and internal resolution notes. Prefer hangup `owner_review` when it is already on the call row. Live vs bar: [`CALL_MESSAGE_GAP.md`](./CALL_MESSAGE_GAP.md).
 
+## 10. Send ledger
+
+Every accepted SMS, WhatsApp, or email writes `notify_sends` (`docs/supabase/notify_send_ledger.sql`). Apply that SQL before counts are durable. Missing table: send still goes, insert is skipped.
+
+| `billed_to` | What |
+| --- | --- |
+| `tenant` | Staff lead, escalate, visit, hold, order, enquiry, callback. Caller visit/hold/order/callback/note. Missed text-back. |
+| `platform` | Wallet low/empty. Speech or reasoning outage. Scalers pays. |
+
+SMS units are segments (GSM-7 160 / 153, UCS-2 70 / 67). Email and WhatsApp count as 1 unit on their own channel. No KES debit. Duplicate dest + kind + call is idempotent.
+
+### Stop at included (same on-demand toggle as minutes)
+
+Apply `docs/supabase/sms_allowance.sql` after the ledger SQL. Default included is 200 segments. `consume_sms_units` claims before send.
+
+| State | Tenant SMS |
+| --- | --- |
+| Beta (`billing_enforcement = off`) | Send. Meter `sms_used_units`. Never block. |
+| Paid, under cap | Send. `overage = false`. |
+| Paid, at cap, on-demand off | Skip SMS. Staff WhatsApp / email / desk note still try. Escalate still saves. |
+| Paid, at cap, on-demand on | Send. `overage = true`. |
+| Platform (`wallet_*`, `outage_*`) | Always send. Never consume tenant units. |
+
+Missing RPC or table: send still goes (staging before apply). Desk caller note at cap returns an error. Appointment / request / escalate saves anyway.
+
 **Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.
+
+## 11. Per-instance send limits
+
+Monthly included SMS is a package cap (`sms_allowance.sql`). This section is the other limit: how many messages one call or desk action may fire. Beta does not lift these. They are anti-storm, not billing.
+
+| Rule | What |
+| --- | --- |
+| One success per dest per kind per call | SMS or WhatsApp or email. Not a stack. |
+| Channel ladder | First working channel wins. A retry does not add a second channel. |
+| Escalate | One teammate. Never a second owner SMS. |
+| Inbox / ops | Every unique permissioned dest. Do not cap dests. |
+| In-flight | Same dest + kind + call while a send is running is skipped (`instance_in_flight`). |
+| Already sent | A `notify_sends` row for that dest + kind + call on any channel is skipped (`instance_already_sent`). No SMS units consumed. |
+| Missed text-back | Marker on the call, plus one caller per 6 hours. |
+| Outage | One owner alert per cooldown. |
+| Wallet | Claim RPC: one low, one empty. |
+| Desk caller SMS | Same idempotency key. Double tap returns `Already sent.` Appointment and request rows still save. |
+
+Gate is `beginInstanceSend` before `consume_sms_units`. Missing `notify_sends` table: send still goes (fail open), same as the ledger insert.

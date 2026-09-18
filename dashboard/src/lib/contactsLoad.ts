@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseSummary } from "@/lib/supabase";
+import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
   displayContactLastReason,
+  pickCallOwnerCard,
   pickCallOwnerReason,
+  pickCallOwnerWant,
 } from "@/lib/callSummarySentence";
 
 export type ContactRow = {
@@ -31,6 +34,13 @@ export type ContactTimelineEntry = {
   callId: string | null;
   status: string | null;
   ownerReason?: string | null;
+  ownerWant?: string | null;
+  ownerCard?: {
+    want: string | null;
+    done: string | null;
+    mood: string | null;
+    next: string | null;
+  } | null;
 };
 
 const CONTACT_SELECT =
@@ -40,6 +50,15 @@ function maxIso(a: string | null, b: string | null): string | null {
   if (!a) return b;
   if (!b) return a;
   return a >= b ? a : b;
+}
+
+/** Newest call or work row. Do not let an older visit created_at beat a later call. */
+export function pickLastContactAt(
+  byPhone: string | null | undefined,
+  byContactId: string | null | undefined,
+  updatedAt: string | null | undefined
+): string | null {
+  return maxIso(byPhone || null, byContactId || null) || updatedAt || null;
 }
 
 export type ContactSavedFilter = "all" | "saved" | "unsaved";
@@ -104,15 +123,22 @@ export async function loadContactsPage(
     contacts
   );
   const rows = contacts.map((row) => {
-    const latestCallReason = row.phone
-      ? extras.reasonByPhone.get(row.phone) ?? null
-      : null;
+    const phoneKeys = row.phone ? storedPhoneCandidates(row.phone) : [];
+    const latestCallReason =
+      phoneKeys
+        .map((key) => extras.reasonByPhone.get(key))
+        .find((value) => value != null) ?? null;
+    const lastByPhone =
+      phoneKeys
+        .map((key) => extras.byPhone.get(key) || null)
+        .reduce<string | null>((best, value) => maxIso(best, value || null), null);
     return {
       ...row,
-      lastContactAt:
-        extras.byId.get(row.id) ||
-        (row.phone ? extras.byPhone.get(row.phone) : null) ||
-        row.updated_at,
+      lastContactAt: pickLastContactAt(
+        lastByPhone,
+        extras.byId.get(row.id),
+        row.updated_at
+      ),
       lastReasonDisplay: displayContactLastReason({
         name: row.name,
         phone: row.phone,
@@ -135,7 +161,11 @@ async function loadLastContactMap(
   reasonByPhone: Map<string, string | null>;
 }> {
   const ids = contacts.map((c) => c.id);
-  const phones = contacts.map((c) => c.phone).filter((p): p is string => Boolean(p));
+  const phones = [
+    ...new Set(
+      contacts.flatMap((c) => (c.phone ? storedPhoneCandidates(c.phone) : []))
+    ),
+  ];
 
   const [callsRes, reqRes, reqPhoneRes, apptRes, apptPhoneRes] = await Promise.all([
     phones.length
@@ -184,12 +214,15 @@ async function loadLastContactMap(
   for (const row of callsRes.data || []) {
     const phone = String(row.caller_number || "");
     if (!phone) continue;
-    byPhone.set(phone, maxIso(byPhone.get(phone) || null, row.created_at));
-    if (!reasonByPhone.has(phone)) {
-      reasonByPhone.set(
-        phone,
-        pickCallOwnerReason(parseSummary(row.summary as string | null))
-      );
+    const at = maxIso(byPhone.get(phone) || null, row.created_at);
+    const reason = reasonByPhone.has(phone)
+      ? null
+      : pickCallOwnerReason(parseSummary(row.summary as string | null));
+    for (const key of storedPhoneCandidates(phone)) {
+      byPhone.set(key, maxIso(byPhone.get(key) || null, at));
+      if (reason != null && !reasonByPhone.has(key)) {
+        reasonByPhone.set(key, reason);
+      }
     }
   }
   for (const row of [
@@ -203,7 +236,9 @@ async function loadLastContactMap(
       byId.set(row.contact_id, maxIso(byId.get(row.contact_id) || null, at));
     }
     if (row.caller_phone) {
-      byPhone.set(row.caller_phone, maxIso(byPhone.get(row.caller_phone) || null, at));
+      for (const key of storedPhoneCandidates(row.caller_phone)) {
+        byPhone.set(key, maxIso(byPhone.get(key) || null, at));
+      }
     }
   }
 
@@ -231,15 +266,16 @@ export async function loadContactTimeline(
   contact: ContactRow
 ): Promise<ContactTimelineEntry[]> {
   const phone = contact.phone;
+  const phoneKeys = phone ? storedPhoneCandidates(phone) : [];
   const [callsRes, reqById, reqByPhone, apptById, apptByPhone] = await Promise.all([
-    phone
+    phoneKeys.length
       ? client
           .from("calls")
           .select(
             "id, created_at, caller_number, status, summary, primary_intent, resolution"
           )
           .eq("tenant_id", tenantId)
-          .eq("caller_number", phone)
+          .in("caller_number", phoneKeys)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     client
@@ -250,14 +286,14 @@ export async function loadContactTimeline(
       .eq("tenant_id", tenantId)
       .eq("contact_id", contact.id)
       .order("created_at", { ascending: false }),
-    phone
+    phoneKeys.length
       ? client
           .from("service_requests")
           .select(
             "id, created_at, request_type, status, item, notes, call_id, contact_id, caller_phone"
           )
           .eq("tenant_id", tenantId)
-          .eq("caller_phone", phone)
+          .in("caller_phone", phoneKeys)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     client
@@ -268,14 +304,14 @@ export async function loadContactTimeline(
       .eq("tenant_id", tenantId)
       .eq("contact_id", contact.id)
       .order("created_at", { ascending: false }),
-    phone
+    phoneKeys.length
       ? client
           .from("appointments")
           .select(
             "id, created_at, service_name, status, when_text, notes, call_id, contact_id, caller_phone"
           )
           .eq("tenant_id", tenantId)
-          .eq("caller_phone", phone)
+          .in("caller_phone", phoneKeys)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
   ]);
@@ -285,9 +321,11 @@ export async function loadContactTimeline(
   const seenAppt = new Set<string>();
 
   for (const row of callsRes.data || []) {
-    const ownerReason = pickCallOwnerReason(
-      parseSummary(typeof row.summary === "string" ? row.summary : null)
+    const meta = parseSummary(
+      typeof row.summary === "string" ? row.summary : null
     );
+    const ownerWant = pickCallOwnerWant(meta);
+    const ownerReason = pickCallOwnerReason(meta);
     entries.push({
       id: `call:${row.id}`,
       kind: "call",
@@ -297,15 +335,18 @@ export async function loadContactTimeline(
           name: contact.name,
           phone: contact.phone,
           lastReason: null,
-          latestCallReason: ownerReason,
+          latestCallReason: ownerReason || ownerWant,
         }) ||
         ownerReason ||
+        ownerWant ||
         row.primary_intent ||
         "Call",
       detail: row.status || null,
       callId: row.id,
       status: row.status || null,
       ownerReason,
+      ownerWant,
+      ownerCard: pickCallOwnerCard(meta),
     });
   }
 

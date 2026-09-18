@@ -10,8 +10,11 @@ const {
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
 const {
+  applyLiveCallerFile,
   formatReturningFileForCallState,
+  returningFileUsable,
   seedCallerFromMemory,
+  speakerKnownOnFile,
   returningFileFromCard,
 } = require('./callerMemory');
 const {
@@ -123,6 +126,12 @@ function looksLikeExistingVisitTalk(value) {
   );
 }
 
+function looksLikePastBookingTalk(value) {
+  return /\b(last (time|visit|job|booking|appointment)|previous (visit|booking|job)|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
+    String(value || '')
+  );
+}
+
 function inferIntent(text, opts = {}) {
   const value = String(text || '').trim().toLowerCase();
   const vertical = String(opts.vertical || '').toLowerCase();
@@ -140,6 +149,13 @@ function inferIntent(text, opts = {}) {
   }
   if (looksLikeCancelOrReschedule(value)) return 'cancellation';
   if (opts.returning?.nextVisit && looksLikeExistingVisitTalk(value)) {
+    return 'general_enquiry';
+  }
+  if (
+    Array.isArray(opts.returning?.recentBookings) &&
+    opts.returning.recentBookings.length &&
+    looksLikePastBookingTalk(value)
+  ) {
     return 'general_enquiry';
   }
   // Appointment-style booking: check BEFORE location so "book carpet cleaning... landmark is Barnabas"
@@ -371,6 +387,7 @@ function observeCallerTurn(state, input = {}) {
   next.caller.name = nameResolution.name || null;
   next.caller.nameConfirmed = Boolean(nameResolution.nameConfirmed);
   next.caller.nameCollision = nameResolution.nameCollision || null;
+  applyLiveCallerFile(input.profile, next);
   if (next.caller.name && !entityValue(next.entities.name)) {
     next.entities.name = {
       value: next.caller.name,
@@ -589,9 +606,9 @@ function formatBrainStateForPrompt(state) {
     formatHearAgainForPrompt(value),
     formatReturningFileForCallState(value.returning),
     value.conversation?.phatic
-      ? value.returning?.sharedLine
+      ? value.returning?.sharedLine && !speakerKnownOnFile(value.returning)
         ? '- Phatic turn: one short well, then who is calling. Do not list services.'
-        : value.returning?.nextVisit
+        : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
           : '- Phatic turn: they only greeted or asked how you are. One short well, then How can I help. Do not list services, prices, or jobs.'
       : '',
@@ -610,6 +627,7 @@ module.exports = {
   looksLikeHomeEmergency,
   looksLikeBookingIntent,
   looksLikeCancelOrReschedule,
+  looksLikePastBookingTalk,
   observeCallerTurn,
   setNextBestAction,
   recordRepairFailure,

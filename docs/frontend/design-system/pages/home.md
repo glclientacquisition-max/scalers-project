@@ -4,15 +4,17 @@
 **Job:** At 08:00 EAT, answer four chunks only.
 
 1. **Is it working** — Line live / Number pending / Needs training. Wallet warn if KES < 200.
-2. **What needs me** — Three exclusive Inbox destinations from the same assemble as Inbox: return calls (Needs you), open Holds, visits still to confirm. Confirmed visits are the Visits book, not this briefing. Caption is a briefing. When a queue is 1, the unit is the actual job. Under it, one digest line for the receptionist's Nairobi day (`Today: 4 answered, 2 visits, 1 complaint.`). Null when nothing happened or when the Inbox window is truncated (`callsTruncated`), never a guess.
+2. **What needs me** — Three exclusive Inbox destinations from the same assemble as Inbox: return calls (Needs you), open Holds, visits still to confirm. Confirmed visits are the Visits book, not this briefing. Caption is a briefing (`deskPreviewClass`). Queue units stay count nouns (`3 to confirm`). When a queue is 1, a short slot (`Tue 14:00`) may replace the unit. Never inject the hangup headline. Under it, one digest line for the receptionist's Nairobi day (`Today: 4 answered, 2 visits, 1 complaint.`). Null when nothing happened or when the call history tape is truncated (`callsTruncated`). Open holds and visits are loaded in full, so Needs you counts stay complete even when the tape is truncated. Never a guess.
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
 **Chrome:** Greeting eyebrow, workspace name as `h1` (not in the app header). Nairobi `<time>`. One aside: today + line + wallet + docked CTA.
 
+**Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
+
 **Desktop gains a second column.** Below `lg` the page is one column: Work, then aside. At `lg` the grid is 7/5: Work (queues + Next to return) on the left, aside on the right. The aside is sticky (`top-24`). The extra width is real content, not margin.
 
-**Next to return (desktop only, `hidden lg:block`).** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one-line reason. Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link.
+**Next to return (desktop only, `hidden lg:block`).** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one truncated reason (`deskPreviewClass`). Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link.
 
 **One blue action per screen.** The aside CTA is the only filled primary. Next to return uses a ghost WhatsApp button (green glyph). Two saturated CTAs would compete; the CTA already routes to the sharpest queue.
 
@@ -20,6 +22,6 @@
 
 **Row density and count weight.** Queue rows are `min-h-12` on phone, `min-h-11` at `lg`. Counts are `text-base font-semibold` so the largest queue (85 to return) holds its own against the blue CTA.
 
-**Data (real only):** tenant row, Nairobi-day call count, `loadInboxItems` (same window as Inbox), `assessMvpAnswerReadiness`, live bulletin. Counts match Inbox purpose, not raw `lead_status=new`.
+**Data (real only):** tenant row, Nairobi-day call count, `loadInboxItems` (open holds/visits unbounded, then a 150-row call tape), `assessMvpAnswerReadiness`, live bulletin. Counts match Inbox purpose, not raw `lead_status=new`.
 
 **Do not:** duplicate the Inbox table. Show Online. Use stacked `TriageLeadCard`.

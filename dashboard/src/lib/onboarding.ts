@@ -17,6 +17,9 @@ export type TeamMember = {
   role: string;
   phone: string;
   email?: string;
+  receives_escalation?: boolean;
+  receives_inbox?: boolean;
+  receives_ops?: boolean;
 };
 
 export type FaqItem = {

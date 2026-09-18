@@ -89,7 +89,7 @@ import {
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 import {
   ExpandTextarea,
   SettingsPageHeader,
@@ -120,6 +120,10 @@ import {
   objectUrlFromPreviewResponse,
   previewErrorCopy,
 } from "@/lib/previewAudio";
+import {
+  EMPTY_TEAM_NOTIFY_FLAGS,
+  normalizeTeamDirectory,
+} from "@/lib/teamNotify";
 import {
   businessSettingsHref,
   type SettingsPanel,
@@ -169,16 +173,11 @@ function initialTone(tenant: TenantRow): OnboardingTone | "" {
   return "";
 }
 
-function normalizeTeam(raw: TenantRow["team_directory"]): TeamDirectoryEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((row) => ({
-      name: String(row?.name || "").trim(),
-      role: String(row?.role || "").trim(),
-      phone: String(row?.phone || "").trim(),
-      email: String(row?.email || "").trim().toLowerCase(),
-    }))
-    .filter((row) => row.name || row.role || row.phone || row.email);
+function normalizeTeam(
+  raw: TenantRow["team_directory"],
+  ownerPhone?: string
+): TeamDirectoryEntry[] {
+  return normalizeTeamDirectory(raw, { ownerPhone });
 }
 
 function normalizeFaqs(raw: TenantRow["faqs"]): FaqEntry[] {
@@ -196,7 +195,17 @@ const emptyMember = (): TeamDirectoryEntry => ({
   role: "",
   phone: "",
   email: "",
+  ...EMPTY_TEAM_NOTIFY_FLAGS,
 });
+
+const TEAM_NOTIFY_CHIPS: Array<{
+  key: "receives_escalation" | "receives_inbox" | "receives_ops";
+  label: string;
+}> = [
+  { key: "receives_escalation", label: "Escalate" },
+  { key: "receives_inbox", label: "Inbox" },
+  { key: "receives_ops", label: "Ops" },
+];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
@@ -274,7 +283,7 @@ function CatalogPager({
           type="button"
           disabled={page <= 0}
           onClick={onPrev}
-          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
+          className={`min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
         >
           Previous
         </button>
@@ -285,7 +294,7 @@ function CatalogPager({
           type="button"
           disabled={page >= pageCount - 1}
           onClick={onNext}
-          className="min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition duration-150 hover:border-[#0096FF]/40 hover:text-[#005ccc] active:bg-[#0096FF]/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-40"
+          className={`min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
         >
           Next
         </button>
@@ -393,7 +402,10 @@ export function TenantForm({
   const [voiceSampleError, setVoiceSampleError] = useState<string | null>(null);
   const [voiceSampleUrl, setVoiceSampleUrl] = useState<string | null>(null);
   const [team, setTeam] = useState<TeamDirectoryEntry[]>(() => {
-    const rows = normalizeTeam(tenant.team_directory);
+    const rows = normalizeTeam(
+      tenant.team_directory,
+      tenant.whatsapp_notification_number
+    );
     return rows.length ? rows : [emptyMember()];
   });
   const liveDest = firstDialableTeammate(team);
@@ -568,7 +580,11 @@ export function TenantForm({
     }
   }
 
-  function updateTeam(index: number, key: keyof TeamDirectoryEntry, value: string) {
+  function updateTeam(
+    index: number,
+    key: keyof TeamDirectoryEntry,
+    value: string | boolean
+  ) {
     setTeam((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
     );
@@ -891,7 +907,7 @@ export function TenantForm({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-white">
+                  <tbody className="divide-y divide-line bg-surface">
                     {socialHandles.channels.map((channel, index) => (
                       <tr key={`social-ch-${index}`} className="align-middle">
                         <td className="px-3 py-1.5">
@@ -948,7 +964,7 @@ export function TenantForm({
                           <button
                             type="button"
                             onClick={() => removeSocialChannel(index)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
                             aria-label={`Remove contact ${index + 1}`}
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -1031,7 +1047,7 @@ export function TenantForm({
               </details>
 
               {bulkPreview.length > 0 ? (
-                <div className="rounded-xl border border-line bg-white px-3 py-2">
+                <div className="rounded-xl border border-line bg-surface px-3 py-2">
                   <p className="text-xs font-medium text-ink">
                     Ready to add {bulkPreview.length} service
                     {bulkPreview.length === 1 ? "" : "s"}
@@ -1066,11 +1082,11 @@ export function TenantForm({
             </div>
           ) : null}
 
-          <div className="hidden space-y-3 md:hidden">
+          <div className="space-y-3 md:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
               return (
-                <div key={`service-m-${index}`} className="space-y-2 rounded-xl border border-line bg-white p-3">
+                <div key={`service-m-${index}`} className="space-y-2 rounded-xl border border-line bg-surface p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Service {index + 1}</p>
                     <button
@@ -1115,7 +1131,7 @@ export function TenantForm({
             />
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-line">
+          <div className="hidden md:block overflow-hidden rounded-xl border border-line">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
@@ -1129,7 +1145,7 @@ export function TenantForm({
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line bg-white">
+                <tbody className="divide-y divide-line bg-surface">
                   {visibleServices.map((service, localIndex) => {
                     const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
                     return (
@@ -1200,7 +1216,7 @@ export function TenantForm({
                                   : prev.filter((_, i) => i !== index)
                               )
                             }
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
                             aria-label={`Remove service ${index + 1}`}
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -1303,11 +1319,11 @@ export function TenantForm({
             <p className="text-sm text-ink-soft">No products yet.</p>
           ) : (
             <>
-            <div className="hidden space-y-3 md:hidden">
+            <div className="space-y-3 md:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                 return (
-                  <div key={`product-m-${index}`} className="space-y-2 rounded-xl border border-line bg-white p-3">
+                  <div key={`product-m-${index}`} className="space-y-2 rounded-xl border border-line bg-surface p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Product {index + 1}</p>
                       <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:text-warn" aria-label={`Remove product ${index + 1}`}>
@@ -1347,7 +1363,7 @@ export function TenantForm({
                 onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
               />
             </div>
-            <div className="overflow-hidden rounded-xl border border-line">
+            <div className="hidden md:block overflow-hidden rounded-xl border border-line">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
@@ -1359,7 +1375,7 @@ export function TenantForm({
                       <th className="px-3 py-2.5 font-medium w-24">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line bg-white">
+                  <tbody className="divide-y divide-line bg-surface">
                     {visibleProducts.map((product, localIndex) => {
                       const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                       return (
@@ -1456,7 +1472,7 @@ export function TenantForm({
               return (
                 <div
                   key={day}
-                  className="flex min-w-0 flex-col gap-2 rounded-lg border border-line/70 bg-white/60 px-3 py-2.5 sm:grid sm:grid-cols-[8.5rem_auto_1fr_1fr] sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
+                  className="flex min-w-0 flex-col gap-2 rounded-lg border border-line/70 bg-surface/60 px-3 py-2.5 sm:grid sm:grid-cols-[8.5rem_auto_1fr_1fr] sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
                 >
                   <span className="text-sm font-medium text-ink">
                     {DAY_LABELS[day]}
@@ -1465,9 +1481,10 @@ export function TenantForm({
                     type="button"
                     onClick={() => setDayOpen(day, !open)}
                     className={[
-                      "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium transition",
+                      "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium",
+                      deskShiftClass,
                       open
-                        ? "border-[#0096FF] bg-accent-soft text-[#0096FF]"
+                        ? "border-accent bg-accent-soft text-accent"
                         : "border-line text-ink-soft",
                     ].join(" ")}
                   >
@@ -1483,7 +1500,7 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                       <span className="text-xs text-ink-soft">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
@@ -1494,7 +1511,7 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]/40"
+                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
                       />
                     </div>
                   ) : (
@@ -1552,10 +1569,10 @@ export function TenantForm({
           {locations.map((loc, index) => (
             <div
               key={`loc-${index}`}
-              className="space-y-2 rounded-xl border border-line bg-white/60 p-3"
+              className="space-y-2 rounded-xl border border-line bg-surface/60 p-3"
             >
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                <div className="min-w-0">
                   <label
                     className="block text-xs font-medium text-ink-soft"
                     htmlFor={`loc-label-${index}`}
@@ -1580,20 +1597,21 @@ export function TenantForm({
                     className={`${denseFieldClass} mt-1`}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label
                     className="block text-xs font-medium text-ink-soft"
                     htmlFor={`loc-address-${index}`}
                   >
                     Area
                   </label>
-                  <input
+                  <ExpandTextarea
                     id={`loc-address-${index}`}
                     value={loc.address}
-                    onChange={(e) => {
-                      updateLocation(index, "address", e.target.value);
+                    maxLength={200}
+                    onChange={(value) => {
+                      updateLocation(index, "address", value);
                       if (index === 0) {
-                        const next = { ...loc, address: e.target.value };
+                        const next = { ...loc, address: value };
                         setLocationNotes(
                           [next.label, next.address, next.landmark]
                             .map((s) => s.trim())
@@ -1603,7 +1621,7 @@ export function TenantForm({
                       }
                     }}
                     placeholder="Westlands, Nairobi"
-                    className={`${denseFieldClass} mt-1`}
+                    className="min-w-0 break-words [overflow-wrap:anywhere]"
                   />
                 </div>
               </div>
@@ -1652,21 +1670,22 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 leading-relaxed`}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label
                   className="block text-xs font-medium text-ink-soft"
                   htmlFor={`loc-coverage-${index}`}
                 >
                   Coverage
                 </label>
-                <input
+                <ExpandTextarea
                   id={`loc-coverage-${index}`}
                   value={loc.coverage_notes}
-                  onChange={(e) =>
-                    updateLocation(index, "coverage_notes", e.target.value)
+                  maxLength={300}
+                  onChange={(value) =>
+                    updateLocation(index, "coverage_notes", value)
                   }
                   placeholder="Kiambu and Ruiru"
-                  className={`${denseFieldClass} mt-1`}
+                  className="min-w-0 break-words [overflow-wrap:anywhere]"
                 />
               </div>
               {locations.length > 1 ? (
@@ -1810,7 +1829,7 @@ export function TenantForm({
         </div>
         <div className="space-y-2">
           <p className={settingsBlockTitleClass}>Tools</p>
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
+          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
           {AGENT_TOOL_OPTIONS.map((opt) => {
             const on = agentTools[opt.id];
             return (
@@ -1847,7 +1866,7 @@ export function TenantForm({
           </p>
           <Link
             href={businessSettingsHref("train", "team")}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-[#005CCC] transition duration-150 hover:text-[#004a99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40"
+            className={`inline-flex min-h-11 items-center text-sm font-medium text-accent-deep ${deskShiftClass} hover:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
           >
             Change in Team
           </Link>
@@ -1929,68 +1948,86 @@ export function TenantForm({
 
         <div className="space-y-2">
           {team.map((member, index) => (
-            <div key={`team-${index}`} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-name-${index}`}>
-                  Name
-                </label>
-                <input
-                  id={`team-name-${index}`}
-                  value={member.name}
-                  onChange={(e) => updateTeam(index, "name", e.target.value)}
-                  placeholder="Wanjiku Mwangi"
-                  className={`${denseFieldClass} mt-1`}
-                />
+            <div key={`team-${index}`} className="space-y-2 border-b border-line pb-2 last:border-b-0 last:pb-0">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-name-${index}`}>
+                    Name
+                  </label>
+                  <input
+                    id={`team-name-${index}`}
+                    value={member.name}
+                    onChange={(e) => updateTeam(index, "name", e.target.value)}
+                    placeholder="Wanjiku Mwangi"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-role-${index}`}>
+                    Handles
+                  </label>
+                  <input
+                    id={`team-role-${index}`}
+                    value={member.role}
+                    onChange={(e) => updateTeam(index, "role", e.target.value)}
+                    placeholder="Orders and payments"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-phone-${index}`}>
+                    Phone
+                  </label>
+                  <input
+                    id={`team-phone-${index}`}
+                    value={member.phone}
+                    onChange={(e) => updateTeam(index, "phone", e.target.value)}
+                    placeholder="+254 700 000 000"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-email-${index}`}>
+                    Email
+                  </label>
+                  <input
+                    id={`team-email-${index}`}
+                    type="email"
+                    value={member.email || ""}
+                    onChange={(e) => updateTeam(index, "email", e.target.value)}
+                    placeholder="wanjiku@shop.co.ke"
+                    className={`${denseFieldClass} mt-1`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTeam((prev) =>
+                      prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
+                    )
+                  }
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                  aria-label={`Remove teammate ${index + 1}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-role-${index}`}>
-                  Handles
-                </label>
-                <input
-                  id={`team-role-${index}`}
-                  value={member.role}
-                  onChange={(e) => updateTeam(index, "role", e.target.value)}
-                  placeholder="Orders and payments"
-                  className={`${denseFieldClass} mt-1`}
-                />
+              <div className="flex flex-wrap gap-2" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
+                {TEAM_NOTIFY_CHIPS.map((chip) => {
+                  const selected = member[chip.key] === true;
+                  return (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => updateTeam(index, chip.key, !selected)}
+                      className={choiceChipClass(selected)}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-phone-${index}`}>
-                  Phone
-                </label>
-                <input
-                  id={`team-phone-${index}`}
-                  value={member.phone}
-                  onChange={(e) => updateTeam(index, "phone", e.target.value)}
-                  placeholder="+254 700 000 000"
-                  className={`${denseFieldClass} mt-1`}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-email-${index}`}>
-                  Email
-                </label>
-                <input
-                  id={`team-email-${index}`}
-                  type="email"
-                  value={member.email || ""}
-                  onChange={(e) => updateTeam(index, "email", e.target.value)}
-                  placeholder="wanjiku@shop.co.ke"
-                  className={`${denseFieldClass} mt-1`}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setTeam((prev) =>
-                    prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
-                  )
-                }
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface hover:text-warn"
-                aria-label={`Remove teammate ${index + 1}`}
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
             </div>
           ))}
         </div>
@@ -2011,14 +2048,14 @@ export function TenantForm({
               setFaqPage(Math.floor(faqs.length / FAQ_PAGE_SIZE));
             }}
             disabled={faqs.length >= FAQ_MAX}
-            className="rounded-lg border border-[#0096FF]/40 px-3 py-1.5 text-xs font-medium text-[#005ccc] hover:bg-accent-soft disabled:opacity-60"
+            className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent-deep hover:bg-accent-soft disabled:opacity-60"
           >
             Add FAQ
           </button>
         </div>
 
         {filledFaqCount === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-white/70 px-4 py-3">
+          <div className="rounded-xl border border-dashed border-line bg-surface/70 px-4 py-3">
             <p className="text-sm text-ink-soft">Common questions</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {FAQ_STARTERS.map((starter) => (
@@ -2036,7 +2073,7 @@ export function TenantForm({
                       return next;
                     })
                   }
-                  className="rounded-xl border border-line bg-white px-3 py-1.5 text-left text-xs text-ink hover:border-[#0096FF]"
+                  className="rounded-xl border border-line bg-surface px-3 py-1.5 text-left text-xs text-ink hover:border-accent"
                 >
                   {starter.question}
                 </button>
@@ -2049,7 +2086,7 @@ export function TenantForm({
           {visibleFaqs.map((faq, localIndex) => {
             const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
             return (
-            <div key={`faq-${index}`} className="space-y-1.5 rounded-xl border border-line bg-white px-3 py-2.5">
+            <div key={`faq-${index}`} className="space-y-1.5 rounded-xl border border-line bg-surface px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                   FAQ {index + 1}

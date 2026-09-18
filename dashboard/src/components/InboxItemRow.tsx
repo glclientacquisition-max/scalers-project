@@ -1,22 +1,28 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
+import { InboxRowAvatar } from "@/components/InboxRowAvatar";
+import { InboxRowMore, InboxRowShell } from "@/components/InboxRowOverflow";
+import { InboxPhoneOpen, InboxRowCheck, InboxRowHit, InboxDockIdle } from "@/components/InboxRowSelect";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
-  DeskRowHit,
   deskRowActionClass,
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
 import {
-  RowIdentity,
+  deskPreviewCellClass,
+  deskPreviewClass,
+  deskShiftClass,
+} from "@/components/ui/deskChrome";
+import {
   RowStateDot,
   deskRowWeightClass,
 } from "@/components/ui/deskRow";
 import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
+import { contactFromInboxHref, inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import {
-  holdTypeLabel,
   itemSignalLabel,
   type InboxItem,
   type InboxPurposeFilterId,
@@ -34,7 +40,8 @@ function inboxCopy(
   item: InboxItem,
   purpose: InboxPurposeFilterId,
   vertical: string | null | undefined,
-  businessName: string
+  businessName: string,
+  ret?: InboxReturn
 ) {
   const kind = inboxTableKind(purpose);
   const who = item.callerName || item.callerPhone || "Caller";
@@ -43,7 +50,9 @@ function inboxCopy(
     name: item.callerName,
     reason: item.headline,
   });
-  const openHref = item.callId ? `/calls/${item.callId}?from=${purpose}` : null;
+  const openHref = item.callId
+    ? inboxRecordHref(item.callId, ret || { purpose })
+    : null;
   const hasJob = Boolean(item.job);
   const hasHold = Boolean(item.hold);
   const needed = item.hold?.when_text?.trim() || "Anytime";
@@ -71,6 +80,53 @@ function inboxCopy(
   };
 }
 
+function inboxContactHref(item: InboxItem, purpose: InboxPurposeFilterId, ret?: InboxReturn) {
+  return item.contactId ? contactFromInboxHref(item.contactId, ret || { purpose }) : null;
+}
+
+function InboxPinMark({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span aria-label="Pinned" className="inline-flex shrink-0 text-ink-soft">
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+        <path d="M10.2 1.6 8.4 3.4 5.8 2.6 4.4 4l3.2 3.2-1 3.6 1.4 1.4 3.6-1 3.2 3.2 1.4-1.4-.8-2.6 1.8-1.8-1.8-1.8z" />
+      </svg>
+    </span>
+  );
+}
+
+function InboxRowWho({
+  item,
+  purpose,
+  ret,
+  children,
+}: {
+  item: InboxItem;
+  purpose: InboxPurposeFilterId;
+  ret?: InboxReturn;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <InboxRowCheck item={item} />
+      <div className={deskRowActionClass}>
+        <InboxRowAvatar
+          name={item.callerName}
+          phone={item.callerPhone}
+          contactHref={inboxContactHref(item, purpose, ret)}
+          ret={ret}
+          itemId={item.id}
+        />
+      </div>
+      <div className={`${deskRowMutedClass} min-w-0`}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Inbox Action dock. One primary verb. Never Open, View, SMS, or email.
+ * Job → Confirm. Hold → Done. Else + number → Call then WhatsApp.
+ */
 function InboxTrailingAction({
   item,
   message,
@@ -79,17 +135,27 @@ function InboxTrailingAction({
   message: string;
 }) {
   if (item.job) {
-    return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
+    return (
+      <InboxDockIdle>
+        <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />
+      </InboxDockIdle>
+    );
   }
   if (item.hold) {
-    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />;
+    return (
+      <InboxDockIdle>
+        <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />
+      </InboxDockIdle>
+    );
   }
   if (item.callerPhone) {
     return (
-      <div className="flex items-center gap-2">
-        <CallLink number={item.callerPhone} />
-        <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
-      </div>
+      <InboxDockIdle>
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          <CallLink number={item.callerPhone} />
+          <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
+        </div>
+      </InboxDockIdle>
     );
   }
   return null;
@@ -100,11 +166,13 @@ export function InboxTableRow({
   businessName,
   purpose,
   vertical,
+  ret,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
+  ret?: InboxReturn;
 }) {
   const {
     kind,
@@ -118,39 +186,41 @@ export function InboxTableRow({
     when,
     hasJob,
     showHold,
-  } = inboxCopy(item, purpose, vertical, businessName);
+  } = inboxCopy(item, purpose, vertical, businessName, ret);
+
+  const live = item.purpose === "live";
 
   return (
-    <tr
+    <InboxRowShell
+      item={item}
+      as="tr"
       className={[
-        "group relative border-t border-line/70 transition duration-150",
+        "relative border-t border-line/70",
+        deskShiftClass,
         openHref ? "cursor-pointer" : "",
-        "hover:bg-[#0096FF]/[0.04] active:bg-[#0096FF]/[0.07]",
+        "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
       {kind === "hold" ? (
         <>
-          <td className="px-5 py-4 align-top">
-            <DeskRowHit href={openHref} label="Conversation" />
-            <div className={`${deskRowMutedClass} flex items-center gap-3`}>
-              <RowIdentity name={item.callerName} />
-              <div className="min-w-0">
-                <p className={`text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
-                  {item.headline}
-                </p>
-                <p className="mt-0.5 text-sm text-ink-soft">
-                  {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
-                </p>
-              </div>
-            </div>
+          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
+            <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
+            <InboxRowWho item={item} purpose={purpose} ret={ret}>
+              <p
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+              >
+                {item.headline}
+              </p>
+            </InboxRowWho>
           </td>
-          <td className={`${deskRowMutedClass} px-5 py-4 align-top font-medium text-ink`}>
-            {item.callerName || "Caller"}
+          <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
+            <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
-              <RowStateDot show={item.needsYou} />
+              <RowStateDot show={item.needsYou} live={live} />
+              <InboxPinMark show={Boolean(item.pinnedAt)} />
               {showHold ? needed : when}
             </span>
           </td>
@@ -159,26 +229,23 @@ export function InboxTableRow({
 
       {kind === "job" ? (
         <>
-          <td className="px-5 py-4 align-top">
-            <DeskRowHit href={openHref} label="Conversation" />
-            <div className={`${deskRowMutedClass} flex items-center gap-3`}>
-              <RowIdentity name={item.callerName} />
-              <div className="min-w-0">
-                <p className={`text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
-                  {hasJob ? visit : stamp}
-                </p>
-                <p className="mt-0.5 text-sm text-ink-soft">
-                  {item.headline}
-                </p>
-              </div>
-            </div>
+          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
+            <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
+            <InboxRowWho item={item} purpose={purpose} ret={ret}>
+              <p
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+              >
+                {hasJob ? visit : stamp}
+              </p>
+            </InboxRowWho>
           </td>
-          <td className={`${deskRowMutedClass} px-5 py-4 align-top font-medium text-ink`}>
-            {item.callerName || "Caller"}
+          <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
+            <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
-              <RowStateDot show={item.needsYou} />
+              <RowStateDot show={item.needsYou} live={live} />
+              <InboxPinMark show={Boolean(item.pinnedAt)} />
               {hasJob ? place : ""}
             </span>
           </td>
@@ -187,29 +254,24 @@ export function InboxTableRow({
 
       {kind === "mixed" ? (
         <>
-          <td className="px-5 py-4 align-top">
-            <DeskRowHit href={openHref} label="Conversation" />
-            <div className={`${deskRowMutedClass} flex items-center gap-3`}>
-              <RowIdentity name={item.callerName} />
-              <div className="min-w-0">
-                <p className={`text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
-                  {who}
-                </p>
-                <p className="mt-0.5 text-sm text-ink">{item.headline}</p>
-                {item.detail ? (
-                  <p className="mt-1 line-clamp-1 text-sm text-ink-soft">
-                    {item.detail}
-                  </p>
-                ) : null}
-              </div>
-            </div>
+          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
+            <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
+            <InboxRowWho item={item} purpose={purpose} ret={ret}>
+              <p
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+              >
+                {who}
+              </p>
+              <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
+            </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top`}>
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
           </td>
           <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex items-center gap-1.5">
-              <RowStateDot show={item.needsYou} />
+              <RowStateDot show={item.needsYou} live={live} />
+              <InboxPinMark show={Boolean(item.pinnedAt)} />
               {when}
             </span>
           </td>
@@ -217,11 +279,12 @@ export function InboxTableRow({
       ) : null}
 
       <td className={`${deskRowActionClass} whitespace-nowrap px-5 py-4 align-middle`}>
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-1">
+          <InboxRowMore item={item} />
           <InboxTrailingAction item={item} message={message} />
         </div>
       </td>
-    </tr>
+    </InboxRowShell>
   );
 }
 
@@ -231,65 +294,62 @@ export function InboxPhoneRow({
   businessName,
   purpose,
   vertical,
+  ret,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
+  ret?: InboxReturn;
 }) {
-  const { who, message, openHref, needed, visit, place, stamp, when, showJob, showHold, showMixed } =
-    inboxCopy(item, purpose, vertical, businessName);
+  const { who, message, openHref, needed, visit, when, showJob, showHold } =
+    inboxCopy(item, purpose, vertical, businessName, ret);
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
   const body = (
-    <>
-      <RowIdentity name={item.callerName} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className={`min-w-0 truncate text-sm tracking-tight ${deskRowWeightClass(item.needsYou)}`}>
-            {who}
-          </p>
-          <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
-            <RowStateDot show={item.needsYou} />
-            {meta}
-          </p>
-        </div>
-        <p className={`mt-0.5 line-clamp-2 text-sm ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
-          {work}
+    <div className="min-w-0 flex-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)}`}>
+          {who}
         </p>
-        {showJob ? (
-          <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">{place}</p>
-        ) : null}
-        {showMixed ? (
-          <p className="mt-1">
-            <InboxPurposeChip purpose={item.purpose} label={stamp} />
-          </p>
-        ) : null}
+        <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
+          <RowStateDot show={item.needsYou} live={item.purpose === "live"} />
+          <InboxPinMark show={Boolean(item.pinnedAt)} />
+          {meta}
+        </p>
       </div>
-    </>
+      <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
+        {work}
+      </p>
+    </div>
   );
 
   return (
-    <li
+    <InboxRowShell
+      item={item}
+      as="li"
       className={[
-        "flex items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
-      {openHref ? (
-        <Link
-          href={openHref}
-          aria-label="Conversation"
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-        >
-          {body}
-        </Link>
-      ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-3">{body}</div>
-      )}
-      <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
+      <InboxRowCheck item={item} />
+      <div className={deskRowActionClass}>
+        <InboxRowAvatar
+          name={item.callerName}
+          phone={item.callerPhone}
+          contactHref={inboxContactHref(item, purpose, ret)}
+          ret={ret}
+          itemId={item.id}
+        />
+      </div>
+      <InboxPhoneOpen href={openHref} itemId={item.id}>
+        {body}
+      </InboxPhoneOpen>
+      <div className={`${deskRowActionClass} flex shrink-0 items-center self-center gap-1`}>
+        <InboxRowMore item={item} />
         <InboxTrailingAction item={item} message={message} />
       </div>
-    </li>
+    </InboxRowShell>
   );
 }

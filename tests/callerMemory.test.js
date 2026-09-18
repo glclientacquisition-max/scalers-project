@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   attachCallerMemory,
+  bindCallerMemoryCard,
   buildCallerMemoryCard,
   formatReturningCallerForPrompt,
   seedCallerFromMemory,
@@ -205,5 +206,221 @@ describe('returning-caller card', () => {
     });
     assert.equal(speakVisit.action, 'ANSWER');
     assert.match(speakVisit.reason, /open visit/i);
+  });
+
+  it('binds the household file after the primary name is confirmed on a shared line', () => {
+    const { observeCallerTurn } = require('../src/conversation/brainState');
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000002',
+        name: 'Amina',
+        last_reason: 'carpet Tuesday',
+        metadata: { alternate_names: [{ name: 'Brian' }] },
+      },
+      nextAppointment: {
+        service_name: 'carpet cleaning',
+        when_text: 'Tuesday 10 AM',
+      },
+    });
+    const profile = { vertical: 'home_services', callerMemory: card };
+    const seeded = createBrainState(profile);
+    assert.equal(seeded.caller.name, null);
+    assert.match(formatBrainStateForPrompt(seeded), /Ask who is speaking/);
+    assert.doesNotMatch(formatReturningCallerForPrompt(card), /use this name/i);
+
+    const named = observeCallerTurn(seeded, {
+      text: 'My name is Amina',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('My name is Amina', {
+        profile,
+        state: seeded,
+      }),
+    });
+    assert.equal(named.caller.name, 'Amina');
+    assert.equal(named.caller.nameConfirmed, true);
+    assert.equal(named.returning.fileRole, 'primary');
+    assert.equal(named.returning.nextVisit, 'carpet cleaning, Tuesday 10 AM');
+    assert.match(formatBrainStateForPrompt(named), /open visit/i);
+    assert.doesNotMatch(formatBrainStateForPrompt(named), /Ask who is speaking/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /use this name/i);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /carpet cleaning/);
+    const { pickPhaticReply } = require('../src/conversation/dynamicSpeech');
+    assert.equal(
+      pickPhaticReply({ language: 'en', callerMemory: profile.callerMemory }),
+      "I'm well. I have your visit on file. Is that why you called?"
+    );
+
+    const aboutVisit = observeCallerTurn(named, {
+      text: 'Calling about my visit',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+    });
+    assert.equal(aboutVisit.intent, 'general_enquiry');
+    const decision = determineNextBestAction({
+      state: aboutVisit,
+      capabilities: { createServiceRequest: true },
+    });
+    assert.equal(decision.action, 'ANSWER');
+    assert.match(decision.reason, /open visit/i);
+  });
+
+  it('does not attach the household visit when an alternate speaks on a shared line', () => {
+    const { observeCallerTurn } = require('../src/conversation/brainState');
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+    const { pickPhaticReply } = require('../src/conversation/dynamicSpeech');
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000002',
+        name: 'Amina',
+        last_reason: 'carpet Tuesday',
+        metadata: { alternate_names: [{ name: 'Brian' }] },
+      },
+      nextAppointment: {
+        service_name: 'carpet cleaning',
+        when_text: 'Tuesday 10 AM',
+      },
+    });
+    const profile = { vertical: 'home_services', callerMemory: card };
+    const seeded = createBrainState(profile);
+    const named = observeCallerTurn(seeded, {
+      text: 'My name is Brian',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('My name is Brian', {
+        profile,
+        state: seeded,
+      }),
+    });
+    assert.equal(named.caller.name, 'Brian');
+    assert.equal(named.caller.nameConfirmed, true);
+    assert.equal(named.returning.fileRole, 'alternate');
+    assert.equal(named.returning.nextVisit, null);
+    assert.equal(named.returning.lastReason, null);
+    assert.match(formatBrainStateForPrompt(named), /Not the household file/);
+    assert.doesNotMatch(formatBrainStateForPrompt(named), /Ask who is speaking/);
+    assert.doesNotMatch(formatReturningCallerForPrompt(profile.callerMemory), /carpet cleaning/);
+    assert.equal(
+      pickPhaticReply({ language: 'en', callerMemory: profile.callerMemory }),
+      "I'm well, thanks. How can I help?"
+    );
+
+    const aboutVisit = observeCallerTurn(named, {
+      text: 'Calling about my visit',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+    });
+    const decision = determineNextBestAction({
+      state: aboutVisit,
+      capabilities: { createServiceRequest: true, createAppointment: true },
+    });
+    assert.notEqual(decision.reason, undefined);
+    assert.doesNotMatch(String(decision.reason), /open visit/i);
+  });
+
+  it('restores the household file if the primary speaks after an alternate on the same call', () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000002',
+        name: 'Amina',
+        last_reason: 'carpet Tuesday',
+        metadata: { alternate_names: [{ name: 'Brian' }] },
+      },
+      nextAppointment: { service_name: 'carpet cleaning', when_text: 'Tuesday' },
+      recentAppointments: [
+        { id: 'old-1', service_name: 'couch cleaning', when_text: 'March', status: 'done' },
+      ],
+    });
+    const asBrian = bindCallerMemoryCard(card, 'Brian');
+    assert.equal(asBrian.fileRole, 'alternate');
+    assert.equal(asBrian.nextAppointment, null);
+    assert.deepEqual(asBrian.recentBookings, []);
+    const asAmina = bindCallerMemoryCard(asBrian, 'Amina');
+    assert.equal(asAmina.fileRole, 'primary');
+    assert.match(asAmina.nextAppointment, /carpet cleaning/);
+    assert.match(asAmina.recentBookings.join(' '), /couch cleaning/);
+    assert.equal(bindCallerMemoryCard(asAmina, 'Amina'), asAmina);
+  });
+
+  it('does not give a unique-line visit to a different spoken name', () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        last_reason: 'held Atomic Habits for Saturday',
+        metadata: {},
+      },
+      nextAppointment: { service_name: 'geyser repair', when_text: 'tomorrow' },
+    });
+    const bound = bindCallerMemoryCard(card, 'Brian');
+    assert.equal(bound.fileRole, 'other');
+    assert.equal(bound.nextAppointment, null);
+    assert.equal(bound.lastReason, null);
+    const jane = bindCallerMemoryCard(card, 'Jane');
+    assert.equal(jane.fileRole, 'primary');
+    assert.match(jane.nextAppointment, /geyser repair/);
+  });
+
+  it('puts two previous bookings on the live file without listing them as a menu', () => {
+    const { observeCallerTurn, inferIntent } = require('../src/conversation/brainState');
+    const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        last_reason: 'carpet Tuesday',
+        metadata: {},
+      },
+      nextAppointment: {
+        id: 'appt-next',
+        service_name: 'mattress clean',
+        when_text: 'Friday',
+      },
+      recentAppointments: [
+        { id: 'appt-next', service_name: 'mattress clean', when_text: 'Friday', status: 'requested' },
+        { id: 'appt-1', service_name: 'carpet cleaning', when_text: 'last Tuesday', status: 'done' },
+        { id: 'appt-2', service_name: 'couch cleaning', when_text: '3 March', status: 'done' },
+        { id: 'appt-3', service_name: 'fumigation', when_text: 'January', status: 'done' },
+      ],
+    });
+    assert.deepEqual(card.recentBookings, [
+      'carpet cleaning, last Tuesday',
+      'couch cleaning, 3 March',
+    ]);
+    assert.doesNotMatch(card.recentBookings.join(' '), /mattress clean/);
+    const block = formatReturningCallerForPrompt(card);
+    assert.match(block, /Recent bookings: carpet cleaning, last Tuesday; couch cleaning, 3 March/);
+    assert.match(block, /Do not read them aloud as a list/);
+    assert.doesNotMatch(block, /fumigation/);
+
+    const state = createBrainState({ vertical: 'home_services', callerMemory: card });
+    assert.match(formatBrainStateForPrompt(state), /recent carpet cleaning/);
+    assert.equal(
+      inferIntent('Last time you came for carpet', { returning: state.returning }),
+      'general_enquiry'
+    );
+    const asked = observeCallerTurn(state, {
+      text: 'Last time you came for carpet',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile: { vertical: 'home_services', callerMemory: card },
+    });
+    const decision = determineNextBestAction({
+      state: asked,
+      capabilities: { createAppointment: true },
+    });
+    assert.equal(decision.action, 'ANSWER');
+    assert.match(decision.reason, /recent bookings/i);
+    assert.match(decision.reason, /Do not read them as a list/);
+
+    const asOther = bindCallerMemoryCard(card, 'Brian');
+    assert.deepEqual(asOther.recentBookings, []);
   });
 });

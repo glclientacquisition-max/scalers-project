@@ -12,6 +12,7 @@ import {
   inboxCaption,
   itemMatchesPurpose,
   itemMatchesQuery,
+  orderInboxItems,
   resolvePurposeFilter,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
@@ -20,13 +21,25 @@ import {
   InboxTableRow,
   inboxTableKind,
 } from "@/components/InboxItemRow";
+import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
+import type { InboxReturn } from "@/lib/inboxHref";
+import { inboxTeammateOptions } from "@/lib/inboxTriage";
+import { InboxRowUiProvider } from "@/components/InboxRowUi";
+import { InboxSelectChrome } from "@/components/InboxRowSelect";
+import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
+import { RunSheetToday } from "@/components/RunSheetToday";
+import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
+import { holdBoardForDay } from "@/lib/holdSheet";
 import {
+  parseDayParam,
   parseWeekParam,
+  shiftDayYmd,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
 import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -68,7 +81,9 @@ function EmptyInbox({
           ? copy.jobEmpty
           : purpose === "needs"
             ? "Nothing needs you"
-            : "Nothing in this filter";
+            : purpose === "archived"
+              ? "None archived"
+              : "Nothing in this filter";
     return (
       <div className={deskEmptyClass}>
         <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
@@ -84,7 +99,7 @@ function EmptyInbox({
 
   if (pendingDid) {
     return (
-      <div className="mt-8 border-y border-[#0096FF]/30 bg-[#0096FF]/5 py-12 text-center">
+      <div className="mt-8 border-y border-accent/30 bg-accent/5 py-12 text-center">
         <p className="font-display text-2xl tracking-tight text-ink">Number being assigned</p>
         <Link
           href={businessSettingsHref("train")}
@@ -97,24 +112,17 @@ function EmptyInbox({
   }
 
   return (
-    <div className="mt-8 border-y border-line py-12 text-center text-ink-soft">
+    <div className={deskEmptyClass}>
       <p className="font-display text-2xl tracking-tight text-ink">Inbox is empty</p>
-      <p className="mx-auto mt-2 max-w-md text-sm">
-        Call{" "}
-        <a
-          href={`tel:${did}`}
-          className="font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-2 transition hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
-        >
+      {did ? (
+        <a href={`tel:${did}`} className={`${btnGhost} mt-6`}>
           {did}
-        </a>{" "}
-        from another phone.
-      </p>
-      <Link
-        href={businessSettingsHref("test")}
-        className={`${btnGhost} mt-6`}
-      >
-        Test line
-      </Link>
+        </a>
+      ) : (
+        <Link href={businessSettingsHref("test")} className={`${btnGhost} mt-6`}>
+          Test line
+        </Link>
+      )}
     </div>
   );
 }
@@ -130,6 +138,7 @@ export default async function CallsPage({
     q?: string;
     view?: string;
     week?: string;
+    day?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -138,15 +147,7 @@ export default async function CallsPage({
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#005CCC]">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -159,7 +160,7 @@ export default async function CallsPage({
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const { items: assembled, error } = await loadInboxItems(
+  const { items: assembled, error, partialError } = await loadInboxItems(
     client,
     tenant.id,
     vertical
@@ -174,44 +175,117 @@ export default async function CallsPage({
     : assembled;
   const counts = countInboxPurposes(searched);
   const activeFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
-  const filtered = searched.filter((item) => itemMatchesPurpose(item, activeFilter));
-  const weekView = activeFilter === "job" && String(sp.view || "") === "week";
+  const filtered = orderInboxItems(
+    searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
+    activeFilter
+  );
+  const rawView = String(sp.view || "");
+  const view = rawView === "work" ? "today" : rawView;
+  const weekView = activeFilter === "job" && view === "week";
+  const todayView = activeFilter === "job" && view === "today";
+  const holdTodayView = activeFilter === "hold" && view === "today";
+  const boardView = weekView || todayView;
   const monday = parseWeekParam(sp.week);
+  const day = parseDayParam(sp.day);
+  const boardItems = boardView ? visitBoardItems(searched) : filtered;
+  const todayItems = todayView ? visitBoardForDay(searched, day) : [];
+  const holdTodayItems = holdTodayView ? holdBoardForDay(searched, day) : [];
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = weekView ? filtered : filtered.slice(from, from + PAGE_SIZE);
+  const pageRows = boardView || holdTodayView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
+  const showArchivedEntry =
+    !boardView &&
+    !holdTodayView &&
+    activeFilter !== "archived" &&
+    counts.archived > 0 &&
+    page === 1;
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
     q: q || undefined,
-    view: weekView ? "week" : undefined,
+    view: weekView ? "week" : todayView || holdTodayView ? "today" : undefined,
     week: weekView ? monday : undefined,
+    day: todayView || holdTodayView ? day : undefined,
+  };
+  const inboxRet: InboxReturn = {
+    purpose: activeFilter,
+    q: q || undefined,
+    page: boardView || holdTodayView ? undefined : page,
+    view: boardView || holdTodayView ? view : undefined,
+    week: weekView ? monday : undefined,
+    day: todayView || holdTodayView ? day : undefined,
   };
 
   return (
+    <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
     <div>
+      <InboxSelectChrome items={boardView || holdTodayView ? [] : pageRows}>
       <InboxToolbar
         active={activeFilter}
         counts={counts}
         q={q}
-        caption={inboxCaption(searched, vertical)}
+        caption={
+          activeFilter === "archived" ? undefined : inboxCaption(searched, vertical)
+        }
         vertical={vertical}
-        view={weekView ? "week" : undefined}
+        view={boardView || holdTodayView ? view : undefined}
         week={weekView ? monday : undefined}
+        day={todayView || holdTodayView ? day : undefined}
       />
+      </InboxSelectChrome>
 
-      {pageRows.length === 0 ? (
-        <EmptyInbox
-          total={total}
-          pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
-          did={tenant.sautikit_virtual_number}
-          purpose={activeFilter}
-          q={q}
+      {partialError ? (
+        <div className="mt-6">
+          <DeskError>{partialError}</DeskError>
+        </div>
+      ) : null}
+
+      {todayView ? (
+        <RunSheetToday
+          items={todayItems}
+          ymd={day}
+          prevHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, -1),
+          })}
+          nextHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, 1),
+          })}
+          listHref={callsHref({ purpose: "job", q: q || undefined })}
+          ret={{ purpose: "job", q: q || undefined, view: "today", day }}
+          businessName={businessName}
+          vertical={vertical}
+        />
+      ) : holdTodayView ? (
+        <RunSheetToday
+          items={holdTodayItems}
+          ymd={day}
+          purpose="hold"
+          prevHref={callsHref({
+            purpose: "hold",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, -1),
+          })}
+          nextHref={callsHref({
+            purpose: "hold",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, 1),
+          })}
+          listHref={callsHref({ purpose: "hold", q: q || undefined })}
+          ret={{ purpose: "hold", q: q || undefined, view: "today", day }}
+          businessName={businessName}
           vertical={vertical}
         />
       ) : weekView ? (
         <VisitWeekCalendar
-          items={filtered}
+          items={boardItems}
           monday={monday}
           prevHref={callsHref({
             purpose: "job",
@@ -226,12 +300,27 @@ export default async function CallsPage({
             week: shiftWeekYmd(monday, 1),
           })}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
+          ret={{ purpose: "job", q: q || undefined, view: "week", week: monday }}
           businessName={businessName}
+          vertical={vertical}
+        />
+      ) : pageRows.length === 0 && !showArchivedEntry ? (
+        <EmptyInbox
+          total={assembled.length}
+          pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
+          did={tenant.sautikit_virtual_number}
+          purpose={activeFilter}
+          q={q}
           vertical={vertical}
         />
       ) : (
         <>
+          <DeskLandScope
+            ids={pageRows.map((item) => item.id)}
+            scopeKey={`${activeFilter}:${page}:${q}`}
+          >
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+            {showArchivedEntry ? <InboxArchivedPhoneRow count={counts.archived} q={q} /> : null}
             {pageRows.map((item) => (
               <InboxPhoneRow
                 key={item.id}
@@ -239,6 +328,7 @@ export default async function CallsPage({
                 businessName={businessName}
                 purpose={activeFilter}
                 vertical={vertical}
+                ret={inboxRet}
               />
             ))}
           </ul>
@@ -291,6 +381,7 @@ export default async function CallsPage({
                 </tr>
               </thead>
               <tbody>
+                {showArchivedEntry ? <InboxArchivedTableRow count={counts.archived} q={q} /> : null}
                 {pageRows.map((item) => (
                   <InboxTableRow
                     key={item.id}
@@ -298,11 +389,13 @@ export default async function CallsPage({
                     businessName={businessName}
                     purpose={activeFilter}
                     vertical={vertical}
+                    ret={inboxRet}
                   />
                 ))}
               </tbody>
             </DeskDataTable>
           </div>
+          </DeskLandScope>
 
           <Pagination
             page={page}
@@ -314,5 +407,6 @@ export default async function CallsPage({
         </>
       )}
     </div>
+    </InboxRowUiProvider>
   );
 }

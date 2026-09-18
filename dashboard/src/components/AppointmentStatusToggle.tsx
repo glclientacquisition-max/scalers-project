@@ -5,6 +5,7 @@ import {
   updateAppointmentStatus,
   type AppointmentStatusState,
 } from "@/app/(desk)/appointments/actions";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const OPTIONS = [
   { id: "requested", label: "Pending" },
@@ -44,7 +45,8 @@ export function AppointmentStatusToggle({
             value={opt.id}
             disabled={pending || active}
             className={[
-              "rounded-lg border px-2.5 py-1 text-xs font-medium transition",
+              "rounded-lg border px-2.5 py-1 text-xs font-medium",
+              deskShiftClass,
               active
                 ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
                 : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]/40",

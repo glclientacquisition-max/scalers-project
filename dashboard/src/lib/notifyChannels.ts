@@ -30,8 +30,8 @@ export const DEFAULT_NOTIFY_CHANNELS: NotifyChannels = {
 
 /**
  * Private-beta platform availability.
- * WhatsApp automated alerts are not live yet — show logo but grey + disable toggle.
- * Override later with NEXT_PUBLIC_NOTIFY_*_AVAILABLE if needed.
+ * WhatsApp staff alerts are live on the Scalers platform sender (utility templates).
+ * Override with NEXT_PUBLIC_NOTIFY_*_AVAILABLE if a host must hide a channel.
  */
 export function platformNotifyAvailability(): Record<
   NotifyChannelId,
@@ -50,8 +50,8 @@ export function platformNotifyAvailability(): Record<
       unavailableLabel: "SMS alerts not enabled on this workspace yet",
     },
     whatsapp: {
-      available: envFlag("NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE", false),
-      unavailableLabel: "WhatsApp alerts not live yet",
+      available: envFlag("NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE", true),
+      unavailableLabel: "WhatsApp alerts not enabled on this workspace yet",
     },
     email: {
       available: envFlag("NEXT_PUBLIC_NOTIFY_EMAIL_AVAILABLE", true),
@@ -73,7 +73,7 @@ export const NOTIFY_CHANNEL_META: NotifyChannelMeta[] = (() => {
     {
       id: "whatsapp",
       label: "WhatsApp",
-      description: "WhatsApp alert to the owner notification number",
+      description: "WhatsApp to the alert phone and People numbers with Inbox, Escalate, or Ops",
       available: avail.whatsapp.available,
       unavailableLabel: avail.whatsapp.unavailableLabel,
     },

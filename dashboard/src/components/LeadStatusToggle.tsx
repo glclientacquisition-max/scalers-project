@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { LeadStatus } from "@/lib/supabase";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const TRIAGE_STEPS: { id: Exclude<LeadStatus, "archived">; label: string }[] = [
   { id: "new", label: "New" },
@@ -15,15 +16,15 @@ const STYLES: Record<
   { active: string; idle: string }
 > = {
   new: {
-    active: "bg-warn text-white border-warn",
+    active: "bg-warn text-accent-on-fill border-warn",
     idle: "border-line text-ink-soft hover:border-warn/60",
   },
   contacted: {
-    active: "bg-lead text-white border-lead",
+    active: "bg-lead text-accent-on-fill border-lead",
     idle: "border-line text-ink-soft hover:border-lead/60",
   },
   resolved: {
-    active: "bg-ok text-white border-ok",
+    active: "bg-ok text-accent-on-fill border-ok",
     idle: "border-line text-ink-soft hover:border-ok/60",
   },
 };
@@ -78,7 +79,8 @@ export function LeadStatusToggle({
               onClick={() => select(step.id)}
               aria-pressed={active}
               className={[
-                "rounded-full border font-medium transition",
+                "rounded-full border font-medium",
+                deskShiftClass,
                 pad,
                 active ? STYLES[step.id].active : STYLES[step.id].idle,
               ].join(" ")}

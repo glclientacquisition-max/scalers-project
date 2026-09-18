@@ -19,6 +19,31 @@ describe('caller phone normalize before DB write', () => {
     assert.equal(normalizeStoredPhone('0712 345 678'), expected);
   });
 
+  it('builds lookup keys that join +254 to 254', () => {
+    const { normalizeKenyaE164 } = require('../src/conversation/liveTransferReady');
+    function storedPhoneLookupKeys(raw) {
+      const trimmed = String(raw || '').trim();
+      if (!trimmed) return [];
+      const seen = new Set();
+      const out = [];
+      const e164 = normalizeKenyaE164(trimmed);
+      const stored = e164 || trimmed;
+      for (const phone of [trimmed, stored, e164, e164 ? e164.slice(1) : null]) {
+        if (!phone || seen.has(phone)) continue;
+        seen.add(phone);
+        out.push(phone);
+      }
+      return out;
+    }
+    const keys = storedPhoneLookupKeys('+254712345678');
+    assert.ok(keys.includes('+254712345678'));
+    assert.ok(keys.includes('254712345678'));
+    assert.deepEqual(
+      storedPhoneLookupKeys('254712345678').sort(),
+      keys.sort()
+    );
+  });
+
   it('leaves undialable values trimmed instead of dropping them', () => {
     assert.equal(normalizeStoredPhone('unknown'), 'unknown');
     assert.equal(normalizeStoredPhone(''), null);
@@ -28,11 +53,14 @@ describe('caller phone normalize before DB write', () => {
     const src = fs.readFileSync(path.join(__dirname, '../src/db.js'), 'utf8');
     assert.match(src, /normalizeKenyaE164/);
     assert.match(src, /function normalizeStoredPhone/);
+    assert.match(src, /function storedPhoneLookupKeys/);
     assert.match(
       src,
       /caller_number:\s*\n\s*normalizeStoredPhone\(fromNumber\)/
     );
     assert.match(src, /const phoneNorm = normalizeStoredPhone\(phone\);/);
+    assert.match(src, /\.in\('phone', phoneKeys\)/);
+    assert.match(src, /if \(existing\.phone !== phoneNorm\) patch\.phone = phoneNorm;/);
   });
 
   it('does not write contacts from the live upsertCall path', () => {

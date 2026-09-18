@@ -17,15 +17,24 @@ function walkFiles(dir, acc = []) {
 }
 
 describe("desk control craft", () => {
-  it("keeps filled primary on #005CCC in deskChrome", () => {
+  it("keeps filled primary on the deep-blue fill token in deskChrome", () => {
     const chrome = read("dashboard/src/components/ui/deskChrome.ts");
+    const globals = read("dashboard/src/app/globals.css");
     assert.match(chrome, /export const btnPrimaryFill/);
-    assert.match(chrome, /bg-\[#005CCC\]/);
+    assert.match(chrome, /bg-accent-fill/);
+    // Light-mode value stays the AA-passing deep blue; dark flips via the token.
+    assert.match(globals, /--accent-fill: #005ccc/);
     assert.match(chrome, /export const btnPrimary/);
+    assert.match(chrome, /export const deskHitClass/);
+    assert.match(chrome, /export const btnDock/);
+    assert.match(chrome, /h-12 w-12/);
     assert.match(chrome, /pendingSpinnerClass/);
     assert.match(chrome, /deskFieldClass/);
     assert.match(chrome, /filterTabClass/);
-    assert.match(chrome, /motion-reduce:active:scale-100/);
+    assert.match(chrome, /deskShiftClass/);
+    assert.match(chrome, /export const deskPreviewClass/);
+    assert.match(chrome, /export const deskPreviewCellClass/);
+    assert.match(chrome, /min-w-0 truncate/);
   });
 
   it("aliases settings primary to btnPrimary", () => {
@@ -37,6 +46,17 @@ describe("desk control craft", () => {
     assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /<FilterTabs/);
     assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /<FilterTabs/);
     assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /filterTabClass/);
+  });
+
+  it("orders Inbox filters as act, tape, book, closed", () => {
+    const niche = read("dashboard/src/lib/inboxNiche.ts");
+    assert.match(
+      niche,
+      /id: "needs"[\s\S]*id: "all"[\s\S]*id: "job"[\s\S]*id: "hold"[\s\S]*id: "human"[\s\S]*id: "answered"/
+    );
+    assert.doesNotMatch(niche, /id: "archived"/);
+    assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /item\.divide/);
+    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /divide: item\.divide/);
   });
 
   it("does not keep the unused TriageLeadCard", () => {

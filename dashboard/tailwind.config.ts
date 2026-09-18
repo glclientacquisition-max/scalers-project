@@ -42,7 +42,12 @@ export default {
         accent: {
           DEFAULT: "var(--accent)",
           deep: "var(--accent-deep)",
+          "deep-hover": "var(--accent-deep-hover)",
           soft: "var(--accent-soft)",
+          fill: "var(--accent-fill)",
+          "fill-hover": "var(--accent-fill-hover)",
+          "fill-active": "var(--accent-fill-active)",
+          "on-fill": "var(--accent-on-fill)",
         },
         warn: {
           DEFAULT: "var(--warn)",
@@ -53,7 +58,16 @@ export default {
           soft: "var(--ok-soft)",
         },
         lead: "var(--lead)",
-        whatsapp: "var(--whatsapp)",
+        whatsapp: {
+          DEFAULT: "var(--whatsapp)",
+          deep: "var(--whatsapp-deep)",
+        },
+        bubble: {
+          caller: "var(--bubble-caller)",
+          "caller-ink": "var(--bubble-caller-ink)",
+        },
+        sms: "var(--sms)",
+        email: "var(--email)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "sans-serif"],

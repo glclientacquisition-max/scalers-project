@@ -4,11 +4,13 @@ import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { RowIdentity } from "@/components/ui/deskRow";
+import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { deskEmptyClass, pageTitleClass } from "@/components/ui/deskChrome";
+import { deskEmptyClass, deskPreviewCellClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
   contactsHref,
@@ -42,15 +44,7 @@ export default async function ContactsPage({
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-[#005CCC]">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -87,7 +81,7 @@ export default async function ContactsPage({
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/contacts/import"
-              className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-[#005CCC] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+              className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               Import CSV
             </Link>
@@ -119,7 +113,7 @@ export default async function ContactsPage({
               Call{" "}
               <a
                 href={`tel:${tenant.sautikit_virtual_number}`}
-                className="font-medium text-[#005ccc] underline decoration-[#0096FF]/40 underline-offset-2 hover:text-[#0096FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+                className="font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 {tenant.sautikit_virtual_number}
               </a>
@@ -128,18 +122,27 @@ export default async function ContactsPage({
         </div>
       ) : (
         <>
+          <DeskLandScope
+            ids={rows.map((row) => row.id)}
+            scopeKey={`${saved}:${page}`}
+          >
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {rows.map((row) => (
-              <li key={row.id} className="border-t border-line/70 first:border-t-0">
+              <DeskLandSurface
+                as="li"
+                key={row.id}
+                id={row.id}
+                className="relative border-t border-line/70 first:border-t-0"
+              >
                 <Link
                   href={`/contacts/${row.id}`}
                   aria-label={row.name?.trim() || "Contact"}
-                  className="flex items-center gap-3 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0096FF]"
+                  className="flex items-center gap-3 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
                 >
                   <RowIdentity name={row.name} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">
+                      <p className={`min-w-0 text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
                         {row.name?.trim() || "Unknown"}
                       </p>
                       {row.lastContactAt ? (
@@ -149,12 +152,12 @@ export default async function ContactsPage({
                       ) : null}
                     </div>
                     <p className="mt-0.5 truncate font-mono text-sm text-ink">{row.phone || "No phone"}</p>
-                    <p className="mt-0.5 line-clamp-1 text-sm text-ink-soft">
+                    <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
                       {row.lastReasonDisplay || "None"}
                     </p>
                   </div>
                 </Link>
-              </li>
+              </DeskLandSurface>
             ))}
           </ul>
           <div className="mt-8 hidden md:block">
@@ -189,15 +192,17 @@ export default async function ContactsPage({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr
+                  <DeskLandSurface
+                    as="tr"
                     key={row.id}
-                    className="group relative cursor-pointer border-t border-line/70 transition duration-150 hover:bg-[#0096FF]/[0.04]"
+                    id={row.id}
+                    className={`group relative cursor-pointer border-t border-line/70 ${deskShiftClass} hover:bg-accent/[0.04]`}
                   >
                     <td className="px-5 py-5 align-top">
                       <DeskRowHit href={`/contacts/${row.id}`} label={row.name?.trim() || "Contact"} />
                       <div className={`${deskRowMutedClass} flex items-center gap-3`}>
                         <RowIdentity name={row.name} />
-                        <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">
+                        <p className={`min-w-0 text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
                           {row.name?.trim() || "Unknown"}
                         </p>
                       </div>
@@ -205,19 +210,20 @@ export default async function ContactsPage({
                     <td className={`${deskRowMutedClass} px-5 py-5 align-top font-mono text-sm text-ink`}>
                       {row.phone || "No phone"}
                     </td>
-                    <td className={`${deskRowMutedClass} px-5 py-5 align-top text-sm text-ink-soft`}>
-                      {row.lastReasonDisplay || "None"}
+                    <td className={`${deskRowMutedClass} ${deskPreviewCellClass} px-5 py-5 align-top text-sm text-ink-soft`}>
+                      <p className={deskPreviewClass}>{row.lastReasonDisplay || "None"}</p>
                     </td>
                     <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft`}>
                       {row.lastContactAt
                         ? formatCallWhenRelative(row.lastContactAt)
                         : "None"}
                     </td>
-                  </tr>
+                  </DeskLandSurface>
                 ))}
               </tbody>
             </DeskDataTable>
           </div>
+          </DeskLandScope>
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}

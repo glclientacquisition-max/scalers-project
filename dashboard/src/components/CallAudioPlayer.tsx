@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { usableRecordingUrl } from "@/lib/recordingSource";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const SPEEDS = [1, 1.5, 2] as const;
 
@@ -24,7 +25,7 @@ export function CallAudioPlayer({ src }: { src: string }) {
   }
 
   return (
-    <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t border-[var(--line)] bg-[var(--card)]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:rounded-t-2xl sm:px-6 md:bottom-0">
+    <div className="sticky bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom))] z-20 -mx-4 mt-8 border-t border-line bg-surface px-4 py-3 shadow-none sm:-mx-6 sm:rounded-t-2xl sm:px-6 md:bottom-0">
       <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <audio
           ref={audioRef}
@@ -44,9 +45,10 @@ export function CallAudioPlayer({ src }: { src: string }) {
               onClick={() => applySpeed(s)}
               aria-pressed={speed === s}
               className={[
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition",
+                "rounded-full border px-2.5 py-1 text-xs font-medium",
+                deskShiftClass,
                 speed === s
-                  ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                  ? "border-[var(--accent)] bg-accent-fill text-accent-on-fill"
                   : "border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]/60",
               ].join(" ")}
             >

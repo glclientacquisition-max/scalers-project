@@ -177,7 +177,7 @@ comment on column public.tenants.notify_channels is
   'Owner notify prefs: {sms, whatsapp, email} booleans. Platform still greys channels that are not live yet.';
 
 -- ---------------------------------------------------------------------------
--- 3) public.calls (15 columns)
+-- 3) public.calls (21 columns)
 -- ---------------------------------------------------------------------------
 create table if not exists public.calls (
   id uuid not null default uuid_generate_v4(),
@@ -195,6 +195,12 @@ create table if not exists public.calls (
   resolution text not null default 'unknown'::text,
   primary_intent text,
   resolution_note text,
+  inbox_read_at timestamptz,
+  inbox_muted boolean not null default false,
+  inbox_pinned_at timestamptz,
+  inbox_assignee text,
+  inbox_labels text[] not null default '{}'::text[],
+  inbox_snoozed_until timestamptz,
   constraint calls_pkey primary key (id),
   constraint calls_sautikit_call_sid_key unique (sautikit_call_sid),
   constraint calls_lead_status_check check (
@@ -225,6 +231,18 @@ comment on column public.calls.primary_intent is
   'Best-effort primary caller intent from the live Brain state.';
 comment on column public.calls.resolution_note is
   'Short note about how the call ended (hold saved, escalate, etc.).';
+comment on column public.calls.inbox_read_at is
+  'Owner inbox read stamp. Null = unread. Distinct from needsYou / lead_status.';
+comment on column public.calls.inbox_muted is
+  'Per-ticket mute. Survives refresh. Not a contact-level mute.';
+comment on column public.calls.inbox_pinned_at is
+  'When set, the ticket stays at the top of the current inbox pile.';
+comment on column public.calls.inbox_assignee is
+  'team_directory teammate label assigned to this ticket. Not tenant_members.user_id.';
+comment on column public.calls.inbox_labels is
+  'Free-text labels on this ticket.';
+comment on column public.calls.inbox_snoozed_until is
+  'Hide from the active inbox until this time. Then the row returns to its pile.';
 
 -- ---------------------------------------------------------------------------
 -- 4) public.transcripts (6 columns — one row per utterance)
@@ -301,7 +319,18 @@ grant select on public.calls to authenticated;
 grant select on public.transcripts to authenticated;
 
 revoke update on public.calls from authenticated;
-grant update (lead_status, resolution, primary_intent, resolution_note)
+grant update (
+  lead_status,
+  resolution,
+  primary_intent,
+  resolution_note,
+  inbox_read_at,
+  inbox_muted,
+  inbox_pinned_at,
+  inbox_assignee,
+  inbox_labels,
+  inbox_snoozed_until
+)
   on public.calls to authenticated;
 
 revoke update on public.tenants from authenticated;

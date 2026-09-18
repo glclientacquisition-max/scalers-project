@@ -48,6 +48,22 @@ function normalizeStoredPhone(raw) {
   return normalizeKenyaE164(trimmed) || trimmed;
 }
 
+/** Lookup variants so +254… still matches a dirty 254… row until backfill. */
+function storedPhoneLookupKeys(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return [];
+  const seen = new Set();
+  const out = [];
+  const e164 = normalizeKenyaE164(trimmed);
+  const stored = normalizeStoredPhone(trimmed);
+  for (const phone of [trimmed, stored, e164, e164 ? e164.slice(1) : null]) {
+    if (!phone || seen.has(phone)) continue;
+    seen.add(phone);
+    out.push(phone);
+  }
+  return out;
+}
+
 /** Map a live `calls` row to the shape server.js historically expected from SQLite. */
 function shapeCall(row) {
   if (!row) return null;
@@ -65,6 +81,7 @@ function shapeCall(row) {
     recording_path: meta.recording_path || null,
     status: row.status || null,
     whatsapp_sent: Boolean(meta.whatsapp_sent),
+    owner_notify_kind: meta.owner_notify_kind || null,
     escalation_sent: Boolean(meta.escalation_sent),
     escalated_to: meta.escalated_to || null,
     escalate_reason: meta.escalate_reason || null,
@@ -302,11 +319,13 @@ async function getCall(callSid) {
  */
 async function listRecentCallsFromNumber({ tenantId, callerNumber, sinceIso, limit = 5 }) {
   if (!tenantId || !callerNumber) return [];
+  const phones = storedPhoneLookupKeys(callerNumber);
+  if (!phones.length) return [];
   let q = supabase
     .from('calls')
     .select('id, sautikit_call_sid, caller_number, status, summary, created_at')
     .eq('tenant_id', tenantId)
-    .eq('caller_number', callerNumber)
+    .in('caller_number', phones)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (sinceIso) q = q.gte('created_at', sinceIso);
@@ -1074,11 +1093,14 @@ async function upsertContact({
   delete incomingMeta.alternate_names;
 
   if (phoneNorm) {
+    const phoneKeys = storedPhoneLookupKeys(phoneNorm);
     const { data: existing, error: findErr } = await supabase
       .from('contacts')
-      .select('id, name, notes, last_reason, metadata')
+      .select('id, name, notes, last_reason, metadata, phone')
       .eq('tenant_id', tenantId)
-      .eq('phone', phoneNorm)
+      .in('phone', phoneKeys)
+      .order('phone', { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (findErr && /contacts|relation/i.test(findErr.message)) {
       console.warn('[db] upsertContact skipped (apply contacts_and_requests.sql):', findErr.message);
@@ -1103,12 +1125,22 @@ async function upsertContact({
           alternate_names: identity.metadata.alternate_names,
         },
       };
-      const { data, error } = await supabase
+      if (existing.phone !== phoneNorm) patch.phone = phoneNorm;
+      let { data, error } = await supabase
         .from('contacts')
         .update(patch)
         .eq('id', existing.id)
         .select('*')
         .maybeSingle();
+      if (error && patch.phone && /duplicate|unique/i.test(error.message || '')) {
+        delete patch.phone;
+        ({ data, error } = await supabase
+          .from('contacts')
+          .update(patch)
+          .eq('id', existing.id)
+          .select('*')
+          .maybeSingle());
+      }
       throwIfError('upsertContact(update)', error);
       return data || null;
     }
@@ -1161,8 +1193,9 @@ async function listOpenRequestsForCaller(tenantId, contactId, phoneNorm) {
     if (error) throwIfError('getCallerMemory(requests)', error);
     if (data?.length) return data;
   }
-  if (!phoneNorm) return [];
-  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return [];
+  const { data, error } = await base().in('caller_phone', phoneKeys);
   if (error && /service_requests|relation/i.test(error.message)) return [];
   if (error) throwIfError('getCallerMemory(requests-phone)', error);
   return data || [];
@@ -1186,11 +1219,37 @@ async function listNextAppointmentForCaller(tenantId, contactId, phoneNorm) {
     if (error) throwIfError('getCallerMemory(appointment)', error);
     if (data?.[0]) return data[0];
   }
-  if (!phoneNorm) return null;
-  const { data, error } = await base().eq('caller_phone', phoneNorm);
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return null;
+  const { data, error } = await base().in('caller_phone', phoneKeys);
   if (error && /appointments|relation/i.test(error.message)) return null;
   if (error) throwIfError('getCallerMemory(appointment-phone)', error);
   return data?.[0] || null;
+}
+
+async function listRecentAppointmentsForCaller(tenantId, contactId, phoneNorm) {
+  const base = () =>
+    supabase
+      .from('appointments')
+      .select(
+        'id, service_name, status, when_text, window_start, address_landmark, created_at'
+      )
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+  if (contactId) {
+    const { data, error } = await base().eq('contact_id', contactId);
+    if (error && /appointments|relation/i.test(error.message)) return [];
+    if (error) throwIfError('getCallerMemory(recent-appointments)', error);
+    if (data?.length) return data;
+  }
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
+  if (!phoneKeys.length) return [];
+  const { data, error } = await base().in('caller_phone', phoneKeys);
+  if (error && /appointments|relation/i.test(error.message)) return [];
+  if (error) throwIfError('getCallerMemory(recent-appointments-phone)', error);
+  return data || [];
 }
 
 /**
@@ -1201,11 +1260,14 @@ async function getCallerMemory({ tenantId, phone } = {}) {
   const phoneNorm = normalizeStoredPhone(phone);
   if (!tenantId || !phoneNorm) return null;
 
+  const phoneKeys = storedPhoneLookupKeys(phoneNorm);
   const { data: contact, error: findErr } = await supabase
     .from('contacts')
     .select('id, name, notes, last_reason, phone, metadata')
     .eq('tenant_id', tenantId)
-    .eq('phone', phoneNorm)
+    .in('phone', phoneKeys)
+    .order('phone', { ascending: true })
+    .limit(1)
     .maybeSingle();
   if (findErr && /contacts|relation/i.test(findErr.message)) {
     console.warn(
@@ -1227,10 +1289,16 @@ async function getCallerMemory({ tenantId, phone } = {}) {
     contact.id,
     phoneNorm
   );
+  const recentAppointments = await listRecentAppointmentsForCaller(
+    tenantId,
+    contact.id,
+    phoneNorm
+  );
   return buildCallerMemoryCard({
     contact,
     openRequests,
     nextAppointment,
+    recentAppointments,
   });
 }
 
@@ -1559,7 +1627,7 @@ async function updateAppointment({
       .order('created_at', { ascending: false })
       .limit(1);
     if (callerPhone) {
-      findQuery = findQuery.eq('caller_phone', callerPhone);
+      findQuery = findQuery.in('caller_phone', storedPhoneLookupKeys(callerPhone));
     } else if (callRow?.id) {
       findQuery = findQuery.eq('call_id', callRow.id);
     } else {
@@ -1598,6 +1666,257 @@ async function updateAppointment({
   return data || null;
 }
 
+function missingWhatsAppRelation(error) {
+  return /whatsapp_threads|whatsapp_messages|does not exist|schema cache|relation/i.test(
+    error?.message || ''
+  );
+}
+
+async function upsertWhatsAppThread(row = {}) {
+  const identity = row.identity || 'platform';
+  const phoneNumberId = String(row.phoneNumberId || '').trim();
+  const contactWaId = String(row.contactWaId || '').trim();
+  if (!phoneNumberId || !contactWaId) return { ok: false, reason: 'invalid' };
+  const now = new Date().toISOString();
+  const payload = {
+    identity,
+    phone_number_id: phoneNumberId,
+    sautikit_number_id: row.sautikitNumberId || null,
+    e164: row.e164 || null,
+    contact_wa_id: contactWaId,
+    contact_name: row.contactName || null,
+    updated_at: now,
+  };
+  if (row.direction === 'outbound') payload.last_outbound_at = now;
+  else payload.last_inbound_at = now;
+
+  const { data, error } = await supabase
+    .from('whatsapp_threads')
+    .upsert(payload, { onConflict: 'identity,phone_number_id,contact_wa_id' })
+    .select('id, last_inbound_at')
+    .maybeSingle();
+  if (error) {
+    if (missingWhatsAppRelation(error)) {
+      console.warn('[db] whatsapp_threads missing (apply docs/supabase/whatsapp_threads.sql)');
+      return { ok: false, reason: 'table_missing' };
+    }
+    console.warn('[db] upsertWhatsAppThread:', error.message);
+    return { ok: false, reason: 'upsert_failed' };
+  }
+  return { ok: true, id: data?.id || null, lastInboundAt: data?.last_inbound_at || null };
+}
+
+async function insertWhatsAppMessage(row = {}) {
+  if (!row.threadId) return { ok: false, reason: 'no_thread' };
+  const payload = {
+    thread_id: row.threadId,
+    direction: row.direction || 'inbound',
+    wamid: row.wamid || null,
+    msg_type: row.type || row.msgType || null,
+    body: row.body || null,
+    status: row.status || null,
+    payload: row.payload || null,
+  };
+  const { data, error } = await supabase
+    .from('whatsapp_messages')
+    .insert(payload)
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    if (missingWhatsAppRelation(error)) {
+      return { ok: false, reason: 'table_missing' };
+    }
+    if (error.code === '23505' || /duplicate|unique/i.test(error.message || '')) {
+      return { ok: false, reason: 'duplicate', duplicate: true };
+    }
+    console.warn('[db] insertWhatsAppMessage:', error.message);
+    return { ok: false, reason: 'insert_failed' };
+  }
+  return { ok: true, id: data?.id || null };
+}
+
+async function persistPlatformWhatsAppInbound(row = {}) {
+  const trail = {
+    identity: row.identity || 'platform',
+    phoneNumberId: row.phoneNumberId,
+    contactWaId: row.contactWaId,
+    wamid: row.wamid,
+    body: row.body,
+  };
+  const thread = await upsertWhatsAppThread({ ...row, direction: 'inbound' });
+  if (thread.reason === 'table_missing' || thread.reason === 'upsert_failed') {
+    console.log('[whatsapp] persist trail', JSON.stringify(trail));
+    return { ok: true, reason: thread.reason || 'json_trail', duplicate: false };
+  }
+  if (!thread.ok) return { ok: false, reason: thread.reason, duplicate: false };
+  const inserted = await insertWhatsAppMessage({
+    threadId: thread.id,
+    direction: 'inbound',
+    wamid: row.wamid,
+    type: row.type,
+    body: row.body,
+    status: 'received',
+    payload: row.payload || null,
+  });
+  if (inserted.duplicate) return { ok: true, duplicate: true, reason: 'duplicate' };
+  if (inserted.reason === 'table_missing') {
+    console.log('[whatsapp] persist trail', JSON.stringify(trail));
+    return { ok: true, reason: 'json_trail', duplicate: false };
+  }
+  return { ok: inserted.ok, duplicate: false, reason: inserted.reason, threadId: thread.id };
+}
+
+async function persistPlatformWhatsAppOutbound(row = {}) {
+  const thread = await upsertWhatsAppThread({ ...row, direction: 'outbound' });
+  if (!thread.ok) {
+    console.log(
+      '[whatsapp] outbound trail',
+      JSON.stringify({ to: row.contactWaId, wamid: row.wamid, body: row.body })
+    );
+    return thread;
+  }
+  return insertWhatsAppMessage({
+    threadId: thread.id,
+    direction: 'outbound',
+    wamid: row.wamid,
+    type: row.type,
+    body: row.body,
+    status: row.status || 'sent',
+    payload: row.payload || null,
+  });
+}
+
+async function persistWhatsAppStatus(row = {}) {
+  const wamid = String(row.wamid || '').trim();
+  if (!wamid) return { ok: false, reason: 'no_wamid' };
+  const { error } = await supabase
+    .from('whatsapp_messages')
+    .update({ status: row.status || null })
+    .eq('wamid', wamid);
+  if (error) {
+    if (missingWhatsAppRelation(error)) return { ok: false, reason: 'table_missing' };
+    console.warn('[db] persistWhatsAppStatus:', error.message);
+    return { ok: false, reason: 'update_failed' };
+  }
+  return { ok: true };
+}
+
+async function getWhatsAppSession({ phoneNumberId, contactWaId, identity = 'platform' } = {}) {
+  if (!phoneNumberId || !contactWaId) return null;
+  const { data, error } = await supabase
+    .from('whatsapp_threads')
+    .select('id, last_inbound_at')
+    .eq('identity', identity)
+    .eq('phone_number_id', phoneNumberId)
+    .eq('contact_wa_id', contactWaId)
+    .maybeSingle();
+  if (error) {
+    if (missingWhatsAppRelation(error)) return null;
+    console.warn('[db] getWhatsAppSession:', error.message);
+    return null;
+  }
+  return data || null;
+}
+
+async function insertNotifySend(row = {}) {
+  if (!row.tenant_id || !row.kind || !row.channel || !row.idempotency_key) {
+    return { ok: false, reason: 'invalid' };
+  }
+  const payload = {
+    tenant_id: row.tenant_id,
+    call_id: row.call_id || null,
+    call_sid: row.call_sid || null,
+    kind: row.kind,
+    channel: row.channel,
+    recipient: row.recipient || null,
+    audience: row.audience,
+    billed_to: row.billed_to,
+    units: Number.isFinite(Number(row.units)) ? Number(row.units) : 1,
+    body: row.body || null,
+    provider_message_id: row.provider_message_id || null,
+    idempotency_key: row.idempotency_key,
+    overage: Boolean(row.overage),
+  };
+  let { data, error } = await supabase
+    .from('notify_sends')
+    .insert(payload)
+    .select('id')
+    .maybeSingle();
+  if (error && /overage/i.test(error.message || '')) {
+    const rest = { ...payload };
+    delete rest.overage;
+    ({ data, error } = await supabase
+      .from('notify_sends')
+      .insert(rest)
+      .select('id')
+      .maybeSingle());
+  }
+  if (error) {
+    if (/notify_sends|does not exist|schema cache|relation/i.test(error.message || '')) {
+      console.warn(
+        '[db] notify_sends missing (apply docs/supabase/notify_send_ledger.sql)'
+      );
+      return { ok: false, reason: 'table_missing' };
+    }
+    if (error.code === '23505' || /duplicate|unique/i.test(error.message || '')) {
+      return { ok: false, reason: 'duplicate' };
+    }
+    console.warn('[db] insertNotifySend:', error.message);
+    return { ok: false, reason: 'insert_failed' };
+  }
+  return { ok: true, id: data?.id || null };
+}
+
+async function findNotifySend({ tenantId, idempotencyKey } = {}) {
+  if (!tenantId || !idempotencyKey) return null;
+  const { data, error } = await supabase
+    .from('notify_sends')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+  if (error) {
+    if (/notify_sends|does not exist|schema cache|relation/i.test(error.message || '')) {
+      return null;
+    }
+    console.warn('[db] findNotifySend:', error.message);
+    return null;
+  }
+  return data || null;
+}
+
+async function consumeSmsUnits({ tenantId, units } = {}) {
+  if (!tenantId) return { allowed: true, reason: 'no_tenant', overage: false };
+  const need = Math.max(1, Number(units) || 1);
+  const { data, error } = await supabase.rpc('consume_sms_units', {
+    p_tenant_id: tenantId,
+    p_units: need,
+  });
+  if (error) {
+    if (/consume_sms_units|does not exist|schema cache|sms_included_units|sms_used_units/i.test(
+      error.message || ''
+    )) {
+      console.warn(
+        '[db] consume_sms_units missing (apply docs/supabase/sms_allowance.sql)'
+      );
+      return { allowed: true, reason: 'rpc_missing', overage: false };
+    }
+    console.warn('[db] consumeSmsUnits:', error.message);
+    return { allowed: true, reason: 'rpc_failed', overage: false };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { allowed: true, reason: 'empty', overage: false };
+  return {
+    allowed: row.allowed !== false,
+    reason: row.reason || 'ok',
+    overage: Boolean(row.overage),
+    used: row.sms_used_units,
+    included: row.sms_included_units,
+    remaining: row.remaining,
+    onDemand: Boolean(row.on_demand_usage_enabled),
+  };
+}
+
 module.exports = {
   upsertCall,
   saveCallerInfo,
@@ -1626,8 +1945,16 @@ module.exports = {
   updateAppointment,
   listOpenAppointments,
   mergeCallSummaryMeta,
+  insertNotifySend,
+  findNotifySend,
+  persistPlatformWhatsAppInbound,
+  persistPlatformWhatsAppOutbound,
+  persistWhatsAppStatus,
+  getWhatsAppSession,
+  consumeSmsUnits,
   RECORDINGS_BUCKET,
   shapeCall,
   normalizeStoredPhone,
+  storedPhoneLookupKeys,
   mergeContactIdentity,
 };

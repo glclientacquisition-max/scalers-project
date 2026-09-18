@@ -1,32 +1,15 @@
 // Automatic prepaid low/empty wallet alerts to the business owner.
 // Soft = live WhatsApp/email only. Never blocks calls by itself.
 
-const { dispatchAlert } = require('./dispatch');
+const { dispatchToStaff, staffRecipients } = require('./recipients');
+const { walletEmptyBody, walletLowBody } = require('./templates');
 
-function buildLowBalanceBody({ businessName, balanceKes, lowThresholdKes }) {
-  const bal = Number(balanceKes || 0).toLocaleString('en-KE');
-  const thr = Number(lowThresholdKes || 200).toLocaleString('en-KE');
-  return [
-    `Scalers wallet running low${businessName ? ` — ${businessName}` : ''}`,
-    `Prepaid balance is about KES ${bal} (alert under KES ${thr}).`,
-    `Top up soon so calls keep being covered. On-demand usage is separate — enable it on Wallet if you want to continue after prepaid hits zero.`,
-  ].join('\n');
+function buildLowBalanceBody(opts) {
+  return walletLowBody(opts);
 }
 
-function buildEmptyBalanceBody({ businessName, onDemandEnabled }) {
-  const name = businessName ? ` — ${businessName}` : '';
-  if (onDemandEnabled) {
-    return [
-      `Scalers prepaid empty${name}`,
-      `Your prepaid balance is KES 0 or below.`,
-      `On-demand usage is ON, so calls can keep going and will bill beyond prepaid. Top up when you can.`,
-    ].join('\n');
-  }
-  return [
-    `Scalers prepaid empty${name}`,
-    `Your prepaid balance is KES 0 or below.`,
-    `On-demand usage is OFF, so further call charges are paused until you top up or enable on-demand on the Wallet page.`,
-  ].join('\n');
+function buildEmptyBalanceBody(opts) {
+  return walletEmptyBody(opts);
 }
 
 /**
@@ -50,38 +33,52 @@ async function maybeNotifyWalletBalanceAlerts(supabase, { tenantId } = {}) {
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return null;
 
+  const { data: tenantRow } = await supabase
+    .from('tenants')
+    .select('team_directory, notify_channels')
+    .eq('id', tenantId)
+    .maybeSingle();
+
   const results = [];
-  const to = row.whatsapp_notification_number || null;
-  const email = row.alert_email || null;
+  const ownerPhone = row.whatsapp_notification_number || null;
+  const ownerEmail = row.alert_email || null;
   const businessName = row.business_name || null;
+  const ops = staffRecipients('ops', {
+    teamDirectory: tenantRow?.team_directory,
+    ownerPhone,
+    ownerEmail,
+  });
+  const channels = tenantRow?.notify_channels || null;
 
   if (row.should_alert_empty) {
     const body = buildEmptyBalanceBody({
       businessName,
       onDemandEnabled: Boolean(row.on_demand_usage_enabled),
     });
-    const sent = await dispatchAlert({
-      to,
-      email,
+    const { sent } = await dispatchToStaff({
+      recipients: ops.recipients,
       body,
-      subject: `Scalers prepaid empty${businessName ? ` — ${businessName}` : ''}`,
+      subject: `Scalers prepaid empty${businessName ? `. ${businessName}` : ''}`,
       lead: { businessName, reason: 'Prepaid wallet empty' },
+      channels,
+      ledger: { tenantId, kind: 'wallet_empty' },
     });
-    results.push({ kind: 'empty', ...sent });
+    results.push({ kind: 'empty', ...(sent[0] || { channel: null }) });
   } else if (row.should_alert_low) {
     const body = buildLowBalanceBody({
       businessName,
       balanceKes: row.wallet_balance_kes,
       lowThresholdKes: row.low_threshold_kes,
     });
-    const sent = await dispatchAlert({
-      to,
-      email,
+    const { sent } = await dispatchToStaff({
+      recipients: ops.recipients,
       body,
-      subject: `Scalers wallet running low${businessName ? ` — ${businessName}` : ''}`,
+      subject: `Scalers wallet running low${businessName ? `. ${businessName}` : ''}`,
       lead: { businessName, reason: 'Prepaid wallet low' },
+      channels,
+      ledger: { tenantId, kind: 'wallet_low' },
     });
-    results.push({ kind: 'low', ...sent });
+    results.push({ kind: 'low', ...(sent[0] || { channel: null }) });
   }
 
   return {

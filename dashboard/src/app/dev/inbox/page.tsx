@@ -1,12 +1,21 @@
 import { notFound } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
+import { CallSummaryCard } from "@/components/CallSummaryCard";
+import { CallTranscript } from "@/components/CallTranscript";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
+import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
+import { InboxRowUiProvider } from "@/components/InboxRowUi";
+import { InboxSelectChrome } from "@/components/InboxRowSelect";
+import { ThemePicker } from "@/components/ThemePicker";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
+import type { TranscriptRow } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
 
 function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "headline">): InboxItem {
   return {
@@ -22,23 +31,38 @@ function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "
     job: null,
     intent: null,
     urgent: false,
+    unread: false,
+    muted: false,
+    pinnedAt: null,
+    assignee: null,
+    labels: [],
+    snoozedUntil: null,
     ...partial,
   };
 }
 
 const ROWS: InboxItem[] = [
   item({
+    id: "live",
+    purpose: "live",
+    callerName: "Amina",
+    headline: "On the line",
+    intent: null,
+  }),
+  item({
     id: "human",
     purpose: "human",
     callerName: "Amina",
     headline: "Asked for a person",
     intent: "human",
+    pinnedAt: "2026-09-18T08:00:00.000Z",
   }),
   item({
     id: "job",
     purpose: "job",
     callerName: "Otieno",
     callerPhone: "254700000002",
+    contactId: "ct-otieno",
     headline: "House cleaning",
     intent: "book_visit",
     job: {
@@ -83,6 +107,67 @@ const ROWS: InboxItem[] = [
       call_id: "call-1",
     },
   }),
+  item({
+    id: "long-reason",
+    purpose: "answered",
+    needsYou: false,
+    callerName: "Mwangi",
+    callerPhone: "254700000005",
+    headline:
+      "Caller wants a deep clean of the three bedroom house in Westlands this Saturday morning and asked the receptionist to confirm the team and send the quote on WhatsApp.",
+    intent: "book_visit",
+  }),
+];
+
+const TURNS: TranscriptRow[] = [
+  {
+    id: "t1",
+    created_at: "2026-09-12T05:10:01.000Z",
+    call_id: "call-1",
+    speaker: "caller",
+    text_content: "Hi, I need house cleaning tomorrow morning.",
+    latency_ms: null,
+  },
+  {
+    id: "t2",
+    created_at: "2026-09-12T05:10:08.000Z",
+    call_id: "call-1",
+    speaker: "agent",
+    text_content: "I can book a visit for tomorrow at 9am. Kericho road still okay?",
+    latency_ms: 400,
+  },
+  {
+    id: "t3",
+    created_at: "2026-09-12T05:10:16.000Z",
+    call_id: "call-1",
+    speaker: "caller",
+    text_content: "Yes. Please confirm on WhatsApp.",
+    latency_ms: null,
+  },
+  {
+    id: "t4",
+    created_at: "2026-09-12T05:10:22.000Z",
+    call_id: "call-1",
+    speaker: "agent",
+    text_content: "Visit saved for tomorrow 9am. I will send the confirmation.",
+    latency_ms: 380,
+  },
+  {
+    id: "t5",
+    created_at: "2026-09-12T05:10:28.000Z",
+    call_id: "call-1",
+    speaker: "caller",
+    text_content: "Thank you.",
+    latency_ms: null,
+  },
+  {
+    id: "t6",
+    created_at: "2026-09-12T05:10:31.000Z",
+    call_id: "call-1",
+    speaker: "system",
+    text_content: "Call ended",
+    latency_ms: null,
+  },
 ];
 
 export default function DevInboxPage() {
@@ -90,26 +175,40 @@ export default function DevInboxPage() {
     notFound();
   }
 
+  const needYou = ROWS.filter((row) => row.needsYou).length;
+  const briefing = needYou > 0 ? `${needYou} need you` : "Clear";
+
   return (
-    <div className="min-h-screen min-w-0">
-      <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/95 backdrop-blur">
+    <div className="desk-theme min-h-screen min-w-0">
+      <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
         <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           <BrandLockup href="/dev/inbox" name="Scalers" size="sm" priority className="max-w-full" />
           <DeskNav />
         </div>
       </header>
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom)+1.5rem)] sm:px-6 sm:pt-10 md:pb-10">
+      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
+        <InboxRowUiProvider>
+        <InboxSelectChrome items={ROWS}>
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">4 need you</p>
+        <p className="mt-1 text-[13px] text-ink-soft">{briefing}</p>
+        <div className="mt-6 max-w-lg">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
+          <div className="mt-2">
+            <ThemePicker />
+          </div>
+        </div>
+        </InboxSelectChrome>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+          <InboxArchivedPhoneRow count={14} />
           {ROWS.map((row) => (
             <InboxPhoneRow
               key={row.id}
               item={row}
               businessName="Workspace"
               purpose={row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs"}
+              ret={{ purpose: row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs" }}
             />
           ))}
         </ul>
@@ -123,52 +222,78 @@ export default function DevInboxPage() {
                 <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">Action</th>
               </tr>
             </thead>
-            <tbody>
-              {ROWS.map((row) => (
+              <tbody>
+                <InboxArchivedTableRow count={14} />
+                {ROWS.map((row) => (
                 <InboxTableRow
                   key={row.id}
                   item={row}
                   businessName="Workspace"
                   purpose="needs"
                   vertical={null}
+                  ret={{ purpose: "needs" }}
                 />
               ))}
             </tbody>
           </DeskDataTable>
         </div>
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <section className="rounded-2xl border border-line bg-surface p-4">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Visit</h2>
-            <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Otieno</p>
-            <div className="mt-3">
-              <InboxJobActions id="job-1" status="requested" extra />
+        </InboxRowUiProvider>
+        <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
+          <div className="contents min-w-0 lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
+            <div className="order-1 min-w-0 lg:order-none">
+              <h2 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
+                Otieno
+              </h2>
+              <p className="mt-2 text-sm text-ink-soft">12 Sep 2026, 08:10</p>
+              <p className="mt-1 min-w-0 break-all font-mono text-sm text-ink">254700000002</p>
             </div>
-            <WhatsAppLink
-              number="254700000002"
-              variant="link"
-              label="Reply on WhatsApp"
-              className="mt-3 w-full"
-            />
-          </section>
-          <section className="rounded-2xl border border-line bg-surface p-4">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Return call</h2>
-            <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Alvin</p>
-            <div className="mt-3">
-              <CallerNoteComposer
-                callId="call-alvin"
-                callerPhone="254700000004"
-                callerName="Alvin"
-                callerSmsOn
-                primary
+            <section className="order-2 min-w-0 rounded-2xl border border-line bg-surface p-5 lg:order-none">
+              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                Summary
+              </h2>
+              <CallSummaryCard
+                name="Otieno"
+                callerNumber="254700000002"
+                want="House cleaning tomorrow 9am"
+                done="Visit saved"
+                mood="calm"
+                next="Confirm the visit"
               />
+            </section>
+            <div className="order-3 min-w-0 space-y-5 lg:order-none">
+              <div className="mx-auto flex w-full max-w-lg flex-col items-stretch gap-2">
+                <div className="text-center">
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    Do next
+                  </p>
+                  <p className="mt-1 text-base font-semibold leading-snug text-ink">
+                    Confirm the visit
+                  </p>
+                </div>
+                <InboxJobActions id="job-1" status="requested" extra />
+                <WhatsAppLink
+                  number="254700000002"
+                  variant="ghost"
+                  label="Reply on WhatsApp"
+                  className="w-full"
+                />
+                <CallerNoteComposer
+                  callId="call-1"
+                  callerPhone="254700000002"
+                  callerName="Otieno"
+                  callerSmsOn
+                  collapsed
+                />
+              </div>
             </div>
-            <WhatsAppLink
-              number="254700000004"
-              variant="link"
-              label="Reply on WhatsApp"
-              className="mt-3 w-full"
-            />
-          </section>
+            <div className="order-5 min-w-0 space-y-4 border-t border-line/80 pt-4 text-sm text-ink-soft lg:order-none">
+              <p>Duration: 48s</p>
+              <p>Assist: Handled</p>
+            </div>
+          </div>
+          <div className="order-4 min-w-0 lg:order-none lg:col-span-8">
+            <CallTranscript turns={TURNS} />
+          </div>
         </div>
       </main>
       <DeskTabBar />

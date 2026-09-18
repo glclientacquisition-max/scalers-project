@@ -1,26 +1,22 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import {
   updateAppointmentSchedule,
   type AppointmentScheduleState,
 } from "@/app/(desk)/appointments/actions";
-import { InboxJobActions } from "@/components/InboxJobActions";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 
 const initial: AppointmentScheduleState = {};
 
-const fieldClass =
-  "w-full min-h-11 rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:outline-none focus:ring-2 focus:ring-[#0096FF]";
+const fieldClass = deskFieldClass;
 
 export function InboxJobEditor({
   id,
-  status,
   whenText,
   landmark,
 }: {
   id: string;
-  status: string;
   whenText: string | null;
   landmark: string | null;
 }) {
@@ -28,10 +24,6 @@ export function InboxJobEditor({
     updateAppointmentSchedule,
     initial
   );
-
-  useEffect(() => {
-    if (state.error) console.warn("[InboxJobEditor]", state.error);
-  }, [state.error]);
 
   return (
     <div className="space-y-3">
@@ -60,13 +52,12 @@ export function InboxJobEditor({
         <button
           type="submit"
           disabled={pending}
-          className={`${btnPrimary} w-full`}
+          className={`${btnGhost} w-full disabled:opacity-50`}
         >
           {pending ? "Saving" : "Save"}
         </button>
-        {state.error ? <p className="text-sm text-warn">{state.error}</p> : null}
+        {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
-      <InboxJobActions id={id} status={status} extra />
     </div>
   );
 }

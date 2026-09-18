@@ -58,7 +58,7 @@ export async function initiateWalletTopUp(
     String(tenant.whatsapp_notification_number || "").trim() ||
     String(formData.get("phone") || "").trim();
   if (!phone.replace(/\D/g, "")) {
-    return { error: "Add your alert WhatsApp number in Business settings first." };
+    return { error: "Add your alert phone in Business settings first." };
   }
 
   const result = await processWalletTopUp({

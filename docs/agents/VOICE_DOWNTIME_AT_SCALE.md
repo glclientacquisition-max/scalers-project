@@ -42,7 +42,7 @@ STT and TTS are alive. Keep the line open. The same receptionist asks for a name
 - EN: `Okay, I can't finish that just now. May I have your name so I can reach them?`
 - SW: `Sawa, siwezi kumaliza hiyo sasa hivi. Niambie jina lako ndio niwasiliane nao.`
 
-After a name: `Okay, I have your name. I'll have the team reach you.` Do not promise a booking.
+After a name, including on the same turn that reasoning failed: `Okay, I have your name. I'll have the team reach you.` Do not promise a booking. Do not ask for the name again if they already said it.
 
 ## Telephony down: bridge playbook
 

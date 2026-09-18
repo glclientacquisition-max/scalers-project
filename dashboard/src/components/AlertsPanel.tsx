@@ -70,7 +70,7 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="owner">
-              SMS phone
+              Alert phone
             </label>
             <input
               id="owner"
@@ -104,7 +104,7 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
           heading={null}
         />
 
-        <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3">
+        <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
           <p className="text-sm font-medium text-ink">Text customers</p>
           <ToolSwitch
             checked={Boolean(notifyChannels.caller_sms)}
@@ -114,7 +114,7 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
             label="Text customers"
           />
         </div>
-        <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-3">
+        <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
           <p className="text-sm font-medium text-ink">Text back missed calls</p>
           <ToolSwitch
             checked={Boolean(notifyChannels.missed_textback)}

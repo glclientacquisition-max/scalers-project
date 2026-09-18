@@ -267,7 +267,7 @@ Optional: `STAGING_DATABASE_URL` for full catalog mode in CI.
 
 | Criterion | What to observe |
 | --- | --- |
-| Naturalness | Prosody, pacing, not robotic |
+| Naturalness | Pass/fail on Voice IDs V1–V9 (fragment TTS, tiny lead-in, hyphen names, punctuation spoken, thinking-ack, idle poke, filler-every-turn, fake volume, barge-then-talk). Not a 1–5 MOS. See `docs/agents/VOICE_NATURALNESS.md`. |
 | Kenyan English clarity | Understandable on mobile |
 | Swahili clarity | Correct language choice and pronunciation |
 | Sheng (if enabled) | Appropriate code-switch, not garbled |

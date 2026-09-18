@@ -4,6 +4,8 @@ These skills sit **beside** Scalers lanes. They do not replace `AGENTS.md`.
 
 Install is a subset of [mattpocock/skills](https://github.com/mattpocock/skills): grill, wayfinder, TDD, code-review, plus the model-invoked helpers they call (grilling, domain-modeling, writing-for-agents, setup).
 
+Desk-only: **desk-motion** (constitution-safe pending / live / land / shift / press). Use it instead of Lottie or Framer Motion.
+
 ## Use with lanes
 
 1. Read `AGENTS.md` and the lane contract first.

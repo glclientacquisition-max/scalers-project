@@ -17,7 +17,7 @@ Scalers uses a **dual migration model**:
 | Table | Columns | Bootstrap source | Historical CREATE provenance |
 | --- | --- | --- | --- |
 | `public.tenants` | 49 | `foundation_bootstrap.sql` | **UNKNOWN** |
-| `public.calls` | 15 | `foundation_bootstrap.sql` | **UNKNOWN** |
+| `public.calls` | 21 | `foundation_bootstrap.sql` | **UNKNOWN** |
 | `public.transcripts` | 6 | `foundation_bootstrap.sql` | **UNKNOWN** |
 
 **Do not use** commit `9153a09` CREATE TABLE as foundation source.
@@ -187,7 +187,13 @@ Every database change merged to `main` must add a row to the **Change registry**
 | LEDGER-PROD-NOTIFY-GRANT | `GRANT UPDATE (notify_channels)` | Desk owner notify persistence | `notify_channels.sql` + `production_pending/grant_notify_channels_update.sql` | Phase 3H A3 | YES (2026-08-15) | YES (2026-08-16) | `20260816180900` | `has_column_privilege` true; wallet UPDATE still false |
 | LEDGER-APPOINTMENTS | `appointments` table + RLS | Home-services bookings | `appointments.sql` | `7af0fcb` (#155) | YES (2026-08-15) | YES (inferred pre-3E) | `20260812083631` | Staging insert smoke |
 | LEDGER-CONTACTS-INSERT | Owner INSERT on `contacts` | Desk add + CSV import | `contacts_owner_insert.sql` | this PR | YES (2026-09-09) | NO | NO | Policy `contacts_insert_member` |
-| LEDGER-SIGNUP-FIX | Drop 1-arg prompt; 2-arg canonical | Fix signup `42725` | `voice_languages.sql`, `did_number_pool.sql` | `f61c11f` (#158) | YES (2026-08-15) | UNKNOWN | NO | Staging signup PASS |
+| LEDGER-REALTIME-INBOX | `supabase_realtime` publication += `calls`, `service_requests`, `appointments` | Live Inbox desk updates | `realtime_inbox.sql` | `bb6bb6c` (#279) | YES (2026-09-16) | YES (2026-09-16) | NO | Staging INSERT+UPDATE probe; production `pg_publication_tables` lists `appointments`, `calls`, `service_requests` |
+| LEDGER-REALTIME-INBOX-REPLICA | `REPLICA IDENTITY FULL` on `calls`, `service_requests`, `appointments` | Filtered hangup UPDATEs reach Live Inbox | `realtime_inbox_replica_identity.sql` | this PR | YES (2026-09-16) | YES (2026-09-16) | NO | `pg_class.relreplident = 'f'` on the three tables |
+| LEDGER-NOTIFY-SENDS | Append-only `notify_sends` | Meter staff/caller SMS vs platform wallet/outage | `notify_send_ledger.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | Table + RLS; `to_regclass` = `notify_sends` |
+| LEDGER-SMS-ALLOWANCE | Included SMS + on-demand stop | Cursor-like cap. Same Wallet toggle as minutes. | `sms_allowance.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | `consume_sms_units` returns `beta` on staging (all tenants `billing_enforcement=off`) |
+| LEDGER-PACKAGE-ENTS | Email + seat included columns | Later packages write these. No gate yet. | `package_entitlements.sql` | `821980a` (#296) | YES (2026-09-17) | NO | NO | Defaults 100 email / 5 seats; no gate |
+| LEDGER-WHATSAPP-THREADS | `whatsapp_threads` + `whatsapp_messages` | Platform two-way WhatsApp persist | `whatsapp_threads.sql` | this PR | YES (2026-09-17) | NO | NO | Service role only. Staging apply `whatsapp_threads`. |
+| LEDGER-LINE-RENTAL-GRACE | Line paid-through + grace | Prerequisite for SMS protect trigger | `line_rental_grace.sql` | prior | YES (2026-09-17) | NO | NO | Staging catch-up; `apply_line_rental` dropped/recreated for new OUT `line_paid_through` |
 
 ### Staging-only / proposed (not in standard Git apply)
 

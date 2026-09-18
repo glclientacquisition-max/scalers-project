@@ -7,13 +7,32 @@ import {
   type PolishCallerNoteState,
   type SendCallerNoteState,
 } from "@/app/(desk)/calls/noteActions";
-import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
 
 const fieldClass =
-  "w-full rounded-lg border border-line bg-white px-2.5 py-2 text-sm outline-none transition duration-150 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:outline-none focus:ring-2 focus:ring-[#0096FF]";
+  `w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent`;
+
+function SmsGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      className={className || "h-4 w-4"}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H9l-4 3.5V6.5Z"
+      />
+    </svg>
+  );
+}
 
 export function CallerNoteComposer({
   callId,
@@ -24,6 +43,7 @@ export function CallerNoteComposer({
   landmark,
   callerSmsOn,
   primary = false,
+  collapsed = false,
 }: {
   callId: string;
   callerPhone: string | null;
@@ -33,7 +53,9 @@ export function CallerNoteComposer({
   landmark?: string | null;
   callerSmsOn: boolean;
   primary?: boolean;
+  collapsed?: boolean;
 }) {
+  const [open, setOpen] = useState(!collapsed);
   const [note, setNote] = useState("");
   const [polishState, polishAction, polishPending] = useActionState(
     polishCallerNoteAction,
@@ -51,9 +73,32 @@ export function CallerNoteComposer({
   const canSend = callerSmsOn && Boolean(callerPhone) && note.trim().length > 0;
   if (!callerSmsOn) return null;
 
+  if (collapsed && !open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={primary ? `${btnPrimary} w-full gap-2` : `${btnGhost} w-full gap-2`}
+      >
+        <SmsGlyph />
+        Send SMS
+      </button>
+    );
+  }
+
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">SMS</p>
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className={`text-xs font-medium text-ink-soft ${deskShiftClass} hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+        >
+          Hide SMS
+        </button>
+      ) : (
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">SMS</p>
+      )}
       <form action={polishAction}>
         <input type="hidden" name="caller_name" value={callerName || ""} />
         <input type="hidden" name="service" value={service || ""} />
@@ -71,7 +116,7 @@ export function CallerNoteComposer({
           <button
             type="submit"
             disabled={polishPending || !note.trim()}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-medium text-ink-soft transition duration-150 hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] disabled:opacity-50"
+            className={`inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-medium text-ink-soft ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50`}
           >
             Polish
           </button>

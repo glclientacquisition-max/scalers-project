@@ -6,8 +6,10 @@ import { isAuthenticated } from "@/lib/auth";
 import {
   planContactCsv,
   planManualContact,
+  parseDialableContactPhone,
   type ContactCsvPlan,
 } from "@/lib/contactImport";
+import { storedPhoneCandidates } from "@/lib/handoffMode";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
 
@@ -54,13 +56,49 @@ async function existingIdForPhone(
   tenantId: string,
   phone: string
 ): Promise<string | null> {
+  const phones = storedPhoneCandidates(phone);
+  if (!phones.length) return null;
   const { data } = await client
     .from("contacts")
     .select("id")
     .eq("tenant_id", tenantId)
-    .eq("phone", phone)
+    .in("phone", phones)
+    .order("phone", { ascending: true })
+    .limit(1)
     .maybeSingle();
   return data?.id || null;
+}
+
+export async function ensureInboxContact(input: {
+  phone?: string | null;
+  name?: string | null;
+}): Promise<CreateContactResult & { stub?: boolean }> {
+  const ctx = await loadWorkspace();
+  if (!ctx) return { error: "Not signed in." };
+
+  const phoneRaw = String(input.phone || "").trim();
+  if (!phoneRaw || phoneRaw.toLowerCase() === "unknown") {
+    return { stub: true, error: "No phone." };
+  }
+
+  const existingId = await existingIdForPhone(
+    ctx.workspace.client,
+    ctx.tenant.id,
+    phoneRaw
+  );
+  if (existingId) return { ok: true, id: existingId, existingId };
+
+  const parsed = parseDialableContactPhone(phoneRaw);
+  if (!parsed.ok) return { stub: true, error: parsed.error };
+
+  const fd = new FormData();
+  fd.set("phone", parsed.phone);
+  if (input.name) fd.set("name", String(input.name));
+  const created = await createContact(fd);
+  if (created.existingId) {
+    return { ok: true, id: created.existingId, existingId: created.existingId };
+  }
+  return created;
 }
 
 export async function updateContactNotes(
@@ -171,13 +209,15 @@ export async function previewContactCsv(
   if (!phonesProbe.ok) return { error: phonesProbe.error };
 
   const phones = [
-    ...new Set([
-      ...phonesProbe.create.map((row) => row.phone),
-      ...phonesProbe.skipped.map((row) => row.phone),
-      ...phonesProbe.rejected
-        .map((row) => row.phone)
-        .filter((phone): phone is string => Boolean(phone && phone.startsWith("+"))),
-    ]),
+    ...new Set(
+      [
+        ...phonesProbe.create.map((row) => row.phone),
+        ...phonesProbe.skipped.map((row) => row.phone),
+        ...phonesProbe.rejected
+          .map((row) => row.phone)
+          .filter((phone): phone is string => Boolean(phone && phone.startsWith("+"))),
+      ].flatMap((phone) => storedPhoneCandidates(phone))
+    ),
   ];
   const existingByPhone: Record<string, string> = {};
   if (phones.length) {
@@ -188,7 +228,10 @@ export async function previewContactCsv(
       .in("phone", phones);
     if (error) return { error: contactsWriteError(error.message) };
     for (const row of data || []) {
-      if (row.phone) existingByPhone[row.phone] = row.id;
+      if (!row.phone) continue;
+      for (const key of storedPhoneCandidates(row.phone)) {
+        existingByPhone[key] = row.id;
+      }
     }
   }
 

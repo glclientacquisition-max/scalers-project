@@ -8,6 +8,79 @@ Do not crank TTS speed. Speech-guarantee on ANSWER (`I can't finish that just no
 
 ---
 
+# Naturalness eval — how we will score roboticness (2026-09-16)
+
+Owner ask: evaluate naturalness and eliminate roboticness.
+
+**Method (do not retune first):** freeze staging `/healthz` `gitSha` + `voiceProfile`, run three scripted DID calls (phatic, barge, pace), score Voice IDs V1–V9 as pass/fail from recording + transcript + `spoken=` logs. Isolated TTS WAVs are a different test (`tts:listen-harness`).
+
+Protocol + freeze knobs + historical SIDs: [`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js`.
+
+Staging freeze knobs: `VOICE_PROFILE=balanced`, speed 1.0, gain 1.38, live transfer off, DID `+254709221536`. N1/N2 on SHA `abf6aa9` (`main` `#281`, 05:01Z). N3 on SHA `2c8fb51` (`main` `#282` desk Alerts, 05:18Z). Voice knobs did not move. Cutover from `23debf0`. Do not change speed or gain.
+
+## Freeze call N1 — `HD_d0f042f5d960` (2026-09-16 05:06Z)
+
+123s. Caller `+254790381872`. SHA `abf6aa9`. Recording URL empty; score from listen + desk transcript + `spoken=`.
+
+| ID | Result | Evidence |
+| --- | --- | --- |
+| V1 | pass | Sentence-only flush. Greeting one stream. |
+| V2 | pass | Filler cache warmup used `silent: true`. Thinking-ack `Mm-hmm.` cancelled when reply audio arrived. |
+| V3 | pass | `spoken="Thank you, Alvin."` not `Al-vin`. |
+| V4 | pass | `10 A M` is the AM spoken form, not a hyphen leak. |
+| V5 | **fail** | Caller closer `Okay.` matched `looksLikePhaticCallerTurn`. Local line `I'm well. Who is calling?` at 242 ms. NBA was already `END`. |
+| V6 | pass | No `idle_nudge`. |
+| V7 | pass | `filler=1` on one turn only. |
+| V8 | n/a | No slower/louder ask (that is N3). |
+| V9 | pass | `At 10:00 AM` barged TTS (`outcome=barge_in`). No `I'm listening.` |
+
+Brain notes (do not retune Voice for these): shared-line card asked who is calling on how-are-you; `Alvin.` hit speech-guarantee `Okay, I can't finish that just now. May I have your name so I can reach them?`; visit saved as carpet / Thursday 10 AM.
+
+Voice next: stop treating bare `Okay` as how-are-you. N3 reproduced the same V5 miss three times.
+
+## Freeze call N2 — `HD_b4cb560bae33` (2026-09-16 05:11Z)
+
+166s. Same SHA `abf6aa9`. Script was barge+wait then pet stain Thursday 10. STT first turn was `Sorry. Pet stain removal.` No `wait` token. Barge still fired later on overlap.
+
+| ID | Result | Evidence |
+| --- | --- | --- |
+| V1 | pass | Sentence chunks, no fragment restart. |
+| V2 | pass | No solo `Sure.` / `I'm listening.` |
+| V3 | pass | `Alvin` in `spoken=`. |
+| V4 | pass | `10 A M` spoken form only. |
+| V5 | pass | Closer `No.` skipped as non-substantive. No how-are-you replay. |
+| V6 | pass | No idle poke. |
+| V7 | pass | `filler=1` on thinking-ack / one barge, not every turn. |
+| V8 | n/a | N3. |
+| V9 | pass (barge) / incomplete (wait) | Multiple `outcome=barge_in`, streamed reply discarded, stale TTS 400 ignored. `wait` never reached STT. |
+| Speech guarantee | **fail** | After `Yeah, I'm Alvin.` Gemini emitted 0 spoken chars (`save_caller_info` succeeded). Voice spoke `Okay, I can't finish that just now. May I have your name so I can reach them?` on `action=ANSWER`. Caller then asked why. Same canned line as N1. |
+
+Brain notes: shared-line identity loop; catalogue recitation on `Aside from carpet cleaning`; landmark saved as `SaidI`.
+
+## Freeze call N3 — `HD_391a57aae9e9` (2026-09-16 05:20Z)
+
+80s, complete. SHA `2c8fb51` (`#282` desk Alerts). Voice knobs still balanced / 1.0 / 1.38 / live transfer off. Recording URL empty; score from listen + desk transcript + `spoken=` / speed-scale logs. Filler warmup used `silent: true`.
+
+Script: couch price, then slower, then slower again, then normal speed.
+
+| ID | Result | Evidence |
+| --- | --- | --- |
+| V1 | pass | Sentence chunks. Price + name-ask in one stream. No fragment restart. |
+| V2 | pass | Thinking-ack `Alright.` cancelled when reply PCM arrived. Warmup `Mm-hmm.` / `Sawa.` / `Poa.` were `silent: true`. |
+| V3 | pass | No hyphenated given name in `spoken=`. |
+| V4 | pass | Desk text `Couch cleaning is Ksh 600 per seat.` Wire `spoken="Couch cleaning is six hundred shillings per seat."` |
+| V5 | **fail** ×3 | Closer `Okay.` three times. Each hit `phatic local reply` `I'm well. Who is calling?` at `first_pcm_ms` 210 / 207 / 301. NBA was `ASK_CLARIFICATION` (shared-line name), not how-are-you. |
+| V6 | pass | No `idle_nudge`. |
+| V7 | pass | `filler=1` on the price turn only. |
+| V8 | **pass** | `caller speed request=slower scale=0.85` then `0.7`. Wire `speed=0.85 (scale=0.85)` / `speed=0.7 (scale=0.7)`. `normal speed` → `request=reset scale=1` / `speed=1`. Model said it would speak slower; the wire actually changed. No `...`. No volume claim. |
+| V9 | pass | Second slower ask barged the first slow line (`outcome=barge_in`). No `I'm listening.` |
+
+Brain notes (do not retune Voice): shared-line card kept `ASK_CLARIFICATION` / “who is speaking” on every turn after the price, including the speed requests. Caller `Who are you?` got `I am Shy from Done and Dusted Cleaning Services. May I please know who is speaking?`
+
+**Freeze verdict:** do not crank `VOICE_PROFILE` / speed / gain. Next Voice PR is V5 (`looksLikePhaticCallerTurn` must not match bare `Okay` / `ok`). Later Voice ticket: speech-guarantee must not speak the reach-them name-ask on `ANSWER` when Gemini emitted 0 chars (N1/N2).
+
+---
+
 # Transcript verification — last-call residuals (2026-09-14)
 
 Owner ask: verify the punctuation / figure / currency fixes against the last transcript.

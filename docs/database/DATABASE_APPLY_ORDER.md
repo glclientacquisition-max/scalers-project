@@ -108,6 +108,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 18 | `lead_status.sql` | `owner_rls.sql`; **drops/recreates `calls_update_member` policy** |
 | 19 | `lead_status_archive.sql` | `lead_status.sql` |
 | 20 | `call_resolution.sql` | `lead_status.sql` |
+| 20b | `inbox_triage.sql` | `call_resolution.sql` | Owner inbox triage columns + expanded `calls` UPDATE grant. Apply after 13c / step 20. |
 
 ---
 
@@ -131,7 +132,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 25 | `wallet_security_beta.sql` | `one_wallet_billing.sql` | **`tenants_protect_wallet_columns()` v2**; column grants; RPC locks |
 | 26 | `fix_charge_call_wallet_ambiguous.sql` | `one_wallet_billing.sql` | RPC body fix |
 | 27 | `wallet_soft_spend_limit.sql` | `wallet_security_beta.sql` | **`tenants_protect_wallet_columns()` v3** |
-| 28 | `wallet_on_demand_alerts.sql` | wallet security chain | **`tenants_protect_wallet_columns()` final**; alert RPCs |
+| 28 | `wallet_on_demand_alerts.sql` | wallet security chain | **`tenants_protect_wallet_columns()` v4**; alert RPCs |
 
 **Blocker:** Wrong wallet order breaks RPC signatures and grants.
 
@@ -154,8 +155,15 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 31b | `contacts_owner_insert.sql` | `contacts_and_requests.sql` |
 | 32 | `product_catalog_and_social.sql` | `business_operating_model.sql` |
 | 33 | `appointments.sql` | **`contacts_and_requests.sql`** (FK to contacts) |
+| 33b | `realtime_inbox.sql` | `contacts_and_requests.sql`, `appointments.sql` |
+| 33c | `realtime_inbox_replica_identity.sql` | `realtime_inbox.sql` |
+| 33d | `notify_send_ledger.sql` | `contacts_and_requests.sql` (`tenants`, `calls`, `current_user_tenant_ids`) |
+| 33e | `sms_allowance.sql` | `notify_send_ledger.sql`, **`line_rental_grace.sql`** (widens protect trigger) |
+| 33f | `package_entitlements.sql` | `sms_allowance.sql` |
+| 33g | `whatsapp_threads.sql` | `notify_send_ledger.sql` |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
+`realtime_inbox.sql` adds the three work tables to `supabase_realtime`. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.
 
 ---
 
@@ -204,7 +212,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | `current_user_tenant_ids()` | onboarding → owner_rls | `owner_rls.sql` | Wrong RLS scope |
 | `default_tenant_llm_prompt()` | 1-arg → 2-arg | `voice_languages.sql` (after DROP 1-arg) | Signup `42725` ambiguity |
 | `handle_new_user_tenant()` | onboarding → voice_languages → did_pool | `did_number_pool.sql` | Signup/DID behavior |
-| `tenants_protect_wallet_columns()` | bootstrap → wallet_security → soft_spend → on_demand | `wallet_on_demand_alerts.sql` | Wallet column exposure |
+| `tenants_protect_wallet_columns()` | bootstrap → wallet_security → soft_spend → on_demand → line_rental → sms_allowance → package_entitlements | `package_entitlements.sql` | Wallet / pack column exposure |
 
 ---
 

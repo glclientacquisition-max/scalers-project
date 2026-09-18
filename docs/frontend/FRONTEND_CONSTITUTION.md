@@ -35,15 +35,15 @@ Cross-referenced. Product rules win when sources disagree.
 | Gestalt: proximity, similarity, common region, continuity | Wertheimer; Carbon spacing overview; Atlassian spacing | Related items sit on the 8px scale (8–12px). Groups use 16–24px. Sections use 32–48px. Tables share one chrome. | Card stacks for the same job as a table |
 | Von Restorff (isolation) | von Restorff 1933 | Only the primary action is saturated blue. Archive/Cancel/Remove stay ghost or icon. | Two blue buttons in one viewport |
 | Serial position / F-pattern | Nielsen Norman Group eyetracking | First line: line status + greeting. First block: work waiting. Metrics after work. | Analytics four-up that does not click into work |
-| Progressive disclosure | Nielsen; Sweller element interactivity | `textarea rows={2}` then expand. Settings panels stay hidden until chosen. | All Train fields on one scroll |
-| Jakob’s law | Nielsen | One Inbox table. Holds and Jobs change columns when that filter is isolated. | Novel card masonry |
+| Progressive disclosure | Nielsen; Sweller element interactivity | `textarea rows={2}` then expand. Settings panels stay hidden until chosen. List preview is one truncated line. Full copy on the record. | All Train fields on one scroll; hangup paragraphs in Inbox Work |
+| Jakob’s law | Nielsen | One Inbox table. Holds and Jobs change columns when that filter is isolated. Chat lists match WhatsApp, Instagram, Messenger, iOS Mail: name plus one ellipsized preview. | Novel card masonry; wrapping summaries in the list |
 | Tesler’s law | Tesler | Complexity stays in compile/save, not in owner copy. | “Train your receptionist in short steps” |
 | Aesthetic-usability | Kurosu & Kashimura 1995; Tractinsky | Calm light canvas, 1px lines, no novelty chrome. | Glassmorphism, Plus Jakarta, orange CTA |
 | Peak-end rule | Kahneman | Empty and error states must still name the next action. | Dead ends and hash links that 404 the intent |
 | Doherty threshold | Doherty & Thadhani 1982 | Pending spinners on mutations. No landing-style rise on desk. | Page-wide animation |
 | Color / contrast | WCAG 2.2 SC 1.4.3, 1.4.11 | Ink `#0A192F` on canvas. Link text `#005CCC`. `#0096FF` on white is **~3.09:1** (fails AA body and `text-sm` button labels). Filled primaries use white on `#005CCC` (~6:1). `#0096FF` is the focus ring, tab underline, and brand wash. Never use `#0096FF` for small links. | Brand-blue body copy; white on `#0096FF` |
 | Touch / Kenya mobile | Apple 44pt; Material 48dp; WCAG 2.5.8 24px | Design for one-thumb morning triage on a mid-range Android. Container `px-4` / `sm:px-6`. | Hover-only actions |
-| Reduced motion | WCAG 2.2 SC 2.3.3 | `prefers-reduced-motion` already kills landing motion. Desk adds no new loops except the existing bulletin ping. | Orbs, drift, blobs on desk |
+| Reduced motion | WCAG 2.2 SC 2.3.3 | `prefers-reduced-motion` kills landing rise/drift, desk live ping, land wash, and the pending spinner. | Orbs, drift, blobs, Lottie, page-wide loops |
 | Situation awareness | Endsley 1995; Klein RPD | Stamps and captions name the **next action** (comprehension). Home units name what is at risk now (projection). | KPI tiles, conversion dashboards, taxonomy chips (Job, Hold) |
 
 ---
@@ -53,8 +53,8 @@ Cross-referenced. Product rules win when sources disagree.
 From `.cursor/rules/scalers-design-ux.mdc`:
 
 1. **Copy:** No fluff, no instructional subheaders, no em/en dashes in UI strings. Labels are verbs or nouns the owner already knows.
-2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side; mobile may stack the same two panes.
-3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted.
+2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side from `lg`; below `lg`, stack the same two panes. One composition at every width. Phone list rows. `md+` tables. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`). List preview is one ellipsized line (`deskPreviewClass`). Full Want / Done / mood / next stay on `/calls/[id]`.
+3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted. Confirm, Done, Call, and WhatsApp use `deskHitClass` (`h-12 w-12`). Label length does not change the hit.
 4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail. Sidebar category titles: `uppercase tracking-wide text-gray-500` (or `text-ink-soft`), no hover, not links.
 5. **Tech:** Tailwind utilities only for layout/chrome. Focus: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`. Container padding `p-4`–`p-6`.
 
@@ -72,7 +72,7 @@ Base unit **8px**, same as IBM Carbon, Atlassian, and Material. Tailwind already
 | Group / cell | 16 | `px-4` / `gap-4` | Table cell padding, form field stack |
 | Block | 24 | `mt-6` / `gap-6` | Title to table, filter to list |
 | Section | 32–40 | `py-8` / `mt-8` | Rare on desk. Prefer 24. |
-| Page frame | 16 / 24 | `px-4 pt-6 sm:px-6 sm:pt-10` | Desk `main` only. Pages do not double-pad. Phone `main` adds `--desk-tabbar-h` plus `safe-area-inset-bottom` so the last row is not under the tab bar. |
+| Page frame | 16 / 24 | `px-4 pt-6 sm:px-6 sm:pt-10` | Desk `main` only. Pages do not double-pad. Phone `main` uses `--desk-tabbar-clearance` (tab bar height plus safe area plus 1.5rem) so the last control is not under the tab bar. |
 
 **Proximity rule:** If two controls complete one task, they sit ≤16px apart (Fitts + docking). If they are different tasks, ≥24px.
 
@@ -106,6 +106,7 @@ No Plus Jakarta Sans. No third family. No purple.
 | Control | Minimum |
 | --- | --- |
 | Primary CTA | `min-h-11` (44px), full width on mobile when it is the page task |
+| List dock verb | `deskHitClass` / `btnDock`: `h-12 w-12` (48px). Confirm, Done, Call, and WhatsApp. Label length does not change the hit. Floor stays 44px. |
 | Filter tab | `min-h-11`, `px-3` |
 | Text input | `min-h-11`, `focus:ring-2 focus:ring-[#0096FF]` |
 | Icon-only (Done, Archive) | `h-8 w-8` (32px) with ≥8px gap to neighbors |
@@ -115,7 +116,7 @@ No Plus Jakarta Sans. No third family. No purple.
 
 ## 6. Information architecture
 
-Keep URLs. Nav is Overview, Inbox, Contacts, Business Profile, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product.
+Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product. The `/settings` page identity is Business Profile.
 
 | Route | Job | Layout |
 | --- | --- | --- |
@@ -137,9 +138,9 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business Profile, Wallet. `/request
 ## 7. Copy voice
 
 - Scan, do not educate.
-- Prefer Confirm, Save, Reply on WhatsApp. Lists have no Open, Call, or View column. Tap the row to open the record.
+- Prefer Confirm, Save, Reply on WhatsApp. Lists have no Open or View column. Tap the row to open the record. Call is a muted handset in the Action dock, not its own column.
 - Stamps name the next action in the workspace niche: Confirm visit, Pickup, Confirm booking, Human asked, Missed.
-- Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday).
+- Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday). Work is one truncated line, never the hangup paragraph.
 - Ban: em dash, en dash, “How to test” as a story, “Coming soon” filler.
 - WhatsApp prefill is owner-facing: no dashes.
 
@@ -151,8 +152,8 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business Profile, Wallet. `/request
 - Sign out stays in the header. It is never a sixth tab.
 - Do not add a left desk rail. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.
-- Desk motion: pending spinner, existing bulletin ping.
-- Landing may keep rise/drift behind `prefers-reduced-motion`.
+- Desk motion verbs: **pending** (spinner on the control), **live** (ping on a Live stamp and the Home bulletin), **land** (one-shot wash on a row that just appeared), **shift** (named-property 150ms on hover and selected), **press** (`active:scale-[0.99]` on `btnPrimary`). Skill: `.cursor/skills/desk-motion/SKILL.md`. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
+- Landing may keep rise/drift behind `prefers-reduced-motion`. Desk never uses `.landing-rise`.
 - No glass on desk. Header and tab bar may keep light `backdrop-blur`.
 - Radius: `rounded-xl` / `rounded-2xl` / `rounded-panel`. Not pill-everything.
 

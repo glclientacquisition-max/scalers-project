@@ -10,9 +10,9 @@ import {
   type FaqApplyState,
   type FaqSuggestState,
 } from "@/app/(desk)/calls/faqActions";
+import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 
-const fieldClass =
-  "mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent focus-visible:shadow-focus";
+const fieldClass = `mt-1 ${deskFieldClass}`;
 
 const suggestInitial: FaqSuggestState = {};
 const applyInitial: FaqApplyState = {};
@@ -136,9 +136,9 @@ export function CallFaqSuggestions({
             aria-describedby={
               !hasTranscript ? "call-faq-no-transcript" : "call-faq-help"
             }
-            className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+            className={btnPrimary}
           >
-            {suggestPending ? "Looking through the call…" : "Find FAQ ideas"}
+            {suggestPending ? "Looking through the call" : "Find FAQ ideas"}
           </button>
           {!hasTranscript ? (
             <p
@@ -168,7 +168,7 @@ export function CallFaqSuggestions({
           <button
             type="button"
             onClick={() => setItems(null)}
-            className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink-soft)]"
+            className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-sm text-[var(--ink-soft)]"
           >
             Back
           </button>
@@ -201,7 +201,7 @@ export function CallFaqSuggestions({
               return (
                 <li
                   key={`faq-idea-${index}`}
-                  className="rounded-xl border border-[var(--line)] bg-white px-3 py-3"
+                  className="rounded-xl border border-[var(--line)] bg-surface px-3 py-3"
                 >
                   <div className="flex gap-3">
                     <input
@@ -292,7 +292,7 @@ export function CallFaqSuggestions({
               type="submit"
               disabled={applyPending || selectedReady === 0}
               aria-describedby="call-faq-add-help"
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+              className={btnPrimary}
             >
               {applyPending
                 ? "Adding…"
@@ -304,7 +304,7 @@ export function CallFaqSuggestions({
               type="button"
               disabled={applyPending}
               onClick={() => setItems(null)}
-              className="rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--ink-soft)]"
+              className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-sm text-[var(--ink-soft)]"
             >
               Start over
             </button>

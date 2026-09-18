@@ -7,6 +7,8 @@
 
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
+const { missedTextbackBody } = require('./templates');
+const { beginInstanceSend, claimTenantSms, recordNotifySend, releaseInstanceFlight } = require('./sendLedger');
 
 const TEXTBACK_META_KEY = 'missed_textback_at';
 
@@ -15,17 +17,6 @@ const SUPPRESS_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 function missedTextbackEnabled(channels) {
   return parseNotifyChannels(channels).missed_textback === true;
-}
-
-/**
- * One fixed template. No reply invite: inbound SMS has no route back to the
- * desk, so the only promise made is the callback, which the Inbox "Missed"
- * queue already surfaces to the owner.
- */
-function missedTextbackBody(businessName) {
-  const business = String(businessName || '').trim();
-  const who = business ? `${business} here` : 'the business you called';
-  return `Hi, ${who}. Sorry we missed your call. We will call you back.`;
 }
 
 function parseMeta(summary) {
@@ -73,13 +64,36 @@ function recentlyTexted(rows, nowMs = Date.now()) {
   });
 }
 
-async function sendMissedTextback({ to, businessName } = {}) {
+async function sendMissedTextback({ to, businessName, ledger } = {}) {
   if (!isSmsConfigured()) return { channel: null, reason: 'sms_not_configured' };
   const dest = normalizeSmsTo(to);
   if (!dest) return { channel: null, reason: 'no_caller_phone' };
   const body = missedTextbackBody(businessName);
-  const result = await sendSms({ to: dest, body });
-  return { channel: 'sms', to: dest, result, body };
+  const gate = await beginInstanceSend({ ...ledger, kind: 'missed_textback' }, dest);
+  if (!gate.ok) {
+    return { channel: null, reason: gate.reason };
+  }
+  try {
+    const claim = await claimTenantSms({ ...ledger, kind: 'missed_textback' }, body);
+    if (!claim.allowed) {
+      return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
+    }
+    const result = await sendSms({ to: dest, body });
+    await recordNotifySend({
+      tenantId: ledger?.tenantId,
+      callId: ledger?.callId,
+      callSid: ledger?.callSid,
+      kind: 'missed_textback',
+      channel: 'sms',
+      to: dest,
+      body,
+      providerMessageId: result?.messageId || null,
+      overage: Boolean(claim.overage),
+    });
+    return { channel: 'sms', to: dest, result, body };
+  } finally {
+    releaseInstanceFlight(gate.key);
+  }
 }
 
 module.exports = {

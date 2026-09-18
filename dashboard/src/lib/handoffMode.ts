@@ -39,6 +39,30 @@ export function normalizeStoredPhone(raw: unknown): string | null {
   return normalizeKenyaE164(trimmed) || trimmed;
 }
 
+/** Stable join key so +254… and 254… match until dirty rows are backfilled. */
+export function storedPhoneJoinKey(raw: unknown): string | null {
+  return normalizeKenyaE164(raw) || normalizeStoredPhone(raw);
+}
+
+/**
+ * Query/lookup variants for one Kenya mobile. Write path still stores E.164.
+ * Includes the national 254 form so old dirty rows still join.
+ */
+export function storedPhoneCandidates(raw: unknown): string[] {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const e164 = normalizeKenyaE164(trimmed);
+  const stored = normalizeStoredPhone(trimmed);
+  for (const phone of [trimmed, stored, e164, e164 ? e164.slice(1) : null]) {
+    if (!phone || seen.has(phone)) continue;
+    seen.add(phone);
+    out.push(phone);
+  }
+  return out;
+}
+
 export function teamHasDialablePhone(
   team: Array<{ phone?: string | null }> | null | undefined
 ): boolean {

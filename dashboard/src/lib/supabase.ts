@@ -48,6 +48,12 @@ export type CallRow = {
   resolution?: CallResolution | null;
   primary_intent?: string | null;
   resolution_note?: string | null;
+  inbox_read_at?: string | null;
+  inbox_muted?: boolean | null;
+  inbox_pinned_at?: string | null;
+  inbox_assignee?: string | null;
+  inbox_labels?: string[] | null;
+  inbox_snoozed_until?: string | null;
 };
 
 export function parseLeadStatus(raw: unknown): LeadStatus {
@@ -112,6 +118,9 @@ export type TeamDirectoryEntry = {
   role: string;
   phone: string;
   email?: string;
+  receives_escalation?: boolean;
+  receives_inbox?: boolean;
+  receives_ops?: boolean;
 };
 
 export type FaqEntry = {
@@ -231,8 +240,12 @@ export type TenantRow = {
   /** Owner opt-in monthly soft spend budget (warn only). */
   soft_spend_limit_enabled?: boolean | null;
   soft_spend_limit_kes?: number | null;
-  /** Owner opt-in: continue charging after prepaid hits zero. */
+  /** Owner opt-in: continue charging after prepaid hits zero. Same toggle covers included SMS. */
   on_demand_usage_enabled?: boolean | null;
+  /** Included tenant SMS segments. Default 200. */
+  sms_included_units?: number | null;
+  /** Consumed tenant SMS segments. */
+  sms_used_units?: number | null;
   /** @deprecated Prefer wallet_balance_kes */
   telecom_wallet_balance_kes?: number | null;
   /** @deprecated AI bundled into wallet_balance_kes */

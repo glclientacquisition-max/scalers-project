@@ -16,20 +16,32 @@
   --card: #ffffff;
   --accent: #0096ff;
   --accent-deep: #005ccc;
+  --accent-deep-hover: #004a99;
   --accent-soft: #eaf6ff;
+  --accent-fill: #005ccc;
+  --accent-fill-hover: #004aad;
+  --accent-fill-active: #003d99;
+  --accent-on-fill: #ffffff;
   --warn: #c2410c;
   --warn-soft: #fdf3ec;
+  --warn-deep: #9a3209;
   --ok: #15803d;
   --ok-soft: #eaf6f0;
   --lead: #b98a1f;
   --whatsapp: #25d366;
+  --whatsapp-deep: #128c7e;
+  --bubble-caller: #d9f4e2;
+  --bubble-caller-ink: #2f6b3a;
+  --sms: #0284c7;
+  --email: #005ccc;
 
   --background: var(--bg);
   --foreground: var(--ink);
 
   /* Desk sticky chrome. Keep settings sticky below the header. Phone tab bar is 0 from md. */
   --desk-header-h: 3.5rem;
-  --desk-tabbar-h: 3.25rem;
+  --desk-tabbar-h: 4rem;
+  --desk-tabbar-clearance: calc(var(--desk-tabbar-h) + env(safe-area-inset-bottom, 0px) + 1.5rem);
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -39,6 +51,140 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
   --tap-min: 2.75rem;
+
+  /* Desk motion verbs. Canon: MASTER.md Motion. Skill: desk-motion. */
+  --motion-fast: 150ms;
+  --motion-land: 900ms;
+  --motion-live: 1.4s;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Dark desk palette. Scoped to .desk-theme (the owner desk); marketing, auth,
+ * onboarding, and admin stay light. Activation: <html data-theme="dark">, or
+ * system dark with no explicit choice. The two blocks must stay in sync.
+ */
+:root[data-theme="dark"] .desk-theme {
+  --bg: #0a1420;
+  --bg-deep: #0e1a2a;
+  --ink: #e9eff7;
+  --ink-soft: #9dafc6;
+  --line: #24374f;
+  --card: #122236;
+  --accent: #2aa8ff;
+  --accent-deep: #6bc2ff;
+  --accent-deep-hover: #a8daff;
+  --accent-soft: #0e2438;
+  --accent-fill: #1f9fff;
+  --accent-fill-hover: #4db4ff;
+  --accent-fill-active: #0096ff;
+  --accent-on-fill: #062033;
+  --warn: #f4955a;
+  --warn-soft: #2b1a12;
+  --warn-deep: #fdba74;
+  --ok: #4ade80;
+  --ok-soft: #122a1c;
+  --lead: #d9a62e;
+  --whatsapp-deep: #25d366;
+  --bubble-caller: #14321f;
+  --bubble-caller-ink: #7fe3a5;
+  --sms: #38bdf8;
+  --email: #6bc2ff;
+  --brand-ink: #e9eff7;
+  --tw-ring-offset-color: var(--card);
+  color-scheme: dark;
+  background:
+    radial-gradient(1100px 520px at 0% -10%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, transparent 55%),
+    var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desk-theme {
+    --bg: #0a1420;
+    --bg-deep: #0e1a2a;
+    --ink: #e9eff7;
+    --ink-soft: #9dafc6;
+    --line: #24374f;
+    --card: #122236;
+    --accent: #2aa8ff;
+    --accent-deep: #6bc2ff;
+    --accent-deep-hover: #a8daff;
+    --accent-soft: #0e2438;
+    --accent-fill: #1f9fff;
+    --accent-fill-hover: #4db4ff;
+    --accent-fill-active: #0096ff;
+    --accent-on-fill: #062033;
+    --warn: #f4955a;
+    --warn-soft: #2b1a12;
+    --warn-deep: #fdba74;
+    --ok: #4ade80;
+    --ok-soft: #122a1c;
+    --lead: #d9a62e;
+    --whatsapp-deep: #25d366;
+    --bubble-caller: #14321f;
+    --bubble-caller-ink: #7fe3a5;
+    --sms: #38bdf8;
+    --email: #6bc2ff;
+    --brand-ink: #e9eff7;
+    --tw-ring-offset-color: var(--card);
+    color-scheme: dark;
+    background:
+      radial-gradient(1100px 520px at 0% -10%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, transparent 55%),
+      var(--bg);
+  }
+}
+
+:root[data-theme="dark"] .desk-theme ::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desk-theme ::selection {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--ink);
+  }
+}
+
+/*
+ * Body sits outside .desk-theme, so its `color` is computed from :root --ink
+ * (navy). Fields that only set a background then inherit that navy onto a dark
+ * card. Recompute ink on the desk shell, and pin form controls so typed text,
+ * carets, and autofill never disappear.
+ */
+.desk-theme {
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+
+.desk-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+.desk-theme textarea,
+.desk-theme select {
+  color: var(--ink);
+  caret-color: var(--ink);
+  color-scheme: inherit;
+}
+
+.desk-theme input::placeholder,
+.desk-theme textarea::placeholder {
+  color: color-mix(in srgb, var(--ink-soft) 70%, transparent);
+  opacity: 1;
+}
+
+.desk-theme option {
+  color: var(--ink);
+  background-color: var(--card);
+}
+
+.desk-theme input:-webkit-autofill,
+.desk-theme input:-webkit-autofill:hover,
+.desk-theme input:-webkit-autofill:focus,
+.desk-theme textarea:-webkit-autofill,
+.desk-theme select:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+  box-shadow: 0 0 0 1000px var(--card) inset;
+  border-color: var(--line);
 }
 
 @media (min-width: 640px) {
@@ -50,12 +196,15 @@
 @media (min-width: 768px) {
   :root {
     --desk-tabbar-h: 0px;
+    --desk-tabbar-clearance: 2.5rem;
   }
 }
 
 html {
   max-width: 100%;
   overflow-x: clip;
+  scroll-padding-top: var(--desk-header-h);
+  scroll-padding-bottom: var(--desk-tabbar-clearance);
 }
 
 body {
@@ -66,6 +215,7 @@ body {
     var(--bg);
   font-family: var(--font-sans), ui-sans-serif, sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
   max-width: 100%;
   overflow-x: clip;
 }
@@ -128,9 +278,51 @@ h3,
   animation: landing-drift 18s ease-in-out alternate infinite;
 }
 
+@keyframes desk-live-ping {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes desk-land-fade {
+  0%,
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.desk-live-ping {
+  animation: desk-live-ping var(--motion-live) cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.desk-just-landed {
+  position: relative;
+}
+
+.desk-just-landed::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+  animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-rise,
-  .landing-drift {
+  .landing-drift,
+  .desk-live-ping,
+  .desk-just-landed::after {
     animation: none;
+  }
+
+  .desk-shift {
+    transition: none;
   }
 }

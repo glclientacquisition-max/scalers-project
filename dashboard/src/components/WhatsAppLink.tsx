@@ -1,9 +1,9 @@
 /**
- * WhatsApp Bridge — 1-click follow-up while automated Meta messaging is pending.
- * Renders the caller number with a green WhatsApp deep link (https://wa.me/<digits>).
+ * WhatsApp follow-up to the caller from the owner's personal chat (wa.me).
+ * Not Scalers staff alerts. Those go out as Meta utility templates.
  */
 
-import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskHitClass, deskShiftClass } from "@/components/ui/deskChrome";
 
 export function waMeHref(rawNumber: string, message?: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
@@ -61,8 +61,8 @@ export function WhatsAppLink({
         title="WhatsApp"
         aria-label={`WhatsApp ${number}`}
         className={[
-          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-whatsapp text-white",
-          "transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2",
+          `${deskHitClass} border border-whatsapp bg-whatsapp text-white`,
+          `${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
           className,
         ].join(" ")}
       >
@@ -79,8 +79,8 @@ export function WhatsAppLink({
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
         className={[
-          "inline-flex min-h-11 items-center justify-center text-sm font-semibold text-[#005CCC] hover:underline",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]",
+          "inline-flex min-h-11 items-center justify-center text-sm font-semibold text-accent-deep hover:underline",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
           className,
         ].join(" ")}
       >
@@ -98,7 +98,7 @@ export function WhatsAppLink({
         aria-label={`WhatsApp ${number}`}
         className={[btnPrimary, "gap-2", className].join(" ")}
       >
-        <WhatsAppIcon className="h-4 w-4 text-white" />
+        <WhatsAppIcon className="h-4 w-4 text-accent-on-fill" />
         {label || "WhatsApp"}
       </a>
     );
@@ -127,7 +127,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
       >
         <WhatsAppIcon className="h-4 w-4" />
       </a>
@@ -143,7 +143,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]"
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
       >
         <WhatsAppIcon className="h-3.5 w-3.5" />
       </a>

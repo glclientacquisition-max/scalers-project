@@ -74,7 +74,10 @@ const {
   recordActionResults,
   formatBrainStateForPrompt,
 } = require('./src/conversation/brainState');
-const { attachCallerMemory } = require('./src/conversation/callerMemory');
+const {
+  attachCallerMemory,
+  liveCallerFileStamp,
+} = require('./src/conversation/callerMemory');
 const { extractConversationEntities } = require('./src/conversation/entityExtraction');
 const { collectKnownCallerNames } = require('./src/conversation/callerNameMatch');
 const {
@@ -144,13 +147,13 @@ const {
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
-  looksLikeCallerName,
   shouldSkipCallerTurn,
   shouldSpeakThinkingAck,
   looksLikePhaticCallerTurn,
   pickPhaticReply,
   polishSpokenReply,
 } = require('./src/conversation/dynamicSpeech');
+const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
   adaptiveFlushMs,
@@ -169,6 +172,13 @@ const { createVoiceTurnTiming, createCallTranscript } = require('./src/speech/vo
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
+  isWhatsAppEventKind,
+  processWhatsAppReceived,
+  platformPhoneNumberId,
+  PLATFORM_SAUTIKIT_NUMBER_ID,
+  PLATFORM_WHATSAPP_E164,
+} = require('./src/sautikit/whatsappInbound');
+const {
   consumeLiveTransferWebhook,
   queuePendingLiveTransfer,
   hasPendingLiveTransfer,
@@ -180,13 +190,17 @@ const {
   summarizeBody,
   createWsPayloadSampler,
 } = require('./src/sautikit/safeLog');
-const { isWhatsAppConfigured } = require('./src/notifications/whatsapp');
+const { isWhatsAppConfigured, sendOwnerWhatsApp, markWhatsAppRead, normalizeWhatsAppTo } = require('./src/notifications/whatsapp');
 const {
   ownerLeadEvent,
   renderEventText,
+  renderEventSubject,
   displayOwnerCallerName,
   shouldSendOwnerLead,
   shouldDeferOwnerLeadForVisit,
+  staffInboxAlreadyNotified,
+  serviceRequestEvent,
+  appointmentEvent,
 } = require('./src/notifications/events');
 const {
   dispatchCallerSms,
@@ -219,12 +233,15 @@ function callDeskUrl(callId) {
   return `${deskBaseUrl()}/calls/${encodeURIComponent(id)}`;
 }
 const {
-  dispatchAlert,
   dispatchEscalationAlert,
   whatsAppSenderReady,
   emailFallbackReady,
   smsSenderReady,
 } = require('./src/notifications/dispatch');
+const {
+  staffRecipients,
+  dispatchToStaff,
+} = require('./src/notifications/recipients');
 const {
   probeSmsCredentials,
   getSmsStatus,
@@ -813,10 +830,12 @@ async function maybeSendMissedTextback({ callSid, call }) {
   try {
     let businessName = process.env.BUSINESS_NAME || null;
     let notifyChannels = null;
+    let tenantId = call.tenant_id || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       businessName = profile.businessName || businessName;
       notifyChannels = profile.notifyChannels || null;
+      tenantId = profile.id || tenantId;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for text-back failed:`, err?.message || err);
       return;
@@ -829,7 +848,15 @@ async function maybeSendMissedTextback({ callSid, call }) {
       sinceIso: new Date(Date.now() - SUPPRESS_WINDOW_MS).toISOString(),
     });
     if (recentlyTexted(recent)) return;
-    const sent = await sendMissedTextback({ to: call.from_number, businessName });
+    const sent = await sendMissedTextback({
+      to: call.from_number,
+      businessName,
+      ledger: {
+        tenantId,
+        callId: call.id || null,
+        callSid,
+      },
+    });
     if (!sent.channel) return;
     await db.mergeCallSummaryMeta({
       callSid,
@@ -964,9 +991,68 @@ async function handleVoiceIncoming(req, res) {
   }
 }
 
-app.post('/', sautikitWebhookGuard, handleVoiceIncoming);
+async function handleWhatsAppWebhook(req, res) {
+  res.sendStatus(200);
+  try {
+    const body = req.body || {};
+    const data = body.data && typeof body.data === 'object' ? body.data : null;
+    console.log('[whatsapp/events] payload', {
+      kind: req.headers?.['x-sautikit-event-kind'] || body.kind || null,
+      eventId: req.headers?.['x-sautikit-event-id'] || body.event_id || null,
+      bodyKeys: Object.keys(body),
+      dataKeys: data ? Object.keys(data) : [],
+      hasEntry: Array.isArray(body.entry) || Array.isArray(data?.entry),
+      messagingProduct:
+        body.messaging_product ||
+        body.value?.messaging_product ||
+        data?.messaging_product ||
+        data?.value?.messaging_product ||
+        null,
+      phoneNumberId:
+        body.metadata?.phone_number_id ||
+        body.value?.metadata?.phone_number_id ||
+        data?.metadata?.phone_number_id ||
+        data?.value?.metadata?.phone_number_id ||
+        null,
+    });
+    const result = await processWhatsAppReceived({
+      body,
+      headers: req.headers,
+      persistInbound: (row) => db.persistPlatformWhatsAppInbound(row),
+      persistStatus: (row) => db.persistWhatsAppStatus(row),
+      markRead: (wamid) => markWhatsAppRead(wamid),
+      sendText: async ({ to, body }) => {
+        const json = await sendOwnerWhatsApp({ to, body, windowOpen: true });
+        await db.persistPlatformWhatsAppOutbound({
+          identity: 'platform',
+          phoneNumberId: platformPhoneNumberId(),
+          sautikitNumberId: PLATFORM_SAUTIKIT_NUMBER_ID,
+          e164: PLATFORM_WHATSAPP_E164,
+          contactWaId: normalizeWhatsAppTo(to),
+          wamid: json?.id || json?.wamid || json?.message_id || null,
+          type: 'text',
+          body,
+          payload: json,
+        });
+        return json;
+      },
+    });
+    console.log('[whatsapp/events]', result);
+  } catch (err) {
+    console.error('[whatsapp/events] failed after ACK:', err?.message || err);
+  }
+}
+
+function handleSautikitRootPost(req, res) {
+  if (isWhatsAppEventKind(req)) return handleWhatsAppWebhook(req, res);
+  return handleVoiceIncoming(req, res);
+}
+
+app.post('/', sautikitWebhookGuard, handleSautikitRootPost);
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
+// Workspace WhatsApp inbound (whatsapp.event.received). Do not resolveTenantId(DID).
+app.post('/whatsapp/events', sautikitWebhookGuard, handleWhatsAppWebhook);
 
 function persistLiveTransferAction(callSid, transferXml) {
   if (!callSid || !transferXml?.xml) return;
@@ -1063,6 +1149,9 @@ app.post('/voice/recording-status', sautikitWebhookGuard, async (req, res) => {
 // 2b. SautiKit workspace events — call.completed / recording.ready
 // ---------------------------------------------------------------------------
 app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
+  if (isWhatsAppEventKind(req)) {
+    return handleWhatsAppWebhook(req, res);
+  }
   // Always ACK immediately so SautiKit does not retry (DB work is best-effort).
   res.sendStatus(200);
 
@@ -1829,12 +1918,16 @@ mediaWss.on('connection', (ws, req) => {
         );
       });
     }
-    if (llmRecoveryOffered && looksLikeCallerName(userText)) {
-      const name = String(userText || '').replace(/\s+/g, ' ').trim();
+    const planned = planLlmRecovery({
+      userText,
+      alreadyOffered: llmRecoveryOffered,
+      language: callLanguage,
+    });
+    if (planned.saved && planned.name) {
       try {
         await db.saveCallerInfo({
           callSid: sidLabel(),
-          name,
+          name: planned.name,
           reason: 'Live line could not complete. Team to follow up.',
         });
         maybeSendWhatsAppNotification(sidLabel());
@@ -1844,12 +1937,9 @@ mediaWss.on('connection', (ws, req) => {
           err?.message || err
         );
       }
-      llmRecoveryOffered = true;
-      return pickLlmRecoverySaved({ language: callLanguage });
     }
-    const line = currentLlmRecoveryLine();
     llmRecoveryOffered = true;
-    return line;
+    return planned.spoken;
   }
 
   async function runCallerTurn(userText) {
@@ -1927,6 +2017,7 @@ mediaWss.on('connection', (ws, req) => {
       intent: entityIntent,
       state: previousBrainState,
     });
+    const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
     let brainState = observeCallerTurn(
       previousBrainState,
       {
@@ -1937,6 +2028,9 @@ mediaWss.on('connection', (ws, req) => {
         lastAgentText,
       }
     );
+    if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
+      systemPrompt = buildSystemPrompt(brainProfile);
+    }
     const nextBestAction = determineNextBestAction({ state: brainState, capabilities });
     brainState = setNextBestAction(brainState, nextBestAction);
     callBrainStates.set(callKey, brainState);
@@ -2948,7 +3042,9 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       console.warn(`[${callSid}] tenant lookup for escalation failed:`, err?.message || err);
     }
 
-    const resolved = resolveEscalation(teamDirectory, escalate.teammate);
+    const resolved = resolveEscalation(teamDirectory, escalate.teammate, {
+      ownerPhone: ownerNumber,
+    });
     const teammate = resolved.teammate;
     const callerName =
       displayOwnerCallerName(escalate.name || call.name) || null;
@@ -2986,12 +3082,19 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
 
     const sent = await dispatchEscalationAlert({
       teammatePhone: teammate?.phone || null,
+      teammateEmail: teammate?.email || null,
       ownerPhone: ownerNumber,
       ownerEmail,
       body,
       lead,
       channels: notifyChannels,
-      subject: `Escalation for ${teammateLabel(teammate)}${businessName ? ` — ${businessName}` : ''}`,
+      subject: `Escalation for ${teammateLabel(teammate)}${businessName ? `. ${businessName}` : ''}`,
+      ledger: {
+        tenantId: loadedProfile?.id || call.tenant_id || null,
+        callId: call.id || null,
+        callSid,
+        kind: 'escalation',
+      },
     });
 
     const transferQueued = await maybeQueueLiveTransfer({
@@ -3137,6 +3240,8 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
 
   if (!shouldSendOwnerLead(call)) return;
 
+  if (staffInboxAlreadyNotified(call)) return;
+
   const brain = callBrainStates.get(callSid);
   if (
     shouldDeferOwnerLeadForVisit({
@@ -3157,12 +3262,16 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
     let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
     let businessName = process.env.BUSINESS_NAME || null;
     let notifyChannels = null;
+    let teamDirectory = [];
+    let tenantId = call.tenant_id || null;
     try {
       const profile = await db.getTenantProfile({ callSid });
       ownerNumber = profile.whatsappNumber || ownerNumber;
       ownerEmail = profile.alertEmail || ownerEmail;
       businessName = profile.businessName || businessName;
       notifyChannels = profile.notifyChannels || null;
+      teamDirectory = profile.teamDirectory || [];
+      tenantId = profile.id || tenantId;
     } catch (err) {
       console.warn(`[${callSid}] tenant lookup for notify failed:`, err?.message || err);
     }
@@ -3179,14 +3288,24 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       callerNumber: call.from_number,
       recordingUrl: call.recording_url,
     };
-
-    const result = await dispatchAlert({
-      to: ownerNumber,
-      email: ownerEmail,
+    const inbox = staffRecipients('inbox', {
+      teamDirectory,
+      ownerPhone: ownerNumber,
+      ownerEmail,
+    });
+    const { sent } = await dispatchToStaff({
+      recipients: inbox.recipients,
       body,
       lead,
       channels: notifyChannels,
+      ledger: {
+        tenantId,
+        callId: call.id || null,
+        callSid,
+        kind: 'lead',
+      },
     });
+    const result = sent[0] || { channel: null, reason: inbox.source === 'none' ? 'no_inbox_recipient' : 'send_failed' };
     if (!result.channel) {
       console.warn(`[${callSid}] Owner notify skipped (${result.reason || 'unknown'}). Lead ready:`, {
         name: call.name,
@@ -3195,6 +3314,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
         recording: call.recording_url,
         ownerNumber: ownerNumber || null,
         ownerEmail: ownerEmail || null,
+        inbox: inbox.source,
         smsSender: smsSenderReady(),
         whatsappSender: whatsAppSenderReady(),
         emailFallback: emailFallbackReady(),
@@ -3208,6 +3328,7 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
       patch: {
         owner_notify_body: body,
         owner_notify_channel: result.channel,
+        owner_notify_kind: 'lead',
       },
     });
     console.log(
@@ -3222,19 +3343,23 @@ async function maybeSendWhatsAppNotification(callSid, opts = {}) {
   }
 }
 
-/** Dedicated hold/order/enquiry alert — does not mark lead whatsapp_sent. */
+/** Dedicated hold/order/enquiry alert. Marks the call so hangup does not also send a lead. */
 async function maybeSendServiceRequestNotification(callSid, request) {
   if (!request) return;
   let ownerNumber = process.env.BUSINESS_OWNER_WHATSAPP_NUMBER || null;
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
   let notifyChannels = null;
+  let teamDirectory = [];
+  let tenantId = null;
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
     notifyChannels = profile.notifyChannels || null;
+    teamDirectory = profile.teamDirectory || [];
+    tenantId = profile.id || null;
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for request notify failed:`,
@@ -3242,48 +3367,57 @@ async function maybeSendServiceRequestNotification(callSid, request) {
     );
   }
 
-  const type = String(request.request_type || 'enquiry').toLowerCase();
-  const typeLabel =
-    type === 'hold'
-      ? 'HOLD / PICKUP'
-      : type === 'order'
-        ? 'ORDER'
-        : type === 'callback'
-          ? 'CALLBACK'
-          : 'ENQUIRY';
+  const callRow = await db.getCall(callSid).catch(() => null);
+  const ledger = {
+    tenantId: tenantId || callRow?.tenant_id || null,
+    callId: callRow?.id || null,
+    callSid,
+  };
 
-  const lines = [
-    `${typeLabel} — ${businessName}`,
-    request.item ? `Item: ${request.item}` : null,
-    request.quantity ? `Qty: ${request.quantity}` : null,
-    request.when_text ? `When: ${request.when_text}` : null,
-    request.caller_name ? `Caller: ${request.caller_name}` : null,
-    request.caller_phone ? `Phone: ${request.caller_phone}` : null,
-    request.notes ? `Notes: ${request.notes}` : null,
-    'Open Inbox Holds to mark fulfilled.',
-  ].filter(Boolean);
-
-  const body = lines.join('\n');
+  const event = serviceRequestEvent(request, businessName);
+  const body = renderEventText(event);
   const lead = {
     businessName,
     name: request.caller_name || 'Caller',
-    reason: `${typeLabel}: ${[request.item, request.when_text].filter(Boolean).join(' — ')}`,
+    reason: `${event.title}: ${[request.item, request.when_text].filter(Boolean).join('. ')}`,
     callerNumber: request.caller_phone,
   };
 
-  const result = await dispatchAlert({
-    to: ownerNumber,
-    email: ownerEmail,
+  const inbox = staffRecipients('inbox', {
+    teamDirectory,
+    ownerPhone: ownerNumber,
+    ownerEmail,
+  });
+  const { sent } = await dispatchToStaff({
+    recipients: inbox.recipients,
     body,
     lead,
     channels: notifyChannels,
-    subject: `${typeLabel} — ${businessName}`,
+    subject: renderEventSubject(event),
+    ledger: { ...ledger, kind: 'service_request' },
   });
+  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
-      `[${callSid}] Request notify (${type}) via ${result.channel}` +
+      `[${callSid}] Request notify (${event.title}) via ${result.channel}` +
         (result.to ? ` → ${result.to}` : '')
     );
+    try {
+      await db.markWhatsappSent(callSid);
+      await db.mergeCallSummaryMeta({
+        callSid,
+        patch: {
+          owner_notify_body: body,
+          owner_notify_channel: result.channel,
+          owner_notify_kind: 'service_request',
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `[${callSid}] request notify mark sent failed:`,
+        err?.message || err
+      );
+    }
   } else {
     console.warn(
       `[${callSid}] Request notify skipped (${result.reason || 'unknown'})`
@@ -3296,6 +3430,7 @@ async function maybeSendServiceRequestNotification(callSid, request) {
       to: request.caller_phone,
       event: callerEvent,
       channels: notifyChannels,
+      ledger,
     });
     if (caller.channel) {
       await db.mergeCallSummaryMeta({
@@ -3316,12 +3451,16 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
   let ownerEmail = process.env.OWNER_ALERT_EMAIL || null;
   let businessName = process.env.BUSINESS_NAME || 'your business';
   let notifyChannels = null;
+  let teamDirectory = [];
+  let tenantId = null;
   try {
     const profile = await db.getTenantProfile({ callSid });
     ownerNumber = profile.whatsappNumber || ownerNumber;
     ownerEmail = profile.alertEmail || ownerEmail;
     businessName = profile.businessName || businessName;
     notifyChannels = profile.notifyChannels || null;
+    teamDirectory = profile.teamDirectory || [];
+    tenantId = profile.id || null;
   } catch (err) {
     console.warn(
       `[${callSid}] tenant lookup for appointment notify failed:`,
@@ -3329,49 +3468,41 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
     );
   }
 
-  const status = String(appointment.status || 'requested').toLowerCase();
-  const title =
-    kind === 'updated'
-      ? status === 'cancelled'
-        ? 'VISIT CANCELLED'
-        : 'VISIT UPDATED'
-      : 'VISIT REQUEST';
+  const callRow = await db.getCall(callSid).catch(() => null);
+  const ledger = {
+    tenantId: tenantId || callRow?.tenant_id || null,
+    callId: callRow?.id || null,
+    callSid,
+  };
 
-  const lines = [
-    `${title} — ${businessName}`,
-    appointment.service_name ? `Service: ${appointment.service_name}` : null,
-    appointment.when_text ? `When: ${appointment.when_text}` : null,
-    appointment.address_landmark
-      ? `Where: ${appointment.address_landmark}`
-      : null,
-    appointment.caller_name ? `Caller: ${appointment.caller_name}` : null,
-    appointment.caller_phone ? `Phone: ${appointment.caller_phone}` : null,
-    appointment.notes ? `Notes: ${appointment.notes}` : null,
-    `Status: ${status}`,
-    'Open Inbox Visits to confirm or cancel.',
-  ].filter(Boolean);
-
-  const body = lines.join('\n');
+  const event = appointmentEvent(appointment, businessName, kind);
+  const body = renderEventText(event);
   const lead = {
     businessName,
     name: appointment.caller_name || 'Caller',
-    reason: `${title}: ${[appointment.service_name, appointment.when_text]
+    reason: `${event.title}: ${[appointment.service_name, appointment.when_text]
       .filter(Boolean)
-      .join(' — ')}`,
+      .join('. ')}`,
     callerNumber: appointment.caller_phone,
   };
 
-  const result = await dispatchAlert({
-    to: ownerNumber,
-    email: ownerEmail,
+  const inbox = staffRecipients('inbox', {
+    teamDirectory,
+    ownerPhone: ownerNumber,
+    ownerEmail,
+  });
+  const { sent } = await dispatchToStaff({
+    recipients: inbox.recipients,
     body,
     lead,
-    subject: `${title} — ${businessName}`,
+    subject: renderEventSubject(event),
     channels: notifyChannels,
+    ledger: { ...ledger, kind: 'appointment' },
   });
+  const result = sent[0] || { channel: null, reason: 'no_inbox_recipient' };
   if (result.channel) {
     console.log(
-      `[${callSid}] Appointment notify (${kind}/${status}) via ${result.channel}` +
+      `[${callSid}] Appointment notify (${kind}) via ${result.channel}` +
         (result.to ? ` → ${result.to}` : '')
     );
     try {
@@ -3405,6 +3536,7 @@ async function maybeSendAppointmentNotification(callSid, appointment, kind = 'cr
       to: appointment.caller_phone,
       event: callerEvent,
       channels: notifyChannels,
+      ledger,
     });
     if (caller.channel) {
       await db.mergeCallSummaryMeta({
@@ -3493,6 +3625,7 @@ wss.on('connection', (ws) => {
           intent: entityIntent,
           state: previousBrainState,
         });
+        const fileStamp = liveCallerFileStamp(brainProfile?.callerMemory);
         let brainState = observeCallerTurn(
           previousBrainState,
           {
@@ -3502,6 +3635,9 @@ wss.on('connection', (ws) => {
             profile: brainProfile,
           }
         );
+        if (liveCallerFileStamp(brainProfile?.callerMemory) !== fileStamp) {
+          systemPrompt = buildSystemPrompt(brainProfile);
+        }
         const decision = determineNextBestAction({ state: brainState, capabilities });
         brainState = setNextBestAction(brainState, decision);
         callBrainStates.set(callSid, brainState);

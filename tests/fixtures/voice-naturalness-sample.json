@@ -1,0 +1,30 @@
+{
+  "callSid": "HD_3f7ed2a5f526",
+  "note": "Historical leak corpus (2026-09-10). Used to lock the roboticness detector, not as a freeze-SHA score.",
+  "turns": [
+    {
+      "speaker": "agent",
+      "text": "Thank you for calling Done and Dusted Cleaning Services, this is Shy speaking. How can I help?"
+    },
+    {
+      "speaker": "caller",
+      "text": "How are you doing, Shy?"
+    },
+    {
+      "speaker": "agent",
+      "text": "Sure!"
+    },
+    {
+      "speaker": "agent",
+      "text": "Sure! Are you looking to clean a couch, carpet, mattress, or perhaps general house cleaning?"
+    },
+    {
+      "speaker": "agent",
+      "text": "I'm listening! What is your name and how can the team help with your roof?"
+    },
+    {
+      "speaker": "agent",
+      "text": "Thank you for calling Done and Dusted Cleaning Services, Al-vin. Have a great day!"
+    }
+  ]
+}

@@ -1,26 +1,85 @@
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { btnGhost, deskPreviewClass } from "@/components/ui/deskChrome";
 import type { InboxItem } from "@/lib/inboxPurpose";
+import { inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import { nicheCopy } from "@/lib/inboxNiche";
-import {
-  groupVisitsForWeek,
-  weekHeading,
-  type CalendarVisit,
-} from "@/lib/visitCalendar";
+import { groupVisitBoardForWeek } from "@/lib/runSheet";
+import { weekHeading, type CalendarVisit, type WeekDay } from "@/lib/visitCalendar";
 
-function jobToVisit(item: InboxItem): CalendarVisit | null {
+function RowAction({ item }: { item: InboxItem }) {
   if (!item.job) return null;
-  return {
-    id: item.job.id,
-    status: item.job.status,
-    service_name: item.job.service_name,
-    when_text: item.job.when_text,
-    window_start: item.job.window_start,
-    window_end: item.job.window_end,
-    address_landmark: item.job.address_landmark,
-    caller_name: item.callerName,
-  };
+  return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
+}
+
+function SlotRow({
+  visit,
+  item,
+  ret,
+}: {
+  visit: CalendarVisit;
+  item: InboxItem;
+  ret?: InboxReturn;
+}) {
+  return (
+    <li className="relative border-t border-line/70 pt-2 first:border-t-0 first:pt-0">
+      <DeskRowHit
+        href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
+        label="Conversation"
+      />
+      <p className={`${deskRowMutedClass} text-sm font-semibold text-ink ${deskPreviewClass}`}>
+        {visit.when_text || item.headline}
+      </p>
+      {visit.when_text ? (
+        <p className={`${deskRowMutedClass} mt-0.5 text-xs text-ink ${deskPreviewClass}`}>
+          {item.headline}
+        </p>
+      ) : null}
+      <div className={`${deskRowActionClass} mt-1`}>
+        <RowAction item={item} />
+      </div>
+    </li>
+  );
+}
+
+function DaySection({
+  day,
+  rows,
+  byId,
+  ret,
+  compact,
+}: {
+  day: WeekDay;
+  rows: CalendarVisit[];
+  byId: Map<string, InboxItem>;
+  ret?: InboxReturn;
+  compact?: boolean;
+}) {
+  return (
+    <section
+      className={[
+        "bg-surface p-3",
+        compact ? "" : "min-h-[11rem]",
+        day.isToday ? "bg-accent/[0.06]" : "",
+      ].join(" ")}
+    >
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+        {day.weekdayShort} {day.dayNum}
+      </h2>
+      <ul className="mt-2 space-y-2">
+        {rows.length === 0 ? (
+          <li className="text-xs text-ink-soft">None</li>
+        ) : (
+          rows.map((visit) => {
+            const item = byId.get(visit.id);
+            if (!item) return null;
+            return <SlotRow key={visit.id} visit={visit} item={item} ret={ret} />;
+          })
+        )}
+      </ul>
+    </section>
+  );
 }
 
 export function VisitWeekCalendar({
@@ -29,6 +88,7 @@ export function VisitWeekCalendar({
   prevHref,
   nextHref,
   listHref,
+  ret,
   vertical,
 }: {
   items: InboxItem[];
@@ -36,14 +96,19 @@ export function VisitWeekCalendar({
   prevHref: string;
   nextHref: string;
   listHref: string;
+  ret?: InboxReturn;
   businessName: string;
   vertical?: string | null;
 }) {
   const copy = nicheCopy(vertical);
-  const byId = new Map(items.filter((item) => item.job).map((item) => [item.job!.id, item]));
-  const visits = items.map(jobToVisit).filter((row): row is CalendarVisit => Boolean(row));
-  const { days, byDay, unscheduled } = groupVisitsForWeek(visits, monday);
+  const byId = new Map<string, InboxItem>();
+  for (const item of items) {
+    if (item.job) byId.set(item.job.id, item);
+  }
+  const { days, byDay, unscheduled } = groupVisitBoardForWeek(items, monday);
   const heading = weekHeading(monday);
+  const filledDays = days.filter((day) => (byDay[day.key] || []).length > 0);
+  const empty = filledDays.length === 0 && unscheduled.length === 0;
 
   return (
     <div className="mt-8">
@@ -52,74 +117,53 @@ export function VisitWeekCalendar({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={prevHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-[#0096FF] focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Prev
           </Link>
           <Link
             href={nextHref}
-            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-[#0096FF] focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+            className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Next
-          </Link>
-          <Link
-            href={listHref}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-[#005CCC] hover:underline focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
-          >
-            List
           </Link>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-7">
-        {days.map((day) => {
-          const rows = byDay[day.key] || [];
-          return (
-            <section
-              key={day.key}
-              className={[
-                "min-h-[11rem] bg-surface p-3",
-                day.isToday ? "bg-[#0096FF]/[0.06]" : "",
-              ].join(" ")}
-            >
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                {day.weekdayShort} {day.dayNum}
-              </h2>
-              <ul className="mt-2 space-y-2">
-                {rows.length === 0 ? (
-                  <li className="text-xs text-ink-soft">None</li>
-                ) : (
-                  rows.map((visit) => {
-                    const item = byId.get(visit.id);
-                    if (!item?.job) return null;
-                    return (
-                      <li
-                        key={visit.id}
-                        className="relative border-t border-line/70 pt-2 first:border-t-0 first:pt-0"
-                      >
-                        <DeskRowHit
-                          href={item.callId ? `/calls/${item.callId}?from=job` : null}
-                          label="Conversation"
-                        />
-                        <p className={`${deskRowMutedClass} text-sm font-semibold text-ink`}>
-                          {visit.when_text || copy.jobColumn}
-                        </p>
-                        <p className={`${deskRowMutedClass} text-xs text-ink-soft`}>{item.headline}</p>
-                        <p className={`${deskRowMutedClass} text-xs text-ink`}>
-                          {item.callerName || "Caller"}
-                        </p>
-                        <div className={`${deskRowActionClass} mt-1`}>
-                          <InboxJobActions id={item.job.id} status={item.job.status} />
-                        </div>
-                      </li>
-                    );
-                  })
-                )}
-              </ul>
-            </section>
-          );
-        })}
-      </div>
+      {empty ? (
+        <div className="border-y border-line py-12 text-center">
+          <p className="font-display text-2xl tracking-tight text-ink">{copy.jobEmpty}</p>
+          <Link href={listHref} className={`${btnGhost} mt-6`}>
+            List
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 space-y-4 md:hidden">
+            {filledDays.map((day) => (
+              <DaySection
+                key={day.key}
+                day={day}
+                rows={byDay[day.key] || []}
+                byId={byId}
+                ret={ret}
+                compact
+              />
+            ))}
+          </div>
+          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-line bg-line md:grid md:grid-cols-7 md:gap-px">
+            {days.map((day) => (
+              <DaySection
+                key={day.key}
+                day={day}
+                rows={byDay[day.key] || []}
+                byId={byId}
+                ret={ret}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {unscheduled.length ? (
         <div className="mt-6">
@@ -129,19 +173,19 @@ export function VisitWeekCalendar({
           <ul className="mt-2 divide-y divide-line border-y border-line">
             {unscheduled.map((visit) => {
               const item = byId.get(visit.id);
-              if (!item?.job) return null;
+              if (!item) return null;
               return (
                 <li key={visit.id} className="relative flex flex-wrap items-center justify-between gap-3 py-3">
                   <DeskRowHit
-                    href={item.callId ? `/calls/${item.callId}?from=job` : null}
+                    href={item.callId ? inboxRecordHref(item.callId, ret || { purpose: "job" }) : null}
                     label="Conversation"
                   />
                   <div className={deskRowMutedClass}>
-                    <p className="text-sm font-semibold text-ink">{item.headline}</p>
-                    <p className="text-xs text-ink-soft">{item.callerName || "Caller"}</p>
+                    <p className={`text-sm font-semibold text-ink ${deskPreviewClass}`}>{item.headline}</p>
+                    <p className={`text-xs text-ink-soft ${deskPreviewClass}`}>{item.callerName || "Caller"}</p>
                   </div>
                   <div className={deskRowActionClass}>
-                    <InboxJobActions id={item.job.id} status={item.job.status} />
+                    <RowAction item={item} />
                   </div>
                 </li>
               );

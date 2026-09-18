@@ -3,35 +3,67 @@
  * Focus ring matches the platform mandate exactly.
  */
 
+import { deskShiftClass } from "@/lib/deskMotion";
+
+export { deskShiftClass };
+
 export const focusRing =
-  "focus:outline-none focus:ring-2 focus:ring-[#0096FF] focus:ring-offset-2";
+  "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2";
 
 export const focusRingVisible =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF] focus-visible:ring-offset-2";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
 
 /** Fill only. Compose with size classes so Tailwind does not fight min-h-11 vs min-h-14. */
 export const btnPrimaryFill =
-  "bg-[#005CCC] font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] hover:bg-[#004AAD] active:bg-[#003D99] disabled:opacity-60";
+  "bg-accent-fill font-semibold text-accent-on-fill shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] hover:bg-accent-fill-hover active:bg-accent-fill-active disabled:opacity-60";
 
-/** Filled primary: white on `#005CCC` (~6:1). `#0096FF` fails AA at `text-sm`. */
+/** Filled primary: on-fill on `--accent-fill` (~6:1 light, inverted on dark). `--accent` fails AA at `text-sm`. */
 export const btnPrimary = [
   "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm",
   btnPrimaryFill,
-  "transition-[background-color,transform,opacity] duration-150 active:scale-[0.99] motion-reduce:active:scale-100",
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
+/** One Action-dock hit. Confirm, Done, Call, and WhatsApp share this box. */
+export const deskHitClass =
+  "box-border inline-flex h-12 w-12 min-h-12 min-w-12 max-h-12 max-w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl p-0";
+
+/** Filled list verb in `deskHitClass`. */
+export const btnDock = [
+  deskHitClass,
+  "px-0 text-xs font-semibold leading-none",
+  btnPrimaryFill,
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
+export const btnDockGhost = [
+  deskHitClass,
+  "border border-line px-0 text-[11px] font-medium leading-none text-ink",
+  deskShiftClass,
+  "hover:border-accent disabled:opacity-50",
   focusRingVisible,
 ].join(" ");
 
 export const btnGhost = [
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-medium text-ink",
-  "transition-[border-color,background-color,color] duration-150 hover:border-[#0096FF]",
+  deskShiftClass,
+  "hover:border-accent",
   focusRingVisible,
 ].join(" ");
 
 export const pendingSpinnerClass =
-  "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white motion-reduce:animate-none";
+  "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent-on-fill/40 border-t-accent-on-fill motion-reduce:animate-none";
+
+/** Spinner on canvas (loading routes). Ink track, not on-fill. */
+export const pendingSpinnerInkClass =
+  "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink/20 border-t-ink motion-reduce:animate-none";
 
 export const deskFieldClass =
-  "w-full min-h-11 rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-ink-soft/70 hover:border-[#0096FF]/35 focus:border-[#0096FF] focus:ring-2 focus:ring-[#0096FF]";
+  `w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
 
 export const deskErrorClass =
   "rounded-2xl border border-warn/40 bg-warn-soft p-6 text-warn";
@@ -40,6 +72,12 @@ export const deskEmptyClass = "mt-8 border-y border-line py-12 text-center";
 
 export const pageTitleClass =
   "font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink";
+
+/** List preview: one ellipsized line. Full copy lives on the record. */
+export const deskPreviewClass = "min-w-0 truncate";
+
+/** Table cell that holds a preview. Takes leftover width and lets `truncate` fire. */
+export const deskPreviewCellClass = "w-full max-w-0";
 
 export const metaLabelClass =
   "text-xs font-medium uppercase tracking-wide text-ink-soft";
@@ -51,10 +89,10 @@ export const tableCellClass = "px-4 py-3.5";
 export function filterTabClass(active: boolean) {
   return [
     "group inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium",
-    "transition-[color,border-color] duration-150",
+    deskShiftClass,
     focusRingVisible,
     active
-      ? "border-[#0096FF] text-[#005CCC]"
+      ? "border-accent text-accent-deep"
       : "border-transparent text-ink-soft hover:border-line hover:text-ink",
   ].join(" ");
 }
@@ -62,8 +100,9 @@ export function filterTabClass(active: boolean) {
 export function filterTabCountClass(active: boolean) {
   return [
     "rounded-md px-1.5 py-0.5 text-xs tabular-nums",
+    deskShiftClass,
     active
-      ? "bg-[#0096FF]/10 text-[#005CCC]"
-      : "bg-surface-muted text-ink-soft group-hover:bg-[#0096FF]/10 group-hover:text-ink",
+      ? "bg-accent/10 text-accent-deep"
+      : "bg-surface-muted text-ink-soft group-hover:bg-accent/10 group-hover:text-ink",
   ].join(" ");
 }

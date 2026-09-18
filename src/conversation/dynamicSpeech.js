@@ -7,6 +7,7 @@ const {
   introLooksValid,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
+const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -191,12 +192,12 @@ function pickPhaticReply(opts = {}) {
   const lang = confirmationLanguage(opts.language);
   const card = opts.callerMemory;
   if (card && typeof card === 'object') {
-    if (card.sharedLine) {
+    if (card.sharedLine && !speakerKnownOnFile(card)) {
       return lang === 'en'
         ? "I'm well. Who is calling?"
         : 'Nzuri. Ni nani anayepiga?';
     }
-    if (card.nextAppointment && !card.sharedLine) {
+    if (card.nextAppointment && returningFileUsable(card)) {
       return lang === 'en'
         ? "I'm well. I have your visit on file. Is that why you called?"
         : 'Nzuri. Una ziara kwenye faili. Nisaidie na hiyo?';
@@ -346,6 +347,10 @@ function pickLlmRecoverySaved(opts = {}) {
 }
 
 function looksLikeCallerName(text) {
+  return Boolean(callerNameFromUtterance(text));
+}
+
+function looksLikeBareCallerName(text) {
   const t = normalizeCallerText(text);
   if (!t || PURE_NOISE.has(t) || CONFIRM_ANSWERS.has(t)) return false;
   const hearAgain = t.replace(/[?'!.,]+$/g, '').trim();
@@ -365,6 +370,19 @@ function looksLikeCallerName(text) {
   }
   const words = t.split(' ').filter(Boolean);
   return words.length >= 1 && words.length <= 3 && t.length <= 40;
+}
+
+function callerNameFromUtterance(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const { extractName } = require('./entityExtraction');
+  const { isJunkCallerName } = require('./callerNameQuality');
+  const extracted = extractName(raw, { firstMissing: 'name', preferKnown: false });
+  if (extracted && !isJunkCallerName(extracted)) return extracted;
+  if (!looksLikeBareCallerName(raw)) return '';
+  const bare = normalizeCallerText(raw).replace(/[?'!.,]+$/g, '').trim();
+  if (!bare || isJunkCallerName(bare)) return '';
+  return bare.replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
 const PURE_NOISE = new Set([
@@ -502,6 +520,7 @@ module.exports = {
   stripSpokenHedges,
   polishSpokenReply,
   looksLikeCallerName,
+  callerNameFromUtterance,
   cleanSpokenLine,
   greetingLooksValid,
   isNonSubstantiveTurn,

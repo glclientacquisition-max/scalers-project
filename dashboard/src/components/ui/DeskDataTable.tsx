@@ -9,7 +9,7 @@ export function DeskDataTable({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+    <div className="max-w-full min-w-0 overflow-x-auto rounded-2xl border border-line bg-surface">
       <table className={`w-full text-left text-sm ${minWidthClass}`}>
         {children}
       </table>

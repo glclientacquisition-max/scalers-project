@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { btnGhost, deskShiftClass } from "@/components/ui/deskChrome";
 
-type SoftAction = "resolved" | "archived";
+type SoftAction = "resolved" | "archived" | "new";
 
 function ArchiveGlyph({ className }: { className?: string }) {
   return (
@@ -20,6 +21,25 @@ function ArchiveGlyph({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M3 7h18M5 7l1 12h12l1-12M9 7V5h6v2"
+      />
+    </svg>
+  );
+}
+
+function UnarchiveGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 7h18M5 7l1 12h12l1-12M9 7V5h6v2M12 18v-6m0 0-2.5 2.5M12 12l2.5 2.5"
       />
     </svg>
   );
@@ -43,7 +63,8 @@ function DoneGlyph({ className }: { className?: string }) {
 /**
  * Soft clear / hide: owners cannot hard-delete calls (RLS).
  * Done = resolved (finished follow-up).
- * Archive = archived (hide from active inbox; still recoverable under Archived).
+ * Archive = archived (leaves Needs you, All, Visits, Holds, Human, Answered; sits on Archived).
+ * Unarchive = new (back on Needs you).
  */
 export function MarkLeadActionButton({
   callId,
@@ -54,16 +75,16 @@ export function MarkLeadActionButton({
   callId: string;
   action: SoftAction;
   disabled?: boolean;
-  variant?: "default" | "icon";
+  variant?: "default" | "icon" | "button";
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const label = action === "archived" ? "Archive" : "Mark done";
+  const label = action === "archived" ? "Archive" : action === "new" ? "Unarchive" : "Mark done";
   const busyLabel = action === "archived" ? "Archiving" : "Saving";
-  const successLabel = action === "archived" ? "Archived" : "Done";
+  const successLabel = action === "archived" ? "Archived" : action === "new" ? "Unarchived" : "Done";
 
   if (done && variant === "icon") {
     return (
@@ -78,18 +99,30 @@ export function MarkLeadActionButton({
   }
 
   if (done) {
+    if (variant === "button") {
+      return (
+        <span className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-sm font-semibold text-ok">
+          {successLabel}
+        </span>
+      );
+    }
     return <span className="text-xs font-medium text-ok">{successLabel}</span>;
   }
 
   const iconButtonClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50";
+    `inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
+  const chromeButtonClass = `${btnGhost} w-full gap-2`;
+  const linkButtonClass =
+    `text-xs font-medium text-ink-soft underline-offset-2 ${deskShiftClass} hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`;
 
   return (
     <span
       className={
         variant === "icon"
           ? "inline-flex flex-col items-center"
-          : "inline-flex flex-col items-start gap-1"
+          : variant === "button"
+            ? "flex w-full flex-col items-stretch gap-1"
+            : "inline-flex flex-col items-start gap-1"
       }
     >
       <button
@@ -102,7 +135,7 @@ export function MarkLeadActionButton({
           startTransition(async () => {
             const res = await updateLeadStatus(callId, action);
             if (!res.ok) {
-              setError(res.error || (action === "archived" ? "Could not archive." : "Could not mark done."));
+              setError(res.error || (action === "archived" ? "Could not archive." : action === "new" ? "Could not unarchive." : "Could not mark done."));
               return;
             }
             setDone(true);
@@ -112,17 +145,30 @@ export function MarkLeadActionButton({
         className={
           variant === "icon"
             ? iconButtonClass
-            : [
-                "text-xs font-medium text-ink-soft underline-offset-2 transition hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0096FF]/40 disabled:opacity-50",
-              ].join(" ")
+            : variant === "button"
+              ? chromeButtonClass
+              : linkButtonClass
         }
       >
         {variant === "icon" ? (
           action === "archived" ? (
             <ArchiveGlyph className="h-4 w-4" />
+          ) : action === "new" ? (
+            <UnarchiveGlyph className="h-4 w-4" />
           ) : (
             <DoneGlyph className="h-4 w-4" />
           )
+        ) : variant === "button" ? (
+          <>
+            {action === "archived" ? (
+              <ArchiveGlyph className="h-4 w-4" />
+            ) : action === "new" ? (
+              <UnarchiveGlyph className="h-4 w-4" />
+            ) : (
+              <DoneGlyph className="h-4 w-4" />
+            )}
+            {pending ? busyLabel : label}
+          </>
         ) : pending ? (
           busyLabel
         ) : (
@@ -133,7 +179,11 @@ export function MarkLeadActionButton({
         <span
           className={[
             "text-xs text-warn",
-            variant === "icon" ? "mt-1 max-w-[9rem] text-center" : "max-w-[14rem]",
+            variant === "icon"
+              ? "mt-1 max-w-[9rem] text-center"
+              : variant === "button"
+                ? "text-center"
+                : "max-w-[14rem]",
           ].join(" ")}
         >
           {error}
@@ -150,7 +200,7 @@ export function MarkLeadDoneButton({
 }: {
   callId: string;
   disabled?: boolean;
-  variant?: "default" | "icon";
+  variant?: "default" | "icon" | "button";
 }) {
   return (
     <MarkLeadActionButton
@@ -169,12 +219,31 @@ export function MarkLeadArchiveButton({
 }: {
   callId: string;
   disabled?: boolean;
-  variant?: "default" | "icon";
+  variant?: "default" | "icon" | "button";
 }) {
   return (
     <MarkLeadActionButton
       callId={callId}
       action="archived"
+      disabled={disabled}
+      variant={variant}
+    />
+  );
+}
+
+export function MarkLeadUnarchiveButton({
+  callId,
+  disabled = false,
+  variant = "default",
+}: {
+  callId: string;
+  disabled?: boolean;
+  variant?: "default" | "icon" | "button";
+}) {
+  return (
+    <MarkLeadActionButton
+      callId={callId}
+      action="new"
       disabled={disabled}
       variant={variant}
     />

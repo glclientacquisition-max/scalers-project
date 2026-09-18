@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { focusRingVisible } from "@/components/ui/deskChrome";
+import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
 export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
   { href: "/calls", label: "Inbox" },
   { href: "/contacts", label: "Contacts" },
-  { href: "/settings", label: "Business Profile" },
+  { href: "/settings", label: "Business" },
   { href: "/wallet", label: "Wallet" },
 ] as const;
 
@@ -23,6 +23,7 @@ function SignOutButton() {
         type="submit"
         className={[
           "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
+          deskShiftClass,
           focusRingVisible,
         ].join(" ")}
       >
@@ -82,7 +83,7 @@ function TabIcon({ name, className }: { name: string; className?: string }) {
       </svg>
     );
   }
-  if (name === "Business Profile") {
+  if (name === "Business") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
         <path
@@ -129,10 +130,11 @@ export function DeskNav() {
               aria-current={active ? "page" : undefined}
               className={[
                 "rounded-md",
+                deskShiftClass,
                 focusRingVisible,
                 active
-                  ? "font-semibold text-[#005CCC]"
-                  : "font-medium text-ink hover:text-[#005CCC]",
+                  ? "font-semibold text-accent-deep"
+                  : "font-medium text-ink hover:text-accent-deep",
               ].join(" ")}
             >
               {item.label}
@@ -152,7 +154,7 @@ export function DeskTabBar() {
   return (
     <nav
       aria-label="Workspace"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line/80 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] border-t border-line/80 bg-surface pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
     >
       <ul className="flex">
         {DESK_LINKS.map((item) => {
@@ -163,10 +165,11 @@ export function DeskTabBar() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={[
-                  "flex min-h-12 flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[11px] leading-none",
+                  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[11px] leading-none",
+                  deskShiftClass,
                   focusRingVisible,
                   active
-                    ? "font-semibold text-[#005CCC]"
+                    ? "font-semibold text-accent-deep"
                     : "font-medium text-ink-soft",
                 ].join(" ")}
               >

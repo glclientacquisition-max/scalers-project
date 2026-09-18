@@ -39,13 +39,7 @@ export async function POST(request: NextRequest) {
     url = getSupabaseUrl();
     anonKey = getSupabaseAnonKey();
   } catch {
-    return NextResponse.redirect(
-      new URL(
-        `/login?error=${encodeURIComponent("Supabase Auth env vars are missing.")}`,
-        request.url
-      ),
-      303
-    );
+    return NextResponse.redirect(new URL("/login?error=config", request.url), 303);
   }
 
   const res = NextResponse.redirect(new URL("/home", request.url), 303);

@@ -30,6 +30,7 @@ import {
   type IngestDraft,
 } from "@/lib/ingest/extract";
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
+import { normalizeTeamDirectory } from "@/lib/teamNotify";
 import { parseAgentTools } from "@/lib/agentTools";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
@@ -73,18 +74,7 @@ function rateLimitExtract(tenantId: string): string | null {
 }
 
 function normalizeTeam(raw: unknown): TeamDirectoryEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((row) => {
-      const r = (row || {}) as Record<string, unknown>;
-      return {
-        name: String(r.name || "").trim(),
-        role: String(r.role || "").trim(),
-        phone: String(r.phone || "").trim(),
-        email: String(r.email || "").trim().toLowerCase(),
-      };
-    })
-    .filter((t) => t.name);
+  return normalizeTeamDirectory(raw, { requireName: true, infer: false });
 }
 
 function normalizeFaqs(raw: unknown): FaqEntry[] {
@@ -353,7 +343,7 @@ export async function applyIngestAction(
       ? draftHoursNotes
       : formatHoursForCompiler(nextSchedule)) ||
     String(tenant.business_hours || "").trim() ||
-    "Hours not set yet — confirm with the team.";
+    "Hours not set yet. Confirm with the team.";
 
   const existingPolicies = normalizeBusinessPolicies(tenant.business_policies);
   const nextPolicies = policiesFilled
@@ -476,7 +466,7 @@ export async function applyIngestAction(
     return {
       ok: true,
       source,
-      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Train below should refresh — open Train to review. Live on the next call.${capNote}`,
+      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Train below should refresh. Open Train to review. Live on the next call.${capNote}`,
     };
   }
 

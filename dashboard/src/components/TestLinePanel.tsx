@@ -27,6 +27,7 @@ import {
   settingsPanelHeadingClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 
 /**
  * Business Settings → Test
@@ -209,7 +210,7 @@ export function TestLinePanel({
         ) : (
           <a
             href={`tel:${did}`}
-            className="flex min-h-14 w-full items-center justify-center rounded-2xl border border-[var(--line)] bg-white px-4 py-4 text-center font-display text-[clamp(1.15rem,4vw,1.5rem)] tracking-tight text-[var(--ink)] transition hover:border-[var(--accent)]"
+            className={`flex min-h-14 w-full items-center justify-center rounded-2xl border border-[var(--line)] bg-surface px-4 py-4 text-center font-display text-[clamp(1.15rem,4vw,1.5rem)] tracking-tight text-[var(--ink)] ${deskShiftClass} hover:border-[var(--accent)]`}
           >
             {did}
           </a>

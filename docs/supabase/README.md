@@ -74,6 +74,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 13 | [`lead_status.sql`](./lead_status.sql) | `owner_rls.sql` | `calls.lead_status` + column-scoped owner UPDATE |
 | 13b | [`lead_status_archive.sql`](./lead_status_archive.sql) | `lead_status.sql` | Adds `archived` status (Archive action; Done stays `resolved`) |
 | 13c | [`call_resolution.sql`](./call_resolution.sql) | `lead_status.sql` | `calls.resolution` + `primary_intent` + `resolution_note` (AI assist outcome; owner may correct) |
+| 13d | [`inbox_triage.sql`](./inbox_triage.sql) | `call_resolution.sql` | Owner inbox read/mute/pin/assignee/labels/snooze on `calls`. Expands authenticated UPDATE grant. No owner DELETE. |
 
 ### 6. DID pool + Super Admin helpers
 
@@ -109,6 +110,17 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 21b | [`contacts_owner_insert.sql`](./contacts_owner_insert.sql) | `contacts_and_requests.sql` | Owner INSERT policy on `contacts` (desk add/import) |
 | 22 | [`product_catalog_and_social.sql`](./product_catalog_and_social.sql) | `business_operating_model.sql` | `product_catalog` + `social_handles` (products separate from services) |
 | 23 | [`appointments.sql`](./appointments.sql) | `contacts_and_requests.sql` | Home-services visit bookings (`requested\|confirmed\|cancelled\|done`) + RLS |
+
+### 10. Realtime
+
+| # | File | Depends on | Notes |
+| --- | --- | --- | --- |
+| 24 | [`realtime_inbox.sql`](./realtime_inbox.sql) | `contacts_and_requests.sql`, `appointments.sql` | Adds `calls` / `service_requests` / `appointments` to the `supabase_realtime` publication (Live Inbox). Idempotent; no schema, grant, or policy change. |
+| 24b | [`realtime_inbox_replica_identity.sql`](./realtime_inbox_replica_identity.sql) | `realtime_inbox.sql` | `REPLICA IDENTITY FULL` on those three tables so `tenant_id` filters match hangup UPDATEs. Idempotent; no publication, grant, or policy change. |
+| 24c | [`notify_send_ledger.sql`](./notify_send_ledger.sql) | `contacts_and_requests.sql` (tenants, calls, `current_user_tenant_ids`) | Append-only `notify_sends`. Staff + caller SMS = tenant. Wallet/outage = platform. Meter only, no charge. |
+| 24d | [`sms_allowance.sql`](./sms_allowance.sql) | `notify_send_ledger.sql`, `line_rental_grace.sql` | Included SMS (default 200). Same `on_demand_usage_enabled` as minutes. Beta never blocks. |
+| 24e | [`package_entitlements.sql`](./package_entitlements.sql) | `sms_allowance.sql` | Reserved email + seat included columns. **`tenants_protect_wallet_columns()` final.** No email/invite gate. |
+| 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |
 
 ---
 

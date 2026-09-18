@@ -26,7 +26,7 @@ Bare `/settings` is the menu. `?tab=updates` is Updates. `?tab=alerts` is Alerts
 
 ## Chrome
 
-Header hierarchy: uppercase “Business Profile” eyebrow, workspace name as `h1` (Sora, clamp 1.5–2rem), Line live / Number pending as caption. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`).
+Header hierarchy: uppercase “Business Profile” eyebrow, workspace name as `h1` (Sora, clamp 1.5–2rem), Line live / Number pending as caption. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Business so the phone tab fits; do not put Business Profile on `DESK_LINKS`.
 
 Menu: grouped destination rows (`min-h-12`, label + chevron). Section titles are non-clickable. Hover, active, and the canonical focus ring.
 
@@ -43,7 +43,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Screen | Blocks |
 | --- | --- |
 | Assistant | Assistant (name, tone) → Business (name, type) → Public contacts |
-| Alerts | SMS phone, email, notify channels, text customers, text back missed calls |
+| Alerts | Alert phone, email, notify channels, text customers, text back missed calls |
 | Catalog | Services → Products |
 | Hours | Days → When closed |
 | Locations | Places: label, area, landmark, directions, coverage |

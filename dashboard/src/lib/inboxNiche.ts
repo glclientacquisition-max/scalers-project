@@ -17,9 +17,12 @@ export type InboxNicheCopy = {
   confirmStamp: string;
   visitStamp: string;
   visitDoneStamp: string;
+  visitGhostStamp: string;
+  holdGhostStamp: string;
   pickupStamp: string;
   holdEmpty: string;
   jobEmpty: string;
+  todayEmpty: string;
   searchPlaceholder: string;
   jobColumn: string;
 };
@@ -40,9 +43,12 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm visit",
     visitStamp: "Visit",
     visitDoneStamp: "Visit done",
+    visitGhostStamp: "Visit not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Pickup",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, hold",
     jobColumn: "Visit",
   },
@@ -61,9 +67,12 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm visit",
     visitStamp: "Visit",
     visitDoneStamp: "Visit done",
+    visitGhostStamp: "Visit not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, visit",
     jobColumn: "Visit",
   },
@@ -82,9 +91,12 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm booking",
     visitStamp: "Booking",
     visitDoneStamp: "Booking done",
+    visitGhostStamp: "Booking not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No bookings",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, booking",
     jobColumn: "Booking",
   },
@@ -103,9 +115,12 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm visit",
     visitStamp: "Visit",
     visitDoneStamp: "Visit done",
+    visitGhostStamp: "Visit not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
+    todayEmpty: "Nothing today",
     searchPlaceholder: "Name, number, job",
     jobColumn: "Visit",
   },
@@ -115,17 +130,19 @@ export function nicheCopy(vertical?: string | null): InboxNicheCopy {
   return NICHE[parseVertical(vertical)];
 }
 
+/** Act, tape, book, closed. 08:00 owner, live watcher, visit confirmer. */
 export function purposeFilters(vertical?: string | null): {
   id: InboxPurposeFilterId;
   label: string;
+  divide?: boolean;
 }[] {
   const copy = nicheCopy(vertical);
   return [
     { id: "needs", label: "Needs you" },
-    { id: "hold", label: copy.holdFilter },
-    { id: "job", label: copy.jobFilter },
-    { id: "human", label: "Human" },
-    { id: "answered", label: "Answered" },
     { id: "all", label: "All" },
+    { id: "job", label: copy.jobFilter, divide: true },
+    { id: "hold", label: copy.holdFilter },
+    { id: "human", label: "Human", divide: true },
+    { id: "answered", label: "Answered" },
   ];
 }

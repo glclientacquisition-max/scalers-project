@@ -7,6 +7,7 @@ import {
   type TeamMember,
   TONE_LABELS,
 } from "@/lib/onboarding";
+import { persistTeamNotifyFlags } from "@/lib/teamNotify";
 
 /** Master instruction template for Gemini → voice-engine system prompt. */
 export const PROMPT_COMPILER_SYSTEM = `You write system prompts for a live Kenyan phone AI business assistant (Scalers).
@@ -257,7 +258,13 @@ export function parseTeamDirectoryField(
     const email = String(row.email ?? "").trim().toLowerCase();
     if (!name && !role && !phone && !email) return null;
     if (!name) return null;
-    return { name, role, phone, ...(email ? { email } : {}) };
+    return {
+      name,
+      role,
+      phone,
+      ...(email ? { email } : {}),
+      ...persistTeamNotifyFlags(row),
+    };
   });
 }
 

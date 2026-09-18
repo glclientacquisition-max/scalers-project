@@ -20,6 +20,12 @@ const {
 } = require('./email');
 const { isSmsConfigured, normalizeSmsTo, sendSms } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
+const {
+  beginInstanceSend,
+  claimTenantSms,
+  recordDispatchResult,
+  releaseInstanceFlight,
+} = require('./sendLedger');
 
 function whatsAppSenderReady() {
   return isWhatsAppConfigured();
@@ -58,10 +64,10 @@ async function trySendSms({ to, body }) {
   return { channel: 'sms', to: dest, result };
 }
 
-async function trySendWhatsApp({ to, body, lead }) {
+async function trySendWhatsApp({ to, body, lead, kind }) {
   const dest = normalizeWhatsAppTo(to);
   if (!whatsAppSenderReady() || !dest) return null;
-  const result = await sendOwnerWhatsApp({ to: dest, body, lead });
+  const result = await sendOwnerWhatsApp({ to: dest, body, lead, kind });
   return { channel: 'whatsapp', to: dest, result };
 }
 
@@ -76,172 +82,130 @@ async function trySendWhatsApp({ to, body, lead }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels } = {}) {
+async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind } = {}) {
   const text = body || buildLeadText(lead);
   const errors = [];
   const prefs = parseNotifyChannels(channels);
-
-  if (prefs.sms) {
-    try {
-      const sms = await trySendSms({ to, body: text });
-      if (sms) return sms;
-    } catch (err) {
-      errors.push(`sms:${err?.message || err}`);
-      console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
-    }
+  const dests = [normalizeSmsTo(to), normalizeWhatsAppTo(to), normalizeEmail(email)].filter(
+    Boolean
+  );
+  const gate = await beginInstanceSend(ledger, dests);
+  if (!gate.ok) {
+    return { channel: null, reason: gate.reason };
   }
 
-  if (prefs.whatsapp) {
-    try {
-      const wa = await trySendWhatsApp({ to, body: text, lead });
-      if (wa) return wa;
-    } catch (err) {
-      errors.push(`whatsapp:${err?.message || err}`);
-      if (!prefs.email || !emailFallbackReady()) {
-        // Keep prior behavior: rethrow when email cannot absorb the failure.
-        throw err;
+  async function accept(result) {
+    if (result?.channel) {
+      await recordDispatchResult(ledger, result, text);
+    }
+    return result;
+  }
+
+  try {
+    if (prefs.sms) {
+      const smsTo = normalizeSmsTo(to);
+      if (smsSenderReady() && smsTo) {
+        const claim = await claimTenantSms(ledger, text);
+        if (!claim.allowed) {
+          errors.push(`sms:${claim.reason || 'sms_allowance_exhausted'}`);
+          console.warn(
+            `[notify] tenant SMS skipped (${claim.reason || 'sms_allowance_exhausted'})`
+          );
+        } else {
+          if (ledger && typeof ledger === 'object') ledger.overage = Boolean(claim.overage);
+          try {
+            const sms = await trySendSms({ to, body: text });
+            if (sms) return accept(sms);
+          } catch (err) {
+            errors.push(`sms:${err?.message || err}`);
+            console.warn(`[notify] SMS send failed (${err?.message || err}); trying next channel`);
+          }
+        }
       }
-      console.warn(
-        `[notify] WhatsApp send failed (${err?.message || err}); falling back to email`
-      );
     }
+
+    if (prefs.whatsapp) {
+      try {
+        const wa = await trySendWhatsApp({
+          to,
+          body: text,
+          lead,
+          kind: kind || (ledger && ledger.kind),
+        });
+        if (wa) return accept(wa);
+      } catch (err) {
+        errors.push(`whatsapp:${err?.message || err}`);
+        if (!prefs.email || !emailFallbackReady()) {
+          throw err;
+        }
+        console.warn(
+          `[notify] WhatsApp send failed (${err?.message || err}); falling back to email`
+        );
+      }
+    }
+
+    if (prefs.email) {
+      const mail = await sendEmailFallback({
+        to: email,
+        body: text,
+        lead,
+        subject,
+      });
+      if (mail.channel) return accept(mail);
+
+      if (!smsSenderReady() && !whatsAppSenderReady()) {
+        return { channel: null, reason: 'no_notify_channel_configured', errors };
+      }
+      if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
+        return { channel: null, reason: mail.reason || 'no_destination_number', errors };
+      }
+      return { channel: null, reason: 'send_failed', errors };
+    }
+
+    return { channel: null, reason: 'channels_disabled_by_tenant', errors };
+  } finally {
+    releaseInstanceFlight(gate.key);
   }
-
-  if (prefs.email) {
-    const mail = await sendEmailFallback({
-      to: email,
-      body: text,
-      lead,
-      subject,
-    });
-    if (mail.channel) return mail;
-
-    if (!smsSenderReady() && !whatsAppSenderReady()) {
-      return { channel: null, reason: 'no_notify_channel_configured', errors };
-    }
-    if (!normalizeSmsTo(to) && !normalizeWhatsAppTo(to)) {
-      return { channel: null, reason: mail.reason || 'no_destination_number', errors };
-    }
-    return { channel: null, reason: 'send_failed', errors };
-  }
-
-  return { channel: null, reason: 'channels_disabled_by_tenant', errors };
 }
 
 /**
- * Escalation: SMS teammate → SMS owner → WhatsApp teammate/owner → owner email.
+ * Escalation: one permissioned teammate. Do not also SMS the workspace owner.
  */
 async function dispatchEscalationAlert({
   teammatePhone,
+  teammateEmail,
   ownerPhone,
   ownerEmail,
   body,
   lead = {},
   subject,
   channels,
+  ledger,
 } = {}) {
-  const sent = [];
   const text = body || buildLeadText(lead);
-  const prefs = parseNotifyChannels(channels);
-
-  const ownerDestSms = normalizeSmsTo(ownerPhone);
-  const teammateDestSms = normalizeSmsTo(teammatePhone);
-  const ownerDistinctSms =
-    ownerDestSms && (!teammateDestSms || ownerDestSms !== teammateDestSms);
-
-  if (prefs.sms && smsSenderReady() && teammateDestSms) {
-    try {
-      const result = await sendSms({ to: teammateDestSms, body: text });
-      sent.push({ channel: 'sms', role: 'teammate', to: teammateDestSms, result });
-    } catch (err) {
-      console.warn(`[notify] teammate SMS failed:`, err?.message || err);
-    }
-  }
-
-  if (prefs.sms && smsSenderReady() && ownerDistinctSms) {
-    try {
-      const result = await sendSms({ to: ownerDestSms, body: text });
-      sent.push({ channel: 'sms', role: 'owner', to: ownerDestSms, result });
-    } catch (err) {
-      console.warn(`[notify] owner SMS failed:`, err?.message || err);
-    }
-  }
-
-  // If SMS already delivered to someone, skip WhatsApp duplicate (WA can layer later).
-  // If SMS missed everyone, fall through to WhatsApp then email.
-  if (prefs.whatsapp && !sent.length && whatsAppSenderReady()) {
-    if (teammatePhone) {
-      try {
-        const result = await sendOwnerWhatsApp({
-          to: teammatePhone,
-          body: text,
-          lead,
-        });
-        sent.push({
-          channel: 'whatsapp',
-          role: 'teammate',
-          to: normalizeWhatsAppTo(teammatePhone),
-          result,
-        });
-      } catch (err) {
-        console.warn(`[notify] teammate WhatsApp failed:`, err?.message || err);
-      }
-    }
-
-    const ownerDest = normalizeWhatsAppTo(ownerPhone);
-    const teammateDest = normalizeWhatsAppTo(teammatePhone);
-    const ownerDistinct = ownerDest && (!teammateDest || ownerDest !== teammateDest);
-
-    if (ownerDistinct) {
-      try {
-        const result = await sendOwnerWhatsApp({
-          to: ownerPhone,
-          body: text,
-          lead,
-        });
-        sent.push({ channel: 'whatsapp', role: 'owner', to: ownerDest, result });
-      } catch (err) {
-        console.warn(`[notify] owner WhatsApp failed:`, err?.message || err);
-      }
-    }
-  }
-
-  if (prefs.email && !sent.length) {
-    const mail = await sendEmailFallback({
-      to: ownerEmail,
-      body: text,
-      lead,
-      subject: subject || `Escalation${lead.businessName ? ` — ${lead.businessName}` : ''}`,
-    });
-    if (mail.channel) {
-      sent.push({ channel: 'email', role: 'owner', to: mail.to, result: mail.result });
-    }
-  }
-
-  // Optional second channel: owner email when a phone channel already succeeded.
-  if (
-    prefs.email &&
-    sent.length &&
-    !sent.some((s) => s.channel === 'email') &&
-    emailFallbackReady() &&
-    ownerEmail
-  ) {
-    try {
-      const mail = await sendEmailFallback({
-        to: ownerEmail,
-        body: text,
-        lead,
-        subject: subject || `Escalation${lead.businessName ? ` — ${lead.businessName}` : ''}`,
-      });
-      if (mail.channel) {
-        sent.push({ channel: 'email', role: 'owner', to: mail.to, result: mail.result });
-      }
-    } catch (err) {
-      console.warn(`[notify] owner email secondary failed:`, err?.message || err);
-    }
-  }
-
-  return sent;
+  const destPhone = teammatePhone || null;
+  const destEmail = teammateEmail || null;
+  const sameOwner =
+    destPhone &&
+    ownerPhone &&
+    String(destPhone).replace(/\D/g, '') ===
+      String(ownerPhone).replace(/\D/g, '');
+  const result = await dispatchAlert({
+    to: destPhone,
+    email: destEmail || (sameOwner ? ownerEmail : null),
+    body: text,
+    lead,
+    subject,
+    channels,
+    ledger,
+  });
+  if (!result?.channel) return [];
+  return [
+    {
+      ...result,
+      role: 'teammate',
+    },
+  ];
 }
 
 module.exports = {

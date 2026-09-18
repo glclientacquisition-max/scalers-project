@@ -16,18 +16,20 @@ describe("work surface jobs on unified inbox", () => {
   const requests = read("dashboard/src/app/(desk)/requests/page.tsx");
   const appointments = read("dashboard/src/app/(desk)/appointments/page.tsx");
 
-  it("keeps Overview Inbox Contacts Business Profile Wallet and Inbox redirects", () => {
+  it("keeps Overview Inbox Contacts Business Wallet and Inbox redirects", () => {
     assert.match(nav, /label: "Overview"/);
     assert.match(nav, /label: "Inbox"/);
     assert.match(nav, /label: "Contacts"/);
-    assert.match(nav, /label: "Business Profile"/);
+    assert.match(nav, /label: "Business"/);
+    assert.doesNotMatch(nav, /label: "Business Profile"/);
     assert.match(nav, /label: "Wallet"/);
     assert.doesNotMatch(nav, /label: "Requests"/);
     assert.doesNotMatch(nav, /label: "Appointments"/);
     assert.match(requests, /\/calls\?purpose=hold/);
     assert.match(appointments, /\/calls\?purpose=job/);
     assert.match(inbox, /view: "week"/);
-    assert.match(toolbar, />\s*Week\s*</);
+    assert.match(toolbar, /label: "Week"/);
+    assert.match(toolbar, /label: "Today"/);
   });
 
   it("makes Overview a map into Inbox purposes", () => {
@@ -52,6 +54,7 @@ describe("work surface jobs on unified inbox", () => {
     assert.doesNotMatch(toolbar, /clamp\(2rem/);
     assert.match(niche, /holdEmpty: "Nothing to fulfill"/);
     assert.match(niche, /jobEmpty: "No visits"/);
+    assert.match(niche, /todayEmpty: "Nothing today"/);
     assert.match(niche, /jobEmpty: "No bookings"/);
     assert.match(niche, /jobFilter: "Visits"/);
     assert.match(niche, /jobFilter: "Bookings"/);
@@ -64,7 +67,7 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(row, /itemSignalLabel\(item, vertical\)/);
     assert.match(row, /formatCallWhenRelative/);
     assert.doesNotMatch(inbox, />\s*Purpose\s*</);
-    assert.match(row, /DeskRowHit/);
+    assert.match(row, /InboxRowHit/);
     assert.match(row, /label="Conversation"/);
     assert.doesNotMatch(row, /item.hold \|\| item.job \? "Call" : "Open"/);
     assert.doesNotMatch(row, /\/contacts\/\$\{item.contactId\}/);
@@ -77,8 +80,10 @@ describe("work surface jobs on unified inbox", () => {
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(load, /attachContactIds/);
     assert.match(purpose, /compareInboxSignal/);
-    assert.match(purpose, /if \(!opts\.job\) return copy\.returnCtaOne/);
-    assert.match(purpose, /if \(!opts\.hold\) return copy\.returnCtaOne/);
+    assert.match(purpose, /orderInboxItems/);
+    assert.match(inbox, /orderInboxItems/);
+    assert.match(purpose, /if \(!opts\.job\) return copy\.visitGhostStamp/);
+    assert.match(purpose, /if \(!opts\.hold\) return copy\.holdGhostStamp/);
     assert.match(purpose, /jobStatus === "requested"/);
     assert.doesNotMatch(purpose, /jobStatus === "requested" \|\| jobStatus === "confirmed"/);
     const composer = read("dashboard/src/components/CallerNoteComposer.tsx");

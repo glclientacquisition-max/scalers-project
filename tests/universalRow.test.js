@@ -12,6 +12,7 @@ function read(rel) {
 describe("universal row anatomy", () => {
   const row = read("dashboard/src/components/ui/deskRow.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
+  const avatar = read("dashboard/src/components/InboxRowAvatar.tsx");
   const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const master = read("docs/frontend/design-system/MASTER.md");
 
@@ -31,7 +32,7 @@ describe("universal row anatomy", () => {
   });
 
   it("carries state as a blue dot plus type weight, never opacity", () => {
-    assert.match(row, /rounded-full bg-\[#0096FF\]/);
+    assert.match(row, /rounded-full bg-accent/);
     assert.match(row, /aria-label="Needs you"/);
     assert.match(row, /font-semibold text-ink/);
     assert.match(row, /font-medium text-ink/);
@@ -39,12 +40,17 @@ describe("universal row anatomy", () => {
   });
 
   it("applies the anatomy to Inbox phone and table rows", () => {
-    const uses = inbox.match(/RowIdentity/g) || [];
-    assert.ok(uses.length >= 4, `RowIdentity in phone + 3 table kinds, got ${uses.length}`);
+    const who = inbox.match(/<InboxRowWho /g) || [];
+    assert.equal(who.length, 3, `InboxRowWho in 3 table kinds, got ${who.length}`);
+    const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
+    assert.match(phone, /<InboxRowAvatar/);
+    assert.match(avatar, /RowIdentity name=\{name\}/);
     assert.match(inbox, /RowStateDot show=\{item\.needsYou\}/);
-    assert.match(inbox, /deskRowWeightClass\(item\.needsYou\)/);
-    assert.match(inbox, /DeskRowHit/);
-    assert.match(inbox, /label="Conversation"/);
+    assert.match(inbox, /deskRowWeightClass\(item\.needsYou \|\| item\.unread\)/);
+    assert.match(inbox, /deskPreviewClass/);
+    assert.match(inbox, /deskPreviewCellClass/);
+    assert.doesNotMatch(inbox, /line-clamp-2/);
+    assert.doesNotMatch(inbox, /item\.detail/);
   });
 
   it("applies the identity circle to Contacts mobile and desktop", () => {
@@ -69,9 +75,12 @@ describe("inbox call action", () => {
   });
 
   it("is a muted 44px icon button, never filled", () => {
-    assert.match(call, /h-11 w-11/);
-    assert.match(call, /border border-line text-ink/);
+    assert.match(call, /deskHitClass/);
+    assert.match(read("dashboard/src/components/ui/deskChrome.ts"), /h-12 w-12/);
     assert.match(call, /aria-label=\{`Call \$\{number\}`\}/);
+    assert.match(call, /data-icon="handset"/);
+    assert.match(call, /stroke="currentColor"/);
+    assert.doesNotMatch(call, /M1\.5 4\.5a3 3 0 0 1 3-3h1\.372/);
     assert.doesNotMatch(call, /bg-\[#0096FF\]|bg-whatsapp/);
   });
 
@@ -81,5 +90,18 @@ describe("inbox call action", () => {
     const wa = inbox.indexOf('variant="icon"');
     assert.ok(dock > -1 && wa > -1 && dock < wa, "CallLink before WhatsApp icon");
     assert.match(master, /`CallLink`/);
+    assert.match(master, /Inbox Action dock/);
+    assert.match(inbox, /Job → Confirm\. Hold → Done\. Else \+ number → Call then WhatsApp/);
+    const actionFn = inbox.indexOf("function InboxTrailingAction");
+    const jobFirst = inbox.indexOf("if (item.job)", actionFn);
+    const holdNext = inbox.indexOf("if (item.hold)", actionFn);
+    const phoneLast = inbox.indexOf("if (item.callerPhone)", actionFn);
+    assert.ok(jobFirst < holdNext && holdNext < phoneLast);
+    assert.doesNotMatch(inbox.slice(actionFn, actionFn + 900), /Send SMS|mailto:|Archive/);
+    assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
+    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/CallLink.tsx"), /deskHitClass/);
+    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /deskHitClass/);
   });
 });
