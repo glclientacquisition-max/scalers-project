@@ -30,17 +30,15 @@ describe("inbox row avatar vs conversation hit", () => {
   it("leaves the phone Conversation link wrapping name and preview only", () => {
     const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
     const avatarAt = phone.indexOf("<InboxRowAvatar");
-    const linkAt = phone.indexOf('aria-label="Conversation"');
-    const closeAvatar = phone.indexOf("/>", avatarAt);
-    assert.ok(avatarAt > -1 && linkAt > -1 && closeAvatar > avatarAt);
-    assert.ok(avatarAt < linkAt, "avatar sits before the Conversation link");
-    assert.ok(closeAvatar < linkAt, "avatar is not inside the Conversation link");
+    const openAt = phone.indexOf("<InboxPhoneOpen");
+    assert.ok(avatarAt > -1 && openAt > -1);
+    assert.ok(avatarAt < openAt, "avatar sits before the Conversation open");
     assert.match(phone, /InboxTrailingAction/);
   });
 
   it("raises the table avatar above DeskRowHit", () => {
     assert.match(inbox, /deskRowActionClass/);
-    assert.match(inbox, /<DeskRowHit href=\{openHref\} label="Conversation" \/>/);
+    assert.match(inbox, /<InboxRowHit href=\{openHref\} label="Conversation" itemId=\{item.id\} \/>/);
     const who = inbox.slice(inbox.indexOf("function InboxRowWho"), inbox.indexOf("function InboxTrailingAction"));
     assert.match(who, /deskRowActionClass/);
     assert.match(who, /InboxRowAvatar/);

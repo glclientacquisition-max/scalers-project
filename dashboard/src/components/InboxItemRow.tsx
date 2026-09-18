@@ -1,14 +1,13 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { InboxRowAvatar } from "@/components/InboxRowAvatar";
 import { InboxRowMore, InboxRowShell } from "@/components/InboxRowOverflow";
+import { InboxPhoneOpen, InboxRowCheck, InboxRowHit } from "@/components/InboxRowSelect";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
-  DeskRowHit,
   deskRowActionClass,
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
@@ -98,6 +97,7 @@ function InboxRowWho({
 }) {
   return (
     <div className="flex items-center gap-3">
+      <InboxRowCheck item={item} />
       <div className={deskRowActionClass}>
         <InboxRowAvatar
           name={item.callerName}
@@ -182,7 +182,7 @@ export function InboxTableRow({
       {kind === "hold" ? (
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
-            <DeskRowHit href={openHref} label="Conversation" />
+            <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
                 className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
@@ -206,7 +206,7 @@ export function InboxTableRow({
       {kind === "job" ? (
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
-            <DeskRowHit href={openHref} label="Conversation" />
+            <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
                 className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
@@ -230,7 +230,7 @@ export function InboxTableRow({
       {kind === "mixed" ? (
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
-            <DeskRowHit href={openHref} label="Conversation" />
+            <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
                 className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
@@ -306,6 +306,7 @@ export function InboxPhoneRow({
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
+      <InboxRowCheck item={item} />
       <div className={deskRowActionClass}>
         <InboxRowAvatar
           name={item.callerName}
@@ -313,17 +314,9 @@ export function InboxPhoneRow({
           contactHref={inboxContactHref(item, purpose, ret)}
         />
       </div>
-      {openHref ? (
-        <Link
-          href={openHref}
-          aria-label="Conversation"
-          className="flex min-w-0 flex-1 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          {body}
-        </Link>
-      ) : (
-        <div className="flex min-w-0 flex-1 items-center">{body}</div>
-      )}
+      <InboxPhoneOpen href={openHref} itemId={item.id}>
+        {body}
+      </InboxPhoneOpen>
       <div className={`${deskRowActionClass} flex shrink-0 items-center self-center gap-1`}>
         <InboxRowMore item={item} />
         <InboxTrailingAction item={item} message={message} />

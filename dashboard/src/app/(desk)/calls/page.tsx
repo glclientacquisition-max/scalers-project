@@ -23,6 +23,7 @@ import {
 } from "@/components/InboxItemRow";
 import type { InboxReturn } from "@/lib/inboxHref";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
+import { InboxBulkBar } from "@/components/InboxRowSelect";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
@@ -277,6 +278,7 @@ export default async function CallsPage({
             scopeKey={`${activeFilter}:${page}:${q}`}
           >
           <InboxRowUiProvider>
+          <InboxBulkBar items={pageRows} />
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {pageRows.map((item) => (
               <InboxPhoneRow

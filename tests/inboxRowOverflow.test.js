@@ -37,6 +37,7 @@ describe("inbox row overflow menu", () => {
     assert.match(row, /InboxTrailingAction/);
     assert.ok(row.indexOf("<InboxRowMore") < row.indexOf("<InboxTrailingAction"), "more sits left of dock");
     for (const label of [
+      "Select",
       "Mark unread",
       "Mark done",
       "Archive",

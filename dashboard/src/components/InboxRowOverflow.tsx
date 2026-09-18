@@ -13,9 +13,10 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
 import { DeskDialog } from "@/components/ui/DeskDialog";
-import { useInboxRowLocal } from "@/components/InboxRowUi";
+import { useInboxRowLocal, useInboxRowUi } from "@/components/InboxRowUi";
 import {
   btnGhost,
   btnPrimary,
@@ -62,6 +63,7 @@ function isInteractiveTarget(target: EventTarget | null, root: HTMLElement | nul
 }
 
 type ActionId =
+  | "select"
   | "unread"
   | "done"
   | "archive"
@@ -84,6 +86,8 @@ export function InboxRowShell({
   children: ReactNode;
 }) {
   const [local, patch] = useInboxRowLocal(item.id);
+  const ui = useInboxRowUi();
+  const router = useRouter();
   const rootRef = useRef<HTMLElement | null>(null);
   const pressRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number }>({
     timer: null,
@@ -119,6 +123,11 @@ export function InboxRowShell({
   useEffect(() => () => clearPress(), [clearPress]);
 
   const run = async (id: ActionId) => {
+    if (id === "select") {
+      ui?.enter(item.id);
+      close();
+      return;
+    }
     if (id === "unread") {
       patch({ unread: !local.unread });
       close();
@@ -164,11 +173,13 @@ export function InboxRowShell({
         return;
       }
       close();
+      router.refresh();
       return;
     }
   };
 
   const actions: { id: ActionId; label: string }[] = [
+    { id: "select", label: "Select" },
     { id: "unread", label: local.unread ? "Mark read" : "Mark unread" },
     { id: "done", label: "Mark done" },
     { id: "archive", label: "Archive" },
@@ -191,9 +202,11 @@ export function InboxRowShell({
         rowRef={rootRef}
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
+          if (ui?.selecting) return;
           openAt(isFinePointer() ? "menu" : "sheet", event.clientX, event.clientY);
         }}
         onPointerDown={(event: ReactPointerEvent) => {
+          if (ui?.selecting) return;
           if (event.pointerType !== "touch") return;
           if (isInteractiveTarget(event.target, rootRef.current)) return;
           clearPress();
@@ -268,8 +281,9 @@ export function InboxRowShell({
 
 export function InboxRowMore({ item }: { item: InboxItem }) {
   const menu = useInboxRowMenu();
+  const ui = useInboxRowUi();
   const btnRef = useRef<HTMLButtonElement>(null);
-  if (!menu) return null;
+  if (!menu || ui?.selecting) return null;
   return (
     <button
       ref={btnRef}

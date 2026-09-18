@@ -7,6 +7,7 @@ import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
+import { InboxBulkBar } from "@/components/InboxRowSelect";
 import { ThemePicker } from "@/components/ThemePicker";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
@@ -166,6 +167,9 @@ export default function DevInboxPage() {
     notFound();
   }
 
+  const needYou = ROWS.filter((row) => row.needsYou).length;
+  const briefing = needYou > 0 ? `${needYou} need you` : "Clear";
+
   return (
     <div className="desk-theme min-h-screen min-w-0">
       <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
@@ -178,7 +182,7 @@ export default function DevInboxPage() {
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
+        <p className="mt-1 text-[13px] text-ink-soft">{briefing}</p>
         <div className="mt-6 max-w-lg">
           <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
           <div className="mt-2">
@@ -186,6 +190,7 @@ export default function DevInboxPage() {
           </div>
         </div>
         <InboxRowUiProvider>
+        <InboxBulkBar items={ROWS} />
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
           {ROWS.map((row) => (
             <InboxPhoneRow
