@@ -29,9 +29,9 @@ Ops:
 - `POST /whatsapp/events` plus demux on `/` and `/voice/events` via `X-Sautikit-Event-Kind`
 - Persist `whatsapp_threads` / `whatsapp_messages` (apply `docs/supabase/whatsapp_threads.sql`)
 - Inbound: mark read, text ack from Scalers inside the 24h window. `parseWhatsAppReceived` accepts a Graph `{ object, entry, changes }` envelope, a bare Meta `value` object, and a SautiKit workspace `{ kind, event_id, data }` envelope. Staging `whatsapp.event.received` posts are the last (~475 bytes).
-- Originate: template when `SAUTIKIT_WHATSAPP_TEMPLATE` is set and the window is closed
-- Desk `NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE` stays false until a live send works
-- Keep `wa.me` follow-up
+- Originate: kind-specific Meta utility templates when the 24h window is closed ([`../WHATSAPP_TEMPLATES.md`](../WHATSAPP_TEMPLATES.md)). Session text only inside an open window (inbound ack).
+- Desk WhatsApp toggle is live (`NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE` defaults true). Owners who already saved Alerts with WhatsApp off stay off until they turn it on.
+- Keep `wa.me` follow-up to the caller. That is not a Scalers send.
 
 ## Phase 2 (separate PR, after a new Kenya DID exists)
 

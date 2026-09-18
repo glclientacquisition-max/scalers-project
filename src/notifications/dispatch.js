@@ -64,10 +64,10 @@ async function trySendSms({ to, body }) {
   return { channel: 'sms', to: dest, result };
 }
 
-async function trySendWhatsApp({ to, body, lead }) {
+async function trySendWhatsApp({ to, body, lead, kind }) {
   const dest = normalizeWhatsAppTo(to);
   if (!whatsAppSenderReady() || !dest) return null;
-  const result = await sendOwnerWhatsApp({ to: dest, body, lead });
+  const result = await sendOwnerWhatsApp({ to: dest, body, lead, kind });
   return { channel: 'whatsapp', to: dest, result };
 }
 
@@ -82,7 +82,7 @@ async function trySendWhatsApp({ to, body, lead }) {
  * @param {object} [opts.lead]
  * @param {string} [opts.subject]
  */
-async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger } = {}) {
+async function dispatchAlert({ to, email, body, lead = {}, subject, channels, ledger, kind } = {}) {
   const text = body || buildLeadText(lead);
   const errors = [];
   const prefs = parseNotifyChannels(channels);
@@ -126,7 +126,12 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
 
     if (prefs.whatsapp) {
       try {
-        const wa = await trySendWhatsApp({ to, body: text, lead });
+        const wa = await trySendWhatsApp({
+          to,
+          body: text,
+          lead,
+          kind: kind || (ledger && ledger.kind),
+        });
         if (wa) return accept(wa);
       } catch (err) {
         errors.push(`whatsapp:${err?.message || err}`);

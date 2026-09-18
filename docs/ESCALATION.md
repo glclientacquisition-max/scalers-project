@@ -40,12 +40,12 @@ Helpers: `deriveEscalationStage()`, `shapeEscalationNotifyOutcome()`.
 
 1. **SMS** — TextSMS.co.ke (`TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`)
 2. **WhatsApp** — SautiKit **platform** sender on `+254709221536` (when `SAUTIKIT_WHATSAPP_NUMBER_ID` is set). Chat identity is Scalers, not the shop on that DID. Inbound replies: `POST /whatsapp/events`. Calling stays parked.
-3. **Email** — Resend → teammate email (owner `alert_email` only when the teammate number is the Alerts SMS phone)
+3. **Email** — Resend → teammate email (owner `alert_email` only when the teammate number is the Alerts phone)
 4. **Desk note** — always saved; soft success if 1–3 miss
 
 One permissioned teammate. `receives_escalation` on the directory row. Unmatched asks go to General queries / inbox catch-all with that flag. Nobody qualifies: desk note only. Do not also SMS a distinct owner.
 
-Owner prefs live on `tenants.notify_channels` (`{sms,whatsapp,email}`) and are edited in Business Settings → Agent Persona → **Notify channels**. Desk greys channels that are not platform-live yet (WhatsApp automated alerts = coming soon). Voice dispatch skips disabled prefs.
+Owner prefs live on `tenants.notify_channels` (`{sms,whatsapp,email}`) and are edited in Business Settings → **Alerts**. Voice dispatch skips disabled prefs. Staff WhatsApp originate uses Meta utility templates ([`WHATSAPP_TEMPLATES.md`](./WHATSAPP_TEMPLATES.md)).
 
 Boot + `/healthz` expose SMS `configured` vs **`verified`** (live balance probe). Env present ≠ working key.
 

@@ -167,7 +167,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Channel dispatch | Priority chain | `src/notifications/dispatch.js` | TextSMS → WhatsApp → email | Direct module calls | CORE |
 | Event model | Typed post-call alerts | `src/notifications/events.js` | One shape per alert kind | Inline strings | CORE |
 | SMS | TextSMS.co.ke | `src/notifications/sms.js` | Private-beta primary | — | CORE |
-| WhatsApp | SautiKit Messaging | `src/notifications/whatsapp.js` + `src/sautikit/whatsappInbound.js` | Platform sender `+254709221536`; inbound `whatsapp.event.received` (not DID tenant lookup). Calling parked. | Shop Embedded Signup | CORE (Phase 1) |
+| WhatsApp | SautiKit Messaging | `src/notifications/whatsapp.js` + `whatsappTemplates.js` + `src/sautikit/whatsappInbound.js` | Platform sender `+254709221536`; staff originate = utility templates; inbound ack only. Calling parked. | Shop Embedded Signup | CORE (Phase 1) |
 | Email | Resend | `src/notifications/email.js` | Fallback | — | CORE |
 | Message contract | What owner vs caller receives | `docs/CALL_MESSAGE_CONTRACT.md` | Product contract | — | CORE |
 

@@ -43,7 +43,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Screen | Blocks |
 | --- | --- |
 | Assistant | Assistant (name, tone) → Business (name, type) → Public contacts |
-| Alerts | SMS phone, email, notify channels, text customers, text back missed calls |
+| Alerts | Alert phone, email, notify channels, text customers, text back missed calls |
 | Catalog | Services → Products |
 | Hours | Days → When closed |
 | Locations | Places: label, area, landmark, directions, coverage |

@@ -36,7 +36,7 @@
     "smoke:escalation": "node scripts/smoke-escalation-scenarios.js",
     "smoke:mvp": "node scripts/smoke-mvp-retail.js",
     "smoke:one-person": "node scripts/smoke-one-person-voice.js",
-    "test:notify": "node --test tests/textsmsNotify.test.js tests/sendLedger.test.js tests/messageTemplates.test.js tests/notifyEvents.test.js tests/callerSms.test.js tests/whatsappDidSmoke.test.js tests/whatsappInbound.test.js",
+    "test:notify": "node --test tests/textsmsNotify.test.js tests/sendLedger.test.js tests/messageTemplates.test.js tests/notifyEvents.test.js tests/callerSms.test.js tests/whatsappDidSmoke.test.js tests/whatsappInbound.test.js tests/whatsappTemplates.test.js",
     "test:mvp": "npm run test:brain && npm run test:knowledge && npm run smoke:retail && npm run smoke:home && npm run smoke:escalation && npm run smoke:mvp && npm run smoke:one-person && npm run test:notify && node --test tests/smokeDbTenant.test.js tests/deskResilience.test.js tests/inboxAnatomy.test.js tests/inboxHref.test.js",
     "eval:brain": "evalite evals/caller-memory.eval.ts",
     "smoke:db": "node scripts/smoke-db.js",

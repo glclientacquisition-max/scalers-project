@@ -70,7 +70,7 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="owner">
-              SMS phone
+              Alert phone
             </label>
             <input
               id="owner"
