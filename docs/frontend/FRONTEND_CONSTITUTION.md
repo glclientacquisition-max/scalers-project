@@ -121,7 +121,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 | Route | Job | Layout |
 | --- | --- | --- |
 | `/home` | Exclusive map: return calls, Holds, Visits or Bookings by niche. Briefing names the next action. Line. One CTA into the sharpest queue. | Rail + remaining width. Command Center. Not a chat list. |
-| `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Rail, Mail list, empty pane on `md+`. Phone header + tabs, full list. |
+| `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Rail, Mail list, empty pane on `md+`. List `20/24/28rem` then resizable. Phone header + tabs, full list. |
 | `/calls/[id]` | Decide + reply | Rail, Mail list, stacked call on `md+`. Phone full call. WhatsApp CTA brand-blue fill, green glyph. |
 | `/contacts` | Named callers | Rail + remaining width. Existing contacts surface. Not a CRM. |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
@@ -148,7 +148,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 
 ## 8. Motion and chrome
 
-- **Owner desk shell:** `md+` icon rail is `DESK_LINKS` (Scalers mark on top, Sign out at the foot). No top destination bar. Do not put the workspace name in the rail. Overview `h1` and Business Profile `h1` own that name. Below `md`, a phone header (mark + Sign out) and the same `DESK_LINKS` as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
+- **Owner desk shell:** `md+` icon rail is `DESK_LINKS` (Scalers mark on top, Sign out at the foot). Icon-only rail hits show the destination name on hover and keyboard focus. No top destination bar. Do not put the workspace name in the rail. Overview `h1` and Business Profile `h1` own that name. Below `md`, a phone header (mark + Sign out) and the same `DESK_LINKS` as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
 - Sign out is never a sixth tab. Rail foot on `md+`. Phone header below `md`.
 - The rail **is** the desktop `DESK_LINKS`. Do not add a second nav tree. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.

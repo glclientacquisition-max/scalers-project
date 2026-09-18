@@ -3,7 +3,7 @@ import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { CallTranscript } from "@/components/CallTranscript";
 import { DeskPhoneHeader, DeskRail, DeskTabBar } from "@/components/DeskNav";
-import { InboxColumn, InboxThread } from "@/components/InboxColumn";
+import { InboxSplit } from "@/components/InboxSplit";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow } from "@/components/InboxItemRow";
 import { ThemePicker } from "@/components/ThemePicker";
@@ -169,11 +169,8 @@ export default function DevInboxPage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <DeskPhoneHeader />
         <main className="min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:overflow-hidden md:p-0">
-          <div
-            data-desk-bleed
-            className="flex min-h-0 flex-1 flex-col md:h-full md:flex-row md:items-stretch md:overflow-hidden"
-          >
-            <InboxColumn>
+          <InboxSplit
+            list={
               <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 pt-4">
                 <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Inbox</h1>
                 <p className="mt-1 text-[13px] leading-5 text-ink-soft">5 need you</p>
@@ -201,8 +198,8 @@ export default function DevInboxPage() {
                   ))}
                 </ul>
               </div>
-            </InboxColumn>
-            <InboxThread>
+            }
+            thread={
               <div className="space-y-6 p-4 sm:p-6">
                 <div className="min-w-0">
                   <h2 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
@@ -248,8 +245,8 @@ export default function DevInboxPage() {
                   <p>Assist: Handled</p>
                 </div>
               </div>
-            </InboxThread>
-          </div>
+            }
+          />
         </main>
         <DeskTabBar />
       </div>

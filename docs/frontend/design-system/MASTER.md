@@ -110,7 +110,8 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as `DeskRail`. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out is the rail foot on `md+` and the phone header below `md`. |
-| Desk rail | `DeskRail`. `md+` only. Mark on top. Five destination icons. Sign out at the foot. No top destination links. |
+| Desk rail | `DeskRail`. `md+` only. Mark on top. Five destination icons. Sign out at the foot. No top destination links. Icon-only hits show `DeskHint` on hover and focus (Overview, Inbox, Contacts, Business, Wallet, Sign out). |
+| Inbox split | `InboxSplit`. List `20rem` from `md`, `24rem` from `lg`, `28rem` from `xl`. Drag or arrow keys resize. Floor 18rem list, 20rem thread. Cap 40rem. Stored in `localStorage["scalers-inbox-split"]`. Double-click the separator resets. |
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |

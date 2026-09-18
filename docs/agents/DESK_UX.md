@@ -34,7 +34,7 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 3. Follow repo frontend design rules (one composition, no hero cards/overlays, expressive type, atmospheric background; avoid purple-on-white / cream-serif-terracotta clichés).
 4. **Platform design mandate (always on):** Follow `.cursor/rules/scalers-design-ux.mdc` on every UI change: zero fluff copy, no em/en dashes in UI text, dense tables over stacked cards, Inbox list beside the call from `md`, call pane stacks, primary CTA fill `#005CCC` (white label; ring `#0096FF`), sticky global Save top-right, muted secondary actions, Tailwind-only utilities, `textarea rows={2}`, focus rings `focus:ring-[#0096FF]`. List verbs share `btnDock`. Fluid: one composition, 44px floor, `min-w-0` text. List previews are one truncated line (`deskPreviewClass`).
 5. **Motion:** Follow `.cursor/skills/desk-motion/SKILL.md`. Only pending, live, land, shift, press. No Lottie or landing-rise on desk.
-6. Phone and desktop share one composition. Phone lists and a full call. `md+` Inbox is Mail rows beside the thread or an empty pane. Controls do not change size by label length.
+6. Phone and desktop share one composition. Phone lists and a full call. `md+` Inbox is Mail rows beside the thread or an empty pane. List width is `20rem` / `24rem` / `28rem`, then resizable. Controls do not change size by label length.
 7. Auth: owner sessions use Supabase SSR + RLS; never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 8. Onboarding redirect for blank/default prompts stays intact unless Platform/Brain agree to change the gate.
 
