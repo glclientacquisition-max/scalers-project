@@ -1,12 +1,7 @@
 /** Visits List, Today, and Week. One book: requested and confirmed visits. */
 
 import type { InboxItem, InboxJob } from "@/lib/inboxPurpose";
-import {
-  eatYmd,
-  groupVisitsForWeek,
-  visitInstant,
-  type CalendarVisit,
-} from "@/lib/visitCalendar";
+import { eatYmd, visitInstant, weekDays } from "@/lib/visitCalendar";
 
 function jobStatus(job: InboxJob): string {
   return String(job.status || "").toLowerCase();
@@ -43,40 +38,8 @@ export function visitBoardInstant(item: InboxItem, now = new Date()): Date | nul
   return null;
 }
 
-function asCalendarVisit(item: InboxItem): CalendarVisit | null {
-  if (!item.job || !isVisitBoardJob(item.job)) return null;
-  return {
-    id: item.job.id,
-    status: item.job.status,
-    service_name: item.job.service_name,
-    when_text: item.job.when_text,
-    window_start: item.job.window_start,
-    window_end: item.job.window_end,
-    address_landmark: item.job.address_landmark,
-    caller_name: item.callerName,
-  };
-}
-
-export function groupVisitBoardForWeek(
-  items: InboxItem[],
-  monday: string,
-  now = new Date()
-) {
-  const visits = visitBoardItems(items)
-    .map(asCalendarVisit)
-    .filter((row): row is CalendarVisit => Boolean(row));
-  return groupVisitsForWeek(visits, monday, now);
-}
-
-export function visitBoardForDay(
-  items: InboxItem[],
-  ymd: string,
-  now = new Date()
-): InboxItem[] {
-  const rows = visitBoardItems(items).filter((item) => {
-    const instant = visitBoardInstant(item, now);
-    return instant ? eatYmd(instant) === ymd : false;
-  });
+function sortBySlot(items: InboxItem[], now: Date): InboxItem[] {
+  const rows = [...items];
   rows.sort((a, b) => {
     const ta = visitBoardInstant(a, now)?.getTime() || 0;
     const tb = visitBoardInstant(b, now)?.getTime() || 0;
@@ -85,14 +48,31 @@ export function visitBoardForDay(
   return rows;
 }
 
-export function formatSlotClock(item: InboxItem, now = new Date()): string {
-  const text = String(item.job?.when_text || "").trim();
-  if (text) return text;
-  const instant = visitBoardInstant(item, now);
-  if (!instant) return "Time TBD";
-  return new Intl.DateTimeFormat("en-KE", {
-    timeZone: "Africa/Nairobi",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(instant);
+export function visitBoardForDay(
+  items: InboxItem[],
+  ymd: string,
+  now = new Date()
+): InboxItem[] {
+  return sortBySlot(
+    visitBoardItems(items).filter((item) => {
+      const instant = visitBoardInstant(item, now);
+      return instant ? eatYmd(instant) === ymd : false;
+    }),
+    now
+  );
+}
+
+export function visitBoardForWeek(
+  items: InboxItem[],
+  monday: string,
+  now = new Date()
+): InboxItem[] {
+  const keys = new Set(weekDays(monday, now).map((day) => day.key));
+  return sortBySlot(
+    visitBoardItems(items).filter((item) => {
+      const instant = visitBoardInstant(item, now);
+      return instant ? keys.has(eatYmd(instant)) : false;
+    }),
+    now
+  );
 }

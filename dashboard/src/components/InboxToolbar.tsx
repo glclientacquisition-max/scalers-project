@@ -14,8 +14,6 @@ export function InboxToolbar({
   caption,
   vertical,
   view,
-  week,
-  day,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
@@ -23,8 +21,6 @@ export function InboxToolbar({
   caption?: string;
   vertical?: string | null;
   view?: string;
-  week?: string;
-  day?: string;
 }) {
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
@@ -33,7 +29,7 @@ export function InboxToolbar({
     (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
   const weekView = active === "job" && view === "week";
   const todayView = active === "job" && view === "today";
-  const boardView = weekView || todayView;
+  const dateFilter = weekView || todayView;
 
   return (
     <header className="space-y-6">
@@ -48,9 +44,7 @@ export function InboxToolbar({
           className="flex w-full min-w-0 gap-2 sm:max-w-sm"
         >
           <input type="hidden" name="purpose" value={active} />
-          {boardView ? <input type="hidden" name="view" value={view} /> : null}
-          {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
-          {todayView && day ? <input type="hidden" name="day" value={day} /> : null}
+          {dateFilter ? <input type="hidden" name="view" value={view} /> : null}
           <label className="sr-only" htmlFor="inbox-search">
             Search inbox
           </label>
@@ -79,16 +73,14 @@ export function InboxToolbar({
           href: callsHref({
             purpose: item.id,
             q: q || undefined,
-            view: item.id === "job" && boardView ? view : undefined,
-            week: item.id === "job" && weekView ? week : undefined,
-            day: item.id === "job" && todayView ? day : undefined,
+            view: item.id === "job" && dateFilter ? view : undefined,
           }),
         }))}
       />
 
       {active === "job" ? (
         <FilterTabs
-          label="Visit layout"
+          label="Visit filter"
           active={weekView ? "week" : todayView ? "today" : "list"}
           items={[
             {
@@ -103,7 +95,6 @@ export function InboxToolbar({
                 purpose: "job",
                 q: q || undefined,
                 view: "today",
-                day,
               }),
             },
             {
@@ -113,7 +104,6 @@ export function InboxToolbar({
                 purpose: "job",
                 q: q || undefined,
                 view: "week",
-                week,
               }),
             },
           ]}

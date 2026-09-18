@@ -19,8 +19,8 @@ describe("inbox outside and inside anatomy", () => {
   it("defines list as who, one preview, stamp or time, one dock verb", () => {
     assert.match(calls, /Who first\. Work second\. Stamp or time as meta/);
     assert.match(calls, /Do not stack a second detail line under Work on mixed filters/);
-    assert.match(calls, /Visit layout uses FilterTabs/);
-    assert.match(calls, /That row is the only layout switcher/);
+    assert.match(calls, /Visit filter uses FilterTabs/);
+    assert.match(calls, /That row is the only date filter/);
     assert.match(calls, /Reopen lives on the call, never beside Done on the list/);
     assert.match(row, /function InboxPhoneRow/);
     const phone = row.slice(row.indexOf("export function InboxPhoneRow"));
@@ -37,24 +37,19 @@ describe("inbox outside and inside anatomy", () => {
   });
 
   it("uses FilterTabs for List Today Week, never a filled selected layout", () => {
-    const today = read("dashboard/src/components/RunSheetToday.tsx");
-    const week = read("dashboard/src/components/VisitWeekCalendar.tsx");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
-    assert.match(toolbar, /label="Visit layout"/);
+    assert.match(toolbar, /label="Visit filter"/);
     assert.match(toolbar, /<FilterTabs/);
     assert.match(toolbar, /label: "Today"/);
     assert.match(toolbar, /label: "Week"/);
     assert.doesNotMatch(toolbar, /btnPrimary/);
-    assert.doesNotMatch(today, /weekHref/);
-    assert.doesNotMatch(today, />\s*Week\s*</);
-    assert.doesNotMatch(week, /RequestStatusToggle/);
+    assert.doesNotMatch(page, /RunSheetToday/);
+    assert.doesNotMatch(page, /VisitWeekCalendar/);
     assert.doesNotMatch(page, /weekHref=/);
-    assert.match(today, /todayEmpty/);
-    assert.match(today, />\s*List\s*</);
-    const todayPhone = today.slice(today.indexOf("<ul className=\"mt-4"), today.indexOf("hidden md:block"));
-    assert.match(todayPhone, /callerName \|\| "Caller"/);
-    assert.match(todayPhone, /formatSlotClock/);
-    assert.doesNotMatch(todayPhone, /placeFor/);
+    assert.match(page, /todayEmpty/);
+    assert.match(page, />\s*List\s*</);
+    assert.match(page, /InboxPhoneRow/);
+    assert.match(page, /InboxTableRow/);
   });
 
   it("defines the call as decide and reply, not operator telemetry", () => {
