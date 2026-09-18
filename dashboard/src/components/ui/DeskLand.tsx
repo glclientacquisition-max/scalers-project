@@ -8,6 +8,7 @@ import {
   useState,
   type ElementType,
   type ReactNode,
+  type Ref,
 } from "react";
 import {
   DESK_LAND_MS,
@@ -78,18 +79,23 @@ export function DeskLandSurface({
   as: Tag = "div",
   className,
   children,
+  rowRef,
+  ...rest
 }: {
   id: string;
   as?: ElementType;
   className?: string;
   children: ReactNode;
-}) {
+  rowRef?: Ref<HTMLElement>;
+} & Record<string, unknown>) {
   const landed = useContext(DeskLandCtx).has(id);
   return (
     <Tag
+      ref={rowRef}
       className={[className, landed ? deskJustLandedClass : ""]
         .filter(Boolean)
         .join(" ")}
+      {...rest}
     >
       {children}
     </Tag>

@@ -136,3 +136,35 @@ export function callFromContactHref(sp: {
     page: sp.page,
   });
 }
+
+/** Contact opened from the Inbox list. Back restores that pile. */
+export function contactFromInboxHref(
+  contactId: string,
+  ret: InboxReturn = {}
+): string {
+  const q = new URLSearchParams();
+  applyInboxQuery(q, ret, true);
+  q.set("from", "inbox");
+  return `/contacts/${contactId}?${q.toString()}`;
+}
+
+export function inboxFromContactHref(sp: {
+  from?: string;
+  purpose?: string;
+  status?: string;
+  view?: string;
+  week?: string;
+  day?: string;
+  q?: string;
+  page?: string;
+}): string | null {
+  if (sp.from !== "inbox") return null;
+  return inboxReturnHref({
+    purpose: pile({ purpose: sp.purpose, status: sp.status }),
+    view: sp.view,
+    week: sp.week,
+    day: sp.day,
+    q: sp.q,
+    page: sp.page,
+  });
+}

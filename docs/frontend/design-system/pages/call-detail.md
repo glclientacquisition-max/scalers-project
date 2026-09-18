@@ -13,7 +13,7 @@
 
 **Left pane order:** identity (name, stamp, status pills, time, phone), Summary, Actions (one filled next step, then WhatsApp / SMS / Done / Archive), Visit/Hold schedule if present. Supporting facts (`dl`) and recording are a de-emphasized footer. Conversation sits in the right pane on `lg+`; below `lg` it stacks after Actions and before the footer.
 
-**Back:** `DeskBack`, 44px. Label is Inbox. Restores pile, search, page, and visit layout. Contact opened from this page uses `DeskBack` Call.
+**Back:** `DeskBack`, 44px. Label is Inbox. Restores pile, search, page, and visit layout. Contact opened from this page uses `DeskBack` Call. Contact opened from Inbox uses `DeskBack` Inbox.
 
 **Full copy lives here.** Inbox and Contacts show one truncated preview. Want, Done, mood, and next unwrap on this page. Do not truncate the Summary card.
 

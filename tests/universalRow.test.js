@@ -12,6 +12,7 @@ function read(rel) {
 describe("universal row anatomy", () => {
   const row = read("dashboard/src/components/ui/deskRow.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
+  const avatar = read("dashboard/src/components/InboxRowAvatar.tsx");
   const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const master = read("docs/frontend/design-system/MASTER.md");
 
@@ -39,8 +40,11 @@ describe("universal row anatomy", () => {
   });
 
   it("applies the anatomy to Inbox phone and table rows", () => {
-    const uses = inbox.match(/RowIdentity/g) || [];
-    assert.ok(uses.length >= 4, `RowIdentity in phone + 3 table kinds, got ${uses.length}`);
+    const who = inbox.match(/<InboxRowWho /g) || [];
+    assert.equal(who.length, 3, `InboxRowWho in 3 table kinds, got ${who.length}`);
+    const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
+    assert.match(phone, /<InboxRowAvatar/);
+    assert.match(avatar, /RowIdentity name=\{name\}/);
     assert.match(inbox, /RowStateDot show=\{item\.needsYou\}/);
     assert.match(inbox, /deskRowWeightClass\(item\.needsYou\)/);
     assert.match(inbox, /deskPreviewClass/);
