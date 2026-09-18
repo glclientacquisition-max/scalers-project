@@ -13,6 +13,7 @@ import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { CallRecording } from "@/components/CallRecording";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
+import { CallTranscript } from "@/components/CallTranscript";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import {
@@ -47,45 +48,6 @@ import {
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
-
-function ChatBubble({ turn }: { turn: TranscriptRow }) {
-  const speaker = String(turn.speaker || "").toLowerCase();
-  const isCaller = speaker === "caller";
-  const isSystem = speaker === "system";
-
-  if (isSystem) {
-    return (
-      <div className="flex justify-center px-2">
-        <p className="max-w-[85%] rounded-full bg-surface-muted/80 px-4 py-1.5 text-center text-xs text-ink-soft">
-          {turn.text_content}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={["flex px-1", isCaller ? "justify-start" : "justify-end"].join(" ")}>
-      <div
-        className={[
-          "max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[75%]",
-          isCaller
-            ? "rounded-bl-md bg-bubble-caller text-ink"
-            : "rounded-br-md bg-surface-muted/90 text-ink",
-        ].join(" ")}
-      >
-        <p
-          className={[
-            "text-[11px] font-medium uppercase tracking-wide",
-            isCaller ? "text-bubble-caller-ink" : "text-ink-soft",
-          ].join(" ")}
-        >
-          {isCaller ? "Caller" : "Receptionist"}
-        </p>
-        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.text_content}</p>
-      </div>
-    </div>
-  );
-}
 
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
@@ -441,24 +403,7 @@ export default async function CallDetailPage({
         </div>
 
         <div className="order-4 min-h-0 min-w-0 space-y-8 lg:order-none lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
-          <section>
-            <h2 className="font-display text-2xl tracking-tight text-ink">
-              Conversation
-            </h2>
-            <div className="mt-4 rounded-2xl border border-line bg-surface px-2 py-4 sm:px-4">
-              {turns.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-ink-soft">
-                  No conversation.
-                </p>
-              ) : (
-                <div className="space-y-2.5">
-                  {turns.map((t) => (
-                    <ChatBubble key={t.id} turn={t} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
+          <CallTranscript turns={turns} />
 
           <CallFaqSuggestions
             tenantId={tenant.id}

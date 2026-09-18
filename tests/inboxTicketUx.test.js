@@ -46,3 +46,17 @@ describe("inbox ticket action chrome", () => {
     assert.match(markup, /label="Reply on WhatsApp"/);
   });
 });
+
+describe("inbox ticket transcript preview", () => {
+  it("previews the last turns and expands the full thread on demand", () => {
+    const src = read("dashboard/src/components/CallTranscript.tsx");
+    const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
+    assert.match(detail, /<CallTranscript turns=\{turns\} \/>/);
+    assert.match(src, /PREVIEW_TURNS = 3/);
+    assert.match(src, /View full conversation/);
+    assert.match(src, /Hide conversation/);
+    assert.match(src, /No conversation\./);
+    assert.match(src, /from-surface to-transparent/);
+    assert.doesNotMatch(src, /[\u2014\u2013]/);
+  });
+});

@@ -64,7 +64,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(callDetail, /Reopen lives here/);
     assert.match(callDetail, /Could not save\./);
     assert.doesNotMatch(detail, />\s*Open contact\s*</);
-    assert.match(detail, /No conversation\./);
+    assert.match(read("dashboard/src/components/CallTranscript.tsx"), /No conversation\./);
     assert.doesNotMatch(detail, / · \{row\.primary_intent\}/);
     assert.doesNotMatch(detail, /Alert sent:/);
     assert.doesNotMatch(detail, /No transcript rows for this call/);

@@ -23,6 +23,6 @@
 
 **Facts:** Duration. Assist in owner language (`callResolutionLabel`). Escalated-to name if present. No brain intent ids, no Alert sent, no middle-dot meta.
 
-**Transcript:** Empty copy is `No conversation.` FAQ ideas stay under the transcript.
+**Transcript:** Last few turns by default, with a fade on the leading edge. `View full conversation` expands the thread inline. `Hide conversation` collapses it. Empty copy is `No conversation.` FAQ ideas stay under the transcript.
 
 **One recording.** A single `CallRecording` under supporting facts. Empty and player are variants of that component, not two mounts.
