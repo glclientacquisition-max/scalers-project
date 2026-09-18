@@ -91,6 +91,16 @@ describe("theme activation", () => {
     assert.match(read("dashboard/src/app/dev/inbox/page.tsx"), /desk-theme/);
   });
 
+  it("keeps the desk header an opaque surface with theme-aware lockup ink", () => {
+    const layout = read("dashboard/src/app/(desk)/layout.tsx");
+    assert.match(layout, /bg-surface/);
+    assert.doesNotMatch(layout, /bg-surface\/95/);
+    assert.doesNotMatch(layout, /backdrop-blur/);
+    const lockup = read("dashboard/src/components/brand/BrandMark.tsx");
+    assert.match(lockup, /onDark \? "text-white" : "text-ink"/);
+    assert.doesNotMatch(lockup, /text-brand-900/);
+  });
+
   it("offers System, Light, Dark as an instant device preference", () => {
     const picker = read("dashboard/src/components/ThemePicker.tsx");
     assert.match(picker, /role="radiogroup"/);

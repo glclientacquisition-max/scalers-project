@@ -99,7 +99,7 @@ export function BrandLockup({
           className={[
             "font-display tracking-tight",
             s.type,
-            onDark ? "text-white" : "text-brand-900",
+            onDark ? "text-white" : "text-ink",
           ].join(" ")}
         >
           {name}
