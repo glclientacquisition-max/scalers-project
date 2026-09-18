@@ -43,6 +43,13 @@ function pageNum(raw?: number | string): number | undefined {
   return Math.floor(n);
 }
 
+function applyViewQuery(q: URLSearchParams, ret: InboxReturn, id?: string) {
+  if (id !== "job" && id !== "hold") return;
+  if (ret.view === "today" || (id === "job" && ret.view === "week")) q.set("view", ret.view);
+  if (id === "job" && ret.view === "week" && ret.week) q.set("week", String(ret.week));
+  if (ret.view === "today" && ret.day) q.set("day", String(ret.day));
+}
+
 function applyInboxQuery(q: URLSearchParams, ret: InboxReturn, list: boolean) {
   const id = pile(ret);
   if (id) {
@@ -54,11 +61,7 @@ function applyInboxQuery(q: URLSearchParams, ret: InboxReturn, list: boolean) {
   if (text) q.set("q", text);
   const page = pageNum(ret.page);
   if (page) q.set("page", String(page));
-  if (id === "job") {
-    if (ret.view === "today" || ret.view === "week") q.set("view", ret.view);
-    if (ret.view === "week" && ret.week) q.set("week", String(ret.week));
-    if (ret.view === "today" && ret.day) q.set("day", String(ret.day));
-  }
+  applyViewQuery(q, ret, id);
 }
 
 export function inboxRecordHref(callId: string, ret: InboxReturn = {}): string {
@@ -107,11 +110,7 @@ export function contactFromCallHref(
   if (text) q.set("q", text);
   const page = pageNum(ret.page);
   if (page) q.set("page", String(page));
-  if (id === "job") {
-    if (ret.view === "today" || ret.view === "week") q.set("view", ret.view);
-    if (ret.view === "week" && ret.week) q.set("week", String(ret.week));
-    if (ret.view === "today" && ret.day) q.set("day", String(ret.day));
-  }
+  applyViewQuery(q, ret, id);
   return `/contacts/${contactId}?${q.toString()}`;
 }
 

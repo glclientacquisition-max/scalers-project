@@ -19,8 +19,8 @@ describe("inbox outside and inside anatomy", () => {
   it("defines list as who, one preview, stamp or time, one dock verb", () => {
     assert.match(calls, /Who first\. Work second\. Stamp or time as meta/);
     assert.match(calls, /Do not stack a second detail line under Work on mixed filters/);
-    assert.match(calls, /Visit sort uses FilterTabs/);
-    assert.match(calls, /Work is the diary of that same book/);
+    assert.match(calls, /Hold sort/);
+    assert.match(calls, /Anytime stays on List/);
     assert.match(calls, /Reopen lives on the call, never beside Done on the list/);
     assert.match(row, /function InboxPhoneRow/);
     const phone = row.slice(row.indexOf("export function InboxPhoneRow"));
@@ -59,8 +59,24 @@ describe("inbox outside and inside anatomy", () => {
     assert.doesNotMatch(page, /weekHref=/);
     const todayPhone = today.slice(today.indexOf("<ul className=\"mt-4"), today.indexOf("hidden md:block"));
     assert.match(todayPhone, /callerName \|\| "Caller"/);
-    assert.match(todayPhone, /formatSlotClock/);
+    assert.match(todayPhone, /clockFor/);
     assert.doesNotMatch(todayPhone, /placeFor/);
+  });
+
+  it("uses FilterTabs for Holds List and Work, Today only", () => {
+    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const today = read("dashboard/src/components/RunSheetToday.tsx");
+    const sheet = read("dashboard/src/lib/holdSheet.ts");
+    assert.match(toolbar, /label="Hold sort"/);
+    assert.match(page, /holdBoardForDay/);
+    assert.match(page, /purpose="hold"/);
+    assert.match(today, /RequestStatusToggle/);
+    assert.match(today, /formatHoldClock/);
+    assert.match(sheet, /=== "open"/);
+    assert.doesNotMatch(sheet, /VisitWeekCalendar/);
+    const holdBlock = toolbar.slice(toolbar.indexOf('label="Hold sort"'), toolbar.indexOf('label="Work date"'));
+    assert.match(holdBlock, /label: "Work"/);
+    assert.doesNotMatch(holdBlock, /label: "Week"/);
   });
 
   it("defines the call as decide and reply, not operator telemetry", () => {

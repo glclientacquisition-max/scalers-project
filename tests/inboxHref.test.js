@@ -15,6 +15,8 @@ function load() {
     } from ${JSON.stringify(helperPath)};
     const cases = {
       today: inboxRecordHref("call-1", { purpose: "job", view: "today", day: "2026-09-18" }),
+      holdToday: inboxRecordHref("call-3", { purpose: "hold", view: "today", day: "2026-09-18" }),
+      backHoldToday: inboxReturnHref({ from: "hold", view: "today", day: "2026-09-18" }),
       searchPage: inboxRecordHref("call-2", { purpose: "needs", q: "Amina", page: 2 }),
       backToday: inboxReturnHref({ from: "job", view: "today", day: "2026-09-18" }),
       backSearch: inboxReturnHref({ from: "needs", q: "Amina", page: "2" }),
@@ -42,12 +44,14 @@ describe("inbox return path", () => {
   it("opens the call with the list pile, visit layout, search, and page", () => {
     const hrefs = load();
     assert.equal(hrefs.today, "/calls/call-1?from=job&view=today&day=2026-09-18");
+    assert.equal(hrefs.holdToday, "/calls/call-3?from=hold&view=today&day=2026-09-18");
     assert.equal(hrefs.searchPage, "/calls/call-2?from=needs&q=Amina&page=2");
   });
 
   it("returns Inbox to that same pile and layout", () => {
     const hrefs = load();
     assert.equal(hrefs.backToday, "/calls?purpose=job&view=today&day=2026-09-18");
+    assert.equal(hrefs.backHoldToday, "/calls?purpose=hold&view=today&day=2026-09-18");
     assert.equal(hrefs.backSearch, "/calls?purpose=needs&q=Amina&page=2");
     assert.equal(hrefs.bare, "/calls");
   });

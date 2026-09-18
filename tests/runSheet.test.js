@@ -57,7 +57,8 @@ describe("desk visit board", () => {
     assert.match(week, /md:grid md:grid-cols-7/);
     assert.match(today, /todayEmpty/);
     assert.match(today, /dayHeading/);
-    assert.doesNotMatch(today, /RequestStatusToggle/);
+    assert.match(today, /InboxJobActions/);
+    assert.match(today, /RequestStatusToggle/);
     assert.match(home, /visitBoardForDay/);
     assert.match(home, /ctaLabel = "Today"/);
     assert.equal(mondayYmd(now).startsWith("2026-09"), true);

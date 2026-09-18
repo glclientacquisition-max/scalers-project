@@ -229,13 +229,13 @@ export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
   return compareInboxRecency(a, b);
 }
 
-/** All is a tape: newest first. Other piles keep work ranking. */
+/** All and Answered are a tape: newest first. Holds List is newest open work. */
 export function orderInboxItems(
   items: InboxItem[],
   filter: InboxPurposeFilterId
 ): InboxItem[] {
   const rows = [...items];
-  if (filter === "all" || filter === "answered") {
+  if (filter === "all" || filter === "answered" || filter === "hold") {
     rows.sort(compareInboxRecency);
   }
   return rows;

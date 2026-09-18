@@ -37,6 +37,8 @@ Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Huma
 
 **Work date:** Today / Week appears only under Work. Today is this EAT day by clock, with the day heading and slot time. Requested slots for that day sit here. Week is the same book by day. Phone shows only days with work. Desktop keeps the seven-day grid. Prev / Next moves the day or week. Holds stay on Holds. Done and cancelled stay off this book.
 
+**Hold sort:** When Holds is isolated, List / Work is a second `FilterTabs` row. List is newest open holds. Pickup, order, and enquiry sit together. Anytime stays on List. Work is this EAT day by pickup clock. Open holds whose slot is today sit here. You Done there. No week grid.
+
 **Bar order (owner characters):**
 - **08:00 owner:** Needs you first. What still needs a decision.
 - **Live watcher:** All second. Newest tape, one hop from Needs you. Hangup stays here.
