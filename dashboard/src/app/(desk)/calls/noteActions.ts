@@ -68,11 +68,12 @@ export async function polishCallerNoteAction(
 export type SendCallerNoteState = {
   error?: string;
   ok?: boolean;
+  token?: number;
 };
 
-export async function sendCallerNoteAction(
-  _prev: SendCallerNoteState,
-  formData: FormData
+async function sendOwnerCallerSms(
+  formData: FormData,
+  kind: string
 ): Promise<SendCallerNoteState> {
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "Not signed in." };
@@ -95,7 +96,7 @@ export async function sendCallerNoteAction(
     client: workspace.client,
     tenantId: tenant.id,
     callId: callId || null,
-    kind: "caller_note",
+    kind,
     to: phone,
     body,
   });
@@ -137,5 +138,27 @@ export async function sendCallerNoteAction(
   }
 
   revalidatePath("/calls");
-  return { ok: true };
+  return { ok: true, token: Date.now() };
+}
+
+export async function sendCallerNoteAction(
+  _prev: SendCallerNoteState,
+  formData: FormData
+): Promise<SendCallerNoteState> {
+  return sendOwnerCallerSms(formData, "caller_note");
+}
+
+/** Manual Inbox ticket SMS. Distinct from auto-SMS on Confirm. */
+export async function sendInboxReplySms(
+  _prev: SendCallerNoteState,
+  formData: FormData
+): Promise<SendCallerNoteState> {
+  const replyId = String(formData.get("reply_id") || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9:_-]/g, "")
+    .slice(0, 80);
+  const kind = replyId
+    ? `caller_inbox_reply:${replyId}`
+    : `caller_inbox_reply:${Date.now()}`;
+  return sendOwnerCallerSms(formData, kind);
 }

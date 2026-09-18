@@ -18,10 +18,12 @@ export function RequestStatusToggle({
   id,
   status,
   extra = false,
+  banner = false,
 }: {
   id: string;
   status: string;
   extra?: boolean;
+  banner?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     updateServiceRequestStatus,
@@ -30,12 +32,13 @@ export function RequestStatusToggle({
 
   const normalized = status === "fulfilled" || status === "cancelled" ? status : "open";
   const err = ownerError(state.error);
-  const stack = extra
+  const wide = extra || banner;
+  const stack = wide
     ? "flex w-full flex-col gap-2"
     : "flex items-center justify-end";
 
   return (
-    <form action={formAction} className={extra ? "flex w-full flex-col gap-1" : "flex flex-col items-end gap-1"}>
+    <form action={formAction} className={wide ? "flex w-full flex-col gap-1" : "flex flex-col items-end gap-1"}>
       <input type="hidden" name="id" value={id} />
       <div className={stack}>
         {normalized === "open" ? (
@@ -45,11 +48,11 @@ export function RequestStatusToggle({
               name="status"
               value="fulfilled"
               disabled={pending}
-              className={extra ? `${btnPrimary} w-full` : btnDock}
+              className={wide ? `${btnPrimary} w-full` : btnDock}
               aria-label={pending ? "Saving" : "Done"}
             >
               {pending ? (
-                extra ? (
+                wide ? (
                   "Saving"
                 ) : (
                   <span aria-hidden="true" className={pendingSpinnerClass} />
@@ -58,7 +61,7 @@ export function RequestStatusToggle({
                 "Done"
               )}
             </button>
-            {extra ? (
+            {extra && !banner ? (
               <button
                 type="submit"
                 name="status"

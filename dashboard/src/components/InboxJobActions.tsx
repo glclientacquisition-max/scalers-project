@@ -18,10 +18,12 @@ export function InboxJobActions({
   id,
   status,
   extra = false,
+  banner = false,
 }: {
   id: string;
   status: string;
   extra?: boolean;
+  banner?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     updateAppointmentStatus,
@@ -32,12 +34,13 @@ export function InboxJobActions({
     ? status
     : "requested";
   const err = ownerError(state.error);
-  const stack = extra
+  const wide = extra || banner;
+  const stack = wide
     ? "flex w-full flex-col gap-2"
     : "flex items-center justify-end";
 
   return (
-    <form action={formAction} className={extra ? "flex w-full flex-col gap-1" : "flex flex-col items-end gap-1"}>
+    <form action={formAction} className={wide ? "flex w-full flex-col gap-1" : "flex flex-col items-end gap-1"}>
       <input type="hidden" name="id" value={id} />
       <div className={stack}>
         {normalized === "requested" ? (
@@ -47,11 +50,11 @@ export function InboxJobActions({
               name="status"
               value="confirmed"
               disabled={pending}
-              className={extra ? `${btnPrimary} w-full` : btnDock}
+              className={wide ? `${btnPrimary} w-full` : btnDock}
               aria-label={pending ? "Saving" : "Confirm"}
             >
               {pending ? (
-                extra ? (
+                wide ? (
                   "Saving"
                 ) : (
                   <span aria-hidden="true" className={pendingSpinnerClass} />
@@ -60,7 +63,7 @@ export function InboxJobActions({
                 "Confirm"
               )}
             </button>
-            {extra ? (
+            {extra && !banner ? (
               <button
                 type="submit"
                 name="status"
@@ -80,11 +83,11 @@ export function InboxJobActions({
               name="status"
               value="done"
               disabled={pending}
-              className={extra ? `${btnPrimary} w-full` : btnDock}
+              className={wide ? `${btnPrimary} w-full` : btnDock}
               aria-label={pending ? "Saving" : "Done"}
             >
               {pending ? (
-                extra ? (
+                wide ? (
                   "Saving"
                 ) : (
                   <span aria-hidden="true" className={pendingSpinnerClass} />
@@ -93,7 +96,7 @@ export function InboxJobActions({
                 "Done"
               )}
             </button>
-            {extra ? (
+            {extra && !banner ? (
               <button
                 type="submit"
                 name="status"

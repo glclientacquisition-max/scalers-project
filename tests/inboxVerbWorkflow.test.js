@@ -455,16 +455,14 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.doesNotMatch(desktop, /Mark unread|Snooze/);
   });
 
-  it("ticket offers Unarchive when archived and hides Mark done on visits and holds", () => {
+  it("ticket stamp is read-only. Archive lives on More", () => {
     const ticket = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
-    const toggle = read("dashboard/src/components/LeadStatusToggle.tsx");
-    assert.match(ticket, /MarkLeadUnarchiveButton/);
-    assert.match(ticket, /leadStatus === "archived"/);
-    assert.match(ticket, /!job && !hold/);
-    assert.match(toggle, /id: "new"/);
-    assert.match(toggle, /id: "contacted"/);
-    assert.match(toggle, /id: "resolved"/);
-    assert.doesNotMatch(toggle, /id: "archived"/);
+    const view = read("dashboard/src/components/InboxTicketView.tsx");
+    assert.doesNotMatch(ticket, /LeadStatusToggle/);
+    assert.doesNotMatch(ticket, /MarkLeadUnarchiveButton/);
+    assert.doesNotMatch(ticket, /MarkLeadDoneButton/);
+    assert.match(view, /InboxPurposeChip/);
+    assert.match(view, /updateLeadStatus\(callId, "archived"\)/);
   });
 
   it("FilterTabs have no Unread or Snoozed. Archived is a folder row", () => {
