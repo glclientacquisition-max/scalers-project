@@ -24,18 +24,9 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 - No number: empty.
 - Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
 
-**Overflow (More, long-press, right-click):** One short list on every row. Same verbs as Mail or WhatsApp. Hairline separators group stay vs leave. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
+**Overflow (More, long-press, right-click):** Archive only. Hover More on desktop. More on phone opens an Archive sheet. Long-press on phone enters bulk select. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
 
-Stay:
-- Select
-- Pin (Unpin when pinned)
-
-Leave:
-- Mark done (return calls only. Hidden when the dock is Confirm or hold Done, when the row is live, or when it is already Done)
-- Archive (leaves the work piles; sits in Archived)
-- Unarchive (Archived pile and archived ticket only. Writes New)
-
-Not in this list: Mark unread, Snooze, Mute, Assign, Label, Delete (owners cannot hard-delete; Archive is the leave verb). Bulk bar: Mark done, Archive, Pin, Cancel. Archived pile: Unarchive, Pin, Cancel. No More sheet.
+Not list verbs: Select, Pin, Mark done, Unarchive, Mark unread, Snooze, Mute, Assign, Label, Delete. Bulk bar: count plus Archive. Confirm or hold Done only when every selected row shares that same valid action. No More sheet on the bulk bar.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Visit not booked** (hospitality: **Booking not booked**) and use Call plus WhatsApp. Intent-only holds stamp **Hold not saved**. Do not show Confirm or Done without a work row.
 

@@ -13,15 +13,13 @@ import {
   deskShiftClass,
   focusRingVisible,
   pendingSpinnerClass,
-  pendingSpinnerInkClass,
 } from "@/components/ui/deskChrome";
 import {
   inboxArchive,
-  inboxMarkDone,
-  inboxTogglePin,
-  inboxUnarchive,
+  inboxConfirm,
+  inboxHoldDone,
 } from "@/lib/inboxLeadActions";
-import { inboxCanMarkDone } from "@/lib/inboxListVerbs";
+import { inboxBulkSharedAction } from "@/lib/inboxListVerbs";
 import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
 const iconHit = [
@@ -45,14 +43,6 @@ function BackGlyph() {
   );
 }
 
-function PinGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-      <path d="M9.4 1.8 8 3.2 6.1 2.7 4.8 4l2.7 2.7-.9 3.1 1.1 1.1 3.1-.9L13 12.7l1.3-1.3-.5-1.9 1.4-1.4-1.4-1.4z" />
-    </svg>
-  );
-}
-
 function ArchiveGlyph() {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
@@ -63,20 +53,6 @@ function ArchiveGlyph() {
       />
       <path d="M2.2 3.4h11.6v1.8H2.2z" stroke="currentColor" strokeWidth="1.4" />
       <path d="M8 7.2v3.4M6.3 9.1 8 10.8l1.7-1.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function UnarchiveGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
-      <path
-        d="M2.5 5.2h11v7.3c0 .6-.5 1.1-1.1 1.1H3.6c-.6 0-1.1-.5-1.1-1.1z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path d="M2.2 3.4h11.6v1.8H2.2z" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M8 10.6V7.2M6.3 8.3 8 6.6l1.7 1.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -189,7 +165,7 @@ export function InboxSelectChrome({
   );
 }
 
-type BulkKind = "done" | "archive" | "unarchive" | "pin";
+type BulkKind = "confirm" | "done" | "archive";
 
 export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const ui = useInboxRowUi();
@@ -200,38 +176,35 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
 
   const { selected, patch, clear } = ui;
   const chosen = items.filter((item) => selected.includes(item.id));
-  const allPinned = chosen.length > 0 && chosen.every((item) => item.pinnedAt);
-  const allArchived = chosen.length > 0 && chosen.every((item) => itemIsArchived(item));
-  const anyDone = chosen.some((item) => inboxCanMarkDone(item));
+  const shared = inboxBulkSharedAction(chosen);
 
   async function run(kind: BulkKind) {
     setBusy(true);
     setError(null);
-    const unpin = allPinned;
     for (const item of chosen) {
-      if (kind === "pin" && unpin && !item.pinnedAt) continue;
-      if (kind === "pin" && !unpin && item.pinnedAt) continue;
-      if (kind === "done" && !inboxCanMarkDone(item)) continue;
+      if (kind === "confirm" && String(item.job?.status || "").toLowerCase() !== "requested") {
+        continue;
+      }
+      if (kind === "done" && String(item.hold?.status || "").toLowerCase() !== "open") {
+        continue;
+      }
       if (kind === "archive" && itemIsArchived(item)) continue;
-      if (kind === "unarchive" && !itemIsArchived(item)) continue;
       const res =
-        kind === "done"
-          ? await inboxMarkDone(item)
-          : kind === "archive"
-            ? await inboxArchive(item)
-            : kind === "unarchive"
-              ? await inboxUnarchive(item)
-              : await inboxTogglePin(item);
+        kind === "confirm"
+          ? await inboxConfirm(item)
+          : kind === "done"
+            ? await inboxHoldDone(item)
+            : await inboxArchive(item);
       if (res.error) {
         setError(res.error);
         setBusy(false);
         return;
       }
-      if (kind === "archive" || kind === "unarchive") {
+      if (kind === "archive") {
         patch(item.id, { hidden: true });
       }
     }
-    if (kind === "done" || kind === "archive" || kind === "unarchive") clear();
+    if (kind === "done" || kind === "archive" || kind === "confirm") clear();
     setBusy(false);
     router.refresh();
   }
@@ -242,7 +215,16 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     </p>
   ) : null;
 
-  const fileKind = allArchived ? "unarchive" : "archive";
+  const sharedVerb =
+    shared === "confirm" ? (
+      <button type="button" className={btnDock} disabled={busy} aria-label="Confirm" onClick={() => run("confirm")}>
+        {busy ? <span aria-hidden="true" className={pendingSpinnerClass} /> : "Confirm"}
+      </button>
+    ) : shared === "done" ? (
+      <button type="button" className={btnDock} disabled={busy} aria-label="Done" onClick={() => run("done")}>
+        {busy ? <span aria-hidden="true" className={pendingSpinnerClass} /> : "Done"}
+      </button>
+    ) : null;
 
   return (
     <>
@@ -251,49 +233,26 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
           <BackGlyph />
         </button>
         <p className="mr-auto min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
-        <button
-          type="button"
-          className={iconHit}
-          disabled={busy}
-          aria-label={allPinned ? "Unpin" : "Pin"}
-          onClick={() => run("pin")}
-        >
-          {busy ? <span aria-hidden="true" className={pendingSpinnerInkClass} /> : <PinGlyph />}
+        <button type="button" className={iconHit} disabled={busy} aria-label="Archive" onClick={() => run("archive")}>
+          <ArchiveGlyph />
         </button>
-        <button
-          type="button"
-          className={iconHit}
-          disabled={busy}
-          aria-label={allArchived ? "Unarchive" : "Archive"}
-          onClick={() => run(fileKind)}
-        >
-          {allArchived ? <UnarchiveGlyph /> : <ArchiveGlyph />}
-        </button>
-        {anyDone ? (
-          <button type="button" className={btnDock} disabled={busy} aria-label="Mark done" onClick={() => run("done")}>
-            {busy ? (
-              <span aria-hidden="true" className={pendingSpinnerClass} />
-            ) : (
-              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
-                <path d="M3.2 8.2 6.4 11.4 12.8 4.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-        ) : null}
+        {sharedVerb}
         {errorLine}
       </div>
       <div className="sticky top-[var(--desk-header-h)] z-20 mt-6 hidden min-h-11 flex-wrap items-center gap-2 border border-line bg-surface px-3 py-2 md:flex md:static md:rounded-xl">
         <p className="mr-auto text-sm font-medium text-ink">{chosen.length} selected</p>
-        {anyDone ? (
-          <button type="button" className={btnPrimary} disabled={busy} onClick={() => run("done")}>
-            {busy ? "Saving" : "Mark done"}
+        {shared === "confirm" ? (
+          <button type="button" className={btnPrimary} disabled={busy} onClick={() => run("confirm")}>
+            {busy ? "Saving" : "Confirm"}
           </button>
         ) : null}
-        <button type="button" className={btnGhost} disabled={busy} onClick={() => run(fileKind)}>
-          {allArchived ? "Unarchive" : "Archive"}
-        </button>
-        <button type="button" className={btnGhost} disabled={busy} onClick={() => run("pin")}>
-          {allPinned ? "Unpin" : "Pin"}
+        {shared === "done" ? (
+          <button type="button" className={btnPrimary} disabled={busy} onClick={() => run("done")}>
+            {busy ? "Saving" : "Done"}
+          </button>
+        ) : null}
+        <button type="button" className={btnGhost} disabled={busy} onClick={() => run("archive")}>
+          Archive
         </button>
         <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>
           Cancel

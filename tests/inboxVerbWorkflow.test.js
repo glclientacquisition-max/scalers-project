@@ -310,7 +310,7 @@ describe("inbox verb workflows: archive and unarchive", () => {
     assert.equal(after.lead.leadStatus, "resolved");
     assert.deepEqual(
       inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
-      ["select", "pin", "unarchive"]
+      []
     );
   });
 });
@@ -391,59 +391,33 @@ describe("inbox verb workflows: mark unread", () => {
   });
 });
 
-function inboxCanMarkDone(item) {
-  if (itemIsArchived(item)) return false;
-  if (item.purpose === "live") return false;
-  if (item.job || item.hold) return false;
-  if (item.lead?.leadStatus === "resolved") return false;
-  return true;
-}
-
 function inboxOverflowActions(item) {
-  const archived = itemIsArchived(item);
-  const canDone = inboxCanMarkDone(item);
-  const actions = [
-    { id: "select", label: "Select" },
-    { id: "pin", label: item.pinnedAt ? "Unpin" : "Pin" },
-  ];
-  if (canDone) actions.push({ id: "done", label: "Mark done", divide: true });
-  actions.push({
-    id: archived ? "unarchive" : "archive",
-    label: archived ? "Unarchive" : "Archive",
-    divide: !canDone,
-  });
-  return actions;
+  if (itemIsArchived(item)) return [];
+  return [{ id: "archive", label: "Archive" }];
 }
 
 describe("inbox verb workflows: overflow menu", () => {
-  it("keeps Select and Pin, files with Archive, and drops unread and snooze", () => {
+  it("offers Archive only", () => {
     assert.deepEqual(
       inboxOverflowActions(humanReturn()).map((row) => row.id),
-      ["select", "pin", "done", "archive"]
+      ["archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(requestedVisit()).map((row) => row.id),
-      ["select", "pin", "archive"]
+      ["archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(openHold()).map((row) => row.id),
-      ["select", "pin", "archive"]
+      ["archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(answeredRow()).map((row) => row.id),
-      ["select", "pin", "archive"]
+      ["archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
-      ["select", "pin", "unarchive"]
+      []
     );
-  });
-
-  it("puts one hairline between stay and leave", () => {
-    const returnCall = inboxOverflowActions(humanReturn());
-    assert.equal(returnCall.filter((row) => row.divide).map((row) => row.id).join(), "done");
-    const visit = inboxOverflowActions(requestedVisit());
-    assert.equal(visit.filter((row) => row.divide).map((row) => row.id).join(), "archive");
   });
 });
 
@@ -453,26 +427,31 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
     assert.match(overflow, /inboxOverflowActions\(item\)/);
     assert.match(verbs, /export function inboxOverflowActions/);
-    assert.match(verbs, /Unarchive/);
+    assert.match(verbs, /label: "Archive"/);
+    assert.doesNotMatch(verbs, /Unarchive/);
     assert.doesNotMatch(overflow, /id: "unread"/);
     assert.doesNotMatch(overflow, /id: "snooze"/);
     assert.doesNotMatch(overflow, /Mark unread/);
     assert.doesNotMatch(overflow, /["']Snooze["']/);
   });
 
-  it("phone select bar has no More sheet. Bulk does not hide Mark done", () => {
+  it("phone select bar has no More sheet. Bulk Confirm and Done are eligibility gated", () => {
     const select = read("dashboard/src/components/InboxRowSelect.tsx");
     assert.doesNotMatch(select, /aria-label="More"/);
     assert.doesNotMatch(select, /id: "unread"/);
     assert.doesNotMatch(select, /id: "snooze"/);
-    assert.match(select, /kind === "archive" \|\| kind === "unarchive"/);
-    assert.doesNotMatch(select, /kind === "done" \|\| kind === "archive" \|\| kind === "snooze"/);
+    assert.match(select, /kind === "archive"/);
+    assert.match(select, /inboxBulkSharedAction/);
+    assert.doesNotMatch(select, /inboxTogglePin/);
+    assert.doesNotMatch(select, /Mark done/);
+    assert.doesNotMatch(select, /aria-label=\{allPinned/);
+    const phone = select.slice(select.indexOf("md:hidden"));
+    assert.match(phone, /aria-label="Archive"/);
+    assert.doesNotMatch(phone, /Pin/);
     const desktop = select.slice(select.indexOf("hidden min-h-11"));
-    assert.match(desktop, /Mark done/);
     assert.match(desktop, /Archive/);
-    assert.match(desktop, /Pin/);
     assert.match(desktop, /Cancel/);
-    assert.match(desktop, /Unarchive/);
+    assert.doesNotMatch(desktop, /Unarchive/);
     assert.doesNotMatch(desktop, /Mark unread|Snooze/);
   });
 

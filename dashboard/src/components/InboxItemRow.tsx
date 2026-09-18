@@ -56,7 +56,9 @@ function inboxCopy(
   const hasJob = Boolean(item.job);
   const hasHold = Boolean(item.hold);
   const needed = item.hold?.when_text?.trim() || "Anytime";
-  const visit = item.job?.when_text?.trim() || "Time TBD";
+  const visit = item.job?.window_start
+    ? formatCallWhenRelative(item.job.window_start)
+    : item.job?.when_text?.trim() || "Time TBD";
   const place = item.job?.address_landmark?.trim() || "Ask on the call";
   const stamp = itemSignalLabel(item, vertical);
   const when = formatCallWhenRelative(item.createdAt);
@@ -82,17 +84,6 @@ function inboxCopy(
 
 function inboxContactHref(item: InboxItem, purpose: InboxPurposeFilterId, ret?: InboxReturn) {
   return item.contactId ? contactFromInboxHref(item.contactId, ret || { purpose }) : null;
-}
-
-function InboxPinMark({ show }: { show: boolean }) {
-  if (!show) return null;
-  return (
-    <span aria-label="Pinned" className="inline-flex shrink-0 text-ink-soft">
-      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
-        <path d="M10.2 1.6 8.4 3.4 5.8 2.6 4.4 4l3.2 3.2-1 3.6 1.4 1.4 3.6-1 3.2 3.2 1.4-1.4-.8-2.6 1.8-1.8-1.8-1.8z" />
-      </svg>
-    </span>
-  );
 }
 
 function InboxRowWho({
@@ -217,11 +208,10 @@ export function InboxTableRow({
           <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
-          <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
-            <span className="inline-flex items-center gap-1.5">
+          <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
+            <span className="inline-flex min-w-[5.5rem] items-center gap-1.5">
               <RowStateDot show={item.needsYou} live={live} />
-              <InboxPinMark show={Boolean(item.pinnedAt)} />
-              {showHold ? needed : when}
+              <span className="min-w-0 truncate">{showHold ? needed : when}</span>
             </span>
           </td>
         </>
@@ -242,11 +232,10 @@ export function InboxTableRow({
           <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
-          <td className={`${deskRowMutedClass} px-5 py-4 align-top text-sm text-ink-soft`}>
-            <span className="inline-flex items-center gap-1.5">
+          <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
+            <span className="inline-flex min-w-[5.5rem] items-center gap-1.5">
               <RowStateDot show={item.needsYou} live={live} />
-              <InboxPinMark show={Boolean(item.pinnedAt)} />
-              {hasJob ? place : ""}
+              <span className="min-w-0 truncate">{hasJob ? place : ""}</span>
             </span>
           </td>
         </>
@@ -265,14 +254,13 @@ export function InboxTableRow({
               <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
             </InboxRowWho>
           </td>
-          <td className={`${deskRowMutedClass} px-5 py-4 align-top`}>
+          <td className={`${deskRowMutedClass} min-w-[7rem] px-5 py-4 align-top`}>
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
           </td>
-          <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
-            <span className="inline-flex items-center gap-1.5">
+          <td className={`${deskRowMutedClass} min-w-[6.5rem] whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
+            <span className="inline-flex min-w-[5.5rem] items-center gap-1.5">
               <RowStateDot show={item.needsYou} live={live} />
-              <InboxPinMark show={Boolean(item.pinnedAt)} />
-              {when}
+              <span className="min-w-0 truncate">{when}</span>
             </span>
           </td>
         </>
@@ -312,10 +300,9 @@ export function InboxPhoneRow({
         <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)}`}>
           {who}
         </p>
-        <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
+        <p className="flex min-w-[5.5rem] shrink-0 items-center justify-end gap-1.5 text-xs text-ink-soft">
           <RowStateDot show={item.needsYou} live={item.purpose === "live"} />
-          <InboxPinMark show={Boolean(item.pinnedAt)} />
-          {meta}
+          <span className="max-w-[7.5rem] truncate">{meta}</span>
         </p>
       </div>
       <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
