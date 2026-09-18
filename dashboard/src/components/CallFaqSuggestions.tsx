@@ -23,10 +23,12 @@ export function CallFaqSuggestions({
   tenantId,
   callId,
   hasTranscript,
+  tone = "card",
 }: {
   tenantId: string;
   callId: string;
   hasTranscript: boolean;
+  tone?: "card" | "thread";
 }) {
   const router = useRouter();
   const panelRef = useRef<HTMLElement | null>(null);
@@ -107,38 +109,54 @@ export function CallFaqSuggestions({
     (!items ? suggestState.message : null);
   const flashIsError = Boolean(applyState.error || suggestState.error);
 
+  const thread = tone === "thread";
+
   return (
     <section
       ref={panelRef}
-      className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"
+      className={
+        thread
+          ? "space-y-3"
+          : "mt-8 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5"
+      }
       aria-labelledby="call-faq-heading"
     >
-      <div>
-        <h2
-          id="call-faq-heading"
-          className="font-display text-2xl tracking-tight"
-        >
-          FAQ ideas from this call
+      {thread ? (
+        <h2 id="call-faq-heading" className="sr-only">
+          FAQ ideas
         </h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]" id="call-faq-help">
-          If the caller asked something useful, we&apos;ll suggest a Golden FAQ. You
-          edit and approve. Nothing goes live on its own.
-        </p>
-      </div>
+      ) : (
+        <div>
+          <h2
+            id="call-faq-heading"
+            className="font-display text-2xl tracking-tight"
+          >
+            FAQ ideas from this call
+          </h2>
+          <p className="mt-1 text-sm text-[var(--ink-soft)]" id="call-faq-help">
+            If the caller asked something useful, we&apos;ll suggest a Golden FAQ. You
+            edit and approve. Nothing goes live on its own.
+          </p>
+        </div>
+      )}
 
       {!items ? (
-        <form action={suggestAction} className="mt-4">
+        <form action={suggestAction} className={thread ? "flex flex-col items-center" : "mt-4"}>
           <input type="hidden" name="tenant_id" value={tenantId} />
           <input type="hidden" name="call_id" value={callId} />
           <button
             type="submit"
             disabled={suggestPending || !hasTranscript}
             aria-describedby={
-              !hasTranscript ? "call-faq-no-transcript" : "call-faq-help"
+              !hasTranscript ? "call-faq-no-transcript" : thread ? undefined : "call-faq-help"
             }
-            className={btnPrimary}
+            className={
+              thread
+                ? "inline-flex min-h-11 items-center rounded-full bg-surface-muted/80 px-4 text-xs font-medium text-ink-soft focus:outline-none focus:ring-2 focus:ring-[#0096FF] disabled:opacity-50"
+                : btnPrimary
+            }
           >
-            {suggestPending ? "Looking through the call" : "Find FAQ ideas"}
+            {suggestPending ? "Looking" : "Find FAQ ideas"}
           </button>
           {!hasTranscript ? (
             <p
@@ -147,7 +165,7 @@ export function CallFaqSuggestions({
             >
               Needs a conversation transcript first.
             </p>
-          ) : suggestPending ? (
+          ) : suggestPending && !thread ? (
             <p className="mt-2 text-xs text-[var(--ink-soft)]" aria-live="polite">
               Usually a few seconds.
             </p>

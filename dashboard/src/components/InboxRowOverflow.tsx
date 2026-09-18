@@ -21,9 +21,6 @@ import { useInboxRowLocal, useInboxRowUi } from "@/components/InboxRowUi";
 import { deskHitClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   inboxArchive,
-  inboxMarkDone,
-  inboxTogglePin,
-  inboxUnarchive,
 } from "@/lib/inboxLeadActions";
 import {
   inboxOverflowActions,
@@ -125,11 +122,6 @@ export function InboxRowShell({
   useEffect(() => () => clearPress(), [clearPress]);
 
   const run = async (id: ActionId) => {
-    if (id === "select") {
-      ui?.enter(item.id);
-      close();
-      return;
-    }
     if (!item.callId) {
       setError("Missing call.");
       return;
@@ -137,16 +129,13 @@ export function InboxRowShell({
     setBusy(true);
     setError(null);
     let res: { error?: string; ok?: boolean } = { ok: true };
-    if (id === "pin") res = await inboxTogglePin(item);
-    else if (id === "done") res = await inboxMarkDone(item);
-    else if (id === "archive") res = await inboxArchive(item);
-    else if (id === "unarchive") res = await inboxUnarchive(item);
+    if (id === "archive") res = await inboxArchive(item);
     setBusy(false);
     if (res.error) {
       setError(res.error);
       return;
     }
-    if (id === "archive" || id === "unarchive") {
+    if (id === "archive") {
       patch({ hidden: true });
     }
     close();
@@ -234,28 +223,30 @@ export function InboxRowMore({ item }: { item: InboxItem }) {
   const menu = useInboxRowMenu();
   const ui = useInboxRowUi();
   const btnRef = useRef<HTMLButtonElement>(null);
-  if (!menu || ui?.selecting) return null;
+  const actions = inboxOverflowActions(item);
+  if (!menu || ui?.selecting || actions.length === 0) return null;
   return (
     <button
       ref={btnRef}
       type="button"
       aria-label={`More actions for ${item.callerName?.trim() || "Caller"}`}
       aria-haspopup="menu"
-      aria-expanded={menu.open === "menu"}
+      aria-expanded={menu.open === "menu" || menu.open === "sheet"}
       className={[
         deskHitClass,
         focusRingVisible,
-        "hidden text-ink-soft hover:bg-surface-muted hover:text-ink md:inline-flex",
-        menu.open === "menu"
+        "inline-flex text-ink-soft hover:bg-surface-muted hover:text-ink",
+        menu.open
           ? "opacity-100"
-          : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
+          : "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100",
       ].join(" ")}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
         const rect = btnRef.current?.getBoundingClientRect();
+        const coarse = !isFinePointer();
         menu.openAt(
-          "menu",
+          coarse ? "sheet" : "menu",
           rect
             ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
             : { x: event.clientX, y: event.clientY, align: "point" }

@@ -20,7 +20,7 @@ export function InboxPurposeChip({
   return (
     <span
       className={[
-        "inline-flex min-h-7 max-w-[11rem] items-center truncate rounded-md px-2 text-[11px] font-semibold tracking-wide ring-1",
+        "inline-flex min-h-7 min-w-[4.5rem] max-w-[11rem] items-center truncate rounded-md px-2 text-[11px] font-semibold tracking-wide ring-1",
         TONE[purpose],
       ].join(" ")}
     >

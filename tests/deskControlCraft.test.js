@@ -56,7 +56,7 @@ describe("desk control craft", () => {
     );
     assert.doesNotMatch(niche, /id: "archived"/);
     assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /item\.divide/);
-    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /divide: item\.divide/);
+    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /<InboxFilterPills/);
   });
 
   it("does not keep the unused TriageLeadCard", () => {
@@ -67,7 +67,7 @@ describe("desk control craft", () => {
   });
 
   it("mounts CallRecording once on call detail", () => {
-    const page = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
+    const page = read("dashboard/src/components/InboxTicketView.tsx");
     assert.equal((page.match(/<CallRecording/g) || []).length, 1);
     assert.doesNotMatch(page, /variant="empty"/);
     assert.doesNotMatch(page, /variant="player"/);

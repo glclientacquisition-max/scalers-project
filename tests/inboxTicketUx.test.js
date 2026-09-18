@@ -9,34 +9,50 @@ function read(rel) {
 
 describe("inbox ticket action chrome", () => {
   const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
-  const markup = detail.slice(detail.indexOf("return ("));
-  const composer = read("dashboard/src/components/CallerNoteComposer.tsx");
-  const mark = read("dashboard/src/components/MarkLeadDoneButton.tsx");
+  const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+  const dock = read("dashboard/src/components/InboxSmsDock.tsx");
+  const notes = read("dashboard/src/app/(desk)/calls/noteActions.ts");
   const summary = read("dashboard/src/components/CallSummaryCard.tsx");
 
-  it("centers the action group and captions Do next above the filled verb", () => {
-    assert.match(markup, /mx-auto flex w-full max-w-lg flex-col items-stretch gap-2/);
-    assert.match(markup, />\s*Do next\s*</);
-    assert.match(markup, /doNextLabel/);
+  it("uses a fixed header, scrolling thread, and docked SMS", () => {
+    assert.match(detail, /<InboxTicketView/);
+    assert.match(ticket, /DeskBack/);
+    assert.match(ticket, /Jump to latest/);
+    assert.match(ticket, /InboxSmsDock/);
+    assert.match(ticket, /needsYou && !archived \? \(/);
+    assert.doesNotMatch(detail, /LeadStatusToggle/);
+    assert.doesNotMatch(ticket, /LeadStatusToggle/);
+    assert.doesNotMatch(detail, /MarkLeadDoneButton/);
+    assert.doesNotMatch(detail, /MarkLeadUnarchiveButton/);
   });
 
-  it("collapses SMS compose until Send SMS is pressed", () => {
-    assert.match(composer, /collapsed = false/);
-    assert.match(composer, /Send SMS/);
-    assert.match(composer, /Hide SMS/);
-    assert.match(markup, /collapsed/);
-    assert.doesNotMatch(markup, /variant="link"/);
+  it("keeps the purpose stamp read-only and archives from More", () => {
+    assert.match(ticket, /InboxPurposeChip/);
+    assert.match(ticket, /aria-label="More"/);
+    assert.match(ticket, /updateLeadStatus\(callId, "archived"\)/);
+    assert.match(ticket, /\{busy \? "Saving" : "Archive"\}/);
+    assert.doesNotMatch(ticket, /Followed Up/);
   });
 
-  it("renders Mark done and Archive as real buttons with icons", () => {
-    assert.match(markup, /<MarkLeadDoneButton callId=\{row.id\} variant="button"/);
-    assert.match(markup, /<MarkLeadArchiveButton callId=\{row.id\} variant="button"/);
-    assert.match(markup, /<MarkLeadUnarchiveButton callId=\{row.id\} variant="button"/);
-    assert.match(markup, /leadStatus === "archived"/);
-    assert.match(markup, /!job && !hold/);
-    assert.match(mark, /variant\?: "default" \| "icon" \| "button"/);
-    assert.match(mark, /btnGhost/);
-    assert.match(mark, /action === "new"/);
+  it("docks a real SMS send distinct from Confirm auto-SMS", () => {
+    assert.match(dock, /sendInboxReplySms/);
+    assert.match(dock, /placeholder="SMS"/);
+    assert.match(dock, /WhatsApp uses the icon above/);
+    assert.match(dock, /rows=\{2\}/);
+    assert.match(notes, /export async function sendInboxReplySms/);
+    assert.match(notes, /caller_inbox_reply/);
+    assert.match(notes, /sendRecordedDeskCallerSms/);
+    assert.match(dock, /name="reply_id"/);
+    assert.match(ticket, /tone="thread"/);
+    assert.doesNotMatch(notes, /caller_appointment_confirmed/);
+  });
+
+  it("banners Confirm or hold Done only when a work row exists", () => {
+    assert.match(ticket, /canConfirm/);
+    assert.match(ticket, /canHoldDone/);
+    assert.match(ticket, /InboxJobActions id=\{job.id\} status=\{job.status\} banner/);
+    assert.match(ticket, /RequestStatusToggle id=\{hold.id\} status=\{hold.status\} banner/);
+    assert.match(ticket, /Want\. \$\{want\}/);
   });
 
   it("keeps Want, Do next, and Mood as the summary lead", () => {
@@ -44,23 +60,19 @@ describe("inbox ticket action chrome", () => {
     assert.ok(structured.indexOf('label="Want"') < structured.indexOf('label="Do next"'));
     assert.ok(structured.indexOf('label="Do next"') < structured.indexOf('label="Mood"'));
   });
-
-  it("uses ghost WhatsApp when it is not the current task", () => {
-    assert.match(markup, /variant="ghost"/);
-    assert.match(markup, /label="Reply on WhatsApp"/);
-  });
 });
 
 describe("inbox ticket transcript preview", () => {
-  it("previews the last turns and expands the full thread on demand", () => {
+  it("renders the full thread on the ticket and keeps preview elsewhere", () => {
     const src = read("dashboard/src/components/CallTranscript.tsx");
-    const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
-    assert.match(detail, /<CallTranscript turns=\{turns\} \/>/);
+    const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+    assert.match(ticket, /<CallTranscript turns=\{turns\} mode="thread" \/>/);
     assert.match(src, /PREVIEW_TURNS = 3/);
     assert.match(src, /View full conversation/);
     assert.match(src, /Hide conversation/);
     assert.match(src, /No conversation\./);
     assert.match(src, /from-surface to-transparent/);
+    assert.match(src, /mode === "thread"/);
     assert.doesNotMatch(src, /[\u2014\u2013]/);
   });
 });

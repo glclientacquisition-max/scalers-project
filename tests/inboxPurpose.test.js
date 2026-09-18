@@ -204,32 +204,36 @@ function nairobiTime(iso) {
     timeZone: "Africa/Nairobi",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(iso));
+    hour12: true,
+  })
+    .format(new Date(iso))
+    .replace(/\s?(am|pm)$/i, (_, mer) => ` ${mer.toUpperCase()}`);
 }
 
 function formatCallWhenRelative(iso, now = new Date()) {
   const time = nairobiTime(iso);
   const thenDay = nairobiDayKey(new Date(iso));
   const today = nairobiDayKey(now);
-  if (thenDay === today) return `Today ${time}`;
+  if (thenDay === today) return `at ${time}`;
   const [ty, tm, td] = today.split("-").map(Number);
   const [yy, ym, yd] = thenDay.split("-").map(Number);
   const diffDays = Math.round(
     (Date.UTC(ty, tm - 1, td) - Date.UTC(yy, ym - 1, yd)) / 86400000
   );
-  if (diffDays === 1) return `Yesterday ${time}`;
-  if (diffDays > 1 && diffDays < 7) {
+  if (diffDays === -1) return `Tomorrow, ${time}`;
+  if (Math.abs(diffDays) < 7) {
     const weekday = new Intl.DateTimeFormat("en-KE", {
       timeZone: "Africa/Nairobi",
       weekday: "short",
     }).format(new Date(iso));
-    return `${weekday} ${time}`;
+    return `${weekday}, ${time}`;
   }
-  return new Intl.DateTimeFormat("en-KE", {
+  const date = new Intl.DateTimeFormat("en-US", {
     timeZone: "Africa/Nairobi",
-    day: "numeric",
     month: "short",
+    day: "numeric",
   }).format(new Date(iso));
+  return `${date}, ${time}`;
 }
 
 describe("inbox purpose", () => {
@@ -545,10 +549,18 @@ describe("inbox signal", () => {
     );
   });
 
-  it("labels When as Today or Yesterday in Nairobi", () => {
+  it("labels When as at-time, weekday, or month day in Nairobi", () => {
     const now = new Date("2026-09-07T12:00:00+03:00");
-    assert.match(formatCallWhenRelative("2026-09-07T08:00:00+03:00", now), /^Today /);
-    assert.match(formatCallWhenRelative("2026-09-06T18:00:00+03:00", now), /^Yesterday /);
+    assert.match(formatCallWhenRelative("2026-09-07T08:00:00+03:00", now), /^at /);
+    assert.match(formatCallWhenRelative("2026-09-08T10:00:00+03:00", now), /^Tomorrow,/);
+    assert.match(formatCallWhenRelative("2026-09-09T10:00:00+03:00", now), /^Wed,/);
+    assert.match(formatCallWhenRelative("2026-09-22T10:00:00+03:00", now), /^Sep 22,/);
+    assert.match(formatCallWhenRelative("2026-09-07T08:00:00+03:00", now), /AM|PM/);
+    const triage = fs.readFileSync(
+      path.join(__dirname, "..", "dashboard/src/lib/callsTriage.ts"),
+      "utf8"
+    );
+    assert.match(triage, /hour12: true/);
   });
 });
 

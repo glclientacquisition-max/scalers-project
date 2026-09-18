@@ -72,35 +72,39 @@ function nairobiTime(iso: string): string {
     timeZone: "Africa/Nairobi",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(iso));
+    hour12: true,
+  })
+    .format(new Date(iso))
+    .replace(/\s?(am|pm)$/i, (_, mer) => ` ${mer.toUpperCase()}`);
 }
 
-/** Inbox When column: Today / Yesterday / weekday, not a full timestamp. */
+/** Inbox When column for real ISO datetimes. Free-text slots stay unformatted. */
 export function formatCallWhenRelative(iso: string, now = new Date()): string {
   try {
     const time = nairobiTime(iso);
     const thenDay = nairobiDayKey(new Date(iso));
     const today = nairobiDayKey(now);
-    if (thenDay === today) return `Today ${time}`;
+    if (thenDay === today) return `at ${time}`;
 
     const [ty, tm, td] = today.split("-").map(Number);
     const [yy, ym, yd] = thenDay.split("-").map(Number);
     const diffDays = Math.round(
       (Date.UTC(ty, tm - 1, td) - Date.UTC(yy, ym - 1, yd)) / 86400000
     );
-    if (diffDays === 1) return `Yesterday ${time}`;
-    if (diffDays > 1 && diffDays < 7) {
+    if (diffDays === -1) return `Tomorrow, ${time}`;
+    if (Math.abs(diffDays) < 7) {
       const weekday = new Intl.DateTimeFormat("en-KE", {
         timeZone: "Africa/Nairobi",
         weekday: "short",
       }).format(new Date(iso));
-      return `${weekday} ${time}`;
+      return `${weekday}, ${time}`;
     }
-    return new Intl.DateTimeFormat("en-KE", {
+    const date = new Intl.DateTimeFormat("en-US", {
       timeZone: "Africa/Nairobi",
-      day: "numeric",
       month: "short",
+      day: "numeric",
     }).format(new Date(iso));
+    return `${date}, ${time}`;
   } catch {
     return iso;
   }

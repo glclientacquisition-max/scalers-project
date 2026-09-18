@@ -1,4 +1,6 @@
+import { updateAppointmentStatus } from "@/app/(desk)/appointments/actions";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { updateServiceRequestStatus } from "@/app/(desk)/requests/actions";
 import {
   inboxAddLabel as writeInboxLabel,
   inboxAssignTeammate as writeInboxAssignee,
@@ -19,6 +21,24 @@ export async function inboxMarkDone(item: InboxItem) {
 export async function inboxArchive(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
   return updateLeadStatus(item.callId, "archived");
+}
+
+/** Same handler as list Confirm (`InboxJobActions` → `updateAppointmentStatus`). */
+export async function inboxConfirm(item: InboxItem) {
+  if (!item.job?.id) return { error: "Missing appointment." };
+  const form = new FormData();
+  form.set("id", item.job.id);
+  form.set("status", "confirmed");
+  return updateAppointmentStatus({}, form);
+}
+
+/** Same handler as list hold Done (`RequestStatusToggle` → `updateServiceRequestStatus`). */
+export async function inboxHoldDone(item: InboxItem) {
+  if (!item.hold?.id) return { error: "Missing hold." };
+  const form = new FormData();
+  form.set("id", item.hold.id);
+  form.set("status", "fulfilled");
+  return updateServiceRequestStatus({}, form);
 }
 
 /** Same handler as ticket Unarchive (`MarkLeadUnarchiveButton` → `updateLeadStatus`). */

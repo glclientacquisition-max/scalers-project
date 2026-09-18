@@ -47,19 +47,34 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
   );
 }
 
-export function CallTranscript({ turns }: { turns: TranscriptRow[] }) {
+export function CallTranscript({
+  turns,
+  mode = "preview",
+}: {
+  turns: TranscriptRow[];
+  mode?: "preview" | "thread";
+}) {
   const [expanded, setExpanded] = useState(false);
-  const canCollapse = turns.length > PREVIEW_TURNS;
+  const thread = mode === "thread";
+  const canCollapse = !thread && turns.length > PREVIEW_TURNS;
   const visible =
-    expanded || !canCollapse ? turns : turns.slice(-PREVIEW_TURNS);
+    thread || expanded || !canCollapse ? turns : turns.slice(-PREVIEW_TURNS);
   const faded = canCollapse && !expanded;
 
   return (
     <section>
-      <h2 className="font-display text-2xl tracking-tight text-ink">
-        Conversation
-      </h2>
-      <div className="relative mt-4 rounded-2xl border border-line bg-surface px-2 py-4 sm:px-4">
+      {thread ? null : (
+        <h2 className="font-display text-2xl tracking-tight text-ink">
+          Conversation
+        </h2>
+      )}
+      <div
+        className={
+          thread
+            ? "space-y-2.5"
+            : "relative mt-4 rounded-2xl border border-line bg-surface px-2 py-4 sm:px-4"
+        }
+      >
         {turns.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-ink-soft">
             No conversation.

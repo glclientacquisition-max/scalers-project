@@ -1,17 +1,14 @@
 import { notFound } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
-import { CallerNoteComposer } from "@/components/CallerNoteComposer";
-import { CallSummaryCard } from "@/components/CallSummaryCard";
-import { CallTranscript } from "@/components/CallTranscript";
+import { InboxTicketView } from "@/components/InboxTicketView";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
-import { InboxJobActions } from "@/components/InboxJobActions";
+import { InboxToolbar } from "@/components/InboxToolbar";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { ThemePicker } from "@/components/ThemePicker";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
 
@@ -189,10 +186,20 @@ export default function DevInboxPage() {
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
         <InboxRowUiProvider>
         <InboxSelectChrome items={ROWS}>
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
-          Inbox
-        </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">{briefing}</p>
+        <InboxToolbar
+          active="needs"
+          counts={{
+            needs: needYou,
+            all: ROWS.length,
+            job: 1,
+            hold: 1,
+            human: 1,
+            answered: 1,
+            archived: 14,
+          }}
+          q=""
+          caption={briefing}
+        />
         <div className="mt-6 max-w-lg">
           <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
           <div className="mt-2">
@@ -238,62 +245,43 @@ export default function DevInboxPage() {
           </DeskDataTable>
         </div>
         </InboxRowUiProvider>
-        <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-          <div className="contents min-w-0 lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
-            <div className="order-1 min-w-0 lg:order-none">
-              <h2 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
-                Otieno
-              </h2>
-              <p className="mt-2 text-sm text-ink-soft">12 Sep 2026, 08:10</p>
-              <p className="mt-1 min-w-0 break-all font-mono text-sm text-ink">254700000002</p>
-            </div>
-            <section className="order-2 min-w-0 rounded-2xl border border-line bg-surface p-5 lg:order-none">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                Summary
-              </h2>
-              <CallSummaryCard
-                name="Otieno"
-                callerNumber="254700000002"
-                want="House cleaning tomorrow 9am"
-                done="Visit saved"
-                mood="calm"
-                next="Confirm the visit"
-              />
-            </section>
-            <div className="order-3 min-w-0 space-y-5 lg:order-none">
-              <div className="mx-auto flex w-full max-w-lg flex-col items-stretch gap-2">
-                <div className="text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                    Do next
-                  </p>
-                  <p className="mt-1 text-base font-semibold leading-snug text-ink">
-                    Confirm the visit
-                  </p>
-                </div>
-                <InboxJobActions id="job-1" status="requested" extra />
-                <WhatsAppLink
-                  number="254700000002"
-                  variant="ghost"
-                  label="Reply on WhatsApp"
-                  className="w-full"
-                />
-                <CallerNoteComposer
-                  callId="call-1"
-                  callerPhone="254700000002"
-                  callerName="Otieno"
-                  callerSmsOn
-                  collapsed
-                />
-              </div>
-            </div>
-            <div className="order-5 min-w-0 space-y-4 border-t border-line/80 pt-4 text-sm text-ink-soft lg:order-none">
-              <p>Duration: 48s</p>
-              <p>Assist: Handled</p>
-            </div>
-          </div>
-          <div className="order-4 min-w-0 lg:order-none lg:col-span-8">
-            <CallTranscript turns={TURNS} />
-          </div>
+        <div className="mt-10">
+          <InboxTicketView
+            callId="call-1"
+            backHref="/dev/inbox"
+            contactHref="/dev/inbox"
+            title="Otieno"
+            stamp="Confirm visit"
+            purpose="job"
+            callerPhone="254700000002"
+            waMessage="House cleaning"
+            needsYou
+            urgency="Confirm the visit"
+            want="House cleaning tomorrow 9am"
+            done="Visit saved"
+            mood="Calm"
+            job={{
+              id: "job-1",
+              created_at: "2026-09-12T05:10:00.000Z",
+              service_name: "House cleaning",
+              status: "requested",
+              when_text: "Tomorrow 9am",
+              address_landmark: "Kericho road",
+              notes: null,
+              caller_name: "Otieno",
+              caller_phone: "254700000002",
+              call_id: "call-1",
+            }}
+            hold={null}
+            turns={TURNS}
+            tenantId="dev"
+            recordingUrl={null}
+            durationLabel="48s"
+            assistLabel="Handled"
+            assistNote={null}
+            escalatedLine={null}
+            archived={false}
+          />
         </div>
       </main>
       <DeskTabBar />

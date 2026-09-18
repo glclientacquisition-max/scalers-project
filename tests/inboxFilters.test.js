@@ -23,8 +23,10 @@ describe("inbox filters and empty states", () => {
     assert.doesNotMatch(purpose, /if \(lead\.leadStatus === "archived"\) continue/);
     assert.doesNotMatch(niche, /Unread/);
     assert.doesNotMatch(niche, /Assigned to me/);
-    assert.match(toolbar, /<FilterTabs/);
+    assert.match(toolbar, /<InboxFilterPills/);
     assert.match(toolbar, /label="Filter by purpose"/);
+    assert.match(toolbar, /<FilterTabs/);
+    assert.match(toolbar, /label="Visit sort"/);
     assert.match(toolbar, /archived \? null/);
     const entry = read("dashboard/src/components/InboxArchivedRow.tsx");
     assert.match(entry, /InboxArchivedPhoneRow/);
@@ -48,5 +50,26 @@ describe("inbox filters and empty states", () => {
     assert.match(page, /inboxCaption\(searched, vertical\)/);
     assert.match(purpose, /\$\{needs\} need you/);
     assert.match(harness, /ROWS.filter\(\(row\) => row.needsYou\)/);
+  });
+
+  it("renders the six purpose piles as snap-scrolling pill chips", () => {
+    const pills = read("dashboard/src/components/InboxFilterPills.tsx");
+    assert.match(pills, /snap-x snap-mandatory/);
+    assert.match(pills, /snap-start/);
+    assert.match(pills, /rounded-full/);
+    assert.match(pills, /bg-\[#005CCC\] text-white/);
+    assert.match(pills, /bg-gradient-to-l from-surface/);
+    assert.match(pills, /item\.count/);
+    assert.doesNotMatch(pills, /border-b-2/);
+    assert.doesNotMatch(pills, /filterTabClass/);
+    assert.match(toolbar, /<InboxFilterPills/);
+    assert.match(toolbar, /label="Filter by purpose"/);
+    assert.match(toolbar, /label="Visit sort"/);
+    assert.match(toolbar, /label="Hold sort"/);
+    assert.match(toolbar, /label="Work date"/);
+    const purposeCall = toolbar.match(/<InboxFilterPills[\s\S]*?\/>/);
+    assert.ok(purposeCall, "purpose row is InboxFilterPills");
+    assert.doesNotMatch(purposeCall[0], /<FilterTabs/);
+    assert.doesNotMatch(niche, /Unread|Snooze/);
   });
 });

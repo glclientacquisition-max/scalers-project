@@ -71,11 +71,11 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(row, /label="Conversation"/);
     assert.doesNotMatch(row, /item.hold \|\| item.job \? "Call" : "Open"/);
     assert.doesNotMatch(row, /\/contacts\/\$\{item.contactId\}/);
-    const detail = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
-    assert.match(detail, /InboxJobEditor/);
-    assert.match(detail, /InboxHoldEditor/);
-    assert.match(detail, /CallerNoteComposer/);
-    assert.match(detail, /callerSmsOn/);
+    const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+    assert.match(ticket, /InboxJobEditor/);
+    assert.match(ticket, /InboxHoldEditor/);
+    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /InboxSmsDock/);
+    assert.match(read("dashboard/src/app/(desk)/calls/noteActions.ts"), /sendInboxReplySms/);
     const load = read("dashboard/src/lib/inboxLoad.ts");
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(load, /attachContactIds/);
@@ -89,7 +89,7 @@ describe("work surface jobs on unified inbox", () => {
     const composer = read("dashboard/src/components/CallerNoteComposer.tsx");
     assert.match(composer, /Send SMS/);
     assert.match(composer, /if \(!callerSmsOn\) return null/);
-    assert.match(detail, /smsPrimary/);
-    assert.match(detail, /waPrimary/);
+    assert.match(read("dashboard/src/components/InboxSmsDock.tsx"), /sendInboxReplySms/);
+    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /needsYou && !archived/);
   });
 });

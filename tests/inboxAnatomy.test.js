@@ -80,29 +80,19 @@ describe("inbox outside and inside anatomy", () => {
   });
 
   it("defines the call as decide and reply, not operator telemetry", () => {
-    assert.match(callDetail, /Stack only below `lg`/);
-    assert.match(callDetail, /that `h1` is the contact link/);
-    assert.match(callDetail, /Confirm or Done full width/);
-    assert.match(callDetail, /Reopen lives here/);
-    assert.match(callDetail, /Could not save\./);
+    assert.match(callDetail, /Fixed header, scrolling conversation/);
+    assert.match(callDetail, /The stamp is read-only/);
+    assert.match(callDetail, /sendInboxReplySms/);
     assert.doesNotMatch(detail, />\s*Open contact\s*</);
     assert.match(read("dashboard/src/components/CallTranscript.tsx"), /No conversation\./);
     assert.doesNotMatch(detail, / · \{row\.primary_intent\}/);
     assert.doesNotMatch(detail, /Alert sent:/);
     assert.doesNotMatch(detail, /No transcript rows for this call/);
-    const markup = detail.slice(detail.indexOf("return ("));
-    const summaryAt = markup.indexOf("Summary");
-    const actionsAt = Math.min(
-      ...["<InboxJobActions", "<RequestStatusToggle", "<CallerNoteComposer"]
-        .map((token) => markup.indexOf(token))
-        .filter((i) => i >= 0)
-    );
-    assert.ok(summaryAt >= 0 && summaryAt < actionsAt, "Summary sits before Actions");
-    assert.match(markup, /order-1 min-w-0 lg:order-none/);
-    assert.match(markup, /order-2 min-w-0 rounded-2xl border p-5 lg:order-none/);
-    assert.match(markup, /order-3 min-w-0 space-y-5 lg:order-none/);
-    assert.match(markup, /order-4 min-h-0 min-w-0 space-y-8 lg:order-none/);
-    assert.match(markup, /order-5 min-w-0 space-y-4[\s\S]*Duration:/);
+    assert.match(detail, /<InboxTicketView/);
+    assert.doesNotMatch(detail, /LeadStatusToggle/);
+    const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+    assert.match(ticket, /<DeskBack/);
+    assert.match(ticket, /InboxJobActions/);
   });
 
   it("makes Confirm and Done full width on the call, dock-sized on the list", () => {
@@ -110,8 +100,8 @@ describe("inbox outside and inside anatomy", () => {
     const editorHold = read("dashboard/src/components/InboxHoldEditor.tsx");
     const back = read("dashboard/src/components/ui/DeskBack.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
-    assert.match(jobActions, /extra \? `\$\{btnPrimary\} w-full` : btnDock/);
-    assert.match(holdActions, /extra \? `\$\{btnPrimary\} w-full` : btnDock/);
+    assert.match(jobActions, /wide \? `\$\{btnPrimary\} w-full` : btnDock/);
+    assert.match(holdActions, /wide \? `\$\{btnPrimary\} w-full` : btnDock/);
     const fulfilled = holdActions.slice(
       holdActions.indexOf('{normalized === "fulfilled"'),
       holdActions.indexOf('{normalized === "cancelled"')
@@ -125,8 +115,9 @@ describe("inbox outside and inside anatomy", () => {
     assert.doesNotMatch(editorJob, /InboxJobActions/);
     assert.doesNotMatch(editorHold, /RequestStatusToggle/);
     assert.match(detail, /inboxRecordHref|inboxReturnHref/);
-    assert.match(detail, /<DeskBack/);
-    assert.match(detail, /InboxJobActions/);
+    const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+    assert.match(ticket, /<DeskBack/);
+    assert.match(ticket, /InboxJobActions/);
     assert.match(back, /min-h-11/);
     assert.match(contact, /<DeskBack/);
     assert.match(jobActions, /pendingSpinnerClass/);
