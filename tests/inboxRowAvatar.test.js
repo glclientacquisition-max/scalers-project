@@ -15,6 +15,7 @@ describe("inbox row avatar vs conversation hit", () => {
   it("keeps the identity circle as a separate contact hit", () => {
     assert.match(avatar, /export function InboxRowAvatar/);
     assert.match(avatar, /aria-label=\{\`\$\{who\} profile\`\}/);
+    assert.match(avatar, /ensureInboxContact/);
     assert.match(avatar, /No history yet/);
     assert.match(avatar, /DeskDialog/);
     assert.match(avatar, /createPortal/);

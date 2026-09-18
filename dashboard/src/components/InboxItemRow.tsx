@@ -103,6 +103,7 @@ function InboxRowWho({
           name={item.callerName}
           phone={item.callerPhone}
           contactHref={inboxContactHref(item, purpose, ret)}
+          ret={ret}
         />
       </div>
       <div className={`${deskRowMutedClass} min-w-0`}>{children}</div>
@@ -185,7 +186,7 @@ export function InboxTableRow({
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {item.headline}
               </p>
@@ -209,7 +210,7 @@ export function InboxTableRow({
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {hasJob ? visit : stamp}
               </p>
@@ -233,7 +234,7 @@ export function InboxTableRow({
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {who}
               </p>
@@ -283,7 +284,7 @@ export function InboxPhoneRow({
   const body = (
     <div className="min-w-0 flex-1">
       <div className="flex items-baseline justify-between gap-3">
-        <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}>
+        <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)}`}>
           {who}
         </p>
         <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
@@ -312,6 +313,7 @@ export function InboxPhoneRow({
           name={item.callerName}
           phone={item.callerPhone}
           contactHref={inboxContactHref(item, purpose, ret)}
+          ret={ret}
         />
       </div>
       <InboxPhoneOpen href={openHref} itemId={item.id}>

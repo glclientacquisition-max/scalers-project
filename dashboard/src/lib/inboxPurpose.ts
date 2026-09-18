@@ -1,6 +1,7 @@
 import type { CallResolution, LeadStatus } from "@/lib/supabase";
 import type { Lead } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
+import { normalizeKenyaE164 } from "@/lib/handoffMode";
 
 export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered" | "live";
 
@@ -119,6 +120,12 @@ export type InboxItem = {
   job: InboxJob | null;
   intent: string | null;
   urgent: boolean;
+  unread: boolean;
+  muted: boolean;
+  pinnedAt: string | null;
+  assignee: string | null;
+  labels: string[];
+  snoozedUntil: string | null;
 };
 
 export function isLiveCallStatus(status?: string | null): boolean {
@@ -229,7 +236,22 @@ export function compareInboxSignal(a: InboxItem, b: InboxItem): number {
   return compareInboxRecency(a, b);
 }
 
-/** All is a tape: newest first. Other piles keep work ranking. */
+export function compareInboxPin(a: InboxItem, b: InboxItem): number {
+  const ap = a.pinnedAt || "";
+  const bp = b.pinnedAt || "";
+  if (ap && !bp) return -1;
+  if (!ap && bp) return 1;
+  if (ap && bp && ap !== bp) return ap < bp ? 1 : -1;
+  return 0;
+}
+
+export function itemIsSnoozed(item: InboxItem, now = Date.now()): boolean {
+  if (!item.snoozedUntil) return false;
+  const until = Date.parse(item.snoozedUntil);
+  return Number.isFinite(until) && until > now;
+}
+
+/** All is a tape: newest first. Pinned rows stay on top of the current pile. */
 export function orderInboxItems(
   items: InboxItem[],
   filter: InboxPurposeFilterId
@@ -238,6 +260,7 @@ export function orderInboxItems(
   if (filter === "all" || filter === "answered") {
     rows.sort(compareInboxRecency);
   }
+  rows.sort(compareInboxPin);
   return rows;
 }
 
@@ -462,6 +485,9 @@ export function buildInboxItem(opts: {
   const createdAt =
     lead?.call.created_at || job?.created_at || hold?.created_at || new Date().toISOString();
   const id = lead?.call.id || job?.id || hold?.id || createdAt;
+  const labels = Array.isArray(lead?.call.inbox_labels)
+    ? lead.call.inbox_labels.filter((row): row is string => typeof row === "string")
+    : [];
 
   return {
     id,
@@ -479,6 +505,12 @@ export function buildInboxItem(opts: {
     job,
     intent: intent || canonicalInboxIntent(hold?.request_type) || null,
     urgent: Boolean(lead?.urgent),
+    unread: lead?.call.inbox_read_at === null,
+    muted: Boolean(lead?.call.inbox_muted),
+    pinnedAt: lead?.call.inbox_pinned_at || null,
+    assignee: lead?.call.inbox_assignee?.trim() || null,
+    labels,
+    snoozedUntil: lead?.call.inbox_snoozed_until || null,
   };
 }
 
@@ -506,13 +538,20 @@ export function assembleInboxItems(opts: {
   }
 
   const items: InboxItem[] = [];
+  const now = Date.now();
   for (const lead of opts.leads) {
     if (lead.leadStatus === "archived") continue;
     const hold = holdByCall.get(lead.call.id) || null;
     const job = jobByCall.get(lead.call.id) || null;
+    const draft = buildInboxItem({ lead, hold, job, vertical });
+    if (itemIsSnoozed(draft, now)) {
+      if (hold) usedHold.add(hold.id);
+      if (job) usedJob.add(job.id);
+      continue;
+    }
     if (hold) usedHold.add(hold.id);
     if (job) usedJob.add(job.id);
-    items.push(buildInboxItem({ lead, hold, job, vertical }));
+    items.push(draft);
   }
 
   for (const hold of opts.holds) {
@@ -544,16 +583,26 @@ export function attachContactIds(
   contacts: Array<{ id: string; phone: string | null; name?: string | null }>
 ): InboxItem[] {
   const byPhone = new Map<string, { id: string; name: string | null }>();
+  const remember = (phone: string | null | undefined, person: { id: string; name: string | null }) => {
+    if (!phone) return;
+    byPhone.set(phone, person);
+    const e164 = normalizeKenyaE164(phone);
+    if (e164) byPhone.set(e164, person);
+  };
   for (const row of contacts) {
-    if (row.phone) {
-      byPhone.set(row.phone, {
-        id: row.id,
-        name: row.name?.trim() || null,
-      });
-    }
+    if (!row.phone) continue;
+    remember(row.phone, {
+      id: row.id,
+      name: row.name?.trim() || null,
+    });
   }
   return items.map((item) => {
-    const person = item.callerPhone ? byPhone.get(item.callerPhone) || null : null;
+    const person =
+      (item.callerPhone && byPhone.get(item.callerPhone)) ||
+      (item.callerPhone && normalizeKenyaE164(item.callerPhone)
+        ? byPhone.get(normalizeKenyaE164(item.callerPhone) as string)
+        : null) ||
+      null;
     return {
       ...item,
       contactId: person?.id || null,

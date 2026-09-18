@@ -30,6 +30,12 @@ function item(partial: Partial<InboxItem> & Pick<InboxItem, "id" | "purpose" | "
     job: null,
     intent: null,
     urgent: false,
+    unread: false,
+    muted: false,
+    pinnedAt: null,
+    assignee: null,
+    labels: [],
+    snoozedUntil: null,
     ...partial,
   };
 }
