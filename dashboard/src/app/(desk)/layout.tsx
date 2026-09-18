@@ -27,7 +27,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="desk-theme min-h-dvh min-w-0">
+    <div className="desk-theme min-h-dvh min-w-0 overflow-x-clip">
       {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
       <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
         <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">

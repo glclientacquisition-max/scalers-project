@@ -32,6 +32,10 @@ describe("desk phone shell", () => {
     assert.match(css, /scroll-padding-bottom:\s*var\(--desk-tabbar-clearance\)/);
     assert.match(css, /--desk-tabbar-clearance:\s*calc\(var\(--desk-tabbar-h\) \+ env\(safe-area-inset-bottom, 0px\) \+ 1\.5rem\)/);
     assert.match(nav, /min-h-\[calc\(var\(--desk-tabbar-h\)\+env\(safe-area-inset-bottom,0px\)\)\]/);
+    assert.match(nav, /bg-surface/);
+    assert.doesNotMatch(nav, /bg-surface\/95/);
+    assert.doesNotMatch(nav, /backdrop-blur/);
+    assert.match(layout, /overflow-x-clip/);
     assert.doesNotMatch(layout, /context=\{businessName\}/);
     const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");
     assert.match(inboxRow, /export function InboxPhoneRow/);

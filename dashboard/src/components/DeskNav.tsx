@@ -154,7 +154,7 @@ export function DeskTabBar() {
   return (
     <nav
       aria-label="Workspace"
-      className="fixed inset-x-0 bottom-0 z-40 min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] border-t border-line/80 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] border-t border-line/80 bg-surface pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
     >
       <ul className="flex">
         {DESK_LINKS.map((item) => {
