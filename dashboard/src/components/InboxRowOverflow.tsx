@@ -146,7 +146,7 @@ export function InboxRowShell({
       setOpen(null);
       return;
     }
-    if (!item.callId && id !== "select") {
+    if (!item.callId) {
       setError("Missing call.");
       return;
     }
