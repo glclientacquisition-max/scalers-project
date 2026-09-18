@@ -33,7 +33,7 @@
   --bubble-caller: #d9f4e2;
   --bubble-caller-ink: #2f6b3a;
   --sms: #0284c7;
-  --email: #4f46e5;
+  --email: #005ccc;
 
   --background: var(--bg);
   --foreground: var(--ink);
@@ -89,7 +89,7 @@
   --bubble-caller: #14321f;
   --bubble-caller-ink: #7fe3a5;
   --sms: #38bdf8;
-  --email: #a5b4fc;
+  --email: #6bc2ff;
   --brand-ink: #e9eff7;
   --tw-ring-offset-color: var(--card);
   color-scheme: dark;
@@ -124,7 +124,7 @@
     --bubble-caller: #14321f;
     --bubble-caller-ink: #7fe3a5;
     --sms: #38bdf8;
-    --email: #a5b4fc;
+    --email: #6bc2ff;
     --brand-ink: #e9eff7;
     --tw-ring-offset-color: var(--card);
     color-scheme: dark;
@@ -215,6 +215,7 @@ body {
     var(--bg);
   font-family: var(--font-sans), ui-sans-serif, sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
   max-width: 100%;
   overflow-x: clip;
 }

@@ -21,18 +21,21 @@ import {
   InboxTableRow,
   inboxTableKind,
 } from "@/components/InboxItemRow";
+import type { InboxReturn } from "@/lib/inboxHref";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
-import { runSheetForDay, runSheetItems } from "@/lib/runSheet";
+import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
+import { holdBoardForDay } from "@/lib/holdSheet";
 import {
   parseDayParam,
   parseWeekParam,
   shiftDayYmd,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
-import { btnGhost, btnPrimary, deskEmptyClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -103,24 +106,17 @@ function EmptyInbox({
   }
 
   return (
-    <div className="mt-8 border-y border-line py-12 text-center text-ink-soft">
+    <div className={deskEmptyClass}>
       <p className="font-display text-2xl tracking-tight text-ink">Inbox is empty</p>
-      <p className="mx-auto mt-2 max-w-md text-sm">
-        Call{" "}
-        <a
-          href={`tel:${did}`}
-          className={`font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 ${deskShiftClass} hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-        >
+      {did ? (
+        <a href={`tel:${did}`} className={`${btnGhost} mt-6`}>
           {did}
-        </a>{" "}
-        from another phone.
-      </p>
-      <Link
-        href={businessSettingsHref("test")}
-        className={`${btnGhost} mt-6`}
-      >
-        Test line
-      </Link>
+        </a>
+      ) : (
+        <Link href={businessSettingsHref("test")} className={`${btnGhost} mt-6`}>
+          Test line
+        </Link>
+      )}
     </div>
   );
 }
@@ -145,15 +141,7 @@ export default async function CallsPage({
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-accent-deep">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -166,7 +154,7 @@ export default async function CallsPage({
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const { items: assembled, error } = await loadInboxItems(
+  const { items: assembled, error, partialError } = await loadInboxItems(
     client,
     tenant.id,
     vertical
@@ -185,24 +173,35 @@ export default async function CallsPage({
     searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
     activeFilter
   );
-  const view = String(sp.view || "");
+  const rawView = String(sp.view || "");
+  const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";
   const todayView = activeFilter === "job" && view === "today";
+  const holdTodayView = activeFilter === "hold" && view === "today";
   const boardView = weekView || todayView;
   const monday = parseWeekParam(sp.week);
   const day = parseDayParam(sp.day);
-  const boardItems = boardView ? runSheetItems(searched) : filtered;
-  const todayItems = todayView ? runSheetForDay(searched, day) : [];
+  const boardItems = boardView ? visitBoardItems(searched) : filtered;
+  const todayItems = todayView ? visitBoardForDay(searched, day) : [];
+  const holdTodayItems = holdTodayView ? holdBoardForDay(searched, day) : [];
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = boardView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
+  const pageRows = boardView || holdTodayView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
     q: q || undefined,
-    view: weekView ? "week" : todayView ? "today" : undefined,
+    view: weekView ? "week" : todayView || holdTodayView ? "today" : undefined,
     week: weekView ? monday : undefined,
-    day: todayView ? day : undefined,
+    day: todayView || holdTodayView ? day : undefined,
+  };
+  const inboxRet: InboxReturn = {
+    purpose: activeFilter,
+    q: q || undefined,
+    page: boardView || holdTodayView ? undefined : page,
+    view: boardView || holdTodayView ? view : undefined,
+    week: weekView ? monday : undefined,
+    day: todayView || holdTodayView ? day : undefined,
   };
 
   return (
@@ -213,10 +212,16 @@ export default async function CallsPage({
         q={q}
         caption={inboxCaption(searched, vertical)}
         vertical={vertical}
-        view={boardView ? view : undefined}
+        view={boardView || holdTodayView ? view : undefined}
         week={weekView ? monday : undefined}
-        day={todayView ? day : undefined}
+        day={todayView || holdTodayView ? day : undefined}
       />
+
+      {partialError ? (
+        <div className="mt-6">
+          <DeskError>{partialError}</DeskError>
+        </div>
+      ) : null}
 
       {todayView ? (
         <RunSheetToday
@@ -235,12 +240,29 @@ export default async function CallsPage({
             day: shiftDayYmd(day, 1),
           })}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
-          weekHref={callsHref({
-            purpose: "job",
+          ret={{ purpose: "job", q: q || undefined, view: "today", day }}
+          businessName={businessName}
+          vertical={vertical}
+        />
+      ) : holdTodayView ? (
+        <RunSheetToday
+          items={holdTodayItems}
+          ymd={day}
+          purpose="hold"
+          prevHref={callsHref({
+            purpose: "hold",
             q: q || undefined,
-            view: "week",
-            week: parseWeekParam(day),
+            view: "today",
+            day: shiftDayYmd(day, -1),
           })}
+          nextHref={callsHref({
+            purpose: "hold",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, 1),
+          })}
+          listHref={callsHref({ purpose: "hold", q: q || undefined })}
+          ret={{ purpose: "hold", q: q || undefined, view: "today", day }}
           businessName={businessName}
           vertical={vertical}
         />
@@ -261,6 +283,7 @@ export default async function CallsPage({
             week: shiftWeekYmd(monday, 1),
           })}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
+          ret={{ purpose: "job", q: q || undefined, view: "week", week: monday }}
           businessName={businessName}
           vertical={vertical}
         />
@@ -287,6 +310,7 @@ export default async function CallsPage({
                 businessName={businessName}
                 purpose={activeFilter}
                 vertical={vertical}
+                ret={inboxRet}
               />
             ))}
           </ul>
@@ -346,6 +370,7 @@ export default async function CallsPage({
                     businessName={businessName}
                     purpose={activeFilter}
                     vertical={vertical}
+                    ret={inboxRet}
                   />
                 ))}
               </tbody>

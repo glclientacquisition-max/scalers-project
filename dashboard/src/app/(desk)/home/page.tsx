@@ -9,6 +9,7 @@ import {
   nairobiGreeting,
   walletKes,
 } from "@/lib/callsTriage";
+import { inboxRecordHref } from "@/lib/inboxHref";
 import {
   formatBulletinEndLabel,
   liveBulletinItems,
@@ -32,9 +33,11 @@ import {
 } from "@/lib/inboxPurpose";
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
-import { runSheetForDay } from "@/lib/runSheet";
+import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { LivePing } from "@/components/ui/deskRow";
 import {
@@ -46,24 +49,12 @@ import {
 export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="font-medium text-accent-deep">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-surface p-6 text-warn">
-        Not signed in.
-      </div>
-    );
+    return <DeskError>Not signed in.</DeskError>;
   }
 
   const client = workspace.client;
@@ -109,14 +100,17 @@ export default async function HomeOverviewPage() {
       ? Promise.resolve(null)
       : getWalletRunwayDays(client, tenant.id, kes),
   ]);
+  if (inbox.error) {
+    return <DeskError>Could not load Overview.</DeskError>;
+  }
   const runway = walletRunwayLabel(runwayDays);
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
 
-  const todayCount = todayRes.count ?? 0;
+  const todayCount = todayRes.error ? null : todayRes.count ?? 0;
   const work = summarizeInboxWork(inbox.items);
-  const todayWork = runSheetForDay(inbox.items, eatYmd()).length;
+  const todayWork = visitBoardForDay(inbox.items, eatYmd()).length;
   const waitingCount = work.needs;
   const briefing = homeBriefing(
     {
@@ -194,19 +188,21 @@ export default async function HomeOverviewPage() {
         </p>
       </header>
 
+      {inbox.partialError ? (
+        <div className="mt-6">
+          <DeskError>{inbox.partialError}</DeskError>
+        </div>
+      ) : null}
+
       {primaryUpdate ? (
         <aside aria-label="Live updates" className="mt-6 w-full min-w-0">
           <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,var(--card))] px-4 py-3">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-accent"
-            />
-            <div className="flex min-w-0 flex-col gap-3 pl-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-accent-deep">
                   <LivePing />
                   Updates
-                  {liveUpdates.length > 1 ? ` · ${liveUpdates.length} live` : ""}
+                  {liveUpdates.length > 1 ? ` ${liveUpdates.length} live` : ""}
                 </p>
                 <p className={`mt-1 font-display text-base tracking-tight text-ink ${deskPreviewClass}`}>
                   {primaryUpdate.text}
@@ -287,7 +283,7 @@ export default async function HomeOverviewPage() {
               className="relative mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
             >
               <DeskRowHit
-                href={nextReturn.callId ? `/calls/${nextReturn.callId}?from=needs` : null}
+                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { purpose: "needs" }) : null}
                 label="Conversation"
               />
               <h2
@@ -337,7 +333,9 @@ export default async function HomeOverviewPage() {
                 ].join(" ")}
               >
                 <span>Calls today</span>
-                <span className="tabular-nums font-medium text-ink">{todayCount}</span>
+                {todayCount === null ? null : (
+                  <span className="tabular-nums font-medium text-ink">{todayCount}</span>
+                )}
               </Link>
             </section>
 

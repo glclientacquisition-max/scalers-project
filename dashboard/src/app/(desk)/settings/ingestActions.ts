@@ -343,7 +343,7 @@ export async function applyIngestAction(
       ? draftHoursNotes
       : formatHoursForCompiler(nextSchedule)) ||
     String(tenant.business_hours || "").trim() ||
-    "Hours not set yet — confirm with the team.";
+    "Hours not set yet. Confirm with the team.";
 
   const existingPolicies = normalizeBusinessPolicies(tenant.business_policies);
   const nextPolicies = policiesFilled
@@ -466,7 +466,7 @@ export async function applyIngestAction(
     return {
       ok: true,
       source,
-      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Train below should refresh — open Train to review. Live on the next call.${capNote}`,
+      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Train below should refresh. Open Train to review. Live on the next call.${capNote}`,
     };
   }
 

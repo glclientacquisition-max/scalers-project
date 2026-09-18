@@ -1,10 +1,12 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskError } from "@/components/ui/DeskError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
+import { callFromContactHref } from "@/lib/inboxHref";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
 import { displayContactLastReason } from "@/lib/callSummarySentence";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
@@ -17,10 +19,23 @@ function kindLabel(kind: "call" | "request" | "appointment"): string {
 
 export default async function ContactDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    from?: string;
+    call?: string;
+    purpose?: string;
+    view?: string;
+    week?: string;
+    day?: string;
+    q?: string;
+    page?: string;
+  }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const callBack = callFromContactHref(sp);
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
 
@@ -28,7 +43,10 @@ export default async function ContactDetailPage({
   if (!workspace) notFound();
 
   const { contact, error } = await loadContactById(workspace.client, tenant.id, id);
-  if (error || !contact) notFound();
+  if (error) {
+    return <DeskError>Could not load this contact.</DeskError>;
+  }
+  if (!contact) notFound();
 
   const timeline = await loadContactTimeline(workspace.client, tenant.id, contact);
   const title = contact.name?.trim() || "Unknown";
@@ -41,12 +59,7 @@ export default async function ContactDetailPage({
   });
   return (
     <div className="max-w-6xl">
-      <Link
-        href="/contacts"
-        className="text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      >
-        Contacts
-      </Link>
+      <DeskBack href={callBack || "/contacts"}>{callBack ? "Call" : "Contacts"}</DeskBack>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
@@ -84,7 +97,7 @@ export default async function ContactDetailPage({
           </section>
         </aside>
 
-        <div className="min-h-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
+        <div className="min-h-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
           <section>
             <h2 className="font-display text-2xl tracking-tight text-ink">Timeline</h2>
             {timeline.length === 0 ? (

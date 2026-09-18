@@ -6,6 +6,7 @@ import {
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { getCurrentTenant } from "@/lib/tenant";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -23,19 +24,7 @@ export default async function SettingsPage({
   }
 
   if (!tenant) {
-    return (
-      <div className="min-w-0">
-        <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
-          Business Profile
-        </p>
-        <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-          No workspace
-        </h1>
-        <p className="mt-1 text-sm text-ink-soft">
-          Sign up again or contact support.
-        </p>
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const params = (await searchParams) || {};

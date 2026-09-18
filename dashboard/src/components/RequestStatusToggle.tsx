@@ -5,7 +5,7 @@ import {
   updateServiceRequestStatus,
   type RequestStatusState,
 } from "@/app/(desk)/requests/actions";
-import { btnDock, btnDockGhost, deskHitClass } from "@/components/ui/deskChrome";
+import { btnDock, btnDockGhost, btnGhost, btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
 
 const initial: RequestStatusState = {};
 
@@ -31,7 +31,7 @@ export function RequestStatusToggle({
   const normalized = status === "fulfilled" || status === "cancelled" ? status : "open";
   const err = ownerError(state.error);
   const stack = extra
-    ? "flex w-full flex-col items-end gap-2"
+    ? "flex w-full flex-col gap-2"
     : "flex items-center justify-end";
 
   return (
@@ -45,9 +45,18 @@ export function RequestStatusToggle({
               name="status"
               value="fulfilled"
               disabled={pending}
-              className={btnDock}
+              className={extra ? `${btnPrimary} w-full` : btnDock}
+              aria-label={pending ? "Saving" : "Done"}
             >
-              {pending ? "Saving" : "Done"}
+              {pending ? (
+                extra ? (
+                  "Saving"
+                ) : (
+                  <span aria-hidden="true" className={pendingSpinnerClass} />
+                )
+              ) : (
+                "Done"
+              )}
             </button>
             {extra ? (
               <button
@@ -55,7 +64,7 @@ export function RequestStatusToggle({
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={btnDockGhost}
+                className={`${btnGhost} w-full`}
               >
                 Cancel
               </button>
@@ -64,20 +73,42 @@ export function RequestStatusToggle({
         ) : null}
         {normalized === "fulfilled" ? (
           <>
-            <span className={`${btnDock} pointer-events-none bg-ok-soft text-ok shadow-none`}>
+            <span
+              className={
+                extra
+                  ? "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-sm font-semibold text-ok"
+                  : `${btnDock} pointer-events-none bg-ok-soft text-ok shadow-none`
+              }
+            >
               Done
             </span>
-            <button type="submit" name="status" value="open" disabled={pending} className={btnDockGhost}>
-              Reopen
-            </button>
+            {extra ? (
+              <button
+                type="submit"
+                name="status"
+                value="open"
+                disabled={pending}
+                className={`${btnGhost} w-full`}
+              >
+                Reopen
+              </button>
+            ) : null}
           </>
         ) : null}
         {normalized === "cancelled" ? (
           <>
-            <span className={`${deskHitClass} bg-surface-muted text-[11px] font-medium leading-none text-ink-soft`}>
-              Cancelled
-            </span>
-            <button type="submit" name="status" value="open" disabled={pending} className={btnDockGhost}>
+            {extra ? (
+              <span className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-surface-muted text-sm font-medium text-ink-soft">
+                Cancelled
+              </span>
+            ) : null}
+            <button
+              type="submit"
+              name="status"
+              value="open"
+              disabled={pending}
+              className={extra ? `${btnGhost} w-full` : btnDockGhost}
+            >
               Reopen
             </button>
           </>

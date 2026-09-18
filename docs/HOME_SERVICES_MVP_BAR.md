@@ -54,7 +54,7 @@ Signup (DID + notify)
   → Compile llm_system_prompt
   → Call: intro → playbook → slots → create_appointment
   → Owner visit notify
-  → Inbox Visits list (Confirm) or Week (run sheet)
+  → Inbox Visits (Confirm on List or Work)
 ```
 
 Owner-typed services keep their rows and still receive missing seed jobs (carpet/couch/mattress) unless they already named them. Recompile after Train edits.

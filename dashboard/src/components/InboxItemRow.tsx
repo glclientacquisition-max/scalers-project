@@ -21,8 +21,8 @@ import {
   deskRowWeightClass,
 } from "@/components/ui/deskRow";
 import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
+import { inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import {
-  holdTypeLabel,
   itemSignalLabel,
   type InboxItem,
   type InboxPurposeFilterId,
@@ -40,7 +40,8 @@ function inboxCopy(
   item: InboxItem,
   purpose: InboxPurposeFilterId,
   vertical: string | null | undefined,
-  businessName: string
+  businessName: string,
+  ret?: InboxReturn
 ) {
   const kind = inboxTableKind(purpose);
   const who = item.callerName || item.callerPhone || "Caller";
@@ -49,7 +50,9 @@ function inboxCopy(
     name: item.callerName,
     reason: item.headline,
   });
-  const openHref = item.callId ? `/calls/${item.callId}?from=${purpose}` : null;
+  const openHref = item.callId
+    ? inboxRecordHref(item.callId, ret || { purpose })
+    : null;
   const hasJob = Boolean(item.job);
   const hasHold = Boolean(item.hold);
   const needed = item.hold?.when_text?.trim() || "Anytime";
@@ -110,11 +113,13 @@ export function InboxTableRow({
   businessName,
   purpose,
   vertical,
+  ret,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
+  ret?: InboxReturn;
 }) {
   const {
     kind,
@@ -128,7 +133,7 @@ export function InboxTableRow({
     when,
     hasJob,
     showHold,
-  } = inboxCopy(item, purpose, vertical, businessName);
+  } = inboxCopy(item, purpose, vertical, businessName, ret);
 
   const live = item.purpose === "live";
 
@@ -156,9 +161,6 @@ export function InboxTableRow({
                 >
                   {item.headline}
                 </p>
-                <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
-                  {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
-                </p>
               </div>
             </div>
           </td>
@@ -185,9 +187,6 @@ export function InboxTableRow({
                   className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
                 >
                   {hasJob ? visit : stamp}
-                </p>
-                <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
-                  {item.headline}
                 </p>
               </div>
             </div>
@@ -247,14 +246,16 @@ export function InboxPhoneRow({
   businessName,
   purpose,
   vertical,
+  ret,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
+  ret?: InboxReturn;
 }) {
-  const { who, message, openHref, needed, visit, place, stamp, when, showJob, showHold, showMixed } =
-    inboxCopy(item, purpose, vertical, businessName);
+  const { who, message, openHref, needed, visit, when, showJob, showHold } =
+    inboxCopy(item, purpose, vertical, businessName, ret);
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
   const body = (
@@ -273,14 +274,6 @@ export function InboxPhoneRow({
         <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
           {work}
         </p>
-        {showJob ? (
-          <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>{place}</p>
-        ) : null}
-        {showMixed ? (
-          <p className="mt-1">
-            <InboxPurposeChip purpose={item.purpose} label={stamp} />
-          </p>
-        ) : null}
       </div>
     </>
   );

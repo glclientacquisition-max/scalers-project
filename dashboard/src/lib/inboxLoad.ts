@@ -27,7 +27,12 @@ export async function loadInboxItems(
   client: SupabaseClient,
   tenantId: string,
   vertical?: string | null
-): Promise<{ items: InboxItem[]; callsTruncated: boolean; error: string | null }> {
+): Promise<{
+  items: InboxItem[];
+  callsTruncated: boolean;
+  error: string | null;
+  partialError: string | null;
+}> {
   const first = await client
     .from("calls")
     .select(CALL_SELECT)
@@ -61,7 +66,7 @@ export async function loadInboxItems(
   }
 
   if (error) {
-    return { items: [], callsTruncated: false, error: error.message };
+    return { items: [], callsTruncated: false, error: error.message, partialError: null };
   }
 
   const [holdsRes, jobsFirst] = await Promise.all([
@@ -80,6 +85,7 @@ export async function loadInboxItems(
   ]);
 
   let jobs: InboxJob[] = [];
+  let jobsFailed = false;
   if (jobsFirst.error && /window_start|window_end|column/i.test(jobsFirst.error.message)) {
     const retry = await client
       .from("appointments")
@@ -89,12 +95,19 @@ export async function loadInboxItems(
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(INBOX_WINDOW);
-    jobs = (retry.error ? [] : retry.data || []) as InboxJob[];
+    if (retry.error) {
+      jobsFailed = true;
+    } else {
+      jobs = (retry.data || []) as InboxJob[];
+    }
+  } else if (jobsFirst.error) {
+    jobsFailed = true;
   } else {
-    jobs = (jobsFirst.error ? [] : jobsFirst.data || []) as InboxJob[];
+    jobs = (jobsFirst.data || []) as InboxJob[];
   }
 
-  const holds = (holdsRes.error ? [] : holdsRes.data || []) as InboxHold[];
+  const holdsFailed = Boolean(holdsRes.error);
+  const holds = (holdsFailed ? [] : holdsRes.data || []) as InboxHold[];
   const leads = (data || []).map(toLead);
   const items = assembleInboxItems({ leads, holds, jobs, vertical });
 
@@ -121,5 +134,7 @@ export async function loadInboxItems(
     items: withPeople,
     callsTruncated: (data || []).length >= INBOX_WINDOW,
     error: null,
+    partialError:
+      holdsFailed || jobsFailed ? "Could not load some inbox rows." : null,
   };
 }

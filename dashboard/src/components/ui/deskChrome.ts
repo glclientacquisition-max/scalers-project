@@ -28,12 +28,12 @@ export const btnPrimary = [
 
 /** One Action-dock hit. Confirm, Done, Call, and WhatsApp share this box. */
 export const deskHitClass =
-  "box-border inline-flex h-11 w-11 min-h-11 min-w-11 max-h-11 max-w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl p-0";
+  "box-border inline-flex h-12 w-12 min-h-12 min-w-12 max-h-12 max-w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl p-0";
 
 /** Filled list verb in `deskHitClass`. */
 export const btnDock = [
   deskHitClass,
-  "px-0 text-[11px] font-semibold leading-none",
+  "px-0 text-xs font-semibold leading-none",
   btnPrimaryFill,
   deskShiftClass,
   "active:scale-[0.99] motion-reduce:active:scale-100",
@@ -57,6 +57,10 @@ export const btnGhost = [
 
 export const pendingSpinnerClass =
   "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent-on-fill/40 border-t-accent-on-fill motion-reduce:animate-none";
+
+/** Spinner on canvas (loading routes). Ink track, not on-fill. */
+export const pendingSpinnerInkClass =
+  "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink/20 border-t-ink motion-reduce:animate-none";
 
 export const deskFieldClass =
   `w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;

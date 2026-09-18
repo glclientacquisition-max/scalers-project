@@ -8,7 +8,7 @@ export default function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center px-6 py-16">
+    <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
         <BrandWordmark href="/" context="Sign in" variant="lockup" priority />
         <h1 className="sr-only">Sign in to Scalers</h1>
@@ -72,9 +72,9 @@ async function LoginError({
   const sp = await searchParams;
   if (!sp.error) return null;
   const message =
-    sp.error === "1"
-      ? "Invalid email or password."
-      : decodeURIComponent(sp.error);
+    sp.error === "config"
+      ? "Sign in is not available. Try again later."
+      : "Invalid email or password.";
   return (
     <p className="mt-1 text-sm text-warn" role="alert">
       {message}

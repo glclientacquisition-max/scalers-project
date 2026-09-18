@@ -4,14 +4,7 @@ import Link from "next/link";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import {
-  btnGhost,
-  btnPrimary,
-  deskFieldClass,
-  deskPreviewClass,
-  deskShiftClass,
-  pageTitleClass,
-} from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 
 export function InboxToolbar({
@@ -39,8 +32,9 @@ export function InboxToolbar({
     caption ||
     (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
   const weekView = active === "job" && view === "week";
-  const todayView = active === "job" && view === "today";
-  const boardView = weekView || todayView;
+  const todayView = active === "job" && (view === "today" || view === "work");
+  const holdToday = active === "hold" && (view === "today" || view === "work");
+  const workView = weekView || todayView;
 
   return (
     <header className="space-y-6">
@@ -55,9 +49,11 @@ export function InboxToolbar({
           className="flex w-full min-w-0 gap-2 sm:max-w-sm"
         >
           <input type="hidden" name="purpose" value={active} />
-          {boardView ? <input type="hidden" name="view" value={view} /> : null}
+          {workView || holdToday ? (
+            <input type="hidden" name="view" value={weekView ? "week" : "today"} />
+          ) : null}
           {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
-          {todayView && day ? <input type="hidden" name="day" value={day} /> : null}
+          {(todayView || holdToday) && day ? <input type="hidden" name="day" value={day} /> : null}
           <label className="sr-only" htmlFor="inbox-search">
             Search inbox
           </label>
@@ -86,44 +82,99 @@ export function InboxToolbar({
           href: callsHref({
             purpose: item.id,
             q: q || undefined,
-            view: item.id === "job" && boardView ? view : undefined,
+            view:
+              item.id === "job" && workView
+                ? weekView
+                  ? "week"
+                  : "today"
+                : item.id === "hold" && holdToday
+                  ? "today"
+                  : undefined,
             week: item.id === "job" && weekView ? week : undefined,
-            day: item.id === "job" && todayView ? day : undefined,
+            day:
+              (item.id === "job" && todayView) || (item.id === "hold" && holdToday)
+                ? day
+                : undefined,
           }),
         }))}
       />
 
       {active === "job" ? (
-        <nav aria-label="Visit layout" className="flex gap-2">
-          <Link
-            href={callsHref({ purpose: "job", q: q || undefined })}
-            className={!boardView ? btnPrimary : btnGhost}
-          >
-            List
-          </Link>
-          <Link
-            href={callsHref({
-              purpose: "job",
-              q: q || undefined,
-              view: "today",
-              day,
-            })}
-            className={todayView ? btnPrimary : btnGhost}
-          >
-            Today
-          </Link>
-          <Link
-            href={callsHref({
-              purpose: "job",
-              q: q || undefined,
-              view: "week",
-              week,
-            })}
-            className={weekView ? btnPrimary : btnGhost}
-          >
-            Week
-          </Link>
-        </nav>
+        <FilterTabs
+          label="Visit sort"
+          active={workView ? "work" : "list"}
+          items={[
+            {
+              id: "list",
+              label: "List",
+              href: callsHref({ purpose: "job", q: q || undefined }),
+            },
+            {
+              id: "work",
+              label: "Work",
+              href: callsHref({
+                purpose: "job",
+                q: q || undefined,
+                view: weekView ? "week" : "today",
+                week: weekView ? week : undefined,
+                day: weekView ? undefined : day,
+              }),
+            },
+          ]}
+        />
+      ) : null}
+
+      {active === "hold" ? (
+        <FilterTabs
+          label="Hold sort"
+          active={holdToday ? "work" : "list"}
+          items={[
+            {
+              id: "list",
+              label: "List",
+              href: callsHref({ purpose: "hold", q: q || undefined }),
+            },
+            {
+              id: "work",
+              label: "Work",
+              href: callsHref({
+                purpose: "hold",
+                q: q || undefined,
+                view: "today",
+                day,
+              }),
+            },
+          ]}
+        />
+      ) : null}
+
+      {active === "job" && workView ? (
+        <FilterTabs
+          label="Work date"
+          active={weekView ? "week" : "today"}
+          items={[
+            {
+              id: "today",
+              label: "Today",
+              href: callsHref({
+                purpose: "job",
+                q: q || undefined,
+                view: "today",
+                day,
+              }),
+            },
+            {
+              id: "week",
+              label: "Week",
+              href: callsHref({
+                purpose: "job",
+                q: q || undefined,
+                view: "week",
+                week,
+              }),
+            },
+          ]}
+        />
       ) : null}
 
       {q ? (

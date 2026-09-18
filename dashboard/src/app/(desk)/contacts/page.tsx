@@ -4,6 +4,7 @@ import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { RowIdentity } from "@/components/ui/deskRow";
@@ -43,15 +44,7 @@ export default async function ContactsPage({
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-accent-deep">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();

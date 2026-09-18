@@ -1,35 +1,27 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import {
   updateServiceRequestSchedule,
   type RequestScheduleState,
 } from "@/app/(desk)/requests/actions";
-import { RequestStatusToggle } from "@/components/RequestStatusToggle";
-import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass } from "@/components/ui/deskChrome";
 
 const initial: RequestScheduleState = {};
 
-const fieldClass =
-  `w-full min-h-11 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent`;
+const fieldClass = deskFieldClass;
 
 export function InboxHoldEditor({
   id,
-  status,
   whenText,
 }: {
   id: string;
-  status: string;
   whenText: string | null;
 }) {
   const [state, formAction, pending] = useActionState(
     updateServiceRequestSchedule,
     initial
   );
-
-  useEffect(() => {
-    if (state.error) console.warn("[InboxHoldEditor]", state.error);
-  }, [state.error]);
 
   return (
     <div className="space-y-3">
@@ -48,13 +40,12 @@ export function InboxHoldEditor({
         <button
           type="submit"
           disabled={pending}
-          className={`${btnPrimary} w-full`}
+          className={`${btnGhost} w-full disabled:opacity-50`}
         >
           {pending ? "Saving" : "Save"}
         </button>
-        {state.error ? <p className="text-sm text-warn">{state.error}</p> : null}
+        {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
-      <RequestStatusToggle id={id} status={status} extra />
     </div>
   );
 }

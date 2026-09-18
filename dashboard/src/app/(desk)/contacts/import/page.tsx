@@ -1,38 +1,23 @@
-import Link from "next/link";
 import { ContactImportForm } from "@/components/ContactImportForm";
+import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskError } from "@/components/ui/DeskError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export default async function ContactImportPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        No workspace linked to this account yet.{" "}
-        <Link href="/signup" className="text-accent-deep">
-          Create one
-        </Link>
-        .
-      </div>
-    );
+    return <DeskNoWorkspace />;
   }
 
   const workspace = await createWorkspaceDataClient();
   if (!workspace) {
-    return (
-      <div className="rounded-2xl border border-warn/40 bg-surface p-6 text-warn">
-        Not signed in.
-      </div>
-    );
+    return <DeskError>Not signed in.</DeskError>;
   }
 
   return (
     <div className="max-w-3xl">
-      <Link
-        href="/contacts"
-        className="text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      >
-        Contacts
-      </Link>
+      <DeskBack href="/contacts">Contacts</DeskBack>
       <h1 className="mt-4 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
         Import
       </h1>

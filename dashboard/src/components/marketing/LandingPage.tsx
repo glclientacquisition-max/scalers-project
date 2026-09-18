@@ -8,7 +8,7 @@ import { brandAssets } from "@/components/brand/assets";
  */
 export function LandingPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <main className="relative min-h-dvh overflow-hidden">
       {/* Full-bleed brand visual plane */}
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <div className="absolute inset-0 bg-brand-900" />
@@ -25,7 +25,7 @@ export function LandingPage() {
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-brand-900 to-transparent" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-desk flex-col px-6 pb-10 pt-6 sm:px-8">
+      <div className="relative z-10 mx-auto flex min-h-dvh max-w-desk flex-col px-6 pb-10 pt-6 sm:px-8">
         <header className="flex items-center justify-between gap-4 landing-rise">
           <span className="font-display text-lg tracking-tight text-white sm:text-xl">
             Scalers

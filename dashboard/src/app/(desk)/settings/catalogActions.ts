@@ -136,7 +136,7 @@ export async function previewCatalogImportAction(
         ok: true,
         products: products.slice(0, PRODUCT_CATALOG_MAX),
         message: capped
-          ? `Found ${products.length} products — keeping the first ${PRODUCT_CATALOG_MAX}. Review below, then add.`
+          ? `Found ${products.length} products. Keeping the first ${PRODUCT_CATALOG_MAX}. Review below, then add.`
           : `Found ${products.length} products. Review below, then add.`,
       };
     }

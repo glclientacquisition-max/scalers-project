@@ -18,7 +18,7 @@ export default async function OnboardingPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-6 py-16">
+      <main className="flex min-h-dvh items-center justify-center px-6 py-16">
         <div className="w-full max-w-lg">
           <BrandWordmark href="/onboarding" context="Workspace" variant="lockup" priority />
           <p className="mt-6 text-ink-soft leading-relaxed">
@@ -34,7 +34,7 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 py-16">
+    <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-xl">
         <BrandWordmark href="/onboarding" context="Setup" variant="lockup" priority />
         <h1 className="mt-8 font-display text-2xl text-ink">
