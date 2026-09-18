@@ -25,10 +25,16 @@ describe('planManualContact', () => {
     assert.deepEqual(next.metadata.alternate_names, []);
   });
 
-  it('rejects an unparseable phone', () => {
-    const next = planManualContact({ phone: 'abc' });
-    assert.equal(next.ok, false);
-    assert.match(next.error, /Kenyan/);
+  it('rejects empty and unknown phones and keeps a non-Kenya fallback', () => {
+    assert.equal(planManualContact({ phone: 'abc' }).ok, true);
+    assert.equal(planManualContact({ phone: 'abc' }).phone, 'abc');
+    assert.equal(planManualContact({ phone: '+14155552671' }).phone, '+14155552671');
+    const empty = planManualContact({ phone: '' });
+    assert.equal(empty.ok, false);
+    assert.match(empty.error, /required/);
+    const unknown = planManualContact({ phone: 'unknown' });
+    assert.equal(unknown.ok, false);
+    assert.match(unknown.error, /required/);
   });
 
   it('flags an existing tenant phone as a duplicate', () => {
@@ -53,13 +59,14 @@ describe('planContactCsv', () => {
     assert.equal(plan.create[0].name, 'Amina');
   });
 
-  it('rejects invalid phones with row numbers and writes nothing for them', () => {
-    const plan = planContactCsv(csv('Amina,not-a-phone,x\nJane,0711111111,'));
+  it('rejects empty phones with row numbers and keeps non-Kenya numbers', () => {
+    const plan = planContactCsv(csv('Amina,,x\nJane,0711111111,\nSam,+14155552671,'));
     assert.equal(plan.ok, true);
     assert.equal(plan.rejected.length, 1);
     assert.equal(plan.rejected[0].rowNumber, 2);
-    assert.equal(plan.summary.create, 1);
+    assert.equal(plan.summary.create, 2);
     assert.equal(plan.create[0].name, 'Jane');
+    assert.equal(plan.create[1].phone, '+14155552671');
   });
 
   it('skips duplicate phones within the file', () => {

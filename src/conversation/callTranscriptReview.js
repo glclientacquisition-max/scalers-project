@@ -5,6 +5,7 @@
 const { isPlausibleCallerName } = require('./entityExtraction');
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { sanitizeStoredCallerName } = require('./callerNameQuality');
+const { parseStoredContactPhone } = require('./contactIdentity');
 
 const REVIEW_MODEL =
   process.env.GEMINI_REVIEW_MODEL ||
@@ -519,10 +520,11 @@ async function persistCompletedCallContact(ctx = {}, deps = {}) {
     deps.upsertContact || ((row) => require('../db').upsertContact(row));
   const call = ctx.call || (await getCall(callSid));
   if (!call) return { ok: false, reason: 'no_call' };
-  const phone = String(call.from_number || '').trim();
-  if (!phone || phone.toLowerCase() === 'unknown') {
+  const parsedPhone = parseStoredContactPhone(call.from_number);
+  if (!parsedPhone.ok) {
     return { ok: false, reason: 'no_phone' };
   }
+  const phone = parsedPhone.phone;
   const tenantId = call.tenant_id;
   if (!tenantId) return { ok: false, reason: 'no_tenant' };
   const incomingName = sanitizeStoredCallerName(
