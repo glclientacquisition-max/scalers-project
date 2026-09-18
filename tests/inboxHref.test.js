@@ -8,6 +8,7 @@ const helperPath = path.join(__dirname, "../dashboard/src/lib/inboxHref.ts");
 function load() {
   const script = `
     import {
+      inboxKeepHref,
       inboxRecordHref,
       inboxReturnHref,
       contactFromCallHref,
@@ -29,6 +30,8 @@ function load() {
         view: "today",
         day: "2026-09-18",
       }),
+      keepOpen: inboxKeepHref("call-9", { purpose: "needs", q: "Amina" }),
+      keepList: inboxKeepHref(undefined, { purpose: "needs", q: "Amina" }),
       contactsList: callFromContactHref({ from: "contacts" }),
     };
     console.log(JSON.stringify(cases));
@@ -64,5 +67,7 @@ describe("inbox return path", () => {
     );
     assert.equal(hrefs.fromContact, "/calls/call-1?from=job&view=today&day=2026-09-18");
     assert.equal(hrefs.contactsList, null);
+    assert.equal(hrefs.keepOpen, "/calls/call-9?from=needs&q=Amina");
+    assert.equal(hrefs.keepList, "/calls?purpose=needs&q=Amina");
   });
 });

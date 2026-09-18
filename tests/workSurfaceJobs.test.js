@@ -9,7 +9,7 @@ function read(rel) {
 
 describe("work surface jobs on unified inbox", () => {
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
-  const inbox = read("dashboard/src/app/(desk)/calls/page.tsx");
+  const inbox = read("dashboard/src/components/InboxWorkspace.tsx");
   const row = read("dashboard/src/components/InboxItemRow.tsx");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const nav = read("dashboard/src/components/DeskNav.tsx");
@@ -59,10 +59,9 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(niche, /jobFilter: "Visits"/);
     assert.match(niche, /jobFilter: "Bookings"/);
     assert.match(niche, /pickupStamp: "Pickup"/);
-    assert.match(inbox, />\s*Item\s*</);
-    assert.match(inbox, />\s*Needed\s*</);
-    assert.match(inbox, /copy.jobColumn/);
-    assert.match(inbox, />\s*Place\s*</);
+    assert.match(inbox, /InboxPhoneRow/);
+    assert.doesNotMatch(inbox, /DeskDataTable/);
+    assert.match(row, /showHold \? needed : showJob \? visit : when/);
     assert.match(inbox, /inboxCaption\(searched, vertical\)/);
     assert.match(row, /itemSignalLabel\(item, vertical\)/);
     assert.match(row, /formatCallWhenRelative/);

@@ -39,7 +39,7 @@ describe("inbox outside and inside anatomy", () => {
   it("uses FilterTabs for List and Work, with Today Week under Work", () => {
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     const week = read("dashboard/src/components/VisitWeekCalendar.tsx");
-    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const page = read("dashboard/src/components/InboxWorkspace.tsx");
     assert.match(toolbar, /label="Visit sort"/);
     assert.match(toolbar, /label="Work date"/);
     assert.match(toolbar, /label: "Work"/);
@@ -64,7 +64,7 @@ describe("inbox outside and inside anatomy", () => {
   });
 
   it("uses FilterTabs for Holds List and Work, Today only", () => {
-    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const page = read("dashboard/src/components/InboxWorkspace.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     const sheet = read("dashboard/src/lib/holdSheet.ts");
     assert.match(toolbar, /label="Hold sort"/);
@@ -80,7 +80,7 @@ describe("inbox outside and inside anatomy", () => {
   });
 
   it("defines the call as decide and reply, not operator telemetry", () => {
-    assert.match(callDetail, /Stack only below `lg`/);
+    assert.match(callDetail, /The call pane stacks/);
     assert.match(callDetail, /that `h1` is the contact link/);
     assert.match(callDetail, /Confirm or Done full width/);
     assert.match(callDetail, /Reopen lives here/);
@@ -98,11 +98,12 @@ describe("inbox outside and inside anatomy", () => {
         .filter((i) => i >= 0)
     );
     assert.ok(summaryAt >= 0 && summaryAt < actionsAt, "Summary sits before Actions");
-    assert.match(markup, /order-1 min-w-0 lg:order-none/);
-    assert.match(markup, /order-2 min-w-0 rounded-2xl border p-5 lg:order-none/);
-    assert.match(markup, /order-3 min-w-0 space-y-5 lg:order-none/);
-    assert.match(markup, /order-4 min-h-0 min-w-0 space-y-8 lg:order-none/);
-    assert.match(markup, /order-5 min-w-0 space-y-4[\s\S]*Duration:/);
+    const transcriptAt = markup.indexOf("<CallTranscript");
+    const durationAt = markup.indexOf("Duration:");
+    assert.ok(actionsAt < transcriptAt, "Conversation sits after Actions");
+    assert.ok(transcriptAt < durationAt, "Facts sit after Conversation");
+    assert.doesNotMatch(markup, /display: contents|className="contents /);
+    assert.doesNotMatch(detail, /InboxWorkspace/);
   });
 
   it("makes Confirm and Done full width on the call, dock-sized on the list", () => {
@@ -131,5 +132,46 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(contact, /<DeskBack/);
     assert.match(jobActions, /pendingSpinnerClass/);
     assert.match(holdActions, /pendingSpinnerClass/);
+  });
+
+  it("opens the call beside Inbox on md and closes with Esc", () => {
+    const workspace = read("dashboard/src/components/InboxWorkspace.tsx");
+    const layout = read("dashboard/src/app/(desk)/calls/layout.tsx");
+    const slot = read("dashboard/src/app/(desk)/calls/@inbox/[id]/page.tsx");
+    const listSlot = read("dashboard/src/app/(desk)/calls/@inbox/page.tsx");
+    const callsPage = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const esc = read("dashboard/src/components/InboxEscClose.tsx");
+    assert.match(layout, /inbox: React.ReactNode/);
+    assert.match(layout, /InboxColumn/);
+    assert.match(layout, /InboxThread/);
+    assert.match(layout, /data-desk-bleed/);
+    assert.match(slot, /<InboxWorkspace/);
+    assert.match(slot, /pane/);
+    assert.match(slot, /openCallId=\{id\}/);
+    assert.match(listSlot, /pane/);
+    assert.match(callsPage, /return null/);
+    assert.doesNotMatch(detail, /InboxWorkspace/);
+    assert.match(detail, /<InboxEscClose href=\{backHref\} \/>/);
+    assert.match(detail, /aria-label="Close call"/);
+    assert.match(detail, />\s*Close\s*</);
+    assert.match(detail, /md:hidden/);
+    assert.match(esc, /event.key !== "Escape"/);
+    assert.match(esc, /role='dialog'/);
+    assert.match(workspace, /pane\?: boolean/);
+    assert.match(workspace, /const split = Boolean\(pane\)/);
+    assert.match(workspace, /current=\{rowIsOpen\(item, openCallId\)\}/);
+    assert.match(workspace, /overflow-x-hidden overflow-y-auto/);
+    assert.doesNotMatch(workspace, /DeskDataTable/);
+    assert.doesNotMatch(workspace, /InboxTableRow/);
+    const column = read("dashboard/src/components/InboxColumn.tsx");
+    assert.match(column, /hidden min-w-0 md:flex/);
+    assert.match(column, /hidden min-w-0 flex-1 md:block/);
+    const harness = read("dashboard/src/app/dev/inbox/page.tsx");
+    assert.match(harness, /InboxColumn/);
+    assert.match(harness, /InboxThread/);
+    assert.doesNotMatch(harness, /DeskDataTable/);
+    assert.match(row, /current\?: boolean/);
+    assert.match(callDetail, /Esc and Close return to Inbox/);
+    assert.match(callDetail, /parallel `@inbox` slot/);
   });
 });

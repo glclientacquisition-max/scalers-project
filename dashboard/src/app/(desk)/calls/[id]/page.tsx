@@ -26,9 +26,10 @@ import { InboxJobActions } from "@/components/InboxJobActions";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
-import { pageTitleClass } from "@/components/ui/deskChrome";
+import { pageTitleClass, deskShiftClass } from "@/components/ui/deskChrome";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
+import { InboxEscClose } from "@/components/InboxEscClose";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import {
   followUpWhatsAppMessage,
@@ -202,16 +203,28 @@ export default async function CallDetailPage({
   const titleIsPhone = !name;
 
   return (
-    <div className="max-w-6xl min-w-0">
-      <DeskBack href={backHref}>Inbox</DeskBack>
+    <>
+      <InboxEscClose href={backHref} />
+      <article className="min-w-0">
+        <div className="sticky top-[var(--desk-header-h)] z-20 flex min-h-11 items-center justify-between gap-3 bg-surface-canvas md:top-0">
+          <div className="md:hidden">
+            <DeskBack href={backHref}>Inbox</DeskBack>
+          </div>
+          <Link
+            href={backHref}
+            aria-label="Close call"
+            className={`ml-auto hidden min-h-11 items-center text-sm font-medium text-ink-soft md:inline-flex ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+          >
+            Close
+          </Link>
+        </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
-        <div className="contents min-w-0 lg:col-span-4 lg:sticky lg:top-24 lg:flex lg:flex-col lg:gap-5 lg:self-start">
+        <div className="mt-4 min-w-0 space-y-8">
           {workLoadError ? (
             <DeskError>Could not load visit or hold.</DeskError>
           ) : null}
 
-          <div className="order-1 min-w-0 lg:order-none">
+          <div className="min-w-0">
             <h1 className={`${pageTitleClass} min-w-0 [overflow-wrap:anywhere]`}>
               {person?.id ? (
                 <Link
@@ -251,7 +264,7 @@ export default async function CallDetailPage({
 
           <section
             className={[
-              "order-2 min-w-0 rounded-2xl border p-5 lg:order-none",
+              "min-w-0 rounded-2xl border p-5",
               urgent ? "border-warn/45 bg-warn-soft/50" : "border-line bg-surface",
             ].join(" ")}
           >
@@ -269,7 +282,7 @@ export default async function CallDetailPage({
             />
           </section>
 
-          <div className="order-3 min-w-0 space-y-5 lg:order-none">
+          <div className="min-w-0 space-y-5">
             <div className="mx-auto flex w-full max-w-lg flex-col items-stretch gap-2">
               {doNextLabel ? (
                 <div className="text-center">
@@ -371,7 +384,17 @@ export default async function CallDetailPage({
             ) : null}
           </div>
 
-          <div className="order-5 min-w-0 space-y-4 border-t border-line/80 pt-4 text-sm text-ink-soft lg:order-none">
+          <div className="min-w-0 space-y-8">
+            <CallTranscript turns={turns} />
+
+            <CallFaqSuggestions
+              tenantId={tenant.id}
+              callId={row.id}
+              hasTranscript={turns.length > 0}
+            />
+          </div>
+
+          <div className="min-w-0 space-y-4 border-t border-line/80 pt-4 text-sm text-ink-soft">
             <dl className="space-y-1">
               <p>
                 Duration:{" "}
@@ -401,17 +424,7 @@ export default async function CallDetailPage({
             <CallRecording recordingUrl={row.recording_url} />
           </div>
         </div>
-
-        <div className="order-4 min-h-0 min-w-0 space-y-8 lg:order-none lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
-          <CallTranscript turns={turns} />
-
-          <CallFaqSuggestions
-            tenantId={tenant.id}
-            callId={row.id}
-            hasTranscript={turns.length > 0}
-          />
-        </div>
-      </div>
-    </div>
+      </article>
+    </>
   );
 }

@@ -14,10 +14,19 @@ export const deskRowActionClass = "relative z-10";
 export function DeskRowHit({
   href,
   label,
+  current,
 }: {
   href: string | null | undefined;
   label: string;
+  current?: boolean;
 }) {
   if (!href) return null;
-  return <Link href={href} aria-label={label} className={deskRowHitClass} />;
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      aria-current={current ? "page" : undefined}
+      className={deskRowHitClass}
+    />
+  );
 }

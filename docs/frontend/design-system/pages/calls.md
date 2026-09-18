@@ -9,9 +9,9 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link. On `md+` Inbox is always this list beside the thread or an empty pane. Phone is a full list, then a full call.
 
-**Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column.
+**Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the phone table Needed column only when the list is full width. The Mail row is the `md+` Inbox list.
 
 **Phone Holds / Visits:** Same two-line row. Isolated Place or hold-type is a table column, not a third phone line.
 
@@ -33,7 +33,7 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 
 Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. Same `FilterTabs` as Contacts. Quiet hairline groups: act (Needs you, All), book (Visits, Holds), closed (Human, Answered).
 
-**Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). Visit sort uses FilterTabs so Confirm stays the only filled verb. List is the Inbox table: requested and confirmed, newest work. Work is the diary of that same book. Date is visible there. Confirm lives on List and on Work.
+**Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). Visit sort uses FilterTabs so Confirm stays the only filled verb. List is the Inbox list: requested and confirmed, newest work. Work is the diary of that same book. Date is visible there. Confirm lives on List and on Work.
 
 **Work date:** Today / Week appears only under Work. Today is this EAT day by clock, with the day heading and slot time. Requested slots for that day sit here. Week is the same book by day. Phone shows only days with work. Desktop keeps the seven-day grid. Prev / Next moves the day or week. Holds stay on Holds. Done and cancelled stay off this book.
 
@@ -68,16 +68,16 @@ All is newest first. No visit backlog, no urgent pin. Needs you still pins urgen
 
 **Live subscribe:** `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page. Coming back to the tab also refetches. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update.
 
-Columns (`md+` table, same data as the phone row):
-- Mixed filters: Work / Needed / When / Action.
-- Holds: Item / Who / Needed. Verb **Done**.
-- Jobs: Visit or Booking / Who / Place. Verb **Confirm**.
+Mail row (same data on phone and `md+`):
+- Mixed: Who, one Work preview, stamp or time, Action.
+- Holds: Who, Item preview, Needed, **Done**.
+- Jobs: Who, Visit or Booking preview, Place as meta, **Confirm**.
 
 **Icons (Inbox only):**
 - WhatsApp glyph, green on white, `h-12 w-12`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
 - Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-12 w-12`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
-- Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit. Transcript is the right pane from `lg`; stack below `lg`.
+- Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit. Conversation stacks in the call pane.
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 

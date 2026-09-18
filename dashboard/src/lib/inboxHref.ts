@@ -78,6 +78,12 @@ export function inboxReturnHref(ret: InboxReturn = {}): string {
   return qs ? `/calls?${qs}` : "/calls";
 }
 
+/** Pile links stay on the open call when the Inbox list sits beside it. */
+export function inboxKeepHref(openCallId: string | undefined, ret: InboxReturn = {}): string {
+  if (openCallId) return inboxRecordHref(openCallId, ret);
+  return inboxReturnHref(ret);
+}
+
 export function inboxReturnFromSearch(sp: {
   from?: string;
   view?: string;

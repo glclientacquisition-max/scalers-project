@@ -13,14 +13,22 @@ export function FilterTabs({
   label,
   items,
   active,
+  wrap,
 }: {
   label: string;
   items: readonly FilterTabItem[];
   active: string;
+  wrap?: boolean;
 }) {
   return (
-    <nav aria-label={label} className="border-b border-line">
-      <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
+    <nav aria-label={label} className="min-w-0 border-b border-line">
+      <ul
+        className={
+          wrap
+            ? "flex min-w-0 flex-wrap gap-1"
+            : "-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]"
+        }
+      >
         {items.map((item) => {
           const isActive = active === item.id;
           return (

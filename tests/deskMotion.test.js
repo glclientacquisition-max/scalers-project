@@ -121,7 +121,7 @@ describe("desk motion canon", () => {
 
 describe("desk motion wiring", () => {
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
-  const calls = read("dashboard/src/app/(desk)/calls/page.tsx");
+  const calls = read("dashboard/src/components/InboxWorkspace.tsx");
   const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const dialog = read("dashboard/src/components/ui/DeskDialog.tsx");

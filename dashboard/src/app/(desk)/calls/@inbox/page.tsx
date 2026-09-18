@@ -1,0 +1,33 @@
+import { InboxWorkspace } from "@/components/InboxWorkspace";
+
+export default async function InboxListSlot({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    from?: string;
+    view?: string;
+    week?: string;
+    day?: string;
+    q?: string;
+    page?: string;
+    status?: string;
+    purpose?: string;
+  }>;
+}) {
+  const sp = await searchParams;
+  return (
+    <InboxWorkspace
+      pane
+      searchParams={{
+        page: sp.page,
+        status: sp.status,
+        purpose: sp.purpose || sp.from,
+        from: sp.from,
+        q: sp.q,
+        view: sp.view,
+        week: sp.week,
+        day: sp.day,
+      }}
+    />
+  );
+}
