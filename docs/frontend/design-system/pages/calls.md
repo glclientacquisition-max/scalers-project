@@ -24,6 +24,17 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 - No number: empty.
 - Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
 
+**Overflow (More, long-press, right-click):** One short list on every row. Same verbs as Mail or WhatsApp. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
+
+- Select
+- Mark unread (Mark read when unread)
+- Mark done
+- Archive
+- Pin (Unpin when pinned)
+- Snooze (24h; the row leaves until due)
+
+Not in this list: Mute (does not stop notify), Assign (no login membership picker or Assigned pile), Label (no Labels pile), Delete (owners cannot hard-delete; Archive is the leave verb). Bulk bar: Mark done, Archive, Cancel.
+
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Return call** and use WhatsApp. Same for holds without a request row.
 
 **Reply vs Confirm (not the same button):**

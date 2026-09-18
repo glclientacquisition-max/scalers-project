@@ -56,12 +56,12 @@ describe("inbox overflow persistence", () => {
     assert.match(actions, /inboxSnooze/);
     assert.match(actions, /return inboxArchive\(item\)/);
     assert.match(overflow, /inboxToggleRead\(item\)/);
-    assert.match(overflow, /inboxToggleMute\(item\)/);
     assert.match(overflow, /inboxTogglePin\(item\)/);
     assert.match(overflow, /inboxSnooze\(item\)/);
-    assert.match(overflow, /inboxDelete\(item\)/);
-    assert.match(overflow, /inboxAssign\(item, value\)/);
-    assert.match(overflow, /inboxAddLabel\(item, value\)/);
+    assert.doesNotMatch(overflow, /inboxToggleMute/);
+    assert.doesNotMatch(overflow, /inboxAssign/);
+    assert.doesNotMatch(overflow, /inboxAddLabel/);
+    assert.doesNotMatch(overflow, /inboxDelete/);
     assert.doesNotMatch(overflow, /patch\(\{ unread:/);
     assert.doesNotMatch(overflow, /patch\(\{ muted:/);
     assert.doesNotMatch(overflow, /patch\(\{ pinned:/);
@@ -70,7 +70,9 @@ describe("inbox overflow persistence", () => {
 
   it("archives Delete through the existing lead_status path", () => {
     assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
-    assert.match(select, /inboxDelete\(item\)/);
+    assert.match(actions, /return inboxArchive\(item\)/);
+    assert.doesNotMatch(select, /inboxDelete/);
+    assert.doesNotMatch(overflow, /inboxDelete/);
     assert.match(sql, /No owner DELETE on calls/);
     assert.doesNotMatch(sql, /delete from public.calls/i);
   });

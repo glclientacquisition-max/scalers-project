@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ElementType,
@@ -15,37 +16,28 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
-import { DeskDialog } from "@/components/ui/DeskDialog";
 import { useInboxRowLocal, useInboxRowUi } from "@/components/InboxRowUi";
+import { deskHitClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
-  btnGhost,
-  btnPrimary,
-  deskFieldClass,
-  deskHitClass,
-  focusRingVisible,
-  pendingSpinnerClass,
-} from "@/components/ui/deskChrome";
-import {
-  inboxAddLabel,
   inboxArchive,
-  inboxAssign,
-  inboxDelete,
   inboxMarkDone,
   inboxSnooze,
-  inboxToggleMute,
   inboxTogglePin,
   inboxToggleRead,
 } from "@/lib/inboxLeadActions";
+import {
+  placeInboxOverflowMenu,
+  type InboxOverflowAnchor,
+} from "@/lib/inboxOverflowPlace";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
 const LONG_PRESS_MS = 500;
 const MOVE_CANCEL_PX = 12;
 
 type MenuMode = "menu" | "sheet";
-type DraftKind = "assign" | "label" | null;
 
 const InboxRowMenuCtx = createContext<{
-  openAt: (mode: MenuMode, x: number, y: number) => void;
+  openAt: (mode: MenuMode, anchor: InboxOverflowAnchor) => void;
   open: MenuMode | null;
 } | null>(null);
 
@@ -73,17 +65,7 @@ function isInteractiveTarget(target: EventTarget | null, root: HTMLElement | nul
   return Boolean(hit && root.contains(hit) && hit !== root);
 }
 
-type ActionId =
-  | "select"
-  | "unread"
-  | "done"
-  | "archive"
-  | "mute"
-  | "pin"
-  | "assign"
-  | "label"
-  | "snooze"
-  | "delete";
+type ActionId = "select" | "unread" | "done" | "archive" | "pin" | "snooze";
 
 export function InboxRowShell({
   item,
@@ -106,21 +88,18 @@ export function InboxRowShell({
     y: 0,
   });
   const [open, setOpen] = useState<MenuMode | null>(null);
-  const [anchor, setAnchor] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [draft, setDraft] = useState<DraftKind>(null);
-  const [draftValue, setDraftValue] = useState("");
+  const [anchor, setAnchor] = useState<InboxOverflowAnchor>({ x: 0, y: 0, align: "point" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const close = useCallback(() => {
     if (busy) return;
     setOpen(null);
-    setDraft(null);
   }, [busy]);
 
-  const openAt = useCallback((mode: MenuMode, x: number, y: number) => {
+  const openAt = useCallback((mode: MenuMode, next: InboxOverflowAnchor) => {
     setError(null);
-    setAnchor({ x, y });
+    setAnchor(next);
     setOpen(mode);
   }, []);
 
@@ -139,13 +118,6 @@ export function InboxRowShell({
       close();
       return;
     }
-    if (id === "assign" || id === "label") {
-      setError(null);
-      setDraftValue(id === "assign" ? item.assignee || "" : "");
-      setDraft(id);
-      setOpen(null);
-      return;
-    }
     if (!item.callId) {
       setError("Missing call.");
       return;
@@ -154,10 +126,8 @@ export function InboxRowShell({
     setError(null);
     let res: { error?: string; ok?: boolean } = { ok: true };
     if (id === "unread") res = await inboxToggleRead(item);
-    else if (id === "mute") res = await inboxToggleMute(item);
     else if (id === "pin") res = await inboxTogglePin(item);
     else if (id === "snooze") res = await inboxSnooze(item);
-    else if (id === "delete") res = await inboxDelete(item);
     else if (id === "done") res = await inboxMarkDone(item);
     else if (id === "archive") res = await inboxArchive(item);
     setBusy(false);
@@ -165,7 +135,7 @@ export function InboxRowShell({
       setError(res.error);
       return;
     }
-    if (id === "snooze" || id === "delete" || id === "archive") {
+    if (id === "snooze" || id === "archive") {
       patch({ hidden: true });
     }
     close();
@@ -177,12 +147,8 @@ export function InboxRowShell({
     { id: "unread", label: item.unread ? "Mark read" : "Mark unread" },
     { id: "done", label: "Mark done" },
     { id: "archive", label: "Archive" },
-    { id: "mute", label: item.muted ? "Unmute" : "Mute" },
     { id: "pin", label: item.pinnedAt ? "Unpin" : "Pin" },
-    { id: "assign", label: "Assign to teammate" },
-    { id: "label", label: "Add label" },
     { id: "snooze", label: "Snooze" },
-    { id: "delete", label: "Archive" },
   ];
 
   if (local.hidden) return null;
@@ -197,7 +163,11 @@ export function InboxRowShell({
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault();
           if (ui?.selecting) return;
-          openAt(isFinePointer() ? "menu" : "sheet", event.clientX, event.clientY);
+          openAt(isFinePointer() ? "menu" : "sheet", {
+            x: event.clientX,
+            y: event.clientY,
+            align: "point",
+          });
         }}
         onPointerDown={(event: ReactPointerEvent) => {
           if (ui?.selecting) return;
@@ -208,7 +178,7 @@ export function InboxRowShell({
           pressRef.current.y = event.clientY;
           pressRef.current.timer = setTimeout(() => {
             pressRef.current.timer = null;
-            openAt("sheet", event.clientX, event.clientY);
+            openAt("sheet", { x: event.clientX, y: event.clientY, align: "point" });
           }, LONG_PRESS_MS);
         }}
         onPointerMove={(event: ReactPointerEvent) => {
@@ -232,90 +202,6 @@ export function InboxRowShell({
             onRun={run}
             onClose={close}
           />
-        ) : null}
-        {draft ? (
-          <DeskDialog
-            title={draft === "assign" ? "Assign to teammate" : "Add label"}
-            onClose={() => {
-              if (!busy) setDraft(null);
-            }}
-          >
-            <form
-              className="mt-4 space-y-4"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                const value = draftValue.trim();
-                setBusy(true);
-                setError(null);
-                const res =
-                  draft === "assign"
-                    ? await inboxAssign(item, value)
-                    : await inboxAddLabel(item, value);
-                setBusy(false);
-                if (res.error) {
-                  setError(res.error);
-                  return;
-                }
-                setDraft(null);
-                close();
-                router.refresh();
-              }}
-            >
-              {draft === "assign" ? (
-                (ui?.teammates || []).length === 0 ? (
-                  <p className="text-sm text-ink-soft">No teammates.</p>
-                ) : (
-                  <label className="block text-xs font-medium uppercase tracking-wide text-ink-soft">
-                    Teammate
-                    <select
-                      value={draftValue}
-                      onChange={(event) => setDraftValue(event.target.value)}
-                      className={`${deskFieldClass} mt-1`}
-                    >
-                      <option value="">Unassigned</option>
-                      {(ui?.teammates || []).map((row) => (
-                        <option key={row.value} value={row.value}>
-                          {row.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )
-              ) : (
-                <label className="block text-xs font-medium uppercase tracking-wide text-ink-soft">
-                  Label
-                  <input
-                    value={draftValue}
-                    onChange={(event) => setDraftValue(event.target.value)}
-                    className={`${deskFieldClass} mt-1`}
-                  />
-                </label>
-              )}
-              {error ? (
-                <p className="text-xs text-warn" role="alert">
-                  {error}
-                </p>
-              ) : null}
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  className={btnGhost}
-                  disabled={busy}
-                  onClick={() => setDraft(null)}
-                >
-                  Cancel
-                </button>
-                {draft === "assign" && (ui?.teammates || []).length === 0 ? null : (
-                  <button type="submit" className={btnPrimary} disabled={busy}>
-                    {busy ? (
-                      <span aria-hidden="true" className={pendingSpinnerClass} />
-                    ) : null}
-                    {busy ? "Saving" : "Save"}
-                  </button>
-                )}
-              </div>
-            </form>
-          </DeskDialog>
         ) : null}
       </DeskLandSurface>
     </InboxRowMenuCtx.Provider>
@@ -346,7 +232,12 @@ export function InboxRowMore({ item }: { item: InboxItem }) {
         event.preventDefault();
         event.stopPropagation();
         const rect = btnRef.current?.getBoundingClientRect();
-        menu.openAt("menu", rect ? rect.right : event.clientX, rect ? rect.bottom : event.clientY);
+        menu.openAt(
+          "menu",
+          rect
+            ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
+            : { x: event.clientX, y: event.clientY, align: "point" }
+        );
       }}
     >
       <MoreGlyph />
@@ -366,7 +257,7 @@ function InboxOverflowSurface({
 }: {
   item: InboxItem;
   mode: MenuMode;
-  anchor: { x: number; y: number };
+  anchor: InboxOverflowAnchor;
   actions: { id: ActionId; label: string }[];
   busy: boolean;
   error: string | null;
@@ -377,7 +268,27 @@ function InboxOverflowSurface({
   const panelRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ y: number } | null>(null);
   const ignoreUntil = useRef(Date.now() + 450);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const who = item.callerName?.trim() || "Caller";
+
+  useLayoutEffect(() => {
+    if (mode !== "menu") return;
+    function place() {
+      const el = panelRef.current;
+      if (!el) return;
+      const box = el.getBoundingClientRect();
+      setPos(
+        placeInboxOverflowMenu(
+          { width: box.width, height: box.height },
+          anchor,
+          { width: window.innerWidth, height: window.innerHeight }
+        )
+      );
+    }
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [mode, anchor, error, actions.length]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -433,9 +344,10 @@ function InboxOverflowSurface({
       style={
         mode === "menu"
           ? {
-              top: Math.min(anchor.y, typeof window !== "undefined" ? window.innerHeight - 320 : anchor.y),
-              left: Math.min(anchor.x, typeof window !== "undefined" ? window.innerWidth - 240 : anchor.x),
               position: "fixed",
+              top: pos?.top ?? 0,
+              left: pos?.left ?? 0,
+              visibility: pos ? "visible" : "hidden",
             }
           : undefined
       }
@@ -474,7 +386,6 @@ function InboxOverflowSurface({
             "flex w-full items-center px-4 text-left text-sm text-ink",
             mode === "sheet" ? "min-h-11" : "min-h-10",
             focusRingVisible,
-            action.id === "delete" ? "text-ink-soft" : "",
             "hover:bg-surface-muted disabled:opacity-50",
           ].join(" ")}
         >
