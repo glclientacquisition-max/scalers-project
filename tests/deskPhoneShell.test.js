@@ -38,8 +38,8 @@ describe("desk phone shell", () => {
     assert.match(inboxRow, /DeskRowHit/);
     assert.match(inboxRow, /label="Conversation"/);
     assert.match(inboxRow, /InboxJobActions id=\{item.job.id\} status=\{item.job.status\} extra=\{false\}/);
-    assert.match(read("dashboard/src/components/InboxJobEditor.tsx"), /InboxJobActions id=\{id\} status=\{status\} extra/);
-    assert.match(read("dashboard/src/components/InboxHoldEditor.tsx"), /RequestStatusToggle id=\{id\} status=\{status\} extra/);
+    assert.match(read("dashboard/src/app/(desk)/calls/[id]/page.tsx"), /InboxJobActions id=\{job.id\} status=\{job.status\} extra/);
+    assert.match(read("dashboard/src/app/(desk)/calls/[id]/page.tsx"), /RequestStatusToggle id=\{hold.id\} status=\{hold.status\} extra/);
     const jobActions = read("dashboard/src/components/InboxJobActions.tsx");
     assert.match(jobActions, /Could not save/);
     assert.ok(

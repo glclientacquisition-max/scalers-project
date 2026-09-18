@@ -5,7 +5,7 @@ import {
   updateAppointmentStatus,
   type AppointmentStatusState,
 } from "@/app/(desk)/appointments/actions";
-import { btnDock, btnDockGhost, btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { btnDock, btnDockGhost, btnGhost, btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
 
 const initial: AppointmentStatusState = {};
 
@@ -48,8 +48,17 @@ export function InboxJobActions({
               value="confirmed"
               disabled={pending}
               className={extra ? `${btnPrimary} w-full` : btnDock}
+              aria-label={pending ? "Saving" : "Confirm"}
             >
-              {pending ? "Saving" : "Confirm"}
+              {pending ? (
+                extra ? (
+                  "Saving"
+                ) : (
+                  <span aria-hidden="true" className={pendingSpinnerClass} />
+                )
+              ) : (
+                "Confirm"
+              )}
             </button>
             {extra ? (
               <button
@@ -72,8 +81,17 @@ export function InboxJobActions({
               value="done"
               disabled={pending}
               className={extra ? `${btnPrimary} w-full` : btnDock}
+              aria-label={pending ? "Saving" : "Done"}
             >
-              {pending ? "Saving" : "Done"}
+              {pending ? (
+                extra ? (
+                  "Saving"
+                ) : (
+                  <span aria-hidden="true" className={pendingSpinnerClass} />
+                )
+              ) : (
+                "Done"
+              )}
             </button>
             {extra ? (
               <button

@@ -21,6 +21,7 @@ import {
   InboxTableRow,
   inboxTableKind,
 } from "@/components/InboxItemRow";
+import type { InboxReturn } from "@/lib/inboxHref";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
@@ -190,6 +191,14 @@ export default async function CallsPage({
     week: weekView ? monday : undefined,
     day: todayView ? day : undefined,
   };
+  const inboxRet: InboxReturn = {
+    purpose: activeFilter,
+    q: q || undefined,
+    page: boardView ? undefined : page,
+    view: boardView ? view : undefined,
+    week: weekView ? monday : undefined,
+    day: todayView ? day : undefined,
+  };
 
   return (
     <div>
@@ -227,6 +236,7 @@ export default async function CallsPage({
             day: shiftDayYmd(day, 1),
           })}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
+          ret={{ purpose: "job", q: q || undefined, view: "today", day }}
           businessName={businessName}
           vertical={vertical}
         />
@@ -246,6 +256,7 @@ export default async function CallsPage({
             view: "week",
             week: shiftWeekYmd(monday, 1),
           })}
+          ret={{ purpose: "job", q: q || undefined, view: "week", week: monday }}
           businessName={businessName}
           vertical={vertical}
         />
@@ -272,6 +283,7 @@ export default async function CallsPage({
                 businessName={businessName}
                 purpose={activeFilter}
                 vertical={vertical}
+                ret={inboxRet}
               />
             ))}
           </ul>
@@ -331,6 +343,7 @@ export default async function CallsPage({
                     businessName={businessName}
                     purpose={activeFilter}
                     vertical={vertical}
+                    ret={inboxRet}
                   />
                 ))}
               </tbody>

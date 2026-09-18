@@ -4,6 +4,7 @@ import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
+import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
@@ -118,7 +119,8 @@ export default function DevInboxPage() {
         </div>
       </header>
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
+        <DeskBack href="/dev/inbox">Inbox</DeskBack>
+        <h1 className="mt-4 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
         <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
@@ -129,6 +131,7 @@ export default function DevInboxPage() {
               item={row}
               businessName="Workspace"
               purpose={row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs"}
+              ret={{ purpose: row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs" }}
             />
           ))}
         </ul>
@@ -150,6 +153,7 @@ export default function DevInboxPage() {
                   businessName="Workspace"
                   purpose="needs"
                   vertical={null}
+                  ret={{ purpose: "needs" }}
                 />
               ))}
             </tbody>
@@ -157,8 +161,9 @@ export default function DevInboxPage() {
         </div>
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <section className="rounded-2xl border border-line bg-surface p-4">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Visit</h2>
-            <p className="mt-2 text-sm font-semibold tracking-tight text-ink">Otieno</p>
+            <DeskBack href="/dev/inbox">Inbox</DeskBack>
+            <h2 className="mt-4 text-[11px] font-bold uppercase tracking-wide text-gray-500">Visit</h2>
+            <p className="mt-2 font-display text-2xl tracking-tight text-ink">Otieno</p>
             <div className="mt-3">
               <InboxJobActions id="job-1" status="requested" extra />
             </div>

@@ -73,6 +73,8 @@ describe("inbox outside and inside anatomy", () => {
   it("makes Confirm and Done full width on the call, dock-sized on the list", () => {
     const editorJob = read("dashboard/src/components/InboxJobEditor.tsx");
     const editorHold = read("dashboard/src/components/InboxHoldEditor.tsx");
+    const back = read("dashboard/src/components/ui/DeskBack.tsx");
+    const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
     assert.match(jobActions, /extra \? `\$\{btnPrimary\} w-full` : btnDock/);
     assert.match(holdActions, /extra \? `\$\{btnPrimary\} w-full` : btnDock/);
     const fulfilled = holdActions.slice(
@@ -85,5 +87,14 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(editorHold, /Could not save\./);
     assert.doesNotMatch(editorJob, /\{state\.error\}/);
     assert.doesNotMatch(editorHold, /\{state\.error\}/);
+    assert.doesNotMatch(editorJob, /InboxJobActions/);
+    assert.doesNotMatch(editorHold, /RequestStatusToggle/);
+    assert.match(detail, /inboxRecordHref|inboxReturnHref/);
+    assert.match(detail, /<DeskBack/);
+    assert.match(detail, /InboxJobActions/);
+    assert.match(back, /min-h-11/);
+    assert.match(contact, /<DeskBack/);
+    assert.match(jobActions, /pendingSpinnerClass/);
+    assert.match(holdActions, /pendingSpinnerClass/);
   });
 });
