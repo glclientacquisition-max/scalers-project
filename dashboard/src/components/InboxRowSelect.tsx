@@ -100,16 +100,17 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!ui?.selecting) return null;
+  if (!ui || !ui.selecting) return null;
 
-  const chosen = items.filter((item) => ui.selected.includes(item.id));
+  const { selected, patch, clear } = ui;
+  const chosen = items.filter((item) => selected.includes(item.id));
 
   async function run(kind: "done" | "archive" | "delete") {
     setBusy(true);
     setError(null);
     for (const item of chosen) {
       if (kind === "delete") {
-        ui.patch(item.id, { hidden: true });
+        patch(item.id, { hidden: true });
         continue;
       }
       const res = kind === "done" ? await inboxMarkDone(item) : await inboxArchive(item);
@@ -119,7 +120,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
         return;
       }
     }
-    ui.clear();
+    clear();
     setBusy(false);
     router.refresh();
   }
@@ -136,7 +137,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       <button type="button" className={btnGhost} disabled={busy} onClick={() => run("delete")}>
         Delete
       </button>
-      <button type="button" className={btnGhost} disabled={busy} onClick={() => ui.clear()}>
+      <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>
         Cancel
       </button>
       {error ? (
