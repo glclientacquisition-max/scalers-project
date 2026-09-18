@@ -53,7 +53,7 @@ describe("desk resilience and anti-slop", () => {
     const call = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
     const load = read("dashboard/src/lib/inboxLoad.ts");
-    const callsPage = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const callsPage = read("dashboard/src/components/InboxWorkspace.tsx");
     assert.match(home, /inbox\.error/);
     assert.match(home, /Could not load Overview/);
     assert.match(home, /DeskNoWorkspace/);

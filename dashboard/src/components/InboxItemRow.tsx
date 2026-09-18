@@ -114,12 +114,14 @@ export function InboxTableRow({
   purpose,
   vertical,
   ret,
+  current,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
   ret?: InboxReturn;
+  current?: boolean;
 }) {
   const {
     kind,
@@ -146,13 +148,14 @@ export function InboxTableRow({
         deskShiftClass,
         openHref ? "cursor-pointer" : "",
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
+        current ? "bg-accent/[0.06]" : "",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
       {kind === "hold" ? (
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
-            <DeskRowHit href={openHref} label="Conversation" />
+            <DeskRowHit href={openHref} label="Conversation" current={current} />
             <div className={`${deskRowMutedClass} flex items-center gap-3`}>
               <RowIdentity name={item.callerName} />
               <div className="min-w-0">
@@ -179,7 +182,7 @@ export function InboxTableRow({
       {kind === "job" ? (
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
-            <DeskRowHit href={openHref} label="Conversation" />
+            <DeskRowHit href={openHref} label="Conversation" current={current} />
             <div className={`${deskRowMutedClass} flex items-center gap-3`}>
               <RowIdentity name={item.callerName} />
               <div className="min-w-0">
@@ -206,7 +209,7 @@ export function InboxTableRow({
       {kind === "mixed" ? (
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
-            <DeskRowHit href={openHref} label="Conversation" />
+            <DeskRowHit href={openHref} label="Conversation" current={current} />
             <div className={`${deskRowMutedClass} flex items-center gap-3`}>
               <RowIdentity name={item.callerName} />
               <div className="min-w-0">
@@ -247,12 +250,14 @@ export function InboxPhoneRow({
   purpose,
   vertical,
   ret,
+  current,
 }: {
   item: InboxItem;
   businessName: string;
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
   ret?: InboxReturn;
+  current?: boolean;
 }) {
   const { who, message, openHref, needed, visit, when, showJob, showHold } =
     inboxCopy(item, purpose, vertical, businessName, ret);
@@ -284,6 +289,8 @@ export function InboxPhoneRow({
       id={item.id}
       className={[
         "relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        deskShiftClass,
+        current ? "bg-accent/[0.06]" : "",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
@@ -291,6 +298,7 @@ export function InboxPhoneRow({
         <Link
           href={openHref}
           aria-label="Conversation"
+          aria-current={current ? "page" : undefined}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {body}

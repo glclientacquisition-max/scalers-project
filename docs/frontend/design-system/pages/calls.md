@@ -9,9 +9,9 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link. On `md+` that conversation opens beside this list. Phone is still a full call.
 
-**Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column.
+**Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column. The same Mail row is the list chrome when a call is open on `md+`.
 
 **Phone Holds / Visits:** Same two-line row. Isolated Place or hold-type is a table column, not a third phone line.
 
@@ -77,7 +77,7 @@ Columns (`md+` table, same data as the phone row):
 - WhatsApp glyph, green on white, `h-12 w-12`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
 - Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-12 w-12`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
-- Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit. Transcript is the right pane from `lg`; stack below `lg`.
+- Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit. Transcript is the right pane from `xl`; stack below `xl`.
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 

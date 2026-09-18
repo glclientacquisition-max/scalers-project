@@ -31,7 +31,7 @@ describe("desk hold board", () => {
 
   it("wires Holds List and Work as one open book", () => {
     const sheet = read("dashboard/src/lib/holdSheet.ts");
-    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const page = read("dashboard/src/components/InboxWorkspace.tsx");
     const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     assert.match(sheet, /export function holdBoardForDay/);

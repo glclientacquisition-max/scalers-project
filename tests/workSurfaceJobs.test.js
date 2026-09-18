@@ -9,7 +9,7 @@ function read(rel) {
 
 describe("work surface jobs on unified inbox", () => {
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
-  const inbox = read("dashboard/src/app/(desk)/calls/page.tsx");
+  const inbox = read("dashboard/src/components/InboxWorkspace.tsx");
   const row = read("dashboard/src/components/InboxItemRow.tsx");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const nav = read("dashboard/src/components/DeskNav.tsx");

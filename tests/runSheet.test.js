@@ -33,7 +33,7 @@ describe("desk visit board", () => {
 
   it("wires List as newest table and Work as dated diary", () => {
     const sheet = read("dashboard/src/lib/runSheet.ts");
-    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const page = read("dashboard/src/components/InboxWorkspace.tsx");
     const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
     const week = read("dashboard/src/components/VisitWeekCalendar.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");

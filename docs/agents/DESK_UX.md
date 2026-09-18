@@ -32,9 +32,9 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 1. **Strict shell split:** owners → `(desk)` (`DESK_LINKS` as top links on `md+` and bottom tabs below `md`); ops → `/admin/*`. Never merge navs.
 2. Brand-first marketing: Scalers must read as the hero identity on the landing first viewport.
 3. Follow repo frontend design rules (one composition, no hero cards/overlays, expressive type, atmospheric background; avoid purple-on-white / cream-serif-terracotta clichés).
-4. **Platform design mandate (always on):** Follow `.cursor/rules/scalers-design-ux.mdc` on every UI change: zero fluff copy, no em/en dashes in UI text, dense tables over stacked cards, split-pane detail views (stack below `lg`), primary CTA fill `#005CCC` (white label; ring `#0096FF`), sticky global Save top-right, muted secondary actions, Tailwind-only utilities, `textarea rows={2}`, focus rings `focus:ring-[#0096FF]`. List verbs share `btnDock`. Fluid: one composition, 44px floor, `min-w-0` text. List previews are one truncated line (`deskPreviewClass`).
+4. **Platform design mandate (always on):** Follow `.cursor/rules/scalers-design-ux.mdc` on every UI change: zero fluff copy, no em/en dashes in UI text, dense tables over stacked cards, Inbox beside the call from `md`, inner summary/transcript from `xl`, primary CTA fill `#005CCC` (white label; ring `#0096FF`), sticky global Save top-right, muted secondary actions, Tailwind-only utilities, `textarea rows={2}`, focus rings `focus:ring-[#0096FF]`. List verbs share `btnDock`. Fluid: one composition, 44px floor, `min-w-0` text. List previews are one truncated line (`deskPreviewClass`).
 5. **Motion:** Follow `.cursor/skills/desk-motion/SKILL.md`. Only pending, live, land, shift, press. No Lottie or landing-rise on desk.
-6. Phone and desktop share one composition. Phone lists and stacked panes. `md+` tables and `lg+` split panes. Controls do not change size by label length.
+6. Phone and desktop share one composition. Phone lists and a full call. `md+` tables on `/calls`, Inbox beside the call, inner summary/transcript from `xl`. Controls do not change size by label length.
 7. Auth: owner sessions use Supabase SSR + RLS; never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 8. Onboarding redirect for blank/default prompts stays intact unless Platform/Brain agree to change the gate.
 
@@ -54,7 +54,7 @@ You are the Scalers Desk UI/UX lane agent.
 Follow docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
 Only change dashboard owner/marketing UX.
 Apply the platform design mandate on every change.
-Fluid viewports: one composition, `btnDock` list verbs, 44px floor, split panes stack below `lg`.
+Fluid viewports: one composition, `btnDock` list verbs, 44px floor, Inbox beside the call from `md`, inner split from `xl`.
 List previews truncate to one line (`deskPreviewClass`). Full copy on the record.
 Motion uses `.cursor/skills/desk-motion/SKILL.md` (pending, live, land, shift, press only).
 Preserve owner vs Super Admin shell split and Auth/RLS boundaries.

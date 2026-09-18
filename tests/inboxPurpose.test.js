@@ -587,7 +587,7 @@ describe("inboxPurpose source lockstep", () => {
       "utf8"
     );
     const page = fs.readFileSync(
-      path.join(__dirname, "..", "dashboard/src/app/(desk)/calls/page.tsx"),
+      path.join(__dirname, "..", "dashboard/src/components/InboxWorkspace.tsx"),
       "utf8"
     );
     assert.match(src, /if \(item\.urgent && item\.needsYou\) return 0;/);
