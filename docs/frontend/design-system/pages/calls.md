@@ -9,7 +9,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** Title Inbox. Caption briefing. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. No Open or View link.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Tap the identity circle to open the contact. No Open or View link.
 
 **Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column.
 

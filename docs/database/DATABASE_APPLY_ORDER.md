@@ -108,6 +108,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 18 | `lead_status.sql` | `owner_rls.sql`; **drops/recreates `calls_update_member` policy** |
 | 19 | `lead_status_archive.sql` | `lead_status.sql` |
 | 20 | `call_resolution.sql` | `lead_status.sql` |
+| 20b | `inbox_triage.sql` | `call_resolution.sql` | Owner inbox triage columns + expanded `calls` UPDATE grant. Apply after 13c / step 20. |
 
 ---
 

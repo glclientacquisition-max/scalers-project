@@ -39,7 +39,7 @@ describe("desk phone shell", () => {
     assert.doesNotMatch(layout, /context=\{businessName\}/);
     const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");
     assert.match(inboxRow, /export function InboxPhoneRow/);
-    assert.match(inboxRow, /DeskRowHit/);
+    assert.match(inboxRow, /InboxRowHit/);
     assert.match(inboxRow, /label="Conversation"/);
     assert.match(inboxRow, /InboxJobActions id=\{item.job.id\} status=\{item.job.status\} extra=\{false\}/);
     assert.match(read("dashboard/src/app/(desk)/calls/[id]/page.tsx"), /InboxJobActions id=\{job.id\} status=\{job.status\} extra/);

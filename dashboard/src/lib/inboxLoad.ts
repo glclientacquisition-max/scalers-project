@@ -1,5 +1,6 @@
 import { type CallRow } from "@/lib/supabase";
 import { toLead } from "@/lib/callsTriage";
+import { normalizeKenyaE164 } from "@/lib/handoffMode";
 import {
   assembleInboxItems,
   attachContactIds,
@@ -10,7 +11,7 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const CALL_SELECT =
-  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note";
+  "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note, inbox_read_at, inbox_muted, inbox_pinned_at, inbox_assignee, inbox_labels, inbox_snoozed_until";
 const CALL_SELECT_LEGACY =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
 const CALL_SELECT_LEAD =
@@ -42,6 +43,19 @@ export async function loadInboxItems(
 
   let data = first.data as CallRow[] | null;
   let error = first.error;
+
+  if (error && /inbox_read_at|inbox_muted|inbox_pinned_at|inbox_assignee|inbox_labels|inbox_snoozed_until|column/i.test(error.message)) {
+    const retry = await client
+      .from("calls")
+      .select(
+        "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note"
+      )
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(INBOX_WINDOW);
+    data = retry.data as CallRow[] | null;
+    error = retry.error;
+  }
 
   if (error && /resolution|primary_intent|resolution_note|column/i.test(error.message)) {
     const retry = await client
@@ -113,9 +127,12 @@ export async function loadInboxItems(
 
   const phones = [
     ...new Set(
-      items
-        .map((item) => item.callerPhone)
-        .filter((phone): phone is string => Boolean(phone && phone !== "unknown"))
+      items.flatMap((item) => {
+        const phone = item.callerPhone;
+        if (!phone || phone === "unknown") return [];
+        const e164 = normalizeKenyaE164(phone);
+        return e164 && e164 !== phone ? [phone, e164] : [phone];
+      })
     ),
   ];
   let withPeople = items;

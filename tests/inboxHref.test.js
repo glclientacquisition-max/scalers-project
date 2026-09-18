@@ -12,6 +12,8 @@ function load() {
       inboxReturnHref,
       contactFromCallHref,
       callFromContactHref,
+      contactFromInboxHref,
+      inboxFromContactHref,
     } from ${JSON.stringify(helperPath)};
     const cases = {
       today: inboxRecordHref("call-1", { purpose: "job", view: "today", day: "2026-09-18" }),
@@ -30,6 +32,15 @@ function load() {
         day: "2026-09-18",
       }),
       contactsList: callFromContactHref({ from: "contacts" }),
+      inboxContact: contactFromInboxHref("ct-1", { purpose: "needs", q: "Amina", page: 2 }),
+      fromInbox: inboxFromContactHref({
+        from: "inbox",
+        purpose: "needs",
+        q: "Amina",
+        page: "2",
+      }),
+      inboxBare: inboxFromContactHref({ from: "inbox" }),
+      notInbox: inboxFromContactHref({ from: "call", call: "call-1" }),
     };
     console.log(JSON.stringify(cases));
   `;
@@ -64,5 +75,13 @@ describe("inbox return path", () => {
     );
     assert.equal(hrefs.fromContact, "/calls/call-1?from=job&view=today&day=2026-09-18");
     assert.equal(hrefs.contactsList, null);
+  });
+
+  it("returns a contact opened from Inbox back to that pile", () => {
+    const hrefs = load();
+    assert.equal(hrefs.inboxContact, "/contacts/ct-1?purpose=needs&q=Amina&page=2&from=inbox");
+    assert.equal(hrefs.fromInbox, "/calls?purpose=needs&q=Amina&page=2");
+    assert.equal(hrefs.inboxBare, "/calls");
+    assert.equal(hrefs.notInbox, null);
   });
 });

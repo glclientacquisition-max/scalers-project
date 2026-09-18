@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
@@ -35,6 +36,7 @@ export function InboxToolbar({
   const todayView = active === "job" && (view === "today" || view === "work");
   const holdToday = active === "hold" && (view === "today" || view === "work");
   const workView = weekView || todayView;
+  const searchWait = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return (
     <header className="space-y-6">
@@ -64,6 +66,11 @@ export function InboxToolbar({
             defaultValue={q}
             placeholder={copy.searchPlaceholder}
             className={deskFieldClass}
+            onChange={(event) => {
+              const form = event.currentTarget.form;
+              if (searchWait.current) clearTimeout(searchWait.current);
+              searchWait.current = setTimeout(() => form?.requestSubmit(), 300);
+            }}
           />
           <button type="submit" className={btnGhost}>
             Search

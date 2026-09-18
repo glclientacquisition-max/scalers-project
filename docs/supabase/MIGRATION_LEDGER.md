@@ -17,7 +17,7 @@ Scalers uses a **dual migration model**:
 | Table | Columns | Bootstrap source | Historical CREATE provenance |
 | --- | --- | --- | --- |
 | `public.tenants` | 49 | `foundation_bootstrap.sql` | **UNKNOWN** |
-| `public.calls` | 15 | `foundation_bootstrap.sql` | **UNKNOWN** |
+| `public.calls` | 21 | `foundation_bootstrap.sql` | **UNKNOWN** |
 | `public.transcripts` | 6 | `foundation_bootstrap.sql` | **UNKNOWN** |
 
 **Do not use** commit `9153a09` CREATE TABLE as foundation source.

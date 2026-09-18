@@ -48,6 +48,12 @@ export type CallRow = {
   resolution?: CallResolution | null;
   primary_intent?: string | null;
   resolution_note?: string | null;
+  inbox_read_at?: string | null;
+  inbox_muted?: boolean | null;
+  inbox_pinned_at?: string | null;
+  inbox_assignee?: string | null;
+  inbox_labels?: string[] | null;
+  inbox_snoozed_until?: string | null;
 };
 
 export function parseLeadStatus(raw: unknown): LeadStatus {

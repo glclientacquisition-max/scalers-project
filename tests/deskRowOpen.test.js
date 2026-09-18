@@ -24,7 +24,7 @@ describe("desk rows open the record", () => {
   });
 
   it("opens Inbox, Contacts, and Home from the row", () => {
-    assert.match(inbox, /DeskRowHit/);
+    assert.match(inbox, /InboxRowHit/);
     assert.match(contacts, /DeskRowHit/);
     assert.match(home, /DeskRowHit/);
     assert.match(contact, /DeskRowHit/);
