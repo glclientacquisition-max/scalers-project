@@ -20,7 +20,8 @@ describe("desk phone shell", () => {
     assert.match(nav, /export function DeskTabBar/);
     assert.match(nav, /export function DeskRail/);
     assert.match(nav, /DeskHint/);
-    assert.match(nav, /label=\{item.label\}/);
+    assert.match(nav, /title=\{item.label\}/);
+    assert.match(nav, /title="Sign out"/);
     assert.match(nav, /label="Sign out"/);
     assert.match(nav, /label="Scalers"/);
     assert.match(nav, /markOnly/);

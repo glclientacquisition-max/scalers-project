@@ -26,10 +26,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh md:overflow-hidden">
+    <div className="desk-theme flex min-h-dvh min-w-0 md:h-dvh">
       {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
       <DeskRail />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip md:overflow-hidden">
         <DeskPhoneHeader />
         <DeskOffline />
         <main className="min-w-0 flex-1 px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 md:overflow-y-auto md:p-6 md:has-[[data-desk-bleed]]:h-full md:has-[[data-desk-bleed]]:overflow-hidden md:has-[[data-desk-bleed]]:p-0">

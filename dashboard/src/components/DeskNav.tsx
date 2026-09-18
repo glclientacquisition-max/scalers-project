@@ -24,6 +24,7 @@ function SignOutButton({ compact }: { compact?: boolean }) {
       <button
         type="submit"
         aria-label="Sign out"
+        title="Sign out"
         className={[
           compact
             ? "inline-flex h-12 w-12 items-center justify-center rounded-xl text-ink-soft hover:bg-surface-muted hover:text-warn"
@@ -147,6 +148,7 @@ export function DeskRail() {
             <DeskHint key={item.href} label={item.label}>
               <Link
                 href={item.href}
+                title={item.label}
                 aria-label={item.label}
                 aria-current={active ? "page" : undefined}
                 className={[

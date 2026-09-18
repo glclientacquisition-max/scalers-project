@@ -164,9 +164,9 @@ export default function DevInboxPage() {
   }
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh md:overflow-hidden">
+    <div className="desk-theme flex min-h-dvh min-w-0 md:h-dvh">
       <DeskRail />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip md:overflow-hidden">
         <DeskPhoneHeader />
         <main className="min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:overflow-hidden md:p-0">
           <InboxSplit
