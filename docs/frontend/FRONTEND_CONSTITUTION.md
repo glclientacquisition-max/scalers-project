@@ -10,6 +10,8 @@ This document is the product design law. The mandate file stays the short always
 
 **Product sentence:** A calm operational console for a Kenyan SME owner at 08:00 EAT. Navy ink, ribbon-blue action, dense tables, one primary task per screen. The owner manages a receptionist, not an AI settings panel.
 
+Chat UI, when it ships, follows [`WHATSAPP_BUSINESS_FRONTEND.md`](./WHATSAPP_BUSINESS_FRONTEND.md). One list recipe. Not a second Inbox.
+
 ---
 
 ## 0. How to use this
