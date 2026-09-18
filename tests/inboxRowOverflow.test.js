@@ -82,8 +82,15 @@ describe("inbox row overflow menu", () => {
   it("right-aligns More to the trigger instead of covering Call and WhatsApp", () => {
     assert.match(overflow, /placeInboxOverflowMenu/);
     assert.match(overflow, /align: "end"/);
+    assert.match(overflow, /visualViewport/);
+    assert.match(overflow, /offsetHeight/);
+    assert.match(overflow, /md:inline-flex/);
+    assert.match(overflow, /max-h-\[min\(24rem/);
+    assert.match(overflow, /flex-col justify-end/);
+    assert.match(overflow, /h-dvh/);
     assert.match(place, /triggerRight - panel.width/);
     assert.doesNotMatch(overflow, /innerHeight - 320/);
+    assert.doesNotMatch(overflow, /max-h-\[80vh\]/);
     const panel = { width: 224, height: 248 };
     const more = placeInboxOverflowMenu(
       panel,

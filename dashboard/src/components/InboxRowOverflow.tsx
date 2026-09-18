@@ -223,7 +223,7 @@ export function InboxRowMore({ item }: { item: InboxItem }) {
       className={[
         deskHitClass,
         focusRingVisible,
-        "hidden text-ink-soft hover:bg-surface-muted hover:text-ink [@media(hover:hover)_and_(pointer:fine)]:inline-flex",
+        "hidden text-ink-soft hover:bg-surface-muted hover:text-ink md:inline-flex",
         menu.open === "menu"
           ? "opacity-100"
           : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
@@ -276,18 +276,25 @@ function InboxOverflowSurface({
     function place() {
       const el = panelRef.current;
       if (!el) return;
-      const box = el.getBoundingClientRect();
+      const view = window.visualViewport;
       setPos(
         placeInboxOverflowMenu(
-          { width: box.width, height: box.height },
+          { width: el.offsetWidth, height: el.offsetHeight },
           anchor,
-          { width: window.innerWidth, height: window.innerHeight }
+          {
+            width: view?.width ?? window.innerWidth,
+            height: view?.height ?? window.innerHeight,
+          }
         )
       );
     }
     place();
     window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
+    window.visualViewport?.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.visualViewport?.removeEventListener("resize", place);
+    };
   }, [mode, anchor, error, actions.length]);
 
   useEffect(() => {
@@ -338,8 +345,8 @@ function InboxOverflowSurface({
       aria-labelledby={labelId}
       className={
         mode === "sheet"
-          ? "flex max-h-[80vh] w-full flex-col overflow-y-auto rounded-t-2xl border border-line bg-surface pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-xl"
-          : "z-50 min-w-[14rem] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-xl"
+          ? "flex h-auto max-h-[min(24rem,calc(100dvh-2rem))] w-full shrink-0 flex-col overflow-y-auto rounded-t-2xl border border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] shadow-xl"
+          : "z-50 max-h-[min(24rem,calc(100dvh-1rem))] min-w-[14rem] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
       }
       style={
         mode === "menu"
@@ -405,7 +412,7 @@ function InboxOverflowSurface({
   if (mode === "sheet") {
     return createPortal(
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40"
+        className="fixed inset-x-0 bottom-0 z-50 flex h-dvh flex-col justify-end bg-ink/40"
         role="presentation"
         onClick={() => {
           if (Date.now() < ignoreUntil.current) return;
