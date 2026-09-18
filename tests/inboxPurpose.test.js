@@ -204,7 +204,10 @@ function nairobiTime(iso) {
     timeZone: "Africa/Nairobi",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(iso));
+    hour12: true,
+  })
+    .format(new Date(iso))
+    .replace(/\s?(am|pm)$/i, (_, mer) => ` ${mer.toUpperCase()}`);
 }
 
 function formatCallWhenRelative(iso, now = new Date()) {
@@ -552,6 +555,12 @@ describe("inbox signal", () => {
     assert.match(formatCallWhenRelative("2026-09-08T10:00:00+03:00", now), /^Tomorrow,/);
     assert.match(formatCallWhenRelative("2026-09-09T10:00:00+03:00", now), /^Wed,/);
     assert.match(formatCallWhenRelative("2026-09-22T10:00:00+03:00", now), /^Sep 22,/);
+    assert.match(formatCallWhenRelative("2026-09-07T08:00:00+03:00", now), /AM|PM/);
+    const triage = fs.readFileSync(
+      path.join(__dirname, "..", "dashboard/src/lib/callsTriage.ts"),
+      "utf8"
+    );
+    assert.match(triage, /hour12: true/);
   });
 });
 

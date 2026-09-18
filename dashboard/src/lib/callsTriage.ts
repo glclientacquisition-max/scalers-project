@@ -72,7 +72,10 @@ function nairobiTime(iso: string): string {
     timeZone: "Africa/Nairobi",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(iso));
+    hour12: true,
+  })
+    .format(new Date(iso))
+    .replace(/\s?(am|pm)$/i, (_, mer) => ` ${mer.toUpperCase()}`);
 }
 
 /** Inbox When column for real ISO datetimes. Free-text slots stay unformatted. */

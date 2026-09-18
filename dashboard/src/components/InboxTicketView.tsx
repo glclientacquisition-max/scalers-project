@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
 import { CallRecording } from "@/components/CallRecording";
@@ -52,7 +53,64 @@ function InboxTicketMore({ callId }: { callId: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  function placeMenu() {
+    const phone = window.matchMedia("(max-width: 767px)").matches;
+    const coarse = !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    setSheet(phone || coarse);
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPos({
+        top: rect.bottom + 4,
+        left: Math.max(8, rect.right - 160),
+      });
+    }
+  }
+
+  const menu = (
+    <div
+      role={sheet ? "dialog" : "menu"}
+      className={
+        sheet
+          ? "flex w-full flex-col rounded-t-2xl border border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] shadow-xl"
+          : "min-w-[10rem] rounded-xl border border-line bg-surface py-1 shadow-xl"
+      }
+      style={
+        sheet || !pos
+          ? undefined
+          : { position: "fixed", top: pos.top, left: pos.left, zIndex: 50 }
+      }
+    >
+      <button
+        type="button"
+        role="menuitem"
+        disabled={busy}
+        className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
+        onClick={async () => {
+          setBusy(true);
+          const res = await updateLeadStatus(callId, "archived");
+          setBusy(false);
+          if (res.error) {
+            setError(res.error);
+            return;
+          }
+          setOpen(false);
+          router.push("/calls");
+          router.refresh();
+        }}
+      >
+        {busy ? "Saving" : "Archive"}
+      </button>
+      {error ? (
+        <p className="px-4 py-2 text-xs text-warn" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="relative">
@@ -65,43 +123,40 @@ function InboxTicketMore({ callId }: { callId: string }) {
         className={`${deskHitClass} ${focusRingVisible} text-ink-soft hover:bg-surface-muted hover:text-ink`}
         onClick={() => {
           setError(null);
+          if (!open) placeMenu();
           setOpen((next) => !next);
         }}
       >
         <MoreGlyph />
       </button>
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 z-30 mt-1 min-w-[10rem] rounded-xl border border-line bg-surface py-1 shadow-xl"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            disabled={busy}
-            className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
-            onClick={async () => {
-              setBusy(true);
-              const res = await updateLeadStatus(callId, "archived");
-              setBusy(false);
-              if (res.error) {
-                setError(res.error);
-                return;
-              }
-              setOpen(false);
-              router.push("/calls");
-              router.refresh();
-            }}
-          >
-            {busy ? "Saving" : "Archive"}
-          </button>
-          {error ? (
-            <p className="px-4 py-2 text-xs text-warn" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            sheet ? (
+              <div
+                className="fixed inset-0 z-50 flex flex-col justify-end bg-ink/40"
+                role="presentation"
+                onClick={() => {
+                  if (!busy) setOpen(false);
+                }}
+              >
+                <div onClick={(event) => event.stopPropagation()}>{menu}</div>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  aria-label="Dismiss"
+                  className="fixed inset-0 z-40"
+                  onClick={() => {
+                    if (!busy) setOpen(false);
+                  }}
+                />
+                {menu}
+              </>
+            ),
+            document.body
+          )
+        : null}
     </div>
   );
 }
@@ -187,7 +242,7 @@ export function InboxTicketView({
   }, [turns.length]);
 
   return (
-    <div className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h)-var(--desk-tabbar-h)-env(safe-area-inset-bottom,0px))] min-h-0 flex-col sm:-mx-6 sm:-mt-10 md:h-[calc(100dvh-var(--desk-header-h))]">
+    <div className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h))] min-h-0 flex-col pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:-mx-6 sm:-mt-10 md:mb-0 md:pb-0">
       <header className="shrink-0 border-b border-line bg-surface px-4 pt-3 pb-3 sm:px-6">
         <DeskBack href={backHref}>Inbox</DeskBack>
         <div className="mt-2 flex items-center gap-2">
