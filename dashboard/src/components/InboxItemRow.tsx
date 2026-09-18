@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
+import { InboxRowAvatar } from "@/components/InboxRowAvatar";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
@@ -16,12 +18,11 @@ import {
   deskShiftClass,
 } from "@/components/ui/deskChrome";
 import {
-  RowIdentity,
   RowStateDot,
   deskRowWeightClass,
 } from "@/components/ui/deskRow";
 import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
-import { inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
+import { contactFromInboxHref, inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import {
   itemSignalLabel,
   type InboxItem,
@@ -78,6 +79,35 @@ function inboxCopy(
     showHold,
     showMixed,
   };
+}
+
+function inboxContactHref(item: InboxItem, purpose: InboxPurposeFilterId, ret?: InboxReturn) {
+  return item.contactId ? contactFromInboxHref(item.contactId, ret || { purpose }) : null;
+}
+
+function InboxRowWho({
+  item,
+  purpose,
+  ret,
+  children,
+}: {
+  item: InboxItem;
+  purpose: InboxPurposeFilterId;
+  ret?: InboxReturn;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className={deskRowActionClass}>
+        <InboxRowAvatar
+          name={item.callerName}
+          phone={item.callerPhone}
+          contactHref={inboxContactHref(item, purpose, ret)}
+        />
+      </div>
+      <div className={`${deskRowMutedClass} min-w-0`}>{children}</div>
+    </div>
+  );
 }
 
 /**
@@ -153,16 +183,13 @@ export function InboxTableRow({
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
             <DeskRowHit href={openHref} label="Conversation" />
-            <div className={`${deskRowMutedClass} flex items-center gap-3`}>
-              <RowIdentity name={item.callerName} />
-              <div className="min-w-0">
-                <p
-                  className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
-                >
-                  {item.headline}
-                </p>
-              </div>
-            </div>
+            <InboxRowWho item={item} purpose={purpose} ret={ret}>
+              <p
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+              >
+                {item.headline}
+              </p>
+            </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
@@ -180,16 +207,13 @@ export function InboxTableRow({
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
             <DeskRowHit href={openHref} label="Conversation" />
-            <div className={`${deskRowMutedClass} flex items-center gap-3`}>
-              <RowIdentity name={item.callerName} />
-              <div className="min-w-0">
-                <p
-                  className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
-                >
-                  {hasJob ? visit : stamp}
-                </p>
-              </div>
-            </div>
+            <InboxRowWho item={item} purpose={purpose} ret={ret}>
+              <p
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+              >
+                {hasJob ? visit : stamp}
+              </p>
+            </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
@@ -207,17 +231,14 @@ export function InboxTableRow({
         <>
           <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
             <DeskRowHit href={openHref} label="Conversation" />
-            <div className={`${deskRowMutedClass} flex items-center gap-3`}>
-              <RowIdentity name={item.callerName} />
-              <div className="min-w-0">
-                <p
-                  className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
-                >
-                  {who}
-                </p>
-                <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
-              </div>
-            </div>
+            <InboxRowWho item={item} purpose={purpose} ret={ret}>
+              <p
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
+              >
+                {who}
+              </p>
+              <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
+            </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} px-5 py-4 align-top`}>
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
@@ -259,23 +280,20 @@ export function InboxPhoneRow({
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
   const body = (
-    <>
-      <RowIdentity name={item.callerName} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}>
-            {who}
-          </p>
-          <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
-            <RowStateDot show={item.needsYou} live={item.purpose === "live"} />
-            {meta}
-          </p>
-        </div>
-        <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
-          {work}
+    <div className="min-w-0 flex-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}>
+          {who}
+        </p>
+        <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft">
+          <RowStateDot show={item.needsYou} live={item.purpose === "live"} />
+          {meta}
         </p>
       </div>
-    </>
+      <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
+        {work}
+      </p>
+    </div>
   );
 
   return (
@@ -287,16 +305,23 @@ export function InboxPhoneRow({
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
+      <div className={deskRowActionClass}>
+        <InboxRowAvatar
+          name={item.callerName}
+          phone={item.callerPhone}
+          contactHref={inboxContactHref(item, purpose, ret)}
+        />
+      </div>
       {openHref ? (
         <Link
           href={openHref}
           aria-label="Conversation"
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex min-w-0 flex-1 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {body}
         </Link>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-3">{body}</div>
+        <div className="flex min-w-0 flex-1 items-center">{body}</div>
       )}
       <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
         <InboxTrailingAction item={item} message={message} />

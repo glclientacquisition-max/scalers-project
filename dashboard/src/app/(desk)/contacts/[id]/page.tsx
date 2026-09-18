@@ -6,7 +6,7 @@ import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
-import { callFromContactHref } from "@/lib/inboxHref";
+import { callFromContactHref, inboxFromContactHref } from "@/lib/inboxHref";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
 import { displayContactLastReason } from "@/lib/callSummarySentence";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
@@ -26,6 +26,7 @@ export default async function ContactDetailPage({
     from?: string;
     call?: string;
     purpose?: string;
+    status?: string;
     view?: string;
     week?: string;
     day?: string;
@@ -36,6 +37,9 @@ export default async function ContactDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const callBack = callFromContactHref(sp);
+  const inboxBack = inboxFromContactHref(sp);
+  const backHref = callBack || inboxBack || "/contacts";
+  const backLabel = callBack ? "Call" : inboxBack ? "Inbox" : "Contacts";
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
 
@@ -59,7 +63,7 @@ export default async function ContactDetailPage({
   });
   return (
     <div className="max-w-6xl">
-      <DeskBack href={callBack || "/contacts"}>{callBack ? "Call" : "Contacts"}</DeskBack>
+      <DeskBack href={backHref}>{backLabel}</DeskBack>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">

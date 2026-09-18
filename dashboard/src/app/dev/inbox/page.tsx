@@ -52,6 +52,7 @@ const ROWS: InboxItem[] = [
     purpose: "job",
     callerName: "Otieno",
     callerPhone: "254700000002",
+    contactId: "ct-otieno",
     headline: "House cleaning",
     intent: "book_visit",
     job: {
@@ -183,7 +184,6 @@ export default function DevInboxPage() {
             <ThemePicker />
           </div>
         </div>
-        <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
           {ROWS.map((row) => (
             <InboxPhoneRow
