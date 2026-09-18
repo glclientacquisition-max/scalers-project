@@ -8,24 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { InboxTeammateOption } from "@/lib/inboxTriage";
 
 export type InboxRowLocal = {
-  unread: boolean;
-  muted: boolean;
-  pinned: boolean;
-  assignee: string | null;
-  labels: string[];
-  snoozed: boolean;
   hidden: boolean;
 };
 
 const EMPTY: InboxRowLocal = {
-  unread: false,
-  muted: false,
-  pinned: false,
-  assignee: null,
-  labels: [],
-  snoozed: false,
   hidden: false,
 };
 
@@ -37,11 +26,18 @@ type InboxRowUiValue = {
   enter: (id: string) => void;
   toggle: (id: string) => void;
   clear: () => void;
+  teammates: InboxTeammateOption[];
 };
 
 const InboxRowUiCtx = createContext<InboxRowUiValue | null>(null);
 
-export function InboxRowUiProvider({ children }: { children: ReactNode }) {
+export function InboxRowUiProvider({
+  children,
+  teammates = [],
+}: {
+  children: ReactNode;
+  teammates?: InboxTeammateOption[];
+}) {
   const [rows, setRows] = useState<Record<string, InboxRowLocal>>({});
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -52,7 +48,7 @@ export function InboxRowUiProvider({ children }: { children: ReactNode }) {
       ...prev,
       [id]: { ...(prev[id] || EMPTY), ...next },
     }));
-    if (next.hidden || next.snoozed) {
+    if (next.hidden) {
       setSelected((prev) => prev.filter((item) => item !== id));
     }
   }, []);
@@ -78,8 +74,9 @@ export function InboxRowUiProvider({ children }: { children: ReactNode }) {
       enter,
       toggle,
       clear,
+      teammates,
     }),
-    [get, patch, selected, enter, toggle, clear]
+    [get, patch, selected, enter, toggle, clear, teammates]
   );
   return <InboxRowUiCtx.Provider value={value}>{children}</InboxRowUiCtx.Provider>;
 }

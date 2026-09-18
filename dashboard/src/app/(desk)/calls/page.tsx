@@ -22,6 +22,7 @@ import {
   inboxTableKind,
 } from "@/components/InboxItemRow";
 import type { InboxReturn } from "@/lib/inboxHref";
+import { inboxTeammateOptions } from "@/lib/inboxTriage";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { InboxBulkBar } from "@/components/InboxRowSelect";
 import { DeskLandScope } from "@/components/ui/DeskLand";
@@ -277,7 +278,7 @@ export default async function CallsPage({
             ids={pageRows.map((item) => item.id)}
             scopeKey={`${activeFilter}:${page}:${q}`}
           >
-          <InboxRowUiProvider>
+          <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
           <InboxBulkBar items={pageRows} />
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {pageRows.map((item) => (

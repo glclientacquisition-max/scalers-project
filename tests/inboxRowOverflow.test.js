@@ -46,9 +46,10 @@ describe("inbox row overflow menu", () => {
       "Assign to teammate",
       "Add label",
       "Snooze",
-      "Delete",
     ]) {
       assert.match(overflow, new RegExp(label));
     }
+    assert.match(overflow, /id: "delete"/);
+    assert.match(overflow, /inboxDelete\(item\)/);
   });
 });

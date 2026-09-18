@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { useInboxRowUi } from "@/components/InboxRowUi";
 import { DeskRowHit, deskRowActionClass, deskRowHitClass } from "@/components/ui/deskRowHit";
 import { btnGhost, btnPrimary, focusRingVisible } from "@/components/ui/deskChrome";
-import { inboxArchive, inboxMarkDone } from "@/lib/inboxLeadActions";
+import { inboxArchive, inboxDelete, inboxMarkDone } from "@/lib/inboxLeadActions";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
 export function InboxRowCheck({ item }: { item: InboxItem }) {
@@ -109,16 +109,18 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     setBusy(true);
     setError(null);
     for (const item of chosen) {
-      if (kind === "delete") {
-        patch(item.id, { hidden: true });
-        continue;
-      }
-      const res = kind === "done" ? await inboxMarkDone(item) : await inboxArchive(item);
+      const res =
+        kind === "done"
+          ? await inboxMarkDone(item)
+          : kind === "delete"
+            ? await inboxDelete(item)
+            : await inboxArchive(item);
       if (res.error) {
         setError(res.error);
         setBusy(false);
         return;
       }
+      patch(item.id, { hidden: true });
     }
     clear();
     setBusy(false);
@@ -135,7 +137,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
         Archive
       </button>
       <button type="button" className={btnGhost} disabled={busy} onClick={() => run("delete")}>
-        Delete
+        Archive
       </button>
       <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>
         Cancel

@@ -26,6 +26,7 @@ describe("inbox bulk select", () => {
     assert.match(select, /for \(const item of chosen\)/);
     assert.match(select, /inboxMarkDone\(item\)/);
     assert.match(select, /inboxArchive\(item\)/);
+    assert.match(select, /inboxDelete\(item\)/);
     assert.match(actions, /updateLeadStatus\(item\.callId, "resolved"\)/);
     assert.match(select, />\s*Cancel\s*</);
     assert.match(select, /\{chosen\.length\} selected/);

@@ -23,8 +23,19 @@ import {
   deskFieldClass,
   deskHitClass,
   focusRingVisible,
+  pendingSpinnerClass,
 } from "@/components/ui/deskChrome";
-import { inboxArchive, inboxMarkDone } from "@/lib/inboxLeadActions";
+import {
+  inboxAddLabel,
+  inboxArchive,
+  inboxAssign,
+  inboxDelete,
+  inboxMarkDone,
+  inboxSnooze,
+  inboxToggleMute,
+  inboxTogglePin,
+  inboxToggleRead,
+} from "@/lib/inboxLeadActions";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
 const LONG_PRESS_MS = 500;
@@ -128,70 +139,53 @@ export function InboxRowShell({
       close();
       return;
     }
-    if (id === "unread") {
-      patch({ unread: !local.unread });
-      close();
-      return;
-    }
-    if (id === "mute") {
-      patch({ muted: !local.muted });
-      close();
-      return;
-    }
-    if (id === "pin") {
-      patch({ pinned: !local.pinned });
-      close();
-      return;
-    }
-    if (id === "snooze") {
-      patch({ snoozed: true });
-      close();
-      return;
-    }
-    if (id === "delete") {
-      patch({ hidden: true });
-      close();
-      return;
-    }
     if (id === "assign" || id === "label") {
-      setDraftValue(id === "assign" ? local.assignee || "" : "");
+      setError(null);
+      setDraftValue(id === "assign" ? item.assignee || "" : "");
       setDraft(id);
       setOpen(null);
       return;
     }
-    if (id === "done" || id === "archive") {
-      if (!item.callId) {
-        setError("Missing call.");
-        return;
-      }
-      setBusy(true);
-      setError(null);
-      const res = id === "done" ? await inboxMarkDone(item) : await inboxArchive(item);
-      setBusy(false);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-      close();
-      router.refresh();
+    if (!item.callId && id !== "select") {
+      setError("Missing call.");
       return;
     }
+    setBusy(true);
+    setError(null);
+    let res: { error?: string; ok?: boolean } = { ok: true };
+    if (id === "unread") res = await inboxToggleRead(item);
+    else if (id === "mute") res = await inboxToggleMute(item);
+    else if (id === "pin") res = await inboxTogglePin(item);
+    else if (id === "snooze") res = await inboxSnooze(item);
+    else if (id === "delete") res = await inboxDelete(item);
+    else if (id === "done") res = await inboxMarkDone(item);
+    else if (id === "archive") res = await inboxArchive(item);
+    setBusy(false);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    if (id === "snooze" || id === "delete" || id === "archive") {
+      patch({ hidden: true });
+    }
+    close();
+    router.refresh();
   };
 
   const actions: { id: ActionId; label: string }[] = [
     { id: "select", label: "Select" },
-    { id: "unread", label: local.unread ? "Mark read" : "Mark unread" },
+    { id: "unread", label: item.unread ? "Mark read" : "Mark unread" },
     { id: "done", label: "Mark done" },
     { id: "archive", label: "Archive" },
-    { id: "mute", label: local.muted ? "Unmute" : "Mute" },
-    { id: "pin", label: local.pinned ? "Unpin" : "Pin" },
+    { id: "mute", label: item.muted ? "Unmute" : "Mute" },
+    { id: "pin", label: item.pinnedAt ? "Unpin" : "Pin" },
     { id: "assign", label: "Assign to teammate" },
     { id: "label", label: "Add label" },
     { id: "snooze", label: "Snooze" },
-    { id: "delete", label: "Delete" },
+    { id: "delete", label: "Archive" },
   ];
 
-  if (local.hidden || local.snoozed) return null;
+  if (local.hidden) return null;
 
   return (
     <InboxRowMenuCtx.Provider value={{ openAt, open }}>
@@ -242,34 +236,83 @@ export function InboxRowShell({
         {draft ? (
           <DeskDialog
             title={draft === "assign" ? "Assign to teammate" : "Add label"}
-            onClose={() => setDraft(null)}
+            onClose={() => {
+              if (!busy) setDraft(null);
+            }}
           >
             <form
               className="mt-4 space-y-4"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault();
                 const value = draftValue.trim();
-                if (draft === "assign") patch({ assignee: value || null });
-                else if (value) patch({ labels: [...local.labels, value] });
+                setBusy(true);
+                setError(null);
+                const res =
+                  draft === "assign"
+                    ? await inboxAssign(item, value)
+                    : await inboxAddLabel(item, value);
+                setBusy(false);
+                if (res.error) {
+                  setError(res.error);
+                  return;
+                }
                 setDraft(null);
                 close();
+                router.refresh();
               }}
             >
-              <label className="block text-xs font-medium uppercase tracking-wide text-ink-soft">
-                {draft === "assign" ? "Name" : "Label"}
-                <input
-                  value={draftValue}
-                  onChange={(event) => setDraftValue(event.target.value)}
-                  className={`${deskFieldClass} mt-1`}
-                />
-              </label>
+              {draft === "assign" ? (
+                (ui?.teammates || []).length === 0 ? (
+                  <p className="text-sm text-ink-soft">No teammates.</p>
+                ) : (
+                  <label className="block text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    Teammate
+                    <select
+                      value={draftValue}
+                      onChange={(event) => setDraftValue(event.target.value)}
+                      className={`${deskFieldClass} mt-1`}
+                    >
+                      <option value="">Unassigned</option>
+                      {(ui?.teammates || []).map((row) => (
+                        <option key={row.value} value={row.value}>
+                          {row.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )
+              ) : (
+                <label className="block text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  Label
+                  <input
+                    value={draftValue}
+                    onChange={(event) => setDraftValue(event.target.value)}
+                    className={`${deskFieldClass} mt-1`}
+                  />
+                </label>
+              )}
+              {error ? (
+                <p className="text-xs text-warn" role="alert">
+                  {error}
+                </p>
+              ) : null}
               <div className="flex justify-end gap-2">
-                <button type="button" className={btnGhost} onClick={() => setDraft(null)}>
+                <button
+                  type="button"
+                  className={btnGhost}
+                  disabled={busy}
+                  onClick={() => setDraft(null)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className={btnPrimary}>
-                  Save
-                </button>
+                {draft === "assign" && (ui?.teammates || []).length === 0 ? null : (
+                  <button type="submit" className={btnPrimary} disabled={busy}>
+                    {busy ? (
+                      <span aria-hidden="true" className={pendingSpinnerClass} />
+                    ) : null}
+                    {busy ? "Saving" : "Save"}
+                  </button>
+                )}
               </div>
             </form>
           </DeskDialog>
@@ -435,7 +478,7 @@ function InboxOverflowSurface({
             "hover:bg-surface-muted disabled:opacity-50",
           ].join(" ")}
         >
-          {busy && (action.id === "done" || action.id === "archive") ? "Saving" : action.label}
+          {busy ? "Saving" : action.label}
         </button>
       ))}
       {error ? (

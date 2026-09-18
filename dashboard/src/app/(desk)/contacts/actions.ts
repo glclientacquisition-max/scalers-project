@@ -6,8 +6,10 @@ import { isAuthenticated } from "@/lib/auth";
 import {
   planContactCsv,
   planManualContact,
+  parseDialableContactPhone,
   type ContactCsvPlan,
 } from "@/lib/contactImport";
+import { normalizeKenyaE164, normalizeStoredPhone } from "@/lib/handoffMode";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
 
@@ -61,6 +63,62 @@ async function existingIdForPhone(
     .eq("phone", phone)
     .maybeSingle();
   return data?.id || null;
+}
+
+function inboxPhoneCandidates(raw: string): string[] {
+  const trimmed = raw.trim();
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const phone of [trimmed, normalizeKenyaE164(trimmed), normalizeStoredPhone(trimmed)]) {
+    if (!phone || seen.has(phone)) continue;
+    seen.add(phone);
+    out.push(phone);
+  }
+  return out;
+}
+
+async function existingIdForInboxPhone(
+  client: SupabaseClient,
+  tenantId: string,
+  raw: string
+): Promise<string | null> {
+  for (const phone of inboxPhoneCandidates(raw)) {
+    const id = await existingIdForPhone(client, tenantId, phone);
+    if (id) return id;
+  }
+  return null;
+}
+
+export async function ensureInboxContact(input: {
+  phone?: string | null;
+  name?: string | null;
+}): Promise<CreateContactResult & { stub?: boolean }> {
+  const ctx = await loadWorkspace();
+  if (!ctx) return { error: "Not signed in." };
+
+  const phoneRaw = String(input.phone || "").trim();
+  if (!phoneRaw || phoneRaw.toLowerCase() === "unknown") {
+    return { stub: true, error: "No phone." };
+  }
+
+  const existingId = await existingIdForInboxPhone(
+    ctx.workspace.client,
+    ctx.tenant.id,
+    phoneRaw
+  );
+  if (existingId) return { ok: true, id: existingId, existingId };
+
+  const parsed = parseDialableContactPhone(phoneRaw);
+  if (!parsed.ok) return { stub: true, error: parsed.error };
+
+  const fd = new FormData();
+  fd.set("phone", parsed.phone);
+  if (input.name) fd.set("name", String(input.name));
+  const created = await createContact(fd);
+  if (created.existingId) {
+    return { ok: true, id: created.existingId, existingId: created.existingId };
+  }
+  return created;
 }
 
 export async function updateContactNotes(

@@ -162,6 +162,14 @@ function orderInboxItems(items, filter) {
   if (filter === "all" || filter === "answered") {
     rows.sort(compareInboxRecency);
   }
+  rows.sort((a, b) => {
+    const ap = a.pinnedAt || "";
+    const bp = b.pinnedAt || "";
+    if (ap && !bp) return -1;
+    if (!ap && bp) return 1;
+    if (ap && bp && ap !== bp) return ap < bp ? 1 : -1;
+    return 0;
+  });
   return rows;
 }
 
