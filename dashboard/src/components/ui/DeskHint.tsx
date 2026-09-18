@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 /**
- * Name for an icon-only control. Shows on hover and focus. Fixed so overflow clip
- * on the desk shell does not hide it. Visual only. The control keeps aria-label.
+ * Name for an icon-only control. Shows on hover and focus. Portaled so desk
+ * overflow clip does not hide it. Visual only. The control keeps aria-label.
  */
 export function DeskHint({
   label,
@@ -16,6 +17,11 @@ export function DeskHint({
   const wrapRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const place = useCallback(() => {
     const node = wrapRef.current;
@@ -49,6 +55,18 @@ export function DeskHint({
     };
   }, [open, place]);
 
+  const tip =
+    mounted && open ? (
+      <span
+        role="tooltip"
+        aria-hidden="true"
+        style={{ top: pos.top, left: pos.left }}
+        className="pointer-events-none fixed z-[80] -translate-y-1/2 rounded-lg bg-ink px-2 py-1 text-xs font-medium text-surface"
+      >
+        {label}
+      </span>
+    ) : null;
+
   return (
     <span
       ref={wrapRef}
@@ -61,16 +79,7 @@ export function DeskHint({
       }}
     >
       {children}
-      {open ? (
-        <span
-          role="tooltip"
-          aria-hidden="true"
-          style={{ top: pos.top, left: pos.left }}
-          className="pointer-events-none fixed z-50 -translate-y-1/2 rounded-lg bg-ink px-2 py-1 text-xs font-medium text-surface"
-        >
-          {label}
-        </span>
-      ) : null}
+      {tip ? createPortal(tip, document.body) : null}
     </span>
   );
 }
