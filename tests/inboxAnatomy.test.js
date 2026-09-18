@@ -141,7 +141,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(detail, /<InboxWorkspace/);
     assert.match(detail, /openCallId=\{id\}/);
     assert.match(detail, /<InboxEscClose href=\{backHref\} \/>/);
-    assert.match(detail, />Close</);
+    assert.match(detail, />\s*Close\s*</);
     assert.match(detail, /md:hidden/);
     assert.match(detail, /xl:grid-cols-12/);
     assert.match(esc, /event.key !== "Escape"/);

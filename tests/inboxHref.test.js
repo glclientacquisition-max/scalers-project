@@ -32,6 +32,7 @@ function load() {
       }),
       keepOpen: inboxKeepHref("call-9", { purpose: "needs", q: "Amina" }),
       keepList: inboxKeepHref(undefined, { purpose: "needs", q: "Amina" }),
+      contactsList: callFromContactHref({ from: "contacts" }),
     };
     console.log(JSON.stringify(cases));
   `;
