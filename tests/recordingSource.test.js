@@ -87,8 +87,8 @@ test("call detail uses CallRecording and still renders transcript and metadata",
   assert.match(source, /Conversation/);
   assert.match(source, /Caller/);
   assert.match(source, /Assist/);
-  assert.match(source, /Escalation/);
-  assert.match(source, /Alert sent/);
+  assert.match(source, /Escalated to/);
+  assert.doesNotMatch(source, /Alert sent/);
   assert.match(source, /row\.primary_intent/);
   assert.match(source, /from\("transcripts"\)/);
 });

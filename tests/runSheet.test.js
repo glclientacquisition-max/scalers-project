@@ -89,7 +89,7 @@ describe("desk run sheet", () => {
     assert.match(page, /view === "today"/);
     assert.match(page, /RunSheetToday/);
     assert.match(page, /runSheetItems/);
-    assert.match(toolbar, />\s*Today\s*</);
+    assert.match(toolbar, /label: "Today"/);
     assert.match(toolbar, /view: "today"/);
     assert.match(week, /groupRunSheetForWeek/);
     assert.match(week, /RequestStatusToggle/);

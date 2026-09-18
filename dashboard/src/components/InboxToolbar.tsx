@@ -4,14 +4,7 @@ import Link from "next/link";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import {
-  btnGhost,
-  btnPrimary,
-  deskFieldClass,
-  deskPreviewClass,
-  deskShiftClass,
-  pageTitleClass,
-} from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 
 export function InboxToolbar({
@@ -94,36 +87,37 @@ export function InboxToolbar({
       />
 
       {active === "job" ? (
-        <nav aria-label="Visit layout" className="flex gap-2">
-          <Link
-            href={callsHref({ purpose: "job", q: q || undefined })}
-            className={!boardView ? btnPrimary : btnGhost}
-          >
-            List
-          </Link>
-          <Link
-            href={callsHref({
-              purpose: "job",
-              q: q || undefined,
-              view: "today",
-              day,
-            })}
-            className={todayView ? btnPrimary : btnGhost}
-          >
-            Today
-          </Link>
-          <Link
-            href={callsHref({
-              purpose: "job",
-              q: q || undefined,
-              view: "week",
-              week,
-            })}
-            className={weekView ? btnPrimary : btnGhost}
-          >
-            Week
-          </Link>
-        </nav>
+        <FilterTabs
+          label="Visit layout"
+          active={weekView ? "week" : todayView ? "today" : "list"}
+          items={[
+            {
+              id: "list",
+              label: "List",
+              href: callsHref({ purpose: "job", q: q || undefined }),
+            },
+            {
+              id: "today",
+              label: "Today",
+              href: callsHref({
+                purpose: "job",
+                q: q || undefined,
+                view: "today",
+                day,
+              }),
+            },
+            {
+              id: "week",
+              label: "Week",
+              href: callsHref({
+                purpose: "job",
+                q: q || undefined,
+                view: "week",
+                week,
+              }),
+            },
+          ]}
+        />
       ) : null}
 
       {q ? (

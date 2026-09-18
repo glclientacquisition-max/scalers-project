@@ -31,7 +31,7 @@ import {
   shiftDayYmd,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
-import { btnGhost, btnPrimary, deskEmptyClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
@@ -104,24 +104,17 @@ function EmptyInbox({
   }
 
   return (
-    <div className="mt-8 border-y border-line py-12 text-center text-ink-soft">
+    <div className={deskEmptyClass}>
       <p className="font-display text-2xl tracking-tight text-ink">Inbox is empty</p>
-      <p className="mx-auto mt-2 max-w-md text-sm">
-        Call{" "}
-        <a
-          href={`tel:${did}`}
-          className={`font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 ${deskShiftClass} hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-        >
+      {did ? (
+        <a href={`tel:${did}`} className={`${btnGhost} mt-6`}>
           {did}
-        </a>{" "}
-        from another phone.
-      </p>
-      <Link
-        href={businessSettingsHref("test")}
-        className={`${btnGhost} mt-6`}
-      >
-        Test line
-      </Link>
+        </a>
+      ) : (
+        <Link href={businessSettingsHref("test")} className={`${btnGhost} mt-6`}>
+          Test line
+        </Link>
+      )}
     </div>
   );
 }
@@ -234,12 +227,6 @@ export default async function CallsPage({
             day: shiftDayYmd(day, 1),
           })}
           listHref={callsHref({ purpose: "job", q: q || undefined })}
-          weekHref={callsHref({
-            purpose: "job",
-            q: q || undefined,
-            view: "week",
-            week: parseWeekParam(day),
-          })}
           businessName={businessName}
           vertical={vertical}
         />
@@ -259,7 +246,6 @@ export default async function CallsPage({
             view: "week",
             week: shiftWeekYmd(monday, 1),
           })}
-          listHref={callsHref({ purpose: "job", q: q || undefined })}
           businessName={businessName}
           vertical={vertical}
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import {
   updateServiceRequestSchedule,
   type RequestScheduleState,
@@ -26,10 +26,6 @@ export function InboxHoldEditor({
     initial
   );
 
-  useEffect(() => {
-    if (state.error) console.warn("[InboxHoldEditor]", state.error);
-  }, [state.error]);
-
   return (
     <div className="space-y-3">
       <form action={formAction} className="space-y-2">
@@ -51,7 +47,7 @@ export function InboxHoldEditor({
         >
           {pending ? "Saving" : "Save"}
         </button>
-        {state.error ? <p className="text-sm text-warn">{state.error}</p> : null}
+        {state.error ? <p className="text-sm text-warn">Could not save.</p> : null}
       </form>
       <RequestStatusToggle id={id} status={status} extra />
     </div>

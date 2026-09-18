@@ -23,14 +23,12 @@ export function VisitWeekCalendar({
   monday,
   prevHref,
   nextHref,
-  listHref,
   vertical,
 }: {
   items: InboxItem[];
   monday: string;
   prevHref: string;
   nextHref: string;
-  listHref: string;
   businessName: string;
   vertical?: string | null;
 }) {
@@ -59,12 +57,6 @@ export function VisitWeekCalendar({
             className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-sm font-medium text-ink hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           >
             Next
-          </Link>
-          <Link
-            href={listHref}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-accent-deep hover:underline focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            List
           </Link>
         </div>
       </div>
@@ -98,13 +90,10 @@ export function VisitWeekCalendar({
                           href={item.callId ? `/calls/${item.callId}?from=job` : null}
                           label="Conversation"
                         />
-                        <p className={`${deskRowMutedClass} text-sm font-semibold text-ink`}>
+                        <p className={`${deskRowMutedClass} text-sm font-semibold text-ink ${deskPreviewClass}`}>
                           {visit.when_text || copy.jobColumn}
                         </p>
-                        <p className={`${deskRowMutedClass} text-xs text-ink-soft ${deskPreviewClass}`}>{item.headline}</p>
-                        <p className={`${deskRowMutedClass} text-xs text-ink ${deskPreviewClass}`}>
-                          {item.callerName || "Caller"}
-                        </p>
+                        <p className={`${deskRowMutedClass} mt-0.5 text-xs text-ink ${deskPreviewClass}`}>{item.headline}</p>
                         <div className={`${deskRowActionClass} mt-1`}>
                           <RowAction item={item} />
                         </div>

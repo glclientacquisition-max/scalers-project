@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/deskRow";
 import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
 import {
-  holdTypeLabel,
   itemSignalLabel,
   type InboxItem,
   type InboxPurposeFilterId,
@@ -156,9 +155,6 @@ export function InboxTableRow({
                 >
                   {item.headline}
                 </p>
-                <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
-                  {item.hold ? holdTypeLabel(item.hold.request_type, vertical) : stamp}
-                </p>
               </div>
             </div>
           </td>
@@ -185,9 +181,6 @@ export function InboxTableRow({
                   className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou)}`}
                 >
                   {hasJob ? visit : stamp}
-                </p>
-                <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
-                  {item.headline}
                 </p>
               </div>
             </div>
@@ -253,7 +246,7 @@ export function InboxPhoneRow({
   purpose: InboxPurposeFilterId;
   vertical?: string | null;
 }) {
-  const { who, message, openHref, needed, visit, place, stamp, when, showJob, showHold, showMixed } =
+  const { who, message, openHref, needed, visit, when, showJob, showHold } =
     inboxCopy(item, purpose, vertical, businessName);
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
@@ -273,14 +266,6 @@ export function InboxPhoneRow({
         <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
           {work}
         </p>
-        {showJob ? (
-          <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>{place}</p>
-        ) : null}
-        {showMixed ? (
-          <p className="mt-1">
-            <InboxPurposeChip purpose={item.purpose} label={stamp} />
-          </p>
-        ) : null}
       </div>
     </>
   );
