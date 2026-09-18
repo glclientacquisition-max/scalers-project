@@ -4,6 +4,7 @@ import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { InboxRowAvatar } from "@/components/InboxRowAvatar";
+import { InboxRowMore, InboxRowShell } from "@/components/InboxRowOverflow";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import {
@@ -11,7 +12,6 @@ import {
   deskRowActionClass,
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
-import { DeskLandSurface } from "@/components/ui/DeskLand";
 import {
   deskPreviewCellClass,
   deskPreviewClass,
@@ -168,11 +168,11 @@ export function InboxTableRow({
   const live = item.purpose === "live";
 
   return (
-    <DeskLandSurface
+    <InboxRowShell
+      item={item}
       as="tr"
-      id={item.id}
       className={[
-        "group relative border-t border-line/70",
+        "relative border-t border-line/70",
         deskShiftClass,
         openHref ? "cursor-pointer" : "",
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
@@ -253,11 +253,12 @@ export function InboxTableRow({
       ) : null}
 
       <td className={`${deskRowActionClass} whitespace-nowrap px-5 py-4 align-middle`}>
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-1">
+          <InboxRowMore item={item} />
           <InboxTrailingAction item={item} message={message} />
         </div>
       </td>
-    </DeskLandSurface>
+    </InboxRowShell>
   );
 }
 
@@ -297,9 +298,9 @@ export function InboxPhoneRow({
   );
 
   return (
-    <DeskLandSurface
+    <InboxRowShell
+      item={item}
       as="li"
-      id={item.id}
       className={[
         "relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
         item.urgent ? "bg-warn-soft/50" : "",
@@ -323,9 +324,10 @@ export function InboxPhoneRow({
       ) : (
         <div className="flex min-w-0 flex-1 items-center">{body}</div>
       )}
-      <div className={`${deskRowActionClass} flex shrink-0 items-center self-center`}>
+      <div className={`${deskRowActionClass} flex shrink-0 items-center self-center gap-1`}>
+        <InboxRowMore item={item} />
         <InboxTrailingAction item={item} message={message} />
       </div>
-    </DeskLandSurface>
+    </InboxRowShell>
   );
 }

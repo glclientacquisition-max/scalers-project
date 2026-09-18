@@ -22,6 +22,7 @@ import {
   inboxTableKind,
 } from "@/components/InboxItemRow";
 import type { InboxReturn } from "@/lib/inboxHref";
+import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
@@ -275,6 +276,7 @@ export default async function CallsPage({
             ids={pageRows.map((item) => item.id)}
             scopeKey={`${activeFilter}:${page}:${q}`}
           >
+          <InboxRowUiProvider>
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {pageRows.map((item) => (
               <InboxPhoneRow
@@ -349,6 +351,7 @@ export default async function CallsPage({
               </tbody>
             </DeskDataTable>
           </div>
+          </InboxRowUiProvider>
           </DeskLandScope>
 
           <Pagination
