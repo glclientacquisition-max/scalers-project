@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom";
 
 /**
- * Name for an icon-only control. Shows on hover and focus. Portaled so desk
- * overflow clip does not hide it. Visual only. The control keeps aria-label.
+ * Name for an icon-only control. Shows on hover, pointer, and focus. Portaled so
+ * desk overflow clip cannot hide it. Visual only. The control keeps aria-label.
  */
 export function DeskHint({
   label,
@@ -15,35 +15,27 @@ export function DeskHint({
   children: ReactNode;
 }) {
   const wrapRef = useRef<HTMLSpanElement>(null);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const [mounted, setMounted] = useState(false);
+  const [tip, setTip] = useState<{ top: number; left: number } | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const place = useCallback(() => {
+  const show = useCallback(() => {
     const node = wrapRef.current;
     if (!node) return;
     const box = node.getBoundingClientRect();
-    setPos({ top: box.top + box.height / 2, left: box.right + 8 });
+    setTip({ top: box.top + box.height / 2, left: box.right + 8 });
   }, []);
 
-  const show = useCallback(() => {
-    place();
-    setOpen(true);
-  }, [place]);
-
-  const hide = useCallback(() => setOpen(false), []);
+  const hide = useCallback(() => setTip(null), []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!tip) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") setTip(null);
     }
     function onReposition() {
-      place();
+      const node = wrapRef.current;
+      if (!node) return;
+      const box = node.getBoundingClientRect();
+      setTip({ top: box.top + box.height / 2, left: box.right + 8 });
     }
     window.addEventListener("keydown", onKey);
     window.addEventListener("scroll", onReposition, true);
@@ -53,24 +45,15 @@ export function DeskHint({
       window.removeEventListener("scroll", onReposition, true);
       window.removeEventListener("resize", onReposition);
     };
-  }, [open, place]);
-
-  const tip =
-    mounted && open ? (
-      <span
-        role="tooltip"
-        aria-hidden="true"
-        style={{ top: pos.top, left: pos.left }}
-        className="pointer-events-none fixed z-[80] -translate-y-1/2 rounded-lg bg-ink px-2 py-1 text-xs font-medium text-surface"
-      >
-        {label}
-      </span>
-    ) : null;
+  }, [tip]);
 
   return (
     <span
       ref={wrapRef}
+      title={label}
       className="relative inline-flex"
+      onPointerEnter={show}
+      onPointerLeave={hide}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocusCapture={show}
@@ -79,7 +62,19 @@ export function DeskHint({
       }}
     >
       {children}
-      {tip ? createPortal(tip, document.body) : null}
+      {tip && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              role="tooltip"
+              aria-hidden="true"
+              style={{ top: tip.top, left: tip.left, zIndex: 9999 }}
+              className="pointer-events-none fixed -translate-y-1/2 rounded-lg bg-ink px-2 py-1 text-xs font-medium text-surface shadow-md"
+            >
+              {label}
+            </span>,
+            document.body
+          )
+        : null}
     </span>
   );
 }

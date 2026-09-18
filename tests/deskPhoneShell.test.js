@@ -69,6 +69,8 @@ describe("desk phone shell", () => {
     assert.match(constitution, /do not live in a hamburger drawer/);
     const hint = read("dashboard/src/components/ui/DeskHint.tsx");
     assert.match(hint, /createPortal/);
+    assert.match(hint, /title=\{label\}/);
+    assert.match(hint, /onPointerEnter/);
     assert.match(hint, /role="tooltip"/);
     assert.match(hint, /onMouseEnter/);
     assert.match(hint, /onFocusCapture/);
