@@ -33,7 +33,9 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 
 Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. Same `FilterTabs` as Contacts. Quiet hairline groups: act (Needs you, All), book (Visits, Holds), closed (Human, Answered).
 
-**Visit filter:** When Visits is isolated, List / Today / Week is a second `FilterTabs` row (underline, not filled). Visit filter uses FilterTabs so Confirm on the row stays the only filled verb. That row is the only date filter. All three show the same Inbox table and the same book: requested and confirmed visits. List is newest work. Today is that book by clock for this EAT day. Week is that book by clock for this EAT week. Requested visits with a slot appear on Today and Week. You Confirm there. Holds stay on Holds. Done and cancelled stay off this book. Unscheduled visits stay on List.
+**Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). Visit sort uses FilterTabs so Confirm stays the only filled verb. List is the Inbox table: requested and confirmed, newest work. Work is the diary of that same book. Date is visible there. Confirm lives on List and on Work.
+
+**Work date:** Today / Week appears only under Work. Today is this EAT day by clock, with the day heading and slot time. Requested slots for that day sit here. Week is the same book by day. Phone shows only days with work. Desktop keeps the seven-day grid. Prev / Next moves the day or week. Holds stay on Holds. Done and cancelled stay off this book.
 
 **Bar order (owner characters):**
 - **08:00 owner:** Needs you first. What still needs a decision.

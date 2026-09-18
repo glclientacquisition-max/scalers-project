@@ -23,8 +23,15 @@ import {
 } from "@/components/InboxItemRow";
 import type { InboxReturn } from "@/lib/inboxHref";
 import { DeskLandScope } from "@/components/ui/DeskLand";
-import { visitBoardForDay, visitBoardForWeek } from "@/lib/runSheet";
-import { parseDayParam, parseWeekParam } from "@/lib/visitCalendar";
+import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
+import { RunSheetToday } from "@/components/RunSheetToday";
+import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
+import {
+  parseDayParam,
+  parseWeekParam,
+  shiftDayYmd,
+  shiftWeekYmd,
+} from "@/lib/visitCalendar";
 import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
@@ -38,8 +45,6 @@ function EmptyInbox({
   purpose,
   q,
   vertical,
-  emptyLabel,
-  listHref,
 }: {
   total: number;
   pendingDid: boolean;
@@ -47,8 +52,6 @@ function EmptyInbox({
   purpose: InboxPurposeFilterId;
   q: string;
   vertical?: string | null;
-  emptyLabel?: string;
-  listHref?: string;
 }) {
   const copy = nicheCopy(vertical);
   if (q) {
@@ -65,19 +68,8 @@ function EmptyInbox({
     );
   }
 
-  if (emptyLabel) {
-    return (
-      <div className={deskEmptyClass}>
-        <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
-        <Link href={listHref || callsHref({ purpose: "job" })} className={`${btnGhost} mt-6`}>
-          List
-        </Link>
-      </div>
-    );
-  }
-
   if (total > 0) {
-    const filterEmpty =
+    const emptyLabel =
       purpose === "hold"
         ? copy.holdEmpty
         : purpose === "job"
@@ -87,7 +79,7 @@ function EmptyInbox({
             : "Nothing in this filter";
     return (
       <div className={deskEmptyClass}>
-        <p className="font-display text-2xl tracking-tight text-ink">{filterEmpty}</p>
+        <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
         <Link
           href={callsHref({ purpose: "all" })}
           className={`${btnGhost} mt-6`}
@@ -180,30 +172,33 @@ export default async function CallsPage({
     searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
     activeFilter
   );
-  const view = String(sp.view || "");
+  const rawView = String(sp.view || "");
+  const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";
   const todayView = activeFilter === "job" && view === "today";
+  const boardView = weekView || todayView;
   const monday = parseWeekParam(sp.week);
   const day = parseDayParam(sp.day);
-  const visible = todayView
-    ? visitBoardForDay(searched, day)
-    : weekView
-      ? visitBoardForWeek(searched, monday)
-      : filtered;
-  const total = visible.length;
+  const boardItems = boardView ? visitBoardItems(searched) : filtered;
+  const todayItems = todayView ? visitBoardForDay(searched, day) : [];
+  const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = visible.slice(from, from + PAGE_SIZE);
+  const pageRows = boardView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
     q: q || undefined,
     view: weekView ? "week" : todayView ? "today" : undefined,
+    week: weekView ? monday : undefined,
+    day: todayView ? day : undefined,
   };
   const inboxRet: InboxReturn = {
     purpose: activeFilter,
     q: q || undefined,
-    page,
-    view: weekView ? "week" : todayView ? "today" : undefined,
+    page: boardView ? undefined : page,
+    view: boardView ? view : undefined,
+    week: weekView ? monday : undefined,
+    day: todayView ? day : undefined,
   };
 
   return (
@@ -214,7 +209,9 @@ export default async function CallsPage({
         q={q}
         caption={inboxCaption(searched, vertical)}
         vertical={vertical}
-        view={todayView || weekView ? view : undefined}
+        view={boardView ? view : undefined}
+        week={weekView ? monday : undefined}
+        day={todayView ? day : undefined}
       />
 
       {partialError ? (
@@ -223,28 +220,62 @@ export default async function CallsPage({
         </div>
       ) : null}
 
-      {pageRows.length === 0 ? (
+      {todayView ? (
+        <RunSheetToday
+          items={todayItems}
+          ymd={day}
+          prevHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, -1),
+          })}
+          nextHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "today",
+            day: shiftDayYmd(day, 1),
+          })}
+          listHref={callsHref({ purpose: "job", q: q || undefined })}
+          ret={{ purpose: "job", q: q || undefined, view: "today", day }}
+          businessName={businessName}
+          vertical={vertical}
+        />
+      ) : weekView ? (
+        <VisitWeekCalendar
+          items={boardItems}
+          monday={monday}
+          prevHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "week",
+            week: shiftWeekYmd(monday, -1),
+          })}
+          nextHref={callsHref({
+            purpose: "job",
+            q: q || undefined,
+            view: "week",
+            week: shiftWeekYmd(monday, 1),
+          })}
+          listHref={callsHref({ purpose: "job", q: q || undefined })}
+          ret={{ purpose: "job", q: q || undefined, view: "week", week: monday }}
+          businessName={businessName}
+          vertical={vertical}
+        />
+      ) : pageRows.length === 0 ? (
         <EmptyInbox
-          total={filtered.length}
+          total={total}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
           did={tenant.sautikit_virtual_number}
           purpose={activeFilter}
           q={q}
           vertical={vertical}
-          emptyLabel={
-            todayView ? copy.todayEmpty : weekView ? copy.jobEmpty : undefined
-          }
-          listHref={
-            todayView || weekView
-              ? callsHref({ purpose: "job", q: q || undefined })
-              : undefined
-          }
         />
       ) : (
         <>
           <DeskLandScope
             ids={pageRows.map((item) => item.id)}
-            scopeKey={`${activeFilter}:${view || "list"}:${page}:${q}`}
+            scopeKey={`${activeFilter}:${page}:${q}`}
           >
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
             {pageRows.map((item) => (
