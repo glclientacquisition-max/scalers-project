@@ -7,7 +7,6 @@ import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { ThemePicker } from "@/components/ThemePicker";
-import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
@@ -174,10 +173,16 @@ export default function DevInboxPage() {
         </div>
       </header>
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
-        <DeskBack href="/dev/inbox">Inbox</DeskBack>
-        <h1 className="mt-4 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
+        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Inbox
         </h1>
+        <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
+        <div className="mt-6 max-w-lg">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
+          <div className="mt-2">
+            <ThemePicker />
+          </div>
+        </div>
         <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
           {ROWS.map((row) => (
@@ -213,12 +218,6 @@ export default function DevInboxPage() {
               ))}
             </tbody>
           </DeskDataTable>
-        </div>
-        <div className="mt-10 max-w-lg">
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
-          <div className="mt-2">
-            <ThemePicker />
-          </div>
         </div>
         <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
           <div className="contents min-w-0 lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
