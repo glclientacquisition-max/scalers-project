@@ -2,7 +2,8 @@
 
 **Status:** Canon for `dashboard/`  
 **Date:** 2026-09-17  
-**Law:** [`FRONTEND_CONSTITUTION.md`](../FRONTEND_CONSTITUTION.md) + `.cursor/rules/scalers-design-ux.mdc`
+**Law:** [`FRONTEND_CONSTITUTION.md`](../FRONTEND_CONSTITUTION.md) + `.cursor/rules/scalers-design-ux.mdc`  
+**Chat client (not shipped):** [`WHATSAPP_BUSINESS_FRONTEND.md`](../WHATSAPP_BUSINESS_FRONTEND.md)
 
 Page notes only record deltas. Do not copy this file into every page spec.
 
