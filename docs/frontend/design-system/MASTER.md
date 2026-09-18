@@ -110,13 +110,14 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as `DeskRail`. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out is the rail foot on `md+` and the phone header below `md`. |
-| Desk rail | `DeskRail`. `md+` only. Mark on top. Five destination icons. Sign out at the foot. No top destination links. |
+| Desk rail | `DeskRail`. `md+` only. Mark on top. Five destination icons. Sign out at the foot. No top destination links. Icon-only hits show `DeskHint` on hover and focus (Overview, Inbox, Contacts, Business, Wallet, Sign out). Navy chip, portaled. |
+| Inbox split | `InboxSplit`. List `20rem` from `md`, `24rem` from `lg`, `28rem` from `xl`. Drag or arrow keys resize. Floor 18rem list, 20rem thread. Cap 40rem. 1px gutter, 24px hit. Reclamps on resize. Stored in `localStorage["scalers-inbox-split"]`. Double-click the separator resets. Hover name: List width. |
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |
 | 404 | `app/not-found.tsx`. Overview is the recovery link. |
 | WhatsApp | Brand-blue fill + white glyph when it is the page CTA (`variant="primary"`). List trailing icon: green glyph on `#25D366`, `h-12 w-12`, `rounded-xl` (`variant="icon"`). No extra WhatsApp mark next to the name. |
-| Inbox Action dock | Trailing cell only. Job row: Confirm. Hold row: Done. Return call with a number: Call then WhatsApp. Every control is `h-12 w-12`. Never Open, View, SMS, email, or Archive in this cell. |
+| Inbox Action dock | Trailing cell only. Job row: Confirm. Hold row: Done. Return call with a number: Call then WhatsApp. Every control is `h-12 w-12`. Icon-only Call and WhatsApp show `DeskHint` on hover and focus. Never Open, View, SMS, email, or Archive in this cell. |
 | Call | `CallLink` (`tel:` deep link, the device dialer places the call). List dock only. Rounded handset glyph (`data-icon="handset"`), brand `text-accent-deep`, muted tile `h-12 w-12` bordered with a light accent wash. Sits left of WhatsApp. Never a filled primary, never a desk-telephone silhouette. |
 | Line chip | Live / Pending / Needs training. Never “Online” |
 
