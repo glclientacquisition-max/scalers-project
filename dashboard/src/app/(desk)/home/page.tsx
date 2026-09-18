@@ -33,7 +33,7 @@ import {
 } from "@/lib/inboxPurpose";
 import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
-import { runSheetForDay } from "@/lib/runSheet";
+import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DeskError } from "@/components/ui/DeskError";
@@ -110,7 +110,7 @@ export default async function HomeOverviewPage() {
 
   const todayCount = todayRes.error ? null : todayRes.count ?? 0;
   const work = summarizeInboxWork(inbox.items);
-  const todayWork = runSheetForDay(inbox.items, eatYmd()).length;
+  const todayWork = visitBoardForDay(inbox.items, eatYmd()).length;
   const waitingCount = work.needs;
   const briefing = homeBriefing(
     {

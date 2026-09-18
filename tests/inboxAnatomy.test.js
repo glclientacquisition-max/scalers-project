@@ -47,7 +47,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.doesNotMatch(toolbar, /btnPrimary/);
     assert.doesNotMatch(today, /weekHref/);
     assert.doesNotMatch(today, />\s*Week\s*</);
-    assert.doesNotMatch(week, />\s*List\s*</);
+    assert.doesNotMatch(week, /RequestStatusToggle/);
     assert.doesNotMatch(page, /weekHref=/);
     assert.match(today, /todayEmpty/);
     assert.match(today, />\s*List\s*</);

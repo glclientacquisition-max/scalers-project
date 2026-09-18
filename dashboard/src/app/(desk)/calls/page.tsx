@@ -25,7 +25,7 @@ import type { InboxReturn } from "@/lib/inboxHref";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
-import { runSheetForDay, runSheetItems } from "@/lib/runSheet";
+import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
 import {
   parseDayParam,
   parseWeekParam,
@@ -178,8 +178,8 @@ export default async function CallsPage({
   const boardView = weekView || todayView;
   const monday = parseWeekParam(sp.week);
   const day = parseDayParam(sp.day);
-  const boardItems = boardView ? runSheetItems(searched) : filtered;
-  const todayItems = todayView ? runSheetForDay(searched, day) : [];
+  const boardItems = boardView ? visitBoardItems(searched) : filtered;
+  const todayItems = todayView ? visitBoardForDay(searched, day) : [];
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
   const pageRows = boardView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
@@ -256,6 +256,7 @@ export default async function CallsPage({
             view: "week",
             week: shiftWeekYmd(monday, 1),
           })}
+          listHref={callsHref({ purpose: "job", q: q || undefined })}
           ret={{ purpose: "job", q: q || undefined, view: "week", week: monday }}
           businessName={businessName}
           vertical={vertical}

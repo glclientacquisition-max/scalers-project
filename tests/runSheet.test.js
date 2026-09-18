@@ -8,93 +8,51 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
-const HOLD_OR_ORDER = new Set(["hold_or_pickup", "hold", "order_enquiry", "order"]);
-
-function isRunSheetJob(job) {
-  return Boolean(job && String(job.status || "").toLowerCase() === "confirmed");
+function isVisitBoardJob(job) {
+  if (!job) return false;
+  const status = String(job.status || "").toLowerCase();
+  return status === "requested" || status === "confirmed";
 }
 
-function isHoldOrOrder(hold) {
-  const key = String(hold.request_type || "").toLowerCase();
-  return HOLD_OR_ORDER.has(key);
-}
-
-function isRunSheetHold(hold, now) {
-  if (!hold || String(hold.status || "").toLowerCase() !== "open") return false;
-  if (!isHoldOrOrder(hold)) return false;
-  return Boolean(visitDayKey({ when_text: hold.when_text, status: hold.status }, now));
-}
-
-describe("desk run sheet", () => {
+describe("desk visit board", () => {
   const now = new Date(Date.UTC(2026, 8, 17, 8, 0, 0));
 
-  it("keeps requested visits off the board and confirmed on it", () => {
-    assert.equal(isRunSheetJob({ status: "requested" }), false);
-    assert.equal(isRunSheetJob({ status: "done" }), false);
-    assert.equal(isRunSheetJob({ status: "cancelled" }), false);
-    assert.equal(isRunSheetJob({ status: "confirmed" }), true);
+  it("keeps requested and confirmed visits on the board", () => {
+    assert.equal(isVisitBoardJob({ status: "requested" }), true);
+    assert.equal(isVisitBoardJob({ status: "confirmed" }), true);
+    assert.equal(isVisitBoardJob({ status: "done" }), false);
+    assert.equal(isVisitBoardJob({ status: "cancelled" }), false);
+    assert.equal(isVisitBoardJob(null), false);
   });
 
-  it("puts timed open holds and orders on the board, not callbacks", () => {
-    assert.equal(
-      isRunSheetHold(
-        { status: "open", request_type: "hold", when_text: "tomorrow at 4 PM" },
-        now
-      ),
-      true
-    );
-    assert.equal(
-      isRunSheetHold(
-        { status: "open", request_type: "order", when_text: "today 10 AM" },
-        now
-      ),
-      true
-    );
-    assert.equal(
-      isRunSheetHold(
-        { status: "open", request_type: "callback", when_text: "tomorrow at 4 PM" },
-        now
-      ),
-      false
-    );
-    assert.equal(
-      isRunSheetHold({ status: "open", request_type: "hold", when_text: "" }, now),
-      false
-    );
-    assert.equal(
-      isRunSheetHold(
-        { status: "fulfilled", request_type: "hold", when_text: "tomorrow at 4 PM" },
-        now
-      ),
-      false
-    );
-  });
-
-  it("places a tomorrow hold on the next EAT day", () => {
+  it("places a tomorrow slot on the next EAT day", () => {
     const key = visitDayKey({ when_text: "tomorrow at 4 PM" }, now);
     assert.equal(key, eatYmd(new Date(now.getTime() + 24 * 60 * 60 * 1000)));
     assert.notEqual(key, eatYmd(now));
   });
 
-  it("wires Today and confirmed Week into Inbox Visits", () => {
+  it("wires List Today Week as one Visits book", () => {
     const sheet = read("dashboard/src/lib/runSheet.ts");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
     const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
     const week = read("dashboard/src/components/VisitWeekCalendar.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
-    assert.match(sheet, /=== "confirmed"/);
-    assert.match(sheet, /hold_or_pickup/);
-    assert.match(sheet, /runSheetForDay/);
-    assert.match(page, /view === "today"/);
-    assert.match(page, /RunSheetToday/);
-    assert.match(page, /runSheetItems/);
+    assert.match(sheet, /status === "requested" \|\| status === "confirmed"/);
+    assert.match(sheet, /export function visitBoardForDay/);
+    assert.match(sheet, /export function visitBoardItems/);
+    assert.doesNotMatch(sheet, /hold_or_pickup/);
+    assert.match(page, /visitBoardItems/);
+    assert.match(page, /visitBoardForDay/);
     assert.match(toolbar, /label: "Today"/);
     assert.match(toolbar, /view: "today"/);
-    assert.match(week, /groupRunSheetForWeek/);
-    assert.match(week, /RequestStatusToggle/);
+    assert.match(week, /groupVisitBoardForWeek/);
+    assert.doesNotMatch(week, /RequestStatusToggle/);
+    assert.match(week, /md:hidden/);
+    assert.match(week, /md:grid md:grid-cols-7/);
     assert.match(today, /todayEmpty/);
-    assert.match(home, /view: "today"/);
+    assert.doesNotMatch(today, /RequestStatusToggle/);
+    assert.match(home, /visitBoardForDay/);
     assert.match(home, /ctaLabel = "Today"/);
     assert.equal(mondayYmd(now).startsWith("2026-09"), true);
   });

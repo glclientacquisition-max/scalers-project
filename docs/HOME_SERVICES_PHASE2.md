@@ -18,7 +18,7 @@ Caller (home_services vertical)
   → create_appointment / update_appointment markers
   → toolExecution validate → db.createAppointment / updateAppointment
   → owner WhatsApp/email visit notify (not a mid-call lead dump)
-  → Desk Inbox → Visits (`/calls?purpose=job`) confirm on List. Run the day on Today / Week.
+  → Desk Inbox → Visits (`/calls?purpose=job`). Confirm on List, Today, or Week.
 ```
 
 Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes (enquiry/callback). Appointments are the booking SoR.
@@ -46,7 +46,7 @@ Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes
 
 ### 2C — Desk: appointments inbox
 - `/appointments` list + status filters (requested / confirmed / cancelled / done)
-- Week calendar on Inbox → Visits (`/calls?purpose=job&view=week`). List is the confirm queue. Today (`view=today`) and Week are the run sheet: **confirmed** visits plus timed open holds/orders. Requested stays on List. No extra nav item.
+- Week calendar on Inbox → Visits (`/calls?purpose=job&view=week`). List, Today, and Week are one book: requested and confirmed visits. Today and Week sort by slot. Timed holds stay on Holds. No extra nav item.
 - Status toggle + nav link
 - Mirror Requests UX (no card clutter)
 

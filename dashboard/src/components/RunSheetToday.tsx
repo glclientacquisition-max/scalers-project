@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
-import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { btnGhost, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
@@ -11,13 +10,8 @@ import { dayHeading } from "@/lib/visitCalendar";
 import { formatSlotClock } from "@/lib/runSheet";
 
 function RowAction({ item }: { item: InboxItem }) {
-  if (item.job) {
-    return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
-  }
-  if (item.hold) {
-    return <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />;
-  }
-  return null;
+  if (!item.job) return null;
+  return <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />;
 }
 
 export function RunSheetToday({
@@ -40,8 +34,7 @@ export function RunSheetToday({
 }) {
   const copy = nicheCopy(vertical);
   const heading = dayHeading(ymd);
-  const placeFor = (item: InboxItem) =>
-    item.job?.address_landmark?.trim() || (item.hold ? copy.pickupStamp : "");
+  const placeFor = (item: InboxItem) => item.job?.address_landmark?.trim() || "";
 
   return (
     <div className="mt-8">

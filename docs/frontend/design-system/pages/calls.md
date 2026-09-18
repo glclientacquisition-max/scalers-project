@@ -33,9 +33,9 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 
 Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. Same `FilterTabs` as Contacts. Quiet hairline groups: act (Needs you, All), book (Visits, Holds), closed (Human, Answered).
 
-**Visit layout:** When Visits is isolated, List / Today / Week is a second `FilterTabs` row (underline, not filled). That row is the only layout switcher. List is the Inbox table. Today and Week are the run sheet. Their chrome is Prev / Next for the date, not a second List / Week control. Visit layout uses FilterTabs so Confirm on the row stays the only filled verb.
+**Visit layout:** When Visits is isolated, List / Today / Week is a second `FilterTabs` row (underline, not filled). Visit layout uses FilterTabs so Confirm on the row stays the only filled verb. That row is the only layout switcher. All three show the same book: requested and confirmed visits. List is newest work. Today is that book by clock for one EAT day. Week is the same book by day. Requested visits with a slot appear on Today and Week. You Confirm there. Holds stay on Holds. Done and cancelled stay off this book. Date chrome is Prev / Next only.
 
-**Run sheet phone:** Same two-line recipe as Inbox. Time is meta. Place stays a table column. Week cells are time plus one work line.
+**Run sheet phone:** Same two-line recipe as Inbox. Time is meta. Place stays a table column. Week on phone is day groups with work, no empty day cells. `md+` is a seven-day grid. Week cells are time plus one work line.
 
 **Bar order (owner characters):**
 - **08:00 owner:** Needs you first. What still needs a decision.
