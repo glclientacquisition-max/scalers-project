@@ -5,7 +5,7 @@
 **Law:** [`FRONTEND_CONSTITUTION.md`](./FRONTEND_CONSTITUTION.md), `.cursor/rules/scalers-design-ux.mdc`, [`design-system/MASTER.md`](./design-system/MASTER.md)  
 **Pipe:** [`../specs/whatsapp-two-way.md`](../specs/whatsapp-two-way.md). SautiKit Cloud API. Chatwoot is not a native WhatsApp inbox.
 
-This document teardowns the **frontend** of WhatsApp and WhatsApp for Business, then binds those paradigms to a Cloud API client we own. It is not a reverse-engineered copy of WhatsApp’s private source. Claims about WhatsApp’s own apps are from observed client behavior, Meta Cloud API docs, and public multi-device writeups.
+This document tears down the **frontend** of WhatsApp and WhatsApp for Business, then binds those paradigms to a Cloud API client we own. It is not a reverse-engineered copy of WhatsApp’s private source. Claims about WhatsApp’s own apps are from observed client behavior, Meta Cloud API docs, and public multi-device writeups.
 
 ## 0. Three products, one design language
 
