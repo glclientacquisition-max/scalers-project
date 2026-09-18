@@ -82,8 +82,8 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(purpose, /compareInboxSignal/);
     assert.match(purpose, /orderInboxItems/);
     assert.match(inbox, /orderInboxItems/);
-    assert.match(purpose, /if \(!opts\.job\) return copy\.returnCtaOne/);
-    assert.match(purpose, /if \(!opts\.hold\) return copy\.returnCtaOne/);
+    assert.match(purpose, /if \(!opts\.job\) return copy\.visitGhostStamp/);
+    assert.match(purpose, /if \(!opts\.hold\) return copy\.holdGhostStamp/);
     assert.match(purpose, /jobStatus === "requested"/);
     assert.doesNotMatch(purpose, /jobStatus === "requested" \|\| jobStatus === "confirmed"/);
     const composer = read("dashboard/src/components/CallerNoteComposer.tsx");

@@ -17,6 +17,8 @@ export type InboxNicheCopy = {
   confirmStamp: string;
   visitStamp: string;
   visitDoneStamp: string;
+  visitGhostStamp: string;
+  holdGhostStamp: string;
   pickupStamp: string;
   holdEmpty: string;
   jobEmpty: string;
@@ -41,6 +43,8 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm visit",
     visitStamp: "Visit",
     visitDoneStamp: "Visit done",
+    visitGhostStamp: "Visit not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Pickup",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
@@ -63,6 +67,8 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm visit",
     visitStamp: "Visit",
     visitDoneStamp: "Visit done",
+    visitGhostStamp: "Visit not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",
@@ -85,6 +91,8 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm booking",
     visitStamp: "Booking",
     visitDoneStamp: "Booking done",
+    visitGhostStamp: "Booking not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No bookings",
@@ -107,6 +115,8 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     confirmStamp: "Confirm visit",
     visitStamp: "Visit",
     visitDoneStamp: "Visit done",
+    visitGhostStamp: "Visit not booked",
+    holdGhostStamp: "Hold not saved",
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
     jobEmpty: "No visits",

@@ -9,7 +9,7 @@ import {
   parseDialableContactPhone,
   type ContactCsvPlan,
 } from "@/lib/contactImport";
-import { normalizeKenyaE164, normalizeStoredPhone } from "@/lib/handoffMode";
+import { storedPhoneCandidates } from "@/lib/handoffMode";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
 
@@ -56,37 +56,17 @@ async function existingIdForPhone(
   tenantId: string,
   phone: string
 ): Promise<string | null> {
+  const phones = storedPhoneCandidates(phone);
+  if (!phones.length) return null;
   const { data } = await client
     .from("contacts")
     .select("id")
     .eq("tenant_id", tenantId)
-    .eq("phone", phone)
+    .in("phone", phones)
+    .order("phone", { ascending: true })
+    .limit(1)
     .maybeSingle();
   return data?.id || null;
-}
-
-function inboxPhoneCandidates(raw: string): string[] {
-  const trimmed = raw.trim();
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const phone of [trimmed, normalizeKenyaE164(trimmed), normalizeStoredPhone(trimmed)]) {
-    if (!phone || seen.has(phone)) continue;
-    seen.add(phone);
-    out.push(phone);
-  }
-  return out;
-}
-
-async function existingIdForInboxPhone(
-  client: SupabaseClient,
-  tenantId: string,
-  raw: string
-): Promise<string | null> {
-  for (const phone of inboxPhoneCandidates(raw)) {
-    const id = await existingIdForPhone(client, tenantId, phone);
-    if (id) return id;
-  }
-  return null;
 }
 
 export async function ensureInboxContact(input: {
@@ -101,7 +81,7 @@ export async function ensureInboxContact(input: {
     return { stub: true, error: "No phone." };
   }
 
-  const existingId = await existingIdForInboxPhone(
+  const existingId = await existingIdForPhone(
     ctx.workspace.client,
     ctx.tenant.id,
     phoneRaw
@@ -229,13 +209,15 @@ export async function previewContactCsv(
   if (!phonesProbe.ok) return { error: phonesProbe.error };
 
   const phones = [
-    ...new Set([
-      ...phonesProbe.create.map((row) => row.phone),
-      ...phonesProbe.skipped.map((row) => row.phone),
-      ...phonesProbe.rejected
-        .map((row) => row.phone)
-        .filter((phone): phone is string => Boolean(phone && phone.startsWith("+"))),
-    ]),
+    ...new Set(
+      [
+        ...phonesProbe.create.map((row) => row.phone),
+        ...phonesProbe.skipped.map((row) => row.phone),
+        ...phonesProbe.rejected
+          .map((row) => row.phone)
+          .filter((phone): phone is string => Boolean(phone && phone.startsWith("+"))),
+      ].flatMap((phone) => storedPhoneCandidates(phone))
+    ),
   ];
   const existingByPhone: Record<string, string> = {};
   if (phones.length) {
@@ -246,7 +228,10 @@ export async function previewContactCsv(
       .in("phone", phones);
     if (error) return { error: contactsWriteError(error.message) };
     for (const row of data || []) {
-      if (row.phone) existingByPhone[row.phone] = row.id;
+      if (!row.phone) continue;
+      for (const key of storedPhoneCandidates(row.phone)) {
+        existingByPhone[key] = row.id;
+      }
     }
   }
 

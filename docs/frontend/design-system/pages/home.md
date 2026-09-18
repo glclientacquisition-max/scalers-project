@@ -4,7 +4,7 @@
 **Job:** At 08:00 EAT, answer four chunks only.
 
 1. **Is it working** — Line live / Number pending / Needs training. Wallet warn if KES < 200.
-2. **What needs me** — Three exclusive Inbox destinations from the same assemble as Inbox: return calls (Needs you), open Holds, visits still to confirm. Confirmed visits are the Visits book, not this briefing. Caption is a briefing (`deskPreviewClass`). Queue units stay count nouns (`3 to confirm`). When a queue is 1, a short slot (`Tue 14:00`) may replace the unit. Never inject the hangup headline. Under it, one digest line for the receptionist's Nairobi day (`Today: 4 answered, 2 visits, 1 complaint.`). Null when nothing happened or when the Inbox window is truncated (`callsTruncated`), never a guess.
+2. **What needs me** — Three exclusive Inbox destinations from the same assemble as Inbox: return calls (Needs you), open Holds, visits still to confirm. Confirmed visits are the Visits book, not this briefing. Caption is a briefing (`deskPreviewClass`). Queue units stay count nouns (`3 to confirm`). When a queue is 1, a short slot (`Tue 14:00`) may replace the unit. Never inject the hangup headline. Under it, one digest line for the receptionist's Nairobi day (`Today: 4 answered, 2 visits, 1 complaint.`). Null when nothing happened or when the call history tape is truncated (`callsTruncated`). Open holds and visits are loaded in full, so Needs you counts stay complete even when the tape is truncated. Never a guess.
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
@@ -22,6 +22,6 @@
 
 **Row density and count weight.** Queue rows are `min-h-12` on phone, `min-h-11` at `lg`. Counts are `text-base font-semibold` so the largest queue (85 to return) holds its own against the blue CTA.
 
-**Data (real only):** tenant row, Nairobi-day call count, `loadInboxItems` (same window as Inbox), `assessMvpAnswerReadiness`, live bulletin. Counts match Inbox purpose, not raw `lead_status=new`.
+**Data (real only):** tenant row, Nairobi-day call count, `loadInboxItems` (open holds/visits unbounded, then a 150-row call tape), `assessMvpAnswerReadiness`, live bulletin. Counts match Inbox purpose, not raw `lead_status=new`.
 
 **Do not:** duplicate the Inbox table. Show Online. Use stacked `TriageLeadCard`.
