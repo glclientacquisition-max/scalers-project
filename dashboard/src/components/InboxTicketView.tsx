@@ -56,6 +56,7 @@ function InboxTicketMore({ callId }: { callId: string }) {
   const [sheet, setSheet] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const ignoreUntil = useRef(0);
 
   function placeMenu() {
     const phone = window.matchMedia("(max-width: 767px)").matches;
@@ -123,7 +124,10 @@ function InboxTicketMore({ callId }: { callId: string }) {
         className={`${deskHitClass} ${focusRingVisible} text-ink-soft hover:bg-surface-muted hover:text-ink`}
         onClick={() => {
           setError(null);
-          if (!open) placeMenu();
+          if (!open) {
+            ignoreUntil.current = Date.now() + 450;
+            placeMenu();
+          }
           setOpen((next) => !next);
         }}
       >
@@ -136,6 +140,7 @@ function InboxTicketMore({ callId }: { callId: string }) {
                 className="fixed inset-0 z-50 flex flex-col justify-end bg-ink/40"
                 role="presentation"
                 onClick={() => {
+                  if (Date.now() < ignoreUntil.current) return;
                   if (!busy) setOpen(false);
                 }}
               >
@@ -148,6 +153,7 @@ function InboxTicketMore({ callId }: { callId: string }) {
                   aria-label="Dismiss"
                   className="fixed inset-0 z-40"
                   onClick={() => {
+                    if (Date.now() < ignoreUntil.current) return;
                     if (!busy) setOpen(false);
                   }}
                 />
