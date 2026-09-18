@@ -31,26 +31,33 @@ describe("desk visit board", () => {
     assert.notEqual(key, eatYmd(now));
   });
 
-  it("wires List Today Week as one Visits table", () => {
+  it("wires List as newest table and Work as dated diary", () => {
     const sheet = read("dashboard/src/lib/runSheet.ts");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
     const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
+    const week = read("dashboard/src/components/VisitWeekCalendar.tsx");
+    const today = read("dashboard/src/components/RunSheetToday.tsx");
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
     assert.match(sheet, /status === "requested" \|\| status === "confirmed"/);
     assert.match(sheet, /export function visitBoardForDay/);
-    assert.match(sheet, /export function visitBoardForWeek/);
     assert.match(sheet, /export function visitBoardItems/);
+    assert.match(sheet, /export function groupVisitBoardForWeek/);
     assert.doesNotMatch(sheet, /hold_or_pickup/);
+    assert.match(page, /visitBoardItems/);
     assert.match(page, /visitBoardForDay/);
-    assert.match(page, /visitBoardForWeek/);
-    assert.match(page, /InboxPhoneRow/);
-    assert.match(page, /InboxTableRow/);
-    assert.doesNotMatch(page, /RunSheetToday/);
-    assert.doesNotMatch(page, /VisitWeekCalendar/);
-    assert.match(toolbar, /label="Visit filter"/);
+    assert.match(page, /RunSheetToday/);
+    assert.match(page, /VisitWeekCalendar/);
+    assert.match(toolbar, /label: "Work"/);
     assert.match(toolbar, /label: "Today"/);
     assert.match(toolbar, /view: "today"/);
-    assert.doesNotMatch(toolbar, /day,/);
+    assert.match(toolbar, /label="Work date"/);
+    assert.match(week, /groupVisitBoardForWeek/);
+    assert.doesNotMatch(week, /RequestStatusToggle/);
+    assert.match(week, /md:hidden/);
+    assert.match(week, /md:grid md:grid-cols-7/);
+    assert.match(today, /todayEmpty/);
+    assert.match(today, /dayHeading/);
+    assert.doesNotMatch(today, /RequestStatusToggle/);
     assert.match(home, /visitBoardForDay/);
     assert.match(home, /ctaLabel = "Today"/);
     assert.equal(mondayYmd(now).startsWith("2026-09"), true);
