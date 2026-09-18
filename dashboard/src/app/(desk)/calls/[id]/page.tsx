@@ -231,6 +231,11 @@ export default async function CallDetailPage({
   const workOnCall = Boolean(job || hold);
   const smsPrimary = callerSmsOn && !workOnCall;
   const waPrimary = !workOnCall && !callerSmsOn;
+  const doNextText = String(summaryCard?.next || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const doNextLabel =
+    doNextText && !/^none\.?$/i.test(doNextText) ? doNextText : null;
 
   const titleIsPhone = !name;
 
@@ -303,27 +308,76 @@ export default async function CallDetailPage({
           </section>
 
           <div className="order-3 min-w-0 space-y-5 lg:order-none">
-            {job ? (
-              <InboxJobActions id={job.id} status={job.status} extra />
-            ) : hold ? (
-              <RequestStatusToggle id={hold.id} status={hold.status} extra />
-            ) : smsPrimary ? (
-              <CallerNoteComposer
-                callId={row.id}
-                callerPhone={row.caller_number}
-                callerName={name}
-                callerSmsOn={callerSmsOn}
-                primary
-              />
-            ) : waPrimary && row.caller_number ? (
-              <WhatsAppLink
-                number={row.caller_number}
-                message={waMessage}
-                variant="primary"
-                label="Reply on WhatsApp"
-                className="w-full"
-              />
-            ) : null}
+            <div className="mx-auto flex w-full max-w-lg flex-col items-stretch gap-2">
+              {doNextLabel ? (
+                <div className="text-center">
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    Do next
+                  </p>
+                  <p className="mt-1 text-base font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
+                    {doNextLabel}
+                  </p>
+                </div>
+              ) : null}
+
+              {job ? (
+                <InboxJobActions id={job.id} status={job.status} extra />
+              ) : hold ? (
+                <RequestStatusToggle id={hold.id} status={hold.status} extra />
+              ) : smsPrimary ? (
+                <CallerNoteComposer
+                  callId={row.id}
+                  callerPhone={row.caller_number}
+                  callerName={name}
+                  callerSmsOn={callerSmsOn}
+                  primary
+                  collapsed
+                />
+              ) : waPrimary && row.caller_number ? (
+                <WhatsAppLink
+                  number={row.caller_number}
+                  message={waMessage}
+                  variant="primary"
+                  label="Reply on WhatsApp"
+                  className="w-full"
+                />
+              ) : null}
+
+              {row.caller_number && !waPrimary ? (
+                <WhatsAppLink
+                  number={row.caller_number}
+                  message={waMessage}
+                  variant="ghost"
+                  label="Reply on WhatsApp"
+                  className="w-full"
+                />
+              ) : null}
+
+              {callerSmsOn && !smsPrimary ? (
+                <CallerNoteComposer
+                  callId={row.id}
+                  callerPhone={row.caller_number}
+                  callerName={name}
+                  service={job?.service_name || hold?.item}
+                  when={job?.when_text || hold?.when_text}
+                  landmark={job?.address_landmark}
+                  callerSmsOn={callerSmsOn}
+                  primary={false}
+                  collapsed
+                />
+              ) : null}
+
+              {leadStatusReady ? (
+                <>
+                  {leadStatus !== "resolved" ? (
+                    <MarkLeadDoneButton callId={row.id} variant="button" />
+                  ) : null}
+                  {leadStatus !== "archived" ? (
+                    <MarkLeadArchiveButton callId={row.id} variant="button" />
+                  ) : null}
+                </>
+              ) : null}
+            </div>
 
             {job ? (
               <section className="rounded-2xl border border-line bg-surface p-4">
@@ -352,42 +406,6 @@ export default async function CallDetailPage({
                   />
                 </div>
               </section>
-            ) : null}
-
-            {callerSmsOn && !smsPrimary ? (
-              <section className="rounded-2xl border border-line bg-surface p-4">
-                <CallerNoteComposer
-                  callId={row.id}
-                  callerPhone={row.caller_number}
-                  callerName={name}
-                  service={job?.service_name || hold?.item}
-                  when={job?.when_text || hold?.when_text}
-                  landmark={job?.address_landmark}
-                  callerSmsOn={callerSmsOn}
-                  primary={false}
-                />
-              </section>
-            ) : null}
-
-            {row.caller_number && !waPrimary ? (
-              <WhatsAppLink
-                number={row.caller_number}
-                message={waMessage}
-                variant="link"
-                label="Reply on WhatsApp"
-                className="w-full"
-              />
-            ) : null}
-
-            {leadStatusReady ? (
-              <div className="flex flex-wrap items-center gap-2 border-t border-line/80 pt-4">
-                {leadStatus !== "resolved" ? (
-                  <MarkLeadDoneButton callId={row.id} />
-                ) : null}
-                {leadStatus !== "archived" ? (
-                  <MarkLeadArchiveButton callId={row.id} />
-                ) : null}
-              </div>
             ) : null}
           </div>
 

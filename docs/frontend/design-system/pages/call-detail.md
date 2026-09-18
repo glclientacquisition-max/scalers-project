@@ -17,7 +17,7 @@
 
 **Full copy lives here.** Inbox and Contacts show one truncated preview. Want, Done, mood, and next unwrap on this page. Do not truncate the Summary card.
 
-**Primary CTA:** One filled verb. Confirm or Done when a visit or hold is on the call (full width). Reply on WhatsApp when that is the current owner task. Brand-blue fill, white WhatsApp glyph (green-on-blue fails WCAG 1.4.11). SMS can be the filled control when WhatsApp is not the current task. Compact list icons stay in the Inbox dock.
+**Primary CTA:** One filled verb, centered with the rest of the action group (`max-w-lg`). Confirm or Done when a visit or hold is on the call (full width). Reply on WhatsApp when that is the current owner task. Brand-blue fill, white WhatsApp glyph (green-on-blue fails WCAG 1.4.11). SMS can be the filled control when WhatsApp is not the current task. Do next copy from the hangup card captions that verb. It is not a second handler. Mark done, Archive, Reply on WhatsApp, and Send SMS are `btnGhost` or `btnPrimary` with icon plus label. SMS compose stays collapsed until Send SMS. Compact list icons stay in the Inbox dock.
 
 **Visit / Hold:** Confirm or Done full width. Cancel ghost below. Reopen lives here. Save on When/Where stays ghost. Failed Save is `Could not save.` Not on the list.
 
