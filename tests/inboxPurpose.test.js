@@ -324,6 +324,9 @@ function inboxNeedsYou({ purpose, leadStatus, hold, job }) {
 }
 
 function itemMatchesPurpose(item, filter) {
+  const archived = item.lead?.leadStatus === "archived";
+  if (filter === "archived") return archived;
+  if (archived) return false;
   if (filter === "all") return true;
   if (filter === "needs") return item.needsYou;
   if (filter === "hold") {
@@ -586,6 +589,18 @@ describe("inbox piles", () => {
     assert.equal(itemMatchesPurpose(answered, "all"), true);
     assert.equal(itemMatchesPurpose(answered, "answered"), true);
   });
+
+  it("puts archived rows on Archived only", () => {
+    const row = {
+      purpose: "missed",
+      needsYou: false,
+      lead: { leadStatus: "archived" },
+    };
+    assert.equal(itemMatchesPurpose(row, "archived"), true);
+    assert.equal(itemMatchesPurpose(row, "all"), false);
+    assert.equal(itemMatchesPurpose(row, "needs"), false);
+    assert.equal(itemMatchesPurpose(row, "human"), false);
+  });
 });
 
 describe("inboxPurpose source lockstep", () => {
@@ -602,7 +617,7 @@ describe("inboxPurpose source lockstep", () => {
     assert.match(src, /if \(isLiveCallStatus\(opts\.callStatus\)\) return "live";/);
     assert.match(src, /if \(opts\.purpose === "live"\) return true;/);
     assert.match(src, /export function compareInboxRecency/);
-    assert.match(src, /filter === "all" \|\| filter === "answered" \|\| filter === "hold"/);
+    assert.match(src, /filter === "all" \|\| filter === "answered" \|\| filter === "archived" \|\| filter === "hold"/);
     assert.match(page, /orderInboxItems\(/);
     assert.doesNotMatch(src, /if \(item\.needsYou\) return 1;/);
   });

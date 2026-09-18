@@ -1,10 +1,11 @@
 /** Holds List and Work. One book: open holds. Anytime stays on List. */
 
 import type { InboxItem, InboxHold } from "@/lib/inboxPurpose";
+import { itemIsArchived } from "@/lib/inboxPurpose";
 import { eatYmd, visitInstant } from "@/lib/visitCalendar";
 
 export function isHoldBoardItem(item: InboxItem | null | undefined): boolean {
-  if (!item?.hold) return false;
+  if (!item?.hold || itemIsArchived(item)) return false;
   return String(item.hold.status || "").toLowerCase() === "open";
 }
 

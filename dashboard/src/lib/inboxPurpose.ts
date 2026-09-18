@@ -11,6 +11,7 @@ export type InboxPurposeFilterId =
   | "job"
   | "human"
   | "answered"
+  | "archived"
   | "all";
 
 export const PURPOSE_FILTERS = purposeFilters("general");
@@ -199,12 +200,13 @@ export function inboxCaption(
   vertical?: string | null
 ): string {
   const copy = nicheCopy(vertical);
-  const needs = items.filter((item) => item.needsYou).length;
+  const live = items.filter((item) => !itemIsArchived(item));
+  const needs = live.filter((item) => item.needsYou).length;
   if (needs === 0) return "Clear";
-  const toConfirm = items.filter(
+  const toConfirm = live.filter(
     (item) => item.job && String(item.job.status || "").toLowerCase() === "requested"
   ).length;
-  const toFulfill = items.filter(
+  const toFulfill = live.filter(
     (item) => item.hold && String(item.hold.status || "").toLowerCase() === "open"
   ).length;
   if (toConfirm === needs) {
@@ -251,13 +253,13 @@ export function itemIsSnoozed(item: InboxItem, now = Date.now()): boolean {
   return Number.isFinite(until) && until > now;
 }
 
-/** All, Answered, and Holds List are a tape: newest first. Pinned rows stay on top of the current pile. */
+/** All, Answered, Archived, and Holds List are a tape: newest first. Pinned rows stay on top of the current pile. */
 export function orderInboxItems(
   items: InboxItem[],
   filter: InboxPurposeFilterId
 ): InboxItem[] {
   const rows = [...items];
-  if (filter === "all" || filter === "answered" || filter === "hold") {
+  if (filter === "all" || filter === "answered" || filter === "archived" || filter === "hold") {
     rows.sort(compareInboxRecency);
   }
   rows.sort(compareInboxPin);
@@ -540,7 +542,6 @@ export function assembleInboxItems(opts: {
   const items: InboxItem[] = [];
   const now = Date.now();
   for (const lead of opts.leads) {
-    if (lead.leadStatus === "archived") continue;
     const hold = holdByCall.get(lead.call.id) || null;
     const job = jobByCall.get(lead.call.id) || null;
     const draft = buildInboxItem({ lead, hold, job, vertical });
@@ -611,10 +612,16 @@ export function attachContactIds(
   });
 }
 
+export function itemIsArchived(item: InboxItem): boolean {
+  return item.lead?.leadStatus === "archived";
+}
+
 export function itemMatchesPurpose(
   item: InboxItem,
   filter: InboxPurposeFilterId
 ): boolean {
+  if (filter === "archived") return itemIsArchived(item);
+  if (itemIsArchived(item)) return false;
   if (filter === "all") return true;
   if (filter === "needs") return item.needsYou;
   if (filter === "hold") {
@@ -636,9 +643,15 @@ export function countInboxPurposes(items: InboxItem[]): Record<InboxPurposeFilte
     job: 0,
     human: 0,
     answered: 0,
-    all: items.length,
+    archived: 0,
+    all: 0,
   };
   for (const item of items) {
+    if (itemIsArchived(item)) {
+      counts.archived += 1;
+      continue;
+    }
+    counts.all += 1;
     if (item.needsYou) counts.needs += 1;
     if (itemMatchesPurpose(item, "hold")) counts.hold += 1;
     if (itemMatchesPurpose(item, "job")) counts.job += 1;
@@ -665,9 +678,10 @@ export function itemMatchesQuery(item: InboxItem, q: string): boolean {
   return hay.includes(q.toLowerCase());
 }
 
-const PURPOSE_IDS = new Set<InboxPurposeFilterId>(
-  PURPOSE_FILTERS.map((f) => f.id)
-);
+const PURPOSE_IDS = new Set<InboxPurposeFilterId>([
+  ...PURPOSE_FILTERS.map((f) => f.id),
+  "archived",
+]);
 
 /** Map legacy lead-status bookmarks onto purpose filters. */
 export function resolvePurposeFilter(
@@ -683,6 +697,6 @@ export function resolvePurposeFilter(
   if (statusRaw === "new") return "needs";
   if (statusRaw === "contacted") return "human";
   if (statusRaw === "resolved") return "answered";
-  if (statusRaw === "archived") return "all";
+  if (statusRaw === "archived") return "archived";
   return needsCount > 0 ? "needs" : "all";
 }

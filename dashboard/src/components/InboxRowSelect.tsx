@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { useInboxRowUi } from "@/components/InboxRowUi";
 import { DeskRowHit, deskRowActionClass, deskRowHitClass } from "@/components/ui/deskRowHit";
 import { btnGhost, btnPrimary, focusRingVisible } from "@/components/ui/deskChrome";
-import { inboxArchive, inboxDelete, inboxMarkDone } from "@/lib/inboxLeadActions";
+import { inboxArchive, inboxMarkDone } from "@/lib/inboxLeadActions";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
 export function InboxRowCheck({ item }: { item: InboxItem }) {
@@ -105,16 +105,11 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const { selected, patch, clear } = ui;
   const chosen = items.filter((item) => selected.includes(item.id));
 
-  async function run(kind: "done" | "archive" | "delete") {
+  async function run(kind: "done" | "archive") {
     setBusy(true);
     setError(null);
     for (const item of chosen) {
-      const res =
-        kind === "done"
-          ? await inboxMarkDone(item)
-          : kind === "delete"
-            ? await inboxDelete(item)
-            : await inboxArchive(item);
+      const res = kind === "done" ? await inboxMarkDone(item) : await inboxArchive(item);
       if (res.error) {
         setError(res.error);
         setBusy(false);
@@ -134,9 +129,6 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
         {busy ? "Saving" : "Mark done"}
       </button>
       <button type="button" className={btnGhost} disabled={busy} onClick={() => run("archive")}>
-        Archive
-      </button>
-      <button type="button" className={btnGhost} disabled={busy} onClick={() => run("delete")}>
         Archive
       </button>
       <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>

@@ -44,7 +44,7 @@ function DoneGlyph({ className }: { className?: string }) {
 /**
  * Soft clear / hide: owners cannot hard-delete calls (RLS).
  * Done = resolved (finished follow-up).
- * Archive = archived (hide from active inbox; still recoverable under Archived).
+ * Archive = archived (leaves Needs you, All, Visits, Holds, Human, Answered; sits on Archived).
  */
 export function MarkLeadActionButton({
   callId,
