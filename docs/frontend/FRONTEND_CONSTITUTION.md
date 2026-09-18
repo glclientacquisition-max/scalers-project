@@ -31,12 +31,12 @@ Cross-referenced. Product rules win when sources disagree.
 | Working memory ~4 chunks | Cowan, *The Magical Number 4*, BBS 2001; Nielsen, *Cognitive Load Is a Budget* (2025) | Home answers at most four questions. Nav is the shipped destinations, at most five. | Miller 7±2 as a dashboard widget quota |
 | Cognitive load types | Sweller 1988; Sweller, van Merriënboer, Paas 1998 | Cut **extraneous** load (fluff, dual layouts, dead fetches). Spend **germane** load on “what needs me.” | Decorative mesh, glass, competing CTAs |
 | Fitts’s law | Fitts 1954; WCAG 2.2 SC 2.5.8 / 2.5.5; Apple HIG 44pt; Material 48dp + 8dp gap | Primary CTA: largest hit, fill `#005CCC`, docked to its field. Floor **44×44 CSS px** for primary/secondary actions. Table icon actions: **32×32** minimum (passes 24×24 AA if isolated). | Tiny adjacent ghost buttons |
-| Hick’s law | Hick 1952; Hyman 1953 | One layout per dataset. One primary action per screen. Nested nav uses a sidebar with non-clickable category headers. | A left desk rail, or a second nav tree for phone. Bottom tabs are the same `DESK_LINKS`. |
+| Hick’s law | Hick 1952; Hyman 1953 | One layout per dataset. One primary action per screen. Nested nav uses a sidebar with non-clickable category headers. | A second nav tree, or a rail that is not `DESK_LINKS`. Bottom tabs are the same list. |
 | Gestalt: proximity, similarity, common region, continuity | Wertheimer; Carbon spacing overview; Atlassian spacing | Related items sit on the 8px scale (8–12px). Groups use 16–24px. Sections use 32–48px. Tables share one chrome. | Card stacks for the same job as a table |
 | Von Restorff (isolation) | von Restorff 1933 | Only the primary action is saturated blue. Archive/Cancel/Remove stay ghost or icon. | Two blue buttons in one viewport |
 | Serial position / F-pattern | Nielsen Norman Group eyetracking | First line: line status + greeting. First block: work waiting. Metrics after work. | Analytics four-up that does not click into work |
 | Progressive disclosure | Nielsen; Sweller element interactivity | `textarea rows={2}` then expand. Settings panels stay hidden until chosen. List preview is one truncated line. Full copy on the record. | All Train fields on one scroll; hangup paragraphs in Inbox Work |
-| Jakob’s law | Nielsen | One Inbox table. Holds and Jobs change columns when that filter is isolated. Chat lists match WhatsApp, Instagram, Messenger, iOS Mail: name plus one ellipsized preview. | Novel card masonry; wrapping summaries in the list |
+| Jakob’s law | Nielsen | One Inbox list. Holds and Jobs change row meta when isolated. Chat lists match WhatsApp, Instagram, Messenger, iOS Mail: name plus one ellipsized preview. | Novel card masonry; wrapping summaries in the list |
 | Tesler’s law | Tesler | Complexity stays in compile/save, not in owner copy. | “Train your receptionist in short steps” |
 | Aesthetic-usability | Kurosu & Kashimura 1995; Tractinsky | Calm light canvas, 1px lines, no novelty chrome. | Glassmorphism, Plus Jakarta, orange CTA |
 | Peak-end rule | Kahneman | Empty and error states must still name the next action. | Dead ends and hash links that 404 the intent |
@@ -53,9 +53,9 @@ Cross-referenced. Product rules win when sources disagree.
 From `.cursor/rules/scalers-design-ux.mdc`:
 
 1. **Copy:** No fluff, no instructional subheaders, no em/en dashes in UI strings. Labels are verbs or nouns the owner already knows.
-2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Inbox on `md+` opens a call beside the list (WhatsApp). Phone is a full call. The call pane stacks. One composition at every width. Phone list rows. `md+` tables on `/calls`. Compact Mail rows when the list shares the viewport with a call. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`). List preview is one truncated line (`deskPreviewClass`). Full Want / Done / mood / next stay on `/calls/[id]`.
-3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted. Confirm, Done, Call, and WhatsApp use `deskHitClass` (`h-12 w-12`). Label length does not change the hit.
-4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail. Sidebar category titles: `uppercase tracking-wide text-gray-500` (or `text-ink-soft`), no hover, not links.
+2. **Density:** Tables over stacked cards for Contacts, catalogs, and Wallet. Inbox on `md+` is always Mail rows beside the thread or an empty pane. Phone is a full list or a full call. The call pane stacks. One composition at every width. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`). List preview is one truncated line (`deskPreviewClass`). Full Want / Done / mood / next stay on `/calls/[id]`.
+3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the phone header, `md:top-0` beside the rail. Secondary actions muted. Confirm, Done, Call, and WhatsApp use `deskHitClass` (`h-12 w-12`). Label length does not change the hit.
+4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Icon rail on `md+` (same five, no top destination links). Sign out at the rail foot. Settings nested nav stays an inner sidebar with non-clickable category headers (`uppercase tracking-wide text-gray-500` or `text-ink-soft`, no hover, not links).
 5. **Tech:** Tailwind utilities only for layout/chrome. Focus: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`. Container padding `p-4`–`p-6`.
 
 ---
@@ -120,14 +120,14 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 
 | Route | Job | Layout |
 | --- | --- | --- |
-| `/home` | Exclusive map: return calls, Holds, Visits or Bookings by niche. Briefing names the next action. Line. One CTA into the sharpest queue. | Command Center. Not a second inbox. |
-| `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Dense table. Work leads. Holds and Jobs change columns. |
-| `/calls/[id]` | Decide + reply | `md+` list beside stacked call; WhatsApp CTA brand-blue fill, green glyph |
-| `/contacts` | Named callers | Existing contacts surface. Not a CRM. |
+| `/home` | Exclusive map: return calls, Holds, Visits or Bookings by niche. Briefing names the next action. Line. One CTA into the sharpest queue. | Rail + remaining width. Command Center. Not a chat list. |
+| `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Rail, Mail list, empty pane on `md+`. Phone header + tabs, full list. |
+| `/calls/[id]` | Decide + reply | Rail, Mail list, stacked call on `md+`. Phone full call. WhatsApp CTA brand-blue fill, green glyph. |
+| `/contacts` | Named callers | Rail + remaining width. Existing contacts surface. Not a CRM. |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
 | `/appointments` | Visits book | Redirect `/calls?purpose=job` |
-| `/settings` | Configure the assistant | Destination menu. One screen. |
-| `/wallet` | Prepaid KES | Token-only from this lane |
+| `/settings` | Configure the assistant | Rail + remaining width. Destination menu. One screen. |
+| `/wallet` | Prepaid KES | Rail + remaining width. Token-only from this lane. |
 
 **Line status (no fake Online):** `Line live` / `Number pending` / `Needs training` from DID + `assessMvpAnswerReadiness`.
 
@@ -148,9 +148,9 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 
 ## 8. Motion and chrome
 
-- **Owner desk shell:** sticky top bar (Scalers mark + Sign out; `md+` text links from `DESK_LINKS`). Do not put the workspace name in the header. Overview `h1` and Business Profile `h1` own that name. Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
-- Sign out stays in the header. It is never a sixth tab.
-- Do not add a left desk rail. Settings nested nav stays an inner sidebar with non-clickable category headers.
+- **Owner desk shell:** `md+` icon rail is `DESK_LINKS` (Scalers mark on top, Sign out at the foot). No top destination bar. Do not put the workspace name in the rail. Overview `h1` and Business Profile `h1` own that name. Below `md`, a phone header (mark + Sign out) and the same `DESK_LINKS` as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
+- Sign out is never a sixth tab. Rail foot on `md+`. Phone header below `md`.
+- The rail **is** the desktop `DESK_LINKS`. Do not add a second nav tree. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.
 - Desk motion verbs: **pending** (spinner on the control), **live** (ping on a Live stamp and the Home bulletin), **land** (one-shot wash on a row that just appeared), **shift** (named-property 150ms on hover and selected), **press** (`active:scale-[0.99]` on `btnPrimary`). Skill: `.cursor/skills/desk-motion/SKILL.md`. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
 - Landing may keep rise/drift behind `prefers-reduced-motion`. Desk never uses `.landing-rise`.

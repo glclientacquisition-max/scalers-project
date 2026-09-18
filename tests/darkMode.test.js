@@ -92,10 +92,10 @@ describe("theme activation", () => {
   });
 
   it("keeps the desk header an opaque surface with theme-aware lockup ink", () => {
-    const layout = read("dashboard/src/app/(desk)/layout.tsx");
-    assert.match(layout, /bg-surface/);
-    assert.doesNotMatch(layout, /bg-surface\/95/);
-    assert.doesNotMatch(layout, /backdrop-blur/);
+    const nav = read("dashboard/src/components/DeskNav.tsx");
+    assert.match(nav, /bg-surface/);
+    assert.doesNotMatch(nav, /bg-surface\/95/);
+    assert.doesNotMatch(nav, /backdrop-blur/);
     const lockup = read("dashboard/src/components/brand/BrandMark.tsx");
     assert.match(lockup, /onDark \? "text-white" : "text-ink"/);
     assert.doesNotMatch(lockup, /text-brand-900/);
@@ -150,8 +150,8 @@ describe("desk token hygiene", () => {
 
   it("puts text-ink on every settings field class", () => {
     const ui = read("dashboard/src/components/settingsUi.tsx");
-    assert.match(ui, /export const settingsDenseFieldClass =\s*"[^"]*text-ink/);
-    assert.match(ui, /export const settingsTableFieldClass =\s*"[^"]*text-ink/);
+    assert.match(ui, /export const settingsDenseFieldClass =\s*[`"'][^`"']*text-ink/);
+    assert.match(ui, /export const settingsTableFieldClass =\s*[`"'][^`"']*text-ink/);
     assert.match(ui, /deskFieldClass/);
   });
 

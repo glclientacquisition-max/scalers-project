@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { BrandLockup } from "@/components/brand/BrandMark";
-import { DeskNav, DeskTabBar } from "@/components/DeskNav";
+import { DeskPhoneHeader, DeskRail, DeskTabBar } from "@/components/DeskNav";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
@@ -9,7 +8,7 @@ import { getCurrentTenant } from "@/lib/tenant";
 
 /**
  * Workspace shell for authenticated business owners.
- * Sticky header (Scalers + md+ links + Sign out). Same DESK_LINKS as a phone tab bar.
+ * md+: DESK_LINKS as a left rail. Phone: lockup header + the same list as bottom tabs.
  */
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const authUser = await getAuthUser();
@@ -27,19 +26,17 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="desk-theme min-h-dvh min-w-0 overflow-x-clip">
+    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh md:overflow-hidden">
       {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
-      <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <BrandLockup href="/home" name="Scalers" size="sm" priority className="max-w-full" />
-          <DeskNav />
-        </div>
-      </header>
-      <DeskOffline />
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
-        {children}
-      </main>
-      <DeskTabBar />
+      <DeskRail />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <DeskPhoneHeader />
+        <DeskOffline />
+        <main className="min-w-0 flex-1 px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 md:overflow-y-auto md:p-6 md:has-[[data-desk-bleed]]:h-full md:has-[[data-desk-bleed]]:overflow-hidden md:has-[[data-desk-bleed]]:p-0">
+          {children}
+        </main>
+        <DeskTabBar />
+      </div>
     </div>
   );
 }

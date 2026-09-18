@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { InboxToolbar } from "@/components/InboxToolbar";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
@@ -15,11 +14,7 @@ import {
   resolvePurposeFilter,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
-import {
-  InboxPhoneRow,
-  InboxTableRow,
-  inboxTableKind,
-} from "@/components/InboxItemRow";
+import { InboxPhoneRow } from "@/components/InboxItemRow";
 import { inboxKeepHref, type InboxReturn } from "@/lib/inboxHref";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
@@ -122,6 +117,7 @@ function rowIsOpen(item: { id: string; callId: string | null }, openCallId?: str
 export async function InboxWorkspace({
   searchParams,
   openCallId,
+  pane,
 }: {
   searchParams: {
     page?: string;
@@ -134,10 +130,11 @@ export async function InboxWorkspace({
     day?: string;
   };
   openCallId?: string;
+  pane?: boolean;
 }) {
   const page = Math.max(1, Number.parseInt(searchParams.page || "1", 10) || 1);
   const q = sanitizeSearchQuery(searchParams.q);
-  const split = Boolean(openCallId);
+  const split = Boolean(pane);
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -152,7 +149,6 @@ export async function InboxWorkspace({
   const client = workspace.client;
   const businessName = tenant.business_name?.trim() || "us";
   const vertical = tenant.vertical;
-  const copy = nicheCopy(vertical);
 
   const { items: assembled, error, partialError } = await loadInboxItems(
     client,
@@ -227,7 +223,7 @@ export async function InboxWorkspace({
   return (
     <div
       className={
-        split ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : undefined
+        split ? "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 pt-4" : undefined
       }
     >
       <div className={split ? "min-w-0 shrink-0" : undefined}>
@@ -241,6 +237,7 @@ export async function InboxWorkspace({
         week={weekView ? monday : undefined}
         day={todayView || holdTodayView ? day : undefined}
         openCallId={openCallId}
+        pane={pane}
       />
       </div>
 
@@ -340,11 +337,7 @@ export async function InboxWorkspace({
           >
             <ul
               aria-label="Conversations"
-              className={
-                split
-                  ? "mt-6 overflow-hidden rounded-2xl border border-line bg-surface"
-                  : "mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden"
-              }
+              className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface"
             >
               {pageRows.map((item) => (
                 <InboxPhoneRow
@@ -358,101 +351,6 @@ export async function InboxWorkspace({
                 />
               ))}
             </ul>
-            {split ? null : (
-              <div className="mt-8 hidden md:block">
-                <DeskDataTable minWidthClass="min-w-[720px]">
-                  <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-                    <tr>
-                      {inboxTableKind(activeFilter) === "hold" ? (
-                        <>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            Item
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            Who
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            Needed
-                          </th>
-                        </>
-                      ) : null}
-                      {inboxTableKind(activeFilter) === "job" ? (
-                        <>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            {copy.jobColumn}
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            Who
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            Place
-                          </th>
-                        </>
-                      ) : null}
-                      {inboxTableKind(activeFilter) === "mixed" ? (
-                        <>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            Work
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            Needed
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                          >
-                            When
-                          </th>
-                        </>
-                      ) : null}
-                      <th
-                        scope="col"
-                        className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]"
-                      >
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageRows.map((item) => (
-                      <InboxTableRow
-                        key={item.id}
-                        item={item}
-                        businessName={businessName}
-                        purpose={activeFilter}
-                        vertical={vertical}
-                        ret={inboxRet}
-                        current={rowIsOpen(item, openCallId)}
-                      />
-                    ))}
-                  </tbody>
-                </DeskDataTable>
-              </div>
-            )}
           </DeskLandScope>
 
           <Pagination

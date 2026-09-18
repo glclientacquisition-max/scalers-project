@@ -1,10 +1,8 @@
 import { InboxWorkspace } from "@/components/InboxWorkspace";
 
-export default async function InboxCallSlot({
-  params,
+export default async function InboxListSlot({
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
   searchParams: Promise<{
     from?: string;
     view?: string;
@@ -16,7 +14,6 @@ export default async function InboxCallSlot({
     purpose?: string;
   }>;
 }) {
-  const { id } = await params;
   const sp = await searchParams;
   return (
     <InboxWorkspace
@@ -31,7 +28,6 @@ export default async function InboxCallSlot({
         week: sp.week,
         day: sp.day,
       }}
-      openCallId={id}
     />
   );
 }

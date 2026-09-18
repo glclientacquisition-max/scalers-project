@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
-import { BrandLockup } from "@/components/brand/BrandMark";
 import { CallerNoteComposer } from "@/components/CallerNoteComposer";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { CallTranscript } from "@/components/CallTranscript";
-import { DeskNav, DeskTabBar } from "@/components/DeskNav";
+import { DeskPhoneHeader, DeskRail, DeskTabBar } from "@/components/DeskNav";
+import { InboxColumn, InboxThread } from "@/components/InboxColumn";
 import { InboxJobActions } from "@/components/InboxJobActions";
-import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
+import { InboxPhoneRow } from "@/components/InboxItemRow";
 import { ThemePicker } from "@/components/ThemePicker";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
@@ -165,119 +164,95 @@ export default function DevInboxPage() {
   }
 
   return (
-    <div className="desk-theme min-h-screen min-w-0">
-      <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <BrandLockup href="/dev/inbox" name="Scalers" size="sm" priority className="max-w-full" />
-          <DeskNav />
-        </div>
-      </header>
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
-          Inbox
-        </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
-        <div className="mt-6 max-w-lg">
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
-          <div className="mt-2">
-            <ThemePicker />
-          </div>
-        </div>
-        <p className="mt-1 text-[13px] text-ink-soft">5 need you</p>
-        <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
-          {ROWS.map((row) => (
-            <InboxPhoneRow
-              key={row.id}
-              item={row}
-              businessName="Workspace"
-              purpose={row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs"}
-              ret={{ purpose: row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs" }}
-            />
-          ))}
-        </ul>
-        <div className="mt-8 hidden md:block">
-          <DeskDataTable minWidthClass="min-w-[720px]">
-            <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-              <tr>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Work</th>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Caller</th>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">When</th>
-                <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROWS.map((row) => (
-                <InboxTableRow
-                  key={row.id}
-                  item={row}
-                  businessName="Workspace"
-                  purpose="needs"
-                  vertical={null}
-                  ret={{ purpose: "needs" }}
-                />
-              ))}
-            </tbody>
-          </DeskDataTable>
-        </div>
-        <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-          <div className="contents min-w-0 lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
-            <div className="order-1 min-w-0 lg:order-none">
-              <h2 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
-                Otieno
-              </h2>
-              <p className="mt-2 text-sm text-ink-soft">12 Sep 2026, 08:10</p>
-              <p className="mt-1 min-w-0 break-all font-mono text-sm text-ink">254700000002</p>
-            </div>
-            <section className="order-2 min-w-0 rounded-2xl border border-line bg-surface p-5 lg:order-none">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                Summary
-              </h2>
-              <CallSummaryCard
-                name="Otieno"
-                callerNumber="254700000002"
-                want="House cleaning tomorrow 9am"
-                done="Visit saved"
-                mood="calm"
-                next="Confirm the visit"
-              />
-            </section>
-            <div className="order-3 min-w-0 space-y-5 lg:order-none">
-              <div className="mx-auto flex w-full max-w-lg flex-col items-stretch gap-2">
-                <div className="text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                    Do next
-                  </p>
-                  <p className="mt-1 text-base font-semibold leading-snug text-ink">
-                    Confirm the visit
-                  </p>
+    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh md:overflow-hidden">
+      <DeskRail />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <DeskPhoneHeader />
+        <main className="min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:overflow-hidden md:p-0">
+          <div
+            data-desk-bleed
+            className="flex min-h-0 flex-1 flex-col md:h-full md:flex-row md:items-stretch md:overflow-hidden"
+          >
+            <InboxColumn>
+              <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 pt-4">
+                <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Inbox</h1>
+                <p className="mt-1 text-[13px] leading-5 text-ink-soft">5 need you</p>
+                <div className="mt-4 min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
+                  <div className="mt-2">
+                    <ThemePicker />
+                  </div>
                 </div>
-                <InboxJobActions id="job-1" status="requested" extra />
-                <WhatsAppLink
-                  number="254700000002"
-                  variant="ghost"
-                  label="Reply on WhatsApp"
-                  className="w-full"
-                />
-                <CallerNoteComposer
-                  callId="call-1"
-                  callerPhone="254700000002"
-                  callerName="Otieno"
-                  callerSmsOn
-                  collapsed
-                />
+                <ul
+                  aria-label="Conversations"
+                  className="mt-6 min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-2xl border border-line bg-surface"
+                >
+                  {ROWS.map((row) => (
+                    <InboxPhoneRow
+                      key={row.id}
+                      item={row}
+                      businessName="Workspace"
+                      purpose={row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs"}
+                      ret={{
+                        purpose: row.purpose === "job" ? "job" : row.purpose === "hold" ? "hold" : "needs",
+                      }}
+                      current={row.id === "job"}
+                    />
+                  ))}
+                </ul>
               </div>
-            </div>
-            <div className="order-5 min-w-0 space-y-4 border-t border-line/80 pt-4 text-sm text-ink-soft lg:order-none">
-              <p>Duration: 48s</p>
-              <p>Assist: Handled</p>
-            </div>
+            </InboxColumn>
+            <InboxThread>
+              <div className="space-y-6 p-4 sm:p-6">
+                <div className="min-w-0">
+                  <h2 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
+                    Otieno
+                  </h2>
+                  <p className="mt-2 text-sm text-ink-soft">12 Sep 2026, 08:10</p>
+                  <p className="mt-1 min-w-0 break-all font-mono text-sm text-ink">254700000002</p>
+                </div>
+                <section className="min-w-0 rounded-2xl border border-line bg-surface p-5">
+                  <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">Summary</h2>
+                  <CallSummaryCard
+                    name="Otieno"
+                    callerNumber="254700000002"
+                    want="House cleaning tomorrow 9am"
+                    done="Visit saved"
+                    mood="calm"
+                    next="Confirm the visit"
+                  />
+                </section>
+                <div className="mx-auto flex w-full max-w-lg flex-col items-stretch gap-2">
+                  <div className="text-center">
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Do next</p>
+                    <p className="mt-1 text-base font-semibold leading-snug text-ink">Confirm the visit</p>
+                  </div>
+                  <InboxJobActions id="job-1" status="requested" extra />
+                  <WhatsAppLink
+                    number="254700000002"
+                    variant="ghost"
+                    label="Reply on WhatsApp"
+                    className="w-full"
+                  />
+                  <CallerNoteComposer
+                    callId="call-1"
+                    callerPhone="254700000002"
+                    callerName="Otieno"
+                    callerSmsOn
+                    collapsed
+                  />
+                </div>
+                <CallTranscript turns={TURNS} />
+                <div className="space-y-4 border-t border-line/80 pt-4 text-sm text-ink-soft">
+                  <p>Duration: 48s</p>
+                  <p>Assist: Handled</p>
+                </div>
+              </div>
+            </InboxThread>
           </div>
-          <div className="order-4 min-w-0 lg:order-none lg:col-span-8">
-            <CallTranscript turns={TURNS} />
-          </div>
-        </div>
-      </main>
-      <DeskTabBar />
+        </main>
+        <DeskTabBar />
+      </div>
     </div>
   );
 }

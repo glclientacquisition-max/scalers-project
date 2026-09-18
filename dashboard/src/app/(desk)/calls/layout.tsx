@@ -1,6 +1,8 @@
+import { InboxColumn, InboxThread } from "@/components/InboxColumn";
+
 /**
- * Inbox list is a parallel slot (`@inbox`), not nested inside the call page.
- * `/calls` has no slot content. `/calls/[id]` shows the list on `md+`.
+ * Inbox list is a parallel `@inbox` slot. Always the middle column on md+.
+ * Phone `/calls` uses that slot full width. Phone `/calls/[id]` hides it.
  */
 export default function CallsLayout({
   children,
@@ -10,16 +12,12 @@ export default function CallsLayout({
   inbox: React.ReactNode;
 }) {
   return (
-    <div className="md:flex md:items-stretch md:gap-6 md:[&:has(aside:not(:empty))]:h-[calc(100dvh-var(--desk-header-h)-5rem)] md:[&:has(aside:not(:empty))]:overflow-hidden">
-      <aside
-        aria-label="Inbox"
-        className="hidden min-w-0 md:flex md:h-full md:w-[22rem] md:shrink-0 md:flex-col md:overflow-hidden md:empty:hidden lg:w-[24rem]"
-      >
-        {inbox}
-      </aside>
-      <div className="min-w-0 flex-1 md:min-h-0 md:overflow-x-hidden md:overflow-y-auto">
-        {children}
-      </div>
+    <div
+      data-desk-bleed
+      className="flex min-h-0 flex-1 flex-col md:h-full md:flex-row md:items-stretch md:overflow-hidden"
+    >
+      <InboxColumn>{inbox}</InboxColumn>
+      <InboxThread>{children}</InboxThread>
     </div>
   );
 }

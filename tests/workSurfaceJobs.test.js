@@ -59,10 +59,9 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(niche, /jobFilter: "Visits"/);
     assert.match(niche, /jobFilter: "Bookings"/);
     assert.match(niche, /pickupStamp: "Pickup"/);
-    assert.match(inbox, />\s*Item\s*</);
-    assert.match(inbox, />\s*Needed\s*</);
-    assert.match(inbox, /copy.jobColumn/);
-    assert.match(inbox, />\s*Place\s*</);
+    assert.match(inbox, /InboxPhoneRow/);
+    assert.doesNotMatch(inbox, /DeskDataTable/);
+    assert.match(row, /showHold \? needed : showJob \? visit : when/);
     assert.match(inbox, /inboxCaption\(searched, vertical\)/);
     assert.match(row, /itemSignalLabel\(item, vertical\)/);
     assert.match(row, /formatCallWhenRelative/);

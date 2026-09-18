@@ -49,6 +49,7 @@ type BrandLockupProps = {
   size?: Size;
   className?: string;
   priority?: boolean;
+  markOnly?: boolean;
 };
 
 /**
@@ -63,6 +64,7 @@ export function BrandLockup({
   size = "md",
   className = "",
   priority = false,
+  markOnly = false,
 }: BrandLockupProps) {
   const [useFallback, setUseFallback] = useState(false);
   const s = SIZE[size];
@@ -94,6 +96,7 @@ export function BrandLockup({
           />
         )}
       </span>
+      {markOnly ? null : (
       <span className="min-w-0 flex flex-col justify-center gap-0.5">
         <span
           className={[
@@ -116,6 +119,7 @@ export function BrandLockup({
           </span>
         ) : null}
       </span>
+      )}
     </span>
   );
 
@@ -124,7 +128,7 @@ export function BrandLockup({
     <Link
       href={href}
       className="inline-flex min-w-0 rounded-md focus-visible:outline-none focus-visible:shadow-focus"
-      aria-label={context ? `${name} · ${context}` : name}
+      aria-label={context ? `${name} · ${context}` : name || "Scalers"}
     >
       {mark}
     </Link>

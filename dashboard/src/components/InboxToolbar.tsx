@@ -17,6 +17,7 @@ export function InboxToolbar({
   week,
   day,
   openCallId,
+  pane,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
@@ -27,6 +28,7 @@ export function InboxToolbar({
   week?: string;
   day?: string;
   openCallId?: string;
+  pane?: boolean;
 }) {
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
@@ -47,22 +49,21 @@ export function InboxToolbar({
 
   return (
     <header className="min-w-0 space-y-4">
-      {openCallId ? <h2 className="sr-only">Inbox</h2> : null}
       <div
         className={
-          openCallId
+          pane
             ? "flex min-w-0 flex-col gap-3"
             : "flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
         }
       >
-        {openCallId ? (
-          <p className="min-w-0 text-[13px] leading-5 text-ink-soft">{briefing}</p>
-        ) : (
-          <div className="min-w-0">
-            <h1 className={pageTitleClass}>Inbox</h1>
-            <p className={`mt-1 text-[13px] text-ink-soft ${deskPreviewClass}`}>{briefing}</p>
-          </div>
-        )}
+        <div className="min-w-0">
+          <h1 className={pane ? "font-display text-2xl font-semibold tracking-tight text-ink" : pageTitleClass}>
+            Inbox
+          </h1>
+          <p className={`mt-1 text-[13px] leading-5 text-ink-soft ${pane ? "" : deskPreviewClass}`}>
+            {briefing}
+          </p>
+        </div>
         <form
           action={openCallId ? `/calls/${openCallId}` : "/calls"}
           method="get"
@@ -74,12 +75,12 @@ export function InboxToolbar({
           ) : null}
           {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
           {(todayView || holdToday) && day ? <input type="hidden" name="day" value={day} /> : null}
-          <label className="sr-only" htmlFor={openCallId ? "inbox-search-pane" : "inbox-search"}>
+          <label className="sr-only" htmlFor={pane ? "inbox-search-pane" : "inbox-search"}>
             Search inbox
           </label>
           <div className="min-w-0 flex-1">
             <input
-              id={openCallId ? "inbox-search-pane" : "inbox-search"}
+              id={pane ? "inbox-search-pane" : "inbox-search"}
               name="q"
               type="search"
               defaultValue={q}
@@ -96,7 +97,7 @@ export function InboxToolbar({
       <FilterTabs
         label="Filter by purpose"
         active={active}
-        wrap={Boolean(openCallId)}
+        wrap={Boolean(pane)}
         items={filters.map((item) => ({
           id: item.id,
           label: item.label,
@@ -126,7 +127,7 @@ export function InboxToolbar({
         <FilterTabs
           label="Visit sort"
           active={workView ? "work" : "list"}
-          wrap={Boolean(openCallId)}
+          wrap={Boolean(pane)}
           items={[
             {
               id: "list",
@@ -152,7 +153,7 @@ export function InboxToolbar({
         <FilterTabs
           label="Hold sort"
           active={holdToday ? "work" : "list"}
-          wrap={Boolean(openCallId)}
+          wrap={Boolean(pane)}
           items={[
             {
               id: "list",
@@ -177,7 +178,7 @@ export function InboxToolbar({
         <FilterTabs
           label="Work date"
           active={weekView ? "week" : "today"}
-          wrap={Boolean(openCallId)}
+          wrap={Boolean(pane)}
           items={[
             {
               id: "today",

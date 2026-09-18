@@ -19,8 +19,8 @@ Brand ribbon: `#0096FF`. Filled primary CTA: `#005CCC` with a white label.
 - **Zero vertical sprawl:** Never allow forms, cards, or lists to congest the vertical viewport. Hardcode all `textarea` defaults to `rows={2}` with auto-expand.
 - **Preview truncate:** Lists are WhatsApp / Mail / Messenger. Identity plus one ellipsized line (`deskPreviewClass`). Full hangup copy, Want, Done, mood, and next live on the record. Never wrap a paragraph in a list cell. Never use `overflow-wrap: anywhere` on a preview. Table preview cells use `deskPreviewCellClass` (`w-full max-w-0`) so the column takes leftover width and ellipsis can fire. Home queue units stay count nouns, not the call summary.
 - **Data density over cards:** Prefer dense, horizontal data tables or inline rows over massive, padded stacked cards for lists (Calls, Requests, Catalogs, Teams). Tap the row to open the record. Do not add Call, Open, or View columns.
-- **Split-pane enforcement:** Inbox on `md+` keeps the list beside the open call (WhatsApp). Phone is still a full call. The call pane stacks identity, Summary, Actions, Conversation, facts. Never a third column. Never invent a second dataset layout.
-- **Fluid viewports:** One composition at every width. Phone uses the list row. `md+` uses the table. Text columns `min-w-0`. Hits never shrink below 44px. Every Action control is `deskHitClass` (`h-12 w-12`): Confirm, Done, Call, and WhatsApp. Do not clip, pinch-zoom, or ship a desktop-only control on phone.
+- **Split-pane enforcement:** Inbox on `md+` is always list beside the thread or an empty pane (WhatsApp). Phone is a full list or a full call. The call pane stacks identity, Summary, Actions, Conversation, facts. Never a third column. Never invent a second dataset layout.
+- **Fluid viewports:** One composition at every width. Phone uses the list row. `md+` Inbox uses Mail rows. Contacts and Wallet stay tables. Text columns `min-w-0`. Hits never shrink below 44px. Every Action control is `deskHitClass` (`h-12 w-12`): Confirm, Done, Call, and WhatsApp. Do not clip, pinch-zoom, or ship a desktop-only control on phone.
 
 ## 3. ACTION VELOCITY (FITTS'S LAW)
 
@@ -31,7 +31,7 @@ Brand ribbon: `#0096FF`. Filled primary CTA: `#005CCC` with a white label.
 ## 4. NAVIGATION & DECISION FATIGUE (HICK'S LAW)
 
 - **Single source of truth:** Never provide two different UI layouts for the exact same dataset.
-- **Primary destinations:** One `DESK_LINKS` list. Bottom tabs below `md`. Top links on `md+`. No left desk rail.
+- **Primary destinations:** One `DESK_LINKS` list. Bottom tabs below `md`. Icon rail on `md+`. No top destination links. Sign out at the rail foot.
 - **Sidebar hierarchy:** Nested navigation must use vertical sidebars. Sidebar category titles must be non-clickable headers (`uppercase`, `tracking-wide`, `text-gray-500`, no hover state) so they are immediately distinct from clickable tabs.
 
 ## 5. TECHNICAL EXECUTION CONSTRAINTS

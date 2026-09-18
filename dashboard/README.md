@@ -62,7 +62,7 @@ Owners land on **`/home`** (main dashboard). **`/calls`** remains the full triag
 - Brain ids mapped: `hold_or_pickup` is a hold, `product_inquiry` is answered
 - Niche stamps: Pickup (retail), Confirm visit (home services), Confirm booking (hospitality)
 - Caption briefing: `3 need you. 1 to confirm.`
-- Mixed columns: Work / Needed / When
+- `md+` Mail rows beside the thread or an empty pane. Phone is a full list.
 - Filters: Needs you · All · Visits, Jobs, or Bookings · Holds · Human · Answered
 - Needs you is open work only. Confirm moves a visit to Visits. Done leaves Holds.
 - Bare `/calls` defaults to Needs you when work is waiting

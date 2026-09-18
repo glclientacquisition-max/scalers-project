@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandLockup } from "@/components/brand/BrandMark";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
 export const DESK_LINKS = [
@@ -16,18 +17,33 @@ function pathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function SignOutButton() {
+function SignOutButton({ compact }: { compact?: boolean }) {
   return (
     <form action="/api/logout" method="post">
       <button
         type="submit"
+        aria-label="Sign out"
         className={[
-          "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
+          compact
+            ? "inline-flex h-12 w-12 items-center justify-center rounded-xl text-ink-soft hover:bg-surface-muted hover:text-warn"
+            : "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
           deskShiftClass,
           focusRingVisible,
         ].join(" ")}
       >
-        Sign out
+        {compact ? (
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-5 w-5">
+            <path
+              d="M8 4.5H4.5v11H8M8.5 10h7M13 7.5 16.5 10 13 12.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : (
+          "Sign out"
+        )}
       </button>
     </form>
   );
@@ -112,42 +128,58 @@ function TabIcon({ name, className }: { name: string; className?: string }) {
   );
 }
 
-/**
- * Desktop workspace links plus Sign out (header). Phone destinations live in DeskTabBar.
- */
-export function DeskNav() {
+/** md+ destination rail. Same DESK_LINKS as DeskTabBar. Sign out at the foot. */
+export function DeskRail() {
   const pathname = usePathname();
 
   return (
-    <div className="flex items-center gap-2 sm:gap-5">
-      <nav className="hidden items-center gap-5 text-sm md:flex" aria-label="Workspace">
+    <div className="hidden h-dvh w-[4.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex">
+      <div className="flex h-14 items-center justify-center">
+        <BrandLockup href="/home" name="Scalers" size="sm" markOnly priority />
+      </div>
+      <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1.5 pt-1">
         {DESK_LINKS.map((item) => {
           const active = pathActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
               aria-current={active ? "page" : undefined}
               className={[
-                "rounded-md",
+                "inline-flex h-12 w-12 items-center justify-center rounded-xl",
                 deskShiftClass,
                 focusRingVisible,
                 active
-                  ? "font-semibold text-accent-deep"
-                  : "font-medium text-ink hover:text-accent-deep",
+                  ? "bg-accent/10 text-accent-deep"
+                  : "text-ink-soft hover:bg-surface-muted hover:text-ink",
               ].join(" ")}
             >
-              {item.label}
+              <TabIcon name={item.label} />
             </Link>
           );
         })}
       </nav>
-      <SignOutButton />
+      <div className="flex justify-center pb-3">
+        <SignOutButton compact />
+      </div>
     </div>
   );
 }
 
-/** Phone thumb destinations. Same DESK_LINKS as the desktop top bar. */
+/** Phone identity + Sign out. Destinations stay in DeskTabBar. */
+export function DeskPhoneHeader() {
+  return (
+    <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none md:hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+        <BrandLockup href="/home" name="Scalers" size="sm" priority className="max-w-full" />
+        <SignOutButton />
+      </div>
+    </header>
+  );
+}
+
+/** Phone thumb destinations. Same DESK_LINKS as the desktop rail. */
 export function DeskTabBar() {
   const pathname = usePathname();
 
