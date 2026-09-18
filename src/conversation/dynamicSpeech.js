@@ -172,7 +172,9 @@ function looksLikePhaticCallerTurn(text) {
   if (howName && !/^(much|many|often|long|come|soon|far|old|now|this|that|the|for|with|about)$/.test(howName[5])) {
     return true;
   }
-  if (/^(i('?m| am) )?(fine|good|okay|ok|great)( thanks| thank you)?$/.test(t)) {
+  // Wellbeing answers need I'm / I am. Bare Okay. / ok / fine is a closer
+  // (live miss HD_d0f042f5d960, HD_391a57aae9e9).
+  if (/^(i('?m| am) )(fine|good|okay|ok|great)( thanks| thank you)?$/.test(t)) {
     return true;
   }
   return false;

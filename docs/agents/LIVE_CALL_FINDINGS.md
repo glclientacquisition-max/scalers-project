@@ -1,3 +1,13 @@
+# Bare Okay. is not how-are-you (2026-09-16)
+
+Live miss: freeze N1 `HD_d0f042f5d960` and N3 `HD_391a57aae9e9`. Closer `Okay.` matched `looksLikePhaticCallerTurn` because `okay|ok|fine|great` did not require `I'm`. Media path spoke the shared-line line `I'm well. Who is calling?` at 210–301 ms. NBA was `END` (N1) or `ASK_CLARIFICATION` (N3), not a how-are-you.
+
+Fix: wellbeing answers require `I'm` / `I am`. Bare `Okay.` / `ok` / `fine` / `great` take the normal turn loop. `How are you doing, Shy?` still skips Gemini.
+
+Do not crank TTS speed. Speech-guarantee on ANSWER (`I can't finish that just now`) is a later Voice ticket.
+
+---
+
 # Naturalness eval — how we will score roboticness (2026-09-16)
 
 Owner ask: evaluate naturalness and eliminate roboticness.
