@@ -30,7 +30,7 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /InboxPurposeChip/);
     assert.match(ticket, /aria-label="More"/);
     assert.match(ticket, /updateLeadStatus\(callId, "archived"\)/);
-    assert.match(ticket, />\{busy \? "Saving" : "Archive"\}/);
+    assert.match(ticket, /\{busy \? "Saving" : "Archive"\}/);
     assert.doesNotMatch(ticket, /Followed Up/);
   });
 
