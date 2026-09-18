@@ -7,6 +7,7 @@ import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import { btnGhost, deskFieldClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { FilterTabs } from "@/components/ui/FilterTabs";
+import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { DeskBack } from "@/components/ui/DeskBack";
 
 export function InboxToolbar({
@@ -88,14 +89,13 @@ export function InboxToolbar({
       </div>
 
       {archived ? null : (
-      <FilterTabs
+      <InboxFilterPills
         label="Filter by purpose"
         active={active}
         items={filters.map((item) => ({
           id: item.id,
           label: item.label,
           count: counts[item.id],
-          divide: item.divide,
           href: callsHref({
             purpose: item.id,
             q: q || undefined,

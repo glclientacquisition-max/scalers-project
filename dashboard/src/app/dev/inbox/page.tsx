@@ -5,6 +5,7 @@ import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { CallTranscript } from "@/components/CallTranscript";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { InboxToolbar } from "@/components/InboxToolbar";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
@@ -189,10 +190,20 @@ export default function DevInboxPage() {
       <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
         <InboxRowUiProvider>
         <InboxSelectChrome items={ROWS}>
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
-          Inbox
-        </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">{briefing}</p>
+        <InboxToolbar
+          active="needs"
+          counts={{
+            needs: needYou,
+            all: ROWS.length,
+            job: 1,
+            hold: 1,
+            human: 1,
+            answered: 1,
+            archived: 14,
+          }}
+          q=""
+          caption={briefing}
+        />
         <div className="mt-6 max-w-lg">
           <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
           <div className="mt-2">
