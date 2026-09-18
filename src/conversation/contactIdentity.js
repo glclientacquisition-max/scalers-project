@@ -1,5 +1,6 @@
 const { namesLikelySame, preferredContactSpelling, compactNameKey } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
+const { normalizeKenyaE164 } = require('./liveTransferReady');
 
 const ALT_CAP = 5;
 
@@ -10,6 +11,28 @@ function trimName(raw) {
 
 function namesMatch(a, b) {
   return namesLikelySame(a, b);
+}
+
+/** Same contract as src/db.js: Kenya E.164, else trimmed original. */
+function normalizeStoredPhone(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return null;
+  return normalizeKenyaE164(trimmed) || trimmed;
+}
+
+/**
+ * Writer parse for live persist, CSV, and manual UI.
+ * Empty and "unknown" are not a phone file. Kenya variants become E.164.
+ * Non-Kenya numbers keep the trimmed original, matching live call writes.
+ */
+function parseStoredContactPhone(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed || trimmed.toLowerCase() === 'unknown') {
+    return { ok: false, error: 'Phone is required.' };
+  }
+  const phone = normalizeStoredPhone(trimmed);
+  if (!phone) return { ok: false, error: 'Phone is required.' };
+  return { ok: true, phone };
 }
 
 function normalizeAlternates(list, primary) {
@@ -79,5 +102,7 @@ module.exports = {
   ALT_CAP,
   mergeContactIdentity,
   namesMatch,
+  normalizeStoredPhone,
+  parseStoredContactPhone,
   trimName,
 };

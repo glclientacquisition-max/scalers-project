@@ -407,6 +407,43 @@ describe('post-call contact persist and name extract', () => {
     assert.equal(upserts[0].callId, 'call-1');
   });
 
+  it('normalizes a Kenya local number and keeps a non-Kenya fallback', async () => {
+    const upserts = [];
+    const kenya = await persistCompletedCallContact(
+      { callSid: 'CA_local' },
+      {
+        getCall: async () => ({
+          id: 'call-local',
+          tenant_id: 't1',
+          from_number: '0712345678',
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return { id: 'ct-local', ...row };
+        },
+      }
+    );
+    assert.equal(kenya.ok, true);
+    assert.equal(upserts[0].phone, '+254712345678');
+
+    const intl = await persistCompletedCallContact(
+      { callSid: 'CA_intl' },
+      {
+        getCall: async () => ({
+          id: 'call-intl',
+          tenant_id: 't1',
+          from_number: '+14155552671',
+        }),
+        upsertContact: async (row) => {
+          upserts.push(row);
+          return { id: 'ct-intl', ...row };
+        },
+      }
+    );
+    assert.equal(intl.ok, true);
+    assert.equal(upserts[1].phone, '+14155552671');
+  });
+
   it('skips unknown phones', async () => {
     const result = await persistCompletedCallContact(
       { callSid: 'CA_unk' },

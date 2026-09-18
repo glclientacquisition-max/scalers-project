@@ -1,28 +1,13 @@
-const { normalizeKenyaE164 } = require('./liveTransferReady');
-const { mergeContactIdentity } = require('./contactIdentity');
+const {
+  mergeContactIdentity,
+  normalizeStoredPhone,
+  parseStoredContactPhone,
+} = require('./contactIdentity');
 
 const CONTACT_CSV_MAX_ROWS = 500;
 
-/** Same contract as src/db.js normalizeStoredPhone. */
-function normalizeStoredPhone(raw) {
-  const trimmed = String(raw || '').trim();
-  if (!trimmed) return null;
-  return normalizeKenyaE164(trimmed) || trimmed;
-}
-
-/**
- * Kenyan E.164 only. Unparseable numbers are errors (unlike live call writes
- * that keep a trimmed fallback).
- */
 function parseDialableContactPhone(raw) {
-  const trimmed = String(raw || '').trim();
-  if (!trimmed) return { ok: false, error: 'Phone is required.' };
-  const stored = normalizeStoredPhone(trimmed);
-  const e164 = normalizeKenyaE164(trimmed);
-  if (!stored || !e164 || stored !== e164) {
-    return { ok: false, error: 'Phone is not a Kenyan number.' };
-  }
-  return { ok: true, phone: e164 };
+  return parseStoredContactPhone(raw);
 }
 
 function trimField(raw) {

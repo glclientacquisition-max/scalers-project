@@ -1,5 +1,7 @@
-import { mergeContactIdentity } from "@/lib/contactIdentity";
-import { normalizeKenyaE164, normalizeStoredPhone } from "@/lib/handoffMode";
+import {
+  mergeContactIdentity,
+  parseStoredContactPhone,
+} from "./contactIdentity";
 
 export const CONTACT_CSV_MAX_ROWS = 500;
 
@@ -42,14 +44,7 @@ function trimField(raw: unknown): string | null {
 export function parseDialableContactPhone(
   raw: unknown
 ): { ok: true; phone: string } | { ok: false; error: string } {
-  const trimmed = String(raw || "").trim();
-  if (!trimmed) return { ok: false, error: "Phone is required." };
-  const stored = normalizeStoredPhone(trimmed);
-  const e164 = normalizeKenyaE164(trimmed);
-  if (!stored || !e164 || stored !== e164) {
-    return { ok: false, error: "Phone is not a Kenyan number." };
-  }
-  return { ok: true, phone: e164 };
+  return parseStoredContactPhone(raw);
 }
 
 export function buildNewContactIdentity(name: unknown) {
