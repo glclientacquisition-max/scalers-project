@@ -7,6 +7,7 @@ import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import { btnGhost, deskFieldClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
 import { FilterTabs } from "@/components/ui/FilterTabs";
+import { DeskBack } from "@/components/ui/DeskBack";
 
 export function InboxToolbar({
   active,
@@ -29,9 +30,16 @@ export function InboxToolbar({
 }) {
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
+  const archived = active === "archived";
   const briefing =
     caption ||
-    (counts.needs > 0 ? `${counts.needs} need you` : "Clear");
+    (archived
+      ? counts.archived > 0
+        ? `${counts.archived} archived`
+        : "None archived"
+      : counts.needs > 0
+        ? `${counts.needs} need you`
+        : "Clear");
   const weekView = active === "job" && view === "week";
   const todayView = active === "job" && (view === "today" || view === "work");
   const holdToday = active === "hold" && (view === "today" || view === "work");
@@ -40,9 +48,10 @@ export function InboxToolbar({
 
   return (
     <header className="space-y-6">
+      {archived ? <DeskBack href={callsHref({ q: q || undefined })}>Inbox</DeskBack> : null}
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className={pageTitleClass}>Inbox</h1>
+          <h1 className={pageTitleClass}>{archived ? "Archived" : "Inbox"}</h1>
           <p className={`mt-1 text-[13px] text-ink-soft ${deskPreviewClass}`}>{briefing}</p>
         </div>
         <form
@@ -78,6 +87,7 @@ export function InboxToolbar({
         </form>
       </div>
 
+      {archived ? null : (
       <FilterTabs
         label="Filter by purpose"
         active={active}
@@ -105,6 +115,7 @@ export function InboxToolbar({
           }),
         }))}
       />
+      )}
 
       {active === "job" ? (
         <FilterTabs

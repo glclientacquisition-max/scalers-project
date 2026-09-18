@@ -678,9 +678,10 @@ export function itemMatchesQuery(item: InboxItem, q: string): boolean {
   return hay.includes(q.toLowerCase());
 }
 
-const PURPOSE_IDS = new Set<InboxPurposeFilterId>(
-  PURPOSE_FILTERS.map((f) => f.id)
-);
+const PURPOSE_IDS = new Set<InboxPurposeFilterId>([
+  ...PURPOSE_FILTERS.map((f) => f.id),
+  "archived",
+]);
 
 /** Map legacy lead-status bookmarks onto purpose filters. */
 export function resolvePurposeFilter(

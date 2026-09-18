@@ -21,6 +21,7 @@ import {
   InboxTableRow,
   inboxTableKind,
 } from "@/components/InboxItemRow";
+import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
 import type { InboxReturn } from "@/lib/inboxHref";
 import { inboxTeammateOptions } from "@/lib/inboxTriage";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
@@ -192,6 +193,12 @@ export default async function CallsPage({
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
   const pageRows = boardView || holdTodayView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
+  const showArchivedEntry =
+    !boardView &&
+    !holdTodayView &&
+    activeFilter !== "archived" &&
+    counts.archived > 0 &&
+    page === 1;
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
@@ -215,7 +222,9 @@ export default async function CallsPage({
         active={activeFilter}
         counts={counts}
         q={q}
-        caption={inboxCaption(searched, vertical)}
+        caption={
+          activeFilter === "archived" ? undefined : inboxCaption(searched, vertical)
+        }
         vertical={vertical}
         view={boardView || holdTodayView ? view : undefined}
         week={weekView ? monday : undefined}
@@ -292,7 +301,7 @@ export default async function CallsPage({
           businessName={businessName}
           vertical={vertical}
         />
-      ) : pageRows.length === 0 ? (
+      ) : pageRows.length === 0 && !showArchivedEntry ? (
         <EmptyInbox
           total={assembled.length}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
@@ -310,6 +319,7 @@ export default async function CallsPage({
           <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
           <InboxBulkBar items={pageRows} />
           <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+            {showArchivedEntry ? <InboxArchivedPhoneRow count={counts.archived} q={q} /> : null}
             {pageRows.map((item) => (
               <InboxPhoneRow
                 key={item.id}
@@ -370,6 +380,7 @@ export default async function CallsPage({
                 </tr>
               </thead>
               <tbody>
+                {showArchivedEntry ? <InboxArchivedTableRow count={counts.archived} q={q} /> : null}
                 {pageRows.map((item) => (
                   <InboxTableRow
                     key={item.id}

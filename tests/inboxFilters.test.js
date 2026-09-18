@@ -18,13 +18,21 @@ describe("inbox filters and empty states", () => {
     assert.match(niche, /label: "Needs you"/);
     assert.match(niche, /label: "All"/);
     assert.match(niche, /label: "Human"/);
-    assert.match(niche, /label: "Archived"/);
+    assert.doesNotMatch(niche, /label: "Archived"/);
     assert.match(purpose, /export function itemIsArchived/);
     assert.doesNotMatch(purpose, /if \(lead\.leadStatus === "archived"\) continue/);
     assert.doesNotMatch(niche, /Unread/);
     assert.doesNotMatch(niche, /Assigned to me/);
     assert.match(toolbar, /<FilterTabs/);
     assert.match(toolbar, /label="Filter by purpose"/);
+    assert.match(toolbar, /archived \? null/);
+    const entry = read("dashboard/src/components/InboxArchivedRow.tsx");
+    assert.match(entry, /InboxArchivedPhoneRow/);
+    assert.match(entry, /InboxArchivedTableRow/);
+    assert.match(entry, /label="Archived"/);
+    assert.match(page, /showArchivedEntry/);
+    assert.match(page, /InboxArchivedPhoneRow/);
+    assert.match(harness, /InboxArchivedPhoneRow/);
   });
 
   it("debounces search against the existing q param", () => {

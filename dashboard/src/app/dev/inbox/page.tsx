@@ -6,6 +6,7 @@ import { CallTranscript } from "@/components/CallTranscript";
 import { DeskNav, DeskTabBar } from "@/components/DeskNav";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
+import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { InboxBulkBar } from "@/components/InboxRowSelect";
 import { ThemePicker } from "@/components/ThemePicker";
@@ -198,6 +199,7 @@ export default function DevInboxPage() {
         <InboxRowUiProvider>
         <InboxBulkBar items={ROWS} />
         <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+          <InboxArchivedPhoneRow count={14} />
           {ROWS.map((row) => (
             <InboxPhoneRow
               key={row.id}
@@ -218,8 +220,9 @@ export default function DevInboxPage() {
                 <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">Action</th>
               </tr>
             </thead>
-            <tbody>
-              {ROWS.map((row) => (
+              <tbody>
+                <InboxArchivedTableRow count={14} />
+                {ROWS.map((row) => (
                 <InboxTableRow
                   key={row.id}
                   item={row}
