@@ -244,7 +244,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     more && typeof document !== "undefined"
       ? createPortal(
           <div
-            className="fixed inset-x-0 bottom-0 z-50 flex h-dvh flex-col justify-end bg-ink/40"
+            className="fixed inset-x-0 bottom-[var(--desk-tabbar-h)] z-[60] flex h-[calc(100dvh-var(--desk-tabbar-h))] flex-col justify-end bg-ink/40 md:bottom-0 md:h-dvh"
             role="presentation"
             onClick={() => {
               if (!busy) setMore(false);

@@ -87,9 +87,11 @@ function inboxContactHref(item: InboxItem, purpose: InboxPurposeFilterId, ret?: 
 function InboxPinMark({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-ink-soft" fill="currentColor" aria-hidden="true">
-      <path d="M9.4 1.8 8 3.2 6.1 2.7 4.8 4l2.7 2.7-.9 3.1 1.1 1.1 3.1-.9L13 12.7l1.3-1.3-.5-1.9 1.4-1.4-1.4-1.4z" />
-    </svg>
+    <span aria-label="Pinned" className="inline-flex shrink-0 text-ink-soft">
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+        <path d="M10.2 1.6 8.4 3.4 5.8 2.6 4.4 4l3.2 3.2-1 3.6 1.4 1.4 3.6-1 3.2 3.2 1.4-1.4-.8-2.6 1.8-1.8-1.8-1.8z" />
+      </svg>
+    </span>
   );
 }
 
