@@ -19,6 +19,7 @@ import { LeadStatusToggle } from "@/components/LeadStatusToggle";
 import {
   MarkLeadArchiveButton,
   MarkLeadDoneButton,
+  MarkLeadUnarchiveButton,
 } from "@/components/MarkLeadDoneButton";
 import { InboxJobEditor } from "@/components/InboxJobEditor";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
@@ -331,12 +332,16 @@ export default async function CallDetailPage({
 
               {leadStatusReady ? (
                 <>
-                  {leadStatus !== "resolved" ? (
-                    <MarkLeadDoneButton callId={row.id} variant="button" />
-                  ) : null}
-                  {leadStatus !== "archived" ? (
-                    <MarkLeadArchiveButton callId={row.id} variant="button" />
-                  ) : null}
+                  {leadStatus === "archived" ? (
+                    <MarkLeadUnarchiveButton callId={row.id} variant="button" />
+                  ) : (
+                    <>
+                      {leadStatus !== "resolved" && !job && !hold ? (
+                        <MarkLeadDoneButton callId={row.id} variant="button" />
+                      ) : null}
+                      <MarkLeadArchiveButton callId={row.id} variant="button" />
+                    </>
+                  )}
                 </>
               ) : null}
             </div>

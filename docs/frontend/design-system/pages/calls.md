@@ -28,15 +28,14 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 Stay:
 - Select
-- Mark unread (Mark read when unread)
 - Pin (Unpin when pinned)
-- Snooze (24h; the row leaves until due)
 
 Leave:
-- Mark done
+- Mark done (return calls only. Hidden when the dock is Confirm or hold Done, when the row is live, or when it is already Done)
 - Archive (leaves the work piles; sits in Archived)
+- Unarchive (Archived pile and archived ticket only. Writes New)
 
-Not in this list: Mute (does not stop notify), Assign (a label, not a login teammate; no Labels pile), Label, Delete (owners cannot hard-delete; Archive is the leave verb). Bulk bar: Mark done, Archive, Cancel.
+Not in this list: Mark unread, Snooze, Mute, Assign, Label, Delete (owners cannot hard-delete; Archive is the leave verb). Bulk bar: Mark done, Archive, Pin, Cancel. Archived pile: Unarchive, Pin, Cancel. No More sheet.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Return call** and use WhatsApp. Same for holds without a request row.
 

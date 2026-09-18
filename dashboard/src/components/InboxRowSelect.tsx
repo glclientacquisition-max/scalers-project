@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useState, type ReactNode } from "react";
 import { useInboxRowUi } from "@/components/InboxRowUi";
 import { DeskRowHit, deskRowActionClass, deskRowHitClass } from "@/components/ui/deskRowHit";
 import {
@@ -19,11 +18,11 @@ import {
 import {
   inboxArchive,
   inboxMarkDone,
-  inboxSnooze,
   inboxTogglePin,
-  inboxToggleRead,
+  inboxUnarchive,
 } from "@/lib/inboxLeadActions";
-import type { InboxItem } from "@/lib/inboxPurpose";
+import { inboxCanMarkDone } from "@/lib/inboxListVerbs";
+import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
 const iconHit = [
   deskHitClass,
@@ -68,12 +67,16 @@ function ArchiveGlyph() {
   );
 }
 
-function MoreGlyph() {
+function UnarchiveGlyph() {
   return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-      <circle cx="8" cy="3.2" r="1.3" />
-      <circle cx="8" cy="8" r="1.3" />
-      <circle cx="8" cy="12.8" r="1.3" />
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 5.2h11v7.3c0 .6-.5 1.1-1.1 1.1H3.6c-.6 0-1.1-.5-1.1-1.1z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path d="M2.2 3.4h11.6v1.8H2.2z" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 10.6V7.2M6.3 8.3 8 6.6l1.7 1.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -186,21 +189,20 @@ export function InboxSelectChrome({
   );
 }
 
-type BulkKind = "done" | "archive" | "pin" | "unread" | "snooze";
+type BulkKind = "done" | "archive" | "unarchive" | "pin";
 
 export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const ui = useInboxRowUi();
   const router = useRouter();
-  const moreLabelId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [more, setMore] = useState(false);
   if (!ui || !ui.selecting) return null;
 
   const { selected, patch, clear } = ui;
   const chosen = items.filter((item) => selected.includes(item.id));
   const allPinned = chosen.length > 0 && chosen.every((item) => item.pinnedAt);
-  const allUnread = chosen.length > 0 && chosen.every((item) => item.unread);
+  const allArchived = chosen.length > 0 && chosen.every((item) => itemIsArchived(item));
+  const anyDone = chosen.some((item) => inboxCanMarkDone(item));
 
   async function run(kind: BulkKind) {
     setBusy(true);
@@ -209,27 +211,27 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     for (const item of chosen) {
       if (kind === "pin" && unpin && !item.pinnedAt) continue;
       if (kind === "pin" && !unpin && item.pinnedAt) continue;
+      if (kind === "done" && !inboxCanMarkDone(item)) continue;
+      if (kind === "archive" && itemIsArchived(item)) continue;
+      if (kind === "unarchive" && !itemIsArchived(item)) continue;
       const res =
         kind === "done"
           ? await inboxMarkDone(item)
           : kind === "archive"
             ? await inboxArchive(item)
-            : kind === "pin"
-              ? await inboxTogglePin(item)
-              : kind === "unread"
-                ? await inboxToggleRead(item)
-                : await inboxSnooze(item);
+            : kind === "unarchive"
+              ? await inboxUnarchive(item)
+              : await inboxTogglePin(item);
       if (res.error) {
         setError(res.error);
         setBusy(false);
         return;
       }
-      if (kind === "done" || kind === "archive" || kind === "snooze") {
+      if (kind === "archive" || kind === "unarchive") {
         patch(item.id, { hidden: true });
       }
     }
-    if (kind === "done" || kind === "archive") clear();
-    setMore(false);
+    if (kind === "done" || kind === "archive" || kind === "unarchive") clear();
     setBusy(false);
     router.refresh();
   }
@@ -240,48 +242,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
     </p>
   ) : null;
 
-  const moreSheet =
-    more && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            className="fixed inset-x-0 bottom-[var(--desk-tabbar-h)] z-[60] flex h-[calc(100dvh-var(--desk-tabbar-h))] flex-col justify-end bg-ink/40 md:bottom-0 md:h-dvh"
-            role="presentation"
-            onClick={() => {
-              if (!busy) setMore(false);
-            }}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={moreLabelId}
-              className="flex h-auto max-h-[min(24rem,calc(100dvh-2rem))] w-full shrink-0 flex-col overflow-y-auto rounded-t-2xl border border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] shadow-xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <p id={moreLabelId} className="px-4 pt-3 text-sm font-medium text-ink">
-                {chosen.length} selected
-              </p>
-              {(
-                [
-                  { id: "unread" as const, label: allUnread ? "Mark read" : "Mark unread" },
-                  { id: "snooze" as const, label: "Snooze" },
-                ] as const
-              ).map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  role="menuitem"
-                  disabled={busy}
-                  onClick={() => run(action.id)}
-                  className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
-                >
-                  {busy ? "Saving" : action.label}
-                </button>
-              ))}
-            </div>
-          </div>,
-          document.body
-        )
-      : null;
+  const fileKind = allArchived ? "unarchive" : "archive";
 
   return (
     <>
@@ -303,40 +264,33 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
           type="button"
           className={iconHit}
           disabled={busy}
-          aria-label="Archive"
-          onClick={() => run("archive")}
+          aria-label={allArchived ? "Unarchive" : "Archive"}
+          onClick={() => run(fileKind)}
         >
-          <ArchiveGlyph />
+          {allArchived ? <UnarchiveGlyph /> : <ArchiveGlyph />}
         </button>
-        <button type="button" className={btnDock} disabled={busy} aria-label="Mark done" onClick={() => run("done")}>
-          {busy ? (
-            <span aria-hidden="true" className={pendingSpinnerClass} />
-          ) : (
-            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
-              <path d="M3.2 8.2 6.4 11.4 12.8 4.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          )}
-        </button>
-        <button
-          type="button"
-          className={iconHit}
-          disabled={busy}
-          aria-label="More"
-          aria-haspopup="dialog"
-          aria-expanded={more}
-          onClick={() => setMore(true)}
-        >
-          <MoreGlyph />
-        </button>
+        {anyDone ? (
+          <button type="button" className={btnDock} disabled={busy} aria-label="Mark done" onClick={() => run("done")}>
+            {busy ? (
+              <span aria-hidden="true" className={pendingSpinnerClass} />
+            ) : (
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+                <path d="M3.2 8.2 6.4 11.4 12.8 4.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+        ) : null}
         {errorLine}
       </div>
       <div className="sticky top-[var(--desk-header-h)] z-20 mt-6 hidden min-h-11 flex-wrap items-center gap-2 border border-line bg-surface px-3 py-2 md:flex md:static md:rounded-xl">
         <p className="mr-auto text-sm font-medium text-ink">{chosen.length} selected</p>
-        <button type="button" className={btnPrimary} disabled={busy} onClick={() => run("done")}>
-          {busy ? "Saving" : "Mark done"}
-        </button>
-        <button type="button" className={btnGhost} disabled={busy} onClick={() => run("archive")}>
-          Archive
+        {anyDone ? (
+          <button type="button" className={btnPrimary} disabled={busy} onClick={() => run("done")}>
+            {busy ? "Saving" : "Mark done"}
+          </button>
+        ) : null}
+        <button type="button" className={btnGhost} disabled={busy} onClick={() => run(fileKind)}>
+          {allArchived ? "Unarchive" : "Archive"}
         </button>
         <button type="button" className={btnGhost} disabled={busy} onClick={() => run("pin")}>
           {allPinned ? "Unpin" : "Pin"}
@@ -346,7 +300,6 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
         </button>
         {errorLine}
       </div>
-      {moreSheet}
     </>
   );
 }

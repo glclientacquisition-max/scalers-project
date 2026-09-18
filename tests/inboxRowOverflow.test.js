@@ -51,6 +51,8 @@ describe("inbox row overflow menu", () => {
     assert.match(lead, /updateLeadStatus\(callId, action\)/);
     assert.match(overflow, /inboxMarkDone/);
     assert.match(overflow, /inboxArchive/);
+    assert.match(overflow, /inboxUnarchive/);
+    assert.match(actions, /updateLeadStatus\(item\.callId, "new"\)/);
   });
 
   it("opens a custom menu on hover and selects on long-press", () => {
@@ -66,27 +68,25 @@ describe("inbox row overflow menu", () => {
   });
 
   it("keeps the trailing dock and a short universal overflow list", () => {
+    const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
     assert.match(row, /InboxRowMore/);
     assert.match(row, /InboxTrailingAction/);
     assert.ok(row.indexOf("<InboxRowMore") < row.indexOf("<InboxTrailingAction"), "more sits left of dock");
-    for (const label of ["Select", "Mark unread", "Pin", "Snooze", "Mark done", "Archive"]) {
-      assert.match(overflow, new RegExp(label));
+    for (const label of ["Select", "Pin", "Mark done", "Archive", "Unarchive"]) {
+      assert.match(verbs, new RegExp(label));
     }
-    const selectAt = overflow.indexOf('id: "select"');
-    const unreadAt = overflow.indexOf('id: "unread"');
-    const pinAt = overflow.indexOf('id: "pin"');
-    const snoozeAt = overflow.indexOf('id: "snooze"');
-    const doneAt = overflow.indexOf('id: "done"');
-    const archiveAt = overflow.indexOf('id: "archive"');
-    assert.ok(selectAt < unreadAt && unreadAt < pinAt && pinAt < snoozeAt && snoozeAt < doneAt && doneAt < archiveAt);
+    assert.match(overflow, /inboxOverflowActions\(item\)/);
+    assert.doesNotMatch(overflow, /id: "unread"/);
+    assert.doesNotMatch(overflow, /id: "snooze"/);
+    assert.doesNotMatch(overflow, /Mark unread/);
+    assert.doesNotMatch(verbs, /Snooze/);
+    assert.doesNotMatch(verbs, /Mark unread/);
     assert.match(overflow, /role="separator"/);
-    assert.equal([...overflow.matchAll(/divide: true/g)].length, 2);
     assert.doesNotMatch(overflow, /Mute/);
     assert.doesNotMatch(overflow, /Assign to teammate/);
     assert.doesNotMatch(overflow, /Add label/);
     assert.doesNotMatch(overflow, /id: "delete"/);
     assert.doesNotMatch(overflow, /inboxDelete/);
-    assert.equal([...overflow.matchAll(/label: "Archive"/g)].length, 1);
   });
 
   it("marks pinned rows without adding a FilterTabs pile", () => {

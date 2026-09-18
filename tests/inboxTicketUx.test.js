@@ -31,8 +31,12 @@ describe("inbox ticket action chrome", () => {
   it("renders Mark done and Archive as real buttons with icons", () => {
     assert.match(markup, /<MarkLeadDoneButton callId=\{row.id\} variant="button"/);
     assert.match(markup, /<MarkLeadArchiveButton callId=\{row.id\} variant="button"/);
+    assert.match(markup, /<MarkLeadUnarchiveButton callId=\{row.id\} variant="button"/);
+    assert.match(markup, /leadStatus === "archived"/);
+    assert.match(markup, /!job && !hold/);
     assert.match(mark, /variant\?: "default" \| "icon" \| "button"/);
     assert.match(mark, /btnGhost/);
+    assert.match(mark, /action === "new"/);
   });
 
   it("keeps Want, Do next, and Mood as the summary lead", () => {

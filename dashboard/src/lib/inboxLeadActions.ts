@@ -21,6 +21,12 @@ export async function inboxArchive(item: InboxItem) {
   return updateLeadStatus(item.callId, "archived");
 }
 
+/** Same handler as ticket Unarchive (`MarkLeadUnarchiveButton` → `updateLeadStatus`). */
+export async function inboxUnarchive(item: InboxItem) {
+  if (!item.callId) return { error: "Missing call." };
+  return updateLeadStatus(item.callId, "new");
+}
+
 /** Owners cannot hard-delete calls. Delete is Archive. */
 export async function inboxDelete(item: InboxItem) {
   return inboxArchive(item);

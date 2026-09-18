@@ -17,7 +17,8 @@ describe("inbox bulk select", () => {
     assert.match(select, /type="checkbox"/);
     assert.match(select, /sr-only/);
     assert.match(select, /Select \{who\}/);
-    assert.match(overflow, /id: "select"/);
+    assert.match(read("dashboard/src/lib/inboxListVerbs.ts"), /id: "select"/);
+    assert.match(overflow, /inboxOverflowActions\(item\)/);
     assert.match(overflow, /ui\?\.enter\(item\.id\)/);
     assert.match(ui, /enter:/);
     assert.match(ui, /toggle:/);
@@ -27,27 +28,28 @@ describe("inbox bulk select", () => {
     assert.match(select, /for \(const item of chosen\)/);
     assert.match(select, /inboxMarkDone\(item\)/);
     assert.match(select, /inboxArchive\(item\)/);
+    assert.match(select, /inboxUnarchive\(item\)/);
     assert.doesNotMatch(select, /inboxDelete/);
+    assert.doesNotMatch(select, /inboxToggleRead/);
+    assert.doesNotMatch(select, /inboxSnooze/);
     assert.match(actions, /updateLeadStatus\(item\.callId, "resolved"\)/);
     assert.match(select, />\s*Cancel\s*</);
     assert.match(select, /\{chosen\.length\} selected/);
   });
 
-  it("shows a WhatsApp-style phone action bar with pin, archive, done, and more", () => {
+  it("shows a WhatsApp-style phone action bar with pin, archive, and done", () => {
     assert.match(select, /aria-label="Back"/);
     assert.match(select, /aria-label=\{allPinned \? "Unpin" : "Pin"\}/);
-    assert.match(select, /aria-label="Archive"/);
+    assert.match(select, /aria-label=\{allArchived \? "Unarchive" : "Archive"\}/);
     assert.match(select, /aria-label="Mark done"/);
-    assert.match(select, /aria-label="More"/);
+    assert.doesNotMatch(select, /aria-label="More"/);
+    assert.doesNotMatch(select, /role="dialog"/);
     assert.match(select, /inboxTogglePin\(item\)/);
-    assert.match(select, /inboxToggleRead\(item\)/);
-    assert.match(select, /inboxSnooze\(item\)/);
     assert.match(select, /md:hidden/);
     assert.match(select, /hidden md:flex|md:flex md:static/);
     assert.match(select, /max-md:hidden/);
-    assert.match(select, /flex-col justify-end/);
-    assert.match(select, /h-dvh/);
-    assert.match(select, /role="dialog"/);
+    assert.match(select, /kind === "archive" \|\| kind === "unarchive"/);
+    assert.doesNotMatch(select, /kind === "done" \|\| kind === "archive" \|\| kind === "snooze"/);
   });
 
   it("toggles the row instead of opening the ticket while selecting", () => {
