@@ -16,7 +16,7 @@ import {
   type HandoffMode,
 } from "@/lib/handoffMode";
 import { compactTextareaExpandHandlers } from "@/components/settingsUi";
-import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
+import { btnPrimary, deskFieldClass, deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
 const STEPS = [
   "Business type",
@@ -25,24 +25,16 @@ const STEPS = [
   "Tone & handoff",
 ] as const;
 
-const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
-  {
-    id: "professional",
-    blurb: "Calm, clear, and polished. Best for clinics, offices, and formal brands.",
-  },
-  {
-    id: "friendly",
-    blurb: "Warm and helpful, like a receptionist people enjoy talking to.",
-  },
-  {
-    id: "empathetic",
-    blurb: "Steady and caring. Acknowledges frustration before solving.",
-  },
-  {
-    id: "localized",
-    blurb: "Natural Kenyan voice with light Sheng when the caller uses it.",
-  },
-];
+const TONE_IDS = Object.keys(TONE_LABELS) as OnboardingTone[];
+
+function choiceClass(selected: boolean): string {
+  return [
+    `min-h-11 w-full rounded-xl border px-4 py-3 text-left ${deskShiftClass} ${focusRingVisible}`,
+    selected
+      ? "border-accent bg-accent-soft"
+      : "border-line bg-surface hover:border-accent/50",
+  ].join(" ");
+}
 
 const initial: OnboardingState = {};
 
@@ -83,26 +75,27 @@ export function OnboardingWizard() {
 
   return (
     <div className="mt-10">
-      <ol className="flex items-center gap-2 mb-8" aria-label="Setup progress">
+      <ol className="mb-8 flex items-center gap-2" aria-label="Setup progress">
         {STEPS.map((label, i) => {
           const active = i === step;
           const done = i < step;
           return (
             <li key={label} className="flex flex-1 items-center gap-2">
               <span
+                aria-hidden
                 className={[
-                  `flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium ${deskShiftClass}`,
+                  `pointer-events-none flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium ${deskShiftClass}`,
                   done || active
-                    ? "bg-[var(--accent-deep)] text-white"
-                    : "bg-white border border-[var(--line)] text-[var(--ink-soft)]",
+                    ? "bg-accent-fill text-accent-on-fill"
+                    : "border border-line bg-surface text-ink-soft",
                 ].join(" ")}
               >
                 {i + 1}
               </span>
               <span
                 className={[
-                  `hidden sm:block text-sm ${deskShiftClass}`,
-                  active ? "text-[var(--ink)] font-medium" : "text-[var(--ink-soft)]",
+                  `hidden text-sm sm:block ${deskShiftClass}`,
+                  active ? "font-medium text-ink" : "text-ink-soft",
                 ].join(" ")}
               >
                 {label}
@@ -111,7 +104,7 @@ export function OnboardingWizard() {
                 <span
                   className={[
                     `mx-1 h-px flex-1 ${deskShiftClass}`,
-                    done ? "bg-[var(--accent)]" : "bg-[var(--line)]",
+                    done ? "bg-accent" : "bg-line",
                   ].join(" ")}
                 />
               ) : null}
@@ -123,8 +116,8 @@ export function OnboardingWizard() {
       <form
         action={formAction}
         className={[
-          `rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6 sm:p-8 shadow-[0_20px_50px_-35px_rgba(28,36,33,0.45)] ${deskShiftClass}`,
-          visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
+          `rounded-2xl border border-line bg-surface p-6 sm:p-8 ${deskShiftClass}`,
+          visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
         ].join(" ")}
       >
         <input type="hidden" name="vertical" value={vertical} />
@@ -138,7 +131,7 @@ export function OnboardingWizard() {
 
         {step === 0 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">Business type</h2>
+            <h2 className="font-display text-2xl text-ink">Business type</h2>
             <div className="mt-5 space-y-3">
               {VERTICAL_OPTIONS.map((opt) => {
                 const selected = vertical === opt.id;
@@ -147,15 +140,9 @@ export function OnboardingWizard() {
                     key={opt.id}
                     type="button"
                     onClick={() => setVertical(opt.id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-4",
-                      deskShiftClass,
-                      selected
-                        ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
-                        : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                    ].join(" ")}
+                    className={choiceClass(selected)}
                   >
-                    <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                    <span className="font-medium text-ink">{opt.label}</span>
                   </button>
                 );
               })}
@@ -165,7 +152,7 @@ export function OnboardingWizard() {
 
         {step === 1 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">
+            <h2 className="font-display text-2xl text-ink">
               {vertical === "retail" ? "Products & pricing" : "Services & pricing"}
             </h2>
             <textarea
@@ -176,17 +163,17 @@ export function OnboardingWizard() {
               {...compactTextareaExpandHandlers}
               placeholder={
                 vertical === "retail"
-                  ? "e.g. Phone accessories, chargers, and screen protectors.\nPricing: chargers from 500 KES. We can hold items with a name until evening. M-Pesa and cash."
-                  : "e.g. Plumbing repairs, electrical fixes, and deep cleaning across Nairobi.\nPricing: we quote after understanding the job. Call-out from KES 1,500. M-Pesa and cash."
+                  ? "Phone accessories, chargers, and screen protectors.\nPricing: chargers from 500 KES. We can hold items with a name until evening. M-Pesa and cash."
+                  : "Plumbing repairs, electrical fixes, and deep cleaning across Nairobi.\nPricing: we quote after understanding the job. Call-out from KES 1,500. M-Pesa and cash."
               }
-              className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+              className={`mt-5 leading-relaxed ${deskFieldClass}`}
             />
           </div>
         ) : null}
 
         {step === 2 ? (
           <div>
-            <h2 className="font-display text-2xl text-[var(--ink)]">Hours & location</h2>
+            <h2 className="font-display text-2xl text-ink">Hours & location</h2>
             <textarea
               autoFocus
               value={hoursLocation}
@@ -196,9 +183,9 @@ export function OnboardingWizard() {
               placeholder={
                 "Monday to Saturday: 9:00 AM to 7:00 PM. Sunday: Closed.\nWestlands, Nairobi."
               }
-              className="mt-5 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+              className={`mt-5 leading-relaxed ${deskFieldClass}`}
             />
-            <label className="mt-4 block text-sm font-medium text-[var(--ink)]" htmlFor="landmark">
+            <label className="mt-4 block text-sm font-medium text-ink" htmlFor="landmark">
               Landmark (optional)
             </label>
             <input
@@ -206,10 +193,10 @@ export function OnboardingWizard() {
               value={landmark}
               onChange={(e) => setLandmark(e.target.value)}
               placeholder="Opposite Naivas, next to the Shell"
-              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)]"
+              className={`mt-2 ${deskFieldClass}`}
             />
             <label
-              className="mt-4 block text-sm font-medium text-[var(--ink)]"
+              className="mt-4 block text-sm font-medium text-ink"
               htmlFor="directions"
             >
               Spoken directions (optional)
@@ -221,7 +208,7 @@ export function OnboardingWizard() {
               rows={2}
               {...compactTextareaExpandHandlers}
               placeholder="From Waiyaki Way, turn at the Shell. We are on the left."
-              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)] leading-relaxed"
+              className={`mt-2 leading-relaxed ${deskFieldClass}`}
             />
           </div>
         ) : null}
@@ -229,9 +216,9 @@ export function OnboardingWizard() {
         {step === 3 ? (
           <div className="space-y-8">
             <div>
-              <h2 className="font-display text-2xl text-[var(--ink)]">Receptionist name & tone</h2>
+              <h2 className="font-display text-2xl text-ink">Receptionist name & tone</h2>
               <label
-                className="mt-5 block text-sm font-medium text-[var(--ink)]"
+                className="mt-5 block text-sm font-medium text-ink"
                 htmlFor="agent_name_field"
               >
                 Receptionist name
@@ -241,34 +228,26 @@ export function OnboardingWizard() {
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
                 placeholder="Receptionist"
-                className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none focus:border-[var(--accent)]"
+                className={`mt-2 ${deskFieldClass}`}
               />
               <div className="mt-5 space-y-3">
-                {TONE_OPTIONS.map((opt) => {
-                  const selected = tone === opt.id;
+                {TONE_IDS.map((id) => {
+                  const selected = tone === id;
                   return (
                     <button
-                      key={opt.id}
+                      key={id}
                       type="button"
-                      onClick={() => setTone(opt.id)}
-                      className={[
-                        "w-full text-left rounded-xl border px-4 py-4",
-                        deskShiftClass,
-                        selected
-                          ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
-                          : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                      ].join(" ")}
+                      onClick={() => setTone(id)}
+                      className={choiceClass(selected)}
                     >
-                      <span className="font-medium text-[var(--ink)]">
-                        {TONE_LABELS[opt.id]}
-                      </span>
+                      <span className="font-medium text-ink">{TONE_LABELS[id]}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-[var(--ink)]">When a caller needs a human</h3>
+              <h3 className="text-sm font-medium text-ink">When a caller needs a human</h3>
               <div className="mt-3 space-y-3">
                 {HANDOFF_OPTIONS.map((opt) => {
                   const selected = handoffMode === opt.id;
@@ -277,15 +256,9 @@ export function OnboardingWizard() {
                       key={opt.id}
                       type="button"
                       onClick={() => setHandoffMode(opt.id)}
-                      className={[
-                        "w-full text-left rounded-xl border px-4 py-4",
-                        deskShiftClass,
-                        selected
-                          ? "border-[var(--accent)] bg-accent-soft shadow-[inset_0_0_0_1px_var(--accent)]"
-                          : "border-[var(--line)] bg-white hover:border-[var(--accent)]/50",
-                      ].join(" ")}
+                      className={choiceClass(selected)}
                     >
-                      <span className="font-medium text-[var(--ink)]">{opt.label}</span>
+                      <span className="font-medium text-ink">{opt.label}</span>
                     </button>
                   );
                 })}
@@ -295,7 +268,7 @@ export function OnboardingWizard() {
         ) : null}
 
         {state.error ? (
-          <p className="mt-5 text-sm text-[var(--warn)]" role="alert">
+          <p className="mt-5 text-sm text-warn" role="alert">
             {state.error}
           </p>
         ) : null}
@@ -306,7 +279,7 @@ export function OnboardingWizard() {
               type="button"
               onClick={() => goTo(step - 1)}
               disabled={pending}
-              className={`text-sm text-[var(--ink-soft)] ${deskShiftClass} hover:text-[var(--ink)] disabled:opacity-50`}
+              className={`min-h-11 text-sm text-ink-soft ${deskShiftClass} ${focusRingVisible} hover:text-ink disabled:opacity-50`}
             >
               Back
             </button>
