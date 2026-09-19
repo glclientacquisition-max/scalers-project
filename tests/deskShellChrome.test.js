@@ -82,8 +82,10 @@ describe("desk shell chrome", () => {
     assert.match(nav, /item\.label === "Inbox"/);
     assert.match(chrome, /export const deskNavBadgeClass/);
     assert.match(chrome, /h-5 min-w-5/);
-    assert.match(chrome, /bg-warn/);
-    assert.doesNotMatch(chrome, /deskNavBadgeClass[\s\S]*bg-accent-fill/);
+    assert.match(chrome, /bg-gradient-to-br from-accent to-accent-fill/);
+    assert.match(chrome, /text-accent-on-fill/);
+    assert.doesNotMatch(chrome, /deskNavBadgeClass =\s*"[^"]*bg-warn/);
+    assert.doesNotMatch(chrome, /deskNavBadgeClass =\s*"[^"]*bg-accent-fill/);
     assert.match(layout, /DeskNavLive/);
     assert.match(layout, /DeskTabBarLive/);
     assert.match(layout, /loadCachedInboxNeedsCount/);
