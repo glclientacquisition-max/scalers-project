@@ -366,6 +366,30 @@ assert.match(
 
 assert.match(
   source,
+  /pickSpeechGuaranteeLine/,
+  'empty Gemini success must ask the next slot, not the Gemini-down name-ask'
+);
+
+assert.match(
+  source,
+  /shouldSpeakHandoffNameAsk/,
+  'handoff name-ask must skip when the caller already gave a name'
+);
+
+assert.match(
+  source,
+  /extractRecordingFields/,
+  'voice events must parse SautiKit recording.ready download_url envelopes'
+);
+
+assert.match(
+  source,
+  /fetchCallRecording/,
+  'call.completed without a URL must fetch GET /v1/calls/{id}/recording'
+);
+
+assert.match(
+  source,
   /spokenTextForToolTurn/,
   'Gemini turns must drop model prose after outcome tools so confirmation is backend-only'
 );

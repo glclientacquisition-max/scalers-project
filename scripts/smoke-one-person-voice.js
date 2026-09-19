@@ -10,6 +10,8 @@ const {
   pickContextualAck,
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
+  pickSpeechGuaranteeLine,
+  shouldSpeakHandoffNameAsk,
 } = require('../src/conversation/dynamicSpeech');
 const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
 const {
@@ -49,6 +51,11 @@ function checkLine(label, line, opts = {}) {
   if (opts.mustInclude) {
     for (const re of opts.mustInclude) {
       if (!re.test(text)) fail(label, `missing ${re}: ${text}`);
+    }
+  }
+  if (opts.mustNotInclude) {
+    for (const re of opts.mustNotInclude) {
+      if (re.test(text)) fail(label, `forbidden ${re}: ${text}`);
     }
   }
   console.log(`✓ ${label}: ${text}`);
@@ -161,6 +168,38 @@ function smokeGeminiRules() {
   console.log('✓ Gemini rules keep the same person when the model is up');
 }
 
+function smokeEmptyGeminiGuarantee() {
+  const known = shouldSpeakHandoffNameAsk({
+    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    brainState: {
+      intent: 'human',
+      caller: { name: 'Alvin' },
+      goal: { missingSlots: ['name'] },
+    },
+    userText: "Yeah, I'm Alvin.",
+  });
+  if (known !== false) {
+    fail('handoff name-ask skipped', 'still asked for a name after Alvin');
+  }
+  console.log('✓ handoff name-ask skipped when the caller already named themselves');
+
+  const line = pickSpeechGuaranteeLine({
+    nextBestAction: { action: 'ANSWER' },
+    brainState: {
+      intent: 'booking',
+      caller: { name: 'Alvin' },
+      goal: { missingSlots: ['name'] },
+    },
+    language: 'en',
+    userText: "Yeah, I'm Alvin.",
+  });
+  checkLine('empty Gemini ANSWER after name', line, {
+    enMidCall: true,
+    mustInclude: [/day and time|time works/i],
+    mustNotInclude: [/can't finish/i, /name so I can reach them/i],
+  });
+}
+
 function smokeRecoveryStillMatches() {
   const handoff = pickClarifyProgress({
     action: 'ASK_CLARIFICATION',
@@ -185,6 +224,7 @@ function smokeRecoveryStillMatches() {
 async function main() {
   smokeGeminiRules();
   await smokeOperationalBooking();
+  smokeEmptyGeminiGuarantee();
   smokeRecoveryStillMatches();
   console.log('\nOne-person voice smoke passed.');
 }

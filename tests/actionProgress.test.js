@@ -6,6 +6,8 @@ const {
   pickContextualAck,
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
+  pickSpeechGuaranteeLine,
+  shouldSpeakHandoffNameAsk,
   looksLikeCallerName,
   looksLikePhaticCallerTurn,
   shouldSpeakThinkingAck,
@@ -145,5 +147,73 @@ assert.equal(looksLikeCallerName('My name is Alvin'), true);
 assert.equal(looksLikeCallerName('Carpet cleaning'), false);
 assert.equal(looksLikeCallerName('Pardon?'), false);
 assert.equal(looksLikeCallerName('sema tena'), false);
+
+// Live miss HD_b4cb560bae33 / Alvin 2026-09-19: empty Gemini ANSWER must not
+// speak the Gemini-down reach-them name-ask when the caller already named themselves.
+assert.equal(
+  shouldSpeakHandoffNameAsk({
+    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    brainState: {
+      intent: 'human',
+      caller: { name: 'Alvin' },
+      goal: { missingSlots: ['name'] },
+    },
+    userText: "Yeah, I'm Alvin.",
+  }),
+  false
+);
+assert.equal(
+  shouldSpeakHandoffNameAsk({
+    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    brainState: { intent: 'human', goal: { missingSlots: ['name'] } },
+    userText: 'Can I speak to someone?',
+  }),
+  true
+);
+
+const emptyAnswerAfterName = pickSpeechGuaranteeLine({
+  nextBestAction: { action: 'ANSWER' },
+  brainState: {
+    intent: 'booking',
+    caller: { name: 'Alvin' },
+    goal: { missingSlots: ['name'] },
+  },
+  language: 'en',
+  userText: "Yeah, I'm Alvin.",
+});
+assert.doesNotMatch(emptyAnswerAfterName, /can't finish/i);
+assert.doesNotMatch(emptyAnswerAfterName, /name so I can reach them/i);
+assert.match(emptyAnswerAfterName, /day and time|time works/i);
+
+const nextWhenSlot = pickSpeechGuaranteeLine({
+  nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'when' },
+  brainState: {
+    intent: 'booking',
+    caller: { name: 'Alvin' },
+    goal: { missingSlots: ['when'] },
+  },
+  language: 'en',
+  userText: 'Carpet cleaning Thursday',
+});
+assert.match(nextWhenSlot, /day and time|time works/i);
+assert.doesNotMatch(nextWhenSlot, /can't finish|reach them/i);
+
+const landmarkSlot = pickClarifyProgress({
+  action: 'ASK_CLARIFICATION',
+  slot: 'landmark',
+  language: 'en',
+});
+assert.match(landmarkSlot, /landmark/i);
+assert.doesNotMatch(landmarkSlot, /[—–]/);
+
+assert.match(
+  pickSpeechGuaranteeLine({
+    nextBestAction: { action: 'ANSWER' },
+    brainState: { intent: 'hours' },
+    language: 'en',
+    userText: 'Are you open?',
+  }),
+  /^Okay\.?$/i
+);
 
 console.log('actionProgress tests passed.');

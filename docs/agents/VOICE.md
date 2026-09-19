@@ -17,6 +17,8 @@ Use this when the task is about audio path, latency, barge-in, fillers, TTS pron
 | `tests/idleNudge.test.js` | Idle silence check-in after a committed question |
 | `tests/spokenStreamBuffer.test.js` | LLM→TTS chunking tests |
 | `tests/voiceWiring.test.js` | Static wiring checks for runtime voice paths |
+| `tests/recordingEvents.test.js` | SautiKit `recording.ready` payload parse + REST fetch |
+| `scripts/smoke-recording-webhook.js` | Live HTTP POST `/voice/events` recording envelopes |
 | `tests/naturalnessScore.test.js` | Roboticness pass/fail scanner for live transcripts |
 | `.env.example` | Voice/Soniox/turn-taking env knobs only |
 | `docs/WEBHOOK_TUNNEL.md` | Local tunnel for SautiKit media |

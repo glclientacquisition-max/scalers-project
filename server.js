@@ -137,6 +137,10 @@ const callBrainStates = new Map();
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
+/** SautiKit UUID call_id → Stream session SID (HD_…) for recording attach. */
+const sidByProviderCallId = new Map();
+const providerCallIdBySid = new Map();
+const recordingFetchScheduled = new Set();
 const {
   analyzeCallerLanguage,
   createLanguageState,
@@ -148,6 +152,8 @@ const {
   pickContextualAck,
   pickActionProgress,
   pickClarifyProgress,
+  pickSpeechGuaranteeLine,
+  shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
@@ -189,6 +195,13 @@ const {
   buildAnswerStreamXml,
   emptyVoiceXml,
 } = require('./src/sautikit/pendingLiveTransfer');
+const {
+  extractEventKind,
+  extractEventCallSids,
+  extractRecordingFields,
+  isRecordingEvent,
+} = require('./src/sautikit/recordingEvents');
+const { fetchCallRecording } = require('./src/sautikit/recordingFetch');
 const {
   summarizeHeaders,
   summarizeBody,
@@ -635,19 +648,119 @@ function shouldSkipMediaStream(callSessionState, body = {}, callSid = '') {
 
 /** Extract callSid from SautiKit event / lifecycle payloads (many shapes). */
 function extractEventCallSid(body = {}) {
-  return (
-    body.call_sid ||
-    body.callSid ||
-    body.CallSid ||
-    body.sessionId ||
-    body.SessionId ||
-    body.data?.call_sid ||
-    body.data?.callSid ||
-    body.data?.sessionId ||
-    body.payload?.call_sid ||
-    body.payload?.callSid ||
-    null
-  );
+  return extractEventCallSids(body)[0] || null;
+}
+
+function rememberProviderCallIds(sessionSid, body = {}) {
+  const sid = String(sessionSid || '').trim();
+  if (!sid) return;
+  const ids = extractEventCallSids(body);
+  for (const id of ids) {
+    if (id === sid) continue;
+    sidByProviderCallId.set(id, sid);
+    providerCallIdBySid.set(sid, id);
+  }
+}
+
+function resolveAttachCallSids(body = {}, extra = []) {
+  const out = [];
+  const push = (value) => {
+    const text = String(value || '').trim();
+    if (!text || out.includes(text)) return;
+    out.push(text);
+  };
+  for (const id of extra) push(id);
+  for (const id of extractEventCallSids(body)) {
+    push(id);
+    push(sidByProviderCallId.get(id));
+  }
+  return out;
+}
+
+async function attachProviderRecording({
+  callSids = [],
+  recordingUrl = null,
+  recordingSid = null,
+  fetchIfMissing = false,
+  source = 'voice/events',
+} = {}) {
+  const ids = [...new Set((callSids || []).map((id) => String(id || '').trim()).filter(Boolean))];
+  const extraSids = [];
+  for (const callSid of ids) {
+    try {
+      const existing = await db.getCall(callSid);
+      if (existing?.recording_url) return callSid;
+    } catch {
+      /* lookup is best-effort */
+    }
+  }
+  let url = recordingUrl;
+  if (!url && fetchIfMissing) {
+    for (const id of ids) {
+      const fetched = await fetchCallRecording(id);
+      if (fetched.sessionId) extraSids.push(fetched.sessionId);
+      if (fetched.downloadUrl) {
+        url = fetched.downloadUrl;
+        console.log(
+          `[${source}] recording fetched callSid=${id} status=${fetched.status}`
+        );
+        break;
+      }
+      if (fetched.status === 404 || fetched.status === 410) {
+        console.warn(
+          `[${source}] no provider recording callSid=${id} status=${fetched.status}`
+        );
+      } else if (fetched.status && fetched.status !== 'not_configured') {
+        console.warn(
+          `[${source}] recording fetch pending callSid=${id} status=${fetched.status}`
+        );
+      }
+    }
+  }
+  if (!url) {
+    if (ids.length) {
+      console.warn(
+        `[${source}] recording missing URL callSids=${ids.join(',')}`
+      );
+    }
+    return null;
+  }
+  const uniqueIds = [...new Set([...extraSids, ...ids].filter(Boolean))];
+  for (const callSid of uniqueIds) {
+    try {
+      await db.attachRecording({
+        callSid,
+        recordingSid,
+        sourceUrl: url,
+        recordingUrl: url,
+      });
+      console.log(`[${source}] attachRecording ok callSid=${callSid}`);
+      return callSid;
+    } catch (err) {
+      console.warn(
+        `[${source}] attachRecording miss callSid=${callSid}:`,
+        err?.message || err
+      );
+    }
+  }
+  return null;
+}
+
+function scheduleRecordingFetch(callSids, source) {
+  const ids = [...new Set((callSids || []).map((id) => String(id || '').trim()).filter(Boolean))];
+  if (!ids.length) return;
+  const key = ids.join('|');
+  if (recordingFetchScheduled.has(key)) return;
+  recordingFetchScheduled.add(key);
+  setTimeout(() => {
+    attachProviderRecording({
+      callSids: ids,
+      fetchIfMissing: true,
+      source: `${source}+retry`,
+    }).catch((err) => {
+      console.warn(`[${source}] delayed recording fetch failed:`, err?.message || err);
+    });
+  }, 8000);
 }
 
 /** Pull duration (seconds) from whatever field SautiKit used. */
@@ -680,6 +793,7 @@ function detectCallTermination(body = {}, kind = '') {
     String(
       body.event ||
         body.event_type ||
+        body.event_kind ||
         body.type ||
         body.kind ||
         body.name ||
@@ -885,6 +999,7 @@ async function handleVoiceIncoming(req, res) {
     const callSessionState = extracted.callSessionState;
     // Always have a durable id for Supabase even if SautiKit omits CallSid.
     const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
+    rememberProviderCallIds(callSid, req.body);
 
     // Load tenant DIDs and undo WebRTC/header flips before persisting.
     let tenantDids = [];
@@ -1118,28 +1233,32 @@ app.post('/voice/transfer', sautikitWebhookGuard, handleVoiceTransferContinue);
 // ---------------------------------------------------------------------------
 app.post('/voice/recording-status', sautikitWebhookGuard, async (req, res) => {
   try {
-    const callSid =
-      req.body.CallSid || req.body.callSid || req.body.call_sid || req.body.call_id;
-    const recordingUrl =
-      req.body.RecordingUrl || req.body.recording_url || req.body.recordingUrl;
-    const recordingSid =
-      req.body.RecordingSid || req.body.recording_sid || req.body.recordingSid;
-    const recordingStatus =
-      req.body.RecordingStatus || req.body.recording_status || req.body.status || 'completed';
+    const body = req.body || {};
+    const rec = extractRecordingFields(body);
+    const callSids = resolveAttachCallSids(body, [
+      body.CallSid,
+      body.callSid,
+      body.call_sid,
+      body.call_id,
+    ]);
+    const recordingStatus = String(
+      body.RecordingStatus || body.recording_status || body.status || 'completed'
+    ).toLowerCase();
 
-    if (!callSid) {
+    if (!callSids.length) {
       return res.status(400).json({ error: 'call_sid required' });
     }
 
-    if (recordingStatus === 'completed' && recordingUrl) {
-      const url = recordingUrl.endsWith('.mp3') ? recordingUrl : recordingUrl;
-      await db.attachRecording({
-        callSid,
-        recordingSid,
-        sourceUrl: url,
-        recordingUrl: url,
+    if (recordingStatus === 'completed' || rec.recordingUrl) {
+      await attachProviderRecording({
+        callSids,
+        recordingUrl: rec.recordingUrl,
+        recordingSid: rec.recordingSid,
+        fetchIfMissing: !rec.recordingUrl,
+        source: 'voice/recording-status',
       });
-      await maybeSendWhatsAppNotification(callSid);
+      const attachedSid = callSids[0];
+      if (attachedSid) await maybeSendWhatsAppNotification(attachedSid);
     }
 
     res.sendStatus(200);
@@ -1163,13 +1282,7 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
     const body = req.body || {};
     console.log('[voice/events] payload', summarizeBody(body));
 
-    const kind =
-      req.headers['x-sautikit-event-kind'] ||
-      body.kind ||
-      body.event_type ||
-      body.event ||
-      body.type ||
-      '';
+    const kind = extractEventKind(req.headers, body);
     const callSid = extractEventCallSid(body);
     const durationSeconds = extractEventDurationSeconds(body);
 
@@ -1194,43 +1307,46 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
     }
 
     const termination = detectCallTermination(body, kind);
+    const rec = extractRecordingFields(body);
+    const attachSids = resolveAttachCallSids(body, [callSid]);
+    if (callSid) rememberProviderCallIds(callSid, body);
 
-    if (kindStr.includes('recording') && callSid) {
-      const recordingUrl =
-        body.recording_url ||
-        body.url ||
-        body.data?.recording_url ||
-        body.data?.url ||
-        body.payload?.recording_url ||
-        null;
-      const recordingSid = body.recording_sid || body.data?.recording_sid || null;
-      if (recordingUrl) {
-        try {
-          await db.attachRecording({
-            callSid,
-            recordingSid,
-            sourceUrl: recordingUrl,
-            recordingUrl,
-          });
-          await maybeSendWhatsAppNotification(callSid);
-        } catch (err) {
-          console.error('[voice/events] attachRecording failed:', err?.message || err);
-        }
+    if (isRecordingEvent(kindStr, body) && attachSids.length) {
+      const attached = await attachProviderRecording({
+        callSids: attachSids,
+        recordingUrl: rec.recordingUrl,
+        recordingSid: rec.recordingSid,
+        fetchIfMissing: !rec.recordingUrl,
+        source: 'voice/events',
+      });
+      if (attached) {
+        await maybeSendWhatsAppNotification(attached);
+      } else if (!rec.recordingUrl) {
+        scheduleRecordingFetch(attachSids, 'voice/events');
       }
+    } else if (isRecordingEvent(kindStr, body) && !attachSids.length) {
+      console.warn('[voice/events] recording event without callSid — cannot attach');
     }
 
     if (termination.terminal && callSid) {
+      const terminalSid = sidByProviderCallId.get(callSid) || callSid;
       await markCallTerminalFromWebhook({
-        callSid,
+        callSid: terminalSid,
         status: termination.status,
         durationSeconds,
         source: 'voice/events',
       });
       if (termination.status === 'complete') {
-        await maybeSendWhatsAppNotification(callSid);
+        await maybeSendWhatsAppNotification(terminalSid);
+        if (!rec.recordingUrl) {
+          scheduleRecordingFetch(attachSids, 'voice/events');
+        }
       }
     } else if (termination.terminal && !callSid) {
       console.warn('[voice/events] terminal event without callSid — cannot update calls row');
+      if (termination.status === 'complete' && attachSids.length) {
+        scheduleRecordingFetch(attachSids, 'voice/events');
+      }
     }
   } catch (err) {
     // Already returned 200; log only so SautiKit does not retry forever.
@@ -2103,12 +2219,12 @@ mediaWss.on('connection', (ws, req) => {
       );
       // Human handoff with missing name uses ASK_CLARIFICATION. Speak now so
       // the caller never waits silently on Gemini (live miss: HD_02bda14e6547).
-      const handoffNameAsk =
-        nextBestAction.action === 'ASK_CLARIFICATION' &&
-        (brainState.intent === 'human' || Boolean(brainState.handoff?.requested)) &&
-        (nextBestAction.slot === 'name' ||
-          (Array.isArray(brainState.goal?.missingSlots) &&
-            brainState.goal.missingSlots.includes('name')));
+      // Skip if they already gave a name (live miss: HD_b4cb560bae33 / Alvin).
+      const handoffNameAsk = shouldSpeakHandoffNameAsk({
+        nextBestAction,
+        brainState,
+        userText: clean,
+      });
       const needsImmediateProgress = actionMayExecute || handoffNameAsk;
 
       // Action / handoff-clarify turns disable streaming and wait on Gemini+tools.
@@ -2478,19 +2594,21 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       // Hard guarantee: every completed caller turn must produce agent audio.
+      // Empty Gemini success asks the next slot. Do not speak the Gemini-down
+      // reach-them name-ask when the caller already named themselves.
       if (!spokeThisTurn && !bargeInActive && tts) {
-        const guarantee = handoffNameAsk
-          ? pickClarifyProgress({
-              action: nextBestAction.action,
-              slot: nextBestAction.slot || 'name',
-              intent: brainState.intent,
+        const llmDown = Boolean(result?.timedOut || result?.llmFailed);
+        const guarantee = llmDown
+          ? await resolveLlmRecoverySpeech(clean)
+          : pickSpeechGuaranteeLine({
+              nextBestAction,
+              brainState,
               language: callLanguage,
-            })
-          : actionMayExecute
-            ? pickActionProgress(nextBestAction.action, callLanguage)
-            : await resolveLlmRecoverySpeech(clean);
+              userText: clean,
+            });
         console.warn(
-          `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}`
+          `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}` +
+            ` slot=${nextBestAction.slot || ''} llmDown=${llmDown ? 1 : 0}`
         );
         callTranscript.pushAgent(guarantee);
         turnTiming.markFirstSpokenChunk();
