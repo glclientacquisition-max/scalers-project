@@ -101,7 +101,9 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\} archived=\{archived\}/);
     assert.match(ticket, /archived \? "new" : "archived"/);
     assert.match(ticket, /archived \? "Unarchive" : "Archive"/);
-    assert.match(ticket, /if \(!archived\) router\.push\(backHref\)/);
+    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
+    assert.match(ticket, /if \(!archived\) \{/);
+    assert.match(ticket, /router\.push\(backHref\)/);
     assert.match(ticket, /!archived && String\(job\?\.status/);
     assert.match(ticket, /!archived && String\(hold\?\.status/);
     assert.doesNotMatch(ticket, /archived \? null : <InboxTicketMore/);
@@ -125,5 +127,101 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(page, /showArchivedEntry/);
     assert.match(toolbar, /inboxArchivedHref/);
     assert.match(toolbar, /page: rpage/);
+  });
+
+  it("offers a 5s Undo toast after Archive and not after Unarchive", () => {
+    const undo = read("dashboard/src/lib/inboxArchiveUndo.ts");
+    const toast = read("dashboard/src/components/InboxArchiveToast.tsx");
+    const ui = read("dashboard/src/components/InboxRowUi.tsx");
+    assert.match(undo, /INBOX_ARCHIVE_UNDO_MS = 5000/);
+    assert.match(undo, /scalers-inbox-archive-undo/);
+    assert.match(undo, /count <= 1\) return "Archived"/);
+    assert.match(undo, /return `\${count} archived`/);
+    assert.match(toast, /text-accent-deep/);
+    assert.match(toast, /min-h-11/);
+    assert.match(toast, /busy \? "Saving" : "Undo"/);
+    assert.match(toast, /updateLeadStatus\(row\.callId, "new"\)/);
+    assert.match(toast, /z-30/);
+    assert.match(toast, /desk-tabbar-h/);
+    assert.doesNotMatch(toast, /btnPrimary|btnDock|bg-accent-fill/);
+    assert.match(ui, /InboxArchiveToast/);
+    assert.match(ui, /INBOX_ARCHIVE_UNDO_EVENT/);
+    assert.match(overflow, /if \(id === "archive" && item.callId\) \{\s*writeInboxArchiveUndo/);
+    assert.match(select, /writeInboxArchiveUndo\(archivedRows\)/);
+    assert.match(select, /kind === "archive" && item.callId/);
+    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
+    assert.match(ticket, /if \(!archived\) \{/);
+    assert.match(ticket, /router\.push\(backHref\)/);
+  });
+});
+
+describe("inbox archive undo payload", () => {
+  function load() {
+    const helperPath = path.join(__dirname, "../dashboard/src/lib/inboxArchiveUndo.ts");
+    const script = `
+      import {
+        INBOX_ARCHIVE_UNDO_MS,
+        INBOX_ARCHIVE_UNDO_KEY,
+        inboxArchiveUndoLabel,
+        writeInboxArchiveUndo,
+        readInboxArchiveUndo,
+        parseInboxArchiveUndo,
+        clearInboxArchiveUndo,
+      } from ${JSON.stringify(helperPath)};
+      const store = {
+        data: new Map(),
+        getItem(key) { return this.data.has(key) ? this.data.get(key) : null; },
+        setItem(key, value) { this.data.set(key, value); },
+        removeItem(key) { this.data.delete(key); },
+      };
+      const now = 1_000_000;
+      const written = writeInboxArchiveUndo([{ id: "row-1", callId: "call-1" }], now, store);
+      const fresh = readInboxArchiveUndo(now + 1000, store);
+      const replaced = writeInboxArchiveUndo(
+        [{ id: "a", callId: "ca" }, { id: "b", callId: "cb" }],
+        now,
+        store
+      );
+      const expired = readInboxArchiveUndo(now + INBOX_ARCHIVE_UNDO_MS, store);
+      const empty = writeInboxArchiveUndo([{ id: " ", callId: "" }], now, store);
+      const garbage = parseInboxArchiveUndo("{nope", now);
+      writeInboxArchiveUndo([{ id: "keep", callId: "call" }], now, store);
+      clearInboxArchiveUndo(store);
+      console.log(JSON.stringify({
+        ms: INBOX_ARCHIVE_UNDO_MS,
+        key: INBOX_ARCHIVE_UNDO_KEY,
+        label1: inboxArchiveUndoLabel(1),
+        label2: inboxArchiveUndoLabel(3),
+        written,
+        fresh,
+        replaced,
+        expired,
+        empty,
+        garbage,
+        afterClear: store.data.get(INBOX_ARCHIVE_UNDO_KEY) ?? null,
+      }));
+    `;
+    const { spawnSync } = require("node:child_process");
+    const ran = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", script], {
+      encoding: "utf8",
+    });
+    assert.equal(ran.status, 0, ran.stderr || ran.stdout);
+    return JSON.parse(ran.stdout.trim().split("\n").at(-1));
+  }
+
+  it("stores a 5s payload, replaces the last Archive, and drops expired rows", () => {
+    const out = load();
+    assert.equal(out.ms, 5000);
+    assert.equal(out.key, "scalers-inbox-archive-undo");
+    assert.equal(out.label1, "Archived");
+    assert.equal(out.label2, "3 archived");
+    assert.equal(out.written.rows[0].callId, "call-1");
+    assert.equal(out.written.expiresAt, 1_000_000 + 5000);
+    assert.equal(out.fresh.rows[0].id, "row-1");
+    assert.equal(out.replaced.rows.length, 2);
+    assert.equal(out.expired, null);
+    assert.equal(out.empty, null);
+    assert.equal(out.garbage, null);
+    assert.equal(out.afterClear, null);
   });
 });

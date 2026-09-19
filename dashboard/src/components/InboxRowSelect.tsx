@@ -20,6 +20,7 @@ import {
   inboxHoldDone,
   inboxUnarchive,
 } from "@/lib/inboxLeadActions";
+import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import { inboxBulkLeaveAction, inboxBulkSharedAction } from "@/lib/inboxListVerbs";
 import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
@@ -197,6 +198,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   async function run(kind: BulkKind) {
     setBusy(true);
     setError(null);
+    const archivedRows: { id: string; callId: string }[] = [];
     for (const item of chosen) {
       if (kind === "confirm" && String(item.job?.status || "").toLowerCase() !== "requested") {
         continue;
@@ -215,14 +217,19 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
               ? await inboxUnarchive(item)
               : await inboxArchive(item);
       if (res.error) {
+        if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
         setError(res.error);
         setBusy(false);
         return;
+      }
+      if (kind === "archive" && item.callId) {
+        archivedRows.push({ id: item.id, callId: item.callId });
       }
       if (kind === "archive" || kind === "unarchive") {
         patch(item.id, { hidden: true });
       }
     }
+    if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
     if (kind === "done" || kind === "archive" || kind === "unarchive" || kind === "confirm") clear();
     setBusy(false);
     router.refresh();

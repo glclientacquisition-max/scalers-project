@@ -24,9 +24,9 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 - No number: empty.
 - Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
 
-**Overflow (More, long-press, right-click):** Archive on live rows. Unarchive on Archived. Hover More on desktop. More on phone opens that one-verb sheet. Long-press on phone enters bulk select. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
+**Overflow (More, long-press, right-click):** Archive on live rows. Unarchive on Archived. After Archive, a 5s toast offers Undo (`InboxArchiveToast`, above the tab bar). Undo is a `text-accent-deep` hit, not a second fill. No toast on Unarchive. Hover More on desktop. More on phone opens that one-verb sheet. Long-press on phone enters bulk select. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
 
-Not list verbs: Select, Pin, Mark done, Mark unread, Snooze, Mute, Assign, Label, Delete. Bulk bar: count plus Archive, or Unarchive when every selected row is archived. Confirm or hold Done only when every selected row shares that same valid action. No More sheet on the bulk bar.
+Not list verbs: Select, Pin, Mark done, Mark unread, Snooze, Mute, Assign, Label, Delete. Bulk bar: count plus Archive, or Unarchive when every selected row is archived. Confirm or hold Done only when every selected row shares that same valid action. Archive also shows that Undo toast. No More sheet on the bulk bar.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Visit not booked** (hospitality: **Booking not booked**) and use Call plus WhatsApp. Intent-only holds stamp **Hold not saved**. Do not show Confirm or Done without a work row.
 

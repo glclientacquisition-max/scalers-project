@@ -23,6 +23,7 @@ import {
   inboxArchive,
   inboxUnarchive,
 } from "@/lib/inboxLeadActions";
+import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import {
   inboxOverflowActions,
   type InboxListAction,
@@ -136,6 +137,9 @@ export function InboxRowShell({
     if (res.error) {
       setError(res.error);
       return;
+    }
+    if (id === "archive" && item.callId) {
+      writeInboxArchiveUndo([{ id: item.id, callId: item.callId }]);
     }
     if (id === "archive" || id === "unarchive") {
       patch({ hidden: true });

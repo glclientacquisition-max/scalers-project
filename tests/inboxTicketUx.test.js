@@ -64,6 +64,7 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\} archived=\{archived\}/);
     assert.match(ticket, /updateLeadStatus\(callId, archived \? "new" : "archived"\)/);
     assert.match(ticket, /archived \? "Unarchive" : "Archive"/);
+    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
     assert.match(ticket, /router\.push\(backHref\)/);
     assert.doesNotMatch(ticket, /router\.push\("\/calls"\)/);
     assert.match(ticket, /\{busy \? "Saving" : archived \? "Unarchive" : "Archive"\}/);

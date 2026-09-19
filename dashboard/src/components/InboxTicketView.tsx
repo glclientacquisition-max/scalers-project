@@ -24,6 +24,7 @@ import {
   metaLabelClass,
 } from "@/components/ui/deskChrome";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
 
@@ -144,7 +145,10 @@ function InboxTicketMore({
             return;
           }
           setOpen(false);
-          if (!archived) router.push(backHref);
+          if (!archived) {
+            writeInboxArchiveUndo([{ id: callId, callId }]);
+            router.push(backHref);
+          }
           router.refresh();
         }}
       >
