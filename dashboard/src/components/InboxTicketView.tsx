@@ -40,6 +40,8 @@ function JumpGlyph() {
     </svg>
   );
 }
+
+function MoreGlyph() {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
       <circle cx="8" cy="3.2" r="1.3" />
@@ -274,19 +276,24 @@ export function InboxTicketView({
     return paneRef.current;
   }
 
-  function measure() {
-    const el = scroller();
-    if (!el) return;
-    setAway(el.scrollHeight - el.scrollTop - el.clientHeight > 96);
-  }
-
   function jumpLatest() {
-    scroller()?.scrollTo({ top: scroller()!.scrollHeight, behavior: "smooth" });
+    const el = scroller();
+    el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }
 
   useEffect(() => {
+    function scrollerEl() {
+      return window.matchMedia("(min-width: 1024px)").matches
+        ? threadRef.current
+        : paneRef.current;
+    }
+    function measure() {
+      const el = scrollerEl();
+      if (!el) return;
+      setAway(el.scrollHeight - el.scrollTop - el.clientHeight > 96);
+    }
     function bind() {
-      const el = scroller();
+      const el = scrollerEl();
       if (!el) return () => {};
       el.scrollTop = el.scrollHeight;
       measure();
