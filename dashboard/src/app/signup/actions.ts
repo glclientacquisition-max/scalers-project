@@ -47,10 +47,7 @@ export async function signupAction(
   try {
     supabase = await createSupabaseServerClient();
   } catch {
-    return {
-      error:
-        "Supabase Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-    };
+    return { error: "Sign up is not available. Try again later." };
   }
 
   const { data, error } = await supabase.auth.signUp({

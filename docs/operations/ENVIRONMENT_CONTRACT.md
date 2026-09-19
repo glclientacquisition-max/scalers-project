@@ -52,6 +52,7 @@
 | Secret | LOCAL | STAGING | PRODUCTION | Browser exposure |
 | --- | --- | --- | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | `.env` | Server-only env | Railway/Vercel server | **NEVER** |
+| `SUPABASE_URL` | `.env` | Vercel staging (server) | Vercel prod (server) | Never |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `.env.local` | Vercel staging | Vercel prod | Yes (RLS-bound) |
 | `SONIOX_API_KEY` | `.env` | Staging env | Prod env | Never |
 | `GEMINI_API_KEY` | `.env` | Staging env | Prod env | Never |
@@ -154,7 +155,10 @@ SUPABASE_SERVICE_ROLE_KEY=<staging-or-dev-key>
 # dashboard/.env.local
 NEXT_PUBLIC_SUPABASE_URL=https://<SAME-REF>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key-for-same-project>
+SUPABASE_URL=https://<SAME-REF>.supabase.co
 ```
+
+Desk `/api/login` prefers `SUPABASE_URL`, then `NEXT_PUBLIC_SUPABASE_URL`. Next.js inlines `NEXT_PUBLIC_*` at build. If that bake is blank, a runtime `SUPABASE_URL` is required or owners see `error=config` ("Sign in is not available").
 
 ### Pre-flight checklist
 
