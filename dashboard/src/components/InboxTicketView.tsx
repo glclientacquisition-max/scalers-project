@@ -124,6 +124,7 @@ function InboxTicketMore({
 
   useLayoutEffect(() => {
     if (!open || !anchor) return;
+    const nextAnchor = anchor;
     function place() {
       const el = panelRef.current;
       if (!el) return;
@@ -131,7 +132,7 @@ function InboxTicketMore({
       setPos(
         placeInboxOverflowMenu(
           { width: el.offsetWidth, height: el.offsetHeight },
-          anchor,
+          nextAnchor,
           {
             width: view?.width ?? window.innerWidth,
             height: view?.height ?? window.innerHeight,
