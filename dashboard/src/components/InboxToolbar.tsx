@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { callsHref } from "@/lib/callsTriage";
 import { inboxArchivedHref } from "@/lib/inboxHref";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
+import { inboxPileHref } from "@/lib/inboxSwipe";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import {
   btnGhost,
@@ -107,22 +108,12 @@ export function InboxToolbar({
           id: item.id,
           label: item.label,
           count: counts[item.id],
-          href: callsHref({
-            purpose: item.id,
-            q: q || undefined,
-            view:
-              item.id === "job" && workView
-                ? weekView
-                  ? "week"
-                  : "today"
-                : item.id === "hold" && holdToday
-                  ? "today"
-                  : undefined,
-            week: item.id === "job" && weekView ? week : undefined,
-            day:
-              (item.id === "job" && todayView) || (item.id === "hold" && holdToday)
-                ? day
-                : undefined,
+          href: inboxPileHref(item.id, {
+            q,
+            active,
+            view,
+            week,
+            day,
           }),
         }))}
       />

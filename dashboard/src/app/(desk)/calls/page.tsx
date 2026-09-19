@@ -29,7 +29,9 @@ import {
 import { inboxTeammateOptions } from "@/lib/inboxTriage";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
+import { InboxPileSwipe } from "@/components/InboxPileSwipe";
 import { DeskLandScope } from "@/components/ui/DeskLand";
+import { inboxPileHref, SWIPE_PILES } from "@/lib/inboxSwipe";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
 import { visitBoardForDay, visitBoardItems, orderVisitList } from "@/lib/runSheet";
@@ -236,6 +238,16 @@ export default async function CallsPage({
         })
       : null;
   const archivedBackHref = archivedReturn ? inboxReturnHref(archivedReturn) : undefined;
+  const pileHrefOpts = {
+    q,
+    active: activeFilter,
+    view: boardView || holdTodayView ? view : archivedReturn?.view,
+    week: weekView ? monday : archivedReturn?.week,
+    day: todayView || holdTodayView ? day : archivedReturn?.day,
+  };
+  const pileHrefs = Object.fromEntries(
+    SWIPE_PILES.map((id) => [id, inboxPileHref(id, pileHrefOpts)])
+  );
 
   return (
     <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
@@ -328,6 +340,11 @@ export default async function CallsPage({
           vertical={vertical}
         />
       ) : pageRows.length === 0 && !showArchivedEntry ? (
+        <InboxPileSwipe
+          active={activeFilter}
+          hrefs={pileHrefs}
+          enabled={activeFilter !== "archived"}
+        >
         <EmptyInbox
           total={assembled.length}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
@@ -336,8 +353,14 @@ export default async function CallsPage({
           q={q}
           vertical={vertical}
         />
+        </InboxPileSwipe>
       ) : (
         <>
+          <InboxPileSwipe
+            active={activeFilter}
+            hrefs={pileHrefs}
+            enabled={activeFilter !== "archived"}
+          >
           <DeskLandScope
             ids={pageRows.map((item) => item.id)}
             scopeKey={`${activeFilter}:${page}:${q}`}
@@ -419,6 +442,7 @@ export default async function CallsPage({
             </DeskDataTable>
           </div>
           </DeskLandScope>
+          </InboxPileSwipe>
 
           <Pagination
             page={page}
