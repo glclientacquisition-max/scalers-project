@@ -46,7 +46,7 @@ Reuse `contacts` via `contact_id`. Keep `service_requests` for non-booking notes
 
 ### 2C — Desk: appointments inbox
 - `/appointments` list + status filters (requested / confirmed / cancelled / done)
-- Inbox → Visits (`/calls?purpose=job`). One book: requested and confirmed visits. List is newest work. Work holds Today (run sheet by clock) and Week (by day; phone days with work, desktop seven-day grid). Timed holds stay on Holds List or Holds Work (Today). No extra nav item.
+- Inbox → Visits (`/calls?purpose=job`). List is requested and confirmed, newest first. Work is confirmed only (Today by clock, Week by day; phone days with work, desktop seven-day grid). Timed holds stay on Holds List or Holds Work (Today). No extra nav item.
 - Status toggle + nav link
 - Mirror Requests UX (no card clutter)
 

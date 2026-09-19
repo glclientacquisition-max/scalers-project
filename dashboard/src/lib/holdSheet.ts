@@ -1,4 +1,4 @@
-/** Holds List and Work. One book: open holds. Anytime stays on List. */
+/** Holds List is open holds. Work is timed pickups only. Anytime stays on List. */
 
 import type { InboxItem, InboxHold } from "@/lib/inboxPurpose";
 import { itemIsArchived } from "@/lib/inboxPurpose";
@@ -28,12 +28,16 @@ export function holdBoardInstant(item: InboxItem, now = new Date()): Date | null
   return visitInstant(asVisit(item.hold, item.callerName), now);
 }
 
+export function holdWorkItems(items: InboxItem[], now = new Date()): InboxItem[] {
+  return holdBoardItems(items).filter((item) => Boolean(holdBoardInstant(item, now)));
+}
+
 export function holdBoardForDay(
   items: InboxItem[],
   ymd: string,
   now = new Date()
 ): InboxItem[] {
-  const rows = holdBoardItems(items).filter((item) => {
+  const rows = holdWorkItems(items, now).filter((item) => {
     const instant = holdBoardInstant(item, now);
     return instant ? eatYmd(instant) === ymd : false;
   });

@@ -14,15 +14,22 @@ function isVisitBoardJob(job) {
   return status === "requested" || status === "confirmed";
 }
 
+function isVisitWorkJob(job) {
+  return String(job?.status || "").toLowerCase() === "confirmed";
+}
+
 describe("desk visit board", () => {
   const now = new Date(Date.UTC(2026, 8, 17, 8, 0, 0));
 
-  it("keeps requested and confirmed visits on the board", () => {
+  it("keeps requested and confirmed visits on List, confirmed only on Work", () => {
     assert.equal(isVisitBoardJob({ status: "requested" }), true);
     assert.equal(isVisitBoardJob({ status: "confirmed" }), true);
     assert.equal(isVisitBoardJob({ status: "done" }), false);
     assert.equal(isVisitBoardJob({ status: "cancelled" }), false);
     assert.equal(isVisitBoardJob(null), false);
+    assert.equal(isVisitWorkJob({ status: "requested" }), false);
+    assert.equal(isVisitWorkJob({ status: "confirmed" }), true);
+    assert.equal(isVisitWorkJob({ status: "done" }), false);
   });
 
   it("places a tomorrow slot on the next EAT day", () => {
@@ -39,9 +46,11 @@ describe("desk visit board", () => {
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
     assert.match(sheet, /status === "requested" \|\| status === "confirmed"/);
+    assert.match(sheet, /export function visitWorkItems/);
     assert.match(sheet, /export function visitBoardForDay/);
     assert.match(sheet, /export function visitBoardItems/);
     assert.match(sheet, /export function groupVisitBoardForWeek/);
+    assert.match(sheet, /visitWorkItems\(items\)/);
     assert.doesNotMatch(sheet, /hold_or_pickup/);
     assert.match(page, /visitBoardItems/);
     assert.match(page, /visitBoardForDay/);

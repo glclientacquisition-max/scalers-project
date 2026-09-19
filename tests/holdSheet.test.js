@@ -29,13 +29,15 @@ describe("desk hold board", () => {
     assert.equal(visitDayKey({ when_text: "" }, now), null);
   });
 
-  it("wires Holds List and Work as one open book", () => {
+  it("wires Holds List as the open book and Work as timed pickups", () => {
     const sheet = read("dashboard/src/lib/holdSheet.ts");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
     const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     assert.match(sheet, /export function holdBoardForDay/);
     assert.match(sheet, /export function holdBoardItems/);
+    assert.match(sheet, /export function holdWorkItems/);
+    assert.match(sheet, /holdWorkItems\(items, now\)/);
     assert.doesNotMatch(sheet, /weekDays/);
     assert.match(page, /holdBoardForDay/);
     assert.match(page, /purpose="hold"/);
