@@ -2,7 +2,7 @@
 
 **Mission:** Be the internal critic that levels Scalers against universal apps (WhatsApp, Telegram, Instagram) on UI/UX, product design, security, and speed. Identify gaps. Rank fixes. Refuse illegal clones.
 
-Paste this lane into a **new Cursor chat** with **Grok** each test run. Not a customer-facing Grok on WhatsApp. Not a second inbox. Not an xAI API bot, Discord bot, or Telegram bot.
+Chosen runtime: **Grok Bot** (cloud computer). Paste pack: [`GROK_BOT.md`](./GROK_BOT.md). Not grok.com chat. Not a customer-facing Grok on WhatsApp. Not a second inbox. Not an xAI API bot, Discord bot, or Telegram bot. Cursor Grok chat is a fallback only.
 
 **Law:** [`../frontend/FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md), `.cursor/rules/scalers-design-ux.mdc`, [`../frontend/design-system/MASTER.md`](../frontend/design-system/MASTER.md). Chat recipe (unshipped): [`../frontend/WHATSAPP_BUSINESS_FRONTEND.md`](../frontend/WHATSAPP_BUSINESS_FRONTEND.md).
 
@@ -55,7 +55,7 @@ Do not ship product code in a tester chat unless the owner names one owning lane
 
 Do these in order. Each step is done when its criterion is true.
 
-1. **New chat, Grok.** Paste the starter from [`PROMPTS.md`](./PROMPTS.md). Attach this file, the constitution, and the scorecard. Done when those three are in context.
+1. **Grok Bot (chosen).** Follow [`GROK_BOT.md`](./GROK_BOT.md). Create Scalers Critic. Paste Instructions. First run is Inbox on staging. Owner logs in at the auth wall. Done when the Bot has those Instructions and one named surface. Fallback: Cursor Grok chat from [`PROMPTS.md`](./PROMPTS.md) with this file, the constitution, and the scorecard attached.
 2. **One surface.** Owner names Inbox, Contacts, Alerts, Home, a live call, or Chat spec. Done when exactly one surface is named. Stop if two surfaces are mixed; ask for one.
 3. **Read the law for that surface.** Constitution + MASTER + the page note under `docs/frontend/design-system/pages/` if it exists. Chat: `WHATSAPP_BUSINESS_FRONTEND.md`. Voice: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md) + [`VOICE_SPEED_CONSISTENCY.md`](./VOICE_SPEED_CONSISTENCY.md). Brain memory: [`BRAIN.md`](./BRAIN.md) + `evals/caller-memory.eval.ts`. Done when the source-of-truth paths for that surface are listed in the report.
 4. **Exercise the surface.** Browser or the closest substitute (tests, curl, fixtures). Empty, error, and the main path. Phone and `md+` when layout is in scope. Done when those states are named with evidence, not a single screenshot caption.
@@ -139,7 +139,7 @@ Evalite lives at `evals/caller-memory.eval.ts` (`evalite` in root `package.json`
 
 ## Chat starter
 
-Copy from [`PROMPTS.md`](./PROMPTS.md) (Platform tester).
+Grok Bot paste pack: [`GROK_BOT.md`](./GROK_BOT.md). Cursor fallback: [`PROMPTS.md`](./PROMPTS.md) (Platform tester).
 
 ## Good first runs
 
@@ -153,5 +153,5 @@ Copy from [`PROMPTS.md`](./PROMPTS.md) (Platform tester).
 
 1. **Same scorecard every run.** Do not invent a new rubric mid-chat.
 2. **Fixtures.** Brain gaps become Evalite cases. Voice gaps become freeze SIDs in LIVE_CALL_FINDINGS. Desk gaps become page-note deltas, not a new design system.
-3. **One surface.** Fresh chat per run. No mega-thread.
+3. **One surface.** Fresh Grok Bot message (or Cursor chat) per run. No mega-thread.
 4. **Never let it propose a design system.** Tokens, type, and list recipe are already law.

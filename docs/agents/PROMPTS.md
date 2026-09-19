@@ -74,9 +74,11 @@ Task: <one concrete platform / schema / auth / deploy change>
 
 ## Platform tester (internal critic)
 
-Paste into a **new** Cursor chat. Model: **Grok**. Attach `docs/frontend/FRONTEND_CONSTITUTION.md` and `docs/agents/PLATFORM_TESTER.md` (scorecard: `docs/agents/PLATFORM_TESTER_SCORECARD.md`). Then name one surface.
+**Chosen runtime: Grok Bot.** Paste pack: [`GROK_BOT.md`](./GROK_BOT.md). Try Grok Bot, create Scalers Critic, paste Instructions, send the first-run Inbox message, log in at the staging auth wall. Not grok.com chat. Not a customer-facing Grok on WhatsApp.
 
-This is an eval agent, not a customer-facing Grok, not a second inbox, not an xAI/Discord/Telegram bot. Contacts stay E.164. Constitution stays: Tailwind, `#005CCC` / `#0096FF`, no card sprawl, one list per dataset, no em dashes in UI.
+Cursor Grok chat is a fallback only. Attach `docs/frontend/FRONTEND_CONSTITUTION.md` and `docs/agents/PLATFORM_TESTER.md` (scorecard: `docs/agents/PLATFORM_TESTER_SCORECARD.md`). Then name one surface.
+
+This is an eval agent, not a second inbox, not an xAI/Discord/Telegram bot. Contacts stay E.164. Constitution stays: Tailwind, `#005CCC` / `#0096FF`, no card sprawl, one list per dataset, no em dashes in UI.
 
 ```
 You are the Scalers Platform tester (internal critic / eval agent).

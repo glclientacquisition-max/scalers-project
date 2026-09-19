@@ -46,7 +46,7 @@ Pick **one lane per PR**. Full contracts: `AGENTS.md` + `docs/agents/{LANE}.md`.
 | Desk UI/UX | `dashboard/` owner/marketing UX | `cd dashboard && npm run lint && npm run build` |
 | Ops & Billing | Wallet, DID, Super Admin | SQL review + ops smoke |
 | Platform | `docs/supabase/`, `src/db.js`, auth, deploy | `npm run smoke:db` (when env set), desk build |
-| Platform tester | Eval reports vs universal apps; does not ship product | Filled [`../agents/PLATFORM_TESTER_SCORECARD.md`](../agents/PLATFORM_TESTER_SCORECARD.md); product PRs in the owning lane |
+| Platform tester | Eval reports vs universal apps; does not ship product | Filled [`../agents/PLATFORM_TESTER_SCORECARD.md`](../agents/PLATFORM_TESTER_SCORECARD.md); Grok Bot: [`../agents/GROK_BOT.md`](../agents/GROK_BOT.md); product PRs in the owning lane |
 
 **Rule:** Schema/RPC changes → Platform first, then feature lanes.  
 **Rule:** Do not run parallel agents that both edit `server.js` heavily.
