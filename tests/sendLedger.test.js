@@ -27,6 +27,8 @@ describe('notify send ledger', () => {
     assert.equal(billedTo('service_request'), 'tenant');
     assert.equal(billedTo('appointment'), 'tenant');
     assert.equal(billedTo('caller_hold'), 'tenant');
+    assert.equal(billedTo('caller_hold_ready'), 'tenant');
+    assert.equal(billedTo('caller_hold_cancelled'), 'tenant');
     assert.equal(billedTo('caller_appointment_confirmed'), 'tenant');
     assert.equal(billedTo('missed_textback'), 'tenant');
     assert.equal(billedTo('caller_note'), 'tenant');
@@ -35,6 +37,8 @@ describe('notify send ledger', () => {
     assert.equal(billedTo('outage_speech'), 'platform');
     assert.equal(billedTo('outage_llm'), 'platform');
     assert.equal(audience('caller_hold'), 'caller');
+    assert.equal(audience('caller_hold_ready'), 'caller');
+    assert.equal(audience('caller_hold_cancelled'), 'caller');
     assert.equal(audience('missed_textback'), 'caller');
     assert.equal(audience('lead'), 'staff');
     assert.equal(audience('wallet_low'), 'staff');
@@ -278,6 +282,28 @@ describe('per-instance send limits', () => {
       assert.notEqual(a.key, b.key);
       releaseInstanceFlight(a.key);
       releaseInstanceFlight(b.key);
+    } finally {
+      restore();
+    }
+  });
+
+  it('skips a second hold ready SMS on the same call dest without consuming SMS', async () => {
+    let consumed = 0;
+    const restore = stubDb({
+      findNotifySend: async () => ({ id: 'ready-1' }),
+      consumeSmsUnits: async () => {
+        consumed += 1;
+        return { allowed: true, reason: 'included', overage: false };
+      },
+    });
+    try {
+      const gate = await beginInstanceSend(
+        { tenantId: 't1', callId: 'c1', kind: 'caller_hold_ready' },
+        '254711000000'
+      );
+      assert.equal(gate.ok, false);
+      assert.equal(gate.reason, 'instance_already_sent');
+      assert.equal(consumed, 0);
     } finally {
       restore();
     }

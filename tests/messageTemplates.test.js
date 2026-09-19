@@ -17,6 +17,15 @@ const {
   serviceRequestEvent,
   appointmentEvent,
 } = require('../src/notifications/events');
+const fs = require('fs');
+const path = require('path');
+
+function readDeskCallerTemplates() {
+  return fs.readFileSync(
+    path.join(__dirname, '..', 'dashboard/src/lib/messageTemplates.ts'),
+    'utf8'
+  );
+}
 
 function assertNoDashes(text, label) {
   assert.doesNotMatch(text, /[—–]/, `${label} has an em or en dash`);
@@ -113,8 +122,43 @@ describe('Scalers message catalog', () => {
       pickup,
       'Hi Soony, ChapterOne Bookstore here. Pickup for two chargers is now Friday 4pm.'
     );
+    const ready = renderCallerText({
+      kind: EVENTS.CALLER_HOLD_READY,
+      businessName: 'ChapterOne Bookstore',
+      caller: { name: 'Soony' },
+      item: 'two chargers',
+    });
+    assert.equal(
+      ready,
+      'Hi Soony, ChapterOne Bookstore here. two chargers is ready for pickup.'
+    );
+    const cancelled = renderCallerText({
+      kind: EVENTS.CALLER_HOLD_CANCELLED,
+      businessName: 'ChapterOne Bookstore',
+      caller: { name: 'Soony' },
+      item: 'two chargers',
+    });
+    assert.equal(
+      cancelled,
+      'Hi Soony, ChapterOne Bookstore here. We cancelled the pickup for two chargers.'
+    );
+    const readyBare = renderCallerText({
+      kind: EVENTS.CALLER_HOLD_READY,
+      businessName: 'ChapterOne Bookstore',
+    });
+    assert.equal(
+      readyBare,
+      'Hi, ChapterOne Bookstore here. Your item is ready for pickup.'
+    );
     assertNoDashes(hold, 'caller hold');
     assertNoDashes(pickup, 'caller hold update');
+    assertNoDashes(ready, 'caller hold ready');
+    assertNoDashes(cancelled, 'caller hold cancelled');
+
+    const desk = readDeskCallerTemplates();
+    assert.match(desk, /\$\{item\} is ready for pickup/);
+    assert.match(desk, /We cancelled the pickup for \$\{item\}/);
+    assert.match(desk, /Your item is ready for pickup/);
   });
 
   it('wallet, outage, missed textback, and escalate have no em dashes', () => {

@@ -11,6 +11,8 @@ export type CallerLedgerKind =
   | "caller_appointment_cancelled"
   | "caller_appointment_rescheduled"
   | "caller_hold_updated"
+  | "caller_hold_ready"
+  | "caller_hold_cancelled"
   | "caller_note";
 
 function normalizeDest(value: string): string {

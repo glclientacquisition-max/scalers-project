@@ -17,6 +17,8 @@ const CALLER_KINDS = new Set([
   'caller_appointment_rescheduled',
   'caller_hold',
   'caller_hold_updated',
+  'caller_hold_ready',
+  'caller_hold_cancelled',
   'caller_order',
   'caller_callback',
   'caller_note',
