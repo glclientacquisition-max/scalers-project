@@ -79,4 +79,29 @@ describe('deriveCallSummary', () => {
     assert.doesNotMatch(summary.text, /I'd like to discuss/i);
     assert.match(summary.reason, /needs you to return the call/i);
   });
+
+  it('keeps visit intent in the summary after a last-turn hours ask', () => {
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'Are you open Saturday?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    state.intent = 'hours';
+    state = recordActionResults(state, [
+      {
+        action: 'create_appointment',
+        status: 'succeeded',
+        fingerprint: 'v1',
+        value: {
+          serviceName: 'Carpet cleaning',
+          whenText: 'Saturday 9 to 11',
+          name: 'Amina',
+        },
+        record: { service_name: 'Carpet cleaning' },
+      },
+    ]);
+    const summary = deriveCallSummary({ brainState: state });
+    assert.equal(summary.primaryIntent, 'book_visit');
+    assert.match(summary.reason, /booked a visit/i);
+  });
 });

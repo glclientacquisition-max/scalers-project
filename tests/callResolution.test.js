@@ -71,4 +71,53 @@ describe('deriveCallResolution', () => {
     assert.equal(parseResolution('resolved'), 'resolved');
     assert.equal(parseResolution('nope'), null);
   });
+
+  it('locks persist intent at a saved visit even if the last turn was hours', () => {
+    let state = createBrainState();
+    state.intent = 'hours';
+    state = recordActionResults(state, [
+      {
+        action: 'create_appointment',
+        status: 'succeeded',
+        fingerprint: 'v1',
+      },
+    ]);
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.resolution, 'resolved');
+    assert.equal(out.primaryIntent, 'book_visit');
+  });
+
+  it('locks persist intent at a saved hold even if the last turn was hours', () => {
+    let state = createBrainState();
+    state.intent = 'hours';
+    state = recordActionResults(state, [
+      {
+        action: 'create_service_request',
+        status: 'succeeded',
+        requestType: 'hold',
+        fingerprint: 'h1',
+      },
+    ]);
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.primaryIntent, 'hold_or_pickup');
+  });
+
+  it('locks persist intent at human when escalate saved after a FAQ', () => {
+    const out = deriveCallResolution({
+      brainState: { ...createBrainState(), intent: 'hours' },
+      toolResults: [{ action: 'escalate', status: 'succeeded' }],
+    });
+    assert.equal(out.resolution, 'needs_human');
+    assert.equal(out.primaryIntent, 'human');
+  });
+
+  it('keeps last-turn intent when no work row was saved', () => {
+    const state = createBrainState();
+    state.intent = 'booking';
+    state.conversation.turnCount = 3;
+    state.goal.missingSlots = ['landmark'];
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.primaryIntent, 'book_visit');
+    assert.notEqual(out.resolution, 'resolved');
+  });
 });

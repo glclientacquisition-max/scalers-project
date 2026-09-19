@@ -64,6 +64,60 @@ function normalizePrimaryIntent(raw) {
   return INTENT_ALIASES[key] || key;
 }
 
+function resultOk(results, actions) {
+  const wanted = new Set(actions);
+  return (Array.isArray(results) ? results : []).some(
+    (row) =>
+      wanted.has(row?.action) &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+}
+
+/**
+ * Hangup persist intent: saved work outranks the last spoken turn.
+ * Live NBA still uses last-turn intent so a follow-up FAQ can be answered.
+ */
+function highWaterPrimaryIntent({ liveIntent, results = [] } = {}) {
+  if (resultOk(results, ['escalate'])) return 'human';
+
+  const visitOk = (Array.isArray(results) ? results : []).some(
+    (row) =>
+      (row.action === 'create_appointment' ||
+        row.action === 'update_appointment') &&
+      row.status === 'succeeded'
+  );
+  if (visitOk) {
+    const cancelledOnly = results.some(
+      (row) =>
+        row.action === 'update_appointment' &&
+        row.status === 'succeeded' &&
+        String(row.appointmentStatus || '').toLowerCase() === 'cancelled'
+    );
+    const created = results.some(
+      (row) => row.action === 'create_appointment' && row.status === 'succeeded'
+    );
+    if (cancelledOnly && !created) return 'cancel';
+    return 'book_visit';
+  }
+
+  const request = (Array.isArray(results) ? results : []).find(
+    (row) =>
+      row.action === 'create_service_request' &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+  if (request) {
+    const type = String(
+      request.requestType || request.value?.type || ''
+    ).toLowerCase();
+    if (type === 'order') return 'order_enquiry';
+    if (type === 'enquiry') return 'order_enquiry';
+    if (type === 'callback') return 'callback';
+    return 'hold_or_pickup';
+  }
+
+  return normalizePrimaryIntent(liveIntent);
+}
+
 /**
  * @param {{
  *   brainState?: object|null,
@@ -85,7 +139,10 @@ function deriveCallResolution(opts = {}) {
       : state.conversation?.turnCount || 0
   );
   const rawIntent = state.intent || opts.primaryIntent || '';
-  const intent = normalizePrimaryIntent(rawIntent);
+  const intent = highWaterPrimaryIntent({
+    liveIntent: rawIntent,
+    results,
+  });
 
   const requestOk = results.some(
     (r) =>
@@ -187,6 +244,7 @@ module.exports = {
   RESOLUTIONS,
   INTENT_ALIASES,
   deriveCallResolution,
+  highWaterPrimaryIntent,
   normalizePrimaryIntent,
   parseResolution,
 };

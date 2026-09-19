@@ -141,6 +141,7 @@ Loaded once per media session in `ensureTenantPrompt()`.
 | Slow Gemini | Fillers / progress lines | `dynamicSpeech.js`, env `VOICE_FILLER` |
 | Missing compile key | Local template on desk | `onboarding.ts` |
 | Required escalate omitted | Backend injects escalate | `requiredEscalate.js` |
+| Required visit/hold omitted | Backend injects create_appointment / create_service_request | `requiredCreateRequest.js` |
 | Tool validation failure | Spoken error + repair | `toolExecution.js`, `conversationRepair.js` |
 | After hours | `after_hours_mode` serve vs message | `businessHours.js`, context header |
 | Soniox STT/TTS down | Catalog-voice downtime clip, hang up, one owner alert per business | `outageClips.js`, `speechOutageNotify.js`, [`VOICE_DOWNTIME_AT_SCALE.md`](./VOICE_DOWNTIME_AT_SCALE.md) |

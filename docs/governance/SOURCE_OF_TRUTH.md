@@ -39,7 +39,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
 | Brain state | Per-call semantic memory, seeded from returning-caller card | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
 | Returning-caller card | Compact phone file at call setup | `src/conversation/callerMemory.js` + `getCallerMemory` | CONTEXT HEADER; ADR-0005 | Transcript dump, RAG | CORE |
-| Tool parse | Marker protocol | `src/conversation/toolMarkers.js` | `parseGeminiResponse` | None | CORE |
+| Tool parse | Marker protocol | `src/conversation/toolMarkers.js` | `parseGeminiResponse` | Required escalate / create-request inject | CORE |
 | Tool execute | Validated side effects | `src/conversation/toolExecution.js` | `executeBrainTools` | None | CORE |
 | Brain observability | Console traces | `src/conversation/brainObservability.js` | `logBrainTrace` → stdout | None persisted | CORE (ephemeral) |
 | Post-call transcript review | Hangup Gemini JSON pass | `src/conversation/callTranscriptReview.js` | Fire-and-forget after `persistCallResolution`; conservative merge | `POST_CALL_GEMINI_REVIEW=off` | CORE |
