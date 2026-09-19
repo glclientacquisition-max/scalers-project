@@ -1,6 +1,6 @@
 import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
-export type InboxListActionId = "archive";
+export type InboxListActionId = "archive" | "unarchive";
 
 export type InboxListAction = {
   id: InboxListActionId;
@@ -9,6 +9,7 @@ export type InboxListAction = {
 };
 
 export type InboxBulkSharedAction = "confirm" | "done";
+export type InboxBulkLeaveAction = "archive" | "unarchive";
 
 /** Confirm is only valid on a requested appointment row. */
 export function inboxCanConfirm(item: InboxItem): boolean {
@@ -22,10 +23,18 @@ export function inboxCanHoldDone(item: InboxItem): boolean {
   return String(item.hold?.status || "").toLowerCase() === "open";
 }
 
-/** Overflow is Archive only. Other list verbs are not offered. */
+/** Overflow is Archive, or Unarchive on Archived. Other list verbs stay off. */
 export function inboxOverflowActions(item: InboxItem): InboxListAction[] {
-  if (itemIsArchived(item)) return [];
+  if (itemIsArchived(item)) return [{ id: "unarchive", label: "Unarchive" }];
   return [{ id: "archive", label: "Archive" }];
+}
+
+/** Unarchive only when every selected row is already archived. */
+export function inboxBulkLeaveAction(items: InboxItem[]): InboxBulkLeaveAction | null {
+  if (!items.length) return null;
+  if (items.every(itemIsArchived)) return "unarchive";
+  if (items.some(itemIsArchived)) return null;
+  return "archive";
 }
 
 /** Confirm or Done on the bulk bar only when every selected row shares that same valid action. */

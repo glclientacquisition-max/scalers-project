@@ -18,8 +18,9 @@ import {
   inboxArchive,
   inboxConfirm,
   inboxHoldDone,
+  inboxUnarchive,
 } from "@/lib/inboxLeadActions";
-import { inboxBulkSharedAction } from "@/lib/inboxListVerbs";
+import { inboxBulkLeaveAction, inboxBulkSharedAction } from "@/lib/inboxListVerbs";
 import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
 const iconHit = [
@@ -53,6 +54,20 @@ function ArchiveGlyph() {
       />
       <path d="M2.2 3.4h11.6v1.8H2.2z" stroke="currentColor" strokeWidth="1.4" />
       <path d="M8 7.2v3.4M6.3 9.1 8 10.8l1.7-1.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function UnarchiveGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 5.2h11v7.3c0 .6-.5 1.1-1.1 1.1H3.6c-.6 0-1.1-.5-1.1-1.1z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path d="M2.2 3.4h11.6v1.8H2.2z" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 10.8V7.4M6.3 8.9 8 7.2l1.7 1.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -165,7 +180,7 @@ export function InboxSelectChrome({
   );
 }
 
-type BulkKind = "confirm" | "done" | "archive";
+type BulkKind = "confirm" | "done" | "archive" | "unarchive";
 
 export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const ui = useInboxRowUi();
@@ -177,6 +192,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const { selected, patch, clear } = ui;
   const chosen = items.filter((item) => selected.includes(item.id));
   const shared = inboxBulkSharedAction(chosen);
+  const leave = inboxBulkLeaveAction(chosen);
 
   async function run(kind: BulkKind) {
     setBusy(true);
@@ -189,22 +205,25 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
         continue;
       }
       if (kind === "archive" && itemIsArchived(item)) continue;
+      if (kind === "unarchive" && !itemIsArchived(item)) continue;
       const res =
         kind === "confirm"
           ? await inboxConfirm(item)
           : kind === "done"
             ? await inboxHoldDone(item)
-            : await inboxArchive(item);
+            : kind === "unarchive"
+              ? await inboxUnarchive(item)
+              : await inboxArchive(item);
       if (res.error) {
         setError(res.error);
         setBusy(false);
         return;
       }
-      if (kind === "archive") {
+      if (kind === "archive" || kind === "unarchive") {
         patch(item.id, { hidden: true });
       }
     }
-    if (kind === "done" || kind === "archive" || kind === "confirm") clear();
+    if (kind === "done" || kind === "archive" || kind === "unarchive" || kind === "confirm") clear();
     setBusy(false);
     router.refresh();
   }
@@ -233,9 +252,15 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
           <BackGlyph />
         </button>
         <p className="mr-auto min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
-        <button type="button" className={iconHit} disabled={busy} aria-label="Archive" onClick={() => run("archive")}>
-          <ArchiveGlyph />
-        </button>
+        {leave === "unarchive" ? (
+          <button type="button" className={iconHit} disabled={busy} aria-label="Unarchive" onClick={() => run("unarchive")}>
+            <UnarchiveGlyph />
+          </button>
+        ) : leave === "archive" ? (
+          <button type="button" className={iconHit} disabled={busy} aria-label="Archive" onClick={() => run("archive")}>
+            <ArchiveGlyph />
+          </button>
+        ) : null}
         {sharedVerb}
         {errorLine}
       </div>
@@ -251,9 +276,15 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
             {busy ? "Saving" : "Done"}
           </button>
         ) : null}
-        <button type="button" className={btnGhost} disabled={busy} onClick={() => run("archive")}>
-          Archive
-        </button>
+        {leave === "unarchive" ? (
+          <button type="button" className={btnGhost} disabled={busy} onClick={() => run("unarchive")}>
+            Unarchive
+          </button>
+        ) : leave === "archive" ? (
+          <button type="button" className={btnGhost} disabled={busy} onClick={() => run("archive")}>
+            Archive
+          </button>
+        ) : null}
         <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>
           Cancel
         </button>

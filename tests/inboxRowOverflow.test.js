@@ -49,9 +49,9 @@ describe("inbox row overflow menu", () => {
     assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
     assert.match(lead, /updateLeadStatus\(callId, action\)/);
     assert.match(overflow, /inboxArchive/);
+    assert.match(overflow, /inboxUnarchive/);
     assert.doesNotMatch(overflow, /inboxMarkDone/);
     assert.doesNotMatch(overflow, /inboxTogglePin/);
-    assert.doesNotMatch(overflow, /inboxUnarchive/);
   });
 
   it("opens a custom menu on hover and selects on long-press", () => {
@@ -66,16 +66,16 @@ describe("inbox row overflow menu", () => {
     assert.doesNotMatch(overflow, /onContextMenu=\{undefined\}/);
   });
 
-  it("keeps the trailing dock and Archive-only overflow", () => {
+  it("keeps the trailing dock and Archive or Unarchive overflow", () => {
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
     assert.match(row, /InboxRowMore/);
     assert.match(row, /InboxTrailingAction/);
     assert.ok(row.indexOf("<InboxRowMore") < row.indexOf("<InboxTrailingAction"), "more sits left of dock");
     assert.match(verbs, /label: "Archive"/);
+    assert.match(verbs, /label: "Unarchive"/);
     assert.doesNotMatch(verbs, /label: "Select"/);
     assert.doesNotMatch(verbs, /label: "Pin"/);
     assert.doesNotMatch(verbs, /Mark done/);
-    assert.doesNotMatch(verbs, /Unarchive/);
     assert.match(overflow, /inboxOverflowActions\(item\)/);
     assert.doesNotMatch(overflow, /id: "unread"/);
     assert.doesNotMatch(overflow, /id: "snooze"/);

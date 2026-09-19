@@ -24,6 +24,7 @@ import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTria
 import { contactFromInboxHref, inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
 import {
   itemSignalLabel,
+  itemIsArchived,
   type InboxItem,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
@@ -125,6 +126,17 @@ function InboxTrailingAction({
   item: InboxItem;
   message: string;
 }) {
+  if (itemIsArchived(item)) {
+    if (!item.callerPhone) return null;
+    return (
+      <InboxDockIdle>
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          <CallLink number={item.callerPhone} />
+          <WhatsAppLink number={item.callerPhone} message={message} variant="icon" />
+        </div>
+      </InboxDockIdle>
+    );
+  }
   if (item.job) {
     return (
       <InboxDockIdle>

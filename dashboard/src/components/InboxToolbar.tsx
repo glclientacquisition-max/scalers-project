@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { callsHref } from "@/lib/callsTriage";
+import { inboxArchivedHref } from "@/lib/inboxHref";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import { btnGhost, deskFieldClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
@@ -211,7 +212,17 @@ export function InboxToolbar({
           Matches for{" "}
           <span className="font-medium text-ink">&ldquo;{q}&rdquo;</span>.{" "}
           <Link
-            href={callsHref({ purpose: active })}
+            href={
+              archived
+                ? inboxArchivedHref({
+                    purpose: from,
+                    view,
+                    week,
+                    day,
+                    page: rpage,
+                  })
+                : callsHref({ purpose: active })
+            }
             className={`font-medium text-accent-deep ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
           >
             Clear

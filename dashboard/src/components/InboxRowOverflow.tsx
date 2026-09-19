@@ -21,6 +21,7 @@ import { useInboxRowLocal, useInboxRowUi } from "@/components/InboxRowUi";
 import { deskHitClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   inboxArchive,
+  inboxUnarchive,
 } from "@/lib/inboxLeadActions";
 import {
   inboxOverflowActions,
@@ -130,12 +131,13 @@ export function InboxRowShell({
     setError(null);
     let res: { error?: string; ok?: boolean } = { ok: true };
     if (id === "archive") res = await inboxArchive(item);
+    if (id === "unarchive") res = await inboxUnarchive(item);
     setBusy(false);
     if (res.error) {
       setError(res.error);
       return;
     }
-    if (id === "archive") {
+    if (id === "archive" || id === "unarchive") {
       patch({ hidden: true });
     }
     close();

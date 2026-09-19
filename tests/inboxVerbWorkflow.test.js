@@ -310,7 +310,7 @@ describe("inbox verb workflows: archive and unarchive", () => {
     assert.equal(after.lead.leadStatus, "resolved");
     assert.deepEqual(
       inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
-      []
+      ["unarchive"]
     );
   });
 });
@@ -392,12 +392,12 @@ describe("inbox verb workflows: mark unread", () => {
 });
 
 function inboxOverflowActions(item) {
-  if (itemIsArchived(item)) return [];
+  if (itemIsArchived(item)) return [{ id: "unarchive", label: "Unarchive" }];
   return [{ id: "archive", label: "Archive" }];
 }
 
 describe("inbox verb workflows: overflow menu", () => {
-  it("offers Archive only", () => {
+  it("offers Archive, or Unarchive on Archived", () => {
     assert.deepEqual(
       inboxOverflowActions(humanReturn()).map((row) => row.id),
       ["archive"]
@@ -416,7 +416,7 @@ describe("inbox verb workflows: overflow menu", () => {
     );
     assert.deepEqual(
       inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
-      []
+      ["unarchive"]
     );
   });
 });
@@ -428,7 +428,7 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.match(overflow, /inboxOverflowActions\(item\)/);
     assert.match(verbs, /export function inboxOverflowActions/);
     assert.match(verbs, /label: "Archive"/);
-    assert.doesNotMatch(verbs, /Unarchive/);
+    assert.match(verbs, /label: "Unarchive"/);
     assert.doesNotMatch(overflow, /id: "unread"/);
     assert.doesNotMatch(overflow, /id: "snooze"/);
     assert.doesNotMatch(overflow, /Mark unread/);
@@ -447,11 +447,12 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.doesNotMatch(select, /aria-label=\{allPinned/);
     const phone = select.slice(select.indexOf("md:hidden"));
     assert.match(phone, /aria-label="Archive"/);
+    assert.match(phone, /aria-label="Unarchive"/);
     assert.doesNotMatch(phone, /Pin/);
     const desktop = select.slice(select.indexOf("hidden min-h-11"));
     assert.match(desktop, /Archive/);
+    assert.match(desktop, /Unarchive/);
     assert.match(desktop, /Cancel/);
-    assert.doesNotMatch(desktop, /Unarchive/);
     assert.doesNotMatch(desktop, /Mark unread|Snooze/);
   });
 
@@ -462,7 +463,7 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.doesNotMatch(ticket, /MarkLeadUnarchiveButton/);
     assert.doesNotMatch(ticket, /MarkLeadDoneButton/);
     assert.match(view, /InboxPurposeChip/);
-    assert.match(view, /updateLeadStatus\(callId, "archived"\)/);
+    assert.match(view, /updateLeadStatus\(callId, archived \? "new" : "archived"\)/);
   });
 
   it("FilterTabs have no Unread or Snoozed. Archived is a folder row", () => {

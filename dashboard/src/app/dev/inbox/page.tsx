@@ -105,6 +105,16 @@ const ROWS: InboxItem[] = [
     },
   }),
   item({
+    id: "archived",
+    purpose: "human",
+    needsYou: false,
+    callerName: "Njeri",
+    callerPhone: "254700000006",
+    headline: "Asked for a person",
+    intent: "human",
+    lead: { leadStatus: "archived" } as InboxItem["lead"],
+  }),
+  item({
     id: "long-reason",
     purpose: "answered",
     needsYou: false,
