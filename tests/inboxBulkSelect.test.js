@@ -58,10 +58,13 @@ describe("inbox bulk select", () => {
   const actions = read("dashboard/src/lib/inboxLeadActions.ts");
   const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
 
-  it("enters selection from a hover checkbox or touch long-press", () => {
+  it("enters selection from a desktop checkbox or touch long-press", () => {
     assert.match(select, /type="checkbox"/);
     assert.match(select, /sr-only/);
     assert.match(select, /Select \{who\}/);
+    assert.match(select, /hidden md:inline-flex opacity-50/);
+    assert.doesNotMatch(select, /hidden opacity-0/);
+    assert.doesNotMatch(select, /group-hover:opacity-100/);
     assert.doesNotMatch(verbs, /id: "select"/);
     assert.match(overflow, /inboxOverflowActions\(item\)/);
     assert.match(overflow, /ui\?\.enter\(item\.id\)/);

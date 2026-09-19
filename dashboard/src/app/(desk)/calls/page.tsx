@@ -22,7 +22,11 @@ import {
   inboxTableKind,
 } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
-import type { InboxReturn } from "@/lib/inboxHref";
+import {
+  inboxReturnFromSearch,
+  inboxReturnHref,
+  type InboxReturn,
+} from "@/lib/inboxHref";
 import { inboxTeammateOptions } from "@/lib/inboxTriage";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
@@ -139,6 +143,8 @@ export default async function CallsPage({
     view?: string;
     week?: string;
     day?: string;
+    from?: string;
+    rpage?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -215,6 +221,18 @@ export default async function CallsPage({
     week: weekView ? monday : undefined,
     day: todayView || holdTodayView ? day : undefined,
   };
+  const archivedReturn =
+    activeFilter === "archived"
+      ? inboxReturnFromSearch({
+          from: sp.from,
+          view: sp.view,
+          week: sp.week,
+          day: sp.day,
+          q: sp.q,
+          page: sp.rpage,
+        })
+      : null;
+  const archivedBackHref = archivedReturn ? inboxReturnHref(archivedReturn) : undefined;
 
   return (
     <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
@@ -228,9 +246,14 @@ export default async function CallsPage({
           activeFilter === "archived" ? undefined : inboxCaption(searched, vertical)
         }
         vertical={vertical}
-        view={boardView || holdTodayView ? view : undefined}
-        week={weekView ? monday : undefined}
-        day={todayView || holdTodayView ? day : undefined}
+        view={boardView || holdTodayView ? view : archivedReturn?.view}
+        week={weekView ? monday : archivedReturn?.week}
+        day={todayView || holdTodayView ? day : archivedReturn?.day}
+        backHref={archivedBackHref}
+        from={archivedReturn?.purpose}
+        rpage={
+          archivedReturn?.page != null ? String(archivedReturn.page) : undefined
+        }
       />
       </InboxSelectChrome>
 
@@ -319,8 +342,8 @@ export default async function CallsPage({
             ids={pageRows.map((item) => item.id)}
             scopeKey={`${activeFilter}:${page}:${q}`}
           >
-          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
-            {showArchivedEntry ? <InboxArchivedPhoneRow count={counts.archived} q={q} /> : null}
+          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
+            {showArchivedEntry ? <InboxArchivedPhoneRow count={counts.archived} ret={inboxRet} /> : null}
             {pageRows.map((item) => (
               <InboxPhoneRow
                 key={item.id}
@@ -332,8 +355,8 @@ export default async function CallsPage({
               />
             ))}
           </ul>
-          <div className="mt-8 hidden md:block">
-            <DeskDataTable minWidthClass="min-w-[720px]">
+          <div className="mt-8 hidden lg:block">
+            <DeskDataTable minWidthClass="min-w-0">
               <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                 <tr>
                   {inboxTableKind(activeFilter) === "hold" ? (
@@ -381,7 +404,7 @@ export default async function CallsPage({
                 </tr>
               </thead>
               <tbody>
-                {showArchivedEntry ? <InboxArchivedTableRow count={counts.archived} q={q} /> : null}
+                {showArchivedEntry ? <InboxArchivedTableRow count={counts.archived} ret={inboxRet} /> : null}
                 {pageRows.map((item) => (
                   <InboxTableRow
                     key={item.id}

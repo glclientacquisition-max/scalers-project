@@ -10,6 +10,8 @@ function load() {
     import {
       inboxRecordHref,
       inboxReturnHref,
+      inboxArchivedHref,
+      inboxReturnFromSearch,
       contactFromCallHref,
       callFromContactHref,
       contactFromInboxHref,
@@ -41,6 +43,31 @@ function load() {
       }),
       inboxBare: inboxFromContactHref({ from: "inbox" }),
       notInbox: inboxFromContactHref({ from: "call", call: "call-1" }),
+      archivedFromJob: inboxArchivedHref({
+        purpose: "job",
+        view: "week",
+        week: "2026-09-14",
+        q: "Amina",
+        page: 2,
+      }),
+      archivedBare: inboxArchivedHref({}),
+      archivedBack: inboxReturnHref(
+        inboxReturnFromSearch({
+          from: "job",
+          view: "week",
+          week: "2026-09-14",
+          q: "Amina",
+          rpage: "2",
+          page: "4",
+        })
+      ),
+      archivedBackNeeds: inboxReturnHref(
+        inboxReturnFromSearch({
+          from: "needs",
+          q: "Amina",
+          rpage: "3",
+        })
+      ),
     };
     console.log(JSON.stringify(cases));
   `;
@@ -83,5 +110,20 @@ describe("inbox return path", () => {
     assert.equal(hrefs.fromInbox, "/calls?purpose=needs&q=Amina&page=2");
     assert.equal(hrefs.inboxBare, "/calls");
     assert.equal(hrefs.notInbox, null);
+  });
+
+  it("opens Archived with the prior pile, page, and visit layout", () => {
+    const hrefs = load();
+    assert.equal(
+      hrefs.archivedFromJob,
+      "/calls?purpose=archived&q=Amina&from=job&rpage=2&view=week&week=2026-09-14"
+    );
+    assert.equal(hrefs.archivedBare, "/calls?purpose=archived");
+  });
+
+  it("returns from Archived to that stored pile, page, and visit layout", () => {
+    const hrefs = load();
+    assert.equal(hrefs.archivedBack, "/calls?purpose=job&q=Amina&page=2&view=week&week=2026-09-14");
+    assert.equal(hrefs.archivedBackNeeds, "/calls?purpose=needs&q=Amina&page=3");
   });
 });

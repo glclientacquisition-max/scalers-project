@@ -85,6 +85,7 @@ export function inboxReturnFromSearch(sp: {
   day?: string;
   q?: string;
   page?: string;
+  rpage?: string;
 }): InboxReturn {
   return {
     purpose: pile({ from: sp.from }),
@@ -92,8 +93,22 @@ export function inboxReturnFromSearch(sp: {
     week: sp.week,
     day: sp.day,
     q: sp.q,
-    page: sp.page,
+    page: sp.rpage || sp.page,
   };
+}
+
+/** Open the Archived folder while keeping the pile the owner came from. */
+export function inboxArchivedHref(ret: InboxReturn = {}): string {
+  const q = new URLSearchParams();
+  q.set("purpose", "archived");
+  const text = cleanQuery(ret.q);
+  if (text) q.set("q", text);
+  const id = pile(ret);
+  if (id && id !== "archived") q.set("from", id);
+  const page = pageNum(ret.page);
+  if (page) q.set("rpage", String(page));
+  applyViewQuery(q, ret, id);
+  return `/calls?${q.toString()}`;
 }
 
 export function contactFromCallHref(

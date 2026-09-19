@@ -70,7 +70,7 @@ export function InboxRowCheck({ item }: { item: InboxItem }) {
         focusRingVisible,
         ui.selecting
           ? "hidden md:inline-flex"
-          : "hidden opacity-0 [@media(hover:hover)_and_(pointer:fine)]:inline-flex group-hover:opacity-100 focus-within:opacity-100",
+          : "hidden md:inline-flex opacity-50 hover:opacity-100 focus-within:opacity-100 has-[:checked]:opacity-100",
       ].join(" ")}
     >
       <span className="sr-only">Select {who}</span>
