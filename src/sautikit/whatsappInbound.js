@@ -12,6 +12,21 @@ const PLATFORM_SAUTIKIT_NUMBER_ID = '81424fbd-8f4c-459a-858d-98ced4393df6';
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_ACK = 'Got it. A Scalers teammate will follow up.';
 
+/**
+ * Map inbound `from` / `wa_id` to Cloud API digits (no +).
+ * Kenya 07… and 7… become 2547…. Non-Kenya digits stay as given.
+ */
+function normalizeWhatsAppContactId(raw) {
+  let digits = String(raw || '').replace(/[^\d+]/g, '');
+  if (digits.startsWith('+')) digits = digits.slice(1);
+  if (digits.startsWith('0') && digits.length === 10) {
+    digits = `254${digits.slice(1)}`;
+  } else if (/^[17]\d{8}$/.test(digits)) {
+    digits = `254${digits}`;
+  }
+  return digits;
+}
+
 function platformPhoneNumberId() {
   return (
     String(process.env.SAUTIKIT_WHATSAPP_PHONE_NUMBER_ID || '').trim() ||
@@ -228,7 +243,7 @@ async function processWhatsAppReceived(opts = {}) {
         phoneNumberId: msg.phoneNumberId,
         sautikitNumberId: PLATFORM_SAUTIKIT_NUMBER_ID,
         e164: PLATFORM_WHATSAPP_E164,
-        contactWaId: msg.from,
+        contactWaId: normalizeWhatsAppContactId(msg.from),
         contactName: msg.contactName,
         wamid: msg.wamid,
         type: msg.type,
@@ -247,10 +262,11 @@ async function processWhatsAppReceived(opts = {}) {
         console.warn('[whatsapp] mark read failed:', err?.message || err);
       }
     }
-    if (inboundAckEnabled() && typeof sendText === 'function' && msg.from) {
+    const contactId = normalizeWhatsAppContactId(msg.from);
+    if (inboundAckEnabled() && typeof sendText === 'function' && contactId) {
       try {
         await sendText({
-          to: msg.from,
+          to: contactId,
           type: 'text',
           body: inboundAckBody(),
         });
@@ -292,4 +308,5 @@ module.exports = {
   isWhatsAppSessionOpen,
   processWhatsAppReceived,
   inboundAckBody,
+  normalizeWhatsAppContactId,
 };

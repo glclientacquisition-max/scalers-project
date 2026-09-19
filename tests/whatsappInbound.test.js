@@ -11,6 +11,7 @@ const {
   createWhatsAppDedupe,
   isWhatsAppSessionOpen,
   processWhatsAppReceived,
+  normalizeWhatsAppContactId,
 } = require('../src/sautikit/whatsappInbound');
 const {
   buildWhatsAppSendPayload,
@@ -223,6 +224,28 @@ describe('processWhatsAppReceived', () => {
     assert.doesNotMatch(sends[0].body, /Done and Dusted/i);
   });
 
+  it('maps inbound from / wa_id to Kenya E.164 digits', async () => {
+    assert.equal(normalizeWhatsAppContactId('+254790381872'), '254790381872');
+    assert.equal(normalizeWhatsAppContactId('0790381872'), '254790381872');
+    assert.equal(normalizeWhatsAppContactId('790381872'), '254790381872');
+    const persist = [];
+    const sends = [];
+    await processWhatsAppReceived({
+      body: metaInbound({ from: '+254790381872' }),
+      persistInbound: async (row) => {
+        persist.push(row);
+        return { ok: true, duplicate: false };
+      },
+      markRead: async () => ({ ok: true }),
+      sendText: async (payload) => {
+        sends.push(payload);
+        return { ok: true };
+      },
+    });
+    assert.equal(persist[0].contactWaId, '254790381872');
+    assert.equal(sends[0].to, '254790381872');
+  });
+
   it('handles a SautiKit workspace envelope the same as a Graph envelope', async () => {
     const persist = [];
     const sends = [];
@@ -337,6 +360,7 @@ describe('platform send payload', () => {
     'SAUTIKIT_WHATSAPP_CONNECTION_ID',
     'SAUTIKIT_WHATSAPP_TEMPLATE',
     'SAUTIKIT_WHATSAPP_TEMPLATE_LANG',
+    'SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY',
   ];
   /** @type {Record<string, string|undefined>} */
   let saved = {};
@@ -371,9 +395,23 @@ describe('platform send payload', () => {
     assert.equal('from' in payload, false);
   });
 
-  it('uses type=template when originating and a template name is set', () => {
+  it('uses the approved first template when originating outside the window', () => {
+    const payload = buildWhatsAppSendPayload({
+      to: '254790381872',
+      body: 'ignored',
+      windowOpen: false,
+      lead: { name: 'Ann', callerNumber: '254711', reason: 'Quote' },
+    });
+    assert.equal(payload.type, 'template');
+    assert.equal(payload.template.name, 'scalers_staff_alert');
+    assert.equal(payload.template.language_code, 'en');
+    assert.equal(payload.template.components[0].parameters.length, 3);
+  });
+
+  it('uses a legacy name only when explicitly allowed', () => {
     process.env.SAUTIKIT_WHATSAPP_TEMPLATE = 'missed_call_lead';
     process.env.SAUTIKIT_WHATSAPP_TEMPLATE_LANG = 'en';
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY = 'on';
     const payload = buildWhatsAppSendPayload({
       to: '254790381872',
       body: 'ignored',
@@ -386,7 +424,7 @@ describe('platform send payload', () => {
   });
 
   it('uses type=text inside the 24h window even if a template is configured', () => {
-    process.env.SAUTIKIT_WHATSAPP_TEMPLATE = 'missed_call_lead';
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE = 'scalers_staff_alert';
     const payload = buildWhatsAppSendPayload({
       to: '254790381872',
       body: 'Got it. A Scalers teammate will follow up.',

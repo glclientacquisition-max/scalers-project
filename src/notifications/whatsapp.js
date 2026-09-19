@@ -8,8 +8,13 @@
 // Session text only inside an open 24h window (inbound ack, or a follow-up ping).
 
 const SAUTIKIT_API_BASE = process.env.SAUTIKIT_API_BASE || 'https://api.sautikit.com';
-const { isWhatsAppSessionOpen } = require('../sautikit/whatsappInbound');
-const { buildStaffWhatsAppTemplate } = require('./whatsappTemplates');
+const { isWhatsAppSessionOpen, normalizeWhatsAppContactId } = require('../sautikit/whatsappInbound');
+const {
+  bodyComponentsFromParameters,
+  buildStaffWhatsAppTemplate,
+  genericTemplateName,
+  templateLanguage,
+} = require('./whatsappTemplates');
 
 function isWhatsAppConfigured() {
   return Boolean(
@@ -18,14 +23,9 @@ function isWhatsAppConfigured() {
   );
 }
 
-/** Normalize to digits with country code, no leading +. */
+/** Cloud API `to` / thread key: digits with country code, no leading +. */
 function normalizeWhatsAppTo(phone) {
-  let digits = String(phone || '').replace(/[^\d+]/g, '');
-  if (digits.startsWith('+')) digits = digits.slice(1);
-  if (digits.startsWith('0') && digits.length === 10) {
-    digits = `254${digits.slice(1)}`;
-  }
-  return digits;
+  return normalizeWhatsAppContactId(phone);
 }
 
 function platformWhatsAppSender() {
@@ -55,7 +55,56 @@ function buildLeadText({ businessName, name, reason, callerNumber, recordingUrl 
   return lines.join('\n');
 }
 
-function buildWhatsAppSendPayload({ to, body, lead = {}, windowOpen = false, kind } = {}) {
+function buildWhatsAppTemplatePayload({
+  to,
+  templateName,
+  language,
+  components,
+  parameters,
+  kind,
+  body,
+  lead = {},
+} = {}) {
+  const toNorm = normalizeWhatsAppTo(to);
+  if (!toNorm) throw new Error('WhatsApp destination number is empty');
+
+  const built = buildStaffWhatsAppTemplate({
+    kind,
+    body: body || buildLeadText(lead),
+    lead,
+    to: toNorm,
+    templateName: templateName || undefined,
+    language: language || undefined,
+  });
+  const name = templateName || built.name || genericTemplateName();
+  const language_code = language || built.language_code || templateLanguage();
+  const resolvedComponents =
+    Array.isArray(components) && components.length
+      ? components
+      : bodyComponentsFromParameters(parameters || built.parameters);
+
+  return {
+    ...senderFields(),
+    to: toNorm,
+    type: 'template',
+    template: {
+      name,
+      language_code,
+      components: resolvedComponents,
+    },
+  };
+}
+
+function buildWhatsAppSendPayload({
+  to,
+  body,
+  lead = {},
+  windowOpen = false,
+  kind,
+  templateName,
+  language,
+  components,
+} = {}) {
   const toNorm = normalizeWhatsAppTo(to);
   if (!toNorm) throw new Error('WhatsApp destination number is empty');
 
@@ -71,27 +120,40 @@ function buildWhatsAppSendPayload({ to, body, lead = {}, windowOpen = false, kin
     };
   }
 
-  const template = buildStaffWhatsAppTemplate({
+  return buildWhatsAppTemplatePayload({
+    to,
+    templateName,
+    language,
+    components,
     kind,
-    body: body || buildLeadText(lead),
+    body,
     lead,
-    to: toNorm,
   });
-  return {
-    ...senderFields(),
-    to: toNorm,
-    type: 'template',
-    template: {
-      name: template.name,
-      language_code: template.language_code,
-      components: [
-        {
-          type: 'body',
-          parameters: template.parameters.map((text) => ({ type: 'text', text })),
-        },
-      ],
-    },
-  };
+}
+
+function mapWhatsAppSendError(status, json, text) {
+  const errObj = json && typeof json === 'object' ? json.error || json : {};
+  const code = errObj.code || errObj.error_code || json?.code || status;
+  const message = String(errObj.message || errObj.error_user_msg || text || '').slice(0, 300);
+  let reason = 'send_failed';
+  if (status === 401 || status === 403) reason = 'auth';
+  else if (status >= 500) reason = 'upstream';
+  else if (code === 131047 || /24\s*hour|session window/i.test(message)) reason = 'outside_24h_window';
+  else if (code === 132001 || /template.*(not (exist|found)|name)/i.test(message)) {
+    reason = 'template_not_found';
+  } else if (code === 132000 || /parameter/i.test(message)) reason = 'template_param_mismatch';
+  else if (code === 131026 || /not a whatsapp/i.test(message)) reason = 'not_whatsapp_user';
+  return { status, code, reason, message };
+}
+
+function throwWhatsAppSendError(status, json, text) {
+  const mapped = mapWhatsAppSendError(status, json, text);
+  const err = new Error(`SautiKit WhatsApp send failed: ${mapped.status} ${mapped.reason} ${mapped.message}`);
+  err.status = mapped.status;
+  err.code = mapped.code;
+  err.reason = mapped.reason;
+  err.body = json;
+  throw err;
 }
 
 async function sautikitWhatsAppPost(path, payload) {
@@ -150,10 +212,40 @@ async function sendOwnerWhatsApp({
   const payload = buildWhatsAppSendPayload({ to, body, lead, windowOpen: open, kind });
   const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
   if (status !== 202 && status !== 200) {
-    const err = new Error(`SautiKit WhatsApp send failed: ${status} ${text.slice(0, 300)}`);
-    err.status = status;
-    err.body = json;
-    throw err;
+    throwWhatsAppSendError(status, json, text);
+  }
+  return json;
+}
+
+/**
+ * Always send a Cloud API template (never session text).
+ * Default name/language: approved first template `scalers_staff_alert` / `en`.
+ */
+async function sendWhatsAppTemplate({
+  to,
+  templateName,
+  language,
+  components,
+  parameters,
+  kind,
+  body,
+  lead = {},
+  dryRun = false,
+} = {}) {
+  const payload = buildWhatsAppTemplatePayload({
+    to,
+    templateName: templateName || genericTemplateName(),
+    language: language || templateLanguage(),
+    components,
+    parameters,
+    kind,
+    body,
+    lead,
+  });
+  if (dryRun) return { dryRun: true, payload };
+  const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
+  if (status !== 202 && status !== 200) {
+    throwWhatsAppSendError(status, json, text);
   }
   return json;
 }
@@ -180,6 +272,9 @@ module.exports = {
   buildLeadText,
   platformWhatsAppSender,
   buildWhatsAppSendPayload,
+  buildWhatsAppTemplatePayload,
+  mapWhatsAppSendError,
   sendOwnerWhatsApp,
+  sendWhatsAppTemplate,
   markWhatsAppRead,
 };

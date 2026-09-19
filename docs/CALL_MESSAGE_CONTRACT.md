@@ -71,7 +71,7 @@ Staff alerts use the first channel that works, in this order:
 | Order | Channel | Provider | When it is used |
 | --- | --- | --- | --- |
 | 1 | **SMS** | TextSMS.co.ke | Always first when configured. Works on any phone. |
-| 2 | **WhatsApp** | SautiKit | When SMS is not configured, fails, or is at cap. Needs `SAUTIKIT_WHATSAPP_NUMBER_ID`. Cold send is a Meta utility template ([`WHATSAPP_TEMPLATES.md`](./WHATSAPP_TEMPLATES.md)). Session text only inside an open 24h window. |
+| 2 | **WhatsApp** | SautiKit | When SMS is not configured, fails, or is at cap. Needs `SAUTIKIT_WHATSAPP_NUMBER_ID`. Cold send is `scalers_staff_alert` / `en` until a kind env is set ([`WHATSAPP_TEMPLATES.md`](./WHATSAPP_TEMPLATES.md)). Session text only inside an open 24h window. |
 | 3 | **Email** | Resend | Fallback when SMS and WhatsApp miss. |
 | 4 | **Desk note** | Supabase call row | Always saved. Soft success if 1–3 miss. |
 

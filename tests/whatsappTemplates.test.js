@@ -3,7 +3,10 @@ const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  APPROVED_FIRST_TEMPLATE,
+  APPROVED_FIRST_TEMPLATE_LANG,
   buildStaffWhatsAppTemplate,
+  genericTemplateName,
   parametersForKind,
   sanitizeParam,
   templateNameForKind,
@@ -11,7 +14,10 @@ const {
 const {
   buildLeadText,
   buildWhatsAppSendPayload,
+  buildWhatsAppTemplatePayload,
+  mapWhatsAppSendError,
   sendOwnerWhatsApp,
+  sendWhatsAppTemplate,
 } = require('../src/notifications/whatsapp');
 const { dispatchAlert } = require('../src/notifications/dispatch');
 
@@ -28,6 +34,7 @@ const ENV_KEYS = [
   'SAUTIKIT_WHATSAPP_TEMPLATE_SERVICE_REQUEST',
   'SAUTIKIT_WHATSAPP_TEMPLATE_WALLET',
   'SAUTIKIT_WHATSAPP_TEMPLATE_OUTAGE',
+  'SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY',
   'TEXTSMS_API_KEY',
   'TEXTSMS_PARTNER_ID',
   'TEXTSMS_SHORTCODE',
@@ -55,15 +62,16 @@ describe('staff WhatsApp templates', () => {
     }
   });
 
-  it('defaults kind names to scalers_* catalog', () => {
-    assert.equal(templateNameForKind('lead'), 'scalers_lead');
-    assert.equal(templateNameForKind('escalation'), 'scalers_escalation');
-    assert.equal(templateNameForKind('appointment'), 'scalers_visit');
-    assert.equal(templateNameForKind('service_request'), 'scalers_request');
-    assert.equal(templateNameForKind('wallet_low'), 'scalers_wallet');
-    assert.equal(templateNameForKind('wallet_empty'), 'scalers_wallet');
-    assert.equal(templateNameForKind('outage_speech'), 'scalers_outage');
-    assert.equal(templateNameForKind('outage_llm'), 'scalers_outage');
+  it('defaults every kind to the approved first template', () => {
+    assert.equal(genericTemplateName(), APPROVED_FIRST_TEMPLATE);
+    assert.equal(templateNameForKind('lead'), 'scalers_staff_alert');
+    assert.equal(templateNameForKind('escalation'), 'scalers_staff_alert');
+    assert.equal(templateNameForKind('appointment'), 'scalers_staff_alert');
+    assert.equal(templateNameForKind('service_request'), 'scalers_staff_alert');
+    assert.equal(templateNameForKind('wallet_low'), 'scalers_staff_alert');
+    assert.equal(templateNameForKind('wallet_empty'), 'scalers_staff_alert');
+    assert.equal(templateNameForKind('outage_speech'), 'scalers_staff_alert');
+    assert.equal(templateNameForKind('outage_llm'), 'scalers_staff_alert');
     assert.equal(templateNameForKind('unknown'), 'scalers_staff_alert');
   });
 
@@ -74,7 +82,15 @@ describe('staff WhatsApp templates', () => {
     assert.equal(templateNameForKind('appointment'), 'scalers_staff_alert');
   });
 
-  it('lead params match the approval body', () => {
+  it('ignores stale missed_call_lead generic unless legacy is allowed', () => {
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE = 'missed_call_lead';
+    assert.equal(templateNameForKind('lead'), 'scalers_staff_alert');
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY = 'on';
+    assert.equal(templateNameForKind('appointment'), 'missed_call_lead');
+  });
+
+  it('lead params match the approval body when the kind template is set', () => {
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_LEAD = 'scalers_lead';
     const params = parametersForKind('lead', {
       body: 'New missed-call lead. Done and Dusted Cleaning Services\nName: Jane\nPhone: 254790381872\nReason: Book carpet cleaning\nOpen call: https://desk.example/calls/1',
       lead: {
@@ -92,7 +108,23 @@ describe('staff WhatsApp templates', () => {
     for (const p of params) assert.doesNotMatch(p, /[—–]|https?:\/\//);
   });
 
+  it('approved first template packs the generic 3-line body', () => {
+    const params = parametersForKind('lead', {
+      body: 'New missed-call lead. Done and Dusted Cleaning Services\nName: Jane\nPhone: 254790381872\nReason: Book carpet cleaning',
+      lead: {
+        businessName: 'Done and Dusted Cleaning Services',
+        name: 'Jane',
+        callerNumber: '254790381872',
+        reason: 'Book carpet cleaning',
+      },
+    });
+    assert.equal(params[0], 'New missed-call lead. Done and Dusted Cleaning Services');
+    assert.equal(params.length, 3);
+    for (const p of params) assert.doesNotMatch(p, /[—–]|https?:\/\//);
+  });
+
   it('escalation params are teammate, business, caller block', () => {
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_ESCALATION = 'scalers_escalation';
     const params = parametersForKind('escalation', {
       body: 'Escalation for Wanjiku. Done and Dusted Cleaning Services\nCaller: Jane\nPhone: 254790381872\nReason: Ask for Wanjiku',
       lead: {
@@ -110,6 +142,8 @@ describe('staff WhatsApp templates', () => {
   });
 
   it('visit and request keep titled layout without stuffing a lead', () => {
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_APPOINTMENT = 'scalers_visit';
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_SERVICE_REQUEST = 'scalers_request';
     const visit = parametersForKind('appointment', {
       body: 'VISIT REQUEST. Done and Dusted Cleaning Services\nService: Carpet cleaning\nWhen: Fri 10:00\nCaller: Jane\nPhone: 254790381872\nOpen Inbox Visits to confirm or cancel.',
       lead: { businessName: 'Done and Dusted Cleaning Services', reason: 'Visit' },
@@ -129,6 +163,8 @@ describe('staff WhatsApp templates', () => {
   });
 
   it('wallet and outage do not use missed-call fields', () => {
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_WALLET = 'scalers_wallet';
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_OUTAGE = 'scalers_outage';
     const wallet = parametersForKind('wallet_low', {
       body: 'Scalers wallet running low. Westlands Books\nPrepaid balance is about KES 1,200 (alert under KES 200).\nTop up soon so calls keep being covered.',
       lead: { businessName: 'Westlands Books', reason: 'Prepaid wallet low' },
@@ -146,8 +182,9 @@ describe('staff WhatsApp templates', () => {
     assert.equal(outage[2], 'Open the desk to act.');
   });
 
-  it('legacy non-scalers template keeps name phone reason', () => {
+  it('legacy non-scalers template keeps name phone reason when allowed', () => {
     process.env.SAUTIKIT_WHATSAPP_TEMPLATE = 'missed_call_lead';
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY = 'on';
     const params = parametersForKind('lead', {
       lead: { name: 'Jane', callerNumber: '254790381872', reason: 'Book carpet cleaning' },
     });
@@ -166,8 +203,8 @@ describe('staff WhatsApp templates', () => {
       kind: 'lead',
       lead: { businessName: 'Shop', name: 'Ann', callerNumber: '2547', reason: 'Hi' },
     });
-    assert.equal(tpl.name, 'scalers_lead');
-    assert.equal(tpl.language_code, 'en');
+    assert.equal(tpl.name, APPROVED_FIRST_TEMPLATE);
+    assert.equal(tpl.language_code, APPROVED_FIRST_TEMPLATE_LANG);
     assert.equal(tpl.parameters.length, 3);
   });
 
@@ -186,12 +223,26 @@ describe('staff WhatsApp templates', () => {
     });
     assert.equal(payload.to, '254740442943');
     assert.equal(payload.type, 'template');
-    assert.equal(payload.template.name, 'scalers_lead');
+    assert.equal(payload.template.name, APPROVED_FIRST_TEMPLATE);
+    assert.equal(payload.template.language_code, 'en');
     assert.equal(payload.template.components[0].parameters.length, 3);
     assert.equal(buildLeadText({ businessName: 'Shop', name: 'Jane' }).includes('—'), false);
   });
 
-  it('dispatchAlert WhatsApp uses the kind template when SMS is down', async () => {
+  it('open 24h window stays session text even with a template name', () => {
+    process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
+    const payload = buildWhatsAppSendPayload({
+      to: '254790381872',
+      body: 'Got it. A Scalers teammate will follow up.',
+      windowOpen: true,
+      kind: 'lead',
+    });
+    assert.equal(payload.type, 'text');
+    assert.equal(payload.template, undefined);
+    assert.equal(payload.text.body, 'Got it. A Scalers teammate will follow up.');
+  });
+
+  it('dispatchAlert WhatsApp uses the approved first template when SMS is down', async () => {
     process.env.SAUTIKIT_API_KEY = 'k';
     process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
     const calls = [];
@@ -208,11 +259,30 @@ describe('staff WhatsApp templates', () => {
     });
     assert.equal(result.channel, 'whatsapp');
     assert.equal(calls[0].body.type, 'template');
-    assert.equal(calls[0].body.template.name, 'scalers_visit');
+    assert.equal(calls[0].body.template.name, APPROVED_FIRST_TEMPLATE);
     assert.equal(calls[0].body.template.components[0].parameters[0].text, 'VISIT REQUEST');
   });
 
-  it('sendOwnerWhatsApp posts the template payload', async () => {
+  it('kind env still selects a later approved template', async () => {
+    process.env.SAUTIKIT_API_KEY = 'k';
+    process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_APPOINTMENT = 'scalers_visit';
+    const calls = [];
+    mock.method(global, 'fetch', async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return { ok: true, status: 202, text: async () => '{}' };
+    });
+    await dispatchAlert({
+      to: '+254711000000',
+      body: 'VISIT REQUEST. Shop\nService: Haircut\nCaller: Jane',
+      lead: { businessName: 'Shop', name: 'Jane', reason: 'Visit' },
+      channels: { sms: false, whatsapp: true, email: false },
+      kind: 'appointment',
+    });
+    assert.equal(calls[0].template.name, 'scalers_visit');
+  });
+
+  it('sendOwnerWhatsApp posts the approved first template', async () => {
     process.env.SAUTIKIT_API_KEY = 'k';
     process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
     let posted = null;
@@ -228,6 +298,80 @@ describe('staff WhatsApp templates', () => {
       lead: { businessName: 'Shop', name: 'Jane', callerNumber: '254711', reason: 'Ask' },
     });
     assert.equal(posted.type, 'template');
-    assert.equal(posted.template.name, 'scalers_escalation');
+    assert.equal(posted.template.name, APPROVED_FIRST_TEMPLATE);
+  });
+
+  it('sendWhatsAppTemplate is parameterized and dry-run never POSTs', async () => {
+    process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
+    let posted = false;
+    mock.method(global, 'fetch', async () => {
+      posted = true;
+      return { ok: true, status: 200, text: async () => '{}' };
+    });
+    const dry = await sendWhatsAppTemplate({
+      to: '+254711000000',
+      templateName: 'hello_world',
+      language: 'en_US',
+      parameters: ['A', 'B', 'C'],
+      dryRun: true,
+    });
+    assert.equal(posted, false);
+    assert.equal(dry.dryRun, true);
+    assert.equal(dry.payload.type, 'template');
+    assert.equal(dry.payload.template.name, 'hello_world');
+    assert.equal(dry.payload.template.language_code, 'en_US');
+
+    const payload = buildWhatsAppTemplatePayload({
+      to: '0711000000',
+      templateName: APPROVED_FIRST_TEMPLATE,
+      language: 'en',
+      parameters: ['Line one', 'Line two', 'Line three'],
+    });
+    assert.equal(payload.template.name, 'scalers_staff_alert');
+    assert.deepEqual(
+      payload.template.components[0].parameters.map((p) => p.text),
+      ['Line one', 'Line two', 'Line three']
+    );
+  });
+
+  it('maps 24h-window and template errors', () => {
+    assert.equal(
+      mapWhatsAppSendError(400, { error: { code: 131047, message: 'outside 24 hour window' } }, '')
+        .reason,
+      'outside_24h_window'
+    );
+    assert.equal(
+      mapWhatsAppSendError(404, { error: { code: 132001, message: 'template name does not exist' } }, '')
+        .reason,
+      'template_not_found'
+    );
+    assert.equal(
+      mapWhatsAppSendError(400, { error: { code: 132000, message: 'parameter count' } }, '').reason,
+      'template_param_mismatch'
+    );
+    assert.equal(mapWhatsAppSendError(503, {}, 'upstream down').reason, 'upstream');
+  });
+
+  it('sendWhatsAppTemplate maps a failed POST', async () => {
+    process.env.SAUTIKIT_API_KEY = 'k';
+    process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
+    mock.method(global, 'fetch', async () => ({
+      ok: false,
+      status: 400,
+      text: async () => JSON.stringify({ error: { code: 132001, message: 'template name does not exist' } }),
+    }));
+    await assert.rejects(
+      () =>
+        sendWhatsAppTemplate({
+          to: '254711000000',
+          templateName: 'not_approved_yet',
+          parameters: ['A', 'B', 'C'],
+        }),
+      (err) => {
+        assert.equal(err.reason, 'template_not_found');
+        assert.equal(err.status, 400);
+        return true;
+      }
+    );
   });
 });

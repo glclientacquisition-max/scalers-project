@@ -26,19 +26,34 @@ const KIND_DEFAULT_NAME = Object.freeze({
   outage_llm: 'scalers_outage',
 });
 
-const GENERIC_DEFAULT_NAME = 'scalers_staff_alert';
+/** First Meta-approved Utility on the Scalers WABA. Unblocks every staff event. */
+const APPROVED_FIRST_TEMPLATE = 'scalers_staff_alert';
+const APPROVED_FIRST_TEMPLATE_LANG = 'en';
+const GENERIC_DEFAULT_NAME = APPROVED_FIRST_TEMPLATE;
+const LEGACY_GENERIC_NAMES = Object.freeze(['missed_call_lead']);
 
 function envTrim(name) {
   const raw = process.env[name];
   return raw && String(raw).trim() ? String(raw).trim() : '';
 }
 
+function allowLegacyGeneric() {
+  return /^(1|true|on|yes)$/i.test(
+    String(process.env.SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY || '').trim()
+  );
+}
+
 function templateLanguage() {
-  return envTrim('SAUTIKIT_WHATSAPP_TEMPLATE_LANG') || 'en';
+  return envTrim('SAUTIKIT_WHATSAPP_TEMPLATE_LANG') || APPROVED_FIRST_TEMPLATE_LANG;
 }
 
 function genericTemplateName() {
-  return envTrim('SAUTIKIT_WHATSAPP_TEMPLATE') || GENERIC_DEFAULT_NAME;
+  const envName = envTrim('SAUTIKIT_WHATSAPP_TEMPLATE');
+  if (!envName) return APPROVED_FIRST_TEMPLATE;
+  if (!allowLegacyGeneric() && LEGACY_GENERIC_NAMES.includes(envName)) {
+    return APPROVED_FIRST_TEMPLATE;
+  }
+  return envName;
 }
 
 function templateNameForKind(kind) {
@@ -47,10 +62,11 @@ function templateNameForKind(kind) {
     const specific = envTrim(key);
     if (specific) return specific;
   }
-  const generic = envTrim('SAUTIKIT_WHATSAPP_TEMPLATE');
-  if (generic) return generic;
-  if (KIND_DEFAULT_NAME[kind]) return KIND_DEFAULT_NAME[kind];
-  return GENERIC_DEFAULT_NAME;
+  return genericTemplateName();
+}
+
+function isApprovedFirstTemplate(name) {
+  return String(name || '') === APPROVED_FIRST_TEMPLATE;
 }
 
 function usesCatalogLayout(name) {
@@ -152,10 +168,13 @@ function packLegacyLeadFields(lead = {}, toFallback = '') {
   ];
 }
 
-function parametersForKind(kind, { body, lead = {}, to } = {}) {
-  const name = templateNameForKind(kind);
+function parametersForKind(kind, { body, lead = {}, to, templateName } = {}) {
+  const name = templateName || templateNameForKind(kind);
   if (!usesCatalogLayout(name)) {
     return packLegacyLeadFields(lead, to).map((value) => sanitizeParam(value));
+  }
+  if (isApprovedFirstTemplate(name)) {
+    return packGeneric(body, lead).map((value) => sanitizeParam(value));
   }
   let raw;
   switch (kind) {
@@ -181,20 +200,42 @@ function parametersForKind(kind, { body, lead = {}, to } = {}) {
   return raw.map((value) => sanitizeParam(value));
 }
 
-function buildStaffWhatsAppTemplate({ kind, body, lead = {}, to } = {}) {
-  const name = templateNameForKind(kind);
-  const parameters = parametersForKind(kind, { body, lead, to });
+function buildStaffWhatsAppTemplate({
+  kind,
+  body,
+  lead = {},
+  to,
+  templateName,
+  language,
+} = {}) {
+  const name = templateName || templateNameForKind(kind);
+  const parameters = parametersForKind(kind, { body, lead, to, templateName: name });
   return {
     name,
-    language_code: templateLanguage(),
+    language_code: language || templateLanguage(),
     parameters,
   };
 }
 
+function bodyComponentsFromParameters(parameters) {
+  return [
+    {
+      type: 'body',
+      parameters: (parameters || []).map((text) => ({ type: 'text', text })),
+    },
+  ];
+}
+
 module.exports = {
+  APPROVED_FIRST_TEMPLATE,
+  APPROVED_FIRST_TEMPLATE_LANG,
   GENERIC_DEFAULT_NAME,
   KIND_DEFAULT_NAME,
+  LEGACY_GENERIC_NAMES,
+  bodyComponentsFromParameters,
   buildStaffWhatsAppTemplate,
+  genericTemplateName,
+  isApprovedFirstTemplate,
   parametersForKind,
   sanitizeParam,
   templateLanguage,

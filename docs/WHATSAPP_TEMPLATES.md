@@ -1,6 +1,6 @@
 # Staff WhatsApp templates (Meta approval)
 
-**Status:** Product lock. Submit these. Staff WhatsApp is template-only.  
+**Status:** First template Active (`scalers_staff_alert` / `en`). Submit the rest. Staff WhatsApp is template-only.  
 **Lanes:** Ops (SautiKit / Meta WABA), Voice (send path)  
 **Companion:** [`CALL_MESSAGE_CONTRACT.md`](./CALL_MESSAGE_CONTRACT.md)
 
@@ -12,7 +12,7 @@ Every staff send uses a **Utility** template on the Scalers WhatsApp Business ac
 
 | # | Name | Use | When |
 | --- | --- | --- | --- |
-| 1 | `scalers_staff_alert` | Generic 3-line alert | **First.** Unblocks every staff event if kind templates are still pending. |
+| 1 | `scalers_staff_alert` | Generic 3-line alert | **Active.** First approval. Default for every staff event until a kind env is set. |
 | 2 | `scalers_lead` | Missed-call lead | Inbox |
 | 3 | `scalers_escalation` | One teammate handoff | Escalate |
 | 4 | `scalers_visit` | Visit request / update / cancel | Inbox Visits |
@@ -42,7 +42,7 @@ SAUTIKIT_WHATSAPP_TEMPLATE_WALLET=scalers_wallet
 SAUTIKIT_WHATSAPP_TEMPLATE_OUTAGE=scalers_outage
 ```
 
-Kind env wins. If a kind name is unset, that event uses `SAUTIKIT_WHATSAPP_TEMPLATE` (generic). If that is unset too, the code default is the `scalers_*` name in the table.
+Kind env wins. If a kind name is unset, that event uses `SAUTIKIT_WHATSAPP_TEMPLATE` when set to a non-legacy name. If that is unset (or still `missed_call_lead`), the send path uses `scalers_staff_alert`. Do not set kind env until that kind name is Active.
 
 Desk: `NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE=true` (default on).
 
@@ -144,11 +144,11 @@ Do this in **WhatsApp Manager** on the **Scalers** WABA (Cloud `phone_number_id`
 | `{{3}}` | `Reason: Book carpet cleaning` |
 
 10. Submit. Status starts **Pending**. Decision is often minutes, can take up to 24 hours. Email goes to Business Suite admins. Usable status is **Active** (API `APPROVED`).
-11. Repeat for the other six names. Do not wait to start `scalers_staff_alert`. Once that one is Active, point Railway `SAUTIKIT_WHATSAPP_TEMPLATE=scalers_staff_alert` and smoke one lead.
+11. Repeat for the other six names. `scalers_staff_alert` is Active. Code already defaults to that name. Optional: set Railway `SAUTIKIT_WHATSAPP_TEMPLATE=scalers_staff_alert`. Smoke one staff phone with `node scripts/send-whatsapp-template.js --to +2547…` (dry-run first; `--apply` only on the owner machine).
 
 If Meta recategorizes as Marketing, appeal as Utility: these are staff operational alerts the business already asked for, not promos. If rejected: add samples, drop any URL, keep Utility wording, resubmit.
 
-Until Active, leave `SAUTIKIT_WHATSAPP_TEMPLATE=missed_call_lead` so existing sends keep using the old name.
+`missed_call_lead` is legacy. The send path ignores that generic env unless `SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY=on`.
 
 ## How unsaved contacts see "Scalers"
 
