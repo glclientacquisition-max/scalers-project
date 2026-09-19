@@ -141,6 +141,7 @@ export function BusinessSettingsShell({
           businessName={businessName}
           lineLive={lineLive}
           lineDetail={lineDetail}
+          index
         />
         <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
         <section className="mt-6">

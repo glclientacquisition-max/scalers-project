@@ -153,33 +153,42 @@ export function SettingsPageHeader({
   lineDetail,
   action,
   showBack = false,
+  index = false,
 }: {
   businessName: string;
   lineLive: boolean;
   lineDetail?: string;
   action?: ReactNode;
   showBack?: boolean;
+  index?: boolean;
 }) {
+  const line = (
+    <p className="text-[13px] text-ink-soft [overflow-wrap:anywhere]">
+      <span className="font-medium text-ink">
+        {lineLive ? "Line live" : "Number pending"}
+      </span>
+      {lineLive && lineDetail ? (
+        <span className="mt-0.5 block truncate font-mono text-xs font-normal">
+          {lineDetail}
+        </span>
+      ) : null}
+    </p>
+  );
+
+  if (index) {
+    return (
+      <header className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
+        {line}
+      </header>
+    );
+  }
+
   return (
     <header className={settingsStickyHeaderClass}>
       <div className="min-w-0">
         {showBack ? <SettingsBackLink /> : null}
-        <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
-          Business Profile
-        </p>
-        <h1 className="mt-1 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink [overflow-wrap:anywhere]">
-          {businessName}
-        </h1>
-        <p className="mt-1 text-[13px] text-ink-soft [overflow-wrap:anywhere]">
-          <span className="font-medium text-ink">
-            {lineLive ? "Line live" : "Number pending"}
-          </span>
-          {lineLive && lineDetail ? (
-            <span className="mt-0.5 block truncate font-mono text-xs font-normal">
-              {lineDetail}
-            </span>
-          ) : null}
-        </p>
+        {line}
       </div>
       {action}
     </header>

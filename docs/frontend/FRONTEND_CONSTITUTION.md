@@ -74,7 +74,7 @@ Base unit **8px**, same as IBM Carbon, Atlassian, and Material. Tailwind already
 | Group / cell | 16 | `px-4` / `gap-4` | Table cell padding, form field stack |
 | Block | 24 | `mt-6` / `gap-6` | Title to table, filter to list |
 | Section | 32–40 | `py-8` / `mt-8` | Rare on desk. Prefer 24. |
-| Page frame | 16 / 24 | `px-4 pt-6 sm:px-6 sm:pt-10` | Desk `main` only. Pages do not double-pad. Phone `main` uses `--desk-tabbar-clearance` (tab bar height plus safe area plus 1.5rem) so the last control is not under the tab bar. |
+| Page frame | 16 / 24 | `px-4 pt-4 sm:px-6 sm:pt-6` | Desk `main` only. Pages do not double-pad. Phone `main` uses `--desk-tabbar-clearance` (tab bar height plus safe area plus 1.5rem) so the last control is not under the tab bar. |
 
 **Proximity rule:** If two controls complete one task, they sit ≤16px apart (Fitts + docking). If they are different tasks, ≥24px.
 
@@ -150,7 +150,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 
 ## 8. Motion and chrome
 
-- **Owner desk shell:** sticky top bar (Scalers mark + Sign out; `md+` text links from `DESK_LINKS`). Do not put the workspace name in the header. Overview `h1` and Business Profile `h1` own that name. Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
+- **Owner desk shell:** sticky top bar (Scalers mark + Sign out; `md+` text links from `DESK_LINKS`). Do not put the workspace name in the header. Primary destinations do not repeat `DESK_LINKS` labels as page titles. Overview keeps a compact workspace name. Settings index does not use a Business Profile `h1`. Nested records and settings panels keep their own titles. Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`.
 - Sign out stays in the header. It is never a sixth tab.
 - Do not add a left desk rail. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.

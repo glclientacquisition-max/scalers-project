@@ -6,7 +6,18 @@ import { callsHref } from "@/lib/callsTriage";
 import { inboxArchivedHref } from "@/lib/inboxHref";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import { btnGhost, deskFieldClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
+import {
+  formatAttentionCount,
+  formatAttentionCountAriaLabel,
+} from "@/lib/deskAttentionCount";
+import {
+  btnGhost,
+  deskFieldClass,
+  deskShiftClass,
+  deskStatusChipClass,
+  pageTitleClass,
+} from "@/components/ui/deskChrome";
+import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { DeskBack } from "@/components/ui/DeskBack";
@@ -15,7 +26,6 @@ export function InboxToolbar({
   active,
   counts,
   q,
-  caption,
   vertical,
   view,
   week,
@@ -27,7 +37,6 @@ export function InboxToolbar({
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
   q: string;
-  caption?: string;
   vertical?: string | null;
   view?: string;
   week?: string;
@@ -39,66 +48,80 @@ export function InboxToolbar({
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
   const archived = active === "archived";
-  const briefing =
-    caption ||
-    (archived
-      ? counts.archived > 0
-        ? `${counts.archived} archived`
-        : "None archived"
-      : counts.needs > 0
-        ? `${counts.needs} need you`
-        : "Clear");
   const weekView = active === "job" && view === "week";
   const todayView = active === "job" && (view === "today" || view === "work");
   const holdToday = active === "hold" && (view === "today" || view === "work");
   const workView = weekView || todayView;
   const searchWait = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const needsDisplay = formatAttentionCount(counts.needs);
+  const needsAria = formatAttentionCountAriaLabel(counts.needs);
+
+  const searchForm = (
+    <form
+      action="/calls"
+      method="get"
+      className="flex w-full min-w-0 gap-2"
+    >
+      <input type="hidden" name="purpose" value={active} />
+      {archived && from ? <input type="hidden" name="from" value={from} /> : null}
+      {archived && rpage ? <input type="hidden" name="rpage" value={rpage} /> : null}
+      {archived && view ? <input type="hidden" name="view" value={view} /> : null}
+      {archived && week ? <input type="hidden" name="week" value={week} /> : null}
+      {archived && day ? <input type="hidden" name="day" value={day} /> : null}
+      {workView || holdToday ? (
+        <input type="hidden" name="view" value={weekView ? "week" : "today"} />
+      ) : null}
+      {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
+      {(todayView || holdToday) && day ? <input type="hidden" name="day" value={day} /> : null}
+      <label className="sr-only" htmlFor="inbox-search">
+        Search inbox
+      </label>
+      <input
+        id="inbox-search"
+        name="q"
+        type="search"
+        defaultValue={q}
+        placeholder={copy.searchPlaceholder}
+        className={deskFieldClass}
+        onChange={(event) => {
+          const form = event.currentTarget.form;
+          if (searchWait.current) clearTimeout(searchWait.current);
+          searchWait.current = setTimeout(() => form?.requestSubmit(), 300);
+        }}
+      />
+      <button type="submit" className={btnGhost}>
+        Search
+      </button>
+    </form>
+  );
+
+  const statusChip =
+    needsDisplay && needsAria ? (
+      active === "needs" ? (
+        <span className={deskStatusChipClass} aria-label={needsAria}>
+          {needsDisplay}
+        </span>
+      ) : (
+        <Link
+          href={callsHref({ purpose: "needs", q: q || undefined })}
+          className={deskStatusChipClass}
+          aria-label={needsAria}
+        >
+          {needsDisplay}
+        </Link>
+      )
+    ) : null;
 
   return (
-    <header className="space-y-6">
+    <header className="space-y-3">
       {archived ? <DeskBack href={backHref || callsHref({ q: q || undefined })}>Inbox</DeskBack> : null}
-      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h1 className={pageTitleClass}>{archived ? "Archived" : "Inbox"}</h1>
-          <p className={`mt-1 text-[13px] text-ink-soft ${deskPreviewClass}`}>{briefing}</p>
-        </div>
-        <form
-          action="/calls"
-          method="get"
-          className="flex w-full min-w-0 gap-2 sm:max-w-sm"
-        >
-          <input type="hidden" name="purpose" value={active} />
-          {archived && from ? <input type="hidden" name="from" value={from} /> : null}
-          {archived && rpage ? <input type="hidden" name="rpage" value={rpage} /> : null}
-          {archived && view ? <input type="hidden" name="view" value={view} /> : null}
-          {archived && week ? <input type="hidden" name="week" value={week} /> : null}
-          {archived && day ? <input type="hidden" name="day" value={day} /> : null}
-          {workView || holdToday ? (
-            <input type="hidden" name="view" value={weekView ? "week" : "today"} />
-          ) : null}
-          {weekView && week ? <input type="hidden" name="week" value={week} /> : null}
-          {(todayView || holdToday) && day ? <input type="hidden" name="day" value={day} /> : null}
-          <label className="sr-only" htmlFor="inbox-search">
-            Search inbox
-          </label>
-          <input
-            id="inbox-search"
-            name="q"
-            type="search"
-            defaultValue={q}
-            placeholder={copy.searchPlaceholder}
-            className={deskFieldClass}
-            onChange={(event) => {
-              const form = event.currentTarget.form;
-              if (searchWait.current) clearTimeout(searchWait.current);
-              searchWait.current = setTimeout(() => form?.requestSubmit(), 300);
-            }}
-          />
-          <button type="submit" className={btnGhost}>
-            Search
-          </button>
-        </form>
-      </div>
+      {archived ? (
+        <DeskIndexLead status={<h1 className={pageTitleClass}>Archived</h1>}>
+          {searchForm}
+        </DeskIndexLead>
+      ) : (
+        <DeskIndexLead status={statusChip}>{searchForm}</DeskIndexLead>
+      )}
 
       {archived ? null : (
       <InboxFilterPills

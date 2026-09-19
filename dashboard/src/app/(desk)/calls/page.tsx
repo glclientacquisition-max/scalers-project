@@ -9,7 +9,6 @@ import { loadInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import {
   countInboxPurposes,
-  inboxCaption,
   itemMatchesPurpose,
   itemMatchesQuery,
   orderInboxItems,
@@ -248,9 +247,6 @@ export default async function CallsPage({
         active={activeFilter}
         counts={counts}
         q={q}
-        caption={
-          activeFilter === "archived" ? undefined : inboxCaption(searched, vertical)
-        }
         vertical={vertical}
         view={boardView || holdTodayView ? view : archivedReturn?.view}
         week={weekView ? monday : archivedReturn?.week}

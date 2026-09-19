@@ -8,7 +8,7 @@
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
-**Chrome:** Greeting eyebrow, workspace name as `h1` (not in the app header). Nairobi `<time>`. One aside: today + line + wallet + docked CTA.
+**Chrome:** Greeting eyebrow, compact workspace name (not in the app header, not the word Overview). Nairobi `<time>`. One aside: today + line + wallet + docked CTA.
 
 **Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
 

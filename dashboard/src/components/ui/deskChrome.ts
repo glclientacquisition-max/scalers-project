@@ -73,6 +73,13 @@ export const deskEmptyClass = "mt-8 border-y border-line py-12 text-center";
 export const pageTitleClass =
   "font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink";
 
+/** Muted status chip on primary destinations. 44px floor. Not a filled CTA. */
+export const deskStatusChipClass = [
+  "inline-flex min-h-11 items-center justify-center rounded-full bg-surface-muted px-3.5 text-sm font-medium tabular-nums text-ink-soft",
+  deskShiftClass,
+  focusRingVisible,
+].join(" ");
+
 /** List preview: one ellipsized line. Full copy lives on the record. */
 export const deskPreviewClass = "min-w-0 truncate";
 

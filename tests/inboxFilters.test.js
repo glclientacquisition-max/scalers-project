@@ -58,7 +58,7 @@ describe("inbox filters and empty states", () => {
     assert.match(page, /Nothing needs you/);
     assert.match(page, /None archived/);
     assert.match(page, /Inbox is empty/);
-    assert.match(page, /inboxCaption\(searched, vertical\)/);
+    assert.doesNotMatch(page, /inboxCaption/);
     assert.match(purpose, /\$\{needs\} need you/);
     assert.match(harness, /ROWS.filter\(\(row\) => row.needsYou\)/);
   });

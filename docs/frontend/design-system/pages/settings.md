@@ -26,11 +26,11 @@ Bare `/settings` is the menu. `?tab=updates` is Updates. `?tab=alerts` is Alerts
 
 ## Chrome
 
-Header hierarchy: uppercase “Business Profile” eyebrow, workspace name as `h1` (Sora, clamp 1.5–2rem), Line live / Number pending as caption. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Business so the phone tab fits; do not put Business Profile on `DESK_LINKS`.
+Header hierarchy: compact workspace name and Line live / Number pending on the settings index. No Business Profile `h1`. Sub-panels keep a short title (Hours, Pronunciation). Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Business so the phone tab fits; do not put Business Profile on `DESK_LINKS`.
 
 Menu: grouped destination rows (`min-h-12`, label + chevron). Section titles are non-clickable. Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl`). Do not compete with the page `h1`.
+Panel titles use `settingsPanelHeadingClass` (`text-xl`). Do not add a page-name `h1` on the settings index.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
