@@ -9,7 +9,7 @@ import { isAuthenticated } from "@/lib/auth";
  */
 export async function revalidateLiveDesk(): Promise<void> {
   if (!(await isAuthenticated())) return;
-  revalidatePath("/home");
+  revalidatePath("/home", "layout");
   revalidatePath("/calls", "layout");
   revalidatePath("/contacts", "layout");
 }

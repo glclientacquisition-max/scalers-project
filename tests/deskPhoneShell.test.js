@@ -57,4 +57,17 @@ describe("desk phone shell", () => {
     assert.match(constitution, /bottom tab bar/);
     assert.match(constitution, /do not live in a hamburger drawer/);
   });
+
+  it("overlays the Inbox count on the tab icon, not as a second control", () => {
+    assert.match(nav, /export function DeskTabBar/);
+    assert.match(nav, /needsCount = 0/);
+    assert.match(nav, /<TabIconWithBadge name=\{item\.label\} count=\{needsCount\} \/>/);
+    assert.match(nav, /formatInboxNavAriaLabel\(needsCount\)/);
+    assert.match(nav, /deskNavBadgeClass/);
+    assert.match(nav, /min-h-12/);
+    assert.doesNotMatch(nav, /deskStatusChipClass/);
+    const badgeBlock = nav.slice(nav.indexOf("function TabIconWithBadge"));
+    assert.match(badgeBlock, /pointer-events-none/);
+    assert.doesNotMatch(badgeBlock, /<Link/);
+  });
 });

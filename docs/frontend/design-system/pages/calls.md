@@ -7,7 +7,7 @@
 
 Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
 
-**Chrome:** No Inbox H1. Compact Needs you chip (`formatAttentionCount`, `9+` at 10). Search, then purpose pills. Nested Archived keeps its title. Search placeholder matches the niche.
+**Chrome:** No Inbox H1. Needs you count overlays the Inbox nav icon (`formatAttentionCount`, `9+` at 10). Search, then purpose pills. Nested Archived keeps its title. Search placeholder matches the niche.
 
 **Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Tap the identity circle to open the contact. No Open or View link.
 

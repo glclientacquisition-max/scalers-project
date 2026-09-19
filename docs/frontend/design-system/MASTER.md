@@ -116,9 +116,8 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Field | `deskFieldClass`. Settings: `settingsFieldClass` = `mt-1` + `deskFieldClass` |
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
-| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` header links. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the header. |
+| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` header links. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the header. Inbox Needs you count overlays the Inbox icon (`deskNavBadgeClass` + `formatAttentionCount`). `1`–`9`, then `9+`. Hidden at 0. `aria-label` includes the count (`Inbox, 3 need you`). Not a second control. |
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
-| Index status chip | `deskStatusChipClass` + `formatAttentionCount`. Muted pill, `min-h-11`, tabular `1`–`9` then `9+`. Inbox Needs you only. Hidden at 0. |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |
 | 404 | `app/not-found.tsx`. Overview is the recovery link. |
