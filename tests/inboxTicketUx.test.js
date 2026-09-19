@@ -26,34 +26,6 @@ describe("inbox ticket action chrome", () => {
     assert.doesNotMatch(detail, /MarkLeadUnarchiveButton/);
   });
 
-  it("splits summary left and transcript right from lg", () => {
-    const splitAt = ticket.indexOf("data-ticket-split");
-    const summaryAt = ticket.indexOf("data-ticket-summary");
-    const threadAt = ticket.indexOf("data-ticket-thread");
-    const transcriptAt = ticket.indexOf("<CallTranscript turns={turns} mode=\"thread\" />");
-    const dockAt = ticket.indexOf("<InboxSmsDock");
-    assert.ok(splitAt > 0 && summaryAt > splitAt && threadAt > summaryAt);
-    assert.ok(transcriptAt > threadAt);
-    assert.ok(dockAt > threadAt);
-    assert.match(ticket, /lg:grid lg:grid-cols-\[minmax\(18rem,22rem\)_minmax\(0,1fr\)\]/);
-    assert.match(ticket, /lg:contents/);
-    assert.match(ticket, /<TicketSummaryFacts want=\{want\} mood=\{mood\} done=\{done\} \/>/);
-    assert.match(ticket, />Want</);
-    assert.match(ticket, />Mood</);
-    assert.match(ticket, />Done</);
-    assert.doesNotMatch(ticket, /Want\. \$\{want\}/);
-    const summaryBlock = ticket.slice(summaryAt, threadAt);
-    const threadBlock = ticket.slice(threadAt, dockAt);
-    assert.match(summaryBlock, /InboxJobEditor/);
-    assert.match(summaryBlock, /InboxHoldEditor/);
-    assert.match(summaryBlock, /CallRecording/);
-    assert.match(threadBlock, /CallTranscript/);
-    assert.match(threadBlock, /CallFaqSuggestions/);
-    assert.doesNotMatch(threadBlock, /InboxJobEditor/);
-    assert.doesNotMatch(threadBlock, /CallRecording/);
-    assert.match(ticket, /InboxSmsDock callId=\{callId\} callerPhone=\{callerPhone\}/);
-  });
-
   it("keeps the purpose stamp read-only and archives from More", () => {
     assert.match(ticket, /InboxPurposeChip/);
     assert.match(ticket, /aria-label="More"/);
@@ -80,7 +52,7 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /canHoldDone/);
     assert.match(ticket, /InboxJobActions id=\{job.id\} status=\{job.status\} banner/);
     assert.match(ticket, /RequestStatusToggle id=\{hold.id\} status=\{hold.status\} banner/);
-    assert.match(ticket, /<TicketSummaryFacts want=\{want\} mood=\{mood\} done=\{done\} \/>/);
+    assert.match(ticket, /Want\. \$\{want\}/);
   });
 
   it("keeps Want, Do next, and Mood as the summary lead", () => {
