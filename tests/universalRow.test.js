@@ -33,7 +33,7 @@ describe("universal row anatomy", () => {
 
   it("carries state as a blue dot plus type weight, never opacity", () => {
     assert.match(row, /rounded-full bg-accent/);
-    assert.match(row, /aria-label="Needs you"/);
+    assert.match(row, /aria-label="Unread"/);
     assert.match(row, /font-semibold text-ink/);
     assert.match(row, /font-medium text-ink/);
     assert.doesNotMatch(inbox, /opacity-\[0\.92\]/);
@@ -45,8 +45,8 @@ describe("universal row anatomy", () => {
     const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
     assert.match(phone, /<InboxRowAvatar/);
     assert.match(avatar, /RowIdentity name=\{name\}/);
-    assert.match(inbox, /RowStateDot show=\{needsYouPile\}/);
-    assert.match(inbox, /deskRowWeightClass\(needsYouPile\)/);
+    assert.match(inbox, /RowStateDot show=\{item\.unread\}/);
+    assert.match(inbox, /deskRowWeightClass\(item\.unread\)/);
     assert.match(inbox, /deskPreviewClass/);
     assert.match(inbox, /deskPreviewCellClass/);
     assert.doesNotMatch(inbox, /line-clamp-2/);

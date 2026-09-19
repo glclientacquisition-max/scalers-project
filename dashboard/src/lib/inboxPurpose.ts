@@ -148,7 +148,7 @@ export function inboxLastCustomerEventAt(opts: {
   return latest;
 }
 
-/** Mail-style unread vs `inbox_read_at`. Not the list dot; the column is unused. */
+/** Mail-style unread vs `inbox_read_at`. Drives the list `RowStateDot` and bold preview. */
 export function inboxIsUnread(opts: {
   lastCustomerEventAt?: string | null;
   inboxReadAt?: string | null;

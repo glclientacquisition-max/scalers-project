@@ -7,6 +7,32 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
+/** Latest customer-originated timestamp: inbound call, hold, or visit. */
+function inboxLastCustomerEventAt({ callCreatedAt, holdCreatedAt, jobCreatedAt }) {
+  let latest = null;
+  let latestMs = -Infinity;
+  for (const iso of [callCreatedAt, holdCreatedAt, jobCreatedAt]) {
+    if (!iso) continue;
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) continue;
+    if (ms >= latestMs) {
+      latestMs = ms;
+      latest = iso;
+    }
+  }
+  return latest;
+}
+
+/** Unread iff a customer event exists after the owner last opened the ticket. */
+function inboxIsUnread({ lastCustomerEventAt, inboxReadAt }) {
+  const eventMs = lastCustomerEventAt ? Date.parse(lastCustomerEventAt) : NaN;
+  if (!Number.isFinite(eventMs)) return false;
+  if (!inboxReadAt) return true;
+  const readMs = Date.parse(inboxReadAt);
+  if (!Number.isFinite(readMs)) return true;
+  return eventMs > readMs;
+}
+
 function inboxNeedsYou({ purpose, leadStatus, hold, job }) {
   if (purpose === "live") return true;
   if (purpose === "answered") return false;
@@ -35,6 +61,10 @@ function countInboxPurposesNeeds(items) {
   return items.filter(itemInNeedsYouPile).length;
 }
 
+function rowDotOn(item) {
+  return Boolean(item.unread);
+}
+
 function refresh(item) {
   return {
     ...item,
@@ -44,6 +74,14 @@ function refresh(item) {
       hold: item.hold,
       job: item.job,
     }),
+    unread: inboxIsUnread({
+      lastCustomerEventAt: inboxLastCustomerEventAt({
+        callCreatedAt: item.lead?.call?.created_at || item.createdAt,
+        holdCreatedAt: item.hold?.created_at,
+        jobCreatedAt: item.job?.created_at,
+      }),
+      inboxReadAt: item.lead?.call?.inbox_read_at,
+    }),
   };
 }
 
@@ -52,10 +90,12 @@ function humanReturn(overrides = {}) {
     id: "human-1",
     createdAt: "2026-09-18T08:00:00.000Z",
     purpose: "human",
-    unread: true,
     hold: null,
     job: null,
-    lead: { leadStatus: "new", call: { inbox_read_at: null } },
+    lead: {
+      leadStatus: "new",
+      call: { created_at: "2026-09-18T08:00:00.000Z", inbox_read_at: null },
+    },
     ...overrides,
   });
 }
@@ -65,10 +105,12 @@ function requestedVisit(overrides = {}) {
     id: "job-1",
     createdAt: "2026-09-18T07:00:00.000Z",
     purpose: "job",
-    unread: false,
     hold: null,
-    job: { status: "requested" },
-    lead: { leadStatus: "new" },
+    job: { status: "requested", created_at: "2026-09-18T07:00:00.000Z" },
+    lead: {
+      leadStatus: "new",
+      call: { created_at: "2026-09-18T07:00:00.000Z", inbox_read_at: "2026-09-18T09:00:00.000Z" },
+    },
     ...overrides,
   });
 }
@@ -78,10 +120,12 @@ function openHold(overrides = {}) {
     id: "hold-1",
     createdAt: "2026-09-18T07:30:00.000Z",
     purpose: "hold",
-    unread: false,
     job: null,
-    hold: { status: "open" },
-    lead: { leadStatus: "new" },
+    hold: { status: "open", created_at: "2026-09-18T07:30:00.000Z" },
+    lead: {
+      leadStatus: "new",
+      call: { created_at: "2026-09-18T07:30:00.000Z", inbox_read_at: "2026-09-18T09:00:00.000Z" },
+    },
     ...overrides,
   });
 }
@@ -91,10 +135,12 @@ function answeredRow() {
     id: "answered-1",
     createdAt: "2026-09-18T09:00:00.000Z",
     purpose: "answered",
-    unread: true,
     hold: null,
     job: null,
-    lead: { leadStatus: "resolved" },
+    lead: {
+      leadStatus: "resolved",
+      call: { created_at: "2026-09-18T09:00:00.000Z", inbox_read_at: null },
+    },
   });
 }
 
@@ -126,96 +172,184 @@ function holdDone(item) {
   });
 }
 
-/** Opening /calls/[id] no longer stamps seen. Unread may flip; the pile does not. */
-function simulateTicketOpen(item) {
-  return {
+/** Opening /calls/[id] stamps inbox_read_at via inboxMarkSeen. */
+function simulateTicketOpen(item, at = "2026-09-19T12:00:00.000Z") {
+  return refresh({
     ...item,
-    unread: false,
     lead: {
       ...(item.lead || {}),
       call: {
         ...(item.lead?.call || {}),
-        inbox_read_at: "2026-09-19T12:00:00.000Z",
+        inbox_read_at: at,
       },
     },
-  };
+  });
 }
 
-describe("inbox row dot matches Needs you", () => {
-  it("is on for unarchived needsYou rows", () => {
-    assert.equal(itemInNeedsYouPile(humanReturn()), true);
-    assert.equal(itemInNeedsYouPile(requestedVisit()), true);
-    assert.equal(itemInNeedsYouPile(openHold()), true);
-    assert.equal(itemInNeedsYouPile(answeredRow()), false);
+describe("inbox unread since last customer event", () => {
+  it("is unread when a customer event exists and the ticket was never opened", () => {
+    const lastCustomerEventAt = inboxLastCustomerEventAt({
+      callCreatedAt: "2026-09-18T08:00:00.000Z",
+    });
+    assert.equal(lastCustomerEventAt, "2026-09-18T08:00:00.000Z");
+    assert.equal(
+      inboxIsUnread({ lastCustomerEventAt, inboxReadAt: null }),
+      true
+    );
+    const row = humanReturn();
+    assert.equal(row.unread, true);
+    assert.equal(rowDotOn(row), true);
   });
 
-  it("clears after archive, confirm, hold Done, and mark done", () => {
-    assert.equal(itemInNeedsYouPile(archive(humanReturn())), false);
-    assert.equal(itemInNeedsYouPile(archive(requestedVisit())), false);
-    assert.equal(itemInNeedsYouPile(confirmVisit(requestedVisit())), false);
-    assert.equal(itemInNeedsYouPile(holdDone(openHold())), false);
-    assert.equal(itemInNeedsYouPile(markDone(humanReturn())), false);
-  });
-
-  it("stays on after a simulated ticket open", () => {
-    const opened = simulateTicketOpen(humanReturn());
-    assert.equal(opened.unread, false);
-    assert.equal(opened.lead.call.inbox_read_at, "2026-09-19T12:00:00.000Z");
-    assert.equal(itemInNeedsYouPile(opened), true);
-    assert.equal(itemInNeedsYouPile(simulateTicketOpen(requestedVisit())), true);
-  });
-
-  it("dots the same set as countInboxPurposes.needs", () => {
-    const items = [
-      humanReturn(),
-      requestedVisit(),
-      openHold(),
-      answeredRow(),
-      archive(humanReturn()),
-      markDone(humanReturn()),
-      confirmVisit(requestedVisit()),
-    ];
-    const dotted = items.filter(itemInNeedsYouPile);
-    assert.equal(dotted.length, 3);
-    assert.equal(countInboxPurposesNeeds(items), dotted.length);
-    assert.deepEqual(
-      dotted.map((row) => row.id),
-      ["human-1", "job-1", "hold-1"]
+  it("is read after opening when no later customer event exists", () => {
+    const lastCustomerEventAt = inboxLastCustomerEventAt({
+      callCreatedAt: "2026-09-18T08:00:00.000Z",
+      holdCreatedAt: "2026-09-18T08:01:00.000Z",
+    });
+    assert.equal(
+      inboxIsUnread({
+        lastCustomerEventAt,
+        inboxReadAt: "2026-09-18T09:00:00.000Z",
+      }),
+      false
     );
   });
 
-  it("wires the list dot and weight to itemInNeedsYouPile, not unread", () => {
-    const purpose = read("dashboard/src/lib/inboxPurpose.ts");
-    const row = read("dashboard/src/components/InboxItemRow.tsx");
-    const desk = read("dashboard/src/components/ui/deskRow.tsx");
-    assert.match(purpose, /export function itemInNeedsYouPile/);
-    assert.match(purpose, /item\.needsYou\) && !itemIsArchived\(item\)/);
-    assert.match(purpose, /if \(itemInNeedsYouPile\(item\)\) counts\.needs \+= 1/);
-    assert.match(row, /itemInNeedsYouPile\(item\)/);
-    assert.match(row, /RowStateDot show=\{needsYouPile\}/);
-    assert.match(row, /deskRowWeightClass\(needsYouPile\)/);
-    assert.doesNotMatch(row, /RowStateDot show=\{item\.unread\}/);
-    assert.doesNotMatch(row, /deskRowWeightClass\(item\.unread\)/);
-    assert.match(desk, /aria-label="Needs you"/);
+  it("is unread when a hold or visit is created after last open", () => {
+    assert.equal(
+      inboxIsUnread({
+        lastCustomerEventAt: inboxLastCustomerEventAt({
+          callCreatedAt: "2026-09-18T08:00:00.000Z",
+          holdCreatedAt: "2026-09-18T10:00:00.000Z",
+        }),
+        inboxReadAt: "2026-09-18T09:00:00.000Z",
+      }),
+      true
+    );
+    assert.equal(
+      inboxIsUnread({
+        lastCustomerEventAt: inboxLastCustomerEventAt({
+          callCreatedAt: "2026-09-18T08:00:00.000Z",
+          jobCreatedAt: "2026-09-18T10:30:00.000Z",
+        }),
+        inboxReadAt: "2026-09-18T09:00:00.000Z",
+      }),
+      true
+    );
   });
 
-  it("does not stamp inbox_read_at when opening /calls/[id]", () => {
+  it("is not unread when there is no customer event timestamp", () => {
+    assert.equal(
+      inboxIsUnread({
+        lastCustomerEventAt: inboxLastCustomerEventAt({}),
+        inboxReadAt: null,
+      }),
+      false
+    );
+  });
+
+  it("wires last-open vs last-customer-event into InboxItem.unread", () => {
+    const purpose = read("dashboard/src/lib/inboxPurpose.ts");
+    assert.match(purpose, /export function inboxLastCustomerEventAt/);
+    assert.match(purpose, /export function inboxIsUnread/);
+    assert.match(purpose, /unread: inboxIsUnread\(/);
+    assert.match(purpose, /callCreatedAt: lead\?\.call\.created_at/);
+    assert.match(purpose, /holdCreatedAt: hold\?\.created_at/);
+    assert.match(purpose, /jobCreatedAt: job\?\.created_at/);
+    assert.match(purpose, /inboxReadAt: lead\?\.call\.inbox_read_at/);
+    assert.doesNotMatch(purpose, /unread: lead\?\.call\.inbox_read_at === null/);
+  });
+
+  it("stamps calls.inbox_read_at when opening /calls/[id]", () => {
+    const actions = read("dashboard/src/app/(desk)/calls/inboxTriageActions.ts");
+    const leads = read("dashboard/src/lib/inboxLeadActions.ts");
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
     const page = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
+    assert.match(actions, /export async function inboxMarkSeen/);
+    assert.match(actions, /inbox_read_at: new Date\(\)\.toISOString\(\)/);
+    assert.match(leads, /export async function inboxMarkSeen/);
+    assert.match(ticket, /inboxMarkSeen\(callId\)/);
     assert.match(page, /InboxTicketView/);
-    assert.doesNotMatch(ticket, /inboxMarkSeen/);
     assert.doesNotMatch(ticket, /id: "unread"/);
     assert.doesNotMatch(ticket, /Mark unread/);
     assert.doesNotMatch(ticket, /["']Snooze["']/);
+    const opened = simulateTicketOpen(humanReturn());
+    assert.equal(opened.unread, false);
+    assert.equal(rowDotOn(opened), false);
+    assert.equal(opened.lead.call.inbox_read_at, "2026-09-19T12:00:00.000Z");
+  });
+
+  it("shows the blue dot and unread weight only when unread is true", () => {
+    const row = read("dashboard/src/components/InboxItemRow.tsx");
+    const desk = read("dashboard/src/components/ui/deskRow.tsx");
+    assert.match(row, /RowStateDot show=\{item\.unread\}/);
+    assert.match(row, /deskRowWeightClass\(item\.unread\)/);
+    assert.doesNotMatch(row, /itemInNeedsYouPile/);
+    assert.doesNotMatch(row, /RowStateDot show=\{item\.needsYou\}/);
+    assert.doesNotMatch(row, /RowStateDot show=\{needsYouPile\}/);
+    assert.doesNotMatch(row, /deskRowWeightClass\(needsYouPile\)/);
+    assert.doesNotMatch(row, /deskRowWeightClass\(item\.needsYou \|\| item\.unread\)/);
+    assert.match(desk, /aria-label="Unread"/);
+    assert.doesNotMatch(desk, /aria-label="Needs you"/);
   });
 
   it("keeps the Inbox nav badge as Needs you count, not unread", () => {
     const load = read("dashboard/src/lib/inboxLoad.ts");
     const layout = read("dashboard/src/app/(desk)/layout.tsx");
+    const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     assert.match(load, /countInboxPurposes\(inbox\.items\)\.needs/);
     assert.match(layout, /loadCachedInboxNeedsCount/);
+    assert.match(purpose, /export function itemInNeedsYouPile/);
+    assert.match(purpose, /if \(itemInNeedsYouPile\(item\)\) counts\.needs \+= 1/);
     assert.doesNotMatch(load, /countInboxPurposes\(inbox\.items\)\.unread/);
     assert.doesNotMatch(load, /items\.filter\(\(item\) => item\.unread\)/);
+  });
+});
+
+describe("inbox unread and Needs you are two signals", () => {
+  it("needsYou can stay true after open so the badge still counts the row", () => {
+    const opened = simulateTicketOpen(humanReturn());
+    assert.equal(opened.unread, false);
+    assert.equal(rowDotOn(opened), false);
+    assert.equal(opened.needsYou, true);
+    assert.equal(itemInNeedsYouPile(opened), true);
+    assert.equal(itemInNeedsYouPile(simulateTicketOpen(requestedVisit())), true);
+    assert.equal(itemInNeedsYouPile(simulateTicketOpen(openHold())), true);
+    assert.equal(
+      countInboxPurposesNeeds([opened, simulateTicketOpen(requestedVisit()), answeredRow()]),
+      2
+    );
+  });
+
+  it("Confirm, hold Done, Mark done, and Archive leave the needs pile independently of unread", () => {
+    const unreadHuman = humanReturn();
+    assert.equal(unreadHuman.unread, true);
+    assert.equal(itemInNeedsYouPile(unreadHuman), true);
+
+    const afterArchive = archive(unreadHuman);
+    assert.equal(afterArchive.unread, true);
+    assert.equal(itemInNeedsYouPile(afterArchive), false);
+
+    const afterDone = markDone(unreadHuman);
+    assert.equal(afterDone.unread, true);
+    assert.equal(itemInNeedsYouPile(afterDone), false);
+
+    const afterConfirm = confirmVisit(requestedVisit());
+    assert.equal(itemInNeedsYouPile(afterConfirm), false);
+
+    const afterHoldDone = holdDone(openHold());
+    assert.equal(itemInNeedsYouPile(afterHoldDone), false);
+
+    const items = [
+      unreadHuman,
+      afterArchive,
+      afterDone,
+      afterConfirm,
+      afterHoldDone,
+      answeredRow(),
+    ];
+    assert.equal(countInboxPurposesNeeds(items), 1);
+    assert.equal(items.filter(rowDotOn).length, 4);
   });
 });
 

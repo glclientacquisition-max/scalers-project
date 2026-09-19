@@ -5,7 +5,7 @@
 
 **Layout:** Fixed header. From `lg`, summary left and transcript right (`lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]`). Below `lg`, the same two panes stack in that source order inside one scrolling region. Optional Confirm or hold Done banner and SMS dock stay full width under the split (one docked action zone at every width).
 
-**Header:** Avatar, name, and purpose stamp are one contact tap. Call is `tel:`. WhatsApp is `wa.me`. More is a portaled menu aligned to the ⋮ (`placeInboxOverflowMenu`): Archive, or Unarchive when the call is archived. Not a sheet. Archive writes the Inbox Undo payload before `DeskBack` so the list toast survives the remount. Opening the ticket does not stamp `calls.inbox_read_at` and does not clear the list Needs you dot. The dot leaves with Confirm, hold Done, Mark done, or Archive. The stamp is read-only `signalLabel` (Return call, Visit confirmed, Hold, Human asked, Missed, Answered, Live). No New / Followed Up / Done taxonomy.
+**Header:** Avatar, name, and purpose stamp are one contact tap. Call is `tel:`. WhatsApp is `wa.me`. More is a portaled menu aligned to the ⋮ (`placeInboxOverflowMenu`): Archive, or Unarchive when the call is archived. Not a sheet. Archive writes the Inbox Undo payload before `DeskBack` so the list toast survives the remount. Opening the ticket stamps `calls.inbox_read_at` (clears the list unread dot). Needs you stays until Confirm, Done, or Archive. The stamp is read-only `signalLabel` (Return call, Visit confirmed, Hold, Human asked, Missed, Answered, Live). No New / Followed Up / Done taxonomy.
 
 **Urgency:** A strip under the header only when `needsYou`. Copy comes from Do next or the summary, not a generic template.
 

@@ -75,7 +75,7 @@ export async function inboxToggleRead(
   });
 }
 
-/** Unused by the list dot. Leaves `inbox_read_at` available without a schema revert. */
+/** Stamp `inbox_read_at` when the owner opens `/calls/[id]`. Clears the unread dot, not Needs you. */
 export async function inboxMarkSeen(callId: string): Promise<InboxTriageResult> {
   return writeInboxTriage(
     callId,

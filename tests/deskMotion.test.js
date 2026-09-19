@@ -132,7 +132,7 @@ describe("desk motion wiring", () => {
     assert.match(calls, /<DeskLandScope/);
     assert.match(calls, /scopeKey=\{`\$\{activeFilter\}:\$\{page\}:\$\{q\}`\}/);
     assert.match(inbox, /item\.purpose === "live"/);
-    assert.match(inbox, /RowStateDot show=\{needsYouPile\} live=/);
+    assert.match(inbox, /RowStateDot show=\{item\.unread\} live=/);
   });
 
   it("lands Contacts rows on the same live refresh", () => {
