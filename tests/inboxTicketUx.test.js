@@ -82,6 +82,57 @@ describe("inbox ticket action chrome", () => {
     assert.doesNotMatch(notes, /caller_appointment_confirmed/);
   });
 
+  it("puts a muted polish wand beside SMS compose", () => {
+    const wandAt = dock.indexOf('aria-label="Polish"');
+    const sendAt = dock.indexOf("{sendPending ? \"Sending\" : \"Send\"}");
+    assert.ok(wandAt > 0, "wand control missing");
+    assert.ok(sendAt > wandAt, "wand must sit beside Send, not after it");
+    assert.match(dock, /title="Polish"/);
+    assert.match(dock, /polishInboxSmsAction/);
+    assert.match(dock, /deskHitClass/);
+    assert.match(dock, /pendingSpinnerInkClass/);
+    assert.match(dock, /type="button"/);
+    const wandBtnStart = dock.lastIndexOf("<button", wandAt);
+    const wandBtnEnd = dock.indexOf("</button>", wandAt);
+    const wandBlock = dock.slice(wandBtnStart, wandBtnEnd);
+    assert.doesNotMatch(wandBlock, /btnPrimary/);
+    assert.doesNotMatch(wandBlock, /bg-accent-fill/);
+    assert.match(dock, /disabled=\{polishPending \|\| sendPending \|\| !note\.trim\(\)\}/);
+    assert.match(dock, /disabled=\{sendPending \|\| !canSend\}/);
+    assert.doesNotMatch(dock, /disabled=\{sendPending \|\| polishPending/);
+    assert.doesNotMatch(dock, /[\u2014\u2013]/);
+  });
+
+  it("hides the wand when the SMS bar is hidden", () => {
+    assert.match(ticket, /needsYou && !archived \? \(/);
+    assert.match(ticket, /InboxSmsDock callId=\{callId\} callerPhone=\{callerPhone\}/);
+    assert.match(dock, /callerPhone \? \(/);
+    const row = read("dashboard/src/components/InboxItemRow.tsx");
+    assert.doesNotMatch(row, /aria-label="Polish"/);
+    assert.doesNotMatch(row, /polishInboxSmsAction/);
+    assert.doesNotMatch(ticket, /aria-label="Polish"/);
+  });
+
+  it("does not invent text for an empty draft", () => {
+    assert.match(notes, /export async function polishInboxSmsAction/);
+    const start = notes.indexOf("export async function polishInboxSmsAction");
+    const end = notes.indexOf("export async function sendCallerNoteAction", start);
+    const action = notes.slice(start, end > start ? end : undefined);
+    assert.match(action, /if \(!note\) return \{ error: "Write a message\." \}/);
+    assert.doesNotMatch(action, /The team will follow up/);
+    assert.doesNotMatch(action, /fallbackPolishCallerNote/);
+    assert.doesNotMatch(action, /Hi \$\{/);
+    assert.match(dock, /!note\.trim\(\)/);
+  });
+
+  it("replaces the SMS textarea from the polish handler", () => {
+    assert.match(dock, /if \(polishState\.text\) setNote\(polishState\.text\)/);
+    assert.match(dock, /polishInboxSmsAction/);
+    assert.match(notes, /fallbackPolishInboxDraft/);
+    assert.match(notes, /POLISH_INBOX_DRAFT_SYSTEM/);
+    assert.match(notes, /generateGeminiText/);
+  });
+
   it("banners Confirm or hold Done only when a work row exists", () => {
     assert.match(ticket, /canConfirm/);
     assert.match(ticket, /canHoldDone/);
