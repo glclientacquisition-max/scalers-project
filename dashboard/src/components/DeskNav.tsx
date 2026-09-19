@@ -123,7 +123,7 @@ function TabIcon({ name, className }: { name: string; className?: string }) {
 function TabIconWithBadge({ name, count: needsCount }: { name: string; count: number }) {
   const display = name === "Inbox" ? formatAttentionCount(needsCount) : null;
   return (
-    <span className="relative inline-flex">
+    <span className="relative inline-flex overflow-visible">
       <TabIcon name={name} />
       {display ? (
         <span aria-hidden="true" className={`pointer-events-none ${deskNavBadgeClass}`}>
