@@ -105,6 +105,17 @@ describe('notify events', () => {
       confirmed,
       'Hi Jane, Done and Dusted Cleaning Services here. Your carpet cleaning visit for tomorrow at 10 AM is confirmed.'
     );
+
+    const holdReady = renderCallerText({
+      kind: EVENTS.CALLER_HOLD_READY,
+      businessName: 'ChapterOne Bookstore',
+      caller: { name: 'Soony' },
+      item: 'two chargers',
+    });
+    assert.equal(
+      holdReady,
+      'Hi Soony, ChapterOne Bookstore here. two chargers is ready for pickup.'
+    );
   });
 
   it('caller text is not generic when the item is missing', () => {

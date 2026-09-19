@@ -32,6 +32,7 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 
 **Reply vs Confirm (not the same button):**
 - **Confirm:** Books the visit from the list or the call. If Business → Text customers is on, Scalers SMS them the confirmation. That SMS is automatic. It is not a second list button.
+- **Done:** Fulfills the hold from the list or the call. If Text customers is on, Scalers SMS them that the item is ready. Enquiry and callback stay silent. Cancel on the call texts that the pickup is cancelled.
 - **WhatsApp:** Opens chat. List verb for return calls. On the call, primary only when there is no visit/hold and Text customers is off.
 - **Send SMS:** Write a text on the call, then send. Shows only if Text customers is on. Primary on the call when there is no visit/hold to Confirm or Done. Not a list verb (needs a body).
 

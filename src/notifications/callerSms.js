@@ -70,6 +70,27 @@ function requestCallerEvent(request) {
   return null;
 }
 
+function requestStatusCallerEvent(request, status) {
+  const type = String(request?.request_type || '').toLowerCase();
+  const next = String(status || '').toLowerCase();
+  if (type !== 'hold' && type !== 'order') return null;
+  if (next !== 'fulfilled' && next !== 'cancelled') return null;
+  return {
+    kind: next === 'cancelled' ? EVENTS.CALLER_HOLD_CANCELLED : EVENTS.CALLER_HOLD_READY,
+    businessName: request?.businessName,
+    item: request?.item,
+    caller: {
+      name: displayOwnerCallerName(request?.caller_name),
+      phone: request?.caller_phone,
+    },
+  };
+}
+
+function holdStatusCallerSms({ channels, status, requestType } = {}) {
+  if (!callerSmsEnabled(channels)) return null;
+  return requestStatusCallerEvent({ request_type: requestType }, status);
+}
+
 /**
  * @param {{ to?: string, event?: object, channels?: object }} opts
  */
@@ -116,5 +137,7 @@ module.exports = {
   callerSmsEnabled,
   appointmentCallerEvent,
   requestCallerEvent,
+  requestStatusCallerEvent,
+  holdStatusCallerSms,
   dispatchCallerSms,
 };

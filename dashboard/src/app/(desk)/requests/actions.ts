@@ -31,19 +31,49 @@ export async function updateServiceRequestStatus(
   const workspace = await createWorkspaceDataClient();
   if (!workspace) return { error: "Not signed in." };
 
-  const { error } = await workspace.client
+  const { data: row, error } = await workspace.client
     .from("service_requests")
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("tenant_id", tenant.id);
+    .eq("tenant_id", tenant.id)
+    .select("caller_phone, caller_name, item, request_type, call_id")
+    .maybeSingle();
 
   if (error) {
     return ownerSaveFailed("request", error.message, "Could not save request.");
   }
 
+  const prefs = parseNotifyChannels(tenant.notify_channels);
+  const type = String(row?.request_type || "").toLowerCase();
+  if (
+    prefs.caller_sms &&
+    row?.caller_phone &&
+    (status === "fulfilled" || status === "cancelled") &&
+    (type === "hold" || type === "order")
+  ) {
+    const kind =
+      status === "cancelled" ? "caller_hold_cancelled" : "caller_hold_ready";
+    const body = renderDeskCallerText({
+      kind,
+      businessName: tenant.business_name,
+      callerName: row.caller_name,
+      service: row.item,
+    });
+    const sent = await sendRecordedDeskCallerSms({
+      client: workspace.client,
+      tenantId: tenant.id,
+      callId: row.call_id,
+      kind,
+      to: row.caller_phone,
+      body,
+    });
+    if (!sent.ok) console.warn("[request caller sms]", sent.reason);
+  }
+
   revalidatePath("/requests");
   revalidatePath("/calls");
   revalidatePath("/home");
+  if (row?.call_id) revalidatePath(`/calls/${row.call_id}`);
   return { ok: true };
 }
 

@@ -15,7 +15,7 @@
 
 **Banner:** Confirm only when an appointments row is requested. Hold Done only when a service_request is open. Not for intent-only, Human, or Missed. Sits above the SMS dock, full width.
 
-**SMS dock:** Shown when `needsYou` and the call is not archived. Growing input plus Send. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm. WhatsApp stays on the header icon. Spans the viewport under the split so Send stays docked at the bottom.
+**SMS dock:** Shown when `needsYou` and the call is not archived. Growing input plus Send. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm or Done. WhatsApp stays on the header icon. Spans the viewport under the split so Send stays docked at the bottom.
 
 **Back:** `DeskBack`, 44px. Label is Inbox.
 

@@ -123,4 +123,21 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(jobActions, /pendingSpinnerClass/);
     assert.match(holdActions, /pendingSpinnerClass/);
   });
+
+  it("texts the caller on hold Done and Cancel when Text customers is on", () => {
+    const actions = read("dashboard/src/app/(desk)/requests/actions.ts");
+    const statusFn = actions.slice(
+      actions.indexOf("export async function updateServiceRequestStatus"),
+      actions.indexOf("export async function updateServiceRequestSchedule")
+    );
+    assert.match(statusFn, /prefs\.caller_sms/);
+    assert.match(statusFn, /caller_hold_ready/);
+    assert.match(statusFn, /caller_hold_cancelled/);
+    assert.match(statusFn, /type === "hold" \|\| type === "order"/);
+    assert.match(statusFn, /sendRecordedDeskCallerSms/);
+    const contract = read("docs/CALL_MESSAGE_CONTRACT.md");
+    assert.match(contract, /caller_hold_ready/);
+    assert.match(contract, /caller_hold_cancelled/);
+    assert.match(contract, /Owner taps Done/);
+  });
 });
