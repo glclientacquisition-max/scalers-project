@@ -67,4 +67,15 @@ describe("desk preview truncate", () => {
     assert.doesNotMatch(phone, /line-clamp-2/);
     assert.doesNotMatch(phone, /font-mono text-sm text-ink/);
   });
+
+  it("clamps contact timeline What to one line and expands on tap", () => {
+    const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
+    const what = read("dashboard/src/components/ContactTimelineWhat.tsx");
+    assert.match(contact, /ContactTimelineWhat/);
+    assert.match(what, /deskPreviewClass/);
+    assert.match(what, /deskRowActionClass/);
+    assert.match(what, /aria-expanded/);
+    assert.match(what, /setOpen/);
+    assert.doesNotMatch(what, /line-clamp-2/);
+  });
 });
