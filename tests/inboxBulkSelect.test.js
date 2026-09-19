@@ -78,7 +78,7 @@ describe("inbox bulk select", () => {
     assert.match(select, /inboxConfirm\(item\)/);
     assert.match(select, /inboxHoldDone\(item\)/);
     assert.doesNotMatch(select, /inboxMarkDone/);
-    assert.doesNotMatch(select, /inboxUnarchive/);
+    assert.match(select, /inboxUnarchive\(item\)/);
     assert.doesNotMatch(select, /inboxTogglePin/);
     assert.doesNotMatch(select, /inboxDelete/);
     assert.doesNotMatch(select, /inboxToggleRead/);
@@ -93,6 +93,7 @@ describe("inbox bulk select", () => {
   it("shows a phone action bar with count and Archive", () => {
     assert.match(select, /aria-label="Back"/);
     assert.match(select, /aria-label="Archive"/);
+    assert.match(select, /aria-label="Unarchive"/);
     assert.doesNotMatch(select, /aria-label=\{allPinned/);
     assert.doesNotMatch(select, /aria-label="Mark done"/);
     assert.doesNotMatch(select, /aria-label="More"/);
@@ -101,7 +102,7 @@ describe("inbox bulk select", () => {
     assert.match(select, /hidden md:flex|md:flex md:static/);
     assert.match(select, /max-md:hidden/);
     assert.match(select, /kind === "archive"/);
-    assert.doesNotMatch(select, /kind === "unarchive"/);
+    assert.match(select, /kind === "unarchive"/);
   });
 
   it("toggles the row instead of opening the ticket while selecting", () => {

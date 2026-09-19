@@ -61,11 +61,13 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /InboxPurposeChip/);
     assert.match(ticket, /aria-label="More"/);
     assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
-    assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\}/);
-    assert.match(ticket, /updateLeadStatus\(callId, "archived"\)/);
+    assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\} archived=\{archived\}/);
+    assert.match(ticket, /updateLeadStatus\(callId, archived \? "new" : "archived"\)/);
+    assert.match(ticket, /archived \? "Unarchive" : "Archive"/);
+    assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
     assert.match(ticket, /router\.push\(backHref\)/);
     assert.doesNotMatch(ticket, /router\.push\("\/calls"\)/);
-    assert.match(ticket, /\{busy \? "Saving" : "Archive"\}/);
+    assert.match(ticket, /\{busy \? "Saving" : archived \? "Unarchive" : "Archive"\}/);
     assert.doesNotMatch(ticket, /Followed Up/);
   });
 

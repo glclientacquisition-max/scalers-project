@@ -24,6 +24,7 @@ import {
   metaLabelClass,
 } from "@/components/ui/deskChrome";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
 
@@ -85,7 +86,15 @@ function TicketSummaryFacts({
   );
 }
 
-function InboxTicketMore({ callId, backHref }: { callId: string; backHref: string }) {
+function InboxTicketMore({
+  callId,
+  backHref,
+  archived,
+}: {
+  callId: string;
+  backHref: string;
+  archived: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -129,18 +138,21 @@ function InboxTicketMore({ callId, backHref }: { callId: string; backHref: strin
         className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
         onClick={async () => {
           setBusy(true);
-          const res = await updateLeadStatus(callId, "archived");
+          const res = await updateLeadStatus(callId, archived ? "new" : "archived");
           setBusy(false);
           if (res.error) {
             setError(res.error);
             return;
           }
           setOpen(false);
-          router.push(backHref);
+          if (!archived) {
+            writeInboxArchiveUndo([{ id: callId, callId }]);
+            router.push(backHref);
+          }
           router.refresh();
         }}
       >
-        {busy ? "Saving" : "Archive"}
+        {busy ? "Saving" : archived ? "Unarchive" : "Archive"}
       </button>
       {error ? (
         <p className="px-4 py-2 text-xs text-warn" role="alert">
@@ -256,8 +268,8 @@ export function InboxTicketView({
   const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const [away, setAway] = useState(false);
-  const canConfirm = String(job?.status || "").toLowerCase() === "requested";
-  const canHoldDone = String(hold?.status || "").toLowerCase() === "open";
+  const canConfirm = !archived && String(job?.status || "").toLowerCase() === "requested";
+  const canHoldDone = !archived && String(hold?.status || "").toLowerCase() === "open";
   const dockedAction = canConfirm || canHoldDone || (needsYou && !archived);
   const identity = (
     <>
@@ -334,7 +346,7 @@ export function InboxTicketView({
           {callerPhone ? (
             <WhatsAppLink number={callerPhone} message={waMessage} variant="icon" />
           ) : null}
-          {archived ? null : <InboxTicketMore callId={callId} backHref={backHref} />}
+          <InboxTicketMore callId={callId} backHref={backHref} archived={archived} />
         </div>
       </header>
 

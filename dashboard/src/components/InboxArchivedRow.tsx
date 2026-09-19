@@ -20,7 +20,7 @@ function ArchiveMark() {
   return (
     <span
       aria-hidden
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-ink-soft"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-ink-soft"
     >
       <ArchiveGlyph />
     </span>
@@ -37,7 +37,7 @@ export function InboxArchivedPhoneRow({
   return (
     <li
       className={[
-        "relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex min-h-12 min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
         deskShiftClass,
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
@@ -49,7 +49,7 @@ export function InboxArchivedPhoneRow({
       <div className={`${deskRowMutedClass} min-w-0 flex-1`}>
         <div className="flex items-baseline justify-between gap-3">
           <p className={`text-sm font-medium tracking-tight ${deskPreviewClass}`}>Archived</p>
-          <p className="shrink-0 text-xs text-ink-soft">{count}</p>
+          <p className="shrink-0 text-xs tabular-nums text-ink-soft">{count}</p>
         </div>
       </div>
     </li>
@@ -71,7 +71,7 @@ export function InboxArchivedTableRow({
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
     >
-      <td colSpan={4} className="px-5 py-4">
+      <td colSpan={4} className="relative min-h-12 px-5 py-4">
         <DeskRowHit href={inboxArchivedHref(ret)} label="Archived" />
         <div className="flex items-center gap-3">
           <div className={deskRowMutedClass}>
@@ -80,7 +80,7 @@ export function InboxArchivedTableRow({
           <p className={`${deskRowMutedClass} min-w-0 text-sm font-medium tracking-tight ${deskPreviewClass}`}>
             Archived
           </p>
-          <p className={`${deskRowMutedClass} ml-auto shrink-0 text-sm text-ink-soft`}>{count}</p>
+          <p className={`${deskRowMutedClass} ml-auto shrink-0 text-sm tabular-nums text-ink-soft`}>{count}</p>
         </div>
       </td>
     </tr>
