@@ -53,4 +53,18 @@ describe("desk preview truncate", () => {
     assert.match(toolbar, /deskPreviewClass/);
     assert.doesNotMatch(home, /overflow-wrap:anywhere/);
   });
+
+  it("clamps Contacts phone rows to name plus one preview", () => {
+    const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
+    const phone = contacts.slice(
+      contacts.indexOf('className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden"'),
+      contacts.indexOf("hidden md:block")
+    );
+    assert.match(phone, /deskPreviewClass/);
+    assert.match(phone, /lastReasonDisplay/);
+    assert.match(phone, /formatCallWhenRelative/);
+    assert.doesNotMatch(phone, /row\.phone/);
+    assert.doesNotMatch(phone, /line-clamp-2/);
+    assert.doesNotMatch(phone, /font-mono text-sm text-ink/);
+  });
 });

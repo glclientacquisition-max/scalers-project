@@ -5,7 +5,7 @@
 
 **Filters:** Same `FilterTabs` as Inbox. Do not restyle this as chips or a second tab dialect.
 
-**Row:** Same recipe as Inbox. Tap the row to open the contact. No Open column. Last reason is one truncated line (`deskPreviewClass`). The four-block summary lives on the person file and the call.
+**Row:** Same recipe as Inbox. Tap the row to open the contact. No Open column. Last reason is one truncated line (`deskPreviewClass`). Phone stays in the `md+` table; phone list rows are name plus that preview. The four-block summary lives on the person file and the call.
 
 **Detail:** `/contacts/[id]`. Notes left. Timeline right. Tap a timeline row that has a call to open the conversation. No Call column. `DeskBack` is Contacts, or Call when opened from a conversation.
 

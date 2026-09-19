@@ -151,7 +151,6 @@ export default async function ContactsPage({
                         </p>
                       ) : null}
                     </div>
-                    <p className="mt-0.5 truncate font-mono text-sm text-ink">{row.phone || "No phone"}</p>
                     <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
                       {row.lastReasonDisplay || "None"}
                     </p>
