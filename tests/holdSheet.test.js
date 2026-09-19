@@ -29,13 +29,15 @@ describe("desk hold board", () => {
     assert.equal(visitDayKey({ when_text: "" }, now), null);
   });
 
-  it("wires Holds List and Work as one open book", () => {
+  it("wires Holds List as the open book and Work as timed pickups", () => {
     const sheet = read("dashboard/src/lib/holdSheet.ts");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
     const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");
     assert.match(sheet, /export function holdBoardForDay/);
     assert.match(sheet, /export function holdBoardItems/);
+    assert.match(sheet, /export function holdWorkItems/);
+    assert.match(sheet, /holdWorkItems\(items, now\)/);
     assert.doesNotMatch(sheet, /weekDays/);
     assert.match(page, /holdBoardForDay/);
     assert.match(page, /purpose="hold"/);
@@ -49,5 +51,17 @@ describe("desk hold board", () => {
     );
     assert.match(holdBlock, /label: "Work"/);
     assert.doesNotMatch(holdBlock, /label: "Week"/);
+  });
+
+  it("pins timed holds from a past day at the top of List", () => {
+    const now = new Date(Date.UTC(2026, 8, 19, 5, 0, 0));
+    assert.equal(visitDayKey({ when_text: "tomorrow at 6 PM" }, now) < eatYmd(now), false);
+    assert.equal(visitDayKey({ when_text: "Anytime" }, now), null);
+    const sheet = read("dashboard/src/lib/holdSheet.ts");
+    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    assert.match(sheet, /export function isHoldListLeftover/);
+    assert.match(sheet, /eatYmd\(instant\) < eatYmd\(now\)/);
+    assert.match(sheet, /export function orderHoldList/);
+    assert.match(page, /orderHoldList\(filtered\)/);
   });
 });

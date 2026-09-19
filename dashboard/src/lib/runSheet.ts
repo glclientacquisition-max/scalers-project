@@ -1,10 +1,11 @@
-/** Visits List, Today, and Week. One book: requested and confirmed visits. */
+/** Visits List is requested and confirmed. Work is confirmed only. */
 
 import type { InboxItem, InboxJob } from "@/lib/inboxPurpose";
 import { itemIsArchived } from "@/lib/inboxPurpose";
 import {
   eatYmd,
   groupVisitsForWeek,
+  mondayYmd,
   visitInstant,
   type CalendarVisit,
 } from "@/lib/visitCalendar";
@@ -17,6 +18,11 @@ export function isVisitBoardJob(job: InboxJob | null | undefined): boolean {
   if (!job) return false;
   const status = jobStatus(job);
   return status === "requested" || status === "confirmed";
+}
+
+export function isVisitWorkJob(job: InboxJob | null | undefined): boolean {
+  if (!job) return false;
+  return jobStatus(job) === "confirmed";
 }
 
 function slotInstantFromJob(job: InboxJob, now: Date): Date | null {
@@ -39,13 +45,17 @@ export function visitBoardItems(items: InboxItem[]): InboxItem[] {
   return (items || []).filter((item) => !itemIsArchived(item) && isVisitBoardJob(item.job));
 }
 
+export function visitWorkItems(items: InboxItem[]): InboxItem[] {
+  return visitBoardItems(items).filter((item) => isVisitWorkJob(item.job));
+}
+
 export function visitBoardInstant(item: InboxItem, now = new Date()): Date | null {
   if (item.job && isVisitBoardJob(item.job)) return slotInstantFromJob(item.job, now);
   return null;
 }
 
 function asCalendarVisit(item: InboxItem): CalendarVisit | null {
-  if (!item.job || !isVisitBoardJob(item.job)) return null;
+  if (!item.job || !isVisitWorkJob(item.job)) return null;
   return {
     id: item.job.id,
     status: item.job.status,
@@ -63,7 +73,7 @@ export function groupVisitBoardForWeek(
   monday: string,
   now = new Date()
 ) {
-  const visits = visitBoardItems(items)
+  const visits = visitWorkItems(items)
     .map(asCalendarVisit)
     .filter((row): row is CalendarVisit => Boolean(row));
   return groupVisitsForWeek(visits, monday, now);
@@ -74,7 +84,7 @@ export function visitBoardForDay(
   ymd: string,
   now = new Date()
 ): InboxItem[] {
-  const rows = visitBoardItems(items).filter((item) => {
+  const rows = visitWorkItems(items).filter((item) => {
     const instant = visitBoardInstant(item, now);
     return instant ? eatYmd(instant) === ymd : false;
   });
@@ -84,6 +94,28 @@ export function visitBoardForDay(
     return ta - tb;
   });
   return rows;
+}
+
+export function isVisitListLeftover(item: InboxItem, now = new Date()): boolean {
+  if (!isVisitWorkJob(item.job)) return false;
+  const instant = visitBoardInstant(item, now);
+  if (!instant) return false;
+  return eatYmd(instant) < mondayYmd(now);
+}
+
+export function orderVisitList(items: InboxItem[], now = new Date()): InboxItem[] {
+  return [...(items || [])].sort((a, b) => {
+    const aLeft = isVisitListLeftover(a, now);
+    const bLeft = isVisitListLeftover(b, now);
+    if (aLeft && !bLeft) return -1;
+    if (!aLeft && bLeft) return 1;
+    if (aLeft && bLeft) {
+      const ta = visitBoardInstant(a, now)?.getTime() || 0;
+      const tb = visitBoardInstant(b, now)?.getTime() || 0;
+      if (ta !== tb) return ta - tb;
+    }
+    return 0;
+  });
 }
 
 export function formatSlotClock(item: InboxItem, now = new Date()): string {

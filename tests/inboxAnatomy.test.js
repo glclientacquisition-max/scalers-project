@@ -63,6 +63,20 @@ describe("inbox outside and inside anatomy", () => {
     assert.doesNotMatch(todayPhone, /placeFor/);
   });
 
+  it("keeps Visits Work to confirmed slots and Holds Work to timed pickups", () => {
+    const sheet = read("dashboard/src/lib/runSheet.ts");
+    const holds = read("dashboard/src/lib/holdSheet.ts");
+    assert.match(calls, /Work is confirmed only/);
+    assert.match(calls, /Confirm lives on List/);
+    assert.doesNotMatch(calls, /Confirm lives on List and on Work/);
+    assert.doesNotMatch(calls, /Requested slots for that day sit here/);
+    assert.match(calls, /Anytime stays on List/);
+    assert.match(calls, /whose week has already ended pin at the top of List/);
+    assert.match(calls, /whose day has already ended pin at the top of List/);
+    assert.match(sheet, /export function visitWorkItems/);
+    assert.match(holds, /export function holdWorkItems/);
+  });
+
   it("uses FilterTabs for Holds List and Work, Today only", () => {
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
     const today = read("dashboard/src/components/RunSheetToday.tsx");

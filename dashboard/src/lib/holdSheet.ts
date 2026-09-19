@@ -1,4 +1,4 @@
-/** Holds List and Work. One book: open holds. Anytime stays on List. */
+/** Holds List is open holds. Work is timed pickups only. Anytime stays on List. */
 
 import type { InboxItem, InboxHold } from "@/lib/inboxPurpose";
 import { itemIsArchived } from "@/lib/inboxPurpose";
@@ -28,12 +28,16 @@ export function holdBoardInstant(item: InboxItem, now = new Date()): Date | null
   return visitInstant(asVisit(item.hold, item.callerName), now);
 }
 
+export function holdWorkItems(items: InboxItem[], now = new Date()): InboxItem[] {
+  return holdBoardItems(items).filter((item) => Boolean(holdBoardInstant(item, now)));
+}
+
 export function holdBoardForDay(
   items: InboxItem[],
   ymd: string,
   now = new Date()
 ): InboxItem[] {
-  const rows = holdBoardItems(items).filter((item) => {
+  const rows = holdWorkItems(items, now).filter((item) => {
     const instant = holdBoardInstant(item, now);
     return instant ? eatYmd(instant) === ymd : false;
   });
@@ -43,6 +47,27 @@ export function holdBoardForDay(
     return ta - tb;
   });
   return rows;
+}
+
+export function isHoldListLeftover(item: InboxItem, now = new Date()): boolean {
+  const instant = holdBoardInstant(item, now);
+  if (!instant) return false;
+  return eatYmd(instant) < eatYmd(now);
+}
+
+export function orderHoldList(items: InboxItem[], now = new Date()): InboxItem[] {
+  return [...(items || [])].sort((a, b) => {
+    const aLeft = isHoldListLeftover(a, now);
+    const bLeft = isHoldListLeftover(b, now);
+    if (aLeft && !bLeft) return -1;
+    if (!aLeft && bLeft) return 1;
+    if (aLeft && bLeft) {
+      const ta = holdBoardInstant(a, now)?.getTime() || 0;
+      const tb = holdBoardInstant(b, now)?.getTime() || 0;
+      if (ta !== tb) return ta - tb;
+    }
+    return 0;
+  });
 }
 
 export function formatHoldClock(item: InboxItem, now = new Date()): string {

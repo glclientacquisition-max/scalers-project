@@ -33,8 +33,8 @@ import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
-import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
-import { holdBoardForDay } from "@/lib/holdSheet";
+import { visitBoardForDay, visitBoardItems, orderVisitList } from "@/lib/runSheet";
+import { holdBoardForDay, orderHoldList } from "@/lib/holdSheet";
 import {
   parseDayParam,
   parseWeekParam,
@@ -185,6 +185,12 @@ export default async function CallsPage({
     searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
     activeFilter
   );
+  const listed =
+    activeFilter === "job"
+      ? orderVisitList(filtered)
+      : activeFilter === "hold"
+        ? orderHoldList(filtered)
+        : filtered;
   const rawView = String(sp.view || "");
   const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";
@@ -198,7 +204,7 @@ export default async function CallsPage({
   const holdTodayItems = holdTodayView ? holdBoardForDay(searched, day) : [];
   const total = filtered.length;
   const from = (page - 1) * PAGE_SIZE;
-  const pageRows = boardView || holdTodayView ? boardItems : filtered.slice(from, from + PAGE_SIZE);
+  const pageRows = boardView || holdTodayView ? boardItems : listed.slice(from, from + PAGE_SIZE);
   const showArchivedEntry =
     !boardView &&
     !holdTodayView &&
