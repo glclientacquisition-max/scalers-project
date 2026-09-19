@@ -15,9 +15,18 @@ describe("desk phone shell", () => {
   const player = read("dashboard/src/components/CallAudioPlayer.tsx");
   const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
 
-  it("keeps one DESK_LINKS list for phone tabs and desktop links", () => {
+  it("keeps one DESK_LINKS list for phone tabs and the desktop rail", () => {
     assert.match(nav, /export const DESK_LINKS/);
     assert.match(nav, /export function DeskTabBar/);
+    assert.match(nav, /export function DeskRail/);
+    assert.match(nav, /DeskHint/);
+    assert.doesNotMatch(nav, /title=\{item.label\}/);
+    assert.doesNotMatch(nav, /title="Sign out"/);
+    assert.match(nav, /label="Sign out"/);
+    assert.match(nav, /label="Scalers"/);
+    assert.match(nav, /markOnly/);
+    assert.match(nav, /w-\[4\.5rem\]/);
+    assert.match(nav, /SignOutButton compact/);
     assert.match(nav, /label: "Overview"/);
     assert.match(nav, /label: "Inbox"/);
     assert.match(nav, /label: "Contacts"/);
@@ -27,7 +36,11 @@ describe("desk phone shell", () => {
     assert.doesNotMatch(nav, /Menu/);
     assert.doesNotMatch(nav, /hamburger/i);
     assert.match(layout, /DeskTabBar/);
-    assert.match(layout, /--desk-tabbar-clearance/);
+    assert.match(layout, /DeskRail/);
+    assert.match(layout, /DeskPhoneHeader/);
+    assert.match(layout, /deskMainClass/);
+    assert.match(nav, /deskMainClass/);
+    assert.match(nav, /--desk-tabbar-clearance/);
     assert.match(css, /--desk-tabbar-clearance/);
     assert.match(css, /scroll-padding-bottom:\s*var\(--desk-tabbar-clearance\)/);
     assert.match(css, /--desk-tabbar-clearance:\s*calc\(var\(--desk-tabbar-h\) \+ env\(safe-area-inset-bottom, 0px\) \+ 1\.5rem\)/);
@@ -55,6 +68,7 @@ describe("desk phone shell", () => {
     assert.match(css, /--desk-tabbar-h:\s*4rem/);
     assert.match(player, /--desk-tabbar-h/);
     assert.match(constitution, /bottom tab bar/);
+    assert.match(constitution, /icon rail is `DESK_LINKS`/);
     assert.match(constitution, /do not live in a hamburger drawer/);
     const hint = read("dashboard/src/components/ui/DeskHint.tsx");
     assert.match(hint, /createPortal/);

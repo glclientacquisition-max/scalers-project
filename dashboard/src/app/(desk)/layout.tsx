@@ -1,7 +1,11 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { BrandLockup } from "@/components/brand/BrandMark";
-import { DeskNav, DeskTabBar } from "@/components/DeskNav";
+import {
+  DeskPhoneHeader,
+  DeskRail,
+  DeskTabBar,
+  deskMainClass,
+} from "@/components/DeskNav";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
@@ -9,7 +13,7 @@ import { loadCachedInboxNeedsCount } from "@/lib/inboxLoad";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
 
-async function DeskNavLive({
+async function DeskRailLive({
   tenantId,
   vertical,
 }: {
@@ -17,7 +21,7 @@ async function DeskNavLive({
   vertical?: string | null;
 }) {
   const needsCount = tenantId ? await loadCachedInboxNeedsCount(tenantId, vertical) : 0;
-  return <DeskNav needsCount={needsCount} />;
+  return <DeskRail needsCount={needsCount} />;
 }
 
 async function DeskTabBarLive({
@@ -33,7 +37,7 @@ async function DeskTabBarLive({
 
 /**
  * Workspace shell for authenticated business owners.
- * Sticky header (Scalers + md+ links + Sign out). Same DESK_LINKS as a phone tab bar.
+ * md+: DESK_LINKS as a left icon rail. Phone: lockup header + the same list as bottom tabs.
  */
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const authUser = await getAuthUser();
@@ -51,23 +55,19 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="desk-theme min-h-dvh min-w-0 overflow-x-clip">
+    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
       {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
-      <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <BrandLockup href="/home" name="Scalers" size="sm" priority className="max-w-full" />
-          <Suspense fallback={<DeskNav />}>
-            <DeskNavLive tenantId={tenant?.id} vertical={tenant?.vertical} />
-          </Suspense>
-        </div>
-      </header>
-      <DeskOffline />
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6">
-        {children}
-      </main>
-      <Suspense fallback={<DeskTabBar />}>
-        <DeskTabBarLive tenantId={tenant?.id} vertical={tenant?.vertical} />
+      <Suspense fallback={<DeskRail />}>
+        <DeskRailLive tenantId={tenant?.id} vertical={tenant?.vertical} />
       </Suspense>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+        <DeskPhoneHeader />
+        <DeskOffline />
+        <main className={deskMainClass}>{children}</main>
+        <Suspense fallback={<DeskTabBar />}>
+          <DeskTabBarLive tenantId={tenant?.id} vertical={tenant?.vertical} />
+        </Suspense>
+      </div>
     </div>
   );
 }

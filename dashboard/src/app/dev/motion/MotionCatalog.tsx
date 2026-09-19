@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BrandLockup } from "@/components/brand/BrandMark";
-import { DeskNav, DeskTabBar } from "@/components/DeskNav";
+import { DeskPhoneHeader, DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { btnGhost, btnPrimary, deskShiftClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { LivePing, RowIdentity, RowStateDot } from "@/components/ui/deskRow";
@@ -16,14 +15,11 @@ export function MotionCatalog() {
   const extra = useMemo(() => ids.filter((id) => !SEED.includes(id)), [ids]);
 
   return (
-    <div className="desk-theme min-h-screen min-w-0">
-      <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <BrandLockup href="/dev/motion" name="Scalers" size="sm" priority className="max-w-full" />
-          <DeskNav />
-        </div>
-      </header>
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
+    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+      <DeskRail homeHref="/dev/motion" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+        <DeskPhoneHeader homeHref="/dev/motion" />
+        <main className={deskMainClass}>
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Motion
         </h1>
@@ -127,8 +123,9 @@ export function MotionCatalog() {
             Reply on WhatsApp
           </button>
         </section>
-      </main>
-      <DeskTabBar />
+        </main>
+        <DeskTabBar />
+      </div>
     </div>
   );
 }

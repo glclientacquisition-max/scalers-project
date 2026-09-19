@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { BrandLockup } from "@/components/brand/BrandMark";
-import { DeskNav, DeskTabBar } from "@/components/DeskNav";
+import { DeskPhoneHeader, DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 
 /**
  * Local chrome harness (no desk login). DASHBOARD_OPEN=true only.
@@ -11,26 +10,24 @@ export default function DevDeskShellPage() {
   }
 
   return (
-    <div className="min-h-screen min-w-0">
-      <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <BrandLockup href="/dev/desk-shell" name="Scalers" size="sm" priority className="max-w-full" />
-          <DeskNav />
-        </div>
-      </header>
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
-        <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">Desk shell</h1>
-        <ul className="mt-6 divide-y divide-line rounded-2xl border border-line bg-surface">
-          {["Amina · Confirm visit", "Otieno · Pickup", "Wanjiku · Human asked", "Last row must clear the tab bar"].map(
-            (row) => (
-              <li key={row} className="px-4 py-3.5 text-sm text-ink">
-                {row}
-              </li>
-            ),
-          )}
-        </ul>
-      </main>
-      <DeskTabBar />
+    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+      <DeskRail needsCount={3} homeHref="/dev/desk-shell" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+        <DeskPhoneHeader homeHref="/dev/desk-shell" />
+        <main className={deskMainClass}>
+          <h1 className="font-display text-3xl tracking-tight text-ink sm:text-4xl">Desk shell</h1>
+          <ul className="mt-6 divide-y divide-line rounded-2xl border border-line bg-surface">
+            {["Amina · Confirm visit", "Otieno · Pickup", "Wanjiku · Human asked", "Last row must clear the tab bar"].map(
+              (row) => (
+                <li key={row} className="px-4 py-3.5 text-sm text-ink">
+                  {row}
+                </li>
+              ),
+            )}
+          </ul>
+        </main>
+        <DeskTabBar needsCount={3} />
+      </div>
     </div>
   );
 }

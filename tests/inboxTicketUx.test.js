@@ -39,6 +39,7 @@ describe("inbox ticket action chrome", () => {
     assert.ok(transcriptAt > threadAt);
     assert.ok(dockAt > threadAt);
     assert.match(ticket, /lg:grid lg:grid-cols-\[minmax\(18rem,var\(--ticket-summary-w,22rem\)\)_1px_minmax\(0,1fr\)\]/);
+    assert.match(ticket, /data-desk-bleed/);
     assert.match(ticket, /role="separator"/);
     assert.match(ticket, /TICKET_SPLIT_KEY/);
     assert.match(ticket, /lg:contents/);

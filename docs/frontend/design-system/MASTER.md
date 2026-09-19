@@ -28,7 +28,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Lead | `--lead` `#B98A1F` | `lead` |
 | WhatsApp glyph | `--whatsapp` `#25D366` | `whatsapp` |
 | Focus glow | `--shadow-focus` | `shadow-focus` |
-| Desk header | `--desk-header-h` | `top-[var(--desk-header-h)]` |
+| Desk header | `--desk-header-h` | Phone sticky bar. `0` from `md`. |
 | Desk tab bar | `--desk-tabbar-h` | `4rem` below `md`, `0` from `md`. Matches `DeskTabBar` min-height. |
 | Desk tab clearance | `--desk-tabbar-clearance` | Phone: tab bar plus `safe-area-inset-bottom` plus `1.5rem`. From `md`: `2.5rem`. Phone `main` padding, `scroll-padding-bottom`, and sticky bottom chrome use this. |
 | Max width | | `max-w-desk` (72rem) |
@@ -69,7 +69,7 @@ The desk (`app/(desk)`) ships a dark palette; marketing, auth, onboarding, and a
 
 ## Super Admin
 
-Ops console (`/admin`) is the exception to the owner-desk ban on a left rail: a fixed navy sidebar on `lg+`, horizontal nav below `lg`. Owner desk stays header links and bottom tabs. Admin stays light. Do not copy this rail onto `(desk)`. Page note: [`pages/admin.md`](pages/admin.md).
+Ops console (`/admin`) keeps a labeled navy sidebar on `lg+`, horizontal nav below `lg`. Owner desk uses a compact icon rail (`DESK_LINKS`) on `md+` and bottom tabs below `md`. Admin stays light. Do not copy the ops sidebar onto `(desk)`. Page note: [`pages/admin.md`](pages/admin.md).
 
 ---
 
@@ -117,7 +117,8 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk hint | `DeskHint`. Navy name chip on hover, pointer, and keyboard focus for icon-only hits. Portaled. Escape and scroll dismiss. The control keeps `aria-label`. |
-| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` header links. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the header. Inbox Needs you count is a 16px corner overlay on the Inbox icon (`deskNavBadgeClass`: `-top-1 -end-1`, `h-4 min-w-4`). Ribbon gradient `from-accent to-accent-fill` (`#0096FF` → `#005CCC`), `text-accent-on-fill`. `1`–`9`, then `9+`. Hidden at 0. `aria-label` includes the count (`Inbox, 3 need you`). Not a second control. |
+| Desk rail | `DeskRail` in `DeskNav.tsx`. `md+` only. `w-[4.5rem]`. Same `DESK_LINKS` as the phone tabs. Icon-only 44px hits, `DeskHint` names. Needs you badge on Inbox. Sign out at the foot. Mark-only Scalers at the top. |
+| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` icon rail. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the phone header. Inbox Needs you count is a 16px corner overlay on the Inbox icon (`deskNavBadgeClass`: `-top-1 -end-1`, `h-4 min-w-4`). Ribbon gradient `from-accent to-accent-fill` (`#0096FF` → `#005CCC`), `text-accent-on-fill`. `1`–`9`, then `9+`. Hidden at 0. `aria-label` includes the count (`Inbox, 3 need you`). Not a second control. |
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |
@@ -168,4 +169,4 @@ Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those
 
 ## Do not add
 
-shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second desk sidebar, a hamburger drawer for primary destinations, fake Online, Lottie, Framer Motion, GSAP, landing-rise on desk.
+shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second nav tree, a hamburger drawer for primary destinations, fake Online, Lottie, Framer Motion, GSAP, landing-rise on desk.

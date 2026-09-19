@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandLockup } from "@/components/brand/BrandMark";
+import { DeskHint } from "@/components/ui/DeskHint";
 import {
   deskNavBadgeClass,
   deskShiftClass,
@@ -20,22 +22,41 @@ export const DESK_LINKS = [
   { href: "/wallet", label: "Wallet" },
 ] as const;
 
+/** Page frame next to the rail. Ticket pages opt into bleed with `data-desk-bleed`. */
+export const deskMainClass =
+  "mx-auto w-full min-w-0 max-w-desk flex-1 px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6 md:overflow-y-auto md:p-6 md:has-[[data-desk-bleed]]:h-full md:has-[[data-desk-bleed]]:max-w-none md:has-[[data-desk-bleed]]:overflow-hidden md:has-[[data-desk-bleed]]:p-0";
+
 function pathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function SignOutButton() {
+function SignOutButton({ compact }: { compact?: boolean }) {
   return (
     <form action="/api/logout" method="post">
       <button
         type="submit"
+        aria-label="Sign out"
         className={[
-          "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
+          compact
+            ? "inline-flex h-12 w-12 items-center justify-center rounded-xl text-ink-soft hover:bg-surface-muted hover:text-warn"
+            : "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
           deskShiftClass,
           focusRingVisible,
         ].join(" ")}
       >
-        Sign out
+        {compact ? (
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-5 w-5">
+            <path
+              d="M8 4.5H4.5v11H8M8.5 10h7M13 7.5 16.5 10 13 12.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : (
+          "Sign out"
+        )}
       </button>
     </form>
   );
@@ -139,46 +160,72 @@ function inboxLinkAria(label: string, needsCount: number) {
   return formatInboxNavAriaLabel(needsCount) || undefined;
 }
 
-/**
- * Desktop workspace links plus Sign out (header). Phone destinations live in DeskTabBar.
- */
-export function DeskNav({ needsCount = 0 }: { needsCount?: number }) {
+/** md+ destination rail. Same DESK_LINKS as DeskTabBar. Sign out at the foot. */
+export function DeskRail({
+  needsCount = 0,
+  homeHref = "/home",
+}: {
+  needsCount?: number;
+  homeHref?: string;
+}) {
   const pathname = usePathname();
 
   return (
-    <div className="flex items-center gap-2 sm:gap-5">
-      <nav className="hidden items-center gap-5 text-sm md:flex" aria-label="Workspace">
+    <div
+      data-desk-rail=""
+      className="hidden h-dvh w-[4.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
+    >
+      <div className="flex h-14 items-center justify-center">
+        <DeskHint label="Scalers">
+          <BrandLockup href={homeHref} name="Scalers" size="sm" markOnly priority />
+        </DeskHint>
+      </div>
+      <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1.5 pt-1">
         {DESK_LINKS.map((item) => {
           const active = pathActive(pathname, item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              aria-label={inboxLinkAria(item.label, needsCount)}
-              className={[
-                "inline-flex items-center gap-1.5 rounded-md",
-                deskShiftClass,
-                focusRingVisible,
-                active
-                  ? "font-semibold text-accent-deep"
-                  : "font-medium text-ink hover:text-accent-deep",
-              ].join(" ")}
-            >
-              {item.label === "Inbox" ? (
-                <TabIconWithBadge name="Inbox" count={needsCount} />
-              ) : null}
-              {item.label}
-            </Link>
+            <DeskHint key={item.href} label={item.label}>
+              <Link
+                href={item.href}
+                aria-label={inboxLinkAria(item.label, needsCount) || item.label}
+                aria-current={active ? "page" : undefined}
+                className={[
+                  "inline-flex h-12 w-12 items-center justify-center rounded-xl",
+                  deskShiftClass,
+                  focusRingVisible,
+                  active
+                    ? "bg-accent/10 text-accent-deep"
+                    : "text-ink-soft hover:bg-surface-muted hover:text-ink",
+                ].join(" ")}
+              >
+                <TabIconWithBadge name={item.label} count={needsCount} />
+              </Link>
+            </DeskHint>
           );
         })}
       </nav>
-      <SignOutButton />
+      <div className="flex justify-center pb-3">
+        <DeskHint label="Sign out">
+          <SignOutButton compact />
+        </DeskHint>
+      </div>
     </div>
   );
 }
 
-/** Phone thumb destinations. Same DESK_LINKS as the desktop top bar. */
+/** Phone identity + Sign out. Destinations stay in DeskTabBar. */
+export function DeskPhoneHeader({ homeHref = "/home" }: { homeHref?: string }) {
+  return (
+    <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none md:hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+        <BrandLockup href={homeHref} name="Scalers" size="sm" priority className="max-w-full" />
+        <SignOutButton />
+      </div>
+    </header>
+  );
+}
+
+/** Phone thumb destinations. Same DESK_LINKS as the desktop rail. */
 export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
   const pathname = usePathname();
 

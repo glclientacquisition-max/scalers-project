@@ -450,7 +450,10 @@ export function InboxTicketView({
   }, [turns.length]);
 
   return (
-    <div className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h))] min-h-0 flex-col pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:-mx-6 sm:-mt-10 md:mb-0 md:pb-0">
+    <div
+      data-desk-bleed=""
+      className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h))] min-h-0 flex-col pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:-mx-6 sm:-mt-10 md:mx-0 md:mb-0 md:mt-0 md:h-full md:pb-0"
+    >
       <header className="shrink-0 border-b border-line bg-surface px-2 py-1 sm:px-4">
         <div className="flex items-center gap-1">
           <DeskBack href={backHref}>Inbox</DeskBack>

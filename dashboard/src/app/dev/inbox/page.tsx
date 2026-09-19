@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-import { BrandLockup } from "@/components/brand/BrandMark";
 import { InboxTicketView } from "@/components/InboxTicketView";
-import { DeskNav, DeskTabBar } from "@/components/DeskNav";
+import { DeskPhoneHeader, DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { InboxToolbar } from "@/components/InboxToolbar";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
@@ -185,14 +184,11 @@ export default function DevInboxPage() {
   const needYou = ROWS.filter((row) => row.needsYou).length;
 
   return (
-    <div className="desk-theme min-h-screen min-w-0">
-      <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none">
-        <div className="relative mx-auto flex max-w-desk items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <BrandLockup href="/dev/inbox" name="Scalers" size="sm" priority className="max-w-full" />
-          <DeskNav />
-        </div>
-      </header>
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6">
+    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+      <DeskRail needsCount={needYou} homeHref="/dev/inbox" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+        <DeskPhoneHeader homeHref="/dev/inbox" />
+        <main className={deskMainClass}>
         <InboxRowUiProvider>
         <InboxSelectChrome items={ROWS}>
         <InboxToolbar
@@ -291,8 +287,9 @@ export default function DevInboxPage() {
             archived={false}
           />
         </div>
-      </main>
-      <DeskTabBar />
+        </main>
+        <DeskTabBar needsCount={needYou} />
+      </div>
     </div>
   );
 }
