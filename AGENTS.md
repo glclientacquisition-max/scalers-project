@@ -9,6 +9,7 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 | **Desk UI/UX** | Owner desk + marketing UI | [`docs/agents/DESK_UX.md`](docs/agents/DESK_UX.md) |
 | **Ops & Billing** | Wallet, DID pool, Super Admin | [`docs/agents/OPS_BILLING.md`](docs/agents/OPS_BILLING.md) |
 | **Platform** | DB surface, auth/RLS, deploy, shared contracts | [`docs/agents/PLATFORM.md`](docs/agents/PLATFORM.md) |
+| **Platform tester** | Internal critic / eval vs WhatsApp, Telegram, Instagram | [`docs/agents/PLATFORM_TESTER.md`](docs/agents/PLATFORM_TESTER.md) · scorecard: [`PLATFORM_TESTER_SCORECARD.md`](docs/agents/PLATFORM_TESTER_SCORECARD.md) |
 
 **Copy-paste chat starters:** [`docs/agents/PROMPTS.md`](docs/agents/PROMPTS.md)
 
@@ -35,6 +36,7 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 | [`docs/ESCALATION.md`](docs/ESCALATION.md) | Async human notify (shipped) |
 | [`docs/database/DATABASE_GOVERNANCE.md`](docs/database/DATABASE_GOVERNANCE.md) | Manual SQL model |
 | [`docs/frontend/FRONTEND_RECONNAISSANCE.md`](docs/frontend/FRONTEND_RECONNAISSANCE.md) | Desk Frontend 2.0 recon (no UI until constitution) |
+| [`docs/agents/PLATFORM_TESTER.md`](docs/agents/PLATFORM_TESTER.md) | Internal critic / eval vs WhatsApp, Telegram, Instagram |
 
 ---
 
