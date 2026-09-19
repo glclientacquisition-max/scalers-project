@@ -7,6 +7,10 @@ import {
   POLISH_CALLER_SMS_SYSTEM,
   stripModelSms,
 } from "@/lib/polishCallerNote";
+import {
+  fallbackPolishInboxDraft,
+  POLISH_INBOX_DRAFT_SYSTEM,
+} from "@/lib/polishInboxSms";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -63,6 +67,36 @@ export async function polishCallerNoteAction(
   }
 
   return { text: fallbackPolishCallerNote(facts), source: "local" };
+}
+
+/** Tighten the Inbox compose draft. Does not invent text for an empty field. */
+export async function polishInboxSmsAction(
+  _prev: PolishCallerNoteState,
+  formData: FormData
+): Promise<PolishCallerNoteState> {
+  const tenant = await getCurrentTenant();
+  if (!tenant) return { error: "Not signed in." };
+
+  const note = String(formData.get("note") || "").trim();
+  if (!note) return { error: "Write a message." };
+
+  try {
+    const raw = await generateGeminiText({
+      systemInstruction: POLISH_INBOX_DRAFT_SYSTEM,
+      userText: `Owner SMS draft:\n${note}`,
+      temperature: 0.2,
+      maxOutputTokens: 256,
+      timeoutMs: 8000,
+    });
+    const text = stripModelSms(raw);
+    if (text) return { text, source: "gemini" };
+  } catch (err) {
+    console.warn("[polishInboxSms]", err instanceof Error ? err.message : err);
+  }
+
+  const text = fallbackPolishInboxDraft(note);
+  if (!text) return { error: "Write a message." };
+  return { text, source: "local" };
 }
 
 export type SendCallerNoteState = {
