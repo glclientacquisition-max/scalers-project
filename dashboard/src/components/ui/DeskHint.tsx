@@ -28,7 +28,7 @@ function place(box: DOMRect, prefer: Side): { top: number; left: number; side: S
 /**
  * Name for an icon-only control. Shows on hover, pointer, and focus. Portaled so
  * desk overflow clip cannot hide it. Navy chip so it stays readable outside
- * `.desk-theme`. Visual only. The control keeps aria-label.
+ * `.desk-theme`. Escape and scroll dismiss. Visual only. The control keeps aria-label.
  */
 export function DeskHint({
   label,
@@ -59,7 +59,7 @@ export function DeskHint({
   useEffect(() => {
     if (!tip) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setTip(null);
+      if (event.key === "Escape") hide();
     }
     function onReposition() {
       const node = wrapRef.current;
@@ -67,14 +67,14 @@ export function DeskHint({
       setTip(place(node.getBoundingClientRect(), preferRef.current));
     }
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("scroll", hide, true);
     window.addEventListener("resize", onReposition);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onReposition, true);
+      window.removeEventListener("scroll", hide, true);
       window.removeEventListener("resize", onReposition);
     };
-  }, [tip]);
+  }, [tip, hide]);
 
   return (
     <span

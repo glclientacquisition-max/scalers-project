@@ -63,6 +63,7 @@ describe("desk phone shell", () => {
     assert.match(hint, /bg-\[#0A192F\]/);
     assert.match(hint, /onPointerEnter/);
     assert.match(hint, /Escape/);
+    assert.match(hint, /addEventListener\("scroll", hide, true\)/);
   });
 
   it("overlays the Inbox count on the tab icon, not as a second control", () => {
