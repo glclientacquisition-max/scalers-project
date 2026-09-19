@@ -3,7 +3,7 @@
 **Route:** `/contacts`  
 **Job:** Named callers. Not a CRM.
 
-**Filters:** Same `FilterTabs` as Inbox. Do not restyle this as chips or a second tab dialect.
+**Filters:** Same `FilterTabs` as Inbox. Do not restyle this as chips or a second tab dialect. No Contacts H1. Import and Add sit in the lead row.
 
 **Row:** Same recipe as Inbox. Tap the row to open the contact. No Open column. Last reason is one truncated line (`deskPreviewClass`). Phone stays in the `md+` table; phone list rows are name plus that preview. The four-block summary lives on the person file and the call.
 

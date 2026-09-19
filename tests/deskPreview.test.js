@@ -11,7 +11,6 @@ describe("desk preview truncate", () => {
   const chrome = read("dashboard/src/components/ui/deskChrome.ts");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
-  const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const purpose = read("dashboard/src/lib/inboxPurpose.ts");
   const mandate = read(".cursor/rules/scalers-design-ux.mdc");
   const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
@@ -50,7 +49,6 @@ describe("desk preview truncate", () => {
     assert.doesNotMatch(home, /nextHold\?\.headline/);
     assert.doesNotMatch(home, /nextJob\?\.headline/);
     assert.match(home, /deskPreviewClass/);
-    assert.match(toolbar, /deskPreviewClass/);
     assert.doesNotMatch(home, /overflow-wrap:anywhere/);
   });
 

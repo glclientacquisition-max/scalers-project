@@ -88,7 +88,7 @@ Ops console (`/admin`) is the exception to the owner-desk ban on a left rail: a 
 
 Use Tailwind utilities. CSS variables exist so sticky chrome and docs stay aligned.
 
-Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below `md`, `main` also clears `--desk-tabbar-clearance`. Child pages start at `mt-0`. Double padding is a defect.
+Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `md`, `main` also clears `--desk-tabbar-clearance`. Child pages start at `mt-0`. Double padding is a defect.
 
 ---
 
@@ -96,7 +96,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 
 - Body: DM Sans
 - Display: Sora on `h1–h3` and `.font-display`
-- Page title: `clamp(1.5rem, 2.4vw, 2rem)` semibold. Inbox matches Home and Settings.
+- Page title: `clamp(1.5rem, 2.4vw, 2rem)` semibold on nested records (`pageTitleClass`). Primary `DESK_LINKS` indexes do not repeat the nav label as an `h1`.
 - Table: `text-sm`
 - Meta: `text-xs uppercase tracking-wide text-ink-soft`
 
@@ -118,6 +118,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-6 sm:px-6 sm:pt-10`. Below 
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` header links. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the header. |
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
+| Index status chip | `deskStatusChipClass` + `formatAttentionCount`. Muted pill, `min-h-11`, tabular `1`–`9` then `9+`. Inbox Needs you only. Hidden at 0. |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |
 | 404 | `app/not-found.tsx`. Overview is the recovery link. |

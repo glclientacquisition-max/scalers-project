@@ -36,7 +36,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
         </div>
       </header>
       <DeskOffline />
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
+      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6">
         {children}
       </main>
       <DeskTabBar />

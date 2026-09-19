@@ -10,7 +10,8 @@ import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { RowIdentity } from "@/components/ui/deskRow";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { deskEmptyClass, deskPreviewCellClass, deskPreviewClass, deskShiftClass, pageTitleClass } from "@/components/ui/deskChrome";
+import { deskEmptyClass, deskPreviewCellClass, deskPreviewClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
   contactsHref,
@@ -66,19 +67,9 @@ export default async function ContactsPage({
 
   return (
     <div>
-      <header className="space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className={pageTitleClass}>
-              Contacts
-            </h1>
-            {total > 0 ? (
-              <p className="mt-1 text-[13px] text-ink-soft">
-                {total} {total === 1 ? "caller" : "callers"}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <header className="space-y-3">
+        <DeskIndexLead>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
               href="/contacts/import"
               className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -88,7 +79,7 @@ export default async function ContactsPage({
             <PhonebookImportButton />
             <AddContactPanel />
           </div>
-        </div>
+        </DeskIndexLead>
         <FilterTabs
           label="Filter by name"
           active={saved}

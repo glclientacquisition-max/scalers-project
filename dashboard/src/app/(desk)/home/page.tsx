@@ -23,7 +23,6 @@ import {
   deskPreviewClass,
   deskShiftClass,
   focusRingVisible,
-  pageTitleClass,
 } from "@/components/ui/deskChrome";
 import {
   homeBriefing,
@@ -180,7 +179,7 @@ export default async function HomeOverviewPage() {
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           {nairobiGreeting()}
         </p>
-        <h1 className={`mt-1 ${pageTitleClass}`}>
+        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight text-ink">
           {business}
         </h1>
         <p className="mt-1 font-sans text-[13px] text-ink-soft">

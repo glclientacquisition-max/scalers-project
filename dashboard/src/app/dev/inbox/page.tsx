@@ -183,7 +183,6 @@ export default function DevInboxPage() {
   }
 
   const needYou = ROWS.filter((row) => row.needsYou).length;
-  const briefing = needYou > 0 ? `${needYou} need you` : "Clear";
 
   return (
     <div className="desk-theme min-h-screen min-w-0">
@@ -193,7 +192,7 @@ export default function DevInboxPage() {
           <DeskNav />
         </div>
       </header>
-      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-6 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-10">
+      <main className="mx-auto w-full min-w-0 max-w-desk px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6">
         <InboxRowUiProvider>
         <InboxSelectChrome items={ROWS}>
         <InboxToolbar
@@ -208,7 +207,6 @@ export default function DevInboxPage() {
             archived: 14,
           }}
           q=""
-          caption={briefing}
         />
         <div className="mt-6 max-w-lg">
           <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Appearance</p>
