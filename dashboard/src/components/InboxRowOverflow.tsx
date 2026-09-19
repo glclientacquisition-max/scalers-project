@@ -356,7 +356,7 @@ function InboxOverflowSurface({
       ref={panelRef}
       role="menu"
       aria-labelledby={labelId}
-      className="z-50 max-h-[min(24rem,calc(100dvh-1rem))] min-w-[14rem] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
+      className="z-[60] max-h-[min(24rem,calc(100dvh-1rem))] min-w-[14rem] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
       style={{
         position: "fixed",
         top: pos?.top ?? 0,
@@ -378,7 +378,7 @@ function InboxOverflowSurface({
             onClick={() => onRun(action.id)}
             className={[
               "flex w-full items-center px-4 text-left text-sm text-ink",
-              "min-h-10",
+              "min-h-11",
               focusRingVisible,
               "hover:bg-surface-muted disabled:opacity-50",
             ].join(" ")}

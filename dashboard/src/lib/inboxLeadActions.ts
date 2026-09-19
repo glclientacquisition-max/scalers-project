@@ -4,6 +4,7 @@ import { updateServiceRequestStatus } from "@/app/(desk)/requests/actions";
 import {
   inboxAddLabel as writeInboxLabel,
   inboxAssignTeammate as writeInboxAssignee,
+  inboxMarkSeen as writeInboxSeen,
   inboxSnooze as writeInboxSnooze,
   inboxToggleMute as writeInboxMute,
   inboxTogglePin as writeInboxPin,
@@ -55,6 +56,12 @@ export async function inboxDelete(item: InboxItem) {
 export async function inboxToggleRead(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
   return writeInboxRead(item.callId, item.unread);
+}
+
+export async function inboxMarkSeen(callId: string) {
+  const id = String(callId || "").trim();
+  if (!id) return { error: "Missing call." };
+  return writeInboxSeen(id);
 }
 
 export async function inboxToggleMute(item: InboxItem) {

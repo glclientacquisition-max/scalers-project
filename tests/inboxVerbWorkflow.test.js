@@ -214,7 +214,7 @@ function assembleVisible(items, now) {
 }
 
 function weightOn(item) {
-  return Boolean(item.needsYou || item.unread);
+  return Boolean(item.unread);
 }
 
 describe("inbox verb workflows: mark done", () => {
@@ -371,9 +371,10 @@ describe("inbox verb workflows: snooze", () => {
 });
 
 describe("inbox verb workflows: mark unread", () => {
-  it("does not change piles. Weight is needsYou OR unread, with no Unread filter", () => {
+  it("does not change piles. Weight follows unread, with no Unread filter", () => {
     const open = humanReturn({ unread: false });
-    assert.equal(weightOn(open), true);
+    assert.equal(weightOn(open), false);
+    assert.equal(open.needsYou, true);
     assert.deepEqual(pilesOf(open), pilesOf(markUnread(open)));
     const closed = markDone(humanReturn({ unread: false }));
     assert.equal(weightOn(closed), false);
@@ -381,13 +382,15 @@ describe("inbox verb workflows: mark unread", () => {
     assert.deepEqual(pilesOf(markUnread(closed)), ["all", "human"]);
   });
 
-  it("new calls are unread when inbox_read_at is null. Opening a ticket does not stamp read", () => {
+  it("unread is last customer event after last open. Opening a ticket stamps inbox_read_at", () => {
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
-    const sql = read("docs/supabase/inbox_triage.sql");
-    const ticket = read("dashboard/src/app/(desk)/calls/[id]/page.tsx");
-    assert.match(purpose, /unread: lead\?\.call\.inbox_read_at === null/);
-    assert.match(sql, /New calls are unread \(inbox_read_at null\)/);
-    assert.doesNotMatch(ticket, /inboxToggleRead|inbox_read_at/);
+    const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+    const actions = read("dashboard/src/app/(desk)/calls/inboxTriageActions.ts");
+    assert.match(purpose, /export function inboxIsUnread/);
+    assert.match(purpose, /unread: inboxIsUnread\(/);
+    assert.match(actions, /export async function inboxMarkSeen/);
+    assert.match(ticket, /inboxMarkSeen\(callId\)/);
+    assert.doesNotMatch(ticket, /Mark unread/);
   });
 });
 

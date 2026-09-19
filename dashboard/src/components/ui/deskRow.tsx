@@ -49,20 +49,20 @@ export function LivePing({ label = "Live" }: { label?: string }) {
   );
 }
 
-/** Brand-blue dot for rows that need the owner. Sits with the timestamp. Live rows ping. */
+/** Brand-blue dot for unread rows. Sits with the timestamp. Live unread rows ping. */
 export function RowStateDot({ show, live }: { show: boolean; live?: boolean }) {
   if (!show) return null;
   if (live) return <LivePing />;
   return (
     <span
       role="img"
-      aria-label="Needs you"
+      aria-label="Unread"
       className="h-2 w-2 shrink-0 rounded-full bg-accent"
     />
   );
 }
 
-/** Name/headline weight: semibold while the row needs you, medium once handled. */
+/** Name/headline weight: semibold while unread, medium once opened. */
 export function deskRowWeightClass(needsYou: boolean): string {
   return needsYou ? "font-semibold text-ink" : "font-medium text-ink";
 }

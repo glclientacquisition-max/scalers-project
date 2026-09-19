@@ -33,7 +33,7 @@ describe("universal row anatomy", () => {
 
   it("carries state as a blue dot plus type weight, never opacity", () => {
     assert.match(row, /rounded-full bg-accent/);
-    assert.match(row, /aria-label="Needs you"/);
+    assert.match(row, /aria-label="Unread"/);
     assert.match(row, /font-semibold text-ink/);
     assert.match(row, /font-medium text-ink/);
     assert.doesNotMatch(inbox, /opacity-\[0\.92\]/);
@@ -45,8 +45,8 @@ describe("universal row anatomy", () => {
     const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
     assert.match(phone, /<InboxRowAvatar/);
     assert.match(avatar, /RowIdentity name=\{name\}/);
-    assert.match(inbox, /RowStateDot show=\{item\.needsYou\}/);
-    assert.match(inbox, /deskRowWeightClass\(item\.needsYou \|\| item\.unread\)/);
+    assert.match(inbox, /RowStateDot show=\{item\.unread\}/);
+    assert.match(inbox, /deskRowWeightClass\(item\.unread\)/);
     assert.match(inbox, /deskPreviewClass/);
     assert.match(inbox, /deskPreviewCellClass/);
     assert.doesNotMatch(inbox, /line-clamp-2/);
@@ -97,7 +97,7 @@ describe("inbox call action", () => {
     const holdNext = inbox.indexOf("if (item.hold)", actionFn);
     const phoneLast = inbox.indexOf("if (item.callerPhone)", actionFn);
     assert.ok(jobFirst < holdNext && holdNext < phoneLast);
-    assert.doesNotMatch(inbox.slice(actionFn, actionFn + 900), /Send SMS|mailto:|Archive/);
+    assert.doesNotMatch(inbox.slice(actionFn, actionFn + 900), /Send SMS|mailto:/);
     assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
     assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);

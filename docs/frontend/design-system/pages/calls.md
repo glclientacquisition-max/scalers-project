@@ -9,7 +9,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** No Inbox H1. Needs you count overlays the Inbox nav icon (`formatAttentionCount`, `9+` at 10, ribbon `from-accent to-accent-fill`). Search, then purpose pills. Nested Archived keeps its title. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Tap the identity circle to open the contact. No Open or View link.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Tap the identity circle to open the contact. No Open or View link. Blue unread dot and bold preview when a customer event (inbound call, hold, or visit from the caller) is newer than `calls.inbox_read_at`. Opening `/calls/[id]` stamps that field. Needs you stays a pile. The nav badge stays Needs you count.
 
 **Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column.
 
