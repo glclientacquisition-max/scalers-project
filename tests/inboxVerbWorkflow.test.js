@@ -310,7 +310,7 @@ describe("inbox verb workflows: archive and unarchive", () => {
     assert.equal(after.lead.leadStatus, "resolved");
     assert.deepEqual(
       inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
-      ["unarchive"]
+      ["pin", "unarchive"]
     );
   });
 });
@@ -391,32 +391,45 @@ describe("inbox verb workflows: mark unread", () => {
   });
 });
 
+function inboxCanMarkDone(item) {
+  if (itemIsArchived(item)) return false;
+  if (item.job || item.hold) return false;
+  if (item.purpose !== "human" && item.purpose !== "missed") return false;
+  return String(item.lead?.leadStatus || "").toLowerCase() !== "resolved";
+}
+
 function inboxOverflowActions(item) {
-  if (itemIsArchived(item)) return [{ id: "unarchive", label: "Unarchive" }];
-  return [{ id: "archive", label: "Archive" }];
+  const stay = [item.pinnedAt ? { id: "unpin", label: "Unpin" } : { id: "pin", label: "Pin" }];
+  if (inboxCanMarkDone(item)) stay.push({ id: "mark_done", label: "Mark done" });
+  if (itemIsArchived(item)) return [...stay, { id: "unarchive", label: "Unarchive" }];
+  return [...stay, { id: "archive", label: "Archive" }];
 }
 
 describe("inbox verb workflows: overflow menu", () => {
-  it("offers Archive, or Unarchive on Archived", () => {
+  it("offers Pin, Mark done on return calls, Archive, or Unarchive on Archived", () => {
     assert.deepEqual(
       inboxOverflowActions(humanReturn()).map((row) => row.id),
-      ["archive"]
+      ["pin", "mark_done", "archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(requestedVisit()).map((row) => row.id),
-      ["archive"]
+      ["pin", "archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(openHold()).map((row) => row.id),
-      ["archive"]
+      ["pin", "archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(answeredRow()).map((row) => row.id),
-      ["archive"]
+      ["pin", "archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(archive(humanReturn())).map((row) => row.id),
-      ["unarchive"]
+      ["pin", "unarchive"]
+    );
+    assert.deepEqual(
+      inboxOverflowActions(pin(humanReturn())).map((row) => row.id),
+      ["unpin", "mark_done", "archive"]
     );
   });
 });
@@ -429,6 +442,8 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.match(verbs, /export function inboxOverflowActions/);
     assert.match(verbs, /label: "Archive"/);
     assert.match(verbs, /label: "Unarchive"/);
+    assert.match(verbs, /label: "Pin"/);
+    assert.match(verbs, /Mark done/);
     assert.doesNotMatch(overflow, /id: "unread"/);
     assert.doesNotMatch(overflow, /id: "snooze"/);
     assert.doesNotMatch(overflow, /Mark unread/);
@@ -437,23 +452,21 @@ describe("inbox verb workflows: surfaces as shipped", () => {
 
   it("phone select bar has no More sheet. Bulk Confirm and Done are eligibility gated", () => {
     const select = read("dashboard/src/components/InboxRowSelect.tsx");
+    const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
     assert.doesNotMatch(select, /aria-label="More"/);
     assert.doesNotMatch(select, /id: "unread"/);
     assert.doesNotMatch(select, /id: "snooze"/);
     assert.match(select, /kind === "archive"/);
-    assert.match(select, /inboxBulkSharedAction/);
+    assert.match(select, /inboxBulkActions/);
     assert.doesNotMatch(select, /inboxTogglePin/);
-    assert.doesNotMatch(select, /Mark done/);
+    assert.match(select, /inboxMarkDone/);
     assert.doesNotMatch(select, /aria-label=\{allPinned/);
-    const phone = select.slice(select.indexOf("md:hidden"));
-    assert.match(phone, /aria-label="Archive"/);
-    assert.match(phone, /aria-label="Unarchive"/);
-    assert.doesNotMatch(phone, /Pin/);
-    const desktop = select.slice(select.indexOf("hidden min-h-11"));
-    assert.match(desktop, /Archive/);
-    assert.match(desktop, /Unarchive/);
-    assert.match(desktop, /Cancel/);
-    assert.doesNotMatch(desktop, /Mark unread|Snooze/);
+    assert.match(select, /aria-label="Close"/);
+    assert.doesNotMatch(select, /aria-label="Back"/);
+    assert.doesNotMatch(overflow, /role="dialog"/);
+    assert.doesNotMatch(overflow, /coarse \? "sheet"/);
+    assert.match(overflow, /hidden md:inline-flex/);
+    assert.doesNotMatch(select, /Mark unread|Snooze/);
   });
 
   it("ticket stamp is read-only. Archive lives on More", () => {

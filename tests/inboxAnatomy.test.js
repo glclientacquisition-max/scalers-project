@@ -132,7 +132,7 @@ describe("inbox outside and inside anatomy", () => {
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
     assert.match(ticket, /<DeskBack/);
     assert.match(ticket, /InboxJobActions/);
-    assert.match(back, /min-h-11/);
+    assert.match(back, /min-h-11 min-w-11/);
     assert.match(contact, /<DeskBack/);
     assert.match(jobActions, /pendingSpinnerClass/);
     assert.match(holdActions, /pendingSpinnerClass/);

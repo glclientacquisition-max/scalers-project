@@ -16,7 +16,7 @@ describe("inbox ticket action chrome", () => {
 
   it("uses a fixed header, scrolling thread, and docked SMS", () => {
     assert.match(detail, /<InboxTicketView/);
-    assert.match(ticket, /DeskBack/);
+    assert.match(ticket, /<DeskBack href=\{backHref\}>Inbox<\/DeskBack>/);
     assert.match(ticket, /Jump to latest/);
     assert.match(ticket, /dockedAction/);
     assert.match(ticket, /border border-line bg-surface text-ink/);
