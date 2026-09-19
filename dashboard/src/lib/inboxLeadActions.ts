@@ -58,6 +58,7 @@ export async function inboxToggleRead(item: InboxItem) {
   return writeInboxRead(item.callId, item.unread);
 }
 
+/** Stamp `inbox_read_at` when the owner opens `/calls/[id]`. Clears the unread dot, not Needs you. */
 export async function inboxMarkSeen(callId: string) {
   const id = String(callId || "").trim();
   if (!id) return { error: "Missing call." };

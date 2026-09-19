@@ -63,6 +63,6 @@ export function RowStateDot({ show, live }: { show: boolean; live?: boolean }) {
 }
 
 /** Name/headline weight: semibold while unread, medium once opened. */
-export function deskRowWeightClass(needsYou: boolean): string {
-  return needsYou ? "font-semibold text-ink" : "font-medium text-ink";
+export function deskRowWeightClass(unread: boolean): string {
+  return unread ? "font-semibold text-ink" : "font-medium text-ink";
 }

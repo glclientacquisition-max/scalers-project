@@ -391,6 +391,9 @@ describe("inbox verb workflows: mark unread", () => {
     assert.match(actions, /export async function inboxMarkSeen/);
     assert.match(ticket, /inboxMarkSeen\(callId\)/);
     assert.doesNotMatch(ticket, /Mark unread/);
+    const opened = markRead(humanReturn({ unread: true }));
+    assert.equal(weightOn(opened), false);
+    assert.equal(opened.needsYou, true);
   });
 });
 

@@ -75,7 +75,7 @@ export async function inboxToggleRead(
   });
 }
 
-/** Opening /calls/[id] stamps last-open. Does not toggle Needs you. */
+/** Stamp `inbox_read_at` when the owner opens `/calls/[id]`. Clears the unread dot, not Needs you. */
 export async function inboxMarkSeen(callId: string): Promise<InboxTriageResult> {
   return writeInboxTriage(
     callId,
