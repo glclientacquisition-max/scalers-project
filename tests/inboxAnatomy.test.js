@@ -80,7 +80,7 @@ describe("inbox outside and inside anatomy", () => {
   });
 
   it("defines the call as decide and reply, not operator telemetry", () => {
-    assert.match(callDetail, /Fixed header, scrolling conversation/);
+    assert.match(callDetail, /From `lg`, summary left and transcript right/);
     assert.match(callDetail, /The stamp is read-only/);
     assert.match(callDetail, /sendInboxReplySms/);
     assert.doesNotMatch(detail, />\s*Open contact\s*</);
