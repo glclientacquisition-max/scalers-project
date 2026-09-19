@@ -105,7 +105,7 @@ Legend: **Persisted** = written to Supabase. **Memory** = process-local only. **
 | Event | Data | Persistence |
 | --- | --- | --- |
 | `call.completed` webhook | Duration, terminal status | **Persisted** — `updateCallStatus` |
-| `recording.ready` | Recording URL | **Persisted** — `attachRecording`; may upload to Storage bucket `call-recordings` |
+| `recording.ready` | Recording URL (`download_url` or GET `/v1/calls/{id}/recording`) | **Persisted** — `attachRecording`; may upload to Storage bucket `call-recordings` |
 | Resolution | `primary_intent`, `resolution`, `resolution_note` | **Persisted** — `setCallResolution` via `deriveCallResolution` |
 | Summary | JSON in `calls.summary` (`text`, `brain_summary`, `reason`) | **Persisted** instantly from Brain; Gemini transcript review may rewrite `reason` |
 | Transcript review | Owner sentence + human-need check | **Persisted** — `mergeCallSummaryMeta` / `setCallResolution` (non-blocking) |

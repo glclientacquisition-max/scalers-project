@@ -307,8 +307,90 @@ function pickClarifyProgress(opts = {}) {
     if (sw) return 'Sawa. Niambie jina lako.';
     return 'Okay. May I have your name?';
   }
+  if (slot === 'when' || slot === 'when_text' || slot === 'when_or_reference') {
+    if (sw) return 'Sawa. Niambie siku na saa.';
+    return 'Okay. What day and time works?';
+  }
+  if (slot === 'landmark') {
+    if (sw) return 'Sawa. Niambie landmark ya karibu.';
+    return 'Okay. What is a nearby landmark?';
+  }
+  if (slot === 'service' || slot === 'subject' || slot === 'catalog_item') {
+    if (sw) return 'Sawa. Unahitaji huduma gani?';
+    return 'Okay. Which service do you need?';
+  }
   if (sw) return 'Sawa, nimekuelewa.';
   return 'Okay.';
+}
+
+function callerNameAlreadyKnown({ brainState = {}, userText = '' } = {}) {
+  if (String(brainState?.caller?.name || '').trim()) return true;
+  const entityName = brainState?.entities?.name;
+  const entityValue =
+    entityName && typeof entityName === 'object'
+      ? String(entityName.value || '').trim()
+      : String(entityName || '').trim();
+  if (entityValue) return true;
+  return Boolean(callerNameFromUtterance(userText));
+}
+
+function nextGuaranteeSlot({ nextBestAction = {}, brainState = {}, nameKnown = false } = {}) {
+  const intent = String(brainState?.intent || '').toLowerCase();
+  const missing = Array.isArray(brainState?.goal?.missingSlots)
+    ? brainState.goal.missingSlots.map((slot) => String(slot || '').toLowerCase())
+    : [];
+  const nbaSlot = String(nextBestAction?.slot || '').toLowerCase();
+  const ordered = [];
+  if (nbaSlot) ordered.push(nbaSlot);
+  for (const slot of missing) {
+    if (slot && !ordered.includes(slot)) ordered.push(slot);
+  }
+  const remaining = nameKnown ? ordered.filter((slot) => slot !== 'name') : ordered;
+  if (remaining[0]) return remaining[0];
+  if (nameKnown && (intent === 'booking' || intent === 'hold')) return 'when';
+  return '';
+}
+
+function shouldSpeakHandoffNameAsk({
+  nextBestAction = {},
+  brainState = {},
+  userText = '',
+} = {}) {
+  if (callerNameAlreadyKnown({ brainState, userText })) return false;
+  const missing = Array.isArray(brainState?.goal?.missingSlots)
+    ? brainState.goal.missingSlots
+    : [];
+  return (
+    String(nextBestAction.action || '').toUpperCase() === 'ASK_CLARIFICATION' &&
+    (String(brainState.intent || '').toLowerCase() === 'human' ||
+      Boolean(brainState.handoff?.requested)) &&
+    (String(nextBestAction.slot || '').toLowerCase() === 'name' ||
+      missing.includes('name'))
+  );
+}
+
+/**
+ * Spoken line when Gemini emitted 0 chars on a successful turn.
+ * Do not use the Gemini-down reach-them name-ask. Ask the next slot.
+ */
+function pickSpeechGuaranteeLine({
+  nextBestAction = {},
+  brainState = {},
+  language,
+  userText = '',
+} = {}) {
+  const nameKnown = callerNameAlreadyKnown({ brainState, userText });
+  const slot = nextGuaranteeSlot({ nextBestAction, brainState, nameKnown });
+  const handoff =
+    !nameKnown &&
+    (String(brainState?.intent || '').toLowerCase() === 'human' ||
+      Boolean(brainState?.handoff?.requested));
+  return pickClarifyProgress({
+    action: nextBestAction.action,
+    slot,
+    intent: handoff ? 'human' : '',
+    language,
+  });
 }
 
 /**
@@ -509,6 +591,8 @@ module.exports = {
   pickContextualAck,
   pickActionProgress,
   pickClarifyProgress,
+  pickSpeechGuaranteeLine,
+  shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
