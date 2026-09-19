@@ -19,7 +19,9 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /DeskBack/);
     assert.match(ticket, /Jump to latest/);
     assert.match(ticket, /InboxSmsDock/);
-    assert.match(ticket, /needsYou && !archived \? \(/);
+    assert.match(ticket, /canSms \? <InboxSmsDock/);
+    assert.match(ticket, /!archived && Boolean\(String\(callerPhone/);
+    assert.doesNotMatch(ticket, /needsYou && !archived \? \(/);
     assert.doesNotMatch(detail, /LeadStatusToggle/);
     assert.doesNotMatch(ticket, /LeadStatusToggle/);
     assert.doesNotMatch(detail, /MarkLeadDoneButton/);
@@ -44,6 +46,10 @@ describe("inbox ticket action chrome", () => {
     assert.match(notes, /sendRecordedDeskCallerSms/);
     assert.match(dock, /name="reply_id"/);
     assert.match(ticket, /tone="thread"/);
+    const harness = read("dashboard/src/app/dev/inbox/page.tsx");
+    assert.match(harness, /id="ticket-answered"/);
+    assert.match(harness, /id="ticket-archived"/);
+    assert.match(harness, /purpose="answered"/);
     assert.doesNotMatch(notes, /caller_appointment_confirmed/);
   });
 
@@ -53,6 +59,10 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /InboxJobActions id=\{job.id\} status=\{job.status\} banner/);
     assert.match(ticket, /RequestStatusToggle id=\{hold.id\} status=\{hold.status\} banner/);
     assert.match(ticket, /Want\. \$\{want\}/);
+    assert.match(ticket, /function ticketSummaryLine/);
+    assert.match(ticket, /deskPreviewClass/);
+    assert.match(ticket, /summaryLine \? \(/);
+    assert.match(ticket, /needsYou && urgency/);
   });
 
   it("keeps Want, Do next, and Mood as the summary lead", () => {

@@ -83,6 +83,7 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(callDetail, /Fixed header, scrolling conversation/);
     assert.match(callDetail, /The stamp is read-only/);
     assert.match(callDetail, /sendInboxReplySms/);
+    assert.match(callDetail, /Summary strip/);
     assert.doesNotMatch(detail, />\s*Open contact\s*</);
     assert.match(read("dashboard/src/components/CallTranscript.tsx"), /No conversation\./);
     assert.doesNotMatch(detail, / · \{row\.primary_intent\}/);

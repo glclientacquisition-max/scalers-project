@@ -9,11 +9,13 @@
 
 **Urgency:** A strip under the header only when `needsYou`. Copy comes from Do next or the summary, not a generic template.
 
+**Summary strip:** One muted truncated line under the header, above the thread. Names the want and the next step. Not a card. Full Want, Mood, and Done stay as thread notices.
+
 **Thread:** Want, Mood, and Done are centered muted system notices. FAQ ideas sit in the thread. Jump to latest appears when scrolled away from the bottom.
 
 **Banner:** Confirm only when an appointments row is requested. Hold Done only when a service_request is open. Not for intent-only, Human, or Missed.
 
-**SMS dock:** Shown when `needsYou` and the call is not archived. Growing input plus Send. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm. WhatsApp stays on the header icon.
+**SMS dock:** Shown on every ticket that has a number and is not archived, including Answered. Growing input plus Send. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm. WhatsApp stays on the header icon.
 
 **Back:** `DeskBack`, 44px. Label is Inbox.
 

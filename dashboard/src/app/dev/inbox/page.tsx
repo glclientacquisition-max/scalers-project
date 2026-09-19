@@ -245,7 +245,7 @@ export default function DevInboxPage() {
           </DeskDataTable>
         </div>
         </InboxRowUiProvider>
-        <div className="mt-10">
+        <div className="mt-10" id="ticket-job">
           <InboxTicketView
             callId="call-1"
             backHref="/dev/inbox"
@@ -281,6 +281,60 @@ export default function DevInboxPage() {
             assistNote={null}
             escalatedLine={null}
             archived={false}
+          />
+        </div>
+        <div className="mt-10" id="ticket-answered">
+          <InboxTicketView
+            callId="call-answered"
+            backHref="/dev/inbox"
+            contactHref={null}
+            title="Mwangi"
+            stamp="Answered"
+            purpose="answered"
+            callerPhone="254700000005"
+            waMessage="Quote"
+            needsYou={false}
+            urgency={null}
+            want="Deep clean Saturday morning"
+            done="Quote promised"
+            mood="Calm"
+            job={null}
+            hold={null}
+            turns={TURNS}
+            tenantId="dev"
+            recordingUrl={null}
+            durationLabel="32s"
+            assistLabel="Handled"
+            assistNote={null}
+            escalatedLine={null}
+            archived={false}
+          />
+        </div>
+        <div className="mt-10" id="ticket-archived">
+          <InboxTicketView
+            callId="call-archived"
+            backHref="/dev/inbox"
+            contactHref={null}
+            title="Amina"
+            stamp="Human asked"
+            purpose="human"
+            callerPhone="254700000001"
+            waMessage="Callback"
+            needsYou
+            urgency="Return the call"
+            want="Asked for a person"
+            done={null}
+            mood={null}
+            job={null}
+            hold={null}
+            turns={TURNS}
+            tenantId="dev"
+            recordingUrl={null}
+            durationLabel="12s"
+            assistLabel={null}
+            assistNote={null}
+            escalatedLine={null}
+            archived
           />
         </div>
       </main>

@@ -19,6 +19,7 @@ import { DeskBack } from "@/components/ui/DeskBack";
 import { RowIdentity } from "@/components/ui/deskRow";
 import {
   deskHitClass,
+  deskPreviewClass,
   deskShiftClass,
   focusRingVisible,
 } from "@/components/ui/deskChrome";
@@ -34,6 +35,13 @@ function MoreGlyph() {
       <circle cx="8" cy="12.8" r="1.3" />
     </svg>
   );
+}
+
+function ticketSummaryLine(want: string | null, next: string | null): string | null {
+  const wantText = String(want || "").replace(/\s+/g, " ").trim();
+  const nextText = String(next || "").replace(/\s+/g, " ").trim();
+  if (wantText && nextText && wantText !== nextText) return `${wantText}. ${nextText}`;
+  return wantText || nextText || null;
 }
 
 function SystemNotice({ children }: { children: ReactNode }) {
@@ -220,6 +228,8 @@ export function InboxTicketView({
   const [away, setAway] = useState(false);
   const canConfirm = String(job?.status || "").toLowerCase() === "requested";
   const canHoldDone = String(hold?.status || "").toLowerCase() === "open";
+  const summaryLine = ticketSummaryLine(want, urgency || done);
+  const canSms = !archived && Boolean(String(callerPhone || "").trim());
   const identity = (
     <>
       <RowIdentity name={title} />
@@ -269,6 +279,12 @@ export function InboxTicketView({
           {archived ? null : <InboxTicketMore callId={callId} />}
         </div>
       </header>
+
+      {summaryLine ? (
+        <p className={`shrink-0 border-b border-line px-4 py-2 text-sm text-ink-soft sm:px-6 ${deskPreviewClass}`}>
+          {summaryLine}
+        </p>
+      ) : null}
 
       {needsYou && urgency ? (
         <p className="shrink-0 border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm font-medium text-warn sm:px-6">
@@ -331,9 +347,7 @@ export function InboxTicketView({
         </div>
       ) : null}
 
-      {needsYou && !archived ? (
-        <InboxSmsDock callId={callId} callerPhone={callerPhone} />
-      ) : null}
+      {canSms ? <InboxSmsDock callId={callId} callerPhone={callerPhone} /> : null}
     </div>
   );
 }
