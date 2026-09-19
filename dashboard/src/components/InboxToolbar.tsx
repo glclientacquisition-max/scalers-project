@@ -19,6 +19,9 @@ export function InboxToolbar({
   view,
   week,
   day,
+  backHref,
+  from,
+  rpage,
 }: {
   active: InboxPurposeFilterId;
   counts: Record<InboxPurposeFilterId, number>;
@@ -28,6 +31,9 @@ export function InboxToolbar({
   view?: string;
   week?: string;
   day?: string;
+  backHref?: string;
+  from?: string;
+  rpage?: string;
 }) {
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
@@ -49,7 +55,7 @@ export function InboxToolbar({
 
   return (
     <header className="space-y-6">
-      {archived ? <DeskBack href={callsHref({ q: q || undefined })}>Inbox</DeskBack> : null}
+      {archived ? <DeskBack href={backHref || callsHref({ q: q || undefined })}>Inbox</DeskBack> : null}
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className={pageTitleClass}>{archived ? "Archived" : "Inbox"}</h1>
@@ -61,6 +67,11 @@ export function InboxToolbar({
           className="flex w-full min-w-0 gap-2 sm:max-w-sm"
         >
           <input type="hidden" name="purpose" value={active} />
+          {archived && from ? <input type="hidden" name="from" value={from} /> : null}
+          {archived && rpage ? <input type="hidden" name="rpage" value={rpage} /> : null}
+          {archived && view ? <input type="hidden" name="view" value={view} /> : null}
+          {archived && week ? <input type="hidden" name="week" value={week} /> : null}
+          {archived && day ? <input type="hidden" name="day" value={day} /> : null}
           {workView || holdToday ? (
             <input type="hidden" name="view" value={weekView ? "week" : "today"} />
           ) : null}

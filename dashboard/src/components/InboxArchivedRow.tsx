@@ -1,6 +1,6 @@
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { deskPreviewClass, deskShiftClass } from "@/components/ui/deskChrome";
-import { callsHref } from "@/lib/callsTriage";
+import { inboxArchivedHref, type InboxReturn } from "@/lib/inboxHref";
 
 function ArchiveGlyph() {
   return (
@@ -27,7 +27,13 @@ function ArchiveMark() {
   );
 }
 
-export function InboxArchivedPhoneRow({ count, q }: { count: number; q?: string }) {
+export function InboxArchivedPhoneRow({
+  count,
+  ret,
+}: {
+  count: number;
+  ret?: InboxReturn;
+}) {
   return (
     <li
       className={[
@@ -36,7 +42,7 @@ export function InboxArchivedPhoneRow({ count, q }: { count: number; q?: string 
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
     >
-      <DeskRowHit href={callsHref({ purpose: "archived", q: q || undefined })} label="Archived" />
+      <DeskRowHit href={inboxArchivedHref(ret)} label="Archived" />
       <div className={deskRowMutedClass}>
         <ArchiveMark />
       </div>
@@ -50,7 +56,13 @@ export function InboxArchivedPhoneRow({ count, q }: { count: number; q?: string 
   );
 }
 
-export function InboxArchivedTableRow({ count, q }: { count: number; q?: string }) {
+export function InboxArchivedTableRow({
+  count,
+  ret,
+}: {
+  count: number;
+  ret?: InboxReturn;
+}) {
   return (
     <tr
       className={[
@@ -60,7 +72,7 @@ export function InboxArchivedTableRow({ count, q }: { count: number; q?: string 
       ].join(" ")}
     >
       <td colSpan={4} className="px-5 py-4">
-        <DeskRowHit href={callsHref({ purpose: "archived", q: q || undefined })} label="Archived" />
+        <DeskRowHit href={inboxArchivedHref(ret)} label="Archived" />
         <div className="flex items-center gap-3">
           <div className={deskRowMutedClass}>
             <ArchiveMark />

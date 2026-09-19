@@ -34,6 +34,10 @@ describe("inbox filters and empty states", () => {
     assert.match(entry, /label="Archived"/);
     assert.match(page, /showArchivedEntry/);
     assert.match(page, /InboxArchivedPhoneRow/);
+    assert.match(page, /ret=\{inboxRet\}/);
+    assert.match(page, /backHref=\{archivedBackHref\}/);
+    assert.match(toolbar, /backHref \|\| callsHref/);
+    assert.match(entry, /inboxArchivedHref\(ret\)/);
     assert.match(harness, /InboxArchivedPhoneRow/);
   });
 

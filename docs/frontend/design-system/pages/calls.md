@@ -86,4 +86,4 @@ Columns (`md+` table, same data as the phone row):
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 
-**Back:** `DeskBack`, 44px. Label is Inbox. Returns to the same pile, search, page, and visit layout (List / Today / Week).
+**Back:** `DeskBack`, 44px. Label is Inbox. Returns to the same pile, search, page, and visit layout (List / Today / Week). Archived stores that return on the folder link (`from`, `rpage`, view params) so DeskBack restores it, not only `q`.
