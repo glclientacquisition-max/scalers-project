@@ -48,8 +48,8 @@ describe("work surface jobs on unified inbox", () => {
   it("changes Holds and Jobs columns inside Inbox", () => {
     const niche = read("dashboard/src/lib/inboxNiche.ts");
     assert.match(toolbar, />Inbox<\/DeskBack>/);
-    assert.match(toolbar, /formatAttentionCountAriaLabel/);
-    assert.match(toolbar, /formatAttentionCount/);
+    assert.match(nav, /formatInboxNavAriaLabel/);
+    assert.match(nav, /formatAttentionCount/);
     assert.match(toolbar, /purposeFilters/);
     assert.doesNotMatch(toolbar, /clamp\(2rem/);
     assert.match(niche, /holdEmpty: "Nothing to fulfill"/);

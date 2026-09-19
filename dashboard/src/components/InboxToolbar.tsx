@@ -7,14 +7,9 @@ import { inboxArchivedHref } from "@/lib/inboxHref";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import {
-  formatAttentionCount,
-  formatAttentionCountAriaLabel,
-} from "@/lib/deskAttentionCount";
-import {
   btnGhost,
   deskFieldClass,
   deskShiftClass,
-  deskStatusChipClass,
   pageTitleClass,
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
@@ -53,8 +48,6 @@ export function InboxToolbar({
   const holdToday = active === "hold" && (view === "today" || view === "work");
   const workView = weekView || todayView;
   const searchWait = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const needsDisplay = formatAttentionCount(counts.needs);
-  const needsAria = formatAttentionCountAriaLabel(counts.needs);
 
   const searchForm = (
     <form
@@ -95,23 +88,6 @@ export function InboxToolbar({
     </form>
   );
 
-  const statusChip =
-    needsDisplay && needsAria ? (
-      active === "needs" ? (
-        <span className={deskStatusChipClass} aria-label={needsAria}>
-          {needsDisplay}
-        </span>
-      ) : (
-        <Link
-          href={callsHref({ purpose: "needs", q: q || undefined })}
-          className={deskStatusChipClass}
-          aria-label={needsAria}
-        >
-          {needsDisplay}
-        </Link>
-      )
-    ) : null;
-
   return (
     <header className="space-y-3">
       {archived ? <DeskBack href={backHref || callsHref({ q: q || undefined })}>Inbox</DeskBack> : null}
@@ -120,7 +96,7 @@ export function InboxToolbar({
           {searchForm}
         </DeskIndexLead>
       ) : (
-        <DeskIndexLead status={statusChip}>{searchForm}</DeskIndexLead>
+        <DeskIndexLead>{searchForm}</DeskIndexLead>
       )}
 
       {archived ? null : (

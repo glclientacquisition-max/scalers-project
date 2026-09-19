@@ -22,6 +22,6 @@
 
 **Row density and count weight.** Queue rows are `min-h-12` on phone, `min-h-11` at `lg`. Counts are `text-base font-semibold` so the largest queue (85 to return) holds its own against the blue CTA.
 
-**Data (real only):** tenant row, Nairobi-day call count, `loadInboxItems` (open holds/visits unbounded, then a 150-row call tape), `assessMvpAnswerReadiness`, live bulletin. Counts match Inbox purpose, not raw `lead_status=new`.
+**Data (real only):** tenant row, Nairobi-day call count, `loadCachedInboxItems` (open holds/visits unbounded, then a 150-row call tape), `assessMvpAnswerReadiness`, live bulletin. Counts match Inbox purpose, not raw `lead_status=new`.
 
 **Do not:** duplicate the Inbox table. Show Online. Use stacked `TriageLeadCard`.

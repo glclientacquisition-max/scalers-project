@@ -30,7 +30,7 @@ import {
   homeQueueUnit,
   summarizeInboxWork,
 } from "@/lib/inboxPurpose";
-import { loadInboxItems } from "@/lib/inboxLoad";
+import { loadCachedInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
@@ -94,7 +94,7 @@ export default async function HomeOverviewPage() {
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
-    loadInboxItems(client, tenant.id, vertical),
+    loadCachedInboxItems(tenant.id, vertical),
     isBeta
       ? Promise.resolve(null)
       : getWalletRunwayDays(client, tenant.id, kes),

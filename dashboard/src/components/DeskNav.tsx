@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
+import {
+  deskNavBadgeClass,
+  deskShiftClass,
+  focusRingVisible,
+} from "@/components/ui/deskChrome";
+import {
+  formatAttentionCount,
+  formatInboxNavAriaLabel,
+} from "@/lib/deskAttentionCount";
 
 export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
@@ -112,10 +120,29 @@ function TabIcon({ name, className }: { name: string; className?: string }) {
   );
 }
 
+function TabIconWithBadge({ name, count: needsCount }: { name: string; count: number }) {
+  const display = name === "Inbox" ? formatAttentionCount(needsCount) : null;
+  return (
+    <span className="relative inline-flex">
+      <TabIcon name={name} />
+      {display ? (
+        <span aria-hidden="true" className={`pointer-events-none ${deskNavBadgeClass}`}>
+          {display}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function inboxLinkAria(label: string, needsCount: number) {
+  if (label !== "Inbox") return undefined;
+  return formatInboxNavAriaLabel(needsCount) || undefined;
+}
+
 /**
  * Desktop workspace links plus Sign out (header). Phone destinations live in DeskTabBar.
  */
-export function DeskNav() {
+export function DeskNav({ needsCount = 0 }: { needsCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -128,8 +155,9 @@ export function DeskNav() {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
+              aria-label={inboxLinkAria(item.label, needsCount)}
               className={[
-                "rounded-md",
+                "inline-flex items-center gap-1.5 rounded-md",
                 deskShiftClass,
                 focusRingVisible,
                 active
@@ -137,6 +165,9 @@ export function DeskNav() {
                   : "font-medium text-ink hover:text-accent-deep",
               ].join(" ")}
             >
+              {item.label === "Inbox" ? (
+                <TabIconWithBadge name="Inbox" count={needsCount} />
+              ) : null}
               {item.label}
             </Link>
           );
@@ -148,7 +179,7 @@ export function DeskNav() {
 }
 
 /** Phone thumb destinations. Same DESK_LINKS as the desktop top bar. */
-export function DeskTabBar() {
+export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -164,6 +195,7 @@ export function DeskTabBar() {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                aria-label={inboxLinkAria(item.label, needsCount)}
                 className={[
                   "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[11px] leading-none",
                   deskShiftClass,
@@ -173,7 +205,7 @@ export function DeskTabBar() {
                     : "font-medium text-ink-soft",
                 ].join(" ")}
               >
-                <TabIcon name={item.label} />
+                <TabIconWithBadge name={item.label} count={needsCount} />
                 <span className="max-w-full truncate">{item.label}</span>
               </Link>
             </li>

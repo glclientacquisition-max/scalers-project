@@ -4,11 +4,14 @@ import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
   assembleInboxItems,
   attachContactIds,
+  countInboxPurposes,
   type InboxHold,
   type InboxItem,
   type InboxJob,
 } from "@/lib/inboxPurpose";
+import { createWorkspaceDataClient } from "@/lib/tenant";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 const CALL_SELECT =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status, resolution, primary_intent, resolution_note, inbox_read_at, inbox_muted, inbox_pinned_at, inbox_assignee, inbox_labels, inbox_snoozed_until";
@@ -274,3 +277,28 @@ export async function loadInboxItems(
         : null,
   };
 }
+
+/** Per-request inbox load. Layout badge and Inbox/Home share one query. */
+export const loadCachedInboxItems = cache(
+  async (tenantId: string, vertical?: string | null) => {
+    const workspace = await createWorkspaceDataClient();
+    if (!workspace) {
+      return {
+        items: [] as InboxItem[],
+        callsTruncated: false,
+        error: "Not signed in.",
+        partialError: null,
+      };
+    }
+    return loadInboxItems(workspace.client, tenantId, vertical);
+  }
+);
+
+/** Same pile as the Needs you filter. Hidden (0) when the load fails. */
+export const loadCachedInboxNeedsCount = cache(
+  async (tenantId: string, vertical?: string | null) => {
+    const inbox = await loadCachedInboxItems(tenantId, vertical);
+    if (inbox.error) return 0;
+    return countInboxPurposes(inbox.items).needs;
+  }
+);

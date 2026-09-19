@@ -5,7 +5,7 @@ import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { callsHref, sanitizeSearchQuery } from "@/lib/callsTriage";
-import { loadInboxItems } from "@/lib/inboxLoad";
+import { loadCachedInboxItems } from "@/lib/inboxLoad";
 import { nicheCopy } from "@/lib/inboxNiche";
 import {
   countInboxPurposes,
@@ -160,13 +160,11 @@ export default async function CallsPage({
     return <DeskError>Not signed in.</DeskError>;
   }
 
-  const client = workspace.client;
   const businessName = tenant.business_name?.trim() || "us";
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const { items: assembled, error, partialError } = await loadInboxItems(
-    client,
+  const { items: assembled, error, partialError } = await loadCachedInboxItems(
     tenant.id,
     vertical
   );

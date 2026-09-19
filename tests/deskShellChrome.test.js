@@ -20,9 +20,17 @@ function formatAttentionCountAriaLabel(count) {
   return `${display} need you`;
 }
 
+function formatInboxNavAriaLabel(count) {
+  const needs = formatAttentionCountAriaLabel(count);
+  return needs ? `Inbox, ${needs}` : null;
+}
+
 describe("desk shell chrome", () => {
   const helper = read("dashboard/src/lib/deskAttentionCount.ts");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
+  const nav = read("dashboard/src/components/DeskNav.tsx");
+  const layout = read("dashboard/src/app/(desk)/layout.tsx");
+  const load = read("dashboard/src/lib/inboxLoad.ts");
   const calls = read("dashboard/src/app/(desk)/calls/page.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
@@ -41,25 +49,47 @@ describe("desk shell chrome", () => {
     assert.equal(formatAttentionCountAriaLabel(0), null);
     assert.equal(formatAttentionCountAriaLabel(3), "3 need you");
     assert.equal(formatAttentionCountAriaLabel(12), "9+ need you");
+    assert.equal(formatInboxNavAriaLabel(0), null);
+    assert.equal(formatInboxNavAriaLabel(3), "Inbox, 3 need you");
+    assert.equal(formatInboxNavAriaLabel(12), "Inbox, 9+ need you");
     assert.match(helper, /export function formatAttentionCount/);
     assert.match(helper, /n > 9 \? "9\+" : String\(n\)/);
     assert.match(helper, /\$\{display\} need you/);
+    assert.match(helper, /Inbox, \$\{needs\}/);
     assert.doesNotMatch(helper, /items in your inbox/i);
   });
 
-  it("drops the Inbox H1 and I need you subtitle for a Needs you chip", () => {
+  it("drops the Inbox H1, I need you subtitle, and page-head count chip", () => {
     assert.doesNotMatch(toolbar, /pageTitleClass.*Inbox|Inbox.*pageTitleClass/);
     assert.doesNotMatch(toolbar, /\{archived \? "Archived" : "Inbox"\}/);
     assert.doesNotMatch(toolbar, /I need you/);
     assert.doesNotMatch(toolbar, /caption\?:/);
     assert.doesNotMatch(calls, /inboxCaption\(/);
-    assert.match(toolbar, /formatAttentionCount\(counts\.needs\)/);
-    assert.match(toolbar, /purpose: "needs"/);
-    assert.match(toolbar, /deskStatusChipClass/);
-    assert.match(chrome, /export const deskStatusChipClass/);
-    assert.match(chrome, /min-h-11/);
-    assert.match(chrome, /tabular-nums/);
+    assert.doesNotMatch(toolbar, /formatAttentionCount/);
+    assert.doesNotMatch(toolbar, /deskStatusChipClass/);
+    assert.doesNotMatch(toolbar, /purpose: "needs"/);
+    assert.match(toolbar, /<InboxFilterPills/);
     assert.match(toolbar, /<h1 className=\{pageTitleClass\}>Archived<\/h1>/);
+  });
+
+  it("overlays the Needs you count on the Inbox nav icon", () => {
+    assert.match(nav, /needsCount = 0/);
+    assert.match(nav, /formatAttentionCount\(needsCount\)/);
+    assert.match(nav, /formatInboxNavAriaLabel\(needsCount\)/);
+    assert.match(nav, /deskNavBadgeClass/);
+    assert.match(nav, /pointer-events-none/);
+    assert.match(nav, /TabIconWithBadge/);
+    assert.match(nav, /item\.label === "Inbox"/);
+    assert.match(chrome, /export const deskNavBadgeClass/);
+    assert.match(chrome, /h-5 min-w-5/);
+    assert.match(chrome, /bg-warn/);
+    assert.doesNotMatch(chrome, /deskNavBadgeClass[\s\S]*bg-accent-fill/);
+    assert.match(layout, /DeskNavLive/);
+    assert.match(layout, /DeskTabBarLive/);
+    assert.match(layout, /loadCachedInboxNeedsCount/);
+    assert.match(load, /countInboxPurposes\(inbox\.items\)\.needs/);
+    assert.match(nav, /href=\{item\.href\}/);
+    assert.doesNotMatch(nav, /callsHref\(\{ purpose: "needs"/);
   });
 
   it("does not repeat DESK_LINKS names as index headings", () => {

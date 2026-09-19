@@ -71,7 +71,7 @@ describe("live desk revalidation", () => {
   it("is a server action that drops Inbox and Home caches", () => {
     assert.match(src, /"use server"/);
     assert.match(src, /export async function revalidateLiveDesk/);
-    assert.match(src, /revalidatePath\("\/home"\)/);
+    assert.match(src, /revalidatePath\("\/home", "layout"\)/);
     assert.match(src, /revalidatePath\("\/calls", "layout"\)/);
     assert.match(src, /revalidatePath\("\/contacts", "layout"\)/);
     assert.match(src, /isAuthenticated\(\)/);
