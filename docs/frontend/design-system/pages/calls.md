@@ -24,9 +24,9 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 - No number: empty.
 - Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
 
-**Overflow (More, long-press, right-click):** Archive on live rows. Unarchive on Archived. After Archive, a 5s toast offers Undo (`InboxArchiveToast`, above the tab bar). Undo is a `text-accent-deep` hit, not a second fill. No toast on Unarchive. Hover More on desktop. More on phone opens that one-verb sheet. Long-press on phone enters bulk select. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
+**Overflow (md+ More, right-click):** Pin / Unpin. Mark done on a return call (`inboxCanMarkDone`). Archive on live rows. Unarchive on Archived. Hairline between stay and leave. No Select (checkboxes are already visible). Never Snooze or Unread. Hover More on desktop. More is `hidden md:inline-flex`. Long-press on phone enters bulk select. It does not open a contact-named sheet. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
 
-Not list verbs: Select, Pin, Mark done, Mark unread, Snooze, Mute, Assign, Label, Delete. Bulk bar: count plus Archive, or Unarchive when every selected row is archived. Confirm or hold Done only when every selected row shares that same valid action. Archive also shows that Undo toast. No More sheet on the bulk bar.
+Not list verbs: Select, Snooze, Mute, Assign, Label, Delete, Mark unread. Bulk header bar: Close, count, then only verbs true for every selected row. Archive if none are archived. Unarchive if all are archived. Confirm if every row is a requested visit. Hold Done if every row is an open hold. Mark done if every row passes `inboxCanMarkDone`. Pin stays on the row overflow. Mixed selection can show only Close. Archive also shows that Undo toast. No More sheet on the bulk bar.
 
 Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Visit not booked** (hospitality: **Booking not booked**) and use Call plus WhatsApp. Intent-only holds stamp **Hold not saved**. Do not show Confirm or Done without a work row.
 
@@ -57,7 +57,7 @@ Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Huma
 - **Holds:** Open items to fulfill. Fulfilled and cancelled leave this pile.
 - **Human:** Person asked or missed.
 - **Answered:** The receptionist closed it. No owner action.
-- **Archived:** WhatsApp folder. A row at the top of the list (phone, tablet, desktop) with the archive glyph, Archived, and the count. Tap it. Not a FilterTabs chip. Inside: DeskBack Inbox, title Archived, same list recipe. Overflow is Unarchive. Confirm and hold Done stay off the dock. Call plus WhatsApp stay if there is a number.
+- **Archived:** WhatsApp folder. A row at the top of the list (phone, tablet, desktop) with the archive glyph, Archived, and the count. Tap it. Not a FilterTabs chip. Inside: icon `DeskBack` (aria-label Inbox), title Archived, same list recipe. Overflow is Pin plus Unarchive. Confirm and hold Done stay off the dock. Call plus WhatsApp stay if there is a number.
 
 Needs you is not a history. Older open work stays until you Confirm, Done, or reply. The Inbox tape of recent calls is 150 rows. Open holds (`status = open`) and unresolved visits (`requested`, `confirmed`) are fetched without that cap (safety stop 10,000, using `service_requests_tenant_status_idx` and `appointments_tenant_status_idx`). `callsTruncated` means the closed history tape is truncated, not that Needs you, Holds, or Visits is missing rows.
 
@@ -87,4 +87,4 @@ Columns (`lg+` table, same data as the phone row; phone rows stay through `md` s
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 
-**Back:** `DeskBack`, 44px. Label is Inbox. Returns to the same pile, search, page, and visit layout (List / Today / Week). Archived stores that return on the folder link (`from`, `rpage`, view params) so DeskBack restores it, not only `q`.
+**Back:** `DeskBack`, icon-only chevron, 44px muted ghost. `aria-label` / `title` is Inbox. No visible "Inbox" or "Back to Inbox". Returns to the same pile, search, page, and visit layout (List / Today / Week). Archived stores that return on the folder link (`from`, `rpage`, view params) so DeskBack restores it, not only `q`.
