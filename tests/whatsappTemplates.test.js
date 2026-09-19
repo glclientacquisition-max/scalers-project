@@ -260,7 +260,7 @@ describe('staff WhatsApp templates', () => {
     assert.equal(result.channel, 'whatsapp');
     assert.equal(calls[0].body.type, 'template');
     assert.equal(calls[0].body.template.name, APPROVED_FIRST_TEMPLATE);
-    assert.equal(calls[0].body.template.components[0].parameters[0].text, 'VISIT REQUEST');
+    assert.equal(calls[0].body.template.components[0].parameters[0].text, 'VISIT REQUEST. Shop');
   });
 
   it('kind env still selects a later approved template', async () => {

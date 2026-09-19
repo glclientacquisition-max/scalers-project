@@ -231,7 +231,7 @@ describe('processWhatsAppReceived', () => {
     const persist = [];
     const sends = [];
     await processWhatsAppReceived({
-      body: metaInbound({ from: '+254790381872' }),
+      body: metaInbound({ from: '+254790381872', wamid: 'wamid.E164' }),
       persistInbound: async (row) => {
         persist.push(row);
         return { ok: true, duplicate: false };
