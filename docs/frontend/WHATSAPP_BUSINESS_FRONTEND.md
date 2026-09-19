@@ -141,7 +141,7 @@ The Business **app** adds a thin metadata layer on the same bubble UI. Cloud API
 
 **Quick replies.** Named snippets with a shortcut (e.g. `/quote`). Not templates. They send as session `type=text` inside the 24h window. Store per-inbox. Picker: type `/` in the composer, filter by prefix, Enter sends. On phone, a 44px chip row above the composer for the top five. Do not hide them behind a settings essay.
 
-**Message templates.** Cloud API only. Approved Meta templates for **originating** outside the window. Composer: if `windowOpen === false`, the text field is disabled and the template picker is the primary control. Fill body parameters in a short form (`textarea rows={2}`). Preview the exact customer string before send.
+**Message templates.** Cloud API only. Approved Meta templates for **originating** outside the window. Staff notify today uses `scalers_staff_alert` / `en` (first Active Utility). Kind names later. Composer (when chat ships): if `windowOpen === false`, the text field is disabled and the template picker is the primary control. Fill body parameters in a short form (`textarea rows={2}`). Preview the exact customer string before send. Do not ship a second `/whatsapp` list for this.
 
 **Away / greeting / default reply.** These are **inbox automations**, not composer features. They fire on the server (voice host or a worker) so they still run when the owner’s laptop is shut. The frontend only edits the copy and the schedule. Away is one message. Greeting is first inbound in a quiet period. Default reply is a single auto-ack (Scalers already has `PLATFORM_WHATSAPP_ACK`). Show a system bubble in the transcript when an automation sent, so staff do not double-reply.
 

@@ -1,6 +1,6 @@
 # WhatsApp two-way and Scalers-as-tenant
 
-**Status:** Phase 1 implementing. Phase 2 cutover blocked on a second DID.  
+**Status:** Phase 1 implementing. First Utility template is Active. Phase 2 cutover blocked on a second DID.  
 **Do not:** enable WhatsApp Calling, POST `/whatsapp/retry`, Chatwoot, or SautiKit-DELETE `+254709221536`.
 
 ## Phase 0 dual-use (live until Phase 2)
@@ -29,9 +29,32 @@ Ops:
 - `POST /whatsapp/events` plus demux on `/` and `/voice/events` via `X-Sautikit-Event-Kind`
 - Persist `whatsapp_threads` / `whatsapp_messages` (apply `docs/supabase/whatsapp_threads.sql`)
 - Inbound: mark read, text ack from Scalers inside the 24h window. `parseWhatsAppReceived` accepts a Graph `{ object, entry, changes }` envelope, a bare Meta `value` object, and a SautiKit workspace `{ kind, event_id, data }` envelope. Staging `whatsapp.event.received` posts are the last (~475 bytes).
-- Originate: kind-specific Meta utility templates when the 24h window is closed ([`../WHATSAPP_TEMPLATES.md`](../WHATSAPP_TEMPLATES.md)). Session text only inside an open window (inbound ack).
+- Originate: Meta Utility template when the 24h window is closed. Session text only inside an open window (inbound ack).
 - Desk WhatsApp toggle is live (`NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE` defaults true). Owners who already saved Alerts with WhatsApp off stay off until they turn it on.
 - Keep `wa.me` follow-up to the caller. That is not a Scalers send.
+
+## Approved first template (Active)
+
+Staff cold send (closed 24h window, or no inbound from that phone) uses this name until a kind-specific env is set.
+
+| Field | Value |
+| --- | --- |
+| Name | `scalers_staff_alert` |
+| Language | `en` (set `SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en_US` if Manager stored US English) |
+| Category | Utility |
+| Who may send | Voice notify dispatch to owner / permissioned staff (`dispatchAlert`). Ops dry-run: `node scripts/send-whatsapp-template.js --to +2547…` |
+| Who must not | No blast of `contacts`. No desk composer. No inbound auto-template. |
+
+| Window | Payload |
+| --- | --- |
+| Open (inbound within 24h) | `type=text` session body (ack only today) |
+| Closed | `type=template` `scalers_staff_alert` with three body params |
+
+Kind names (`scalers_lead`, `scalers_escalation`, `scalers_visit`, `scalers_request`, `scalers_wallet`, `scalers_outage`) send only after that env is set (`SAUTIKIT_WHATSAPP_TEMPLATE_LEAD=…`). Stale `SAUTIKIT_WHATSAPP_TEMPLATE=missed_call_lead` is ignored unless `SAUTIKIT_WHATSAPP_TEMPLATE_ALLOW_LEGACY=on`.
+
+If Meta approved a different first name, pass it: `sendWhatsAppTemplate({ templateName, language })` or `--template` on the dry-run script.
+
+Helpers: `sendOwnerWhatsApp` (window-aware), `sendWhatsAppTemplate` (always template). Catalog: [`../WHATSAPP_TEMPLATES.md`](../WHATSAPP_TEMPLATES.md).
 
 ## Phase 2 (separate PR, after a new Kenya DID exists)
 

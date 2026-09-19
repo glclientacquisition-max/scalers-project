@@ -85,7 +85,7 @@ Channel order in `src/notifications/dispatch.js`: **TextSMS** (private-beta prim
 **Secondary:** WhatsApp via SautiKit (when WA sender is ready)
 
 1. Set `SAUTIKIT_API_KEY` + `SAUTIKIT_WHATSAPP_NUMBER_ID` (or `CONNECTION_ID`)
-2. Utility templates: [`WHATSAPP_TEMPLATES.md`](./WHATSAPP_TEMPLATES.md). Point `SAUTIKIT_WHATSAPP_TEMPLATE=scalers_staff_alert` once that name is Active. Kind-specific env names after those are approved.
+2. Utility templates: [`WHATSAPP_TEMPLATES.md`](./WHATSAPP_TEMPLATES.md). First name `scalers_staff_alert` / `en` is Active (code default). Optional Railway `SAUTIKIT_WHATSAPP_TEMPLATE=scalers_staff_alert`. Kind-specific env names after those are approved.
 
 **Fallback:** email via Resend
 
