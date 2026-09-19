@@ -18,6 +18,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
 import { useInboxRowLocal, useInboxRowUi } from "@/components/InboxRowUi";
+import { DeskHint } from "@/components/ui/DeskHint";
 import { deskHitClass, focusRingVisible } from "@/components/ui/deskChrome";
 import {
   inboxArchive,
@@ -233,33 +234,35 @@ export function InboxRowMore({ item }: { item: InboxItem }) {
   const actions = inboxOverflowActions(item);
   if (!menu || ui?.selecting || actions.length === 0) return null;
   return (
-    <button
-      ref={btnRef}
-      type="button"
-      aria-label={`More actions for ${item.callerName?.trim() || "Caller"}`}
-      aria-haspopup="menu"
-      aria-expanded={menu.open}
-      className={[
-        deskHitClass,
-        focusRingVisible,
-        "hidden md:inline-flex text-ink-soft hover:bg-surface-muted hover:text-ink",
-        menu.open
-          ? "opacity-100"
-          : "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100",
-      ].join(" ")}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const rect = btnRef.current?.getBoundingClientRect();
-        menu.openAt(
-          rect
-            ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
-            : { x: event.clientX, y: event.clientY, align: "point" }
-        );
-      }}
-    >
-      <MoreGlyph />
-    </button>
+    <DeskHint label="More" side="top">
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label={`More actions for ${item.callerName?.trim() || "Caller"}`}
+        aria-haspopup="menu"
+        aria-expanded={menu.open}
+        className={[
+          deskHitClass,
+          focusRingVisible,
+          "hidden md:inline-flex text-ink-soft hover:bg-surface-muted hover:text-ink",
+          menu.open
+            ? "opacity-100"
+            : "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100",
+        ].join(" ")}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const rect = btnRef.current?.getBoundingClientRect();
+          menu.openAt(
+            rect
+              ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
+              : { x: event.clientX, y: event.clientY, align: "point" }
+          );
+        }}
+      >
+        <MoreGlyph />
+      </button>
+    </DeskHint>
   );
 }
 

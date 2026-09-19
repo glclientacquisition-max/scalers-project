@@ -15,6 +15,7 @@ describe("DeskBack icon", () => {
   const settings = read("dashboard/src/components/settingsUi.tsx");
 
   it("renders a chevron without the visible word Inbox", () => {
+    assert.match(back, /DeskHint label=\{children\}/);
     assert.match(back, /aria-label=\{children\}/);
     assert.match(back, /title=\{children\}/);
     assert.match(back, /min-h-11 min-w-11/);

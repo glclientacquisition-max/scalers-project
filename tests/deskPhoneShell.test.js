@@ -56,6 +56,13 @@ describe("desk phone shell", () => {
     assert.match(player, /--desk-tabbar-h/);
     assert.match(constitution, /bottom tab bar/);
     assert.match(constitution, /do not live in a hamburger drawer/);
+    const hint = read("dashboard/src/components/ui/DeskHint.tsx");
+    assert.match(hint, /createPortal/);
+    assert.match(hint, /role="tooltip"/);
+    assert.match(hint, /data-desk-hint=\{label\}/);
+    assert.match(hint, /bg-\[#0A192F\]/);
+    assert.match(hint, /onPointerEnter/);
+    assert.match(hint, /Escape/);
   });
 
   it("overlays the Inbox count on the tab icon, not as a second control", () => {

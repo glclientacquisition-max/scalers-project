@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeskHint } from "@/components/ui/DeskHint";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 
 function BackChevron() {
@@ -26,21 +27,23 @@ export function DeskBack({
   className?: string;
 }) {
   return (
-    <Link
-      href={href}
-      aria-label={children}
-      title={children}
-      className={[
-        "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-soft",
-        deskShiftClass,
-        "hover:bg-surface-muted hover:text-ink",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      <BackChevron />
-    </Link>
+    <DeskHint label={children} side="top">
+      <Link
+        href={href}
+        aria-label={children}
+        title={children}
+        className={[
+          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-soft",
+          deskShiftClass,
+          "hover:bg-surface-muted hover:text-ink",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <BackChevron />
+      </Link>
+    </DeskHint>
   );
 }

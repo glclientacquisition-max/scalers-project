@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
@@ -16,6 +16,7 @@ import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { CallLink } from "@/components/CallLink";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskHint } from "@/components/ui/DeskHint";
 import { RowIdentity } from "@/components/ui/deskRow";
 import {
   deskHitClass,
@@ -23,6 +24,13 @@ import {
   focusRingVisible,
   metaLabelClass,
 } from "@/components/ui/deskChrome";
+import {
+  TICKET_SPLIT_KEY,
+  TICKET_SUMMARY_DEFAULT,
+  TICKET_SUMMARY_MAX,
+  TICKET_SUMMARY_MIN,
+  clampTicketSummaryWidth,
+} from "@/lib/ticketSplit";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import { inboxMarkSeen } from "@/lib/inboxLeadActions";
@@ -232,24 +240,26 @@ function InboxTicketMore({
 
   return (
     <div className="relative">
-      <button
-        ref={btnRef}
-        type="button"
-        aria-label="More"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={`${deskHitClass} ${focusRingVisible} text-ink-soft hover:bg-surface-muted hover:text-ink`}
-        onClick={() => {
-          setError(null);
-          if (!open) {
-            ignoreUntil.current = Date.now() + 450;
-            placeFromButton();
-          }
-          setOpen((next) => !next);
-        }}
-      >
-        <MoreGlyph />
-      </button>
+      <DeskHint label="More" side="top">
+        <button
+          ref={btnRef}
+          type="button"
+          aria-label="More"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className={`${deskHitClass} ${focusRingVisible} text-ink-soft hover:bg-surface-muted hover:text-ink`}
+          onClick={() => {
+            setError(null);
+            if (!open) {
+              ignoreUntil.current = Date.now() + 450;
+              placeFromButton();
+            }
+            setOpen((next) => !next);
+          }}
+        >
+          <MoreGlyph />
+        </button>
+      </DeskHint>
       {open && typeof document !== "undefined" ? createPortal(menu, document.body) : null}
     </div>
   );
@@ -306,7 +316,11 @@ export function InboxTicketView({
 }) {
   const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const splitRef = useRef<HTMLDivElement>(null);
   const [away, setAway] = useState(false);
+  const [summaryW, setSummaryW] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const summaryWRef = useRef<number | null>(null);
   const canConfirm = !archived && String(job?.status || "").toLowerCase() === "requested";
   const canHoldDone = !archived && String(hold?.status || "").toLowerCase() === "open";
   const dockedAction = canConfirm || canHoldDone || (needsYou && !archived);
@@ -314,6 +328,71 @@ export function InboxTicketView({
   useEffect(() => {
     void inboxMarkSeen(callId);
   }, [callId]);
+
+  useEffect(() => {
+    summaryWRef.current = summaryW;
+  }, [summaryW]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TICKET_SPLIT_KEY);
+      const next = raw ? Number.parseInt(raw, 10) : NaN;
+      if (Number.isFinite(next)) setSummaryW(next);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistSummary = useCallback((next: number | null) => {
+    setSummaryW(next);
+    try {
+      if (next == null) localStorage.removeItem(TICKET_SPLIT_KEY);
+      else localStorage.setItem(TICKET_SPLIT_KEY, String(next));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    const node = splitRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const box = node.getBoundingClientRect();
+      const current = summaryWRef.current;
+      if (current == null) return;
+      const next = clampTicketSummaryWidth(current, box.width);
+      if (next !== current) persistSummary(next);
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [persistSummary]);
+
+  const applySummaryFromClientX = useCallback(
+    (clientX: number) => {
+      const box = splitRef.current?.getBoundingClientRect();
+      if (!box) return;
+      persistSummary(clampTicketSummaryWidth(clientX - box.left, box.width));
+    },
+    [persistSummary]
+  );
+
+  useEffect(() => {
+    if (!dragging) return;
+    function move(event: PointerEvent) {
+      applySummaryFromClientX(event.clientX);
+    }
+    function up() {
+      setDragging(false);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [dragging, applySummaryFromClientX]);
   const identity = (
     <>
       <RowIdentity name={title} />
@@ -400,8 +479,17 @@ export function InboxTicketView({
       ) : null}
 
       <div
+        ref={splitRef}
         data-ticket-split=""
-        className="relative min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]"
+        style={
+          summaryW
+            ? ({ "--ticket-summary-w": `${summaryW}px` } as CSSProperties)
+            : undefined
+        }
+        className={[
+          "relative min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(18rem,var(--ticket-summary-w,22rem))_1px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]",
+          dragging ? "select-none" : "",
+        ].join(" ")}
       >
         <div
           ref={paneRef}
@@ -409,7 +497,7 @@ export function InboxTicketView({
         >
           <aside
             data-ticket-summary=""
-            className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-line"
+            className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
           >
             <TicketSummaryFacts want={want} mood={mood} done={done} />
             {job ? (
@@ -430,6 +518,58 @@ export function InboxTicketView({
               <CallRecording recordingUrl={recordingUrl} />
             </div>
           </aside>
+          <DeskHint
+            label="Summary width"
+            className="relative z-10 hidden h-full w-px shrink-0 lg:flex"
+          >
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Summary width"
+              aria-valuemin={TICKET_SUMMARY_MIN}
+              aria-valuemax={TICKET_SUMMARY_MAX}
+              aria-valuenow={Math.min(
+                TICKET_SUMMARY_MAX,
+                Math.max(TICKET_SUMMARY_MIN, summaryW ?? TICKET_SUMMARY_DEFAULT)
+              )}
+              tabIndex={0}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                (event.target as HTMLElement).focus();
+                setDragging(true);
+                applySummaryFromClientX(event.clientX);
+              }}
+              onDoubleClick={() => persistSummary(null)}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                event.preventDefault();
+                const box = splitRef.current?.getBoundingClientRect();
+                if (!box) return;
+                const current = summaryWRef.current ?? TICKET_SUMMARY_DEFAULT;
+                const step = event.key === "ArrowLeft" ? -16 : 16;
+                persistSummary(clampTicketSummaryWidth(current + step, box.width));
+              }}
+              className={[
+                "relative h-full w-px shrink-0 cursor-col-resize touch-none",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              ].join(" ")}
+            >
+              <span
+                aria-hidden="true"
+                className={[
+                  "absolute inset-y-0 left-1/2 z-10 w-6 -translate-x-1/2",
+                  dragging ? "bg-accent/15" : "hover:bg-accent/10",
+                ].join(" ")}
+              />
+              <span
+                aria-hidden="true"
+                className={[
+                  "absolute inset-y-0 left-1/2 w-px -translate-x-1/2",
+                  dragging ? "bg-accent" : "bg-line",
+                ].join(" ")}
+              />
+            </div>
+          </DeskHint>
           <section data-ticket-thread="" className="relative min-h-0">
             <div
               ref={threadRef}
@@ -446,25 +586,28 @@ export function InboxTicketView({
           </section>
         </div>
         {away ? (
-          <button
-            type="button"
-            onClick={jumpLatest}
-            aria-label="Jump to latest"
-            className={
-              dockedAction
-                ? `absolute right-4 bottom-3 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`
-                : `absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-[#005CCC] px-4 text-sm font-semibold text-white shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`
-            }
-          >
-            {dockedAction ? (
-              <>
+          dockedAction ? (
+            <DeskHint label="Jump to latest" side="top" className="absolute right-4 bottom-3 z-10 inline-flex">
+              <button
+                type="button"
+                onClick={jumpLatest}
+                aria-label="Jump to latest"
+                className={`inline-flex h-12 w-12 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+              >
                 <JumpGlyph />
                 <span className="sr-only">Jump to latest</span>
-              </>
-            ) : (
-              "Jump to latest"
-            )}
-          </button>
+              </button>
+            </DeskHint>
+          ) : (
+            <button
+              type="button"
+              onClick={jumpLatest}
+              aria-label="Jump to latest"
+              className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-[#005CCC] px-4 text-sm font-semibold text-white shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+            >
+              Jump to latest
+            </button>
+          )
         ) : null}
       </div>
 

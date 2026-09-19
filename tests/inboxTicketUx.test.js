@@ -38,7 +38,9 @@ describe("inbox ticket action chrome", () => {
     assert.ok(splitAt > 0 && summaryAt > splitAt && threadAt > summaryAt);
     assert.ok(transcriptAt > threadAt);
     assert.ok(dockAt > threadAt);
-    assert.match(ticket, /lg:grid lg:grid-cols-\[minmax\(18rem,22rem\)_minmax\(0,1fr\)\]/);
+    assert.match(ticket, /lg:grid lg:grid-cols-\[minmax\(18rem,var\(--ticket-summary-w,22rem\)\)_1px_minmax\(0,1fr\)\]/);
+    assert.match(ticket, /role="separator"/);
+    assert.match(ticket, /TICKET_SPLIT_KEY/);
     assert.match(ticket, /lg:contents/);
     assert.match(ticket, /<TicketSummaryFacts want=\{want\} mood=\{mood\} done=\{done\} \/>/);
     assert.match(ticket, />Want</);
@@ -60,6 +62,7 @@ describe("inbox ticket action chrome", () => {
   it("keeps the purpose stamp read-only and archives from More", () => {
     assert.match(ticket, /InboxPurposeChip/);
     assert.match(ticket, /aria-label="More"/);
+    assert.match(ticket, /DeskHint label="More"/);
     assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
     assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\} archived=\{archived\}/);
     assert.match(ticket, /updateLeadStatus\(callId, archived \? "new" : "archived"\)/);
@@ -96,6 +99,7 @@ describe("inbox ticket action chrome", () => {
     assert.ok(wandAt > 0, "wand control missing");
     assert.ok(sendAt > wandAt, "wand must sit beside Send, not after it");
     assert.match(dock, /title="Polish"/);
+    assert.match(dock, /DeskHint label="Polish"/);
     assert.match(dock, /polishInboxSmsAction/);
     assert.match(dock, /deskHitClass/);
     assert.match(dock, /pendingSpinnerInkClass/);
