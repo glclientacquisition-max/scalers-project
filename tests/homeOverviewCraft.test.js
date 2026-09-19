@@ -68,10 +68,12 @@ describe("home overview craft", () => {
     assert.match(page, /KES \{kes\.toLocaleString/);
   });
 
-  it("keeps one blue action and earns the card on desktop only", () => {
+  it("keeps one blue action and shows Next to return on phone", () => {
     assert.match(page, /variant="ghost"/);
     assert.doesNotMatch(page, /variant="primary"/);
     assert.match(page, /hidden rounded-2xl border border-line bg-surface p-4 lg:block/);
+    assert.match(page, /lg:hidden/);
+    assert.match(page, /next-return-phone/);
     assert.match(page, /nextReturn\.callerPhone \|\| nextReturn\.callId/);
   });
 

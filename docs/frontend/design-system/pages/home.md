@@ -14,7 +14,7 @@
 
 **Desktop gains a second column.** Below `lg` the page is one column: Work, then aside. At `lg` the grid is 7/5: Work (queues + Next to return) on the left, aside on the right. The aside is sticky (`top-24`). The extra width is real content, not margin.
 
-**Next to return (desktop only, `hidden lg:block`).** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one truncated reason (`deskPreviewClass`). Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link.
+**Next to return.** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one truncated reason (`deskPreviewClass`). Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link. On phone (`lg:hidden`) it is a compact row under Work. At `lg` it is the left-column card (`hidden lg:block`).
 
 **One blue action per screen.** The aside CTA is the only filled primary. Next to return uses a ghost WhatsApp button (green glyph). Two saturated CTAs would compete; the CTA already routes to the sharpest queue.
 
