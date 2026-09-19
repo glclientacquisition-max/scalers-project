@@ -5,6 +5,8 @@ const {
   callerSmsEnabled,
   appointmentCallerEvent,
   requestCallerEvent,
+  requestStatusCallerEvent,
+  holdStatusCallerSms,
 } = require('../src/notifications/callerSms');
 const { EVENTS, renderCallerText } = require('../src/notifications/events');
 
@@ -62,5 +64,63 @@ describe('caller SMS opt-in', () => {
     assert.equal(cancelled.kind, EVENTS.CALLER_APPOINTMENT_CANCELLED);
     assert.match(renderCallerText(cancelled), /^Hi, Done and Dusted/);
     assert.doesNotMatch(renderCallerText(cancelled), /Haijawekwa/);
+  });
+
+  it('maps desk hold Done and Cancel to ready copy, and skips enquiry', () => {
+    const ready = requestStatusCallerEvent(
+      {
+        request_type: 'hold',
+        item: 'two chargers',
+        caller_name: 'Soony',
+        businessName: 'ChapterOne Bookstore',
+      },
+      'fulfilled'
+    );
+    assert.equal(ready.kind, EVENTS.CALLER_HOLD_READY);
+    assert.equal(
+      renderCallerText(ready),
+      'Hi Soony, ChapterOne Bookstore here. two chargers is ready for pickup.'
+    );
+
+    const orderReady = requestStatusCallerEvent(
+      { request_type: 'order', item: 'toner', businessName: 'Aris Kenya' },
+      'fulfilled'
+    );
+    assert.equal(orderReady.kind, EVENTS.CALLER_HOLD_READY);
+
+    const cancelled = requestStatusCallerEvent(
+      {
+        request_type: 'hold',
+        item: 'two chargers',
+        caller_name: 'Haijawekwa',
+        businessName: 'ChapterOne Bookstore',
+      },
+      'cancelled'
+    );
+    assert.equal(cancelled.kind, EVENTS.CALLER_HOLD_CANCELLED);
+    assert.equal(
+      renderCallerText(cancelled),
+      'Hi, ChapterOne Bookstore here. We cancelled the pickup for two chargers.'
+    );
+
+    assert.equal(requestStatusCallerEvent({ request_type: 'enquiry' }, 'fulfilled'), null);
+    assert.equal(requestStatusCallerEvent({ request_type: 'callback' }, 'fulfilled'), null);
+    assert.equal(requestStatusCallerEvent({ request_type: 'hold' }, 'open'), null);
+    assert.equal(
+      holdStatusCallerSms({
+        channels: { caller_sms: false },
+        status: 'fulfilled',
+        requestType: 'hold',
+      }),
+      null
+    );
+    assert.equal(
+      holdStatusCallerSms({
+        channels: { caller_sms: true },
+        status: 'fulfilled',
+        requestType: 'hold',
+      }).kind,
+      EVENTS.CALLER_HOLD_READY
+    );
   });
 });
