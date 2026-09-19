@@ -106,4 +106,14 @@ describe("admin console polish", () => {
       /bg-accent-fill[\s\S]*text-accent-on-fill/
     );
   });
+
+  it("renders overview attention as a dense table with row tap", () => {
+    const page = read("dashboard/src/app/admin/page.tsx");
+    assert.match(page, /lg:grid-cols-4/);
+    assert.match(page, /Needs attention/);
+    assert.match(page, /<table/);
+    assert.match(page, /DeskRowHit/);
+    assert.match(page, /href="\/admin\/businesses"/);
+    assert.doesNotMatch(page, /Manage →/);
+  });
 });
