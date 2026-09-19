@@ -176,4 +176,13 @@ describe("desk motion wiring", () => {
     assert.match(read("dashboard/src/components/LeadStatusToggle.tsx"), /deskShiftClass/);
     assert.match(read("dashboard/src/components/CallFaqSuggestions.tsx"), /btnPrimary/);
   });
+
+  it("spins the Inbox SMS polish wand with pending ink", () => {
+    const dock = read("dashboard/src/components/InboxSmsDock.tsx");
+    assert.match(dock, /pendingSpinnerInkClass/);
+    assert.match(dock, /polishPending/);
+    assert.match(dock, /pendingSpinnerClass/);
+    assert.match(dock, /sendPending/);
+    assert.doesNotMatch(dock, /animate-pulse/);
+  });
 });
