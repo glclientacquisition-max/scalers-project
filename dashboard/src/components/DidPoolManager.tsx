@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { btnPrimary } from "@/components/ui/deskChrome";
 import type { DidPoolRow, PendingTenant } from "@/lib/didPool";
 
 export function DidPoolManager({
@@ -70,7 +71,7 @@ export function DidPoolManager({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-white text-sm font-medium hover:bg-[var(--accent-deep)] disabled:opacity-60"
+            className={btnPrimary}
           >
             Add to pool
           </button>
@@ -108,7 +109,7 @@ export function DidPoolManager({
             <button
               type="submit"
               disabled={pending || available === 0}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-white text-sm font-medium hover:bg-[var(--accent-deep)] disabled:opacity-60"
+              className={btnPrimary}
             >
               Assign next available
             </button>

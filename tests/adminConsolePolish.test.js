@@ -87,4 +87,23 @@ describe("admin console polish", () => {
       "No available numbers in the pool",
     ]);
   });
+
+  it("uses accent-fill for filled primary CTAs", () => {
+    const offenders = [];
+    for (const file of adminUiFiles()) {
+      const rel = path.relative(ROOT, file);
+      const source = fs.readFileSync(file, "utf8");
+      if (/bg-\[var\(--accent\)\]/.test(source)) offenders.push(rel);
+    }
+    assert.deepEqual(offenders, []);
+    assert.match(read("dashboard/src/app/admin/page.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/AdminWalletsPanel.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
+    assert.match(
+      read("dashboard/src/components/BuyNumberPanel.tsx"),
+      /bg-accent-fill[\s\S]*text-accent-on-fill/
+    );
+  });
 });

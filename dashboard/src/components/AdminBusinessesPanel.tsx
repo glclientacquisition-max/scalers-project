@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBusiness } from "@/lib/admin";
 import type { PendingTenant } from "@/lib/didPool";
+import { btnPrimary } from "@/components/ui/deskChrome";
 
 function statusLabel(status: AdminBusiness["status"]) {
   if (status === "waiting") return "Waiting for number";
@@ -302,7 +303,7 @@ export function AdminBusinessesPanel({
                   note: adjustNote,
                 }).then(() => setAdjustId(null))
               }
-              className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className={btnPrimary}
             >
               Apply
             </button>

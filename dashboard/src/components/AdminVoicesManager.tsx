@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { btnPrimary } from "@/components/ui/deskChrome";
 import type { PlatformSonioxVoiceRow } from "@/lib/sonioxVoiceCatalog";
 
 export function AdminVoicesManager({
@@ -113,7 +114,7 @@ export function AdminVoicesManager({
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
+              className={btnPrimary}
             >
               {editingId ? "Save changes" : "Add voice"}
             </button>

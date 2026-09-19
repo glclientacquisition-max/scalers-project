@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { SautikitTelecomPanel } from "@/components/SautikitTelecomPanel";
+import { btnPrimary } from "@/components/ui/deskChrome";
 import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
 
@@ -43,7 +44,7 @@ export default async function AdminOverviewPage() {
       <section className="flex flex-wrap gap-3">
         <Link
           href="/admin/numbers"
-          className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-deep)]"
+          className={btnPrimary}
         >
           Add / manage numbers
         </Link>
