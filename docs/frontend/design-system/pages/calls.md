@@ -73,7 +73,7 @@ All is newest first. No visit backlog, no urgent pin. Needs you still pins urgen
 
 **Live subscribe:** `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page. Coming back to the tab also refetches. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update.
 
-Columns (`md+` table, same data as the phone row):
+Columns (`lg+` table, same data as the phone row; phone rows stay through `md` so the Action dock is not clipped):
 - Mixed filters: Work / Needed / When / Action.
 - Holds: Item / Who / Needed. Verb **Done**.
 - Jobs: Visit or Booking / Who / Place. Verb **Confirm**.

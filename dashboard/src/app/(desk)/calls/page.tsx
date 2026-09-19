@@ -342,7 +342,7 @@ export default async function CallsPage({
             ids={pageRows.map((item) => item.id)}
             scopeKey={`${activeFilter}:${page}:${q}`}
           >
-          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
             {showArchivedEntry ? <InboxArchivedPhoneRow count={counts.archived} ret={inboxRet} /> : null}
             {pageRows.map((item) => (
               <InboxPhoneRow
@@ -355,8 +355,8 @@ export default async function CallsPage({
               />
             ))}
           </ul>
-          <div className="mt-8 hidden md:block">
-            <DeskDataTable minWidthClass="min-w-[720px]">
+          <div className="mt-8 hidden lg:block">
+            <DeskDataTable minWidthClass="min-w-0">
               <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                 <tr>
                   {inboxTableKind(activeFilter) === "hold" ? (

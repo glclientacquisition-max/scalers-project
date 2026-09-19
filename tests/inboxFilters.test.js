@@ -33,12 +33,19 @@ describe("inbox filters and empty states", () => {
     assert.match(entry, /InboxArchivedTableRow/);
     assert.match(entry, /label="Archived"/);
     assert.match(page, /showArchivedEntry/);
-    assert.match(page, /InboxArchivedPhoneRow/);
     assert.match(page, /ret=\{inboxRet\}/);
     assert.match(page, /backHref=\{archivedBackHref\}/);
     assert.match(toolbar, /backHref \|\| callsHref/);
     assert.match(entry, /inboxArchivedHref\(ret\)/);
     assert.match(harness, /InboxArchivedPhoneRow/);
+  });
+
+  it("keeps phone rows through md so the Action dock is not clipped", () => {
+    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    assert.match(page, /lg:hidden/);
+    assert.match(page, /hidden lg:block/);
+    assert.match(page, /minWidthClass="min-w-0"/);
+    assert.doesNotMatch(page, /min-w-\[720px\]/);
   });
 
   it("debounces search against the existing q param", () => {

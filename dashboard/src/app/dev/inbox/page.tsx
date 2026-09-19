@@ -207,7 +207,7 @@ export default function DevInboxPage() {
           </div>
         </div>
         </InboxSelectChrome>
-        <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+        <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
           <InboxArchivedPhoneRow count={14} />
           {ROWS.map((row) => (
             <InboxPhoneRow
@@ -219,8 +219,8 @@ export default function DevInboxPage() {
             />
           ))}
         </ul>
-        <div className="mt-8 hidden md:block">
-          <DeskDataTable minWidthClass="min-w-[720px]">
+        <div className="mt-8 hidden lg:block">
+          <DeskDataTable minWidthClass="min-w-0">
             <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
               <tr>
                 <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Work</th>
