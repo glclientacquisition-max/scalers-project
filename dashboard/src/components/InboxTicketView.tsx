@@ -27,7 +27,19 @@ import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
 
-function MoreGlyph() {
+function JumpGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M4 6.5 8 10.5 12 6.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor" aria-hidden="true">
       <circle cx="8" cy="3.2" r="1.3" />
@@ -244,6 +256,7 @@ export function InboxTicketView({
   const [away, setAway] = useState(false);
   const canConfirm = String(job?.status || "").toLowerCase() === "requested";
   const canHoldDone = String(hold?.status || "").toLowerCase() === "open";
+  const dockedAction = canConfirm || canHoldDone || (needsYou && !archived);
   const identity = (
     <>
       <RowIdentity name={title} />
@@ -374,9 +387,21 @@ export function InboxTicketView({
           <button
             type="button"
             onClick={jumpLatest}
-            className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-[#005CCC] px-4 text-sm font-semibold text-white shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+            aria-label="Jump to latest"
+            className={
+              dockedAction
+                ? `absolute right-4 bottom-3 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-md ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`
+                : `absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-[#005CCC] px-4 text-sm font-semibold text-white shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`
+            }
           >
-            Jump to latest
+            {dockedAction ? (
+              <>
+                <JumpGlyph />
+                <span className="sr-only">Jump to latest</span>
+              </>
+            ) : (
+              "Jump to latest"
+            )}
           </button>
         ) : null}
       </div>

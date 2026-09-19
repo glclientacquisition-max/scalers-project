@@ -18,6 +18,9 @@ describe("inbox ticket action chrome", () => {
     assert.match(detail, /<InboxTicketView/);
     assert.match(ticket, /DeskBack/);
     assert.match(ticket, /Jump to latest/);
+    assert.match(ticket, /dockedAction/);
+    assert.match(ticket, /border border-line bg-surface text-ink/);
+    assert.match(ticket, /sr-only">Jump to latest/);
     assert.match(ticket, /InboxSmsDock/);
     assert.match(ticket, /needsYou && !archived \? \(/);
     assert.doesNotMatch(detail, /LeadStatusToggle/);
