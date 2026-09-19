@@ -132,4 +132,18 @@ describe("admin console polish", () => {
     assert.match(panel, /Add to pool/);
     assert.match(panel, /Assign next available/);
   });
+
+  it("standardizes admin page titles on text-2xl", () => {
+    for (const rel of [
+      "dashboard/src/app/admin/wallets/page.tsx",
+      "dashboard/src/app/admin/voices/page.tsx",
+      "dashboard/src/app/admin/businesses/page.tsx",
+      "dashboard/src/app/admin/numbers/page.tsx",
+    ]) {
+      const src = read(rel);
+      assert.match(src, /font-display text-2xl tracking-tight/);
+      assert.doesNotMatch(src, /font-display text-3xl/);
+      assert.doesNotMatch(src, /font-display text-4xl/);
+    }
+  });
 });
