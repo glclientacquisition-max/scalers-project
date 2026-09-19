@@ -5,7 +5,7 @@
  */
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { DeskBack } from "@/components/ui/DeskBack";
 import { btnPrimary, deskFieldClass, deskShiftClass } from "@/components/ui/deskChrome";
 
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
@@ -141,26 +141,9 @@ export const settingsGhostButtonClass =
 
 export function SettingsBackLink() {
   return (
-    <Link
-      href="/settings"
-      className={`mb-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent-deep ${deskShiftClass} hover:text-accent-deep-hover active:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 lg:hidden`}
-    >
-      <svg
-        viewBox="0 0 20 20"
-        fill="none"
-        className="h-4 w-4 shrink-0"
-        aria-hidden
-      >
-        <path
-          d="M12.5 4.5 7 10l5.5 5.5"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+    <DeskBack href="/settings" className="mb-1 lg:hidden">
       Business Profile
-    </Link>
+    </DeskBack>
   );
 }
 
