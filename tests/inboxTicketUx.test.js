@@ -57,7 +57,11 @@ describe("inbox ticket action chrome", () => {
   it("keeps the purpose stamp read-only and archives from More", () => {
     assert.match(ticket, /InboxPurposeChip/);
     assert.match(ticket, /aria-label="More"/);
+    assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
+    assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\}/);
     assert.match(ticket, /updateLeadStatus\(callId, "archived"\)/);
+    assert.match(ticket, /router\.push\(backHref\)/);
+    assert.doesNotMatch(ticket, /router\.push\("\/calls"\)/);
     assert.match(ticket, /\{busy \? "Saving" : "Archive"\}/);
     assert.doesNotMatch(ticket, /Followed Up/);
   });

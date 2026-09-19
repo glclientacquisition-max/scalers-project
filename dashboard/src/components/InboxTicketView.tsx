@@ -71,7 +71,7 @@ function TicketSummaryFacts({
   );
 }
 
-function InboxTicketMore({ callId }: { callId: string }) {
+function InboxTicketMore({ callId, backHref }: { callId: string; backHref: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -122,7 +122,7 @@ function InboxTicketMore({ callId }: { callId: string }) {
             return;
           }
           setOpen(false);
-          router.push("/calls");
+          router.push(backHref);
           router.refresh();
         }}
       >
@@ -314,7 +314,7 @@ export function InboxTicketView({
           {callerPhone ? (
             <WhatsAppLink number={callerPhone} message={waMessage} variant="icon" />
           ) : null}
-          {archived ? null : <InboxTicketMore callId={callId} />}
+          {archived ? null : <InboxTicketMore callId={callId} backHref={backHref} />}
         </div>
       </header>
 
