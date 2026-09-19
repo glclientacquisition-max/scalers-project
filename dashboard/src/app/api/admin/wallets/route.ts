@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
   adjustTenantWalletSecure,
@@ -20,8 +21,8 @@ export async function GET(request: Request) {
       const ledger = await listTenantLedger(ledgerFor);
       return NextResponse.json({ ok: true, ledger });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return NextResponse.json({ error: message }, { status: 500 });
+      logAdminError("wallets-ledger", err);
+      return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
     }
   }
 
@@ -29,8 +30,8 @@ export async function GET(request: Request) {
     const overview = await listAdminWallets();
     return NextResponse.json({ ok: true, ...overview });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    logAdminError("wallets-list", err);
+    return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
   }
 }
 
@@ -89,10 +90,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const hint = /function|schema cache|set_tenant_billing_mode|adjust_tenant_wallet/i.test(message)
-      ? " Apply docs/supabase/wallet_security_beta.sql in Supabase."
-      : "";
-    return NextResponse.json({ error: `${message}${hint}` }, { status: 500 });
+    logAdminError("wallets", err);
+    return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
   }
 }

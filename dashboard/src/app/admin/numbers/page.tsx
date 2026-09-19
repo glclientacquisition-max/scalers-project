@@ -1,7 +1,9 @@
-import { listDidPool, listPendingTenants } from "@/lib/didPool";
+import { AdminSetupError } from "@/components/AdminSetupError";
 import { BuyNumberPanel } from "@/components/BuyNumberPanel";
 import { DidPoolManager } from "@/components/DidPoolManager";
 import { SautikitSyncButton } from "@/components/SautikitSyncButton";
+import { logAdminError } from "@/lib/adminErrors";
+import { listDidPool, listPendingTenants } from "@/lib/didPool";
 
 export default async function AdminNumbersPage() {
   let pool;
@@ -9,15 +11,8 @@ export default async function AdminNumbersPage() {
   try {
     [pool, pendingBusinesses] = await Promise.all([listDidPool(), listPendingTenants()]);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
-        Could not load number pool: {message}
-        <p className="mt-2 text-sm text-[var(--ink-soft)]">
-          Apply <code>docs/supabase/did_number_pool.sql</code> in the Supabase SQL editor.
-        </p>
-      </div>
-    );
+    logAdminError("numbers", err);
+    return <AdminSetupError />;
   }
 
   return (

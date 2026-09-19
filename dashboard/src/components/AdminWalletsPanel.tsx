@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminWalletRow, BillingMode } from "@/lib/adminWallets";
 import type { WalletLedgerRow } from "@/lib/wallet";
+import { btnPrimary } from "@/components/ui/deskChrome";
 
 const CREDIT_PRESETS = [500, 1000, 5000, 10000];
 const DEBIT_PRESETS = [-500, -1000];
@@ -454,7 +455,7 @@ export function AdminWalletsPanel({
             <button
               type="button"
               disabled={pending || !creditValid}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className={btnPrimary}
               onClick={() => void applyCredit()}
             >
               {deltaNum < 0 ? "Apply debit" : "Apply credit"}
@@ -548,7 +549,7 @@ export function AdminWalletsPanel({
             <button
               type="button"
               disabled={pending || !planValid}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className={btnPrimary}
               onClick={() => void savePlan()}
             >
               {graduatingToPrepaid ? "Graduate & save" : "Save plan"}

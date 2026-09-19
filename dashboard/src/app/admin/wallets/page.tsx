@@ -1,25 +1,20 @@
-import { listAdminWallets } from "@/lib/adminWallets";
+import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminWalletsPanel } from "@/components/AdminWalletsPanel";
+import { logAdminError } from "@/lib/adminErrors";
+import { listAdminWallets } from "@/lib/adminWallets";
 
 export default async function AdminWalletsPage() {
   let overview;
   try {
     overview = await listAdminWallets();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
-        Could not load wallets: {message}
-        <p className="mt-2 text-sm text-[var(--ink-soft)]">
-          Apply <code>docs/supabase/wallet_security_beta.sql</code> if columns/RPCs are missing.
-        </p>
-      </div>
-    );
+    logAdminError("wallets", err);
+    return <AdminSetupError />;
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-3xl tracking-tight">Wallets</h1>
+      <h1 className="font-display text-2xl tracking-tight">Wallets</h1>
       <AdminWalletsPanel {...overview} />
     </div>
   );

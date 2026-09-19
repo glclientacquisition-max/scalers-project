@@ -67,6 +67,12 @@ The desk (`app/(desk)`) ships a dark palette; marketing, auth, onboarding, and a
 
 ---
 
+## Super Admin
+
+Ops console (`/admin`) is the exception to the owner-desk ban on a left rail: a fixed navy sidebar on `lg+`, horizontal nav below `lg`. Owner desk stays header links and bottom tabs. Admin stays light. Do not copy this rail onto `(desk)`. Page note: [`pages/admin.md`](pages/admin.md).
+
+---
+
 ## Spacing (8px)
 
 | Token | rem | px | Tailwind |
