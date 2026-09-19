@@ -20,6 +20,7 @@ const {
   sendWhatsAppTemplate,
 } = require('../src/notifications/whatsapp');
 const { dispatchAlert } = require('../src/notifications/dispatch');
+const { walletEmptyBody, walletLowBody } = require('../src/notifications/templates');
 
 const ENV_KEYS = [
   'SAUTIKIT_API_KEY',
@@ -166,12 +167,39 @@ describe('staff WhatsApp templates', () => {
     process.env.SAUTIKIT_WHATSAPP_TEMPLATE_WALLET = 'scalers_wallet';
     process.env.SAUTIKIT_WHATSAPP_TEMPLATE_OUTAGE = 'scalers_outage';
     const wallet = parametersForKind('wallet_low', {
-      body: 'Scalers wallet running low. Westlands Books\nPrepaid balance is about KES 1,200 (alert under KES 200).\nTop up soon so calls keep being covered.',
+      body: walletLowBody({
+        businessName: 'Westlands Books',
+        balanceKes: 1200,
+        lowThresholdKes: 200,
+      }),
       lead: { businessName: 'Westlands Books', reason: 'Prepaid wallet low' },
     });
-    assert.equal(wallet[0], 'Scalers wallet running low');
-    assert.equal(wallet[1], 'Westlands Books');
-    assert.match(wallet[2], /KES 1,200/);
+    assert.deepEqual(wallet, [
+      'Scalers wallet running low',
+      'Westlands Books',
+      'Prepaid balance is about KES 1,200 (alert under KES 200). Top up soon so calls stay covered.',
+    ]);
+    assert.doesNotMatch(wallet[2], /Enable it on Wallet if you want to continue/);
+
+    const emptyOff = parametersForKind('wallet_empty', {
+      body: walletEmptyBody({ businessName: 'Westlands Books', onDemandEnabled: false }),
+      lead: { businessName: 'Westlands Books', reason: 'Prepaid wallet empty' },
+    });
+    assert.deepEqual(emptyOff, [
+      'Scalers prepaid empty',
+      'Westlands Books',
+      'Prepaid balance is KES 0. On-demand is off. Top up or enable on-demand on Wallet.',
+    ]);
+
+    const emptyOn = parametersForKind('wallet_empty', {
+      body: walletEmptyBody({ businessName: 'Westlands Books', onDemandEnabled: true }),
+      lead: { businessName: 'Westlands Books', reason: 'Prepaid wallet empty' },
+    });
+    assert.deepEqual(emptyOn, [
+      'Scalers prepaid empty',
+      'Westlands Books',
+      'Prepaid balance is KES 0. On-demand is on. Top up when you can.',
+    ]);
 
     const outage = parametersForKind('outage_speech', {
       body: 'Westlands Books line downtime. Callers heard a short message and were asked to call back.',

@@ -117,6 +117,34 @@ describe('Scalers message catalog', () => {
     assertNoDashes(pickup, 'caller hold update');
   });
 
+  it('wallet staff copy is one tight line after the title', () => {
+    assert.equal(
+      walletLowBody({ businessName: 'Aris Kenya', balanceKes: 120, lowThresholdKes: 200 }),
+      [
+        'Scalers wallet running low. Aris Kenya',
+        'Prepaid balance is about KES 120 (alert under KES 200). Top up soon so calls stay covered.',
+      ].join('\n')
+    );
+    assert.equal(
+      walletEmptyBody({ businessName: 'Aris Kenya', onDemandEnabled: false }),
+      [
+        'Scalers prepaid empty. Aris Kenya',
+        'Prepaid balance is KES 0. On-demand is off. Top up or enable on-demand on Wallet.',
+      ].join('\n')
+    );
+    assert.equal(
+      walletEmptyBody({ businessName: 'Aris Kenya', onDemandEnabled: true }),
+      [
+        'Scalers prepaid empty. Aris Kenya',
+        'Prepaid balance is KES 0. On-demand is on. Top up when you can.',
+      ].join('\n')
+    );
+    assert.doesNotMatch(
+      walletLowBody({ businessName: 'Aris Kenya', balanceKes: 80, lowThresholdKes: 200 }),
+      /Enable it on Wallet if you want to continue/
+    );
+  });
+
   it('wallet, outage, missed textback, and escalate have no em dashes', () => {
     const samples = [
       walletLowBody({ businessName: 'Aris Kenya', balanceKes: 80, lowThresholdKes: 200 }),

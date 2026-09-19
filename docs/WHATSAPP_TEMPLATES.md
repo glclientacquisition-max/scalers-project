@@ -108,7 +108,13 @@ Open Inbox Holds to mark fulfilled. Do not reply to this chat.
 Do not reply to this chat.
 ```
 
-`{{1}}` `Scalers wallet running low` or `Scalers prepaid empty`. `{{2}}` business. `{{3}}` balance or on-demand state.
+`{{1}}` `Scalers wallet running low` or `Scalers prepaid empty`. `{{2}}` business. `{{3}}` one tight line at send time. Meta sample length does not lock live `{{3}}`. A long sample can stay.
+
+- Low: `Prepaid balance is about KES 120 (alert under KES 200). Top up soon so calls stay covered.`
+- Empty, on-demand off: `Prepaid balance is KES 0. On-demand is off. Top up or enable on-demand on Wallet.`
+- Empty, on-demand on: `Prepaid balance is KES 0. On-demand is on. Top up when you can.`
+
+Do not put the on-demand essay in `{{3}}`. Until `SAUTIKIT_WHATSAPP_TEMPLATE_WALLET=scalers_wallet` is set, wallet still packs on `scalers_staff_alert`.
 
 ### 7. `scalers_outage`
 
@@ -191,11 +197,11 @@ Platform inbound already exists: someone texts the Scalers WhatsApp number, we m
 
 ## Ops check
 
-1. Templates approved on the Scalers WABA. Status Active. Utility.  
-2. SautiKit number / connection id on Railway.  
-3. Voice env names match the table.  
+1. `scalers_staff_alert` is Active on the Scalers WABA. Utility. Other names still pending.  
+2. SautiKit number / connection id on Railway. Staging has the number id; template env may stay unset (code default is the first name).  
+3. Kind env names only after those templates are Active.  
 4. Desk WhatsApp toggle is live. Alert phone is the dest.  
-5. Smoke: SMS off (or SMS fail) on a staging tenant, save a lead, staff phone gets the template, not a session text. Visit and wallet must not look like a missed-call lead.  
+5. Dry-run: `node scripts/send-whatsapp-template.js --to +2547XXXXXXXX`. `--apply` only on the owner machine, one staff phone.  
 6. A reply to the alert does nothing in the desk. That is correct.
 
-Code: `src/notifications/whatsappTemplates.js`, send in `whatsapp.js`.
+Code: `src/notifications/whatsappTemplates.js`, `sendOwnerWhatsApp` / `sendWhatsAppTemplate` in `whatsapp.js`.
