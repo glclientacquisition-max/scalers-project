@@ -42,12 +42,12 @@ export function InboxSmsDock({
         <input type="hidden" name="call_id" value={callId} />
         <input type="hidden" name="caller_phone" value={callerPhone || ""} />
         <input type="hidden" name="reply_id" value={replyId} />
-        <label className="sr-only" htmlFor="inbox-sms">
+        <label className="sr-only" htmlFor={`inbox-sms-${callId}`}>
           SMS
         </label>
         <textarea
           ref={areaRef}
-          id="inbox-sms"
+          id={`inbox-sms-${callId}`}
           name="note"
           value={note}
           rows={2}
