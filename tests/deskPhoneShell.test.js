@@ -66,7 +66,10 @@ describe("desk phone shell", () => {
     assert.match(nav, /deskNavBadgeClass/);
     assert.match(nav, /min-h-12/);
     assert.doesNotMatch(nav, /deskStatusChipClass/);
-    const badgeBlock = nav.slice(nav.indexOf("function TabIconWithBadge"));
+    const start = nav.indexOf("function TabIconWithBadge");
+    const end = nav.indexOf("function inboxLinkAria");
+    const badgeBlock = nav.slice(start, end);
+    assert.ok(start >= 0 && end > start);
     assert.match(badgeBlock, /pointer-events-none/);
     assert.doesNotMatch(badgeBlock, /<Link/);
   });
