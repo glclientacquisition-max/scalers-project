@@ -80,11 +80,17 @@ describe("inbox ticket action chrome", () => {
     assert.match(dock, /name="reply_id"/);
     assert.match(ticket, /tone="thread"/);
     assert.doesNotMatch(notes, /caller_appointment_confirmed/);
+    assert.match(dock, /aria-label="Send"/);
+    assert.match(dock, /title="Send"/);
+    assert.match(dock, /SendGlyph/);
+    assert.match(dock, /min-h-11 min-w-11/);
+    assert.match(dock, /btnPrimaryFill/);
+    assert.doesNotMatch(dock, /\{sendPending \? "Sending" : "Send"\}/);
   });
 
   it("puts a muted polish wand beside SMS compose", () => {
     const wandAt = dock.indexOf('aria-label="Polish"');
-    const sendAt = dock.indexOf("{sendPending ? \"Sending\" : \"Send\"}");
+    const sendAt = dock.indexOf('aria-label="Send"');
     assert.ok(wandAt > 0, "wand control missing");
     assert.ok(sendAt > wandAt, "wand must sit beside Send, not after it");
     assert.match(dock, /title="Polish"/);

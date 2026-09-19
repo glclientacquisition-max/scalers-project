@@ -8,15 +8,37 @@ import {
   type SendCallerNoteState,
 } from "@/app/(desk)/calls/noteActions";
 import {
-  btnPrimary,
+  btnPrimaryFill,
   deskHitClass,
   deskShiftClass,
   focusRingVisible,
+  pendingSpinnerClass,
   pendingSpinnerInkClass,
 } from "@/components/ui/deskChrome";
 
 const polishInitial: PolishCallerNoteState = {};
 const sendInitial: SendCallerNoteState = {};
+
+function SendGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M22 2 11 13"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M22 2 15 22l-4-9-9-4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function WandGlyph() {
   return (
@@ -134,10 +156,17 @@ export function InboxSmsDock({
         ) : null}
         <button
           type="submit"
+          aria-label="Send"
+          title="Send"
+          aria-busy={sendPending}
           disabled={sendPending || !canSend}
-          className={`${btnPrimary} h-12 min-w-12 shrink-0 px-4`}
+          className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl ${btnPrimaryFill} ${deskShiftClass} active:scale-[0.99] motion-reduce:active:scale-100 ${focusRingVisible}`}
         >
-          {sendPending ? "Sending" : "Send"}
+          {sendPending ? (
+            <span aria-hidden="true" className={pendingSpinnerClass} />
+          ) : (
+            <SendGlyph />
+          )}
         </button>
       </form>
       <p className="mt-1.5 text-xs text-ink-soft">WhatsApp uses the icon above.</p>

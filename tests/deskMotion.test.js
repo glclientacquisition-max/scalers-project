@@ -181,6 +181,8 @@ describe("desk motion wiring", () => {
     const dock = read("dashboard/src/components/InboxSmsDock.tsx");
     assert.match(dock, /pendingSpinnerInkClass/);
     assert.match(dock, /polishPending/);
+    assert.match(dock, /pendingSpinnerClass/);
+    assert.match(dock, /sendPending/);
     assert.doesNotMatch(dock, /animate-pulse/);
   });
 });
