@@ -13,7 +13,11 @@
  * Owner can pass another approved name if Meta used a different string.
  */
 
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch {
+  // optional; Railway / owner env may already be set
+}
 
 const { sendWhatsAppTemplate } = require('../src/notifications/whatsapp');
 const {
