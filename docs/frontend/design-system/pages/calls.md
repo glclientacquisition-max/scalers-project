@@ -36,7 +36,7 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 - **WhatsApp:** Opens chat. List verb for return calls. On the call, primary only when there is no visit/hold and Text customers is off.
 - **Send SMS:** Write a text on the call, then send. Shows only if Text customers is on. Primary on the call when there is no visit/hold to Confirm or Done. Not a list verb (needs a body).
 
-Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. That six-item row is `InboxFilterPills`: self-contained rounded chips, count inside the chip, horizontal scroll-snap, trailing fade. Selected is a filled chip, not an underline. List / Work and Today / Week stay underline `FilterTabs`. Archived is not a chip.
+Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. That six-item row is `InboxFilterPills`: self-contained rounded chips, count inside the chip, horizontal scroll-snap, trailing fade. Selected is a filled chip, not an underline. List / Work and Today / Week stay underline `FilterTabs`. Archived is not a chip. On touch, a dominant horizontal swipe on the thread list (not the shell, not the chips) moves one pile along that same order and updates `purpose=` like tapping the chip. Archived is not a swipe stop. Mouse and trackpad use chips only. Bulk select turns the gesture off.
 
 **Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). List is the Inbox table: requested and confirmed, newest first. Confirmed visits whose week has already ended pin at the top of List, oldest slot first. Confirm lives on List. Work is confirmed only, by clock. Work's verb is Done.
 

@@ -133,6 +133,9 @@ describe("desk motion wiring", () => {
     assert.match(calls, /scopeKey=\{`\$\{activeFilter\}:\$\{page\}:\$\{q\}`\}/);
     assert.match(inbox, /item\.purpose === "live"/);
     assert.match(inbox, /RowStateDot show=\{item\.unread\} live=/);
+    const swipe = read("dashboard/src/components/InboxPileSwipe.tsx");
+    assert.match(swipe, /deskShiftClass/);
+    assert.doesNotMatch(swipe, /transition-all|framer-motion/);
   });
 
   it("lands Contacts rows on the same live refresh", () => {

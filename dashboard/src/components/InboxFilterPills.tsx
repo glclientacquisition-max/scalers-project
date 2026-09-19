@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 
 export type InboxFilterPillItem = {
@@ -17,13 +20,30 @@ export function InboxFilterPills({
   items: readonly InboxFilterPillItem[];
   active: string;
 }) {
+  const activeRef = useRef<HTMLLIElement | null>(null);
+
+  useEffect(() => {
+    const node = activeRef.current;
+    if (!node) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({
+      inline: "nearest",
+      block: "nearest",
+      behavior: reduce ? "auto" : "smooth",
+    });
+  }, [active]);
+
   return (
     <nav aria-label={label} className="relative">
-      <ul className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul className="-mx-1 flex flex-nowrap snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const isActive = active === item.id;
           return (
-            <li key={item.id} className="snap-start shrink-0">
+            <li
+              key={item.id}
+              ref={isActive ? activeRef : undefined}
+              className="snap-start shrink-0"
+            >
               <Link
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
