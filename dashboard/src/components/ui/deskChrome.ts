@@ -73,10 +73,10 @@ export const deskEmptyClass = "mt-8 border-y border-line py-12 text-center";
 export const pageTitleClass =
   "font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink";
 
-/** Overlay count on the Inbox nav icon. 20px pill, not a second 44px control.
+/** Corner overlay on the Inbox nav icon. 16px, not a second 44px control.
  * Ribbon wash matches the S mark: accent `#0096FF` → accent-fill `#005CCC`. */
 export const deskNavBadgeClass =
-  "pointer-events-none absolute -right-1.5 -top-1 z-10 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-fill px-1 text-[10px] font-semibold leading-none tabular-nums text-accent-on-fill";
+  "pointer-events-none absolute -top-1 -end-1 z-10 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-fill px-0.5 text-[9px] font-semibold leading-none tabular-nums text-accent-on-fill";
 
 /** List preview: one ellipsized line. Full copy lives on the record. */
 export const deskPreviewClass = "min-w-0 truncate";

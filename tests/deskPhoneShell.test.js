@@ -71,6 +71,8 @@ describe("desk phone shell", () => {
     const badgeBlock = nav.slice(start, end);
     assert.ok(start >= 0 && end > start);
     assert.match(badgeBlock, /pointer-events-none/);
+    assert.match(badgeBlock, /relative inline-flex overflow-visible/);
     assert.doesNotMatch(badgeBlock, /<Link/);
+    assert.doesNotMatch(badgeBlock, /inset-0/);
   });
 });
