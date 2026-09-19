@@ -41,6 +41,13 @@ export function inboxCanMarkDone(item: InboxItem): boolean {
   return String(item.lead?.leadStatus || "").toLowerCase() !== "resolved";
 }
 
+/** Ticket ⋮: Archive or Unarchive only. Pin stays a list verb. */
+export function inboxTicketOverflowActions(archived: boolean): InboxListAction[] {
+  return archived
+    ? [{ id: "unarchive", label: "Unarchive" }]
+    : [{ id: "archive", label: "Archive" }];
+}
+
 /** md+ overflow: Pin, Mark done when eligible, Archive or Unarchive. No Select. */
 export function inboxOverflowActions(item: InboxItem): InboxListAction[] {
   const stay: InboxListAction[] = [

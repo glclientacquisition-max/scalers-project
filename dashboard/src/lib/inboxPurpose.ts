@@ -128,6 +128,39 @@ export type InboxItem = {
   snoozedUntil: string | null;
 };
 
+/** Latest inbound call, hold, or visit created from the caller. */
+export function inboxLastCustomerEventAt(opts: {
+  callCreatedAt?: string | null;
+  holdCreatedAt?: string | null;
+  jobCreatedAt?: string | null;
+}): string | null {
+  let latest: string | null = null;
+  let latestMs = Number.NEGATIVE_INFINITY;
+  for (const iso of [opts.callCreatedAt, opts.holdCreatedAt, opts.jobCreatedAt]) {
+    if (!iso) continue;
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) continue;
+    if (ms >= latestMs) {
+      latestMs = ms;
+      latest = iso;
+    }
+  }
+  return latest;
+}
+
+/** Unread when a customer event exists after the owner last opened the ticket. */
+export function inboxIsUnread(opts: {
+  lastCustomerEventAt?: string | null;
+  inboxReadAt?: string | null;
+}): boolean {
+  const eventMs = opts.lastCustomerEventAt ? Date.parse(opts.lastCustomerEventAt) : Number.NaN;
+  if (!Number.isFinite(eventMs)) return false;
+  if (!opts.inboxReadAt) return true;
+  const readMs = Date.parse(opts.inboxReadAt);
+  if (!Number.isFinite(readMs)) return true;
+  return eventMs > readMs;
+}
+
 export function isLiveCallStatus(status?: string | null): boolean {
   const s = String(status || "").toLowerCase();
   return s === "in_progress" || s === "ringing" || s === "queued";
@@ -508,7 +541,14 @@ export function buildInboxItem(opts: {
     job,
     intent: intent || canonicalInboxIntent(hold?.request_type) || null,
     urgent: Boolean(lead?.urgent),
-    unread: lead?.call.inbox_read_at === null,
+    unread: inboxIsUnread({
+      lastCustomerEventAt: inboxLastCustomerEventAt({
+        callCreatedAt: lead?.call.created_at,
+        holdCreatedAt: hold?.created_at,
+        jobCreatedAt: job?.created_at,
+      }),
+      inboxReadAt: lead?.call.inbox_read_at,
+    }),
     muted: Boolean(lead?.call.inbox_muted),
     pinnedAt: lead?.call.inbox_pinned_at || null,
     assignee: lead?.call.inbox_assignee?.trim() || null,

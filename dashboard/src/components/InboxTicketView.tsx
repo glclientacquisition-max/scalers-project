@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
@@ -25,6 +25,12 @@ import {
 } from "@/components/ui/deskChrome";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
+import { inboxMarkSeen } from "@/lib/inboxLeadActions";
+import { inboxTicketOverflowActions } from "@/lib/inboxListVerbs";
+import {
+  placeInboxOverflowMenu,
+  type InboxOverflowAnchor,
+} from "@/lib/inboxOverflowPlace";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
 
@@ -96,64 +102,126 @@ function InboxTicketMore({
   archived: boolean;
 }) {
   const router = useRouter();
+  const labelId = useId();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sheet, setSheet] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<InboxOverflowAnchor | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const ignoreUntil = useRef(0);
+  const actions = inboxTicketOverflowActions(archived);
 
-  function placeMenu() {
-    const phone = window.matchMedia("(max-width: 767px)").matches;
-    const coarse = !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-    setSheet(phone || coarse);
+  function placeFromButton() {
     const rect = btnRef.current?.getBoundingClientRect();
-    if (rect) {
-      setPos({
-        top: rect.bottom + 4,
-        left: Math.max(8, rect.right - 160),
-      });
+    setAnchor(
+      rect
+        ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
+        : { x: 8, y: 8, align: "point" }
+    );
+  }
+
+  useLayoutEffect(() => {
+    if (!open || !anchor) return;
+    const nextAnchor = anchor;
+    function place() {
+      const el = panelRef.current;
+      if (!el) return;
+      const view = window.visualViewport;
+      setPos(
+        placeInboxOverflowMenu(
+          { width: el.offsetWidth, height: el.offsetHeight },
+          nextAnchor,
+          {
+            width: view?.width ?? window.innerWidth,
+            height: view?.height ?? window.innerHeight,
+          }
+        )
+      );
     }
+    place();
+    window.addEventListener("resize", place);
+    window.visualViewport?.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.visualViewport?.removeEventListener("resize", place);
+    };
+  }, [open, anchor, error, actions.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
+
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (!busy) setOpen(false);
+      }
+    }
+
+    function onPointer(event: MouseEvent) {
+      if (Date.now() < ignoreUntil.current) return;
+      if (panelRef.current && !panelRef.current.contains(event.target as Node) && !busy) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onPointer);
+      previous?.focus?.();
+    };
+  }, [open, busy]);
+
+  async function run() {
+    setBusy(true);
+    const res = await updateLeadStatus(callId, archived ? "new" : "archived");
+    setBusy(false);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    setOpen(false);
+    if (!archived) {
+      writeInboxArchiveUndo([{ id: callId, callId }]);
+      router.push(backHref);
+    }
+    router.refresh();
   }
 
   const menu = (
     <div
-      role={sheet ? "dialog" : "menu"}
-      className={
-        sheet
-          ? "flex w-full flex-col rounded-t-2xl border border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] shadow-xl"
-          : "min-w-[10rem] rounded-xl border border-line bg-surface py-1 shadow-xl"
-      }
-      style={
-        sheet || !pos
-          ? undefined
-          : { position: "fixed", top: pos.top, left: pos.left, zIndex: 50 }
-      }
+      ref={panelRef}
+      role="menu"
+      aria-labelledby={labelId}
+      className="z-[60] max-h-[min(24rem,calc(100dvh-1rem))] min-w-[10rem] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
+      style={{
+        position: "fixed",
+        top: pos?.top ?? 0,
+        left: pos?.left ?? 0,
+        visibility: pos ? "visible" : "hidden",
+      }}
+      onClick={(event) => event.stopPropagation()}
     >
-      <button
-        type="button"
-        role="menuitem"
-        disabled={busy}
-        className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
-        onClick={async () => {
-          setBusy(true);
-          const res = await updateLeadStatus(callId, archived ? "new" : "archived");
-          setBusy(false);
-          if (res.error) {
-            setError(res.error);
-            return;
-          }
-          setOpen(false);
-          if (!archived) {
-            writeInboxArchiveUndo([{ id: callId, callId }]);
-            router.push(backHref);
-          }
-          router.refresh();
-        }}
-      >
-        {busy ? "Saving" : archived ? "Unarchive" : "Archive"}
-      </button>
+      <p id={labelId} className="sr-only">
+        More
+      </p>
+      {actions.map((action) => (
+        <button
+          key={action.id}
+          type="button"
+          role="menuitem"
+          disabled={busy}
+          className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
+          onClick={() => void run()}
+        >
+          {busy ? "Saving" : archived ? "Unarchive" : "Archive"}
+        </button>
+      ))}
       {error ? (
         <p className="px-4 py-2 text-xs text-warn" role="alert">
           {error}
@@ -175,43 +243,14 @@ function InboxTicketMore({
           setError(null);
           if (!open) {
             ignoreUntil.current = Date.now() + 450;
-            placeMenu();
+            placeFromButton();
           }
           setOpen((next) => !next);
         }}
       >
         <MoreGlyph />
       </button>
-      {open && typeof document !== "undefined"
-        ? createPortal(
-            sheet ? (
-              <div
-                className="fixed inset-0 z-50 flex flex-col justify-end bg-ink/40"
-                role="presentation"
-                onClick={() => {
-                  if (Date.now() < ignoreUntil.current) return;
-                  if (!busy) setOpen(false);
-                }}
-              >
-                <div onClick={(event) => event.stopPropagation()}>{menu}</div>
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  aria-label="Dismiss"
-                  className="fixed inset-0 z-40"
-                  onClick={() => {
-                    if (Date.now() < ignoreUntil.current) return;
-                    if (!busy) setOpen(false);
-                  }}
-                />
-                {menu}
-              </>
-            ),
-            document.body
-          )
-        : null}
+      {open && typeof document !== "undefined" ? createPortal(menu, document.body) : null}
     </div>
   );
 }
@@ -271,6 +310,10 @@ export function InboxTicketView({
   const canConfirm = !archived && String(job?.status || "").toLowerCase() === "requested";
   const canHoldDone = !archived && String(hold?.status || "").toLowerCase() === "open";
   const dockedAction = canConfirm || canHoldDone || (needsYou && !archived);
+
+  useEffect(() => {
+    void inboxMarkSeen(callId);
+  }, [callId]);
   const identity = (
     <>
       <RowIdentity name={title} />

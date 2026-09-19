@@ -211,7 +211,7 @@ export function InboxTableRow({
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {item.headline}
               </p>
@@ -222,7 +222,7 @@ export function InboxTableRow({
           </td>
           <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex min-w-[5.5rem] items-center gap-1.5">
-              <RowStateDot show={item.needsYou} live={live} />
+              <RowStateDot show={item.unread} live={live} />
               <span className="min-w-0 truncate">{showHold ? needed : when}</span>
             </span>
           </td>
@@ -235,7 +235,7 @@ export function InboxTableRow({
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {hasJob ? visit : stamp}
               </p>
@@ -246,7 +246,7 @@ export function InboxTableRow({
           </td>
           <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex min-w-[5.5rem] items-center gap-1.5">
-              <RowStateDot show={item.needsYou} live={live} />
+              <RowStateDot show={item.unread} live={live} />
               <span className="min-w-0 truncate">{hasJob ? place : ""}</span>
             </span>
           </td>
@@ -259,7 +259,7 @@ export function InboxTableRow({
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
-                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
+                className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {who}
               </p>
@@ -271,7 +271,7 @@ export function InboxTableRow({
           </td>
           <td className={`${deskRowMutedClass} min-w-[6.5rem] whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
             <span className="inline-flex min-w-[5.5rem] items-center gap-1.5">
-              <RowStateDot show={item.needsYou} live={live} />
+              <RowStateDot show={item.unread} live={live} />
               <span className="min-w-0 truncate">{when}</span>
             </span>
           </td>
@@ -309,11 +309,11 @@ export function InboxPhoneRow({
   const body = (
     <div className="min-w-0 flex-1">
       <div className="flex items-baseline justify-between gap-3">
-        <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.needsYou || item.unread)}`}>
+        <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)}`}>
           {who}
         </p>
         <p className="flex min-w-[5.5rem] shrink-0 items-center justify-end gap-1.5 text-xs text-ink-soft">
-          <RowStateDot show={item.needsYou} live={item.purpose === "live"} />
+          <RowStateDot show={item.unread} live={item.purpose === "live"} />
           <span className="max-w-[7.5rem] truncate">{meta}</span>
         </p>
       </div>

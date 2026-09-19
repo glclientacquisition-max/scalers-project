@@ -41,7 +41,8 @@ function missingCall(): InboxTriageResult {
 
 async function writeInboxTriage(
   callId: string,
-  patch: InboxTriagePatch
+  patch: InboxTriagePatch,
+  opts?: { revalidateTicket?: boolean }
 ): Promise<InboxTriageResult> {
   const id = String(callId || "").trim();
   if (!id) return missingCall();
@@ -59,7 +60,9 @@ async function writeInboxTriage(
 
   revalidatePath("/home");
   revalidatePath("/calls");
-  revalidatePath(`/calls/${id}`);
+  if (opts?.revalidateTicket !== false) {
+    revalidatePath(`/calls/${id}`);
+  }
   return { ok: true };
 }
 
@@ -70,6 +73,15 @@ export async function inboxToggleRead(
   return writeInboxTriage(callId, {
     inbox_read_at: unread ? new Date().toISOString() : null,
   });
+}
+
+/** Opening /calls/[id] stamps last-open. Does not toggle Needs you. */
+export async function inboxMarkSeen(callId: string): Promise<InboxTriageResult> {
+  return writeInboxTriage(
+    callId,
+    { inbox_read_at: new Date().toISOString() },
+    { revalidateTicket: false }
+  );
 }
 
 export async function inboxToggleMute(
