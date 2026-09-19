@@ -26,6 +26,8 @@ const EVENTS = Object.freeze({
   CALLER_APPOINTMENT_RESCHEDULED: 'caller_appointment_rescheduled',
   CALLER_HOLD: 'caller_hold',
   CALLER_HOLD_UPDATED: 'caller_hold_updated',
+  CALLER_HOLD_READY: 'caller_hold_ready',
+  CALLER_HOLD_CANCELLED: 'caller_hold_cancelled',
   CALLER_ORDER: 'caller_order',
   CALLER_CALLBACK: 'caller_callback',
 });

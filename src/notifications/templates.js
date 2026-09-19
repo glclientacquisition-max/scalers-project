@@ -123,6 +123,16 @@ function renderCallerText(event = {}) {
       const now = when ? ` is now ${when}` : ' was updated';
       return `${hi}${business} here. ${what}${now}.`;
     }
+    case 'caller_hold_ready': {
+      const item = String(event.item || '').trim();
+      const what = item ? `${item} is ready for pickup` : 'Your item is ready for pickup';
+      return `${hi}${business} here. ${what}.`;
+    }
+    case 'caller_hold_cancelled': {
+      const item = String(event.item || '').trim();
+      const what = item ? `We cancelled the pickup for ${item}` : 'We cancelled your pickup';
+      return `${hi}${business} here. ${what}.`;
+    }
     case 'caller_order': {
       const item = String(event.item || '').trim();
       const what = item ? `your order for ${item}` : 'your order';

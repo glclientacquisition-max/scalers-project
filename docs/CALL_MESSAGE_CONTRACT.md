@@ -35,6 +35,8 @@ Every post-call notification is one typed event. Voice builds the event; `src/no
 | `caller_appointment_rescheduled` | Visit time changes | — | Yes, if on |
 | `caller_hold` | Hold placed | — | Yes, if on |
 | `caller_hold_updated` | Desk changes hold pickup time | — | Yes, if on |
+| `caller_hold_ready` | Owner taps Done on a hold or order | — | Yes, if on |
+| `caller_hold_cancelled` | Owner taps Cancel on a hold or order | — | Yes, if on |
 | `caller_order` | Order captured | — | Yes, if on |
 | `caller_callback` | Callback promised | — | Yes, if on |
 
@@ -116,6 +118,8 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 | Visit cancelled | Voice or desk | `Hi {Name}, {Business} here. We cancelled your {service} visit for {when}.` |
 | Hold placed | Voice | `Hi {Name}, {Business} here. We have held {item} for you. We will confirm shortly.` |
 | Hold time changed | Desk (When + Save) | `Hi {Name}, {Business} here. Pickup for {item} is now {when}.` |
+| Owner taps Done | Desk | `Hi {Name}, {Business} here. {item} is ready for pickup.` |
+| Hold cancelled | Desk | `Hi {Name}, {Business} here. We cancelled the pickup for {item}.` |
 | Order captured | Voice | `Hi {Name}, {Business} here. We have your order for {item}. We will confirm shortly.` |
 | Callback promised | Voice | `Hi {Name}, {Business} here. The team will call you back.` |
 | Owner note | Desk Polish then Send | Gemini rewrite of the owner's note. Owner must tap Send. |
@@ -131,8 +135,8 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 **Rules**
 
 - Owner toggle `notify_channels.caller_sms`. Off until they turn it on.
-- Desk: open the call. Change When/Where and Save. Confirm or Cancel. Note, Polish, Send.
-- One customer text per trigger. Capture then Confirm is two texts on purpose (received, then confirmed).
+- Desk: open the call. Change When/Where and Save. Confirm, Done, or Cancel. Note, Polish, Send.
+- One customer text per trigger. Capture then Confirm is two texts on purpose (received, then confirmed). Capture then Done is two texts (held, then ready).
 - Use the captured name when it is a real name. Otherwise `Hi, {Business} here`.
 - Name the service or item.
 - Send from the Scalers TextSMS sender, not the owner's personal number.

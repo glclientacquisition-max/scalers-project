@@ -10,6 +10,8 @@ export type CallerTemplateKind =
   | "caller_appointment_rescheduled"
   | "caller_hold"
   | "caller_hold_updated"
+  | "caller_hold_ready"
+  | "caller_hold_cancelled"
   | "caller_order"
   | "caller_callback";
 
@@ -63,6 +65,14 @@ export function renderCallerTemplate(opts: {
       const what = item ? `Pickup for ${item}` : "Pickup";
       const now = when ? ` is now ${when}` : " was updated";
       return `${hi}${business} here. ${what}${now}.`;
+    }
+    case "caller_hold_ready": {
+      const what = item ? `${item} is ready for pickup` : "Your item is ready for pickup";
+      return `${hi}${business} here. ${what}.`;
+    }
+    case "caller_hold_cancelled": {
+      const what = item ? `We cancelled the pickup for ${item}` : "We cancelled your pickup";
+      return `${hi}${business} here. ${what}.`;
     }
     case "caller_order": {
       const what = item ? `your order for ${item}` : "your order";
