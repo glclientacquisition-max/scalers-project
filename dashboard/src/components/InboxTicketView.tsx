@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
@@ -21,6 +21,7 @@ import {
   deskHitClass,
   deskShiftClass,
   focusRingVisible,
+  metaLabelClass,
 } from "@/components/ui/deskChrome";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
@@ -36,15 +37,37 @@ function MoreGlyph() {
   );
 }
 
-function SystemNotice({ children }: { children: ReactNode }) {
-  const text = typeof children === "string" ? children.trim() : children;
-  if (!text) return null;
+function TicketSummaryFacts({
+  want,
+  mood,
+  done,
+}: {
+  want: string | null;
+  mood: string | null;
+  done: string | null;
+}) {
+  if (!want && !mood && !done) return null;
   return (
-    <div className="flex justify-center px-2">
-      <p className="max-w-[85%] rounded-full bg-surface-muted/80 px-4 py-1.5 text-center text-xs text-ink-soft [overflow-wrap:anywhere]">
-        {text}
-      </p>
-    </div>
+    <dl className="space-y-3 rounded-2xl bg-accent-soft/70 px-4 py-3">
+      {want ? (
+        <div>
+          <dt className={metaLabelClass}>Want</dt>
+          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{want}</dd>
+        </div>
+      ) : null}
+      {mood ? (
+        <div>
+          <dt className={metaLabelClass}>Mood</dt>
+          <dd className="mt-1 text-sm text-ink">{mood}</dd>
+        </div>
+      ) : null}
+      {done ? (
+        <div>
+          <dt className={metaLabelClass}>Done</dt>
+          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{done}</dd>
+        </div>
+      ) : null}
+    </dl>
   );
 }
 
@@ -216,6 +239,7 @@ export function InboxTicketView({
   escalatedLine: string | null;
   archived: boolean;
 }) {
+  const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const [away, setAway] = useState(false);
   const canConfirm = String(job?.status || "").toLowerCase() === "requested";
@@ -230,21 +254,45 @@ export function InboxTicketView({
     </>
   );
 
+  function scroller() {
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
+      return threadRef.current;
+    }
+    return paneRef.current;
+  }
+
   function measure() {
-    const el = threadRef.current;
+    const el = scroller();
     if (!el) return;
     setAway(el.scrollHeight - el.scrollTop - el.clientHeight > 96);
   }
 
   function jumpLatest() {
-    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
+    scroller()?.scrollTo({ top: scroller()!.scrollHeight, behavior: "smooth" });
   }
 
   useEffect(() => {
-    const el = threadRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-    measure();
+    function bind() {
+      const el = scroller();
+      if (!el) return () => {};
+      el.scrollTop = el.scrollHeight;
+      measure();
+      el.addEventListener("scroll", measure);
+      return () => el.removeEventListener("scroll", measure);
+    }
+    let unbind = bind();
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => {
+      unbind();
+      unbind = bind();
+    };
+    mq.addEventListener("change", onChange);
+    window.addEventListener("resize", measure);
+    return () => {
+      unbind();
+      mq.removeEventListener("change", onChange);
+      window.removeEventListener("resize", measure);
+    };
   }, [turns.length]);
 
   return (
@@ -276,45 +324,57 @@ export function InboxTicketView({
         </p>
       ) : null}
 
-      <div className="relative min-h-0 flex-1">
+      <div
+        data-ticket-split=""
+        className="relative min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]"
+      >
         <div
-          ref={threadRef}
-          onScroll={measure}
-          className="absolute inset-0 space-y-2.5 overflow-y-auto px-4 py-4 sm:px-6"
+          ref={paneRef}
+          className="absolute inset-0 overflow-y-auto lg:contents"
         >
-          {want ? <SystemNotice>{`Want. ${want}`}</SystemNotice> : null}
-          {mood ? <SystemNotice>{`Mood. ${mood}`}</SystemNotice> : null}
-          {done ? <SystemNotice>{`Done. ${done}`}</SystemNotice> : null}
-          <CallTranscript turns={turns} mode="thread" />
-          {job ? (
-            <div className="mx-auto max-w-lg rounded-2xl bg-surface-muted/60 px-4 py-3">
-              <InboxJobEditor id={job.id} whenText={job.when_text} landmark={job.address_landmark} />
+          <aside
+            data-ticket-summary=""
+            className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-line"
+          >
+            <TicketSummaryFacts want={want} mood={mood} done={done} />
+            {job ? (
+              <div className="rounded-2xl bg-surface-muted/60 px-4 py-3">
+                <InboxJobEditor id={job.id} whenText={job.when_text} landmark={job.address_landmark} />
+              </div>
+            ) : null}
+            {hold ? (
+              <div className="rounded-2xl bg-surface-muted/60 px-4 py-3">
+                <InboxHoldEditor id={hold.id} whenText={hold.when_text} />
+              </div>
+            ) : null}
+            <div className="space-y-2 text-xs text-ink-soft">
+              <p>Duration: {durationLabel}</p>
+              {assistLabel ? <p>Assist: {assistLabel}</p> : null}
+              {assistNote ? <p className="[overflow-wrap:anywhere]">{assistNote}</p> : null}
+              {escalatedLine ? <p className="[overflow-wrap:anywhere]">{escalatedLine}</p> : null}
+              <CallRecording recordingUrl={recordingUrl} />
             </div>
-          ) : null}
-          {hold ? (
-            <div className="mx-auto max-w-lg rounded-2xl bg-surface-muted/60 px-4 py-3">
-              <InboxHoldEditor id={hold.id} whenText={hold.when_text} />
+          </aside>
+          <section data-ticket-thread="" className="relative min-h-0">
+            <div
+              ref={threadRef}
+              className="space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
+            >
+              <CallTranscript turns={turns} mode="thread" />
+              <CallFaqSuggestions
+                tenantId={tenantId}
+                callId={callId}
+                hasTranscript={turns.length > 0}
+                tone="thread"
+              />
             </div>
-          ) : null}
-          <CallFaqSuggestions
-            tenantId={tenantId}
-            callId={callId}
-            hasTranscript={turns.length > 0}
-            tone="thread"
-          />
-          <div className="mx-auto max-w-lg space-y-2 pt-4 text-center text-xs text-ink-soft">
-            <p>Duration: {durationLabel}</p>
-            {assistLabel ? <p>Assist: {assistLabel}</p> : null}
-            {assistNote ? <p className="[overflow-wrap:anywhere]">{assistNote}</p> : null}
-            {escalatedLine ? <p className="[overflow-wrap:anywhere]">{escalatedLine}</p> : null}
-            <CallRecording recordingUrl={recordingUrl} />
-          </div>
+          </section>
         </div>
         {away ? (
           <button
             type="button"
             onClick={jumpLatest}
-            className={`absolute bottom-3 right-4 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-[#005CCC] px-4 text-sm font-semibold text-white shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
+            className={`absolute right-4 bottom-3 z-10 inline-flex h-12 min-w-12 items-center justify-center rounded-full bg-[#005CCC] px-4 text-sm font-semibold text-white shadow-lg ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
           >
             Jump to latest
           </button>

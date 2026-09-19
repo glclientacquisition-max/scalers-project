@@ -116,4 +116,20 @@ describe("admin console polish", () => {
     assert.match(page, /href="\/admin\/businesses"/);
     assert.doesNotMatch(page, /Manage →/);
   });
+
+  it("lists businesses in one dense table", () => {
+    const panel = read("dashboard/src/components/AdminBusinessesPanel.tsx");
+    assert.match(panel, /<table/);
+    assert.doesNotMatch(panel, /lg:hidden/);
+    assert.match(panel, /Assign next number/);
+    assert.match(panel, /Adjust wallet/);
+  });
+
+  it("lists DID pool rows in one dense table", () => {
+    const panel = read("dashboard/src/components/DidPoolManager.tsx");
+    assert.match(panel, /<table/);
+    assert.doesNotMatch(panel, /lg:hidden/);
+    assert.match(panel, /Add to pool/);
+    assert.match(panel, /Assign next available/);
+  });
 });
