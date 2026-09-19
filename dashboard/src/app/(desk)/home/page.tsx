@@ -131,11 +131,11 @@ export default async function HomeOverviewPage() {
 
   const queues = [
     {
-      id: "needs",
-      label: "Needs you",
+      id: "return",
+      label: copy.returnCtaMany,
       href: callsHref({ purpose: "human" }),
       count: work.toReturn,
-      unit: homeQueueUnit(work.toReturn, copy.returnUnit),
+      unit: "",
     },
     {
       id: "hold",
@@ -254,8 +254,8 @@ export default async function HomeOverviewPage() {
                     <span className={`min-w-0 ${deskPreviewClass}`}>
                       <span className="tabular-nums text-base font-semibold text-ink">
                         {queue.count}
-                      </span>{" "}
-                      {queue.unit}
+                      </span>
+                      {queue.unit ? ` ${queue.unit}` : ""}
                     </span>
                     <svg
                       viewBox="0 0 20 20"
