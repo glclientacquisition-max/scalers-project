@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminFacingError, logAdminError } from "@/lib/adminErrors";
 import { isLegacyAuthenticated } from "@/lib/auth";
 import {
   deletePlatformSonioxVoice,
@@ -17,10 +18,8 @@ export async function GET() {
     const voices = await listPlatformSonioxVoicesAdmin();
     return NextResponse.json({ voices });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to list voices" },
-      { status: 500 }
-    );
+    logAdminError("voices-list", err);
+    return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
   }
 }
 
@@ -73,15 +72,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Request failed";
-    if (/platform_soniox_voices|relation|column/i.test(message)) {
-      return NextResponse.json(
-        {
-          error: `${message} Apply docs/supabase/soniox_voice_id.sql in Supabase.`,
-        },
-        { status: 500 }
-      );
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    logAdminError("voices", err);
+    return NextResponse.json({ error: adminFacingError(err) }, { status: 500 });
   }
 }

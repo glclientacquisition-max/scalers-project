@@ -1,17 +1,15 @@
-import { getAdminOverview } from "@/lib/admin";
+import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminBusinessesPanel } from "@/components/AdminBusinessesPanel";
+import { getAdminOverview } from "@/lib/admin";
+import { logAdminError } from "@/lib/adminErrors";
 
 export default async function AdminBusinessesPage() {
   let overview;
   try {
     overview = await getAdminOverview();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
-        Could not load businesses: {message}
-      </div>
-    );
+    logAdminError("businesses", err);
+    return <AdminSetupError />;
   }
 
   return (

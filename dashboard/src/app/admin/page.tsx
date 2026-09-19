@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { getAdminOverview } from "@/lib/admin";
+import { AdminSetupError } from "@/components/AdminSetupError";
 import { SautikitTelecomPanel } from "@/components/SautikitTelecomPanel";
+import { getAdminOverview } from "@/lib/admin";
+import { logAdminError } from "@/lib/adminErrors";
 
 function Kpi({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
@@ -17,16 +19,8 @@ export default async function AdminOverviewPage() {
   try {
     overview = await getAdminOverview();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return (
-      <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-6 text-[var(--warn)]">
-        Could not load overview: {message}
-        <p className="mt-2 text-sm text-[var(--ink-soft)]">
-          Apply <code>docs/supabase/did_number_pool.sql</code> and{" "}
-          <code>docs/supabase/super_admin_ops.sql</code> if tables/RPCs are missing.
-        </p>
-      </div>
-    );
+    logAdminError("overview", err);
+    return <AdminSetupError />;
   }
 
   return (

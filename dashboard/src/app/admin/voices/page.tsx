@@ -1,4 +1,6 @@
+import { AdminSetupError } from "@/components/AdminSetupError";
 import { AdminVoicesManager } from "@/components/AdminVoicesManager";
+import { logAdminError } from "@/lib/adminErrors";
 import {
   listPlatformSonioxVoicesAdmin,
   type PlatformSonioxVoiceRow,
@@ -10,7 +12,8 @@ export default async function AdminVoicesPage() {
   try {
     voices = await listPlatformSonioxVoicesAdmin();
   } catch (err) {
-    loadError = err instanceof Error ? err.message : String(err);
+    logAdminError("voices", err);
+    loadError = "setup";
   }
 
   return (
@@ -21,13 +24,7 @@ export default async function AdminVoicesPage() {
         </h1>
       </div>
       {loadError ? (
-        <div className="rounded-2xl border border-warn/40 bg-white p-6 text-warn">
-          Could not load voices: {loadError}
-          <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Apply <code>docs/supabase/soniox_voice_id.sql</code> if the table is
-            missing.
-          </p>
-        </div>
+        <AdminSetupError />
       ) : (
         <AdminVoicesManager initialVoices={voices} />
       )}
