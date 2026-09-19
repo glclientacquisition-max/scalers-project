@@ -32,7 +32,11 @@ const { parseGeminiResponse } = require('../src/conversation/toolMarkers');
 const {
   ensureRequiredEscalate,
 } = require('../src/conversation/requiredEscalate');
+const {
+  ensureRequiredCreateRequest,
+} = require('../src/conversation/requiredCreateRequest');
 const { deriveCallSummary } = require('../src/conversation/callSummary');
+const { deriveCallResolution } = require('../src/conversation/callResolution');
 
 const catalog = [
   {
@@ -238,6 +242,58 @@ const scenarios = [
       });
       assert.equal(escalated, true);
       assert.equal(execution.results.find((r) => r.action === 'escalate')?.status, 'succeeded');
+    },
+  },
+  {
+    name: 'Hold slots complete → inject create_service_request if model skips marker',
+    async run() {
+      let state = createBrainState(profile);
+      state.intent = 'hold';
+      state.caller = { name: 'Jane', phone: '', nameConfirmed: true };
+      state.entities = {
+        product: { value: 'The Smart Money Tribe' },
+        name: { value: 'Jane' },
+        when: { value: 'tomorrow 5pm' },
+      };
+      state.goal.missingSlots = [];
+      state.goal.description = 'hold The Smart Money Tribe tomorrow 5pm';
+      state = setNextBestAction(state, {
+        action: 'CREATE_REQUEST',
+        reason: 'Slots are complete.',
+      });
+
+      const injected = ensureRequiredCreateRequest(
+        { spokenText: "I'll put it aside for you.", serviceRequest: null },
+        state,
+        capabilities
+      );
+      assert.equal(injected.serviceRequest.item, 'The Smart Money Tribe');
+      assert.equal(injected.serviceRequest.type, 'hold');
+
+      let saved = null;
+      const execution = await executeBrainTools({
+        parsed: injected,
+        capabilities,
+        productCatalog: catalog,
+        handlers: {
+          createServiceRequest: async (request) => {
+            saved = request;
+            return { id: 'h-inject', request_type: request.type };
+          },
+        },
+      });
+      assert.equal(saved.item, 'The Smart Money Tribe');
+      assert.equal(
+        execution.results.find((r) => r.action === 'create_service_request')?.status,
+        'succeeded'
+      );
+      assert.match(formatToolConfirmation(execution.results, 'en'), /saved/i);
+
+      state.intent = 'hours';
+      state = recordActionResults(state, execution.results);
+      const derived = deriveCallResolution({ brainState: state });
+      assert.equal(derived.primaryIntent, 'hold_or_pickup');
+      assert.equal(derived.resolution, 'resolved');
     },
   },
   {

@@ -125,6 +125,10 @@ const {
   ensureRequiredEscalate,
   formatEscalateActionDirective,
 } = require('./src/conversation/requiredEscalate');
+const {
+  ensureRequiredCreateRequest,
+  formatCreateRequestDirective,
+} = require('./src/conversation/requiredCreateRequest');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
 const callAgentTools = new Map();
@@ -2062,6 +2066,7 @@ mediaWss.on('connection', (ws, req) => {
       formatAuthorityPolicy(capabilities),
       formatBrainStateForPrompt(brainState),
       formatEscalateActionDirective(brainState),
+      formatCreateRequestDirective(brainState),
       formatTargetedProductsForPrompt(turnMatches, {
         totalCatalogSize: catalogSize,
         queryText: clean,
@@ -3659,6 +3664,7 @@ wss.on('connection', (ws) => {
           formatAuthorityPolicy(capabilities),
           formatBrainStateForPrompt(brainState),
           formatEscalateActionDirective(brainState),
+      formatCreateRequestDirective(brainState),
           formatTargetedProductsForPrompt(turnMatches, {
             totalCatalogSize: catalogSize,
             queryText: data.voicePrompt,
@@ -3805,7 +3811,11 @@ async function applyGeminiTools(callSid, parsed) {
     capabilitiesForProfile(callTenantProfiles.get(callSid) || {}, tools);
   const state = callBrainStates.get(callSid) || createBrainState();
   const groundedProfile = callTenantProfiles.get(callSid) || {};
-  const enforcedParsed = ensureRequiredEscalate(parsed, state, capabilities);
+  const enforcedParsed = ensureRequiredEscalate(
+    ensureRequiredCreateRequest(parsed, state, capabilities),
+    state,
+    capabilities
+  );
   const execution = await executeBrainTools({
     parsed: enforcedParsed,
     capabilities,

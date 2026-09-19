@@ -1,7 +1,7 @@
 // Deterministic call summary + intent collection from Brain state (no live audio).
 // Gemini already sees STT text mid-call; post-call we persist structured desk fields.
 
-const { normalizePrimaryIntent } = require('./callResolution');
+const { highWaterPrimaryIntent, normalizePrimaryIntent } = require('./callResolution');
 const {
   entityValue,
   isBackchannelOrFragment,
@@ -42,6 +42,10 @@ function deriveCallSummary(opts = {}) {
       : [];
 
   let primaryIntent =
+    highWaterPrimaryIntent({
+      liveIntent: state.intent || opts.primaryIntent,
+      results,
+    }) ||
     normalizePrimaryIntent(state.intent) ||
     normalizePrimaryIntent(opts.primaryIntent) ||
     null;
