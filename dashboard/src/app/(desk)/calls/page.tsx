@@ -444,7 +444,7 @@ export default async function CallsPage({
           </DeskLandScope>
           </InboxPileSwipe>
 
-          <Pagination>
+          <Pagination
             page={page}
             pageSize={PAGE_SIZE}
             total={total}
