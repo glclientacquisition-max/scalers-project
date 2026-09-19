@@ -11,7 +11,7 @@ import { WalletTopUpButton } from "@/components/WalletTopUpButton";
 import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
-import { pageTitleClass } from "@/components/ui/deskChrome";
+import { deskPreviewCellClass, deskPreviewClass, pageTitleClass } from "@/components/ui/deskChrome";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -191,37 +191,57 @@ export default async function WalletPage() {
         />
       </div>
 
-      <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
-        <h2 className="font-display text-xl tracking-tight text-ink">Recent activity</h2>
+      <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
+        <h2 className="px-4 pt-4 font-display text-xl tracking-tight text-ink">Recent activity</h2>
         {usage.recentLedger.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-soft">
+          <p className="px-4 py-3 text-sm text-ink-soft">
             {usage.isBeta ? "No charges during beta." : "No ledger entries yet."}
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-line">
-            {usage.recentLedger.map((row) => {
-              const credit = row.amount_kes > 0;
-              return (
-                <li key={row.id} className="flex items-baseline justify-between gap-3 py-3 text-sm">
-                  <div className="min-w-0">
-                    <p className="font-medium text-ink">{kindLabel(row.kind)}</p>
-                    <p className="text-xs text-ink-soft">
+          <table className="mt-2 w-full text-left text-sm">
+            <thead className="border-b border-line text-ink-soft">
+              <tr>
+                <th scope="col" className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                  When
+                </th>
+                <th scope="col" className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                  Kind
+                </th>
+                <th
+                  scope="col"
+                  className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-[0.14em]"
+                >
+                  KES
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {usage.recentLedger.map((row) => {
+                const credit = row.amount_kes > 0;
+                return (
+                  <tr key={row.id} className="border-t border-line/70">
+                    <td className="whitespace-nowrap px-4 py-2 text-ink-soft">
                       {new Date(row.created_at).toLocaleString("en-KE")}
-                      {row.note ? ` · ${row.note}` : ""}
-                    </p>
-                  </div>
-                  <p
-                    className={`shrink-0 font-medium ${
-                      credit ? "text-accent-deep" : "text-ink"
-                    }`}
-                  >
-                    {credit ? "+" : ""}
-                    {row.amount_kes.toLocaleString("en-KE")} KES
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+                    </td>
+                    <td className={`${deskPreviewCellClass} px-4 py-2`}>
+                      <p className={deskPreviewClass}>
+                        <span className="font-medium text-ink">{kindLabel(row.kind)}</span>
+                        {row.note ? <span className="text-ink-soft"> · {row.note}</span> : null}
+                      </p>
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-right font-medium tabular-nums ${
+                        credit ? "text-accent-deep" : "text-ink"
+                      }`}
+                    >
+                      {credit ? "+" : ""}
+                      {row.amount_kes.toLocaleString("en-KE")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </section>
     </div>
