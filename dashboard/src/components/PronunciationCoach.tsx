@@ -701,33 +701,21 @@ export function PronunciationCoach({
         {omitLexiconField ? (
           <h3
             id="pronunciation-coach-heading"
-            className="text-sm font-medium text-[var(--ink)]"
+            className="font-display text-xl tracking-tight text-ink"
           >
-            Practice lines
+            Pronunciation
           </h3>
         ) : (
           <h2
             id="pronunciation-coach-heading"
-            className="font-display text-2xl tracking-tight text-[var(--ink)]"
+            className="font-display text-2xl tracking-tight text-ink"
           >
-            Pronunciation Overrides
+            Pronunciation
           </h2>
         )}
         {cleanNote ? (
           <p className="mt-2 text-xs text-[var(--ok)]" role="status">
             {cleanNote}
-          </p>
-        ) : null}
-        {omitLexiconField ? (
-          <p className="mt-1 text-xs text-[var(--ink-soft)]">
-            After you save overrides, hear the full greeting on{" "}
-            <Link
-              href={businessSettingsHref("test")}
-              className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
-            >
-              Test
-            </Link>
-            .
           </p>
         ) : null}
       </div>
@@ -790,7 +778,7 @@ export function PronunciationCoach({
                 <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/35 to-white px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                      {active.label} · say this line
+                      {active.label}
                     </p>
                     {totalFocus ? (
                       <p className="text-xs text-[var(--ink-soft)]">
@@ -1357,7 +1345,7 @@ export function PronunciationCoach({
                 Saved. Next call will use it. Confirm on{" "}
                 <Link
                   href={businessSettingsHref("test")}
-                  className="font-medium underline-offset-2 hover:underline"
+                  className="font-medium text-accent-deep underline-offset-2 hover:underline"
                 >
                   Test
                 </Link>

@@ -31,6 +31,24 @@ describe("home overview craft", () => {
     assert.doesNotMatch(page, /\bOnline\b/);
   });
 
+  it("names Work row 1 Return calls with matching href, CTA, and count", () => {
+    const queues = page.slice(page.indexOf("const queues"), page.indexOf("let ctaHref"));
+    assert.match(queues, /label: copy\.returnCtaMany/);
+    assert.match(queues, /href: callsHref\(\{ purpose: "human" \}\)/);
+    assert.match(queues, /count: work\.toReturn/);
+    assert.doesNotMatch(queues, /label: "Needs you"/);
+    assert.doesNotMatch(queues, /purpose: "needs"/);
+    assert.doesNotMatch(queues, /count: work\.needs/);
+    const note = read("docs/frontend/design-system/pages/home.md");
+    assert.match(note, /Return calls/);
+    assert.match(note, /copy\.returnCtaMany/);
+    const cta = page.slice(page.indexOf("let ctaHref"), page.indexOf("const showCta"));
+    assert.match(cta, /else if \(work\.toReturn > 0\) \{/);
+    assert.match(cta, /callsHref\(\{ purpose: "human" \}\)/);
+    assert.match(cta, /copy\.returnCtaOne/);
+    assert.match(cta, /copy\.returnCtaMany/);
+  });
+
   it("earns desktop width with a Next to return column", () => {
     assert.match(page, /nextReturn/);
     assert.match(page, /Next to return/);
@@ -50,10 +68,12 @@ describe("home overview craft", () => {
     assert.match(page, /KES \{kes\.toLocaleString/);
   });
 
-  it("keeps one blue action and earns the card on desktop only", () => {
+  it("keeps one blue action and shows Next to return on phone", () => {
     assert.match(page, /variant="ghost"/);
     assert.doesNotMatch(page, /variant="primary"/);
     assert.match(page, /hidden rounded-2xl border border-line bg-surface p-4 lg:block/);
+    assert.match(page, /lg:hidden/);
+    assert.match(page, /next-return-phone/);
     assert.match(page, /nextReturn\.callerPhone \|\| nextReturn\.callId/);
   });
 

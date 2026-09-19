@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { deskPreviewCellClass } from "@/components/ui/deskChrome";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
@@ -10,6 +10,7 @@ import { callFromContactHref, inboxFromContactHref } from "@/lib/inboxHref";
 import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
 import { displayContactLastReason } from "@/lib/callSummarySentence";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
+import { ContactTimelineWhat } from "@/components/ContactTimelineWhat";
 
 function kindLabel(kind: "call" | "request" | "appointment"): string {
   if (kind === "request") return "Request";
@@ -147,11 +148,8 @@ export default async function ContactDetailPage({
                           {formatCallWhen(entry.createdAt)}
                         </td>
                         <td className={`${deskRowMutedClass} px-5 py-4 text-ink`}>{kindLabel(entry.kind)}</td>
-                        <td className={`${deskRowMutedClass} ${deskPreviewCellClass} px-5 py-4`}>
-                          <p className={`font-medium text-ink ${deskPreviewClass}`}>{entry.headline}</p>
-                          {entry.detail ? (
-                            <p className={`mt-0.5 text-ink-soft ${deskPreviewClass}`}>{entry.detail}</p>
-                          ) : null}
+                        <td className={`${deskPreviewCellClass} px-5 py-4`}>
+                          <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
                         </td>
                       </tr>
                     ))}

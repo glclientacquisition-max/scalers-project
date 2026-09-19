@@ -131,11 +131,11 @@ export default async function HomeOverviewPage() {
 
   const queues = [
     {
-      id: "needs",
-      label: "Needs you",
+      id: "return",
+      label: copy.returnCtaMany,
       href: callsHref({ purpose: "human" }),
       count: work.toReturn,
-      unit: homeQueueUnit(work.toReturn, copy.returnUnit),
+      unit: "",
     },
     {
       id: "hold",
@@ -254,8 +254,8 @@ export default async function HomeOverviewPage() {
                     <span className={`min-w-0 ${deskPreviewClass}`}>
                       <span className="tabular-nums text-base font-semibold text-ink">
                         {queue.count}
-                      </span>{" "}
-                      {queue.unit}
+                      </span>
+                      {queue.unit ? ` ${queue.unit}` : ""}
                     </span>
                     <svg
                       viewBox="0 0 20 20"
@@ -278,6 +278,51 @@ export default async function HomeOverviewPage() {
           </ul>
 
           {nextReturn && (nextReturn.callerPhone || nextReturn.callId) ? (
+            <>
+            <section
+              id="next-return-phone"
+              aria-labelledby="next-return-heading-phone"
+              className="relative mt-3 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden"
+            >
+              <DeskRowHit
+                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { purpose: "needs" }) : null}
+                label="Conversation"
+              />
+              <div className="flex min-h-12 items-center gap-3 px-4 py-2">
+                <div className="min-w-0 flex-1">
+                  <h2
+                    id="next-return-heading-phone"
+                    className={`${deskRowMutedClass} text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft`}
+                  >
+                    Next to return
+                  </h2>
+                  <p className={`${deskRowMutedClass} mt-0.5 text-sm font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
+                    {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
+                    {nextReturnWhen ? (
+                      <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
+                    ) : null}
+                  </p>
+                  {nextReturnReason ? (
+                    <p className={`${deskRowMutedClass} text-sm text-ink-soft ${deskPreviewClass}`}>
+                      {nextReturnReason}
+                    </p>
+                  ) : null}
+                </div>
+                {nextReturn.callerPhone ? (
+                  <div className={`${deskRowActionClass} shrink-0`}>
+                    <WhatsAppLink
+                      number={nextReturn.callerPhone}
+                      message={followUpWhatsAppMessage({
+                        businessName: business,
+                        name: nextReturn.callerName,
+                        reason: nextReturnReason,
+                      })}
+                      variant="icon"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </section>
             <section
               aria-labelledby="next-return-heading"
               className="relative mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
@@ -318,6 +363,7 @@ export default async function HomeOverviewPage() {
                 </div>
               ) : null}
             </section>
+            </>
           ) : null}
         </section>
 

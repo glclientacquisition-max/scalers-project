@@ -33,7 +33,7 @@ describe("work surface jobs on unified inbox", () => {
   });
 
   it("makes Overview a map into Inbox purposes", () => {
-    assert.match(home, /Needs you/);
+    assert.match(home, /copy.returnCtaMany/);
     assert.match(home, /copy.holdFilter/);
     assert.match(home, /copy.jobFilter/);
     assert.match(home, /homeBriefing/);

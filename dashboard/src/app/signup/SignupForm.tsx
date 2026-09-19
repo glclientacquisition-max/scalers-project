@@ -19,7 +19,7 @@ export function SignupForm() {
         </p>
         <Link
           href="/login"
-          className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-[#005CCC] hover:underline"
+          className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-accent-deep hover:underline"
         >
           Go to sign in
         </Link>
@@ -89,7 +89,6 @@ export function SignupForm() {
           className={`mt-2 ${deskFieldClass}`}
           placeholder="+2547…"
         />
-        <p className="mt-1.5 text-xs text-ink-soft">Lead alerts go here.</p>
       </div>
 
       {state.error ? (

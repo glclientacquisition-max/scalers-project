@@ -4,6 +4,11 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function normalizeForCompare(text) {
   return String(text || "")
@@ -62,5 +67,22 @@ describe("pronunciation recording guardrails", () => {
       }),
       false
     );
+  });
+});
+
+describe("pronunciation coach chrome", () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, "..", "dashboard/src/components/PronunciationCoach.tsx"),
+    "utf8"
+  );
+
+  it("titles the panel Pronunciation with accent-deep links", () => {
+    assert.match(src, />\s*Pronunciation\s*</);
+    assert.doesNotMatch(src, /Pronunciation Overrides/);
+    assert.doesNotMatch(src, /Practice lines/);
+    assert.doesNotMatch(src, /After you save overrides/);
+    assert.doesNotMatch(src, /text-\[var\(--accent\)\]/);
+    assert.match(src, /text-accent-deep/);
+    assert.doesNotMatch(src, /say this line/);
   });
 });
