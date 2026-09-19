@@ -76,7 +76,7 @@ See: `docs/PRODUCTION_CUTOVER.md`, `docs/WEBHOOK_TUNNEL.md` (local).
 
 1. Import repository
 2. **Root Directory:** `dashboard`
-3. Set env vars (see `dashboard/.env.example`)
+3. Set env vars (see `dashboard/.env.example`). Include server `SUPABASE_URL` so `/api/login` does not depend on `NEXT_PUBLIC_*` inlined at build.
 4. Deploy
 
 ### Build command

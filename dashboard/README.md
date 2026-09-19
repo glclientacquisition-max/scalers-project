@@ -138,9 +138,9 @@ Open http://localhost:3000 (or the port Next prints).
 
 | Var | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (browser + server Auth) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (browser Auth) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key for Auth sessions |
-| `SUPABASE_URL` | Same URL (server admin client) |
+| `SUPABASE_URL` | Same URL (server Auth fallback + admin client) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only: Super Admin, DID pool, signup provisioner (never browser) |
 | `GEMINI_API_KEY` | Optional: onboarding prompt compile (local template fallback if unset) |
 | `GEMINI_MODEL` | Optional: defaults to `gemini-3.5-flash-lite` (desk compile; 12s timeout then local fallback) |
