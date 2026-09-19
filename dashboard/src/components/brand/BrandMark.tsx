@@ -49,6 +49,8 @@ type BrandLockupProps = {
   size?: Size;
   className?: string;
   priority?: boolean;
+  /** Icon only. Use in the md+ destination rail. */
+  markOnly?: boolean;
 };
 
 /**
@@ -63,6 +65,7 @@ export function BrandLockup({
   size = "md",
   className = "",
   priority = false,
+  markOnly = false,
 }: BrandLockupProps) {
   const [useFallback, setUseFallback] = useState(false);
   const s = SIZE[size];
@@ -94,6 +97,7 @@ export function BrandLockup({
           />
         )}
       </span>
+      {markOnly ? null : (
       <span className="min-w-0 flex flex-col justify-center gap-0.5">
         <span
           className={[
@@ -116,6 +120,7 @@ export function BrandLockup({
           </span>
         ) : null}
       </span>
+      )}
     </span>
   );
 

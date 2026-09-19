@@ -3,6 +3,7 @@
  * Not Scalers staff alerts. Those go out as Meta utility templates.
  */
 
+import { DeskHint } from "@/components/ui/DeskHint";
 import { btnGhost, btnPrimary, deskHitClass, deskShiftClass } from "@/components/ui/deskChrome";
 
 export function waMeHref(rawNumber: string, message?: string): string | null {
@@ -54,20 +55,22 @@ export function WhatsAppLink({
 
   if (variant === "icon") {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        title="WhatsApp"
-        aria-label={`WhatsApp ${number}`}
-        className={[
-          `${deskHitClass} border border-whatsapp bg-whatsapp text-white`,
-          `${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
-          className,
-        ].join(" ")}
-      >
-        <WhatsAppIcon className="h-5 w-5" />
-      </a>
+      <DeskHint label="WhatsApp" side="top">
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          title="WhatsApp"
+          aria-label={`WhatsApp ${number}`}
+          className={[
+            `${deskHitClass} border border-whatsapp bg-whatsapp text-white`,
+            `${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
+            className,
+          ].join(" ")}
+        >
+          <WhatsAppIcon className="h-5 w-5" />
+        </a>
+      </DeskHint>
     );
   }
 

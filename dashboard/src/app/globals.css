@@ -38,7 +38,7 @@
   --background: var(--bg);
   --foreground: var(--ink);
 
-  /* Desk sticky chrome. Keep settings sticky below the header. Phone tab bar is 0 from md. */
+  /* Desk sticky chrome. Phone header; 0 from md (rail owns destinations). Phone tab bar is 0 from md. */
   --desk-header-h: 3.5rem;
   --desk-tabbar-h: 4rem;
   --desk-tabbar-clearance: calc(var(--desk-tabbar-h) + env(safe-area-inset-bottom, 0px) + 1.5rem);
@@ -195,6 +195,7 @@
 
 @media (min-width: 768px) {
   :root {
+    --desk-header-h: 0px;
     --desk-tabbar-h: 0px;
     --desk-tabbar-clearance: 2.5rem;
   }

@@ -7,6 +7,7 @@ import {
   type PolishCallerNoteState,
   type SendCallerNoteState,
 } from "@/app/(desk)/calls/noteActions";
+import { DeskHint } from "@/components/ui/DeskHint";
 import {
   btnPrimaryFill,
   deskHitClass,
@@ -133,41 +134,45 @@ export function InboxSmsDock({
           className={`min-h-11 max-h-40 w-full resize-none rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink ${deskShiftClass} placeholder:text-ink-soft/70 focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
         />
         {callerPhone ? (
+          <DeskHint label="Polish" side="top">
+            <button
+              type="button"
+              aria-label="Polish"
+              title="Polish"
+              aria-busy={polishPending}
+              disabled={polishPending || sendPending || !note.trim()}
+              className={`${deskHitClass} ${deskShiftClass} text-ink-soft hover:bg-surface-muted hover:text-ink ${focusRingVisible} disabled:opacity-50`}
+              onClick={() => {
+                if (!note.trim() || polishPending || sendPending) return;
+                const fd = new FormData();
+                fd.set("note", note);
+                polishAction(fd);
+              }}
+            >
+              {polishPending ? (
+                <span aria-hidden="true" className={pendingSpinnerInkClass} />
+              ) : (
+                <WandGlyph />
+              )}
+            </button>
+          </DeskHint>
+        ) : null}
+        <DeskHint label="Send" side="top">
           <button
-            type="button"
-            aria-label="Polish"
-            title="Polish"
-            aria-busy={polishPending}
-            disabled={polishPending || sendPending || !note.trim()}
-            className={`${deskHitClass} ${deskShiftClass} text-ink-soft hover:bg-surface-muted hover:text-ink ${focusRingVisible} disabled:opacity-50`}
-            onClick={() => {
-              if (!note.trim() || polishPending || sendPending) return;
-              const fd = new FormData();
-              fd.set("note", note);
-              polishAction(fd);
-            }}
+            type="submit"
+            aria-label="Send"
+            title="Send"
+            aria-busy={sendPending}
+            disabled={sendPending || !canSend}
+            className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl ${btnPrimaryFill} ${deskShiftClass} active:scale-[0.99] motion-reduce:active:scale-100 ${focusRingVisible}`}
           >
-            {polishPending ? (
-              <span aria-hidden="true" className={pendingSpinnerInkClass} />
+            {sendPending ? (
+              <span aria-hidden="true" className={pendingSpinnerClass} />
             ) : (
-              <WandGlyph />
+              <SendGlyph />
             )}
           </button>
-        ) : null}
-        <button
-          type="submit"
-          aria-label="Send"
-          title="Send"
-          aria-busy={sendPending}
-          disabled={sendPending || !canSend}
-          className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl ${btnPrimaryFill} ${deskShiftClass} active:scale-[0.99] motion-reduce:active:scale-100 ${focusRingVisible}`}
-        >
-          {sendPending ? (
-            <span aria-hidden="true" className={pendingSpinnerClass} />
-          ) : (
-            <SendGlyph />
-          )}
-        </button>
+        </DeskHint>
       </form>
       <p className="mt-1.5 text-xs text-ink-soft">WhatsApp uses the icon above.</p>
       {polishState.error ? (

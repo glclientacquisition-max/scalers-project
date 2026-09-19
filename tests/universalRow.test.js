@@ -101,7 +101,7 @@ describe("inbox call action", () => {
     assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
     assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
-    assert.match(read("dashboard/src/components/CallLink.tsx"), /deskHitClass/);
-    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /deskHitClass/);
+    assert.match(call, /DeskHint label="Call"/);
+    assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /DeskHint label="WhatsApp"/);
   });
 });
