@@ -19,7 +19,7 @@ export default async function AdminVoicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-4xl tracking-tight text-[var(--ink)]">
+        <h1 className="font-display text-2xl tracking-tight text-ink">
           Voices
         </h1>
       </div>

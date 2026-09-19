@@ -14,7 +14,7 @@ export default async function AdminWalletsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-3xl tracking-tight">Wallets</h1>
+      <h1 className="font-display text-2xl tracking-tight">Wallets</h1>
       <AdminWalletsPanel {...overview} />
     </div>
   );
