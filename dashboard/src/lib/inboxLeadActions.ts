@@ -58,6 +58,7 @@ export async function inboxToggleRead(item: InboxItem) {
   return writeInboxRead(item.callId, item.unread);
 }
 
+/** Unused by the list dot. Leaves `inbox_read_at` available without a schema revert. */
 export async function inboxMarkSeen(callId: string) {
   const id = String(callId || "").trim();
   if (!id) return { error: "Missing call." };

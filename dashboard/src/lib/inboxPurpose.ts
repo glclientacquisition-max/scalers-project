@@ -148,7 +148,7 @@ export function inboxLastCustomerEventAt(opts: {
   return latest;
 }
 
-/** Unread when a customer event exists after the owner last opened the ticket. */
+/** Mail-style unread vs `inbox_read_at`. Not the list dot; the column is unused. */
 export function inboxIsUnread(opts: {
   lastCustomerEventAt?: string | null;
   inboxReadAt?: string | null;
@@ -655,6 +655,11 @@ export function itemIsArchived(item: InboxItem): boolean {
   return item.lead?.leadStatus === "archived";
 }
 
+/** Same set as `countInboxPurposes(items).needs` and the Inbox nav badge. */
+export function itemInNeedsYouPile(item: InboxItem): boolean {
+  return Boolean(item.needsYou) && !itemIsArchived(item);
+}
+
 export function itemMatchesPurpose(
   item: InboxItem,
   filter: InboxPurposeFilterId
@@ -662,7 +667,7 @@ export function itemMatchesPurpose(
   if (filter === "archived") return itemIsArchived(item);
   if (itemIsArchived(item)) return false;
   if (filter === "all") return true;
-  if (filter === "needs") return item.needsYou;
+  if (filter === "needs") return itemInNeedsYouPile(item);
   if (filter === "hold") {
     return String(item.hold?.status || "").toLowerCase() === "open";
   }
@@ -691,7 +696,7 @@ export function countInboxPurposes(items: InboxItem[]): Record<InboxPurposeFilte
       continue;
     }
     counts.all += 1;
-    if (item.needsYou) counts.needs += 1;
+    if (itemInNeedsYouPile(item)) counts.needs += 1;
     if (itemMatchesPurpose(item, "hold")) counts.hold += 1;
     if (itemMatchesPurpose(item, "job")) counts.job += 1;
     if (item.purpose === "human" || item.purpose === "missed") counts.human += 1;

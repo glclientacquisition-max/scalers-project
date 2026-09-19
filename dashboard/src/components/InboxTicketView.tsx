@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/deskChrome";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
-import { inboxMarkSeen } from "@/lib/inboxLeadActions";
 import { inboxTicketOverflowActions } from "@/lib/inboxListVerbs";
 import {
   placeInboxOverflowMenu,
@@ -311,9 +310,6 @@ export function InboxTicketView({
   const canHoldDone = !archived && String(hold?.status || "").toLowerCase() === "open";
   const dockedAction = canConfirm || canHoldDone || (needsYou && !archived);
 
-  useEffect(() => {
-    void inboxMarkSeen(callId);
-  }, [callId]);
   const identity = (
     <>
       <RowIdentity name={title} />

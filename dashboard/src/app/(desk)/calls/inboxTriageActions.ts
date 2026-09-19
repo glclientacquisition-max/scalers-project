@@ -75,7 +75,7 @@ export async function inboxToggleRead(
   });
 }
 
-/** Opening /calls/[id] stamps last-open. Does not toggle Needs you. */
+/** Unused by the list dot. Leaves `inbox_read_at` available without a schema revert. */
 export async function inboxMarkSeen(callId: string): Promise<InboxTriageResult> {
   return writeInboxTriage(
     callId,

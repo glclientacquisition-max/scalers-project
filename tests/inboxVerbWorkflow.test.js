@@ -213,8 +213,12 @@ function assembleVisible(items, now) {
   return items.filter((item) => !itemIsSnoozed(item, now));
 }
 
-function weightOn(item) {
-  return Boolean(item.unread);
+function itemInNeedsYouPile(item) {
+  return Boolean(item.needsYou) && !itemIsArchived(item);
+}
+
+function rowDotOn(item) {
+  return itemInNeedsYouPile(item);
 }
 
 describe("inbox verb workflows: mark done", () => {
@@ -370,27 +374,26 @@ describe("inbox verb workflows: snooze", () => {
   });
 });
 
-describe("inbox verb workflows: mark unread", () => {
-  it("does not change piles. Weight follows unread, with no Unread filter", () => {
+describe("inbox verb workflows: row dot", () => {
+  it("follows the Needs you pile, not mail unread", () => {
     const open = humanReturn({ unread: false });
-    assert.equal(weightOn(open), false);
+    assert.equal(rowDotOn(open), true);
     assert.equal(open.needsYou, true);
     assert.deepEqual(pilesOf(open), pilesOf(markUnread(open)));
-    const closed = markDone(humanReturn({ unread: false }));
-    assert.equal(weightOn(closed), false);
-    assert.equal(weightOn(markUnread(closed)), true);
+    const closed = markDone(humanReturn({ unread: true }));
+    assert.equal(rowDotOn(closed), false);
+    assert.equal(rowDotOn(archive(humanReturn())), false);
     assert.deepEqual(pilesOf(markUnread(closed)), ["all", "human"]);
   });
 
-  it("unread is last customer event after last open. Opening a ticket stamps inbox_read_at", () => {
+  it("does not stamp inbox_read_at when opening a ticket", () => {
     const purpose = read("dashboard/src/lib/inboxPurpose.ts");
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
-    const actions = read("dashboard/src/app/(desk)/calls/inboxTriageActions.ts");
-    assert.match(purpose, /export function inboxIsUnread/);
-    assert.match(purpose, /unread: inboxIsUnread\(/);
-    assert.match(actions, /export async function inboxMarkSeen/);
-    assert.match(ticket, /inboxMarkSeen\(callId\)/);
+    assert.match(purpose, /export function itemInNeedsYouPile/);
+    assert.doesNotMatch(ticket, /inboxMarkSeen/);
     assert.doesNotMatch(ticket, /Mark unread/);
+    const opened = { ...humanReturn({ unread: true }), unread: false };
+    assert.equal(rowDotOn(opened), true);
   });
 });
 
