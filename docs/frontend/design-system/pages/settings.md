@@ -18,7 +18,7 @@ Line        Tools & voice · Pronunciation · Test
 
 Order is who we are, what we know, how we run, prove the line.
 
-Mobile: list or detail, with Back to Business Profile. Desktop: list beside the open panel.
+Mobile: list or detail. `DeskBack` icon, aria-label Business Profile (`lg:hidden`). Desktop: list beside the open panel.
 
 Sticky Save on Catalog and Train panels. Updates, Alerts, Import, and Test use the same menu without a second compile save.
 

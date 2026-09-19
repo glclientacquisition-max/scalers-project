@@ -1,6 +1,13 @@
 import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
-export type InboxListActionId = "archive" | "unarchive";
+export type InboxListActionId =
+  | "pin"
+  | "unpin"
+  | "mark_done"
+  | "confirm"
+  | "done"
+  | "archive"
+  | "unarchive";
 
 export type InboxListAction = {
   id: InboxListActionId;
@@ -8,7 +15,7 @@ export type InboxListAction = {
   divide?: boolean;
 };
 
-export type InboxBulkSharedAction = "confirm" | "done";
+export type InboxBulkSharedAction = "confirm" | "done" | "mark_done";
 export type InboxBulkLeaveAction = "archive" | "unarchive";
 
 /** Confirm is only valid on a requested appointment row. */
@@ -23,10 +30,27 @@ export function inboxCanHoldDone(item: InboxItem): boolean {
   return String(item.hold?.status || "").toLowerCase() === "open";
 }
 
-/** Overflow is Archive, or Unarchive on Archived. Other list verbs stay off. */
+/**
+ * Return-call close. Confirm owns visits. Hold Done owns holds.
+ * Answered and live rows are already off that job.
+ */
+export function inboxCanMarkDone(item: InboxItem): boolean {
+  if (itemIsArchived(item)) return false;
+  if (item.job || item.hold) return false;
+  if (item.purpose !== "human" && item.purpose !== "missed") return false;
+  return String(item.lead?.leadStatus || "").toLowerCase() !== "resolved";
+}
+
+/** md+ overflow: Pin, Mark done when eligible, Archive or Unarchive. No Select. */
 export function inboxOverflowActions(item: InboxItem): InboxListAction[] {
-  if (itemIsArchived(item)) return [{ id: "unarchive", label: "Unarchive" }];
-  return [{ id: "archive", label: "Archive" }];
+  const stay: InboxListAction[] = [
+    item.pinnedAt ? { id: "unpin", label: "Unpin" } : { id: "pin", label: "Pin" },
+  ];
+  if (inboxCanMarkDone(item)) stay.push({ id: "mark_done", label: "Mark done" });
+  const leave: InboxListAction = itemIsArchived(item)
+    ? { id: "unarchive", label: "Unarchive", divide: true }
+    : { id: "archive", label: "Archive", divide: true };
+  return [...stay, leave];
 }
 
 /** Unarchive only when every selected row is already archived. */
@@ -37,12 +61,26 @@ export function inboxBulkLeaveAction(items: InboxItem[]): InboxBulkLeaveAction |
   return "archive";
 }
 
-/** Confirm or Done on the bulk bar only when every selected row shares that same valid action. */
+/** Confirm, Hold Done, or Mark done only when every selected row shares that same valid action. */
 export function inboxBulkSharedAction(
   items: InboxItem[]
 ): InboxBulkSharedAction | null {
   if (!items.length) return null;
   if (items.every(inboxCanConfirm)) return "confirm";
   if (items.every(inboxCanHoldDone)) return "done";
+  if (items.every(inboxCanMarkDone)) return "mark_done";
   return null;
+}
+
+/** Header select bar: only verbs true for every selected row. */
+export function inboxBulkActions(items: InboxItem[]): InboxListAction[] {
+  if (!items.length) return [];
+  const out: InboxListAction[] = [];
+  const leave = inboxBulkLeaveAction(items);
+  if (leave === "archive") out.push({ id: "archive", label: "Archive" });
+  if (leave === "unarchive") out.push({ id: "unarchive", label: "Unarchive" });
+  if (items.every(inboxCanConfirm)) out.push({ id: "confirm", label: "Confirm" });
+  if (items.every(inboxCanHoldDone)) out.push({ id: "done", label: "Hold Done" });
+  if (items.every(inboxCanMarkDone)) out.push({ id: "mark_done", label: "Mark done" });
+  return out;
 }

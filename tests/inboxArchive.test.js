@@ -38,9 +38,18 @@ function itemIsArchived(row) {
   return row.lead?.leadStatus === "archived";
 }
 
+function inboxCanMarkDone(row) {
+  if (itemIsArchived(row)) return false;
+  if (row.job || row.hold) return false;
+  if (row.purpose !== "human" && row.purpose !== "missed") return false;
+  return String(row.lead?.leadStatus || "").toLowerCase() !== "resolved";
+}
+
 function inboxOverflowActions(row) {
-  if (itemIsArchived(row)) return [{ id: "unarchive", label: "Unarchive" }];
-  return [{ id: "archive", label: "Archive" }];
+  const stay = [row.pinnedAt ? { id: "unpin", label: "Unpin" } : { id: "pin", label: "Pin" }];
+  if (inboxCanMarkDone(row)) stay.push({ id: "mark_done", label: "Mark done" });
+  if (itemIsArchived(row)) return [...stay, { id: "unarchive", label: "Unarchive" }];
+  return [...stay, { id: "archive", label: "Archive" }];
 }
 
 function inboxBulkLeaveAction(items) {
@@ -70,21 +79,20 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(verbs, /label: "Unarchive"/);
     assert.deepEqual(
       inboxOverflowActions(item({ lead: { leadStatus: "new" } })).map((verb) => verb.id),
-      ["archive"]
+      ["pin", "mark_done", "archive"]
     );
     assert.deepEqual(
       inboxOverflowActions(item({ lead: { leadStatus: "archived" } })).map((verb) => verb.id),
-      ["unarchive"]
+      ["pin", "unarchive"]
     );
   });
 
   it("bulk Archives live rows and Unarchives when every selected row is archived", () => {
     assert.match(verbs, /export function inboxBulkLeaveAction/);
-    assert.match(select, /inboxBulkLeaveAction\(chosen\)/);
+    assert.match(select, /inboxBulkActions\(chosen\)/);
     assert.match(select, /inboxUnarchive\(item\)/);
     assert.match(select, /kind === "unarchive"/);
-    assert.match(select, /aria-label="Unarchive"/);
-    assert.match(select, />\s*Unarchive\s*</);
+    assert.match(select, /aria-label=\{action\.label\}/);
     const live = [item({ id: "a" }), item({ id: "b" })];
     const archived = [
       item({ id: "a", lead: { leadStatus: "archived" } }),

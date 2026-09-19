@@ -17,6 +17,6 @@
 
 **SMS dock:** Shown when `needsYou` and the call is not archived. Growing input, muted Polish wand, plus Send. Wand rewrites the current draft in the field. Empty draft stays empty. Wand hides when the dock hides (archived or no number). Send stays the filled primary. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm or Done. WhatsApp stays on the header icon. Spans the viewport under the split so Send stays docked at the bottom.
 
-**Back:** `DeskBack`, 44px. Label is Inbox.
+**Back:** `DeskBack`, icon-only chevron, 44px muted ghost. `aria-label` / `title` is Inbox. Sits in the header row with the contact, not on its own text row.
 
 **One recording.** A single `CallRecording` in the summary pane.

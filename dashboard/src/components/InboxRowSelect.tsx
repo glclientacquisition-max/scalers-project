@@ -6,22 +6,21 @@ import { useState, type ReactNode } from "react";
 import { useInboxRowUi } from "@/components/InboxRowUi";
 import { DeskRowHit, deskRowActionClass, deskRowHitClass } from "@/components/ui/deskRowHit";
 import {
-  btnDock,
   btnGhost,
   btnPrimary,
   deskHitClass,
   deskShiftClass,
   focusRingVisible,
-  pendingSpinnerClass,
 } from "@/components/ui/deskChrome";
 import {
   inboxArchive,
   inboxConfirm,
   inboxHoldDone,
+  inboxMarkDone,
   inboxUnarchive,
 } from "@/lib/inboxLeadActions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
-import { inboxBulkLeaveAction, inboxBulkSharedAction } from "@/lib/inboxListVerbs";
+import { inboxBulkActions, type InboxListActionId } from "@/lib/inboxListVerbs";
 import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
 const iconHit = [
@@ -31,44 +30,15 @@ const iconHit = [
   "text-ink-soft hover:bg-surface-muted hover:text-ink disabled:opacity-50",
 ].join(" ");
 
-function BackGlyph() {
+function CloseGlyph() {
   return (
     <svg viewBox="0 0 16 16" className="h-5 w-5" fill="none" aria-hidden="true">
       <path
-        d="M10.2 3.2 5.4 8l4.8 4.8"
+        d="M4 4l8 8M12 4l-8 8"
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
-    </svg>
-  );
-}
-
-function ArchiveGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
-      <path
-        d="M2.5 5.2h11v7.3c0 .6-.5 1.1-1.1 1.1H3.6c-.6 0-1.1-.5-1.1-1.1z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path d="M2.2 3.4h11.6v1.8H2.2z" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M8 7.2v3.4M6.3 9.1 8 10.8l1.7-1.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function UnarchiveGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
-      <path
-        d="M2.5 5.2h11v7.3c0 .6-.5 1.1-1.1 1.1H3.6c-.6 0-1.1-.5-1.1-1.1z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path d="M2.2 3.4h11.6v1.8H2.2z" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M8 10.8V7.4M6.3 8.9 8 7.2l1.7 1.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -175,13 +145,11 @@ export function InboxSelectChrome({
   const ui = useInboxRowUi();
   return (
     <>
-      <div className={ui?.selecting ? "max-md:hidden" : undefined}>{children}</div>
+      <div className={ui?.selecting ? "hidden" : undefined}>{children}</div>
       <InboxBulkBar items={items} />
     </>
   );
 }
-
-type BulkKind = "confirm" | "done" | "archive" | "unarchive";
 
 export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const ui = useInboxRowUi();
@@ -192,10 +160,10 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
 
   const { selected, patch, clear } = ui;
   const chosen = items.filter((item) => selected.includes(item.id));
-  const shared = inboxBulkSharedAction(chosen);
-  const leave = inboxBulkLeaveAction(chosen);
+  const actions = inboxBulkActions(chosen);
 
-  async function run(kind: BulkKind) {
+  async function run(kind: InboxListActionId) {
+    if (kind === "pin" || kind === "unpin") return;
     setBusy(true);
     setError(null);
     const archivedRows: { id: string; callId: string }[] = [];
@@ -206,6 +174,9 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       if (kind === "done" && String(item.hold?.status || "").toLowerCase() !== "open") {
         continue;
       }
+      if (kind === "mark_done" && (item.job || item.hold || itemIsArchived(item))) {
+        continue;
+      }
       if (kind === "archive" && itemIsArchived(item)) continue;
       if (kind === "unarchive" && !itemIsArchived(item)) continue;
       const res =
@@ -213,9 +184,11 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
           ? await inboxConfirm(item)
           : kind === "done"
             ? await inboxHoldDone(item)
-            : kind === "unarchive"
-              ? await inboxUnarchive(item)
-              : await inboxArchive(item);
+            : kind === "mark_done"
+              ? await inboxMarkDone(item)
+              : kind === "unarchive"
+                ? await inboxUnarchive(item)
+                : await inboxArchive(item);
       if (res.error) {
         if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
         setError(res.error);
@@ -230,73 +203,39 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       }
     }
     if (archivedRows.length) writeInboxArchiveUndo(archivedRows);
-    if (kind === "done" || kind === "archive" || kind === "unarchive" || kind === "confirm") clear();
+    if (kind === "done" || kind === "archive" || kind === "unarchive" || kind === "confirm" || kind === "mark_done") {
+      clear();
+    }
     setBusy(false);
     router.refresh();
   }
 
-  const errorLine = error ? (
-    <p className="w-full text-xs text-warn" role="alert">
-      {error}
-    </p>
-  ) : null;
-
-  const sharedVerb =
-    shared === "confirm" ? (
-      <button type="button" className={btnDock} disabled={busy} aria-label="Confirm" onClick={() => run("confirm")}>
-        {busy ? <span aria-hidden="true" className={pendingSpinnerClass} /> : "Confirm"}
-      </button>
-    ) : shared === "done" ? (
-      <button type="button" className={btnDock} disabled={busy} aria-label="Done" onClick={() => run("done")}>
-        {busy ? <span aria-hidden="true" className={pendingSpinnerClass} /> : "Done"}
-      </button>
-    ) : null;
-
   return (
-    <>
-      <div className="sticky top-[var(--desk-header-h)] z-20 -mx-4 mt-0 flex min-h-12 items-center gap-1 border-b border-line bg-surface px-2 md:hidden">
-        <button type="button" className={iconHit} disabled={busy} aria-label="Back" onClick={() => clear()}>
-          <BackGlyph />
-        </button>
-        <p className="mr-auto min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
-        {leave === "unarchive" ? (
-          <button type="button" className={iconHit} disabled={busy} aria-label="Unarchive" onClick={() => run("unarchive")}>
-            <UnarchiveGlyph />
+    <div className="sticky top-[var(--desk-header-h)] z-20 -mx-4 mt-0 flex min-h-12 flex-wrap items-center gap-1 border-b border-line bg-surface px-2 sm:-mx-6">
+      <button type="button" className={iconHit} disabled={busy} aria-label="Close" onClick={() => clear()}>
+        <CloseGlyph />
+      </button>
+      <p className="mr-auto min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
+      {actions.map((action) => {
+        const filled = action.id === "confirm" || action.id === "done";
+        return (
+          <button
+            key={action.id}
+            type="button"
+            className={filled ? btnPrimary : btnGhost}
+            disabled={busy}
+            aria-label={action.label}
+            onClick={() => run(action.id)}
+          >
+            {busy ? "Saving" : action.label}
           </button>
-        ) : leave === "archive" ? (
-          <button type="button" className={iconHit} disabled={busy} aria-label="Archive" onClick={() => run("archive")}>
-            <ArchiveGlyph />
-          </button>
-        ) : null}
-        {sharedVerb}
-        {errorLine}
-      </div>
-      <div className="sticky top-[var(--desk-header-h)] z-20 mt-6 hidden min-h-11 flex-wrap items-center gap-2 border border-line bg-surface px-3 py-2 md:flex md:static md:rounded-xl">
-        <p className="mr-auto text-sm font-medium text-ink">{chosen.length} selected</p>
-        {shared === "confirm" ? (
-          <button type="button" className={btnPrimary} disabled={busy} onClick={() => run("confirm")}>
-            {busy ? "Saving" : "Confirm"}
-          </button>
-        ) : null}
-        {shared === "done" ? (
-          <button type="button" className={btnPrimary} disabled={busy} onClick={() => run("done")}>
-            {busy ? "Saving" : "Done"}
-          </button>
-        ) : null}
-        {leave === "unarchive" ? (
-          <button type="button" className={btnGhost} disabled={busy} onClick={() => run("unarchive")}>
-            Unarchive
-          </button>
-        ) : leave === "archive" ? (
-          <button type="button" className={btnGhost} disabled={busy} onClick={() => run("archive")}>
-            Archive
-          </button>
-        ) : null}
-        <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>
-          Cancel
-        </button>
-        {errorLine}
-      </div>
-    </>
+        );
+      })}
+      {error ? (
+        <p className="w-full text-xs text-warn" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
