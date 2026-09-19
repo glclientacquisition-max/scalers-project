@@ -55,8 +55,16 @@ export default function LoginPage({
 
         <p className="mt-6 text-sm text-ink-soft">
           New business?{" "}
-          <Link href="/signup" className="font-medium text-[#005CCC] hover:underline">
+          <Link href="/signup" className="font-medium text-accent-deep hover:underline">
             Create a workspace
+          </Link>
+        </p>
+        <p className="mt-3">
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center text-sm text-ink-soft hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Scalers home
           </Link>
         </p>
       </div>
