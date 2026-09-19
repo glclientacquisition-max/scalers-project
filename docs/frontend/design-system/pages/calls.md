@@ -38,11 +38,11 @@ Stamp matches the verb on that row. **Confirm visit** only when an appointments 
 
 Filters: Needs you / All / Visits or Bookings / Holds or niche hold label / Human / Answered. That six-item row is `InboxFilterPills`: self-contained rounded chips, count inside the chip, horizontal scroll-snap, trailing fade. Selected is a filled chip, not an underline. List / Work and Today / Week stay underline `FilterTabs`. Archived is not a chip.
 
-**Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). List is the Inbox table: requested and confirmed, newest first. Confirm lives on List. Work is confirmed only, by clock. Work's verb is Done.
+**Visit sort:** When Visits is isolated, List / Work is a second `FilterTabs` row (underline, not filled). List is the Inbox table: requested and confirmed, newest first. Confirmed visits whose week has already ended pin at the top of List, oldest slot first. Confirm lives on List. Work is confirmed only, by clock. Work's verb is Done.
 
-**Work date:** Today / Week appears only under Work. Today is this EAT day by clock, with the day heading and slot time. Confirmed slots for that day sit here. Requested visits stay on List until Confirm. Week is the same confirmed book by day. Phone shows only days with work. Desktop keeps the seven-day grid. Prev / Next moves the day or week. Holds stay on Holds. Done and cancelled stay off this book.
+**Work date:** Today / Week appears only under Work. Today is this EAT day by clock, with the day heading and slot time. Confirmed slots for that day sit here. Requested visits stay on List until Confirm. Week is the same confirmed book by day. A past day this week still sits on that weekday. Last week's open confirmed visits sit on List, not on Today. Phone shows only days with work. Desktop keeps the seven-day grid. Prev / Next moves the day or week. Holds stay on Holds. Done and cancelled stay off this book.
 
-**Hold sort:** When Holds is isolated, List / Work is a second `FilterTabs` row. List is newest open holds. Pickup, order, and enquiry sit together. Anytime stays on List. Work is timed pickups only, this EAT day by clock. You Done there. No week grid.
+**Hold sort:** When Holds is isolated, List / Work is a second `FilterTabs` row. List is newest open holds. Pickup, order, and enquiry sit together. Anytime stays on List. Timed open holds whose day has already ended pin at the top of List, oldest slot first. Work is timed pickups for this EAT day only. You Done there. No week grid.
 
 **Bar order (owner characters):**
 - **08:00 owner:** Needs you first. What still needs a decision.

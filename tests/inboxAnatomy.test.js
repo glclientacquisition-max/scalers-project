@@ -71,6 +71,8 @@ describe("inbox outside and inside anatomy", () => {
     assert.doesNotMatch(calls, /Confirm lives on List and on Work/);
     assert.doesNotMatch(calls, /Requested slots for that day sit here/);
     assert.match(calls, /Anytime stays on List/);
+    assert.match(calls, /whose week has already ended pin at the top of List/);
+    assert.match(calls, /whose day has already ended pin at the top of List/);
     assert.match(sheet, /export function visitWorkItems/);
     assert.match(holds, /export function holdWorkItems/);
   });

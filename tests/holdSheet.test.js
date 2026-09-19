@@ -52,4 +52,16 @@ describe("desk hold board", () => {
     assert.match(holdBlock, /label: "Work"/);
     assert.doesNotMatch(holdBlock, /label: "Week"/);
   });
+
+  it("pins timed holds from a past day at the top of List", () => {
+    const now = new Date(Date.UTC(2026, 8, 19, 5, 0, 0));
+    assert.equal(visitDayKey({ when_text: "tomorrow at 6 PM" }, now) < eatYmd(now), false);
+    assert.equal(visitDayKey({ when_text: "Anytime" }, now), null);
+    const sheet = read("dashboard/src/lib/holdSheet.ts");
+    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    assert.match(sheet, /export function isHoldListLeftover/);
+    assert.match(sheet, /eatYmd\(instant\) < eatYmd\(now\)/);
+    assert.match(sheet, /export function orderHoldList/);
+    assert.match(page, /orderHoldList\(filtered\)/);
+  });
 });

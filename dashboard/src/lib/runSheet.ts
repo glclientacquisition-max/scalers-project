@@ -5,6 +5,7 @@ import { itemIsArchived } from "@/lib/inboxPurpose";
 import {
   eatYmd,
   groupVisitsForWeek,
+  mondayYmd,
   visitInstant,
   type CalendarVisit,
 } from "@/lib/visitCalendar";
@@ -93,6 +94,28 @@ export function visitBoardForDay(
     return ta - tb;
   });
   return rows;
+}
+
+export function isVisitListLeftover(item: InboxItem, now = new Date()): boolean {
+  if (!isVisitWorkJob(item.job)) return false;
+  const instant = visitBoardInstant(item, now);
+  if (!instant) return false;
+  return eatYmd(instant) < mondayYmd(now);
+}
+
+export function orderVisitList(items: InboxItem[], now = new Date()): InboxItem[] {
+  return [...(items || [])].sort((a, b) => {
+    const aLeft = isVisitListLeftover(a, now);
+    const bLeft = isVisitListLeftover(b, now);
+    if (aLeft && !bLeft) return -1;
+    if (!aLeft && bLeft) return 1;
+    if (aLeft && bLeft) {
+      const ta = visitBoardInstant(a, now)?.getTime() || 0;
+      const tb = visitBoardInstant(b, now)?.getTime() || 0;
+      if (ta !== tb) return ta - tb;
+    }
+    return 0;
+  });
 }
 
 export function formatSlotClock(item: InboxItem, now = new Date()): string {

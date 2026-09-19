@@ -49,6 +49,27 @@ export function holdBoardForDay(
   return rows;
 }
 
+export function isHoldListLeftover(item: InboxItem, now = new Date()): boolean {
+  const instant = holdBoardInstant(item, now);
+  if (!instant) return false;
+  return eatYmd(instant) < eatYmd(now);
+}
+
+export function orderHoldList(items: InboxItem[], now = new Date()): InboxItem[] {
+  return [...(items || [])].sort((a, b) => {
+    const aLeft = isHoldListLeftover(a, now);
+    const bLeft = isHoldListLeftover(b, now);
+    if (aLeft && !bLeft) return -1;
+    if (!aLeft && bLeft) return 1;
+    if (aLeft && bLeft) {
+      const ta = holdBoardInstant(a, now)?.getTime() || 0;
+      const tb = holdBoardInstant(b, now)?.getTime() || 0;
+      if (ta !== tb) return ta - tb;
+    }
+    return 0;
+  });
+}
+
 export function formatHoldClock(item: InboxItem, now = new Date()): string {
   const text = String(item.hold?.when_text || "").trim();
   if (text) return text;
