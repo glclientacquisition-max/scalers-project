@@ -137,7 +137,7 @@ describe('notify events', () => {
         reason: 'Book carpet cleaning',
         primary_intent: 'book_visit',
         brain_summary: 'Intent: book_visit. Caller: Jane. Goal: carpet cleaning tomorrow.',
-        resolution_note: 'Visit request saved',
+        resolution_note: 'Visit request saved — confirm on desk.',
         recording_url: 'https://example.com/rec.mp3',
       },
       'Done and Dusted Cleaning Services'

@@ -6,6 +6,7 @@ import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { renderDeskCallerText } from "@/lib/callerSms";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
+import { stampScheduleWindows } from "@/lib/visitCalendar";
 
 export type AppointmentStatusState = {
   error?: string;
@@ -111,10 +112,13 @@ export async function updateAppointmentSchedule(
     .eq("tenant_id", tenant.id)
     .maybeSingle();
 
+  const windows = stampScheduleWindows(whenText);
   const { data: row, error } = await workspace.client
     .from("appointments")
     .update({
-      when_text: whenText,
+      when_text: windows.when_text,
+      window_start: windows.window_start,
+      window_end: windows.window_end,
       address_landmark: landmark || null,
       updated_at: new Date().toISOString(),
     })

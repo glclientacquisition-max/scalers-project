@@ -92,7 +92,7 @@ function buildSummarySentence(opts) {
     Boolean(opts.name && reason.toLowerCase().startsWith(opts.name.toLowerCase()));
   const complete =
     reason.length >= 40 ||
-    /\b(left a hold|booked a visit|updated a visit|needs you|asked about|called to|called in)\b/i.test(
+    /\b(left a hold|visit request saved|booked a visit|updated a visit|confirmed a visit|needs you|asked about|called to|called in)\b/i.test(
       reason
     );
   if (named || complete) {

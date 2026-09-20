@@ -6,6 +6,7 @@ import { ownerSaveFailed } from "@/lib/ownerFacingError";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { renderDeskCallerText } from "@/lib/callerSms";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
+import { stampScheduleWindows } from "@/lib/visitCalendar";
 
 export type RequestStatusState = {
   error?: string;
@@ -104,16 +105,34 @@ export async function updateServiceRequestSchedule(
     .eq("tenant_id", tenant.id)
     .maybeSingle();
 
-  const { data: row, error } = await workspace.client
+  const windows = stampScheduleWindows(whenText);
+  const schedulePatch = {
+    when_text: windows.when_text,
+    window_start: windows.window_start,
+    window_end: windows.window_end,
+    updated_at: new Date().toISOString(),
+  };
+
+  let { data: row, error } = await workspace.client
     .from("service_requests")
-    .update({
-      when_text: whenText,
-      updated_at: new Date().toISOString(),
-    })
+    .update(schedulePatch)
     .eq("id", id)
     .eq("tenant_id", tenant.id)
     .select("caller_phone, caller_name, item, request_type, when_text, call_id")
     .maybeSingle();
+
+  if (error && /window_start|window_end|column/i.test(error.message || "")) {
+    ({ data: row, error } = await workspace.client
+      .from("service_requests")
+      .update({
+        when_text: windows.when_text,
+        updated_at: schedulePatch.updated_at,
+      })
+      .eq("id", id)
+      .eq("tenant_id", tenant.id)
+      .select("caller_phone, caller_name, item, request_type, when_text, call_id")
+      .maybeSingle());
+  }
 
   if (error) {
     return ownerSaveFailed("request", error.message, "Could not save request.");

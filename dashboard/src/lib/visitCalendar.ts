@@ -86,6 +86,29 @@ export function parseWeekParam(raw: string | undefined, now = new Date()): strin
   return mondayYmd(now);
 }
 
+export function stampScheduleWindows(
+  whenText: string,
+  now = new Date()
+): { when_text: string; window_start: string | null; window_end: string | null } {
+  const text = String(whenText || "").trim();
+  const instant = visitInstant(
+    {
+      id: "stamp",
+      status: "requested",
+      service_name: "",
+      when_text: text,
+      window_start: null,
+      window_end: null,
+    },
+    now
+  );
+  if (!instant || Number.isNaN(instant.getTime())) {
+    return { when_text: text, window_start: null, window_end: null };
+  }
+  const iso = instant.toISOString();
+  return { when_text: text, window_start: iso, window_end: iso };
+}
+
 export function visitInstant(visit: CalendarVisit, now: Date): Date | null {
   if (visit.window_start) {
     const parsed = Date.parse(visit.window_start);

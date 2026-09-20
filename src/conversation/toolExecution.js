@@ -343,10 +343,14 @@ function validateEscalation(raw, { agentName = '', businessName = '', knownNames
 }
 
 function stampVisitWindow(value, hours) {
-  if (value.windowStart) return value;
   const instant = hours?.resolved?.instant;
   if (!instant || Number.isNaN(instant.getTime())) return value;
-  return { ...value, windowStart: instant.toISOString() };
+  const iso = instant.toISOString();
+  return {
+    ...value,
+    windowStart: value.windowStart || iso,
+    windowEnd: value.windowEnd || iso,
+  };
 }
 
 function visitTimeGate(whenText, { hoursSchedule = null, now = new Date() } = {}) {
@@ -557,6 +561,7 @@ async function executeBrainTools({
             identity,
             id: updated.id || priorHold.id,
             requestType: updated.request_type || validation.value.type,
+            requestStatus: updated.status || 'open',
             value: validation.value,
             record: updated,
           });
@@ -606,6 +611,7 @@ async function executeBrainTools({
                 identity,
                 id: created.id || null,
                 requestType: created.request_type || validation.value.type,
+                requestStatus: created.status || 'open',
                 value: validation.value,
                 record: created,
               }
@@ -671,6 +677,7 @@ async function executeBrainTools({
                 status: 'succeeded',
                 fingerprint,
                 id: created.id || null,
+                appointmentStatus: created.status || 'requested',
                 value: validation.value,
                 hours: validation.hours || null,
                 record: created,
@@ -982,7 +989,7 @@ function formatToolConfirmation(results = [], language = 'en') {
         if (sheng) {
           return 'Niambie jina, service, when, na landmark ndio ni-save visit.';
         }
-        return 'Tell me your name, the service, when, and a landmark so I can book the visit.';
+        return 'Tell me your name, the service, when, and a landmark so I can save the visit request.';
       }
       if (missing.includes('name') || missing.includes('service')) {
         if (sw) return 'Niambie jina lako na huduma unayohitaji.';
@@ -991,7 +998,7 @@ function formatToolConfirmation(results = [], language = 'en') {
       }
       if (sw) return 'Nahitaji kidogo zaidi kabla nihifadhi ziara.';
       if (sheng) return 'Nahitaji detail kidogo kabla ni-save visit.';
-      return 'I need a bit more detail before I can book that visit.';
+      return 'I need a bit more detail before I can save that visit request.';
     }
     if (sw) return 'Sijaweza kuhifadhi ziara sasa hivi.';
     if (sheng) return 'Sijaweza ku-save hiyo visit saa hii.';

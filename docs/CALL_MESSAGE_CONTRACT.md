@@ -203,7 +203,7 @@ Name: Jane
 Phone: +254790381872
 Reason: Book carpet cleaning
 Intent: book_visit
-Outcome: Visit request saved
+Outcome: Visit request saved — confirm on desk.
 Recording: https://…
 Open call: https://scalers-project.vercel.app/calls/{call_id}
 ```

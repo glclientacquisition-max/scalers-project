@@ -6,6 +6,7 @@ const {
   shiftWeekYmd,
   weekDayKeys,
   visitDayKey,
+  stampScheduleWindows,
   groupVisitsByDay,
   formatOpenVisitsForPrompt,
 } = require('../src/conversation/visitCalendar');
@@ -64,6 +65,21 @@ describe('visit calendar', () => {
     assert.match(block, /Carpet cleaning/);
     assert.match(block, /Same-hour visits are allowed/);
     assert.doesNotMatch(block, /Sofa/);
+  });
+
+  it('stamps when_text with matching window_start and window_end', () => {
+    const now = eat(2026, 9, 9, 11, 0);
+    const stamped = stampScheduleWindows('tomorrow at 10 AM', now);
+    assert.equal(stamped.when_text, 'tomorrow at 10 AM');
+    assert.equal(stamped.window_start, eat(2026, 9, 10, 10, 0).toISOString());
+    assert.equal(stamped.window_end, stamped.window_start);
+  });
+
+  it('clears stale windows when When text cannot be parsed', () => {
+    const stamped = stampScheduleWindows('Anytime', eat(2026, 9, 9, 11, 0));
+    assert.equal(stamped.when_text, 'Anytime');
+    assert.equal(stamped.window_start, null);
+    assert.equal(stamped.window_end, null);
   });
 
   it('flags same-hour open visits without treating them as a lock', () => {

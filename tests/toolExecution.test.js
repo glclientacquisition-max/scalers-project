@@ -582,7 +582,10 @@ describe('validated tool execution', () => {
       },
     });
     assert.equal(payloads.length, 1);
+    assert.ok(payloads[0].windowStart);
+    assert.equal(payloads[0].windowEnd, payloads[0].windowStart);
     assert.equal(execution.results[0].status, 'succeeded');
+    assert.equal(execution.results[0].appointmentStatus, 'requested');
     assert.equal(execution.results[0].record.status, 'requested');
     const spoken = formatToolConfirmation(execution.results, 'en');
     assert.match(spoken, /saved your visit request/i);

@@ -156,4 +156,17 @@ describe("inbox outside and inside anatomy", () => {
     assert.match(contract, /caller_hold_cancelled/);
     assert.match(contract, /Owner taps Done/);
   });
+
+  it("When+Save writes when_text with window_start and window_end", () => {
+    const visit = read("dashboard/src/app/(desk)/appointments/actions.ts");
+    const hold = read("dashboard/src/app/(desk)/requests/actions.ts");
+    const visitFn = visit.slice(visit.indexOf("export async function updateAppointmentSchedule"));
+    const holdFn = hold.slice(hold.indexOf("export async function updateServiceRequestSchedule"));
+    assert.match(visitFn, /stampScheduleWindows/);
+    assert.match(visitFn, /window_start: windows\.window_start/);
+    assert.match(visitFn, /window_end: windows\.window_end/);
+    assert.match(holdFn, /stampScheduleWindows/);
+    assert.match(holdFn, /window_start: windows\.window_start/);
+    assert.match(holdFn, /window_end: windows\.window_end/);
+  });
 });

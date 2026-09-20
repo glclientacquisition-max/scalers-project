@@ -62,6 +62,21 @@ function visitInstant(visit, now = new Date()) {
   return resolved.ok ? resolved.instant : null;
 }
 
+/**
+ * Desk When+Save: stamp when_text and calendar windows together.
+ * Ignores any prior window_start so Today/Week cannot keep a stale instant.
+ * Unparsed text clears both windows.
+ */
+function stampScheduleWindows(whenText, now = new Date()) {
+  const text = String(whenText || '').trim();
+  const instant = visitInstant({ when_text: text, window_start: null }, now);
+  if (!instant || Number.isNaN(instant.getTime())) {
+    return { when_text: text, window_start: null, window_end: null };
+  }
+  const iso = instant.toISOString();
+  return { when_text: text, window_start: iso, window_end: iso };
+}
+
 function visitDayKey(visit, now = new Date()) {
   const instant = visitInstant(visit, now);
   return instant ? eatYmd(instant) : null;
@@ -157,6 +172,7 @@ module.exports = {
   shiftWeekYmd,
   weekDayKeys,
   visitInstant,
+  stampScheduleWindows,
   visitDayKey,
   visitOverlapsOpen,
   groupVisitsByDay,
