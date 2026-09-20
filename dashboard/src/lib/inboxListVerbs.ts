@@ -41,11 +41,37 @@ export function inboxCanMarkDone(item: InboxItem): boolean {
   return String(item.lead?.leadStatus || "").toLowerCase() !== "resolved";
 }
 
-/** Ticket ⋮: Archive or Unarchive only. Pin stays a list verb. */
-export function inboxTicketOverflowActions(archived: boolean): InboxListAction[] {
-  return archived
-    ? [{ id: "unarchive", label: "Unarchive" }]
-    : [{ id: "archive", label: "Archive" }];
+/**
+ * Ticket Mark done uses the same rules as list/bulk (`inboxCanMarkDone`).
+ * Confirm owns visits. Hold Done owns holds.
+ */
+export function inboxTicketCanMarkDone(opts: {
+  archived: boolean;
+  purpose: InboxItem["purpose"];
+  hasJob: boolean;
+  hasHold: boolean;
+  leadStatus?: string | null;
+}): boolean {
+  if (opts.archived) return false;
+  if (opts.hasJob || opts.hasHold) return false;
+  if (opts.purpose !== "human" && opts.purpose !== "missed") return false;
+  return String(opts.leadStatus || "").toLowerCase() !== "resolved";
+}
+
+/** Ticket ⋮: Mark done when eligible, then Archive. Unarchive when archived. */
+export function inboxTicketOverflowActions(opts: {
+  archived: boolean;
+  canMarkDone?: boolean;
+}): InboxListAction[] {
+  if (opts.archived) return [{ id: "unarchive", label: "Unarchive" }];
+  const out: InboxListAction[] = [];
+  if (opts.canMarkDone) out.push({ id: "mark_done", label: "Mark done" });
+  out.push({
+    id: "archive",
+    label: "Archive",
+    divide: out.length > 0,
+  });
+  return out;
 }
 
 /** md+ overflow: Pin, Mark done when eligible, Archive or Unarchive. No Select. */

@@ -226,6 +226,13 @@ describe("desk motion wiring", () => {
     assert.doesNotMatch(dock, /animate-pulse/);
   });
 
+  it("spins Ping teammate with pending while notify is in flight", () => {
+    const ping = read("dashboard/src/components/InboxPingTeammate.tsx");
+    assert.match(ping, /pendingSpinnerClass/);
+    assert.doesNotMatch(ping, /animate-pulse/);
+    assert.doesNotMatch(ping, /transition-all/);
+  });
+
   it("uses one DeskNotice channel for toasts and keeps dialogs enter-static", () => {
     assert.match(notice, /export function DeskNotice/);
     assert.match(notice, /export function useNotify/);

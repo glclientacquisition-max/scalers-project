@@ -76,7 +76,7 @@ Return ONLY valid JSON (no markdown fences):
 
 Rules:
 - want: name the caller if known. State the visit, hold, or question. If they only said hello, "No clear ask."
-- done: Visit saved. Hold saved. Hours answered. Escalation sent. Or "None."
+- done: Visit saved. Hold saved. Hours answered. Escalation sent only if SMS/WhatsApp/email delivered. Notify failed if not. Or "None."
 - mood: how they came across. unknown if you cannot tell. Not a medical label.
 - next: Confirm the visit. Call them back. Nothing. Hours were answered. One line.
 - reason: Inbox one-liner. Same truth as want.

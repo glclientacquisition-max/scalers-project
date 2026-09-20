@@ -13,7 +13,7 @@ export const HANDOFF_OPTIONS: {
   {
     id: "live_transfer",
     label: "Connect live call",
-    blurb: "Rings a team phone during open hours. Messages them if they miss it.",
+    blurb: "Coming soon. Today we message a teammate.",
   },
 ];
 

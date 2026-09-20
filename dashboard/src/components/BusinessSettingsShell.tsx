@@ -109,11 +109,13 @@ export function BusinessSettingsShell({
   tab,
   trainPanel,
   curatedVoices = [],
+  liveTransferExecutor = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
+  liveTransferExecutor?: boolean;
 }) {
   const formPanel: SettingsPanel =
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
@@ -176,6 +178,7 @@ export function BusinessSettingsShell({
           heading={heading}
           lineNumber={lineLive ? lineDetail : "Number pending"}
           sidebar={rail}
+          liveTransferExecutor={liveTransferExecutor}
         />
       ) : (
         <>

@@ -26,7 +26,10 @@ import {
   type InboxHold,
   type InboxJob,
 } from "@/lib/inboxPurpose";
-import { storedPhoneCandidates } from "@/lib/handoffMode";
+import { parseHandoffMode, storedPhoneCandidates } from "@/lib/handoffMode";
+import { formatEscalationDelivery } from "@/lib/escalationDelivery";
+import { formatLiveConnectStamp } from "@/lib/deskLiveTransfer";
+import { normalizeTeamDirectory } from "@/lib/teamNotify";
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
@@ -212,6 +215,16 @@ export default async function CallDetailPage({
         escalateReason ? `: ${escalateReason}` : ""
       }`
     : null;
+  const escalationDelivery = formatEscalationDelivery(meta);
+  const handoffMode = parseHandoffMode(tenant.handoff_mode);
+  const liveConnectLine = formatLiveConnectStamp(meta, handoffMode);
+  const escalatePeople = normalizeTeamDirectory(tenant.team_directory, {
+    ownerPhone: tenant.whatsapp_notification_number || undefined,
+  }).filter(
+    (row) =>
+      row.receives_escalation === true &&
+      Boolean(String(row.phone || "").trim() || String(row.email || "").trim())
+  );
   const urgency = needsYou ? doNextLabel || wantText || stamp : null;
 
   return (
@@ -246,7 +259,16 @@ export default async function CallDetailPage({
         }
         assistNote={row.resolution_note || null}
         escalatedLine={escalatedLine}
+        escalationDelivery={escalationDelivery.line}
+        liveConnectLine={liveConnectLine}
+        escalatePeople={escalatePeople.map((row) => ({
+          name: row.name,
+          role: row.role,
+          phone: row.phone,
+          email: row.email,
+        }))}
         archived={archived}
+        leadStatus={leadStatus}
       />
     </>
   );

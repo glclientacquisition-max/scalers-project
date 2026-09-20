@@ -7,6 +7,7 @@ import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVo
 import { getCurrentTenant } from "@/lib/tenant";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
+import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
@@ -46,6 +47,7 @@ export default async function SettingsPage({
       tab={tab}
       trainPanel={trainPanel}
       curatedVoices={curatedVoices}
+      liveTransferExecutor={deskLiveTransferExecutorEnabled()}
     />
   );
 }

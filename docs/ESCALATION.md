@@ -28,8 +28,8 @@ idle
       → ready                # name + reason known; escalate tool must fire
         → notifying
           → notified         # SMS and/or WA and/or email delivered
-          → desk_only        # soft success: saved on call, no live channel
-          → failed           # rare hard failure
+          → desk_only        # saved on call; no live channel (desk shows notify failed)
+          → failed           # no live channel, or hard failure
 ```
 
 Helpers: `deriveEscalationStage()`, `shapeEscalationNotifyOutcome()`.
@@ -41,7 +41,7 @@ Helpers: `deriveEscalationStage()`, `shapeEscalationNotifyOutcome()`.
 1. **SMS** — TextSMS.co.ke (`TEXTSMS_API_KEY`, `TEXTSMS_PARTNER_ID`, `TEXTSMS_SHORTCODE`)
 2. **WhatsApp** — SautiKit **platform** sender on `+254709221536` (when `SAUTIKIT_WHATSAPP_NUMBER_ID` is set). Chat identity is Scalers, not the shop on that DID. Inbound replies: `POST /whatsapp/events`. Calling stays parked.
 3. **Email** — Resend → teammate email (owner `alert_email` only when the teammate number is the Alerts phone)
-4. **Desk note** — always saved; soft success if 1–3 miss
+4. **Desk note** — always saved. If 1–3 miss, persist `escalation_notify.stage=failed` and show “Needs human. Notify failed.” Do not mark `escalation_sent`.
 
 One permissioned teammate. `receives_escalation` on the directory row. Unmatched asks go to General queries / inbox catch-all with that flag. Nobody qualifies: desk note only. Do not also SMS a distinct owner.
 
@@ -58,7 +58,7 @@ Boot + `/healthz` expose SMS `configured` vs **`verified`** (live balance probe)
 | Human asked, name missing | Immediate ask for name (`pickClarifyProgress`) |
 | Escalate running | Progress: “Okay.” |
 | SMS/WA/email delivered | “Okay, I've texted/sent it to the team.” |
-| Desk-only soft success | “Okay, I've noted that for the team to follow up.” |
+| No live channel | Honest fail. Desk shows “Needs human. Notify failed.” |
 | Invalid / missing name on tool | “Tell me your name so I can reach the team…” |
 
 Never claim a live transfer unless a transfer executor actually runs.
@@ -71,8 +71,9 @@ Stored on `calls.summary` JSON (no migration):
 
 - `escalated_to` — `{ name, role, phone }`
 - `escalate_reason`
-- `escalation_sent` — boolean (notify path finished, including soft)
+- `escalation_sent` — boolean (true only after a live SMS/WA/email channel delivered)
 - `escalation_notify` — `{ ok, soft, stage, channels[], reason, at }`
+- Desk never shows “Escalation sent” unless `stage=notified` and `channels` has a live channel. Soft / no-channel → “Needs human. Notify failed.”
 
 Resolution: `needs_human` when escalate succeeded or handoff requested without a completed request.
 
@@ -89,7 +90,7 @@ Resolution: `needs_human` when escalate succeeded or handoff requested without a
 ## 7. Improvement backlog (prioritized)
 
 1. **Verify SMS live** — rotate TextSMS API key until `/healthz.notify.sms.verified === true`
-2. **Desk UI** — show `escalation_notify.channels` on call detail (SMS vs desk-only)
+2. **Desk UI** — show `escalation_notify.channels` on call detail, or “Needs human. Notify failed.”
 3. **Per-tenant sender ID** (optional) when businesses register their own shortcodes
 4. **Delivery receipts** — TextSMS DLR webhook → update `escalation_notify`
 5. **Live transfer** — spec: [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) + [`adr/ADR-0004-live-human-transfer.md`](./adr/ADR-0004-live-human-transfer.md). Do not implement until the Stream-stop → Dial staging spike passes. Keep this async escalate path as default and as Dial fallback.

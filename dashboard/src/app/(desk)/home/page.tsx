@@ -317,6 +317,7 @@ export default async function HomeOverviewPage() {
                         reason: nextReturnReason,
                       })}
                       variant="icon"
+                      callId={nextReturn.callId}
                     />
                   </div>
                 ) : null}
@@ -358,6 +359,7 @@ export default async function HomeOverviewPage() {
                     })}
                     variant="ghost"
                     label="Reply on WhatsApp"
+                    callId={nextReturn.callId}
                   />
                 </div>
               ) : null}

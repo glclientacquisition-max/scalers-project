@@ -70,6 +70,7 @@ import {
   teamHasDialablePhone,
   type HandoffMode,
 } from "@/lib/handoffMode";
+import { handoffComingSoonLine } from "@/lib/deskLiveTransfer";
 import {
   displaySonioxVoiceLabel,
   getDefaultSonioxVoiceIdSync,
@@ -310,6 +311,7 @@ export function TenantForm({
   heading = null,
   lineNumber = "",
   sidebar = null,
+  liveTransferExecutor = false,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -317,6 +319,7 @@ export function TenantForm({
   heading?: string | null;
   lineNumber?: string;
   sidebar?: ReactNode;
+  liveTransferExecutor?: boolean;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -1904,7 +1907,12 @@ export function TenantForm({
         <div className="space-y-2">
           <p className="text-sm font-medium text-[var(--ink)]">When a caller needs a human</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
-            {HANDOFF_OPTIONS.map((opt) => {
+            {HANDOFF_OPTIONS.filter(
+              (opt) =>
+                opt.id === "callback" ||
+                liveTransferExecutor ||
+                handoffMode === "live_transfer"
+            ).map((opt) => {
               const selected = handoffMode === opt.id;
               return (
                 <button
@@ -1922,9 +1930,13 @@ export function TenantForm({
           </div>
           {handoffMode === "live_transfer" ? (
             <p className="text-xs text-[var(--ink-soft)]">
-              {liveDest
-                ? `Rings ${liveDest.name} during open hours.`
-                : "Add a team phone. Until then, Scalers messages the team."}
+              {liveTransferExecutor
+                ? liveDest
+                  ? `Rings ${liveDest.name} during open hours.`
+                  : "Add a team phone. Until then, Scalers messages the team."
+                : liveDest
+                  ? handoffComingSoonLine(liveDest.name)
+                  : "Coming soon. Today we message a teammate."}
             </p>
           ) : (
             <p className="text-xs text-[var(--ink-soft)]">

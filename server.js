@@ -270,6 +270,7 @@ const {
   envLiveTransferExecutorEnabled,
   envLiveTransferIgnoreHours,
 } = require('./src/conversation/liveTransferReady');
+const { parseHandoffMode } = require('./src/conversation/handoffMode');
 const {
   resolveEscalation,
   buildEscalationText,
@@ -433,6 +434,31 @@ app.get('/internal/sms/status', async (req, res) => {
   }
   const status = await probeSmsCredentials({ force: true });
   return res.status(200).json({ ok: Boolean(status.verified), sms: status });
+});
+
+/** Owner desk re-ping. Same dispatch as live escalate. Force retries after a failed notify. */
+app.post('/internal/desk/escalate', async (req, res) => {
+  if (!voicePreviewAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const callSid = String(req.body?.callSid || '').trim();
+  if (!callSid) {
+    return res.status(400).json({ ok: false, reason: 'callSid required' });
+  }
+  try {
+    const result = await maybeSendEscalationNotification(callSid, {
+      teammate: String(req.body?.teammate || '').trim() || undefined,
+      name: String(req.body?.callerName || '').trim() || undefined,
+      reason: String(req.body?.reason || '').trim() || 'Desk ping',
+      force: req.body?.force !== false,
+    });
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      reason: err?.message || String(err),
+    });
+  }
 });
 
 app.get('/api/voices', async (_req, res) => {
@@ -3137,10 +3163,28 @@ const escalationNotifyInProgress = new Set();
  * Plug-and-play: WhatsApp to teammate/owner when SautiKit WA is configured;
  * email fallback when WhatsApp is unavailable.
  */
+function liveConnectMetaPatch(profile, transferQueued) {
+  if (parseHandoffMode(profile?.handoffMode) !== 'live_transfer') return {};
+  if (transferQueued) {
+    return {
+      live_connect: { ran: true, at: new Date().toISOString() },
+    };
+  }
+  const ready = liveTransferReady({ profile: profile || {} });
+  return {
+    live_connect: {
+      ran: false,
+      stamp: 'Notify only (live connect unavailable)',
+      reason: ready.reason || 'unavailable',
+    },
+  };
+}
+
 async function maybeSendEscalationNotification(callSid, escalate = {}) {
   const call = await db.getCall(callSid);
   if (!call) return { ok: false, reason: 'Call record was not found.' };
-  if (call.escalation_sent) return { ok: true, channel: 'already_sent' };
+  const force = escalate.force === true;
+  if (call.escalation_sent && !force) return { ok: true, channel: 'already_sent' };
   if (escalationNotifyInProgress.has(callSid)) {
     return { ok: false, reason: 'An escalation is already in progress.' };
   }
@@ -3242,30 +3286,24 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         ownerEmail: ownerEmail || null,
         teammatePhone: teammate?.phone || null,
       });
-      // Desk already has the escalation note via saveEscalation — treat as soft success
-      // so the caller hears a follow-up promise instead of a hard failure.
-      const refreshed = await db.getCall(callSid);
-      if (refreshed?.name && refreshed?.reason) {
-        await maybeSendWhatsAppNotification(callSid);
-      }
-      await db.markEscalationSent(callSid);
-      const softOutcome = shapeEscalationNotifyOutcome({
-        ok: true,
-        soft: true,
-        channel: 'desk_note',
-        reason: 'No live SMS/WA/email channel; escalation saved on the call for the desk.',
+      const failed = shapeEscalationNotifyOutcome({
+        ok: false,
+        reason: 'No live SMS/WA/email channel.',
       });
       await db.mergeCallSummaryMeta({
         callSid,
-        patch: { escalation_notify: softOutcome },
+        patch: {
+          escalation_notify: failed,
+          ...liveConnectMetaPatch(loadedProfile || {}, transferQueued),
+        },
       });
       return {
-        ok: true,
-        soft: true,
+        ok: false,
+        soft: false,
         transfer: transferQueued,
-        channel: 'desk_note',
-        sent: [{ channel: 'desk_note', role: 'desk', to: null }],
-        reason: softOutcome.reason,
+        channel: null,
+        reason: failed.reason,
+        escalation_notify: failed,
       };
     }
 
@@ -3288,7 +3326,10 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
     });
     await db.mergeCallSummaryMeta({
       callSid,
-      patch: { escalation_notify: liveOutcome },
+      patch: {
+        escalation_notify: liveOutcome,
+        ...liveConnectMetaPatch(loadedProfile || {}, transferQueued),
+      },
     });
     return {
       ok: true,
@@ -3296,6 +3337,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       transfer: transferQueued,
       channel: liveOutcome.channels.map((c) => c.channel).join(',') || 'alert',
       sent,
+      escalation_notify: liveOutcome,
     };
   } catch (err) {
     console.error(`[${callSid}] Escalation notification failed:`, err?.message || err);

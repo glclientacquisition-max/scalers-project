@@ -55,6 +55,16 @@ describe('escalation feature contract', () => {
     assert.equal(shaped.soft, true);
   });
 
+  it('shapes a missing live channel as failed', () => {
+    const shaped = shapeEscalationNotifyOutcome({
+      ok: false,
+      reason: 'No live SMS/WA/email channel.',
+    });
+    assert.equal(shaped.stage, 'failed');
+    assert.equal(shaped.ok, false);
+    assert.equal(shaped.soft, false);
+  });
+
   it('documents SMS-first channel order', () => {
     assert.deepEqual(NOTIFY_CHANNEL_ORDER[0], 'sms');
     assert.equal(escalationMvpRules().channelOrder[0], 'sms');
