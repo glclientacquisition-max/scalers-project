@@ -6,7 +6,6 @@ import {
   formatCallWhenRelative,
   nairobiDateLabel,
   nairobiDayStartIso,
-  nairobiGreeting,
   walletKes,
 } from "@/lib/callsTriage";
 import { inboxRecordHref } from "@/lib/inboxHref";
@@ -177,16 +176,12 @@ export default async function HomeOverviewPage() {
   return (
     <div className="w-full min-w-0">
       <header className="min-w-0">
-        <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
-          {nairobiGreeting()}
-        </p>
-        <div className="mt-1 min-w-0">
+        <h1 className="min-w-0">
           <BrandLockup href={null} name="Scalers" size="lg" />
-          <h1 className="mt-2 min-w-0 font-display text-xl font-semibold tracking-tight text-ink">
-            {business}
-          </h1>
-        </div>
-        <p className="mt-1 font-sans text-[13px] text-ink-soft">
+        </h1>
+        <p className="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-sm text-ink-soft">
+          <span className="min-w-0 truncate">{business}</span>
+          <span aria-hidden="true">·</span>
           <time dateTime={today.iso}>{today.label}</time>
         </p>
       </header>

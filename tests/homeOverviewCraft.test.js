@@ -11,17 +11,28 @@ describe("home overview craft", () => {
   const page = read("dashboard/src/app/(desk)/home/page.tsx");
   const triage = read("dashboard/src/lib/callsTriage.ts");
 
-  it("uses greeting eyebrow, business name, and Nairobi date", () => {
-    assert.match(page, /nairobiGreeting\(\)/);
+  it("titles Overview with Scalers lockup and muted workspace meta", () => {
+    const header = page.slice(page.indexOf("<header"), page.indexOf("</header>"));
+    assert.match(header, /BrandLockup/);
+    assert.match(header, /name="Scalers"/);
+    assert.match(header, /size="lg"/);
+    assert.doesNotMatch(header, /markOnly/);
+    assert.match(header, /flex min-w-0 flex-wrap items-center gap-2 text-sm text-ink-soft/);
+    assert.match(header, /\{business\}/);
+    assert.match(header, /·/);
+    assert.match(header, /<time dateTime=\{today\.iso\}>/);
     assert.match(page, /nairobiDateLabel\(\)/);
-    assert.match(page, /<time dateTime=\{today\.iso\}>/);
     assert.match(triage, /export function nairobiDateLabel/);
+    assert.doesNotMatch(page, /nairobiGreeting/);
+    assert.doesNotMatch(triage, /nairobiGreeting/);
+    assert.doesNotMatch(header, /Good morning|Good afternoon|Good evening|GOOD AFTERNOON/);
+    assert.doesNotMatch(header, /uppercase tracking-\[0\.14em\]/);
+    const title = header.slice(header.indexOf("<h1"), header.indexOf("</h1>"));
+    assert.match(title, /BrandLockup/);
+    assert.doesNotMatch(title, /\{business\}/);
+    assert.match(header, /<span className="min-w-0 truncate">\{business\}<\/span>/);
+    assert.doesNotMatch(header, /pageTitleClass|deskListTitleClass|text-3xl/);
     assert.doesNotMatch(page, />Overview</);
-    assert.match(page, /BrandLockup/);
-    assert.match(page, /name="Scalers"/);
-    assert.match(page, /size="lg"/);
-    assert.doesNotMatch(page, /markOnly/);
-    assert.match(page, /\{business\}/);
     assert.doesNotMatch(page, /Sign out/);
   });
 

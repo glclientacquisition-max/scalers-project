@@ -161,6 +161,7 @@ describe("desk shell chrome", () => {
     assert.match(home, /name="Scalers"/);
     assert.match(home, /size="lg"/);
     assert.doesNotMatch(home, /markOnly/);
+    assert.doesNotMatch(home, /nairobiGreeting/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.doesNotMatch(contacts, /BrandLockup/);
     assert.doesNotMatch(wallet, /BrandLockup/);

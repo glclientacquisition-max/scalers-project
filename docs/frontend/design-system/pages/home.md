@@ -8,7 +8,7 @@
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
-**Chrome:** Greeting eyebrow, large in-page Scalers lockup (`BrandLockup` size `lg`, name visible, not `markOnly`, not sticky, not Sign out, not the word Overview). Workspace name under the lockup. Nairobi `<time>`. One aside: today + line + prepaid + docked CTA.
+**Chrome:** One title: large in-page Scalers lockup (`BrandLockup` size `lg`, name visible, not `markOnly`, not sticky, not Sign out, not the word Overview). One muted meta line under it (`text-sm text-ink-soft`): workspace name, middot, Nairobi `<time>`. Workspace is not a second display title. No time-of-day greeting. One aside: today + line + prepaid + docked CTA.
 
 **Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
 
@@ -18,7 +18,7 @@
 
 **One blue action per screen.** The aside CTA is the only filled primary. Next to return uses a ghost WhatsApp button (green glyph). Two saturated CTAs would compete; the CTA already routes to the sharpest queue.
 
-**Aside sections.** Today, Line, and prepaid balance are hairline-separated sections. Values self-label: `Line live` + DID, `KES 0` + Top up. No caps headings on self-evident data rows. Caps eyebrows introduce content regions only (greeting, Next to return). Prepaid always shows the balance; `Top up` appears only when low. Line shows the formatted DID (`+254 700 000 000`). Beta workspaces skip the prepaid section entirely (metered, never charged). When the balance lasts 1 to 90 days at the current call pace, a quiet caption says so (`about 3 weeks at this pace`, same math as Usage).
+**Aside sections.** Today, Line, and prepaid balance are hairline-separated sections. Values self-label: `Line live` + DID, `KES 0` + Top up. No caps headings on self-evident data rows. Caps eyebrows introduce content regions only (Next to return). Prepaid always shows the balance; `Top up` appears only when low. Line shows the formatted DID (`+254 700 000 000`). Beta workspaces skip the prepaid section entirely (metered, never charged). When the balance lasts 1 to 90 days at the current call pace, a quiet caption says so (`about 3 weeks at this pace`, same math as Usage).
 
 **Row density and count weight.** Queue rows are `min-h-12` on phone, `min-h-11` at `lg`. Counts are `text-base font-semibold` so the largest queue (85 to return) holds its own against the blue CTA.
 
