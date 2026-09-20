@@ -26,7 +26,8 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 
 | Doc | Purpose |
 | --- | --- |
-| [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) | What Scalers **is** today |
+| [`docs/architecture/CURRENT_STATE.md`](docs/architecture/CURRENT_STATE.md) | What Scalers **is** today (Aug 2026 baseline) |
+| [`docs/platform/PLATFORM_SYSTEM_MAP.md`](docs/platform/PLATFORM_SYSTEM_MAP.md) | Platform as-is map: voice, notify, WhatsApp, wallet, Brain SoR, ladder jobs |
 | [`docs/governance/SOURCE_OF_TRUTH.md`](docs/governance/SOURCE_OF_TRUTH.md) | Subsystem ownership |
 | [`docs/governance/DEVELOPMENT_WORKFLOW.md`](docs/governance/DEVELOPMENT_WORKFLOW.md) | Branching, lifecycle, PR checklist |
 | [`docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md`](docs/governance/SCALERS_ENGINEERING_PRINCIPLES.md) | Permanent engineering rules |
