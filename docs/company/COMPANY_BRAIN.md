@@ -1,6 +1,6 @@
 # Scalers Company Brain
 
-**Status:** Approved v0.2 — founder + Chief (2026-09-20 EAT)  
+**Status:** Approved v0.2.1 — founder + Chief (2026-09-20 EAT)  
 **Audience:** Every Scalers bot must read this before acting.  
 **Owner:** Scalers Chief maintains; Scalers Product owns product facts; founder owns irreversible calls (pricing final, first customer relationships, taste).  
 **Repo path (when landed):** `docs/company/COMPANY_BRAIN.md`
@@ -138,7 +138,7 @@ Do not reorder without Product + founder.
 | Critic | 4414861 | Honesty gate on status/notify/auto-reply claims | Shipping features |
 | Release | 4468442 | Staging smoke GO/NO-GO | Soft “seems fine” |
 | Intelligence | 4472792 | Opportunity briefs → Product | Roadmap / coding orders |
-| Platform | *(not seated)* | Channels, voice/notify, Meta delivery, wallet, campaign send plumbing | Desk chrome polish |
+| Platform | 4486659 | Channels, voice/notify, Meta delivery, wallet, campaign send plumbing | Desk chrome polish |
 | markert researcher | 4390689 | Founder’s other use | Scalers (do not retarget) |
 
 **Phase B (after #364 GO + wedge stable):** Customer Discovery, Growth/GTM (campaigns + packaging), Success/Onboarding.  
@@ -205,3 +205,4 @@ If a bot can’t name which scoreboard line it moves, it should not start work.
 
 - **2026-09-20** — v0.1 drafted by Scalers Chief from live crew decisions.
 - **2026-09-20** — v0.2 north star expanded: business intelligence OS (multi-channel customers, grounded replies, campaigns) with explicit expansion ladder; wedge kept as PMF path; product law adds intelligence-before-automation.
+- **2026-09-20** — v0.2.1 Platform seated (id 4486659); roster updated.
