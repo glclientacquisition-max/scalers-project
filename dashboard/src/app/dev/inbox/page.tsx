@@ -291,6 +291,39 @@ export default function DevInboxPage() {
             leadStatus="new"
           />
         </div>
+        <div className="mt-10">
+          <InboxTicketView
+            callId="call-2"
+            backHref="/dev/inbox"
+            contactHref="/dev/inbox"
+            title="Amina"
+            stamp="Human asked"
+            purpose="human"
+            callerPhone="254700000001"
+            waMessage="Please call back"
+            needsYou
+            urgency="Return the call"
+            want="Speak to the owner"
+            done={null}
+            mood="Urgent"
+            job={null}
+            hold={null}
+            turns={TURNS}
+            tenantId="dev"
+            recordingUrl={null}
+            durationLabel="32s"
+            assistLabel="Needs human"
+            assistNote={null}
+            escalatedLine={null}
+            escalationDelivery={null}
+            liveConnectLine={null}
+            escalatePeople={[
+              { name: "Wanjiku", role: "Owner", phone: "254700000099" },
+            ]}
+            archived={false}
+            leadStatus="new"
+          />
+        </div>
         </main>
         <DeskTabBar needsCount={needYou} />
       </div>

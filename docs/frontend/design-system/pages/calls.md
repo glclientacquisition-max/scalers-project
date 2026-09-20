@@ -83,7 +83,7 @@ Columns (`lg+` table, same data as the phone row; phone rows stay through `md` s
 - WhatsApp glyph, green on white, `h-12 w-12`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
 - Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-12 w-12`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
-- Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit. Transcript is the right pane from `lg`; stack below `lg`. Icon-only Call, WhatsApp, More, Back, Polish, and Send name themselves on hover (`DeskHint`).
+- Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit on the ticket action dock (Mark done, Call, WhatsApp, Ping). Transcript is the right pane from `lg`; stack below `lg`. Icon-only Call, WhatsApp, More, Back, Polish, and Send name themselves on hover (`DeskHint`).
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 

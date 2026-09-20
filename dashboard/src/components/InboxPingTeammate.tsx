@@ -1,9 +1,22 @@
 "use client";
 
+import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { pingTeammateAction } from "@/app/(desk)/calls/escalateActions";
-import { btnGhost, focusRingVisible, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { DeskHint } from "@/components/ui/DeskHint";
+import {
+  btnGhost,
+  deskHitClass,
+  deskShiftClass,
+  focusRingVisible,
+  pendingSpinnerClass,
+  pendingSpinnerInkClass,
+} from "@/components/ui/deskChrome";
+import {
+  placeInboxOverflowMenu,
+  type InboxOverflowAnchor,
+} from "@/lib/inboxOverflowPlace";
 
 export type InboxPingPerson = {
   name: string;
@@ -12,27 +25,59 @@ export type InboxPingPerson = {
   email?: string;
 };
 
+function PingGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M12 12a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M5.6 18.4a6.6 6.6 0 0 1 12.8 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16.8 7.2 19 5m-11.8 2.2L5 5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function InboxPingTeammate({
   callId,
   people,
   archived,
+  variant = "block",
 }: {
   callId: string;
   people: InboxPingPerson[];
   archived: boolean;
+  variant?: "block" | "dock";
 }) {
   const router = useRouter();
+  const labelId = useId();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [line, setLine] = useState<string | null>(null);
   const [picked, setPicked] = useState(people[0]?.name || "");
-
-  if (archived || people.length === 0) return null;
-
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<InboxOverflowAnchor | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const ignoreUntil = useRef(0);
   const one = people.length === 1 ? people[0] : null;
+  const hidden = archived || people.length === 0;
 
   function run(name: string) {
     setError(null);
+    setOpen(false);
     startTransition(async () => {
       const res = await pingTeammateAction({ callId, teammateName: name });
       if (res.line) setLine(res.line);
@@ -40,6 +85,151 @@ export function InboxPingTeammate({
       else if (!res.ok && !res.failed) setError(res.error || "Could not ping.");
       router.refresh();
     });
+  }
+
+  function placeFromButton() {
+    const rect = btnRef.current?.getBoundingClientRect();
+    setAnchor(
+      rect
+        ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height, align: "end" }
+        : { x: 8, y: 8, align: "point" }
+    );
+  }
+
+  useLayoutEffect(() => {
+    if (!open || !anchor || variant !== "dock") return;
+    const nextAnchor = anchor;
+    function place() {
+      const el = panelRef.current;
+      if (!el) return;
+      const view = window.visualViewport;
+      setPos(
+        placeInboxOverflowMenu(
+          { width: el.offsetWidth, height: el.offsetHeight },
+          nextAnchor,
+          {
+            width: view?.width ?? window.innerWidth,
+            height: view?.height ?? window.innerHeight,
+          }
+        )
+      );
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.visualViewport?.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.visualViewport?.removeEventListener("resize", place);
+    };
+  }, [open, anchor, variant, people.length]);
+
+  useEffect(() => {
+    if (!open || variant !== "dock") return;
+    const previous = document.activeElement as HTMLElement | null;
+    panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
+
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (!pending) setOpen(false);
+      }
+    }
+
+    function onPointer(event: MouseEvent) {
+      if (Date.now() < ignoreUntil.current) return;
+      if (panelRef.current && !panelRef.current.contains(event.target as Node) && !pending) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onPointer);
+      previous?.focus?.();
+    };
+  }, [open, pending, variant]);
+
+  if (hidden) return null;
+
+  if (variant === "dock") {
+    const hint = one ? `Ping ${one.name}` : "Ping teammate";
+    const menu = (
+      <div
+        ref={panelRef}
+        role="menu"
+        aria-labelledby={labelId}
+        className="z-[60] max-h-[min(24rem,calc(100dvh-1rem))] min-w-[10rem] overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
+        style={{
+          position: "fixed",
+          top: pos?.top ?? 0,
+          left: pos?.left ?? 0,
+          visibility: pos ? "visible" : "hidden",
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <p id={labelId} className="sr-only">
+          Ping teammate
+        </p>
+        {people.map((person) => (
+          <button
+            key={`${person.name}-${person.phone}`}
+            type="button"
+            role="menuitem"
+            disabled={pending}
+            className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
+            onClick={() => run(person.name)}
+          >
+            {pending ? "Pinging" : person.name}
+            {person.role ? ` (${person.role})` : ""}
+          </button>
+        ))}
+      </div>
+    );
+
+    return (
+      <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+        <DeskHint label={hint} side="top">
+          <button
+            ref={btnRef}
+            type="button"
+            disabled={pending}
+            aria-label={pending ? "Pinging" : hint}
+            aria-haspopup={one ? undefined : "menu"}
+            aria-expanded={one ? undefined : open}
+            title={pending ? "Pinging" : hint}
+            onClick={() => {
+              if (one) {
+                run(one.name);
+                return;
+              }
+              setError(null);
+              if (!open) {
+                ignoreUntil.current = Date.now() + 450;
+                placeFromButton();
+              }
+              setOpen((next) => !next);
+            }}
+            className={`${deskHitClass} border border-line bg-surface text-ink ${deskShiftClass} ${focusRingVisible} hover:border-accent disabled:opacity-50`}
+          >
+            {pending ? (
+              <span aria-hidden="true" className={pendingSpinnerInkClass} />
+            ) : (
+              <PingGlyph />
+            )}
+          </button>
+        </DeskHint>
+        <span className="text-[11px] font-medium leading-none text-ink-soft">Ping</span>
+        {open && typeof document !== "undefined" ? createPortal(menu, document.body) : null}
+        {line ? <p className="max-w-[6.5rem] text-center text-[11px] text-ink-soft [overflow-wrap:anywhere]">{line}</p> : null}
+        {error ? (
+          <p className="max-w-[6.5rem] text-center text-[11px] text-warn [overflow-wrap:anywhere]" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
