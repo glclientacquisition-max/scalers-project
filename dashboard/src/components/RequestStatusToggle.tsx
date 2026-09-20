@@ -33,6 +33,7 @@ export function RequestStatusToggle({
   const normalized = status === "fulfilled" || status === "cancelled" ? status : "open";
   const err = ownerError(state.error);
   const wide = extra || banner;
+  const holdDoneLabel = wide ? "Hold Done" : "Done";
   const stack = wide
     ? "flex w-full flex-col gap-2"
     : "flex items-center justify-end";
@@ -49,7 +50,7 @@ export function RequestStatusToggle({
               value="fulfilled"
               disabled={pending}
               className={wide ? `${btnPrimary} w-full` : btnDock}
-              aria-label={pending ? "Saving" : "Done"}
+              aria-label={pending ? "Saving" : holdDoneLabel}
             >
               {pending ? (
                 wide ? (
@@ -58,7 +59,7 @@ export function RequestStatusToggle({
                   <span aria-hidden="true" className={pendingSpinnerClass} />
                 )
               ) : (
-                "Done"
+                holdDoneLabel
               )}
             </button>
             {extra && !banner ? (

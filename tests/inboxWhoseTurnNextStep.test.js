@@ -72,10 +72,8 @@ function inboxListDockRecipe(row) {
   return "none";
 }
 
-function nicheConfirmStamp(vertical) {
-  return String(vertical || "").toLowerCase() === "hospitality"
-    ? "Confirm booking"
-    : "Confirm visit";
+function nicheConfirmStamp(_vertical) {
+  return "Confirm visit";
 }
 
 function inboxNeedsYouNextStep(row, vertical) {
@@ -120,7 +118,7 @@ describe("Needs you whose-turn next-step", () => {
     });
 
     assert.equal(inboxNeedsYouNextStep(visit), "Confirm visit");
-    assert.equal(inboxNeedsYouNextStep(visit, "hospitality"), "Confirm booking");
+    assert.equal(inboxNeedsYouNextStep(visit, "hospitality"), "Confirm visit");
     assert.equal(inboxNeedsYouNextStep(hold), "Hold Done");
     assert.equal(inboxNeedsYouNextStep(human), "Call or WhatsApp");
     assert.equal(inboxNeedsYouNextStep(missed), "Call or WhatsApp");
@@ -175,6 +173,7 @@ describe("Needs you whose-turn next-step", () => {
     assert.doesNotMatch(verbs, /lead_status:\s*"resolved"/);
     assert.doesNotMatch(verbs, /notifyChannels/);
     assert.match(read("dashboard/src/lib/inboxNiche.ts"), /confirmStamp: "Confirm visit"/);
+    assert.match(read("dashboard/src/lib/inboxNiche.ts"), /HOSPITALITY_RESERVATIONS_EXIST = false/);
     assert.match(read("dashboard/src/lib/inboxNiche.ts"), /confirmStamp: "Confirm booking"/);
     assert.match(verbs, /label: "Hold Done"/);
   });
