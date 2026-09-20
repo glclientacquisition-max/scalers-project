@@ -147,7 +147,7 @@ describe("desk motion canon", () => {
 
 describe("desk motion wiring", () => {
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
-  const calls = read("dashboard/src/app/(desk)/calls/page.tsx");
+  const board = read("dashboard/src/components/InboxPileBoard.tsx");
   const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const dialog = read("dashboard/src/components/ui/DeskDialog.tsx");
@@ -157,8 +157,8 @@ describe("desk motion wiring", () => {
   const catalog = read("dashboard/src/app/dev/motion/MotionCatalog.tsx");
 
   it("lands Inbox rows that appear while watching", () => {
-    assert.match(calls, /<DeskLandScope/);
-    assert.match(calls, /scopeKey=\{`\$\{activeFilter\}:\$\{page\}:\$\{q\}`\}/);
+    assert.match(board, /<DeskLandScope/);
+    assert.match(board, /scopeKey=\{`\$\{purpose\}:\$\{page\}:\$\{q\}`\}/);
     assert.match(inbox, /item\.purpose === "live"/);
     assert.match(inbox, /RowStateDot show=\{item\.unread\} live=/);
     const swipe = read("dashboard/src/components/InboxPileSwipe.tsx");

@@ -7,6 +7,7 @@ import { inboxArchivedHref } from "@/lib/inboxHref";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import { inboxPileHref } from "@/lib/inboxSwipe";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
+import { useInboxPileNav } from "@/components/InboxPileNav";
 import {
   btnGhost,
   deskFieldClass,
@@ -41,12 +42,14 @@ export function InboxToolbar({
   from?: string;
   rpage?: string;
 }) {
+  const nav = useInboxPileNav();
+  const current = nav?.purpose ?? active;
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
-  const archived = active === "archived";
-  const weekView = active === "job" && view === "week";
-  const todayView = active === "job" && (view === "today" || view === "work");
-  const holdToday = active === "hold" && (view === "today" || view === "work");
+  const archived = current === "archived";
+  const weekView = current === "job" && view === "week";
+  const todayView = current === "job" && (view === "today" || view === "work");
+  const holdToday = current === "hold" && (view === "today" || view === "work");
   const workView = weekView || todayView;
   const searchWait = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -56,7 +59,7 @@ export function InboxToolbar({
       method="get"
       className="flex w-full min-w-0 gap-2"
     >
-      <input type="hidden" name="purpose" value={active} />
+      <input type="hidden" name="purpose" value={current} />
       {archived && from ? <input type="hidden" name="from" value={from} /> : null}
       {archived && rpage ? <input type="hidden" name="rpage" value={rpage} /> : null}
       {archived && view ? <input type="hidden" name="view" value={view} /> : null}
@@ -103,14 +106,14 @@ export function InboxToolbar({
       {archived ? null : (
       <InboxFilterPills
         label="Filter by purpose"
-        active={active}
+        active={current}
         items={filters.map((item) => ({
           id: item.id,
           label: item.label,
           count: counts[item.id],
           href: inboxPileHref(item.id, {
             q,
-            active,
+            active: current,
             view,
             week,
             day,
@@ -119,7 +122,7 @@ export function InboxToolbar({
       />
       )}
 
-      {active === "job" ? (
+      {current === "job" ? (
         <FilterTabs
           label="Visit sort"
           active={workView ? "work" : "list"}
@@ -144,7 +147,7 @@ export function InboxToolbar({
         />
       ) : null}
 
-      {active === "hold" ? (
+      {current === "hold" ? (
         <FilterTabs
           label="Hold sort"
           active={holdToday ? "work" : "list"}
@@ -168,7 +171,7 @@ export function InboxToolbar({
         />
       ) : null}
 
-      {active === "job" && workView ? (
+      {current === "job" && workView ? (
         <FilterTabs
           label="Work date"
           active={weekView ? "week" : "today"}
@@ -211,7 +214,7 @@ export function InboxToolbar({
                     day,
                     page: rpage,
                   })
-                : callsHref({ purpose: active })
+                : callsHref({ purpose: current })
             }
             className={`font-medium text-accent-deep ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
           >

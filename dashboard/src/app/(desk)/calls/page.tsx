@@ -1,26 +1,14 @@
-import Link from "next/link";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxToolbar } from "@/components/InboxToolbar";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { callsHref, sanitizeSearchQuery } from "@/lib/callsTriage";
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
-import { nicheCopy } from "@/lib/inboxNiche";
 import {
   countInboxPurposes,
   itemMatchesPurpose,
   itemMatchesQuery,
   orderInboxItems,
   resolvePurposeFilter,
-  type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
-import {
-  InboxPhoneRow,
-  InboxTableRow,
-  inboxTableKind,
-} from "@/components/InboxItemRow";
-import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
 import {
   inboxReturnFromSearch,
   inboxReturnHref,
@@ -28,110 +16,24 @@ import {
 } from "@/lib/inboxHref";
 import { inboxTeammateOptions } from "@/lib/inboxTriage";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
-import { InboxSelectChrome } from "@/components/InboxRowSelect";
-import { InboxPileSwipe } from "@/components/InboxPileSwipe";
-import { DeskLandScope } from "@/components/ui/DeskLand";
+import {
+  InboxPileNavProvider,
+  InboxPileSelectChrome,
+} from "@/components/InboxPileNav";
+import { InboxPileBoard } from "@/components/InboxPileBoard";
 import { inboxPileHref, SWIPE_PILES } from "@/lib/inboxSwipe";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
-import { visitBoardForDay, visitBoardItems, orderVisitList } from "@/lib/runSheet";
-import { holdBoardForDay, orderHoldList } from "@/lib/holdSheet";
+import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
+import { holdBoardForDay } from "@/lib/holdSheet";
 import {
   parseDayParam,
   parseWeekParam,
   shiftDayYmd,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
-import { btnGhost, btnPrimary, deskEmptyClass } from "@/components/ui/deskChrome";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
-
-const PAGE_SIZE = DEFAULT_PAGE_SIZE;
-
-function EmptyInbox({
-  total,
-  pendingDid,
-  did,
-  purpose,
-  q,
-  vertical,
-}: {
-  total: number;
-  pendingDid: boolean;
-  did: string;
-  purpose: InboxPurposeFilterId;
-  q: string;
-  vertical?: string | null;
-}) {
-  const copy = nicheCopy(vertical);
-  if (q) {
-    return (
-      <div className={deskEmptyClass}>
-        <p className="font-display text-2xl tracking-tight text-ink">No matches</p>
-        <Link
-          href={callsHref({ purpose })}
-          className={`${btnGhost} mt-6`}
-        >
-          Clear search
-        </Link>
-      </div>
-    );
-  }
-
-  if (total > 0) {
-    const emptyLabel =
-      purpose === "hold"
-        ? copy.holdEmpty
-        : purpose === "job"
-          ? copy.jobEmpty
-          : purpose === "needs"
-            ? "Nothing needs you"
-            : purpose === "archived"
-              ? "None archived"
-              : "Nothing in this filter";
-    return (
-      <div className={deskEmptyClass}>
-        <p className="font-display text-2xl tracking-tight text-ink">{emptyLabel}</p>
-        <Link
-          href={callsHref({ purpose: "all" })}
-          className={`${btnGhost} mt-6`}
-        >
-          Show all
-        </Link>
-      </div>
-    );
-  }
-
-  if (pendingDid) {
-    return (
-      <div className="mt-8 border-y border-accent/30 bg-accent/5 py-12 text-center">
-        <p className="font-display text-2xl tracking-tight text-ink">Number being assigned</p>
-        <Link
-          href={businessSettingsHref("train")}
-          className={`${btnPrimary} mt-6 px-5`}
-        >
-          Train
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className={deskEmptyClass}>
-      <p className="font-display text-2xl tracking-tight text-ink">Inbox is empty</p>
-      {did ? (
-        <a href={`tel:${did}`} className={`${btnGhost} mt-6`}>
-          {did}
-        </a>
-      ) : (
-        <Link href={businessSettingsHref("test")} className={`${btnGhost} mt-6`}>
-          Test line
-        </Link>
-      )}
-    </div>
-  );
-}
-
 
 export default async function CallsPage({
   searchParams,
@@ -164,7 +66,6 @@ export default async function CallsPage({
 
   const businessName = tenant.business_name?.trim() || "us";
   const vertical = tenant.vertical;
-  const copy = nicheCopy(vertical);
 
   const { items: assembled, error, partialError } = await loadCachedInboxItems(
     tenant.id,
@@ -184,12 +85,6 @@ export default async function CallsPage({
     searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
     activeFilter
   );
-  const listed =
-    activeFilter === "job"
-      ? orderVisitList(filtered)
-      : activeFilter === "hold"
-        ? orderHoldList(filtered)
-        : filtered;
   const rawView = String(sp.view || "");
   const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";
@@ -201,15 +96,6 @@ export default async function CallsPage({
   const boardItems = boardView ? visitBoardItems(searched) : filtered;
   const todayItems = todayView ? visitBoardForDay(searched, day) : [];
   const holdTodayItems = holdTodayView ? holdBoardForDay(searched, day) : [];
-  const total = filtered.length;
-  const from = (page - 1) * PAGE_SIZE;
-  const pageRows = boardView || holdTodayView ? boardItems : listed.slice(from, from + PAGE_SIZE);
-  const showArchivedEntry =
-    !boardView &&
-    !holdTodayView &&
-    activeFilter !== "archived" &&
-    counts.archived > 0 &&
-    page === 1;
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
@@ -251,8 +137,15 @@ export default async function CallsPage({
 
   return (
     <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
+    <InboxPileNavProvider
+      purpose={activeFilter}
+      items={searched}
+      hrefs={pileHrefs}
+      page={boardView || holdTodayView ? 1 : page}
+      enableSelect={!boardView && !holdTodayView}
+    >
     <div>
-      <InboxSelectChrome items={boardView || holdTodayView ? [] : pageRows}>
+      <InboxPileSelectChrome>
       <InboxToolbar
         active={activeFilter}
         counts={counts}
@@ -267,7 +160,7 @@ export default async function CallsPage({
           archivedReturn?.page != null ? String(archivedReturn.page) : undefined
         }
       />
-      </InboxSelectChrome>
+      </InboxPileSelectChrome>
 
       {partialError ? (
         <div className="mt-6">
@@ -339,121 +232,22 @@ export default async function CallsPage({
           businessName={businessName}
           vertical={vertical}
         />
-      ) : pageRows.length === 0 && !showArchivedEntry ? (
-        <InboxPileSwipe
-          active={activeFilter}
-          hrefs={pileHrefs}
-          enabled={activeFilter !== "archived"}
-        >
-        <EmptyInbox
-          total={assembled.length}
+      ) : (
+        <InboxPileBoard
+          assembledCount={assembled.length}
           pendingDid={String(tenant.sautikit_virtual_number || "").startsWith("pending:")}
           did={tenant.sautikit_virtual_number}
-          purpose={activeFilter}
           q={q}
           vertical={vertical}
+          businessName={businessName}
+          counts={counts}
+          inboxRet={inboxRet}
+          viewParams={paginationParams}
+          hrefs={pileHrefs}
         />
-        </InboxPileSwipe>
-      ) : (
-        <>
-          <InboxPileSwipe
-            active={activeFilter}
-            hrefs={pileHrefs}
-            enabled={activeFilter !== "archived"}
-          >
-          <DeskLandScope
-            ids={pageRows.map((item) => item.id)}
-            scopeKey={`${activeFilter}:${page}:${q}`}
-          >
-          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
-            {showArchivedEntry ? <InboxArchivedPhoneRow count={counts.archived} ret={inboxRet} /> : null}
-            {pageRows.map((item) => (
-              <InboxPhoneRow
-                key={item.id}
-                item={item}
-                businessName={businessName}
-                purpose={activeFilter}
-                vertical={vertical}
-                ret={inboxRet}
-              />
-            ))}
-          </ul>
-          <div className="mt-8 hidden lg:block">
-            <DeskDataTable minWidthClass="min-w-0">
-              <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-                <tr>
-                  {inboxTableKind(activeFilter) === "hold" ? (
-                    <>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Item
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Who
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Needed
-                      </th>
-                    </>
-                  ) : null}
-                  {inboxTableKind(activeFilter) === "job" ? (
-                    <>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        {copy.jobColumn}
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Who
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Place
-                      </th>
-                    </>
-                  ) : null}
-                  {inboxTableKind(activeFilter) === "mixed" ? (
-                    <>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Work
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        Needed
-                      </th>
-                      <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                        When
-                      </th>
-                    </>
-                  ) : null}
-                  <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {showArchivedEntry ? <InboxArchivedTableRow count={counts.archived} ret={inboxRet} /> : null}
-                {pageRows.map((item) => (
-                  <InboxTableRow
-                    key={item.id}
-                    item={item}
-                    businessName={businessName}
-                    purpose={activeFilter}
-                    vertical={vertical}
-                    ret={inboxRet}
-                  />
-                ))}
-              </tbody>
-            </DeskDataTable>
-          </div>
-          </DeskLandScope>
-          </InboxPileSwipe>
-
-          <Pagination
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            href="/calls"
-            params={paginationParams}
-          />
-        </>
       )}
     </div>
+    </InboxPileNavProvider>
     </InboxRowUiProvider>
   );
 }

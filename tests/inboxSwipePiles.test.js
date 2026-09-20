@@ -15,12 +15,25 @@ function load() {
     import {
       SWIPE_PILES,
       INBOX_SWIPE_PX,
+      INBOX_SWIPE_FOLLOW_CAP,
       nextPurpose,
       prevPurpose,
       swipePileCommit,
       purposeAfterSwipe,
       inboxPileHref,
+      adjacentPileHrefs,
+      inboxSwipeFollowPx,
+      inboxSwipeCommitPx,
+      filterCachedPile,
     } from ${JSON.stringify(helperPath)};
+    const hrefs = {
+      needs: "/calls?purpose=needs",
+      all: "/calls?purpose=all",
+      job: "/calls?purpose=job",
+      hold: "/calls?purpose=hold",
+      human: "/calls?purpose=human",
+      answered: "/calls?purpose=answered",
+    };
     const cases = {
       piles: [...SWIPE_PILES],
       threshold: INBOX_SWIPE_PX,
@@ -75,6 +88,23 @@ function load() {
         day: "2026-09-18",
       }),
       hrefHuman: inboxPileHref("human", { active: "hold", view: "today", day: "2026-09-18" }),
+      followCap: INBOX_SWIPE_FOLLOW_CAP,
+      followOver: inboxSwipeFollowPx(400),
+      followUnder: inboxSwipeFollowPx(-12),
+      followZero: inboxSwipeFollowPx(0),
+      commitNext: inboxSwipeCommitPx("next"),
+      commitPrev: inboxSwipeCommitPx("prev"),
+      adjNeeds: adjacentPileHrefs("needs", hrefs),
+      adjAll: adjacentPileHrefs("all", hrefs),
+      adjAnswered: adjacentPileHrefs("answered", hrefs),
+      adjArchived: adjacentPileHrefs("archived", hrefs),
+      paintPending: filterCachedPile(null, "all", () => true),
+      paintEmpty: filterCachedPile([{ id: "a" }], "needs", () => false),
+      paintRows: filterCachedPile(
+        [{ id: "needs" }, { id: "other" }],
+        "needs",
+        (item, purpose) => item.id === purpose
+      ),
     };
     console.log(JSON.stringify(cases));
   `;
@@ -131,11 +161,42 @@ describe("inbox swipe piles", () => {
     assert.equal(out.hrefHoldToday, "/calls?purpose=hold&view=today&day=2026-09-18");
     assert.equal(out.hrefHuman, "/calls?purpose=human");
   });
+
+  it("prefetches next and prev hrefs and follows a capped dx", () => {
+    const out = load();
+    assert.equal(out.followCap, 96);
+    assert.equal(out.followOver, 96);
+    assert.equal(out.followUnder, -12);
+    assert.equal(out.followZero, 0);
+    assert.equal(out.commitNext, -120);
+    assert.equal(out.commitPrev, 120);
+    assert.equal(out.adjNeeds.next, "/calls?purpose=all");
+    assert.equal(out.adjNeeds.prev, undefined);
+    assert.equal(out.adjAll.next, "/calls?purpose=job");
+    assert.equal(out.adjAll.prev, "/calls?purpose=needs");
+    assert.equal(out.adjAnswered.next, undefined);
+    assert.equal(out.adjAnswered.prev, "/calls?purpose=human");
+    assert.equal(out.adjArchived.next, undefined);
+    assert.equal(out.adjArchived.prev, undefined);
+  });
+
+  it("paints the next pile from cache without waiting, pending only with no cache", () => {
+    const out = load();
+    assert.equal(out.paintPending.paint, "pending");
+    assert.deepEqual(out.paintPending.rows, []);
+    assert.equal(out.paintEmpty.paint, "empty");
+    assert.deepEqual(out.paintEmpty.rows, []);
+    assert.equal(out.paintRows.paint, "rows");
+    assert.deepEqual(out.paintRows.rows, [{ id: "needs" }]);
+    assert.equal(out.mouse, null);
+  });
 });
 
 describe("inbox swipe wiring", () => {
   const helper = read("dashboard/src/lib/inboxSwipe.ts");
   const swipe = read("dashboard/src/components/InboxPileSwipe.tsx");
+  const nav = read("dashboard/src/components/InboxPileNav.tsx");
+  const board = read("dashboard/src/components/InboxPileBoard.tsx");
   const pills = read("dashboard/src/components/InboxFilterPills.tsx");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const page = read("dashboard/src/app/(desk)/calls/page.tsx");
@@ -144,22 +205,48 @@ describe("inbox swipe wiring", () => {
   it("swipes one list with touch, chips stay the map, no max-md gate", () => {
     assert.match(swipe, /pointerType !== "touch"/);
     assert.match(swipe, /swipePileCommit/);
-    assert.match(swipe, /router\.push/);
+    assert.match(swipe, /router\.replace/);
+    assert.doesNotMatch(swipe, /router\.push/);
+    assert.match(nav, /router\.replace/);
+    assert.doesNotMatch(nav, /router\.push/);
+    assert.doesNotMatch(nav, /await router\.replace/);
     assert.match(swipe, /ui\?\.selecting/);
     assert.match(swipe, /deskShiftClass/);
     assert.match(swipe, /touch-pan-y/);
+    assert.match(swipe, /inboxSwipeFollowPx/);
+    assert.doesNotMatch(swipe, /dx \* 0\.28/);
+    assert.match(swipe, /transitionend/);
     assert.doesNotMatch(swipe, /max-md/);
-    assert.doesNotMatch(swipe, /framer-motion|lottie|gsap/i);
-    assert.match(page, /<InboxPileSwipe/);
+    assert.doesNotMatch(swipe, /framer-motion|lottie|gsap|transition-all/i);
+    assert.match(page, /<InboxPileNavProvider/);
+    assert.match(page, /<InboxPileBoard/);
     assert.match(page, /<InboxToolbar/);
+    assert.match(board, /<InboxPileSwipe/);
     const toolbarAt = page.indexOf("<InboxToolbar");
-    const swipeAt = page.indexOf("<InboxPileSwipe");
-    assert.ok(toolbarAt >= 0 && swipeAt > toolbarAt, "swipe the list, not the chips");
-    assert.equal((page.match(/<DeskLandScope/g) || []).length, 1);
+    const boardAt = page.indexOf("<InboxPileBoard");
+    assert.ok(toolbarAt >= 0 && boardAt > toolbarAt, "swipe the list, not the chips");
+    assert.equal((board.match(/<DeskLandScope/g) || []).length, 1);
     assert.doesNotMatch(page, /SWIPE_PILES\.map\([\s\S]{0,300}<ul/);
     assert.match(page, /inboxPileHref\(id, pileHrefOpts\)/);
     assert.doesNotMatch(page, /max-md/);
-    assert.match(page, /scopeKey=\{`\$\{activeFilter\}:\$\{page\}:\$\{q\}`\}/);
+    assert.match(board, /scopeKey=\{`\$\{purpose\}:\$\{page\}:\$\{q\}`\}/);
+  });
+
+  it("replaces the URL after a client cache filter and prefetches next and prev", () => {
+    assert.match(helper, /export function adjacentPileHrefs/);
+    assert.match(helper, /export function filterCachedPile/);
+    assert.match(swipe, /router\.prefetch/);
+    assert.match(swipe, /adjacentPileHrefs/);
+    assert.match(swipe, /prefetch/);
+    assert.match(nav, /filterCachedPile/);
+    assert.match(nav, /itemMatchesPurpose/);
+    assert.match(nav, /router\.prefetch/);
+    assert.match(pills, /prefetch/);
+    assert.match(toolbar, /useInboxPileNav/);
+    assert.match(page, /items=\{searched\}/);
+    assert.doesNotMatch(nav, /async function goPile/);
+    assert.match(board, /pendingSpinnerInkClass/);
+    assert.match(board, /paint === "pending"/);
   });
 
   it("scrolls the active chip on a snap strip that never wraps", () => {
