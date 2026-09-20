@@ -4,7 +4,13 @@
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { EVENTS, renderCallerText, displayOwnerCallerName } = require('./events');
 const { parseNotifyChannels } = require('./notifyChannels');
-const { beginInstanceSend, claimTenantSms, recordNotifySend, releaseInstanceFlight } = require('./sendLedger');
+const {
+  beginInstanceSend,
+  claimTenantSms,
+  durableSendClaim,
+  recordNotifySend,
+  releaseInstanceFlight,
+} = require('./sendLedger');
 
 function callerSmsEnabled(channels) {
   return parseNotifyChannels(channels).caller_sms === true;
@@ -116,7 +122,7 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
     }
     const result = await sendSms({ to: dest, body });
     const sent = { channel: 'sms', to: dest, result, body };
-    await recordNotifySend({
+    const recorded = await recordNotifySend({
       tenantId: ledger?.tenantId,
       callId: ledger?.callId,
       callSid: ledger?.callSid,
@@ -127,6 +133,10 @@ async function dispatchCallerSms({ to, event, channels, ledger } = {}) {
       providerMessageId: result?.messageId || null,
       overage: Boolean(claim.overage),
     });
+    const claimSent = durableSendClaim(recorded);
+    if (!claimSent.ok) {
+      return { channel: null, reason: claimSent.reason };
+    }
     return sent;
   } finally {
     releaseInstanceFlight(gate.key);

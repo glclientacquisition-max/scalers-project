@@ -7,6 +7,8 @@ const {
   buildLedgerRow,
   beginInstanceSend,
   claimInstanceFlight,
+  claimTenantSms,
+  durableSendClaim,
   idempotencyKey,
   instanceFlightKey,
   allowanceDecision,
@@ -369,6 +371,207 @@ describe('per-instance send limits', () => {
       assert.equal(result.channel, null);
       assert.equal(result.reason, 'instance_in_flight');
       releaseInstanceFlight(first.key);
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('missing notify ledger / SMS RPC honesty', () => {
+  const ledger = {
+    tenantId: 't1',
+    callSid: 'HD_abc',
+    callId: 'call-1',
+    kind: 'escalation',
+  };
+
+  const envKeys = [
+    'TEXTSMS_API_KEY',
+    'TEXTSMS_PARTNER_ID',
+    'TEXTSMS_SHORTCODE',
+    'SAUTIKIT_API_KEY',
+    'SAUTIKIT_WHATSAPP_NUMBER_ID',
+    'RESEND_API_KEY',
+    'ALERT_EMAIL_FROM',
+  ];
+  /** @type {Record<string, string|undefined>} */
+  let saved = {};
+
+  beforeEach(() => {
+    resetInstanceFlights();
+    saved = {};
+    for (const key of envKeys) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+    process.env.TEXTSMS_API_KEY = 'test-key';
+    process.env.TEXTSMS_PARTNER_ID = '99';
+    process.env.TEXTSMS_SHORTCODE = 'SCALERS';
+  });
+
+  afterEach(() => {
+    resetInstanceFlights();
+    for (const key of envKeys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  it('beginInstanceSend skips when notify_sends is missing', async () => {
+    const restore = stubDb({
+      findNotifySend: async () => ({ reason: 'table_missing' }),
+    });
+    try {
+      const gate = await beginInstanceSend(ledger, '254711000000');
+      assert.equal(gate.ok, false);
+      assert.equal(gate.reason, 'table_missing');
+    } finally {
+      restore();
+    }
+  });
+
+  it('claimTenantSms does not allow tenant SMS when consume_sms_units is missing', async () => {
+    const restore = stubDb({
+      consumeSmsUnits: async () => ({
+        allowed: true,
+        reason: 'rpc_missing',
+        overage: false,
+      }),
+    });
+    try {
+      const claim = await claimTenantSms(ledger, 'Needs human');
+      assert.equal(claim.allowed, false);
+      assert.equal(claim.reason, 'rpc_missing');
+    } finally {
+      restore();
+    }
+  });
+
+  it('claimTenantSms still allows platform wallet SMS when the RPC is missing', async () => {
+    let consumed = 0;
+    const restore = stubDb({
+      consumeSmsUnits: async () => {
+        consumed += 1;
+        return { allowed: true, reason: 'rpc_missing', overage: false };
+      },
+    });
+    try {
+      const claim = await claimTenantSms(
+        { tenantId: 't1', kind: 'wallet_low' },
+        'Wallet low'
+      );
+      assert.equal(claim.allowed, true);
+      assert.equal(claim.reason, 'platform');
+      assert.equal(consumed, 0);
+    } finally {
+      restore();
+    }
+  });
+
+  it('durableSendClaim refuses sent when the ledger row was not written', () => {
+    assert.deepEqual(durableSendClaim({ ok: true, id: 'n1' }), { ok: true });
+    assert.deepEqual(durableSendClaim({ ok: false, reason: 'duplicate' }), {
+      ok: true,
+    });
+    assert.deepEqual(durableSendClaim({ ok: false, reason: 'table_missing' }), {
+      ok: false,
+      reason: 'table_missing',
+    });
+    assert.deepEqual(durableSendClaim({ ok: false, reason: 'insert_failed' }), {
+      ok: false,
+      reason: 'ledger_unrecorded',
+    });
+    assert.deepEqual(durableSendClaim({ ok: false, reason: 'skipped' }), {
+      ok: true,
+    });
+  });
+
+  it('dispatchAlert does not claim sent when notify_sends insert is skipped', async () => {
+    const { mock } = require('node:test');
+    let fetches = 0;
+    mock.method(global, 'fetch', async () => {
+      fetches += 1;
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            responses: [
+              {
+                'respose-code': 200,
+                'response-description': 'Success',
+                mobile: '254711000000',
+                messageid: 1,
+              },
+            ],
+          }),
+      };
+    });
+    const restore = stubDb({
+      findNotifySend: async () => null,
+      consumeSmsUnits: async () => ({
+        allowed: true,
+        reason: 'included',
+        overage: false,
+      }),
+      insertNotifySend: async () => ({ ok: false, reason: 'table_missing' }),
+    });
+    try {
+      const { dispatchAlert } = require('../src/notifications/dispatch');
+      const result = await dispatchAlert({
+        to: '+254711000000',
+        body: 'Caller wants the floor manager',
+        ledger,
+      });
+      assert.equal(result.channel, null);
+      assert.equal(result.reason, 'table_missing');
+      assert.equal(fetches, 1);
+    } finally {
+      restore();
+      mock.restoreAll();
+    }
+  });
+
+  it('dispatchAlert skips the provider when the ledger table is missing', async () => {
+    const { mock } = require('node:test');
+    let fetches = 0;
+    mock.method(global, 'fetch', async () => {
+      fetches += 1;
+      return { ok: true, status: 200, text: async () => '{}' };
+    });
+    const restore = stubDb({
+      findNotifySend: async () => ({ reason: 'table_missing' }),
+    });
+    try {
+      const { dispatchAlert } = require('../src/notifications/dispatch');
+      const result = await dispatchAlert({
+        to: '+254711000000',
+        body: 'Caller wants the floor manager',
+        ledger,
+      });
+      assert.equal(result.channel, null);
+      assert.equal(result.reason, 'table_missing');
+      assert.equal(fetches, 0);
+    } finally {
+      restore();
+      mock.restoreAll();
+    }
+  });
+
+  it('dispatchEscalationAlert returns no live channel and keeps the skip reason', async () => {
+    const restore = stubDb({
+      findNotifySend: async () => ({ reason: 'table_missing' }),
+    });
+    try {
+      const { dispatchEscalationAlert } = require('../src/notifications/dispatch');
+      const sent = await dispatchEscalationAlert({
+        teammatePhone: '0740442943',
+        ownerPhone: '+254790381872',
+        body: 'Caller wants Harrison',
+        ledger,
+      });
+      assert.equal(sent.length, 0);
+      assert.equal(sent.reason, 'table_missing');
     } finally {
       restore();
     }

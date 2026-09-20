@@ -8,7 +8,13 @@
 const { sendSms, isSmsConfigured, normalizeSmsTo } = require('./sms');
 const { parseNotifyChannels } = require('./notifyChannels');
 const { missedTextbackBody } = require('./templates');
-const { beginInstanceSend, claimTenantSms, recordNotifySend, releaseInstanceFlight } = require('./sendLedger');
+const {
+  beginInstanceSend,
+  claimTenantSms,
+  durableSendClaim,
+  recordNotifySend,
+  releaseInstanceFlight,
+} = require('./sendLedger');
 
 const TEXTBACK_META_KEY = 'missed_textback_at';
 
@@ -79,7 +85,7 @@ async function sendMissedTextback({ to, businessName, ledger } = {}) {
       return { channel: null, reason: claim.reason || 'sms_allowance_exhausted' };
     }
     const result = await sendSms({ to: dest, body });
-    await recordNotifySend({
+    const recorded = await recordNotifySend({
       tenantId: ledger?.tenantId,
       callId: ledger?.callId,
       callSid: ledger?.callSid,
@@ -90,6 +96,10 @@ async function sendMissedTextback({ to, businessName, ledger } = {}) {
       providerMessageId: result?.messageId || null,
       overage: Boolean(claim.overage),
     });
+    const claimSent = durableSendClaim(recorded);
+    if (!claimSent.ok) {
+      return { channel: null, reason: claimSent.reason };
+    }
     return { channel: 'sms', to: dest, result, body };
   } finally {
     releaseInstanceFlight(gate.key);

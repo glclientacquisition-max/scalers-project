@@ -3288,7 +3288,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
       });
       const failed = shapeEscalationNotifyOutcome({
         ok: false,
-        reason: 'No live SMS/WA/email channel.',
+        reason: sent.reason || 'No live SMS/WA/email channel.',
       });
       await db.mergeCallSummaryMeta({
         callSid,

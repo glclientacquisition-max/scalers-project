@@ -23,6 +23,7 @@ const { parseNotifyChannels } = require('./notifyChannels');
 const {
   beginInstanceSend,
   claimTenantSms,
+  durableSendClaim,
   recordDispatchResult,
   releaseInstanceFlight,
 } = require('./sendLedger');
@@ -96,7 +97,11 @@ async function dispatchAlert({ to, email, body, lead = {}, subject, channels, le
 
   async function accept(result) {
     if (result?.channel) {
-      await recordDispatchResult(ledger, result, text);
+      const recorded = await recordDispatchResult(ledger, result, text);
+      const claim = durableSendClaim(recorded);
+      if (!claim.ok) {
+        return { channel: null, reason: claim.reason };
+      }
     }
     return result;
   }
@@ -199,7 +204,11 @@ async function dispatchEscalationAlert({
     channels,
     ledger,
   });
-  if (!result?.channel) return [];
+  if (!result?.channel) {
+    const skipped = [];
+    skipped.reason = result?.reason || null;
+    return skipped;
+  }
   return [
     {
       ...result,

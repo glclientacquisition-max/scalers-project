@@ -1877,7 +1877,7 @@ async function findNotifySend({ tenantId, idempotencyKey } = {}) {
     .maybeSingle();
   if (error) {
     if (/notify_sends|does not exist|schema cache|relation/i.test(error.message || '')) {
-      return null;
+      return { reason: 'table_missing' };
     }
     console.warn('[db] findNotifySend:', error.message);
     return null;
@@ -1899,7 +1899,7 @@ async function consumeSmsUnits({ tenantId, units } = {}) {
       console.warn(
         '[db] consume_sms_units missing (apply docs/supabase/sms_allowance.sql)'
       );
-      return { allowed: true, reason: 'rpc_missing', overage: false };
+      return { allowed: false, reason: 'rpc_missing', overage: false };
     }
     console.warn('[db] consumeSmsUnits:', error.message);
     return { allowed: true, reason: 'rpc_failed', overage: false };

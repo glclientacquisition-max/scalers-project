@@ -1,10 +1,10 @@
 # Platform system map
 
-**Status:** Investigation snapshot for Chief → Platform + Product  
+**Status:** Investigation snapshot plus P2 notify catalog  
 **Date:** 2026-09-20  
 **Baseline:** `main` @ `2e6d58d` (Company Brain v0.2.1 seated; #364 merged)  
-**Audience:** Scalers Platform (seat 4486659), Product, Critic. Not a build ticket.  
-**Authority:** [`../company/COMPANY_BRAIN.md`](../company/COMPANY_BRAIN.md) wins on wedge vs north star. This file maps **what the repo actually has**.
+**Audience:** Scalers Platform (seat 4486659), Product, Critic.  
+**Authority:** [`../company/COMPANY_BRAIN.md`](../company/COMPANY_BRAIN.md) wins on wedge vs north star. This file maps **what the repo actually has**. Vocab: [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md). SQL matrix: [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md).
 
 How to use: §0 is the briefing. §§1–6 are the inventory. §7 is the only allowed incorporation order. Do not skip the wedge. Do not invent PSTN-as-product, Baileys, Instagram inbox, campaign send, or a fourth status machine.
 
@@ -19,6 +19,8 @@ How to use: §0 is the briefing. §§1–6 are the inventory. §7 is the only al
 **Platform seat (now):** channels, voice/notify contracts, Meta delivery *when the send stack is real*, wallet plumbing, campaign send plumbing *later*. Platform does **not** own desk chrome, whose-turn copy, or Critic vocab.
 
 **#364:** already on `main` (`4430168`). Needs you row recipes are Product-owned. Release smoke is still the gate (Vercel Pro / 11:30 EAT 21 Sep routine). Platform does not ship a follow-up feature while that smoke is open.
+
+**P2 (2026-09-20 probe):** ALCR is missing `notify_sends`, `whatsapp_threads`, `whatsapp_messages`, `sms_included_units`, `sms_used_units`. Staging has that stack. Runtime now skips / persists **failed** when the ledger or `consume_sms_units` is missing. SQL is still for Ops / SQL Editor on ALCR. This PR did not apply production SQL.
 
 **Hard kills (forever unless founder reverses):** fake Online, Baileys / unofficial WA Web, PSTN live transfer as a product promise, parallel `lead_status` / Needs you / notify machines, Instagram or campaigns before wedge GO.
 
@@ -40,14 +42,14 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Post-call review | Hangup Gemini JSON → `owner_review` | `src/conversation/callTranscriptReview.js` | **live** (kill: `POST_CALL_GEMINI_REVIEW=off`) | Lands 1–2 min after mid-call SMS. Do not SMS the four-block card. |
 | Compile / live ground truth | Desk fields → `llm_system_prompt` + per-turn facts | `dashboard/src/lib/promptCompiler.ts`; `src/conversation/liveKnowledge.js` | **live** | Stale compile vs live facts: live ground truth wins. |
 | Thin CRM | Contacts, holds/orders, visits | `contacts`, `service_requests`, `appointments`; `src/db.js` upsert/create helpers | **live** | Confirm / Done only when those rows exist (#364). |
-| Staff notify | SMS → SautiKit WA → Resend | `src/notifications/*`; `server.js` `maybeSend*` | **live** | Soft/desk-only is **not** “Escalation sent”. |
+| Staff notify | SMS → SautiKit WA → Resend | `src/notifications/*`; `server.js` `maybeSend*` | **live** | Soft/`desk_only` is **not** sent. Missing `notify_sends` → skip / **failed**, not sent. |
 | Caller SMS | Opt-in confirmations | `src/notifications/callerSms.js`; `notify_channels.caller_sms` | **partial** | Default **off**. Templates exist. Do not imply every caller is texted. |
 | Missed text-back | Separate opt-in on failed/no-answer | `src/notifications/missedTextback.js` | **live** (toggle off by default) | Promises callback only. No inbound SMS route. |
 | Desk wa.me | Owner’s personal WhatsApp to the caller | `dashboard/src/components/WhatsAppLink.tsx`; `logWhatsAppFollowUp` | **live** | Click = opened / followed up. **Not** Meta delivery. Writes `lead_status=resolved` + note. |
 | Platform WhatsApp Cloud | Scalers WABA via SautiKit | `src/notifications/whatsapp.js`; `src/sautikit/whatsappInbound.js`; `docs/supabase/whatsapp_threads.sql` | **partial** | Staff templates + inbound ack only. Same E.164 as Done and Dusted **voice**. No shop inbox. |
 | Instagram / other social | Handles on the tenant profile | `tenants.social_handles`; `src/conversation/socialHandles.js` | **docs-only** as a channel | Brain may *read* a handle. There is no IG inbox, Graph, or send. |
 | Wallet / ledger | One prepaid KES wallet | `docs/supabase/one_wallet_billing.sql`; `src/db.js` `chargeCallToWallet`; desk `/wallet` | **live** (beta meters, does not charge) | Do not show dual USD/KES as the product. M-Pesa top-up is a stub. |
-| SMS allowance | Included segments, same on-demand toggle | `docs/supabase/sms_allowance.sql`; `consumeSmsUnits` | **live** if SQL applied; fail-open if missing | Skip tenant SMS at cap (paid). Never debit KES for SMS. |
+| SMS allowance | Included segments, same on-demand toggle | `docs/supabase/sms_allowance.sql`; `consumeSmsUnits` | **live** if SQL applied; skip tenant SMS if RPC missing | Skip tenant SMS at cap (paid) or `rpc_missing`. Never debit KES for SMS. Never claim sent without a ledger row. |
 | Packages / SKUs | Reserved email + seat columns | `docs/supabase/package_entitlements.sql`; [`../PACKAGES.md`](../PACKAGES.md) | **docs-only** | No shop UI. Do not gate email or invites. |
 | DID pool | Assign / release Kenya numbers | `sautikit_did_pool`; admin APIs; [`../PRODUCTION_DID_POOL.md`](../PRODUCTION_DID_POOL.md) | **live** | `+254709221536` must never be `available`. |
 | Auth (owner) | Supabase Auth JWT + RLS | `dashboard/src/lib/auth.ts`; `docs/supabase/owner_rls.sql` | **live** | Service role never in `NEXT_PUBLIC_*`. |
@@ -86,7 +88,7 @@ Desk APIs (Vercel): login/logout/tenant, admin businesses/wallets/voices/DID/Sau
 | `appointments.status` | `requested` \| `confirmed` \| `cancelled` \| `done` | Visit book. |
 | `service_requests.status` | `open` \| `fulfilled` \| `cancelled` | Hold / order / enquiry. |
 | `escalation_notify.stage` | `notified` \| `desk_only` \| `failed` | Staff handoff delivery. |
-| `notify_sends` | dest + kind + call, channel | Send ledger + instance cap. |
+| `notify_sends` | dest + kind + call, channel | Send ledger + instance cap. **MISSING on ALCR** until 24c apply. Staging has it. |
 | `whatsapp_messages.status` | Meta/SautiKit receipt | Platform WABA only. |
 | `billing_enforcement` | `off` \| `soft` \| `hard` | Wallet mode. |
 | `handoff_mode` | `callback` \| `live_transfer` | Preference. **Not** proof Dial works. |
@@ -142,7 +144,7 @@ Call detail already stamps `live_connect` when escalate runs and transfer did no
 - Rings {name}, “transferred you”, “connect live” as a shipped outcome.
 - PSTN / conference / queue / press-0 as a package feature.
 - Softphone / click-to-dial from Scalers.
-- “Escalation sent” without `escalation_notify.stage=notified` and a live channel.
+- “Escalation sent” without `escalation_notify.stage=notified`, a live channel, and a `notify_sends` row. Missing ledger → **failed**.
 - “Replied” or “WhatsApp delivered” from a wa.me click.
 
 ---
@@ -251,7 +253,7 @@ Always separate in copy (when Growth unlocks): (1) Scalers subscription, (2) car
 
 Voice-facing `src/db.js` (do not break names): `upsertCall`, `saveCallerInfo`, `saveEscalation`, `saveTransferAttempt`, `persistOutboundTransferLeg`, `appendTranscript`, `attachRecording`, `getCall`, `getTenantProfile`, `getCallerMemory`, `markWhatsappSent`, `markEscalationSent`, `setCallResolution`, `chargeCallToWallet`, `createServiceRequest`, `createAppointment`, `updateAppointment`, `upsertContact`, `insertNotifySend`, `consumeSmsUnits`, `persistPlatformWhatsApp*`.
 
-SQL apply order: [`../supabase/README.md`](../supabase/README.md). Production apply-tier is still **UNKNOWN** (TD-P0-2). Staging was rebuilt. Do not assume `notify_sends` / `whatsapp_threads` / SMS allowance are on ALCR without a catalog check.
+SQL apply order: [`../supabase/README.md`](../supabase/README.md). Notify objects: [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md). **P2 probe 2026-09-20:** ALCR missing `notify_sends` / WhatsApp thread tables / SMS allowance columns. Staging has them. Contacts / appointments / `notify_channels` / wallet columns are on both. `business_locations` / `business_policies` missing on both (note only). Never apply `foundation_bootstrap.sql` to ALCR. Other production SQL tiers stay unverified.
 
 ---
 
@@ -274,7 +276,7 @@ Company Brain §7. Do not reorder without Product + founder.
 | --- | --- | --- | --- | --- |
 | P0 | Stay out of whose-turn / verb cut / contact strip | Product | #364 GO | No new `lead_status`. No Platform PR unless a read helper is requested. |
 | P1 | **Lock delivery vocab** (opened / followed up / sent / delivered / failed) | Product + Critic | Wedge still in flight is OK (notes track) | Desk already has wa.me write-back and staff notify. Words first. |
-| P2 | Production SQL catalog: which of `notify_sends`, `whatsapp_threads`, SMS allowance, contacts/appointments are on ALCR vs staging | Platform | Access to both projects | Delivery UI on missing tables fail-opens and **looks** sent. |
+| P2 | Production SQL catalog + fail-open honesty | Platform | Probe 2026-09-20 | Catalog: [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md). Runtime refuses **sent** without ledger/RPC. **SQL still to apply on ALCR (ops):** `notify_send_ledger.sql`, `sms_allowance.sql`, `whatsapp_threads.sql` (24c, 24d, 24f). 24e not probed. |
 | P3 | Read model for existing truth: `notify_sends` + `whatsapp_messages.status` + `escalation_notify` | Platform → Desk | P1 vocab + P2 apply | Surface ticks. Do not add `delivery_status` on `calls`. |
 | P4 | Optional: persist `owner_notify_body` (or ledger body already written) so SMS audits stop reconstructing | Voice + Platform | P2 | CALL_MESSAGE_GAP. Small additive column or use `notify_sends`. |
 | P5 | Hangup-wait for owner **lead** SMS | Voice | P4 optional | Largest payload fix. Not a new channel. |
@@ -306,6 +308,8 @@ Company Brain §7. Do not reorder without Product + founder.
 | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) / ADR-0004 | Blocked Dial; conference next |
 | [`../WHATSAPP_TEMPLATES.md`](../WHATSAPP_TEMPLATES.md) / [`../specs/whatsapp-two-way.md`](../specs/whatsapp-two-way.md) | Staff templates + dual-use DID |
 | [`../ONE_WALLET_BILLING.md`](../ONE_WALLET_BILLING.md) / [`../BETA_WALLET_PROGRAM.md`](../BETA_WALLET_PROGRAM.md) | Prepaid truth |
+| [`NOTIFY_SQL_CATALOG.md`](./NOTIFY_SQL_CATALOG.md) | ALCR vs staging notify SQL + apply checklist |
+| [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md) | Critic ladder: opened / followed_up / sent / delivered / failed |
 | [`../agents/PLATFORM.md`](../agents/PLATFORM.md) | Lane owns |
 | [`../architecture/CURRENT_STATE.md`](../architecture/CURRENT_STATE.md) | Aug 2026 baseline; this map is newer |
 
@@ -313,4 +317,5 @@ Company Brain §7. Do not reorder without Product + founder.
 
 ## 9. Change log
 
-- **2026-09-20** — First map from `main` @ `2e6d58d` for Company Brain v0.2.1 Platform seating.
+- **2026-09-20** — First map from `main` @ `2e6d58d` for Company Brain v0.2.1 Platform seating. Landed on `main` as #368.
+- **2026-09-20 P2** — Live SQL probe: ALCR missing notify ledger / WhatsApp threads / SMS allowance; staging has them. Runtime no longer claims **sent** when those objects are missing. Apply remains ops/SQL Editor.
