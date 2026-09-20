@@ -317,5 +317,5 @@ Company Brain §7. Do not reorder without Product + founder.
 
 ## 9. Change log
 
-- **2026-09-20** — First map from `main` @ `2e6d58d` for Company Brain v0.2.1 Platform seating.
+- **2026-09-20** — First map from `main` @ `2e6d58d` for Company Brain v0.2.1 Platform seating. Landed on `main` as #368.
 - **2026-09-20 P2** — Live SQL probe: ALCR missing notify ledger / WhatsApp threads / SMS allowance; staging has them. Runtime no longer claims **sent** when those objects are missing. Apply remains ops/SQL Editor.

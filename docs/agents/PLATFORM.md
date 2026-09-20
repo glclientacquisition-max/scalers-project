@@ -22,6 +22,8 @@ Use for database migrations, auth membership, environment/deploy, and any change
 
 Also owns: merge conflicts on shared files; defining new stable function signatures before feature lanes land.
 
+**As-is inventory** (voice, notify, WhatsApp, wallet, Brain SoR, ladder jobs): [`../platform/PLATFORM_SYSTEM_MAP.md`](../platform/PLATFORM_SYSTEM_MAP.md). Read it before seating channel or delivery work. Wedge first.
+
 ## Do not touch (unless unblocking a contract)
 
 - Deep speech DSP / barge-in tuning (Voice)

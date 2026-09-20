@@ -19,6 +19,8 @@ describe("inbox outside and inside anatomy", () => {
   it("defines list as who, one preview, stamp or time, one dock verb", () => {
     assert.match(calls, /Who first\. Work second\. Stamp or time as meta/);
     assert.match(calls, /Do not stack a second detail line under Work on mixed filters/);
+    assert.match(calls, /Needs you next step/);
+    assert.match(row, /inboxNeedsYouNextStep/);
     assert.match(calls, /Hold sort/);
     assert.match(calls, /Anytime stays on List/);
     assert.match(calls, /Reopen lives on the call, never beside Done on the list/);

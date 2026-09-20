@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/deskRow";
 import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
 import { contactFromInboxHref, inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
-import { inboxListDockRecipe } from "@/lib/inboxListVerbs";
+import { inboxListDockRecipe, inboxNeedsYouNextStep } from "@/lib/inboxListVerbs";
 import {
   itemSignalLabel,
   type InboxItem,
@@ -80,7 +80,13 @@ function inboxCopy(
     showJob,
     showHold,
     showMixed,
+    nextStep: inboxNeedsYouNextStep(item, vertical),
   };
+}
+
+function InboxNextStep({ line }: { line: string | null }) {
+  if (!line) return null;
+  return <p className={`mt-0.5 text-xs text-ink-soft ${deskPreviewClass}`}>{line}</p>;
 }
 
 function inboxContactHref(item: InboxItem, purpose: InboxPurposeFilterId, ret?: InboxReturn) {
@@ -186,6 +192,7 @@ export function InboxTableRow({
     when,
     hasJob,
     showHold,
+    nextStep,
   } = inboxCopy(item, purpose, vertical, businessName, ret);
 
   const live = item.purpose === "live";
@@ -212,6 +219,7 @@ export function InboxTableRow({
               >
                 {item.headline}
               </p>
+              <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
@@ -236,6 +244,7 @@ export function InboxTableRow({
               >
                 {hasJob ? visit : stamp}
               </p>
+              <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
@@ -261,6 +270,7 @@ export function InboxTableRow({
                 {who}
               </p>
               <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
+              <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
           <td className={`${deskRowMutedClass} min-w-[7rem] px-5 py-4 align-top`}>
@@ -299,7 +309,7 @@ export function InboxPhoneRow({
   vertical?: string | null;
   ret?: InboxReturn;
 }) {
-  const { who, message, openHref, needed, visit, when, showJob, showHold } =
+  const { who, message, openHref, needed, visit, when, showJob, showHold, nextStep } =
     inboxCopy(item, purpose, vertical, businessName, ret);
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
@@ -317,6 +327,7 @@ export function InboxPhoneRow({
       <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
         {work}
       </p>
+      <InboxNextStep line={nextStep} />
     </div>
   );
 

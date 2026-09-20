@@ -55,7 +55,7 @@ Cross-referenced. Product rules win when sources disagree.
 From `.cursor/rules/scalers-design-ux.mdc`:
 
 1. **Copy:** No fluff, no instructional subheaders, no em/en dashes in UI strings. Labels are verbs or nouns the owner already knows.
-2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side from `lg`; below `lg`, stack the same two panes. One composition at every width. Phone list rows. `md+` tables. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`). List preview is one ellipsized line (`deskPreviewClass`). Full Want / Done / mood / next stay on `/calls/[id]`.
+2. **Density:** Tables over stacked cards for Calls, Requests, Appointments, catalogs. Split pane for call detail (summary left, transcript right). Desktop side-by-side from `lg`; below `lg`, stack the same two panes. One composition at every width. Phone list rows. `md+` tables. `min-w-0` on text. Hits never shrink below 44px. List verbs share one box (`btnDock`). List preview is one ellipsized line (`deskPreviewClass`). Needs you may restate the dock verb as one muted next-step line under that preview. Full Want / Done / mood / next stay on `/calls/[id]`.
 3. **Action:** Primary CTA fill `#005CCC` (white label), largest hit. Brand ribbon and focus remain `#0096FF`. Sticky Save top-right under the desk header. Secondary actions muted. Confirm, Done, Call, and WhatsApp use `deskHitClass` (`h-12 w-12`). Label length does not change the hit.
 4. **Nav:** One layout per dataset. Primary destinations: one `DESK_LINKS` list. Bottom tabs below `md`. Icon rail on `md+`. Nested settings sidebar with non-clickable category headers (`uppercase tracking-wide text-gray-500` or `text-ink-soft`, no hover, not links).
 5. **Tech:** Tailwind utilities only for layout/chrome. Focus: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`. Container padding `p-4`–`p-6`.
@@ -142,7 +142,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Usage, Profile. `/wallet` stays the
 - Scan, do not educate.
 - Prefer Confirm, Save, Reply on WhatsApp. Lists have no Open or View column. Tap the row to open the record. Call is a muted handset in the Action dock, not its own column.
 - Stamps name the next action in the workspace niche: Confirm visit, Pickup, Confirm booking, Human asked, Missed.
-- Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday). Work is one truncated line, never the hangup paragraph.
+- Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday). Work is one truncated line, never the hangup paragraph. Needs you may add one muted next-step line that restates the dock (`inboxNeedsYouNextStep`).
 - Ban: em dash, en dash, “How to test” as a story, “Coming soon” filler.
 - WhatsApp prefill is owner-facing: no dashes.
 
