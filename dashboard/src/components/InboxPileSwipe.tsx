@@ -167,7 +167,7 @@ export function InboxPileSwipe({
       selecting: Boolean(ui?.selecting),
     });
     const next = purposeAfterSwipe(purpose, dir);
-    if (!next || !pileHrefs[next]) {
+    if (!dir || !next || !pileHrefs[next]) {
       setShift(0, true);
       return;
     }
