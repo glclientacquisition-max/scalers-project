@@ -33,6 +33,7 @@ describe("desk shell chrome", () => {
   const load = read("dashboard/src/lib/inboxLoad.ts");
   const calls = read("dashboard/src/app/(desk)/calls/page.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
+  const homeHeader = read("dashboard/src/components/HomeOverviewHeader.tsx");
   const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const wallet = read("dashboard/src/app/(desk)/wallet/page.tsx");
   const settingsUi = read("dashboard/src/components/settingsUi.tsx");
@@ -112,7 +113,8 @@ describe("desk shell chrome", () => {
     assert.match(wallet, /<h1 className=\{deskListTitleClass\}>Usage<\/h1>/);
     assert.doesNotMatch(wallet, /<h1 className=\{deskListTitleClass\}>Wallet<\/h1>/);
     assert.doesNotMatch(home, />Overview</);
-    assert.match(home, /deskListTitleClass/);
+    assert.match(home, /HomeOverviewHeader/);
+    assert.match(homeHeader, /deskListTitleClass/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.match(settingsShell, /<SettingsPageHeader[\s\S]*?index/);
     assert.doesNotMatch(
@@ -157,12 +159,17 @@ describe("desk shell chrome", () => {
     assert.match(settingsUi, />Profile</);
     assert.match(settingsShell, /<SignOutButton/);
     assert.doesNotMatch(home, /Sign out/);
-    assert.match(home, /BrandLockup/);
-    assert.match(home, /name="Scalers"/);
-    assert.match(home, /size="sm"/);
-    assert.match(home, /markOnly/);
-    assert.match(home, /md:hidden/);
-    assert.doesNotMatch(home, /size="lg"/);
+    assert.match(home, /HomeOverviewHeader/);
+    assert.match(homeHeader, /BrandLockup/);
+    assert.match(homeHeader, /name="Scalers"/);
+    assert.match(homeHeader, /size="xs"/);
+    assert.match(homeHeader, /markOnly/);
+    assert.match(homeHeader, /md:hidden/);
+    assert.match(homeHeader, /href=\{null\}/);
+    assert.match(homeHeader, /aria-label=\{`Scalers\. \$\{business\}`\}/);
+    assert.doesNotMatch(homeHeader, /size="sm"/);
+    assert.doesNotMatch(homeHeader, /size="lg"/);
+    assert.doesNotMatch(home, /BrandLockup/);
     assert.doesNotMatch(home, /nairobiGreeting/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.doesNotMatch(contacts, /BrandLockup/);

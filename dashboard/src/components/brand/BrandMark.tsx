@@ -5,13 +5,22 @@ import Link from "next/link";
 import { useState } from "react";
 import { brandAssets } from "@/components/brand/assets";
 
-type Size = "sm" | "md" | "lg";
+type Size = "xs" | "sm" | "md" | "lg";
 
 /** Average, readable chrome sizes — icon stays legible beside the name. */
 const SIZE: Record<
   Size,
   { box: string; img: string; type: string; gap: string; width: number; height: number; context: string }
 > = {
+  xs: {
+    box: "h-6 w-6",
+    img: "h-6 w-6",
+    type: "text-base leading-none",
+    gap: "gap-1.5",
+    width: 24,
+    height: 24,
+    context: "text-[9px]",
+  },
   sm: {
     box: "h-8 w-8",
     img: "h-8 w-8",
@@ -49,7 +58,7 @@ type BrandLockupProps = {
   size?: Size;
   className?: string;
   priority?: boolean;
-  /** Icon only. Use in the md+ destination rail. */
+  /** Icon only. Phone Overview uses `xs`; the md+ destination rail uses `sm`. */
   markOnly?: boolean;
 };
 

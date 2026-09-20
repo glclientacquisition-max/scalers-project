@@ -19,7 +19,6 @@ import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import {
   btnGhost,
   btnPrimary,
-  deskListTitleClass,
   deskPreviewClass,
   deskShiftClass,
   focusRingVisible,
@@ -35,7 +34,7 @@ import { nicheCopy } from "@/lib/inboxNiche";
 import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
-import { BrandLockup } from "@/components/brand/BrandMark";
+import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
@@ -176,17 +175,7 @@ export default async function HomeOverviewPage() {
 
   return (
     <div className="w-full min-w-0">
-      <header className="min-w-0">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 md:hidden" aria-hidden>
-            <BrandLockup href={null} name="Scalers" size="sm" markOnly />
-          </span>
-          <h1 className={`${deskListTitleClass} min-w-0 truncate`}>{business}</h1>
-        </div>
-        <p className="mt-1 text-sm text-ink-soft">
-          <time dateTime={today.iso}>{today.label}</time>
-        </p>
-      </header>
+      <HomeOverviewHeader business={business} today={today} />
 
       {inbox.partialError ? (
         <div className="mt-6">

@@ -9,25 +9,41 @@ function read(rel) {
 
 describe("home overview craft", () => {
   const page = read("dashboard/src/app/(desk)/home/page.tsx");
+  const headerFile = read("dashboard/src/components/HomeOverviewHeader.tsx");
   const triage = read("dashboard/src/lib/callsTriage.ts");
 
   it("titles Overview with the workspace name and a quiet phone mark", () => {
-    const header = page.slice(page.indexOf("<header"), page.indexOf("</header>"));
+    const header = headerFile.slice(headerFile.indexOf("<header"), headerFile.indexOf("</header>"));
     const title = header.slice(header.indexOf("<h1"), header.indexOf("</h1>"));
+    assert.match(page, /<HomeOverviewHeader business=\{business\} today=\{today\} \/>/);
+    const lockup = read("dashboard/src/components/brand/BrandMark.tsx");
+    const xs = lockup.slice(lockup.indexOf("xs:"), lockup.indexOf("sm:"));
     assert.match(title, /deskListTitleClass/);
     assert.match(title, /\{business\}/);
+    assert.match(title, /min-w-0 truncate/);
+    assert.match(title, /aria-label=\{`Scalers\. \$\{business\}`\}/);
     assert.doesNotMatch(title, /BrandLockup/);
     assert.doesNotMatch(title, /name="Scalers"/);
     assert.doesNotMatch(title, /size="lg"/);
     assert.doesNotMatch(header, /size="lg"/);
+    assert.doesNotMatch(header, /size="sm"/);
     assert.match(header, /BrandLockup/);
+    assert.match(header, /href=\{null\}/);
     assert.match(header, /name="Scalers"/);
-    assert.match(header, /size="sm"/);
+    assert.match(header, /size="xs"/);
     assert.match(header, /markOnly/);
     assert.match(header, /md:hidden/);
+    assert.match(header, /shrink-0/);
+    assert.match(header, /min-h-11/);
+    assert.match(header, /aria-hidden/);
+    assert.match(header, /min-w-0 flex-1/);
     assert.match(header, /<time dateTime=\{today\.iso\}>/);
-    assert.match(header, /text-sm text-ink-soft/);
+    assert.match(header, /truncate text-sm text-ink-soft/);
     assert.doesNotMatch(header, /<span className="min-w-0 truncate">\{business\}<\/span>/);
+    assert.doesNotMatch(lockup, /min-h-11/);
+    assert.match(xs, /box: "h-6 w-6"/);
+    assert.match(xs, /width: 24/);
+    assert.match(xs, /height: 24/);
     assert.match(page, /nairobiDateLabel\(\)/);
     assert.match(triage, /export function nairobiDateLabel/);
     assert.doesNotMatch(page, /nairobiGreeting/);
@@ -38,6 +54,9 @@ describe("home overview craft", () => {
     assert.doesNotMatch(header, /sticky/);
     assert.doesNotMatch(page, />Overview</);
     assert.doesNotMatch(page, /Sign out/);
+    const devHome = read("dashboard/src/app/dev/home/page.tsx");
+    assert.match(devHome, /HomeOverviewHeader/);
+    assert.match(devHome, /DASHBOARD_OPEN/);
   });
 
   it("maps Inbox queues and does not invent Online", () => {
