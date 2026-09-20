@@ -74,6 +74,10 @@ describe("desk motion canon", () => {
     assert.match(motion, /export const deskLivePingClass = "desk-live-ping"/);
     assert.match(motion, /export const deskShiftClass/);
     assert.match(motion, /export const deskJustLandedClass = "desk-just-landed"/);
+    assert.match(motion, /export const DESK_NOTICE_MS = 150/);
+    assert.match(motion, /export const deskNoticeClass = "desk-notice"/);
+    assert.match(motion, /export const deskNoticeOpenClass = "is-open"/);
+    assert.match(motion, /export const deskNoticeLeaveClass = "is-leaving"/);
   });
 
   it("names desk verbs and kills them under reduced motion", () => {
@@ -84,19 +88,40 @@ describe("desk motion canon", () => {
     assert.match(css, /\.desk-live-ping/);
     assert.match(css, /background: var\(--accent-soft\)/);
     assert.match(css, /box-shadow: inset 3px 0 0 var\(--accent\)/);
+    assert.match(css, /\.desk-notice \{/);
+    assert.match(css, /transform: translateY\(12px\)/);
+    assert.match(css, /transform: translateY\(8px\)/);
+    assert.match(css, /transition: opacity var\(--motion-fast\) ease-out, transform var\(--motion-fast\) ease-out/);
     const reduce = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
     assert.match(reduce, /\.desk-live-ping/);
     assert.match(reduce, /\.desk-just-landed/);
     assert.match(reduce, /\.desk-shift/);
+    assert.match(reduce, /\.desk-notice/);
     assert.match(reduce, /\.landing-rise/);
     assert.match(reduce, /\.landing-drift/);
+    assert.match(reduce, /animation-duration: 0\.01ms !important/);
+    assert.match(reduce, /transition-duration: 0\.01ms !important/);
     assert.match(master, /\*\*pending\*\*/);
     assert.match(master, /\*\*live\*\*/);
     assert.match(master, /\*\*land\*\*/);
     assert.match(master, /\*\*shift\*\*/);
     assert.match(master, /\*\*press\*\*/);
+    assert.match(master, /\| Shell \|/);
+    assert.match(master, /\| List \|/);
+    assert.match(master, /\| Detail \|/);
+    assert.match(master, /\| Notice \|/);
+    assert.match(master, /\| Modal \|/);
+    assert.match(master, /\| State \|/);
+    assert.match(master, /\| Empty \/ loading \|/);
+    assert.match(master, /\| Numbers \|/);
+    assert.match(master, /\| Form \|/);
+    assert.match(master, /\| Route \|/);
+    assert.match(master, /DeskNotice/);
     assert.match(constitution, /Desk motion verbs/);
+    assert.match(constitution, /DeskNotice/);
     assert.match(skill, /pending.*live.*land.*shift.*press/s);
+    assert.match(skill, /DeskNotice/);
+    assert.match(skill, /motion\/react/);
   });
 
   it("ships LivePing, land scope, and pending spinner", () => {
@@ -113,9 +138,10 @@ describe("desk motion canon", () => {
 
   it("does not install a motion-graphics stack", () => {
     const pkg = read("dashboard/package.json");
-    assert.doesNotMatch(pkg, /lottie|framer-motion|gsap|animate\.css/i);
+    assert.doesNotMatch(pkg, /lottie|framer-motion|gsap|animate\.css|"motion"/i);
     assert.doesNotMatch(land, /landing-rise|landing-drift/);
     assert.doesNotMatch(row, /landing-rise|animate-pulse/);
+    assert.doesNotMatch(motion, /from ["']motion\/react["']|framer-motion|spring/i);
   });
 });
 
@@ -125,6 +151,8 @@ describe("desk motion wiring", () => {
   const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const home = read("dashboard/src/app/(desk)/home/page.tsx");
   const dialog = read("dashboard/src/components/ui/DeskDialog.tsx");
+  const notice = read("dashboard/src/components/ui/DeskNotice.tsx");
+  const toast = read("dashboard/src/components/InboxArchiveToast.tsx");
   const catalogPage = read("dashboard/src/app/dev/motion/page.tsx");
   const catalog = read("dashboard/src/app/dev/motion/MotionCatalog.tsx");
 
@@ -158,6 +186,9 @@ describe("desk motion wiring", () => {
     assert.match(catalog, /Shift/);
     assert.match(catalog, /deskShiftClass/);
     assert.match(catalog, /btnPrimary/);
+    assert.match(catalog, /Notice/);
+    assert.match(catalog, /useNotify/);
+    assert.match(catalog, /notify\("Saved"\)/);
   });
 
   it("shifts Inbox and Home chrome with named properties", () => {
@@ -167,6 +198,12 @@ describe("desk motion wiring", () => {
     assert.match(contacts, /deskShiftClass/);
     const nav = read("dashboard/src/components/DeskNav.tsx");
     assert.match(nav, /deskShiftClass/);
+    const tabs = read("dashboard/src/components/ui/FilterTabs.tsx");
+    assert.match(tabs, /filterTabClass/);
+    assert.doesNotMatch(tabs, /layoutId/);
+    const wallet = read("dashboard/src/app/(desk)/wallet/page.tsx");
+    assert.match(wallet, /key=\{row\.id\}/);
+    assert.doesNotMatch(wallet, /count-up|requestAnimationFrame|layoutId/);
   });
 
   it("replaces leftover duration-150 and transition-all with deskShiftClass", () => {
@@ -187,5 +224,25 @@ describe("desk motion wiring", () => {
     assert.match(dock, /pendingSpinnerClass/);
     assert.match(dock, /sendPending/);
     assert.doesNotMatch(dock, /animate-pulse/);
+  });
+
+  it("uses one DeskNotice channel for toasts and keeps dialogs enter-static", () => {
+    assert.match(notice, /export function DeskNotice/);
+    assert.match(notice, /export function useNotify/);
+    assert.match(notice, /export function NotifyHost/);
+    assert.match(notice, /mx-auto w-full max-w-md/);
+    assert.match(notice, /role="status"/);
+    assert.match(notice, /desk-tabbar-h/);
+    assert.match(notice, /z-30/);
+    assert.match(notice, /usePrefersReducedMotion/);
+    assert.match(notice, /DESK_NOTICE_MS/);
+    assert.doesNotMatch(notice, /layoutId|spring|framer-motion|motion\/react/);
+    assert.match(toast, /DeskNotice open=\{!!notice\}/);
+    assert.doesNotMatch(toast, /createPortal/);
+    const gate = read("dashboard/src/components/ui/usePrefersReducedMotion.ts");
+    assert.match(gate, /prefers-reduced-motion: reduce/);
+    assert.match(gate, /export function useReducedMotionGate/);
+    const root = read("dashboard/src/app/layout.tsx");
+    assert.match(root, /<NotifyHost \/>/);
   });
 });

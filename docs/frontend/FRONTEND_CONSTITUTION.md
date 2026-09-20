@@ -45,7 +45,7 @@ Cross-referenced. Product rules win when sources disagree.
 | Doherty threshold | Doherty & Thadhani 1982 | Pending spinners on mutations. No landing-style rise on desk. | Page-wide animation |
 | Color / contrast | WCAG 2.2 SC 1.4.3, 1.4.11 | Ink `#0A192F` on canvas. Link text `#005CCC`. `#0096FF` on white is **~3.09:1** (fails AA body and `text-sm` button labels). Filled primaries use white on `#005CCC` (~6:1). `#0096FF` is the focus ring, tab underline, and brand wash. Never use `#0096FF` for small links. | Brand-blue body copy; white on `#0096FF` |
 | Touch / Kenya mobile | Apple 44pt; Material 48dp; WCAG 2.5.8 24px | Design for one-thumb morning triage on a mid-range Android. Container `px-4` / `sm:px-6`. | Hover-only actions |
-| Reduced motion | WCAG 2.2 SC 2.3.3 | `prefers-reduced-motion` kills landing rise/drift, desk live ping, land wash, and the pending spinner. | Orbs, drift, blobs, Lottie, page-wide loops |
+| Reduced motion | WCAG 2.2 SC 2.3.3 | `prefers-reduced-motion` kills landing rise/drift, desk live ping, land wash, the pending spinner, shift, and notice enter/exit. | Orbs, drift, blobs, Lottie, page-wide loops |
 | Situation awareness | Endsley 1995; Klein RPD | Stamps and captions name the **next action** (comprehension). Home units name what is at risk now (projection). | KPI tiles, conversion dashboards, taxonomy chips (Job, Hold) |
 
 ---
@@ -154,7 +154,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 - Sign out is at the rail foot on `md+` and in the phone header below `md`. It is never a sixth tab.
 - Do not also show header text links. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.
-- Desk motion verbs: **pending** (spinner on the control), **live** (ping on a Live stamp and the Home bulletin), **land** (one-shot wash on a row that just appeared), **shift** (named-property 150ms on hover and selected), **press** (`active:scale-[0.99]` on `btnPrimary`). Skill: `.cursor/skills/desk-motion/SKILL.md`. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
+- Desk motion verbs: **pending** (spinner on the control), **live** (ping on a Live stamp and the Home bulletin), **land** (one-shot wash on a row that just appeared), **shift** (named-property 150ms on hover, selected, and `DeskNotice` enter/exit), **press** (`active:scale-[0.99]` on `btnPrimary`). Surface types: shell none, lists land, detail instant, notice `DeskNotice`, modal enter-static, state shift, empty/loading static or pending, numbers instant, forms shift, routes instant. Skill: `.cursor/skills/desk-motion/SKILL.md`. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
 - Landing may keep rise/drift behind `prefers-reduced-motion`. Desk never uses `.landing-rise`.
 - No glass on desk. Header and tab bar may keep light `backdrop-blur`.
 - Radius: `rounded-xl` / `rounded-2xl` / `rounded-panel`. Not pill-everything.
