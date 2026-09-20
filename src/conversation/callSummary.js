@@ -3,6 +3,7 @@
 
 const {
   highWaterPrimaryIntent,
+  hangupResults,
   normalizePrimaryIntent,
   VISIT_REQUESTED_NOTE,
   resultStatus,
@@ -40,11 +41,7 @@ function safeGoalDescription(raw) {
  */
 function deriveCallSummary(opts = {}) {
   const state = opts.brainState || {};
-  const results = Array.isArray(opts.toolResults)
-    ? opts.toolResults
-    : Array.isArray(state.actions?.lastResults)
-      ? state.actions.lastResults
-      : [];
+  const results = hangupResults(state, opts.toolResults);
 
   let primaryIntent =
     highWaterPrimaryIntent({

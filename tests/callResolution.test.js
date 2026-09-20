@@ -160,6 +160,32 @@ describe('deriveCallResolution', () => {
     assert.equal(out.primaryIntent, 'human');
   });
 
+  it('keeps the exact requested-visit note after a later END turn wipes lastResults', () => {
+    let state = createBrainState();
+    state.intent = 'book_visit';
+    state = recordActionResults(state, [
+      {
+        action: 'create_appointment',
+        status: 'succeeded',
+        appointmentStatus: 'requested',
+        fingerprint: 'v-keep',
+      },
+    ]);
+    state = recordActionResults(state, [
+      {
+        action: 'save_caller_info',
+        status: 'succeeded',
+        name: 'Amina',
+      },
+    ]);
+    state.resolution.nextBestAction = 'END';
+    state.resolution.reason = 'The response included a permitted end-call action.';
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.resolution, 'resolved');
+    assert.equal(out.resolutionNote, VISIT_REQUESTED_NOTE);
+    assert.doesNotMatch(out.resolutionNote || '', /permitted end-call|Answered/i);
+  });
+
   it('keeps last-turn intent when no work row was saved', () => {
     const state = createBrainState();
     state.intent = 'booking';

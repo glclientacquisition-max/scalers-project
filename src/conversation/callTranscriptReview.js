@@ -3,7 +3,11 @@
 // Gemini never hears live audio. Transcript text is untrusted.
 
 const { isPlausibleCallerName } = require('./entityExtraction');
-const { VISIT_REQUESTED_NOTE, HOLD_OPEN_NOTE } = require('./callResolution');
+const {
+  VISIT_REQUESTED_NOTE,
+  HOLD_OPEN_NOTE,
+  hangupResults,
+} = require('./callResolution');
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { sanitizeStoredCallerName } = require('./callerNameQuality');
 const { parseStoredContactPhone } = require('./contactIdentity');
@@ -279,9 +283,7 @@ function parseReviewJson(text) {
 }
 
 function toolFlagsFromBrain(brainState) {
-  const results = Array.isArray(brainState?.actions?.lastResults)
-    ? brainState.actions.lastResults
-    : [];
+  const results = hangupResults(brainState);
   const ok = (action) =>
     results.some(
       (row) =>
@@ -698,7 +700,11 @@ async function defaultSave({ callSid, merged, review, derived }) {
     patch.text = merged.reason;
   }
   await db.mergeCallSummaryMeta({ callSid, patch });
-  if (merged.applied.intent || merged.applied.resolution) {
+  if (
+    merged.applied.intent ||
+    merged.applied.resolution ||
+    derived?.resolutionNote
+  ) {
     await db.setCallResolution({
       callSid,
       resolution: merged.resolution,

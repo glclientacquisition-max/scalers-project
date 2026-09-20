@@ -107,6 +107,33 @@ describe('deriveCallSummary', () => {
     assert.doesNotMatch(summary.reason, /Carpet cleaning|Saturday/);
   });
 
+  it('keeps the exact requested-visit hangup after a later non-visit tool turn', () => {
+    let state = observeCallerTurn(createBrainState(), {
+      text: 'Are you open Saturday?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+    });
+    state.intent = 'hours';
+    state = recordActionResults(state, [
+      {
+        action: 'create_appointment',
+        status: 'succeeded',
+        fingerprint: 'v1',
+        value: {
+          serviceName: 'Carpet cleaning',
+          whenText: 'Saturday 9 to 11',
+          name: 'Amina',
+        },
+        record: { service_name: 'Carpet cleaning' },
+      },
+    ]);
+    state = recordActionResults(state, [
+      { action: 'save_caller_info', status: 'succeeded', name: 'Amina' },
+    ]);
+    const summary = deriveCallSummary({ brainState: state });
+    assert.equal(summary.reason, 'Visit request saved — confirm on desk.');
+  });
+
   it('keeps confirmed visit language after Confirm', () => {
     const state = recordActionResults(createBrainState(), [
       {
@@ -149,5 +176,10 @@ describe('K1 exact hangup string source scan', () => {
 
   it('exports the exact Product constant', () => {
     assert.equal(require('../src/conversation/callResolution').VISIT_REQUESTED_NOTE, exact);
+  });
+
+  it('persists visit honesty at tool-save before hangup review', () => {
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    assert.match(server, /persistCallResolution\(callSid, 'tool', \{ review: false \}\)/);
   });
 });
