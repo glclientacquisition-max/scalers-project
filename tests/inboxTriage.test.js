@@ -41,6 +41,7 @@ describe("inbox overflow persistence", () => {
   const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
   const select = read("dashboard/src/components/InboxRowSelect.tsx");
   const actions = read("dashboard/src/lib/inboxLeadActions.ts");
+  const writers = read("dashboard/src/app/(desk)/calls/inboxTriageActions.ts");
   const purpose = read("dashboard/src/lib/inboxPurpose.ts");
   const triage = read("dashboard/src/lib/inboxTriage.ts");
   const sql = read("docs/supabase/inbox_triage.sql");
@@ -48,12 +49,14 @@ describe("inbox overflow persistence", () => {
   const ui = read("dashboard/src/components/InboxRowUi.tsx");
 
   it("writes overflow verbs instead of patching local unread/mute/pin state", () => {
-    assert.match(actions, /inboxToggleRead/);
+    assert.match(writers, /export async function inboxToggleRead/);
+    assert.match(writers, /export async function inboxSnooze/);
     assert.match(actions, /inboxToggleMute/);
     assert.match(actions, /inboxTogglePin/);
     assert.match(actions, /inboxAssign/);
     assert.match(actions, /inboxAddLabel/);
-    assert.match(actions, /inboxSnooze/);
+    assert.doesNotMatch(actions, /export async function inboxToggleRead/);
+    assert.doesNotMatch(actions, /export async function inboxSnooze/);
     assert.match(actions, /return inboxArchive\(item\)/);
     assert.match(overflow, /inboxTogglePin\(item\)/);
     assert.doesNotMatch(overflow, /inboxSnooze\(item\)/);
@@ -62,6 +65,7 @@ describe("inbox overflow persistence", () => {
     assert.doesNotMatch(overflow, /inboxAssign/);
     assert.doesNotMatch(overflow, /inboxAddLabel/);
     assert.doesNotMatch(overflow, /inboxDelete/);
+    assert.doesNotMatch(overflow, /inboxToggleRead/);
     assert.doesNotMatch(overflow, /patch\(\{ unread:/);
     assert.doesNotMatch(overflow, /patch\(\{ muted:/);
     assert.doesNotMatch(overflow, /patch\(\{ pinned:/);

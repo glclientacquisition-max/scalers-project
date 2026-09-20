@@ -510,7 +510,23 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.match(row, /RequestStatusToggle/);
     assert.match(row, /CallLink/);
     assert.match(row, /WhatsAppLink/);
+    assert.match(row, /inboxListDockRecipe\(item\)/);
+    assert.match(row, /inboxNeedsYouNextStep\(item, vertical\)/);
     assert.doesNotMatch(overflow, /Confirm/);
     assert.doesNotMatch(overflow, /WhatsApp/);
+  });
+
+  it("owner facade keeps columns via writers, not snooze or unread verbs", () => {
+    const actions = read("dashboard/src/lib/inboxLeadActions.ts");
+    const writers = read("dashboard/src/app/(desk)/calls/inboxTriageActions.ts");
+    const sql = read("docs/supabase/inbox_triage.sql");
+    assert.doesNotMatch(actions, /export async function inboxToggleRead/);
+    assert.doesNotMatch(actions, /export async function inboxSnooze/);
+    assert.match(actions, /export async function inboxUnarchive/);
+    assert.match(actions, /export async function inboxMarkSeen/);
+    assert.match(writers, /export async function inboxToggleRead/);
+    assert.match(writers, /export async function inboxSnooze/);
+    assert.match(sql, /inbox_read_at/);
+    assert.match(sql, /inbox_snoozed_until/);
   });
 });

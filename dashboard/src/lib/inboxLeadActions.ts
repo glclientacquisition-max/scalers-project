@@ -5,10 +5,8 @@ import {
   inboxAddLabel as writeInboxLabel,
   inboxAssignTeammate as writeInboxAssignee,
   inboxMarkSeen as writeInboxSeen,
-  inboxSnooze as writeInboxSnooze,
   inboxToggleMute as writeInboxMute,
   inboxTogglePin as writeInboxPin,
-  inboxToggleRead as writeInboxRead,
 } from "@/app/(desk)/calls/inboxTriageActions";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
@@ -59,11 +57,6 @@ export async function inboxDelete(item: InboxItem) {
   return inboxArchive(item);
 }
 
-export async function inboxToggleRead(item: InboxItem) {
-  if (!item.callId) return { error: "Missing call." };
-  return writeInboxRead(item.callId, item.unread);
-}
-
 /** Stamp `inbox_read_at` when the owner opens `/calls/[id]`. Clears the unread dot, not Needs you. */
 export async function inboxMarkSeen(callId: string) {
   const id = String(callId || "").trim();
@@ -89,9 +82,4 @@ export async function inboxAssign(item: InboxItem, assignee: string) {
 export async function inboxAddLabel(item: InboxItem, label: string) {
   if (!item.callId) return { error: "Missing call." };
   return writeInboxLabel(item.callId, label);
-}
-
-export async function inboxSnooze(item: InboxItem) {
-  if (!item.callId) return { error: "Missing call." };
-  return writeInboxSnooze(item.callId);
 }

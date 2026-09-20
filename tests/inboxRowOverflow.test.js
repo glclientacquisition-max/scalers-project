@@ -91,6 +91,8 @@ describe("inbox row overflow menu", () => {
     assert.doesNotMatch(overflow, /Add label/);
     assert.doesNotMatch(overflow, /id: "delete"/);
     assert.doesNotMatch(overflow, /inboxDelete/);
+    assert.match(overflow, /if \(id === "archive" \|\| id === "unarchive"\) \{\n      patch\(\{ hidden: true \}\);/);
+    assert.doesNotMatch(overflow, /id === "mark_done"[\s\S]{0,400}patch\(\{ hidden/);
   });
 
   it("does not render Pin UI on the list", () => {
