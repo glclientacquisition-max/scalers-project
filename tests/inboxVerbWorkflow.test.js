@@ -482,7 +482,8 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.doesNotMatch(ticket, /MarkLeadUnarchiveButton/);
     assert.doesNotMatch(ticket, /MarkLeadDoneButton/);
     assert.match(view, /InboxPurposeChip/);
-    assert.match(view, /updateLeadStatus\(callId, archived \? "new" : "archived"\)/);
+    assert.match(view, /id === "mark_done" \? "resolved"/);
+    assert.match(view, /updateLeadStatus\(callId, next\)/);
   });
 
   it("FilterTabs have no Unread or Snoozed. Archived is a folder row", () => {

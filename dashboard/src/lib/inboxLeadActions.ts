@@ -1,5 +1,5 @@
 import { updateAppointmentStatus } from "@/app/(desk)/appointments/actions";
-import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { logWhatsAppFollowUp, updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { updateServiceRequestStatus } from "@/app/(desk)/requests/actions";
 import {
   inboxAddLabel as writeInboxLabel,
@@ -16,6 +16,12 @@ import type { InboxItem } from "@/lib/inboxPurpose";
 export async function inboxMarkDone(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
   return updateLeadStatus(item.callId, "resolved");
+}
+
+/** wa.me click: same pile close as Mark done, plus "WhatsApp follow-up opened". */
+export async function inboxWhatsAppFollowUp(item: InboxItem) {
+  if (!item.callId) return { error: "Missing call." };
+  return logWhatsAppFollowUp(item.callId);
 }
 
 /** Same handler as ticket Archive (`MarkLeadArchiveButton` → `updateLeadStatus`). */

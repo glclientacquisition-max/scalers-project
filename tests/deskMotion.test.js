@@ -188,4 +188,11 @@ describe("desk motion wiring", () => {
     assert.match(dock, /sendPending/);
     assert.doesNotMatch(dock, /animate-pulse/);
   });
+
+  it("spins Ping teammate with pending while notify is in flight", () => {
+    const ping = read("dashboard/src/components/InboxPingTeammate.tsx");
+    assert.match(ping, /pendingSpinnerClass/);
+    assert.doesNotMatch(ping, /animate-pulse/);
+    assert.doesNotMatch(ping, /transition-all/);
+  });
 });

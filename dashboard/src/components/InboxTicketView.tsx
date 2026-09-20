@@ -32,9 +32,14 @@ import {
   clampTicketSummaryWidth,
 } from "@/lib/ticketSplit";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
+import { InboxPingTeammate, type InboxPingPerson } from "@/components/InboxPingTeammate";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import { inboxMarkSeen } from "@/lib/inboxLeadActions";
-import { inboxTicketOverflowActions } from "@/lib/inboxListVerbs";
+import {
+  inboxTicketCanMarkDone,
+  inboxTicketOverflowActions,
+  type InboxListActionId,
+} from "@/lib/inboxListVerbs";
 import {
   placeInboxOverflowMenu,
   type InboxOverflowAnchor,
@@ -104,10 +109,12 @@ function InboxTicketMore({
   callId,
   backHref,
   archived,
+  canMarkDone,
 }: {
   callId: string;
   backHref: string;
   archived: boolean;
+  canMarkDone: boolean;
 }) {
   const router = useRouter();
   const labelId = useId();
@@ -119,7 +126,7 @@ function InboxTicketMore({
   const [anchor, setAnchor] = useState<InboxOverflowAnchor | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const ignoreUntil = useRef(0);
-  const actions = inboxTicketOverflowActions(archived);
+  const actions = inboxTicketOverflowActions({ archived, canMarkDone });
 
   function placeFromButton() {
     const rect = btnRef.current?.getBoundingClientRect();
@@ -185,16 +192,18 @@ function InboxTicketMore({
     };
   }, [open, busy]);
 
-  async function run() {
+  async function run(id: InboxListActionId) {
     setBusy(true);
-    const res = await updateLeadStatus(callId, archived ? "new" : "archived");
+    const next =
+      id === "mark_done" ? "resolved" : id === "unarchive" || archived ? "new" : "archived";
+    const res = await updateLeadStatus(callId, next);
     setBusy(false);
     if (res.error) {
       setError(res.error);
       return;
     }
     setOpen(false);
-    if (!archived) {
+    if (id === "archive" && !archived) {
       writeInboxArchiveUndo([{ id: callId, callId }]);
       router.push(backHref);
     }
@@ -225,9 +234,9 @@ function InboxTicketMore({
           role="menuitem"
           disabled={busy}
           className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${focusRingVisible} hover:bg-surface-muted disabled:opacity-50`}
-          onClick={() => void run()}
+          onClick={() => void run(action.id)}
         >
-          {busy ? "Saving" : archived ? "Unarchive" : "Archive"}
+          {busy ? "Saving" : action.label}
         </button>
       ))}
       {error ? (
@@ -288,7 +297,11 @@ export function InboxTicketView({
   assistLabel,
   assistNote,
   escalatedLine,
+  escalationDelivery,
+  liveConnectLine,
+  escalatePeople,
   archived,
+  leadStatus,
 }: {
   callId: string;
   backHref: string;
@@ -312,7 +325,11 @@ export function InboxTicketView({
   assistLabel: string | null;
   assistNote: string | null;
   escalatedLine: string | null;
+  escalationDelivery: string | null;
+  liveConnectLine: string | null;
+  escalatePeople: InboxPingPerson[];
   archived: boolean;
+  leadStatus: string | null;
 }) {
   const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -323,6 +340,13 @@ export function InboxTicketView({
   const summaryWRef = useRef<number | null>(null);
   const canConfirm = !archived && String(job?.status || "").toLowerCase() === "requested";
   const canHoldDone = !archived && String(hold?.status || "").toLowerCase() === "open";
+  const canMarkDone = inboxTicketCanMarkDone({
+    archived,
+    purpose,
+    hasJob: Boolean(job),
+    hasHold: Boolean(hold),
+    leadStatus,
+  });
   const dockedAction = canConfirm || canHoldDone || (needsYou && !archived);
 
   useEffect(() => {
@@ -469,9 +493,19 @@ export function InboxTicketView({
           )}
           {callerPhone ? <CallLink number={callerPhone} /> : null}
           {callerPhone ? (
-            <WhatsAppLink number={callerPhone} message={waMessage} variant="icon" />
+            <WhatsAppLink
+              number={callerPhone}
+              message={waMessage}
+              variant="icon"
+              callId={callId}
+            />
           ) : null}
-          <InboxTicketMore callId={callId} backHref={backHref} archived={archived} />
+          <InboxTicketMore
+            callId={callId}
+            backHref={backHref}
+            archived={archived}
+            canMarkDone={canMarkDone}
+          />
         </div>
       </header>
 
@@ -518,6 +552,13 @@ export function InboxTicketView({
               {assistLabel ? <p>Assist: {assistLabel}</p> : null}
               {assistNote ? <p className="[overflow-wrap:anywhere]">{assistNote}</p> : null}
               {escalatedLine ? <p className="[overflow-wrap:anywhere]">{escalatedLine}</p> : null}
+              {escalationDelivery ? (
+                <p className="[overflow-wrap:anywhere]">{escalationDelivery}</p>
+              ) : null}
+              {liveConnectLine ? (
+                <p className="[overflow-wrap:anywhere]">{liveConnectLine}</p>
+              ) : null}
+              <InboxPingTeammate callId={callId} people={escalatePeople} archived={archived} />
               <CallRecording recordingUrl={recordingUrl} />
             </div>
           </aside>

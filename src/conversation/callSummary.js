@@ -75,10 +75,14 @@ function deriveCallSummary(opts = {}) {
       if (when) instructions.push(clean(`Pickup/when: ${when}`, 120));
       if (result.value?.notes) instructions.push(clean(result.value.notes, 160));
     }
-    if (result.action === 'escalate' && result.status === 'succeeded') {
-      actions.push(
-        result.soft ? 'Escalation noted for desk follow-up' : 'Escalation sent to team'
-      );
+    if (result.action === 'escalate' && result.status === 'succeeded' && !result.soft) {
+      actions.push('Escalation sent to team');
+    }
+    if (
+      result.action === 'escalate' &&
+      (result.status === 'failed' || (result.status === 'succeeded' && result.soft))
+    ) {
+      actions.push('Needs human. Notify failed.');
     }
   }
 

@@ -284,7 +284,11 @@ export default function DevInboxPage() {
             assistLabel="Handled"
             assistNote={null}
             escalatedLine={null}
+            escalationDelivery={null}
+            liveConnectLine={null}
+            escalatePeople={[]}
             archived={false}
+            leadStatus="new"
           />
         </div>
         </main>

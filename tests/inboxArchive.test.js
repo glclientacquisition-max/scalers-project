@@ -106,11 +106,13 @@ describe("inbox archive folder and leave verbs", () => {
   });
 
   it("keeps ticket More as Archive, or Unarchive when archived, and stays on the ticket after Unarchive", () => {
-    assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\} archived=\{archived\}/);
-    assert.match(ticket, /archived \? "new" : "archived"/);
-    assert.match(ticket, /archived \? "Unarchive" : "Archive"/);
+    assert.match(ticket, /<InboxTicketMore/);
+    assert.match(ticket, /archived=\{archived\}/);
+    assert.match(ticket, /canMarkDone=\{canMarkDone\}/);
+    assert.match(ticket, /id === "unarchive" \|\| archived \? "new" : "archived"/);
+    assert.match(ticket, /action\.label/);
     assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
-    assert.match(ticket, /if \(!archived\) \{/);
+    assert.match(ticket, /id === "archive" && !archived/);
     assert.match(ticket, /router\.push\(backHref\)/);
     assert.match(ticket, /!archived && String\(job\?\.status/);
     assert.match(ticket, /!archived && String\(hold\?\.status/);
@@ -158,7 +160,7 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(select, /writeInboxArchiveUndo\(archivedRows\)/);
     assert.match(select, /kind === "archive" && item.callId/);
     assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
-    assert.match(ticket, /if \(!archived\) \{/);
+    assert.match(ticket, /id === "archive" && !archived/);
     assert.match(ticket, /router\.push\(backHref\)/);
   });
 });

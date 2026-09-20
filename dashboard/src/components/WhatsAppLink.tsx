@@ -3,8 +3,11 @@
  * Not Scalers staff alerts. Those go out as Meta utility templates.
  */
 
+"use client";
+
 import { DeskHint } from "@/components/ui/DeskHint";
 import { btnGhost, btnPrimary, deskHitClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { logWhatsAppFollowUp } from "@/app/(desk)/calls/actions";
 
 export function waMeHref(rawNumber: string, message?: string): string | null {
   const digits = String(rawNumber || "").replace(/\D/g, "");
@@ -35,6 +38,7 @@ export function WhatsAppLink({
   message,
   variant = "inline",
   className = "",
+  callId = null,
 }: {
   number: string;
   /** Optional visible text; defaults to the number itself. */
@@ -45,9 +49,16 @@ export function WhatsAppLink({
   message?: string;
   variant?: "inline" | "primary" | "icon" | "link" | "ghost";
   className?: string;
+  /** When set, click writes the follow-up note and exits Needs you. */
+  callId?: string | null;
 }) {
   const href = waMeHref(number, message);
   const text = label ?? number;
+  const onOpen = callId
+    ? () => {
+        void logWhatsAppFollowUp(callId);
+      }
+    : undefined;
 
   if (!href) {
     return <span className="font-medium">{text}</span>;
@@ -62,6 +73,7 @@ export function WhatsAppLink({
           rel="noreferrer"
           title="WhatsApp"
           aria-label={`WhatsApp ${number}`}
+          onClick={onOpen}
           className={[
             `${deskHitClass} border border-whatsapp bg-whatsapp text-white`,
             `${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
@@ -81,6 +93,7 @@ export function WhatsAppLink({
         target="_blank"
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
+        onClick={onOpen}
         className={[
           "inline-flex min-h-11 items-center justify-center text-sm font-semibold text-accent-deep hover:underline",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
@@ -99,6 +112,7 @@ export function WhatsAppLink({
         target="_blank"
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
+        onClick={onOpen}
         className={[btnPrimary, "gap-2", className].join(" ")}
       >
         <WhatsAppIcon className="h-4 w-4 text-accent-on-fill" />
@@ -114,6 +128,7 @@ export function WhatsAppLink({
         target="_blank"
         rel="noreferrer"
         aria-label={`WhatsApp ${number}`}
+        onClick={onOpen}
         className={[btnGhost, "gap-2", className].join(" ")}
       >
         <WhatsAppIcon className="h-4 w-4 text-whatsapp" />
@@ -130,6 +145,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
+        onClick={onOpen}
         className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
       >
         <WhatsAppIcon className="h-4 w-4" />
@@ -146,6 +162,7 @@ export function WhatsAppLink({
         rel="noreferrer"
         title={`Chat with ${number} on WhatsApp`}
         aria-label={`Chat with ${number} on WhatsApp`}
+        onClick={onOpen}
         className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-whatsapp text-white ${deskShiftClass} hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
       >
         <WhatsAppIcon className="h-3.5 w-3.5" />
