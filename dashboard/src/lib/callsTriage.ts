@@ -121,19 +121,6 @@ export function nairobiDayStartIso(): string {
   return new Date(`${day}T00:00:00+03:00`).toISOString();
 }
 
-export function nairobiGreeting(): string {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-KE", {
-      timeZone: "Africa/Nairobi",
-      hour: "numeric",
-      hour12: false,
-    }).format(new Date())
-  );
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 /** Nairobi calendar day for Home. Real date, not decorative copy. */
 export function nairobiDateLabel(now = new Date()): { iso: string; label: string } {
   const iso = new Intl.DateTimeFormat("en-CA", {
