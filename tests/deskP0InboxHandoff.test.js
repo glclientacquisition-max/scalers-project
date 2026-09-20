@@ -18,12 +18,13 @@ describe("P0 #1 ticket Mark done", () => {
   const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
   const ticket = read("dashboard/src/components/InboxTicketView.tsx");
 
-  it("offers Mark done on the ticket More menu with the list handler", () => {
+  it("offers Mark done on the ticket action dock with the list handler", () => {
+    const dock = read("dashboard/src/components/InboxTicketActionDock.tsx");
     assert.match(verbs, /export function inboxTicketCanMarkDone/);
     assert.match(verbs, /id: "mark_done", label: "Mark done"/);
-    assert.match(ticket, /inboxTicketOverflowActions\(\{ archived, canMarkDone \}\)/);
-    assert.match(ticket, /id === "mark_done" \? "resolved"/);
-    assert.match(ticket, /updateLeadStatus\(callId, next\)/);
+    assert.match(ticket, /<InboxTicketActionDock/);
+    assert.match(ticket, /canMarkDone=\{canMarkDone\}/);
+    assert.match(dock, /updateLeadStatus\(callId, "resolved"\)/);
   });
 
   it("keeps Archive and hides Mark done on visits, holds, and archived", () => {
@@ -38,6 +39,7 @@ describe("P0 #2 WhatsApp write-back", () => {
   const actions = read("dashboard/src/app/(desk)/calls/actions.ts");
   const row = read("dashboard/src/components/InboxItemRow.tsx");
   const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+  const dock = read("dashboard/src/components/InboxTicketActionDock.tsx");
   const note = read("dashboard/src/lib/whatsappFollowUp.ts");
 
   it("keeps wa.me and writes resolved plus follow-up note on click", () => {
@@ -48,6 +50,8 @@ describe("P0 #2 WhatsApp write-back", () => {
     assert.match(note, /WhatsApp follow-up opened/);
     assert.match(row, /callId=\{item\.callId\}/);
     assert.match(ticket, /callId=\{callId\}/);
+    assert.match(dock, /variant="icon"/);
+    assert.match(dock, /callId=\{callId\}/);
   });
 });
 
@@ -126,8 +130,9 @@ describe("P0 #5 desk ping teammate", () => {
   const ticket = read("dashboard/src/components/InboxTicketView.tsx");
 
   it("pings Escalate-flagged people only through the voice notify path", () => {
-    assert.match(ticket, /InboxPingTeammate/);
+    assert.match(ticket, /InboxTicketActionDock/);
     assert.match(ping, /Ping teammate/);
+    assert.match(ping, /variant === "dock"/);
     assert.match(action, /receives_escalation === true/);
     assert.match(action, /Escalate is off for that person/);
     assert.match(action, /\/internal\/desk\/escalate/);

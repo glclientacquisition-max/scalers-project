@@ -13,8 +13,7 @@ import { InboxJobEditor } from "@/components/InboxJobEditor";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { InboxSmsDock } from "@/components/InboxSmsDock";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
-import { CallLink } from "@/components/CallLink";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
 import { RowIdentity } from "@/components/ui/deskRow";
@@ -32,7 +31,7 @@ import {
   clampTicketSummaryWidth,
 } from "@/lib/ticketSplit";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
-import { InboxPingTeammate, type InboxPingPerson } from "@/components/InboxPingTeammate";
+import type { InboxPingPerson } from "@/components/InboxPingTeammate";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import { inboxMarkSeen } from "@/lib/inboxLeadActions";
 import {
@@ -109,12 +108,10 @@ function InboxTicketMore({
   callId,
   backHref,
   archived,
-  canMarkDone,
 }: {
   callId: string;
   backHref: string;
   archived: boolean;
-  canMarkDone: boolean;
 }) {
   const router = useRouter();
   const labelId = useId();
@@ -126,7 +123,7 @@ function InboxTicketMore({
   const [anchor, setAnchor] = useState<InboxOverflowAnchor | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const ignoreUntil = useRef(0);
-  const actions = inboxTicketOverflowActions({ archived, canMarkDone });
+  const actions = inboxTicketOverflowActions({ archived });
 
   function placeFromButton() {
     const rect = btnRef.current?.getBoundingClientRect();
@@ -194,8 +191,7 @@ function InboxTicketMore({
 
   async function run(id: InboxListActionId) {
     setBusy(true);
-    const next =
-      id === "mark_done" ? "resolved" : id === "unarchive" || archived ? "new" : "archived";
+    const next = id === "unarchive" || archived ? "new" : "archived";
     const res = await updateLeadStatus(callId, next);
     setBusy(false);
     if (res.error) {
@@ -347,7 +343,10 @@ export function InboxTicketView({
     hasHold: Boolean(hold),
     leadStatus,
   });
-  const dockedAction = canConfirm || canHoldDone || (needsYou && !archived);
+  const canPing = !archived && escalatePeople.length > 0;
+  const showActionDock = canMarkDone || Boolean(callerPhone) || canPing;
+  const dockedAction =
+    canConfirm || canHoldDone || (needsYou && !archived) || showActionDock;
 
   useEffect(() => {
     void inboxMarkSeen(callId);
@@ -491,20 +490,10 @@ export function InboxTicketView({
           ) : (
             <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3">{identity}</div>
           )}
-          {callerPhone ? <CallLink number={callerPhone} /> : null}
-          {callerPhone ? (
-            <WhatsAppLink
-              number={callerPhone}
-              message={waMessage}
-              variant="icon"
-              callId={callId}
-            />
-          ) : null}
           <InboxTicketMore
             callId={callId}
             backHref={backHref}
             archived={archived}
-            canMarkDone={canMarkDone}
           />
         </div>
       </header>
@@ -558,7 +547,6 @@ export function InboxTicketView({
               {liveConnectLine ? (
                 <p className="[overflow-wrap:anywhere]">{liveConnectLine}</p>
               ) : null}
-              <InboxPingTeammate callId={callId} people={escalatePeople} archived={archived} />
               <CallRecording recordingUrl={recordingUrl} />
             </div>
           </aside>
@@ -654,6 +642,15 @@ export function InboxTicketView({
           )
         ) : null}
       </div>
+
+      <InboxTicketActionDock
+        callId={callId}
+        callerPhone={callerPhone}
+        waMessage={waMessage}
+        canMarkDone={canMarkDone}
+        escalatePeople={escalatePeople}
+        archived={archived}
+      />
 
       {canConfirm && job ? (
         <div className="shrink-0 border-t border-line bg-surface px-4 py-3 sm:px-6">

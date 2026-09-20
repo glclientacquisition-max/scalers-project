@@ -65,13 +65,13 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /aria-label="More"/);
     assert.match(ticket, /DeskHint label="More"/);
     assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
-    assert.match(ticket, /InboxTicketMore callId=\{callId\} backHref=\{backHref\} archived=\{archived\}/);
-    assert.match(ticket, /updateLeadStatus\(callId, archived \? "new" : "archived"\)/);
-    assert.match(ticket, /archived \? "Unarchive" : "Archive"/);
+    assert.match(ticket, /InboxTicketMore[\s\S]*callId=\{callId\}[\s\S]*backHref=\{backHref\}[\s\S]*archived=\{archived\}/);
+    assert.match(ticket, /inboxTicketOverflowActions\(\{ archived \}\)/);
+    assert.match(ticket, /updateLeadStatus\(callId, next\)/);
+    assert.match(ticket, /action\.label/);
     assert.match(ticket, /writeInboxArchiveUndo\(\[\{ id: callId, callId \}\]\)/);
     assert.match(ticket, /router\.push\(backHref\)/);
     assert.doesNotMatch(ticket, /router\.push\("\/calls"\)/);
-    assert.match(ticket, /\{busy \? "Saving" : archived \? "Unarchive" : "Archive"\}/);
     assert.doesNotMatch(ticket, /Followed Up/);
   });
 

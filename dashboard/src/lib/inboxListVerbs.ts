@@ -58,20 +58,12 @@ export function inboxTicketCanMarkDone(opts: {
   return String(opts.leadStatus || "").toLowerCase() !== "resolved";
 }
 
-/** Ticket ⋮: Mark done when eligible, then Archive. Unarchive when archived. */
+/** Ticket ⋮: Archive. Unarchive when archived. Mark done lives on the action dock. */
 export function inboxTicketOverflowActions(opts: {
   archived: boolean;
-  canMarkDone?: boolean;
 }): InboxListAction[] {
   if (opts.archived) return [{ id: "unarchive", label: "Unarchive" }];
-  const out: InboxListAction[] = [];
-  if (opts.canMarkDone) out.push({ id: "mark_done", label: "Mark done" });
-  out.push({
-    id: "archive",
-    label: "Archive",
-    divide: out.length > 0,
-  });
-  return out;
+  return [{ id: "archive", label: "Archive" }];
 }
 
 /** md+ overflow: Pin, Mark done when eligible, Archive or Unarchive. No Select. */

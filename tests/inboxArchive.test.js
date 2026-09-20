@@ -109,6 +109,7 @@ describe("inbox archive folder and leave verbs", () => {
   it("keeps ticket More as Archive, or Unarchive when archived, and stays on the ticket after Unarchive", () => {
     assert.match(ticket, /<InboxTicketMore/);
     assert.match(ticket, /archived=\{archived\}/);
+    assert.match(ticket, /<InboxTicketActionDock/);
     assert.match(ticket, /canMarkDone=\{canMarkDone\}/);
     assert.match(ticket, /id === "unarchive" \|\| archived \? "new" : "archived"/);
     assert.match(ticket, /action\.label/);
