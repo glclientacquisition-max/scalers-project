@@ -114,7 +114,8 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(wallet, /<h1 className=\{deskListTitleClass\}>Wallet<\/h1>/);
     assert.doesNotMatch(home, />Overview</);
     assert.match(home, /HomeOverviewHeader/);
-    assert.match(homeHeader, /deskListTitleClass/);
+    assert.doesNotMatch(homeHeader, /deskListTitleClass/);
+    assert.match(homeHeader, /<h1[\s\S]*text-lg font-semibold[\s\S]*\{business\}/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.match(settingsShell, /<SettingsPageHeader[\s\S]*?index/);
     assert.doesNotMatch(
@@ -162,13 +163,14 @@ describe("desk shell chrome", () => {
     assert.match(home, /HomeOverviewHeader/);
     assert.match(homeHeader, /BrandLockup/);
     assert.match(homeHeader, /name="Scalers"/);
-    assert.match(homeHeader, /size="xs"/);
-    assert.match(homeHeader, /markOnly/);
-    assert.match(homeHeader, /md:hidden/);
+    assert.match(homeHeader, /size="sm"/);
     assert.match(homeHeader, /href=\{null\}/);
-    assert.match(homeHeader, /aria-label=\{`Scalers\. \$\{business\}`\}/);
-    assert.doesNotMatch(homeHeader, /size="sm"/);
+    assert.doesNotMatch(homeHeader, /markOnly/);
+    assert.doesNotMatch(homeHeader, /md:hidden/);
+    assert.doesNotMatch(homeHeader, /size="xs"/);
     assert.doesNotMatch(homeHeader, /size="lg"/);
+    assert.doesNotMatch(homeHeader, /deskListTitleClass/);
+    assert.match(homeHeader, /text-lg font-semibold/);
     assert.doesNotMatch(home, /BrandLockup/);
     assert.doesNotMatch(home, /nairobiGreeting/);
     assert.doesNotMatch(home, /pageTitleClass/);

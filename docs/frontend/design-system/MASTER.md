@@ -96,7 +96,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 - Body: DM Sans
 - Display: Sora on `h1–h3` and `.font-display`
-- Page title: nested records use `pageTitleClass` (`clamp(1.5rem, 2.4vw, 2rem)` semibold). List roots (Inbox, Contacts, Usage) use `deskListTitleClass` (`text-3xl sm:text-4xl` semibold, Sora via `font-display`). Not sticky. Overview `h1` is the workspace name (`deskListTitleClass`). Phone adds a 24px Scalers mark (`markOnly`, `size="xs"`) leading the title in a `min-h-11` row; `md+` has no in-page lockup. Date is one muted meta line under the name. Profile keeps a compact `text-xl` hub title.
+- Page title: nested records use `pageTitleClass` (`clamp(1.5rem, 2.4vw, 2rem)` semibold). List roots (Inbox, Contacts, Usage) use `deskListTitleClass` (`text-3xl sm:text-4xl` semibold, Sora via `font-display`). Not sticky. Overview stacks a compact Scalers lockup (`BrandLockup` `size="sm"`, name Scalers, not `markOnly`) over a modest workspace `h1` (`text-lg font-semibold text-ink min-w-0 truncate`), then a muted date (`text-sm text-ink-soft`). Phone and `md+` share that stack. The rail keeps its own mark. Profile keeps a compact `text-xl` hub title.
 - Table: `text-sm`
 - Meta: `text-xs uppercase tracking-wide text-ink-soft`
 
