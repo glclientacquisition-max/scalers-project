@@ -78,4 +78,27 @@ describe("bookings + holds honesty desk copy", () => {
     assert.match(jobActions, /"Confirm"/);
     assert.doesNotMatch(jobActions, /Confirm booking/);
   });
+
+  it("uses Hold Done on Home hold units, never to fulfill (A1 residual)", () => {
+    const holdUnits = [...niche.matchAll(/holdUnit: "([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(holdUnits.length >= 4, "every niche sets holdUnit");
+    for (const unit of holdUnits) {
+      assert.equal(unit, "Hold Done");
+    }
+    assert.doesNotMatch(niche, /holdUnit: "to fulfill"/);
+    assert.doesNotMatch(home, /to fulfill/);
+    assert.doesNotMatch(home, /\bfulfill\b/);
+    assert.match(home, /copy\.holdUnit/);
+    const purpose = read("dashboard/src/lib/inboxPurpose.ts");
+    const briefing = purpose.slice(
+      purpose.indexOf("export function homeBriefing"),
+      purpose.indexOf("export function homeDigestLine")
+    );
+    assert.match(briefing, /copy\.holdUnit/);
+    assert.doesNotMatch(briefing, /to fulfill/);
+    assert.doesNotMatch(briefing, /\bfulfill\b/);
+    const queues = home.slice(home.indexOf("const queues"), home.indexOf("let ctaHref"));
+    assert.match(queues, /homeQueueUnit\(work\.toFulfill, copy\.holdUnit/);
+    assert.doesNotMatch(queues, /to fulfill/);
+  });
 });
