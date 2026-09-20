@@ -102,8 +102,9 @@ describe('deriveCallSummary', () => {
     ]);
     const summary = deriveCallSummary({ brainState: state });
     assert.equal(summary.primaryIntent, 'book_visit');
-    assert.match(summary.reason, /Visit request saved — confirm on desk/);
-    assert.doesNotMatch(summary.reason, /booked a visit/i);
+    assert.equal(summary.reason, 'Visit request saved — confirm on desk.');
+    assert.doesNotMatch(summary.reason, /booked a visit|book that for you/i);
+    assert.doesNotMatch(summary.reason, /Carpet cleaning|Saturday/);
   });
 
   it('keeps confirmed visit language after Confirm', () => {
@@ -118,5 +119,35 @@ describe('deriveCallSummary', () => {
     const summary = deriveCallSummary({ brainState: state });
     assert.match(summary.reason, /updated a visit/i);
     assert.doesNotMatch(summary.reason, /Visit request saved/);
+  });
+});
+
+describe('K1 exact hangup string source scan', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const exact = 'Visit request saved — confirm on desk.';
+  const hangupFiles = [
+    'src/conversation/callSummary.js',
+    'src/conversation/callResolution.js',
+    'src/conversation/callTranscriptReview.js',
+  ];
+
+  it('keeps the exact Product line and no booked-visit hangup copy', () => {
+    for (const rel of hangupFiles) {
+      const src = fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+      assert.match(src, /VISIT_REQUESTED_NOTE|Visit request saved — confirm on desk\./);
+      assert.doesNotMatch(src, /booked a visit/);
+      assert.doesNotMatch(src, /book that for you/);
+      const truncated = src.match(/Visit request saved(?![^`"]*— confirm on desk)/g) || [];
+      assert.equal(
+        truncated.length,
+        0,
+        `${rel} has truncated Visit request saved without confirm on desk`
+      );
+    }
+  });
+
+  it('exports the exact Product constant', () => {
+    assert.equal(require('../src/conversation/callResolution').VISIT_REQUESTED_NOTE, exact);
   });
 });
