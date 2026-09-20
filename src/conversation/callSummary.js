@@ -1,7 +1,12 @@
 // Deterministic call summary + intent collection from Brain state (no live audio).
 // Gemini already sees STT text mid-call; post-call we persist structured desk fields.
 
-const { highWaterPrimaryIntent, normalizePrimaryIntent } = require('./callResolution');
+const {
+  highWaterPrimaryIntent,
+  normalizePrimaryIntent,
+  VISIT_REQUESTED_NOTE,
+  resultStatus,
+} = require('./callResolution');
 const {
   entityValue,
   isBackchannelOrFragment,
@@ -152,9 +157,19 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
       visit.record?.service_name ||
       '';
     const when = visit.value?.whenText || visit.value?.when_text || '';
-    const verb =
-      visit.action === 'update_appointment' ? 'updated a visit' : 'booked a visit';
-    return clean([`${who} ${verb}`, service, when].filter(Boolean).join('. '), 220);
+    const status = resultStatus(visit, 'requested');
+    if (status === 'cancelled') {
+      return clean(
+        [`${who} cancelled a visit`, service, when].filter(Boolean).join('. '),
+        220
+      );
+    }
+    if (status === 'confirmed' || status === 'done') {
+      const verb =
+        visit.action === 'update_appointment' ? 'updated a visit' : 'confirmed a visit';
+      return clean([`${who} ${verb}`, service, when].filter(Boolean).join('. '), 220);
+    }
+    return clean([VISIT_REQUESTED_NOTE, service, when].filter(Boolean).join('. '), 220);
   }
   if (primaryIntent === 'human') {
     return clean(`${who} needs you to return the call.`, 220);

@@ -21,6 +21,8 @@ const CALL_SELECT_LEAD =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment, lead_status";
 
 const HOLD_SELECT =
+  "id, created_at, request_type, status, item, quantity, when_text, window_start, window_end, notes, caller_name, caller_phone, call_id";
+const HOLD_SELECT_LEGACY =
   "id, created_at, request_type, status, item, quantity, when_text, notes, caller_name, caller_phone, call_id";
 const JOB_SELECT =
   "id, created_at, service_name, status, when_text, window_start, window_end, address_landmark, notes, caller_name, caller_phone, call_id";
@@ -207,6 +209,27 @@ export async function loadInboxItems(
       .limit(INBOX_WINDOW),
   ]);
 
+  let openHolds = openHoldsRes;
+  let tapeHolds = tapeHoldsRes;
+  if (openHolds.error && /window_start|window_end|column/i.test(openHolds.error)) {
+    openHolds = await fetchPagedOpenWork<InboxHold>((from, to) =>
+      client
+        .from("service_requests")
+        .select(HOLD_SELECT_LEGACY)
+        .eq("tenant_id", tenantId)
+        .eq("status", OPEN_HOLD_STATUS)
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    );
+    tapeHolds = (await client
+      .from("service_requests")
+      .select(HOLD_SELECT_LEGACY)
+      .eq("tenant_id", tenantId)
+      .in("status", [...TAPE_HOLD_STATUSES])
+      .order("created_at", { ascending: false })
+      .limit(INBOX_WINDOW)) as typeof tapeHoldsRes;
+  }
+
   let openJobs = openJobsFirst;
   let tapeJobs = tapeJobsFirst;
   if (openJobs.error && /window_start|window_end|column/i.test(openJobs.error)) {
@@ -228,15 +251,15 @@ export async function loadInboxItems(
       .limit(INBOX_WINDOW)) as typeof tapeJobsFirst;
   }
 
-  const holdsFailed = Boolean(openHoldsRes.error);
+  const holdsFailed = Boolean(openHolds.error);
   const jobsFailed = Boolean(openJobs.error);
-  const tapeFailed = Boolean(tapeHoldsRes.error || tapeJobs.error);
-  const openWorkTruncated = Boolean(openHoldsRes.truncated || openJobs.truncated);
+  const tapeFailed = Boolean(tapeHolds.error || tapeJobs.error);
+  const openWorkTruncated = Boolean(openHolds.truncated || openJobs.truncated);
   const holds = holdsFailed
     ? []
     : mergeOpenAndTapeRows(
-        openHoldsRes.rows,
-        tapeHoldsRes.error ? [] : ((tapeHoldsRes.data || []) as InboxHold[])
+        openHolds.rows,
+        tapeHolds.error ? [] : ((tapeHolds.data || []) as InboxHold[])
       );
   const jobs = jobsFailed
     ? []

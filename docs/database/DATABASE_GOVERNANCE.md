@@ -19,7 +19,7 @@ There is **no** `supabase/migrations/` folder in this repository.
 
 | Artifact | Location | Role |
 | --- | --- | --- |
-| SQL apply scripts (35 files) | `docs/supabase/*.sql` | Authoritative **intent** for schema changes |
+| SQL apply scripts (36 files) | `docs/supabase/*.sql` | Authoritative **intent** for schema changes |
 | Apply order index | `docs/supabase/README.md` | Dependency tiers and numbering |
 | Executable apply sequence | `docs/database/DATABASE_APPLY_ORDER.md` | Greenfield/staging rebuild (Phase 3F) |
 | Evolution model | `docs/database/DATABASE_EVOLUTION.md` | Where new DB changes live |

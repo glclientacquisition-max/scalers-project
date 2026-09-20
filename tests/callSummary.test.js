@@ -102,6 +102,21 @@ describe('deriveCallSummary', () => {
     ]);
     const summary = deriveCallSummary({ brainState: state });
     assert.equal(summary.primaryIntent, 'book_visit');
-    assert.match(summary.reason, /booked a visit/i);
+    assert.match(summary.reason, /Visit request saved — confirm on desk/);
+    assert.doesNotMatch(summary.reason, /booked a visit/i);
+  });
+
+  it('keeps confirmed visit language after Confirm', () => {
+    const state = recordActionResults(createBrainState(), [
+      {
+        action: 'update_appointment',
+        status: 'succeeded',
+        appointmentStatus: 'confirmed',
+        value: { serviceName: 'Carpet cleaning', whenText: 'Tuesday 10 AM' },
+      },
+    ]);
+    const summary = deriveCallSummary({ brainState: state });
+    assert.match(summary.reason, /updated a visit/i);
+    assert.doesNotMatch(summary.reason, /Visit request saved/);
   });
 });

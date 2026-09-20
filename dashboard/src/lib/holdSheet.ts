@@ -19,6 +19,8 @@ function asVisit(hold: InboxHold, callerName: string | null) {
     status: hold.status,
     service_name: hold.item || "",
     when_text: hold.when_text,
+    window_start: hold.window_start,
+    window_end: hold.window_end,
     caller_name: callerName,
   };
 }

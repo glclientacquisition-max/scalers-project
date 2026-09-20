@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const {
   deriveCallResolution,
   parseResolution,
+  VISIT_REQUESTED_NOTE,
+  HOLD_OPEN_NOTE,
 } = require('../src/conversation/callResolution');
 const { createBrainState, recordActionResults } = require('../src/conversation/brainState');
 
@@ -21,7 +23,40 @@ describe('deriveCallResolution', () => {
     const out = deriveCallResolution({ brainState: state });
     assert.equal(out.resolution, 'resolved');
     assert.equal(out.primaryIntent, 'hold_or_pickup');
-    assert.match(out.resolutionNote || '', /hold/i);
+    assert.equal(out.resolutionNote, HOLD_OPEN_NOTE);
+    assert.doesNotMatch(out.resolutionNote || '', /fulfilled|ready|booked/i);
+  });
+
+  it('does not claim a closed visit while status is requested', () => {
+    let state = createBrainState();
+    state.intent = 'book_visit';
+    state = recordActionResults(state, [
+      {
+        action: 'create_appointment',
+        status: 'succeeded',
+        appointmentStatus: 'requested',
+        fingerprint: 'v-req',
+      },
+    ]);
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.resolution, 'resolved');
+    assert.equal(out.primaryIntent, 'book_visit');
+    assert.equal(out.resolutionNote, VISIT_REQUESTED_NOTE);
+    assert.doesNotMatch(out.resolutionNote || '', /booked|confirmed|scheduled/i);
+  });
+
+  it('allows confirmed language only after the visit is confirmed', () => {
+    const out = deriveCallResolution({
+      brainState: createBrainState(),
+      toolResults: [
+        {
+          action: 'update_appointment',
+          status: 'succeeded',
+          appointmentStatus: 'confirmed',
+        },
+      ],
+    });
+    assert.equal(out.resolutionNote, 'Visit confirmed');
   });
 
   it('maps runtime hold intent onto hold_or_pickup', () => {

@@ -184,7 +184,7 @@ describe('mergeTranscriptReview', () => {
   it('never overrides a saved visit with needs_human', () => {
     const merged = mergeTranscriptReview({
       derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
-      summary: { reason: 'Mary booked a visit.' },
+      summary: { reason: 'Visit request saved — confirm on desk.' },
       toolFlags: visitFlags,
       review: {
         reason: 'Mary needs you to confirm the plumber.',
@@ -195,6 +195,24 @@ describe('mergeTranscriptReview', () => {
     });
     assert.equal(merged.primaryIntent, 'book_visit');
     assert.equal(merged.resolution, 'resolved');
+  });
+
+  it('rewrites booked hangup copy while the visit is still requested', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
+      summary: { reason: 'Visit request saved — confirm on desk.' },
+      toolFlags: { ...visitFlags, visitRequested: true },
+      review: {
+        reason: 'Mary booked a visit tomorrow.',
+        want: 'Mary booked a mattress cleaning visit.',
+        primary_intent: 'book_visit',
+        needs_human: false,
+        confidence: 0.94,
+      },
+    });
+    assert.match(merged.reason, /Visit request saved/);
+    assert.doesNotMatch(merged.reason, /booked/i);
+    assert.doesNotMatch(merged.want, /booked/i);
   });
 
   it('upgrades to needs_human at high confidence when nothing was saved', () => {

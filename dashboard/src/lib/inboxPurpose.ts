@@ -83,6 +83,8 @@ export type InboxHold = {
   item: string | null;
   quantity: string | null;
   when_text: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
   notes: string | null;
   caller_name: string | null;
   caller_phone: string | null;

@@ -51,6 +51,60 @@ const DIRECT_ANSWER_INTENTS = new Set([
   'general_enquiry',
 ]);
 
+/** K1 exact Product hangup / tool-save line while a visit is still requested. */
+const VISIT_REQUESTED_NOTE = 'Visit request saved — confirm on desk.';
+const VISIT_CONFIRMED_NOTE = 'Visit confirmed';
+const HOLD_OPEN_NOTE = 'Hold saved; awaiting owner Done.';
+const HOLD_DONE_NOTE = 'Hold done';
+
+function resultStatus(row, fallback = '') {
+  return String(
+    row?.appointmentStatus ||
+      row?.requestStatus ||
+      row?.record?.status ||
+      fallback ||
+      ''
+  ).toLowerCase();
+}
+
+function lastOkResult(results, actions) {
+  const wanted = new Set(actions);
+  const rows = (Array.isArray(results) ? results : []).filter(
+    (row) =>
+      wanted.has(row?.action) &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+  return rows.length ? rows[rows.length - 1] : null;
+}
+
+function visitHonestyNote(results) {
+  const row = lastOkResult(results, [
+    'create_appointment',
+    'update_appointment',
+  ]);
+  const status = resultStatus(row, 'requested');
+  if (status === 'confirmed') return VISIT_CONFIRMED_NOTE;
+  if (status === 'cancelled') {
+    return `Visit updated (${status})`;
+  }
+  if (status === 'done') return `Visit updated (${status})`;
+  return VISIT_REQUESTED_NOTE;
+}
+
+function holdHonestyNote(results) {
+  const row = lastOkResult(results, ['create_service_request']);
+  const status = resultStatus(row, 'open');
+  const type = String(
+    row?.requestType || row?.value?.type || ''
+  ).toLowerCase();
+  const isHold = !type || type === 'hold' || type === 'hold_or_pickup';
+  if (isHold) {
+    return status === 'fulfilled' ? HOLD_DONE_NOTE : HOLD_OPEN_NOTE;
+  }
+  const typeNote = type || null;
+  return typeNote ? `Request saved (${typeNote})` : 'Request saved';
+}
+
 function clean(value, max = 240) {
   return String(value == null ? '' : value)
     .replace(/\s+/g, ' ')
@@ -180,6 +234,8 @@ function deriveCallResolution(opts = {}) {
       ? 'Escalated to the team'
       : 'Caller needed a human';
   } else if (requestOk) {
+    // Receptionist finished the save. Needs you still owns Confirm / Hold Done.
+    // Resolution stays an existing outcome; the note must not claim a closed book.
     resolution = 'resolved';
     const appointmentOk = results.some(
       (r) =>
@@ -187,25 +243,7 @@ function deriveCallResolution(opts = {}) {
           r.action === 'update_appointment') &&
         r.status === 'succeeded'
     );
-    if (appointmentOk) {
-      const updated = results.find(
-        (r) => r.action === 'update_appointment' && r.status === 'succeeded'
-      );
-      note = updated
-        ? `Visit updated (${updated.appointmentStatus || 'updated'})`
-        : 'Visit request saved';
-    } else {
-      const type = results.find(
-        (r) =>
-          r.action === 'create_service_request' &&
-          (r.status === 'succeeded' || r.status === 'updated')
-      )?.requestType;
-      const typeNote =
-        type === 'hold' || type === 'hold_or_pickup'
-          ? 'hold'
-          : type || null;
-      note = typeNote ? `Request saved (${typeNote})` : 'Request saved';
-    }
+    note = appointmentOk ? visitHonestyNote(results) : holdHonestyNote(results);
   } else if (
     state.resolution?.status === 'resolved' ||
     state.resolution?.nextBestAction === 'END' ||
@@ -243,8 +281,15 @@ function parseResolution(raw) {
 module.exports = {
   RESOLUTIONS,
   INTENT_ALIASES,
+  VISIT_REQUESTED_NOTE,
+  VISIT_CONFIRMED_NOTE,
+  HOLD_OPEN_NOTE,
+  HOLD_DONE_NOTE,
   deriveCallResolution,
   highWaterPrimaryIntent,
   normalizePrimaryIntent,
   parseResolution,
+  resultStatus,
+  visitHonestyNote,
+  holdHonestyNote,
 };
