@@ -23,7 +23,7 @@ On Needs you, the trailing Action dock is:
 | **Return** | Human asked or missed, dialable number | **Call** then **WhatsApp** |
 | **Intent-only** | Job purpose with no appointments row, or hold purpose with no request row | No Confirm. No Done. Call then WhatsApp if a number exists. Empty if not. |
 
-Stamp still matches that verb. Confirm visit only when an appointments row exists. Intent-only visits stamp Visit not booked (hospitality: Booking not booked). Intent-only holds stamp Hold not saved.
+Stamp still matches that verb. Confirm visit only when an appointments row exists. Intent-only visits stamp Visit not booked. Hospitality Confirm booking / Booking not booked stay behind `HOSPITALITY_RESERVATIONS_EXIST`. Intent-only holds stamp Hold not saved.
 
 ---
 

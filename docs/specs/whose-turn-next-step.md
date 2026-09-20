@@ -19,7 +19,7 @@ Add **one muted, truncated line** under Work. It restates the same `inboxListDoc
 
 | Recipe | When | Line |
 | --- | --- | --- |
-| **confirm** | Requested appointments row | Niche Confirm stamp (`Confirm visit` / `Confirm booking`) |
+| **confirm** | Requested appointments row | Niche Confirm stamp (`Confirm visit`). Hospitality Confirm booking stays behind `HOSPITALITY_RESERVATIONS_EXIST`. |
 | **hold_done** | Open service request row | `Hold Done` (existing bulk label) |
 | **call_wa** | Return call, missed, human asked, or intent-only, with a number | `Call or WhatsApp` |
 | **none** | No number | Omit the line |
@@ -74,7 +74,7 @@ The line is `text-xs text-ink-soft` plus `deskPreviewClass`. Work stays the `tex
 
 ## Test gate
 
-- Requested visit → Confirm visit (hospitality: Confirm booking).
+- Requested visit → Confirm visit (hospitality too, until reservations exist).
 - Open hold → Hold Done.
 - Human / missed / intent-only with a number → Call or WhatsApp.
 - Intent-only never contains Confirm or Done.

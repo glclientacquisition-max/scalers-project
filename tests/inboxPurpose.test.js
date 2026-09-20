@@ -103,7 +103,7 @@ function purposeLabel(purpose) {
 
 function signalLabel({ purpose, hold, job, vertical }) {
   if (purpose === "job") {
-    if (!job) return vertical === "hospitality" ? "Booking not booked" : "Visit not booked";
+    if (!job) return "Visit not booked";
     const status = String(job.status || "").toLowerCase();
     if (status === "confirmed") return "Visit";
     if (status === "done") return "Visit done";
@@ -368,7 +368,7 @@ describe("inbox signal", () => {
     assert.equal(signalLabel({ purpose: "job" }), "Visit not booked");
     assert.equal(
       signalLabel({ purpose: "job", vertical: "hospitality" }),
-      "Booking not booked"
+      "Visit not booked"
     );
     assert.equal(signalLabel({ purpose: "hold" }), "Hold not saved");
     assert.equal(

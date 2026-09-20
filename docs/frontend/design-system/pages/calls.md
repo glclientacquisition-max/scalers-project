@@ -5,7 +5,7 @@
 
 **Outside vs inside.** `/calls` is recognition. `/calls/[id]` is decision. Jakob: who plus one ellipsized preview, like Mail or WhatsApp. Progressive disclosure: hangup copy stays on the record. Working memory: four chunks on a row (who, work, stamp or time, one verb). Needs you may restate that verb as one muted next-step line. Von Restorff: that verb is the only fill. Hick: Holds and Visits change columns; they do not grow a second list. Fitts: the dock is `h-12 w-12`. Tesler: Brain taxonomy stays off the row.
 
-Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
+Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm visit / Bookings until reservations exist. Confirm booking stays gated.
 
 **Chrome:** Large in-page Inbox title (`deskListTitleClass`). Not sticky. No product wordmark. Needs you count overlays the Inbox nav icon (`formatAttentionCount`, `9+` at 10, ribbon `from-accent to-accent-fill`). Search, then purpose pills. Nested Archived keeps its compact title. Nested tickets do not render Inbox as a page title. Search placeholder matches the niche.
 
@@ -17,7 +17,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Preview (one line):** Work is `deskPreviewClass`. One ellipsized line. The hangup paragraph, Want, Done, mood, and next live on `/calls/[id]`. Do not stack a second detail line under Work on mixed filters. Table Work cells use `deskPreviewCellClass`. Phone uses the same one-line clamp, never `line-clamp-2` for the summary. Isolated Holds and Visits table cells are also one line (Item or slot, not a stacked subtype).
 
-**Needs you next step:** Rows still in the Needs you pile may show one muted line under the preview (`inboxNeedsYouNextStep`). It restates `inboxListDockRecipe` in words: Confirm visit or Confirm booking, Hold Done, or Call or WhatsApp. Intent-only never uses Confirm or Done language. Live and empty docks omit the line. Not hangup copy. Not a second button.
+**Needs you next step:** Rows still in the Needs you pile may show one muted line under the preview (`inboxNeedsYouNextStep`). It restates `inboxListDockRecipe` in words: Confirm visit, Hold Done, or Call or WhatsApp. Hospitality Confirm booking stays gated until reservations exist. Intent-only never uses Confirm or Done language. Live and empty docks omit the line. Not hangup copy. Not a second button.
 
 **Action dock (that trailing cell):**
 - Visit or booking with a job row: **Confirm** (then Done). That verb only.
@@ -30,7 +30,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 Not list verbs: Select, Snooze, Mute, Assign, Label, Delete, Mark unread. Bulk header bar: Close, count, then only verbs true for every selected row. Archive if none are archived. Unarchive if all are archived. Confirm if every row is a requested visit. Hold Done if every row is an open hold. Mark done if every row passes `inboxCanMarkDone`. Pin stays on the row overflow. Mixed selection can show only Close. Archive also shows that Undo toast. No More sheet on the bulk bar.
 
-Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Visit not booked** (hospitality: **Booking not booked**) and use Call plus WhatsApp. Intent-only holds stamp **Hold not saved**. Do not show Confirm or Done without a work row.
+Stamp matches the verb on that row. **Confirm visit** only when an appointments row exists (verb Confirm). Intent-only visits stamp **Visit not booked** and use Call plus WhatsApp. Hospitality **Confirm booking** / **Booking not booked** stay behind `HOSPITALITY_RESERVATIONS_EXIST`. Intent-only holds stamp **Hold not saved**. Do not show Confirm or Done without a work row.
 
 **Reply vs Confirm (not the same button):**
 - **Confirm:** Books the visit from the list or the call. If Business → Text customers is on, Scalers SMS them the confirmation. That SMS is automatic. It is not a second list button.

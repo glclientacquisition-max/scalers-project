@@ -126,7 +126,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Usage, Profile. `/wallet` stays the
 | `/calls` | Signal-stamped Inbox. Brain intents mapped per niche language. | Dense table. Work leads. Holds and Jobs change columns. |
 | `/calls/[id]` | Decide + reply | Split pane; WhatsApp CTA brand-blue fill, green glyph |
 | `/contacts` | Named callers | Existing contacts surface. Not a CRM. |
-| `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
+| `/requests` | Hold Done | Redirect `/calls?purpose=hold` |
 | `/appointments` | Visits book | Redirect `/calls?purpose=job` |
 | `/settings` | Profile. Business settings plus Sign out. | Account hub. Menu then one screen. |
 | `/wallet` | Usage. Prepaid KES. | Token-only from this lane. Path stays `/wallet`. |
@@ -141,7 +141,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Usage, Profile. `/wallet` stays the
 
 - Scan, do not educate.
 - Prefer Confirm, Save, Reply on WhatsApp. Lists have no Open or View column. Tap the row to open the record. Call is a muted handset in the Action dock, not its own column.
-- Stamps name the next action in the workspace niche: Confirm visit, Pickup, Confirm booking, Human asked, Missed.
+- Stamps name the next action in the workspace niche: Confirm visit, Pickup, Human asked, Missed. Hospitality Confirm booking stays gated until reservations exist.
 - Mixed Inbox leads with Work, then Needed, then When (Today / Yesterday). Work is one truncated line, never the hangup paragraph. Needs you may add one muted next-step line that restates the dock (`inboxNeedsYouNextStep`).
 - Ban: em dash, en dash, “How to test” as a story, “Coming soon” filler.
 - WhatsApp prefill is owner-facing: no dashes.

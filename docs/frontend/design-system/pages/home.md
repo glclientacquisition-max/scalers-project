@@ -6,7 +6,7 @@
 1. **Is it working** — Line live / Number pending / Needs training. Wallet warn if KES < 200.
 2. **What needs me** — Three exclusive Inbox destinations from the same assemble as Inbox: return calls, open Holds, visits still to confirm. Row 1 uses the niche return label (`copy.returnCtaMany`), counts `toReturn`, and opens `purpose=human` (the Human pile). Inbox **Needs you** is the full open-work pile; do not reuse that label here. Confirmed visits are the Visits book, not this briefing. Caption is a briefing (`deskPreviewClass`). Hold and visit units stay count nouns (`3 to confirm`). Return calls let the count carry the row. When a hold or visit queue is 1, a short slot (`Tue 14:00`) may replace the unit. Never inject the hangup headline. Under it, one digest line for the receptionist's Nairobi day (`Today: 4 answered, 2 visits, 1 complaint.`). Null when nothing happened or when the call history tape is truncated (`callsTruncated`). Open holds and visits are loaded in full, so return-call counts stay complete even when the tape is truncated. Never a guess.
 3. **What happened** — Calls today as a compact link.
-4. **What to do next** — Niche CTA into the sharpest queue.
+4. **What to do next** — Niche CTA into the sharpest queue. Confirm visit or Hold Done. Hospitality Confirm booking stays gated until reservations exist.
 
 **Chrome:** `h1` is the workspace name (`deskListTitleClass`). Below `md`, a small Scalers mark (`BrandLockup` `size="sm"` `markOnly`) leads that title row. `md+` has no in-page lockup (the rail already has the mark). Date is one muted meta line under the title (`text-sm text-ink-soft` Nairobi `<time>`). Not sticky, not Sign out, not the word Overview, no time-of-day greeting. One aside: today + line + prepaid + docked CTA.
 

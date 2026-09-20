@@ -1,6 +1,19 @@
 import { parseVertical, type BusinessVertical } from "@/lib/vertical";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 
+/**
+ * Hospitality reservations are not a product. Gate Confirm booking until they exist.
+ * Home-services Confirm visit is never gated.
+ */
+export const HOSPITALITY_RESERVATIONS_EXIST = false;
+
+const HOSPITALITY_RESERVATION_AFFORDANCES = {
+  jobCtaOne: "Confirm booking",
+  jobCtaMany: "Confirm bookings",
+  confirmStamp: "Confirm booking",
+  visitGhostStamp: "Booking not booked",
+} as const;
+
 /** Owner-facing vocabulary for one vertical. Intents stay canonical; copy changes. */
 export type InboxNicheCopy = {
   holdFilter: string;
@@ -34,8 +47,8 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     holdUnit: "to fulfill",
     jobUnit: "to confirm",
     returnUnit: "to return",
-    holdCtaOne: "Fulfill hold",
-    holdCtaMany: "Fulfill holds",
+    holdCtaOne: "Hold Done",
+    holdCtaMany: "Hold Done",
     jobCtaOne: "Confirm visit",
     jobCtaMany: "Confirm visits",
     returnCtaOne: "Return call",
@@ -58,8 +71,8 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     holdUnit: "to fulfill",
     jobUnit: "to confirm",
     returnUnit: "to return",
-    holdCtaOne: "Fulfill hold",
-    holdCtaMany: "Fulfill holds",
+    holdCtaOne: "Hold Done",
+    holdCtaMany: "Hold Done",
     jobCtaOne: "Confirm visit",
     jobCtaMany: "Confirm visits",
     returnCtaOne: "Return call",
@@ -82,16 +95,16 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     holdUnit: "to fulfill",
     jobUnit: "to confirm",
     returnUnit: "to return",
-    holdCtaOne: "Fulfill hold",
-    holdCtaMany: "Fulfill holds",
-    jobCtaOne: "Confirm booking",
-    jobCtaMany: "Confirm bookings",
+    holdCtaOne: "Hold Done",
+    holdCtaMany: "Hold Done",
+    jobCtaOne: "Confirm visit",
+    jobCtaMany: "Confirm visits",
     returnCtaOne: "Return call",
     returnCtaMany: "Return calls",
-    confirmStamp: "Confirm booking",
+    confirmStamp: "Confirm visit",
     visitStamp: "Booking",
     visitDoneStamp: "Booking done",
-    visitGhostStamp: "Booking not booked",
+    visitGhostStamp: "Visit not booked",
     holdGhostStamp: "Hold not saved",
     pickupStamp: "Hold",
     holdEmpty: "Nothing to fulfill",
@@ -106,8 +119,8 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
     holdUnit: "to fulfill",
     jobUnit: "to confirm",
     returnUnit: "to return",
-    holdCtaOne: "Fulfill hold",
-    holdCtaMany: "Fulfill holds",
+    holdCtaOne: "Hold Done",
+    holdCtaMany: "Hold Done",
     jobCtaOne: "Confirm visit",
     jobCtaMany: "Confirm visits",
     returnCtaOne: "Return call",
@@ -127,7 +140,12 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
 };
 
 export function nicheCopy(vertical?: string | null): InboxNicheCopy {
-  return NICHE[parseVertical(vertical)];
+  const parsed = parseVertical(vertical);
+  const copy = NICHE[parsed];
+  if (parsed !== "hospitality") return copy;
+  return HOSPITALITY_RESERVATIONS_EXIST
+    ? { ...copy, ...HOSPITALITY_RESERVATION_AFFORDANCES }
+    : copy;
 }
 
 /** Act, tape, book, closed. 08:00 owner, live watcher, visit confirmer. */
