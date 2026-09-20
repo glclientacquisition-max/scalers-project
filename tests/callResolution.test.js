@@ -59,6 +59,20 @@ describe('deriveCallResolution', () => {
     assert.equal(out.resolutionNote, 'Visit confirmed');
   });
 
+  it('keeps appointment status through Brain persist so hangup notes stay honest', () => {
+    const state = recordActionResults(createBrainState(), [
+      {
+        action: 'update_appointment',
+        status: 'succeeded',
+        appointmentStatus: 'confirmed',
+        value: { serviceName: 'Carpet cleaning', whenText: 'Tuesday 10 AM' },
+      },
+    ]);
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.resolutionNote, 'Visit confirmed');
+    assert.doesNotMatch(out.resolutionNote || '', /Visit request saved/);
+  });
+
   it('maps runtime hold intent onto hold_or_pickup', () => {
     let state = createBrainState();
     state.intent = 'hold';

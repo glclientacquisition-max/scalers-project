@@ -476,6 +476,20 @@ function recordActionResults(state, results = []) {
     ...(result.requestType
       ? { requestType: String(result.requestType) }
       : {}),
+    ...(result.appointmentStatus
+      ? { appointmentStatus: String(result.appointmentStatus) }
+      : {}),
+    ...(result.requestStatus
+      ? { requestStatus: String(result.requestStatus) }
+      : {}),
+    ...(result.record && typeof result.record === 'object'
+      ? {
+          record: {
+            status: result.record.status || null,
+            service_name: result.record.service_name || null,
+          },
+        }
+      : {}),
     ...(result.value && typeof result.value === 'object'
       ? {
           value: {
@@ -484,6 +498,11 @@ function recordActionResults(state, results = []) {
             whenText: result.value.whenText || result.value.when_text || null,
             notes: result.value.notes || null,
             name: result.value.name || null,
+            serviceName:
+              result.value.serviceName ||
+              result.value.service_name ||
+              result.value.service ||
+              null,
           },
         }
       : {}),
