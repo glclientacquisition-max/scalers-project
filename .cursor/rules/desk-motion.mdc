@@ -1,9 +1,9 @@
 ---
 description: Desk motion verbs. Apply when adding animation, ping, land, spinner, transitions, reduced-motion, or editing desk motion CSS.
-globs: dashboard/src/app/globals.css,dashboard/src/lib/deskMotion.ts,dashboard/src/components/ui/DeskLand.tsx,dashboard/src/components/ui/deskRow.tsx,dashboard/src/components/ui/deskChrome.ts,dashboard/src/app/dev/motion/**
+globs: dashboard/src/app/globals.css,dashboard/src/lib/deskMotion.ts,dashboard/src/components/ui/DeskLand.tsx,dashboard/src/components/ui/DeskNotice.tsx,dashboard/src/components/ui/deskRow.tsx,dashboard/src/components/ui/deskChrome.ts,dashboard/src/app/dev/motion/**
 alwaysApply: false
 ---
 
 Read `.cursor/skills/desk-motion/SKILL.md` before adding movement.
 
-Only pending, live, land, shift, press. Reuse `pendingSpinnerClass`, `LivePing`, `DeskLandScope`, `DeskLandSurface`, `deskShiftClass`. `prefers-reduced-motion` kills live ping, land wash, landing rise/drift, pending spinner, and shift.
+Only pending, live, land, shift, press. Reuse `pendingSpinnerClass`, `LivePing`, `DeskLandScope`, `DeskLandSurface`, `deskShiftClass`, `DeskNotice`. Map by surface type (shell, list, detail, notice, modal, state, empty, numbers, form, route). `prefers-reduced-motion` kills live ping, land wash, landing rise/drift, pending spinner, shift, and notice enter/exit.

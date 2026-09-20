@@ -147,26 +147,41 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Land | `DeskLandScope` + `DeskLandSurface`. First paint never lands. Filter/page swaps do not flash |
 | Shift | `deskShiftClass`. Color, fill, border, shadow, opacity, transform, filter. 150ms. Not layout |
 | Focus | 2px brand ring, visible on keyboard |
-| Reduced motion | Kills live ping, land wash, landing rise/drift, pending spinner, and shift. Press scale is `motion-reduce:active:scale-100` |
+| Reduced motion | Kills live ping, land wash, landing rise/drift, pending spinner, shift, and notice enter/exit. Press scale is `motion-reduce:active:scale-100`. Global duration fallback in `globals.css`. |
 
 ---
 
 ## Motion
 
-Five desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`.
+Five desk verbs. Skill: `.cursor/skills/desk-motion/SKILL.md`. Tokens: `--motion-fast` 150ms, `--motion-land` 900ms, `--motion-live` 1.4s, `--motion-ease`. Class names and `DESK_*_MS` live in `dashboard/src/lib/deskMotion.ts`. No Framer Motion, `motion/react`, springs, or ad-hoc durations.
 
 | Verb | Primitive | Loop? |
 | --- | --- | --- |
 | **pending** | `pendingSpinnerClass` | Yes, on the control, `motion-reduce:animate-none` |
 | **live** | `LivePing` (`.desk-live-ping`) | Yes. Live call stamp and Home bulletin only |
 | **land** | `DeskLandScope` + `DeskLandSurface` (`.desk-just-landed`) | No. One-shot wash after first paint |
-| **shift** | `deskShiftClass` (`.desk-shift`) | No. Named properties, `--motion-fast` |
+| **shift** | `deskShiftClass` (`.desk-shift`). Notice enter/exit: `DeskNotice` (`.desk-notice`) | No. Named properties, `--motion-fast` |
 | **press** | `btnPrimary` `active:scale-[0.99]` | No |
 
-Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.
+Map a surface to a type, then to a verb. Do not invent a per-page animation.
+
+| Type | Surfaces | Motion |
+| --- | --- | --- |
+| Shell | `DeskRail`, phone header, tab bar | None. Rail width is static `4.5rem`. Do not animate `h-dvh` or scroll containers. |
+| List | Inbox queue, Contacts, wallet ledger | `land` on a live insert after first paint. Row hover/selected: `shift`. Stable keys (`item.id`). No enter-stagger. No layout reorder. |
+| Detail | Ticket transcript, contact profile, action dock | Instant swap. Key the route by record id. Panel chrome does not slide. |
+| Notice | Archive undo, Saved | `DeskNotice` + `useNotify`. Enter `translateY(12px)`, exit `translateY(8px)`, opacity. Transform only. `role="status"`. One pattern. |
+| Modal | `DeskDialog`, overflow menu, `DeskHint` | Enter-static. No scale, no overlay fade. |
+| State | Filter tabs, badges, chips | `shift` / `filterTabClass`. No `layoutId`. |
+| Empty / loading | `deskEmptyClass`, `(desk)/loading.tsx` | Empty is static. Route pending is the ink spinner. No skeleton pulse. No `animate-pulse` except the pronunciation recording dot. |
+| Numbers | Wallet balance, Home counts, call duration | Instant `tabular-nums`. No count-up. |
+| Form | Fields, field errors | Focus/border: `shift`. Errors mount instantly next to the field. No shake. |
+| Route | Overview, Inbox, Contacts, Wallet, Settings | Instant. The new page's lists land on later inserts only. |
+
+Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
 
 ---
 
 ## Do not add
 
-shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second nav tree, a hamburger drawer for primary destinations, fake Online, Lottie, Framer Motion, GSAP, landing-rise on desk.
+shadcn, Radix, icon packs, Plus Jakarta, orange CTA, glass panels, purple mesh, a second nav tree, a hamburger drawer for primary destinations, fake Online, Lottie, Framer Motion, the `motion` package, GSAP, landing-rise on desk.

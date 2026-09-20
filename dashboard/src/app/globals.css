@@ -315,7 +315,34 @@ h3,
   animation: desk-land-fade var(--motion-land) var(--motion-ease) both;
 }
 
+/* Notice enter/exit. Shift family: opacity + transform, --motion-fast. */
+.desk-notice {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity var(--motion-fast) ease-out, transform var(--motion-fast) ease-out;
+}
+
+.desk-notice.is-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.desk-notice.is-leaving {
+  opacity: 0;
+  transform: translateY(8px);
+  transition-timing-function: ease-in;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
   .landing-rise,
   .landing-drift,
   .desk-live-ping,
@@ -324,6 +351,14 @@ h3,
   }
 
   .desk-shift {
+    transition: none;
+  }
+
+  .desk-notice,
+  .desk-notice.is-open,
+  .desk-notice.is-leaving {
+    opacity: 1;
+    transform: none;
     transition: none;
   }
 }
