@@ -177,15 +177,22 @@ export default async function HomeOverviewPage() {
   return (
     <div className="w-full min-w-0">
       <header className="min-w-0">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 md:hidden" aria-hidden>
-            <BrandLockup href={null} name="Scalers" size="sm" markOnly />
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="flex min-h-11 shrink-0 items-center md:hidden" aria-hidden>
+            <BrandLockup href={null} name="Scalers" size="xs" markOnly />
           </span>
-          <h1 className={`${deskListTitleClass} min-w-0 truncate`}>{business}</h1>
+          <div className="min-w-0 flex-1">
+            <h1
+              className={`${deskListTitleClass} min-h-11 min-w-0 truncate`}
+              aria-label={`Scalers. ${business}`}
+            >
+              {business}
+            </h1>
+            <p className="mt-1 truncate text-sm text-ink-soft">
+              <time dateTime={today.iso}>{today.label}</time>
+            </p>
+          </div>
         </div>
-        <p className="mt-1 text-sm text-ink-soft">
-          <time dateTime={today.iso}>{today.label}</time>
-        </p>
       </header>
 
       {inbox.partialError ? (

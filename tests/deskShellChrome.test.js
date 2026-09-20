@@ -159,9 +159,12 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /BrandLockup/);
     assert.match(home, /name="Scalers"/);
-    assert.match(home, /size="sm"/);
+    assert.match(home, /size="xs"/);
     assert.match(home, /markOnly/);
     assert.match(home, /md:hidden/);
+    assert.match(home, /href=\{null\}/);
+    assert.match(home, /aria-label=\{`Scalers\. \$\{business\}`\}/);
+    assert.doesNotMatch(home, /size="sm"/);
     assert.doesNotMatch(home, /size="lg"/);
     assert.doesNotMatch(home, /nairobiGreeting/);
     assert.doesNotMatch(home, /pageTitleClass/);
