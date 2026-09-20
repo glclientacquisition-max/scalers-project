@@ -1,13 +1,13 @@
-# Settings `/settings` (Business Profile)
+# Profile `/settings`
 
-**Job:** Teach and configure the assistant.  
+**Job:** Account hub. Teach and configure the assistant. Sign out.  
 **This page is the knowledge IA benchmark.** Do not flatten it into one long form chrome.
 
 See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `settingsUi.tsx`.
 
 ## IA
 
-`/settings` is the menu. Each row is one destination. Same `?tab=` / `?panel=` routes. No new screens.
+`/settings` is the Profile tab. Bare `/settings` is the account hub: business settings destinations plus muted Sign out. Each settings row is one destination. Same `?tab=` / `?panel=` routes. No new screens.
 
 ```text
 General     Updates · Assistant · Team · Alerts
@@ -18,19 +18,19 @@ Line        Tools & voice · Pronunciation · Test
 
 Order is who we are, what we know, how we run, prove the line.
 
-Mobile: list or detail. `DeskBack` icon, aria-label Business Profile (`lg:hidden`). Desktop: list beside the open panel.
+Mobile: list or detail. `DeskBack` icon, aria-label Profile (`lg:hidden`). Desktop: list beside the open panel.
 
 Sticky Save on Catalog and Train panels. Updates, Alerts, Import, and Test use the same menu without a second compile save.
 
-Bare `/settings` is the menu. `?tab=updates` is Updates. `?tab=alerts` is Alerts. Hash `#train` is not routed. `Train` is the verb on Save.
+Bare `/settings` is the hub. `?tab=updates` is Updates. `?tab=alerts` is Alerts. Hash `#train` is not routed. `Train` is the verb on Save.
 
 ## Chrome
 
-Header hierarchy: compact workspace name and Line live / Number pending on the settings index. No Business Profile `h1`. Sub-panels keep a short title (Hours, Pronunciation). Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Business so the phone tab fits; do not put Business Profile on `DESK_LINKS`.
+Short in-page title Profile plus compact workspace name and Line live / Number pending. Muted Sign out on the hub header and again below the menu (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` plus a short title (Hours, Pronunciation). Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`.
 
 Menu: grouped destination rows (`min-h-12`, label + chevron). Section titles are non-clickable. Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl`). Do not add a page-name `h1` on the settings index.
+Panel titles use `settingsPanelHeadingClass` (`text-xl`).
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 

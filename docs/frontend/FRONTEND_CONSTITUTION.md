@@ -118,7 +118,7 @@ No Plus Jakarta Sans. No third family. No purple.
 
 ## 6. Information architecture
 
-Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product. The `/settings` page identity is Business Profile.
+Keep URLs. Nav is Overview, Inbox, Contacts, Usage, Profile. `/wallet` stays the Usage path. `/settings` is the Profile account hub (business settings plus Sign out). `/requests` and `/appointments` filter Inbox. Contacts is a shipped destination, not a CRM product.
 
 | Route | Job | Layout |
 | --- | --- | --- |
@@ -128,8 +128,8 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 | `/contacts` | Named callers | Existing contacts surface. Not a CRM. |
 | `/requests` | Fulfill holds | Redirect `/calls?purpose=hold` |
 | `/appointments` | Visits book | Redirect `/calls?purpose=job` |
-| `/settings` | Configure the assistant | Destination menu. One screen. |
-| `/wallet` | Prepaid KES | Token-only from this lane |
+| `/settings` | Profile. Business settings plus Sign out. | Account hub. Menu then one screen. |
+| `/wallet` | Usage. Prepaid KES. | Token-only from this lane. Path stays `/wallet`. |
 
 **Line status (no fake Online):** `Line live` / `Number pending` / `Needs training` from DID + `assessMvpAnswerReadiness`.
 
@@ -150,8 +150,8 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Business, Wallet. `/requests` and `
 
 ## 8. Motion and chrome
 
-- **Owner desk shell:** phone sticky bar (Scalers mark + Sign out). `md+` destinations live in `DeskRail` (`w-[4.5rem]`, icon-only, `DeskHint` names). Same `DESK_LINKS`. Do not put the workspace name in the chrome. Primary destinations do not repeat `DESK_LINKS` labels as page titles. Overview keeps a compact workspace name. Settings index does not use a Business Profile `h1`. Nested records and settings panels keep their own titles. Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Root viewport uses `viewportFit: cover`. Icon-only hits show the action name on hover and keyboard focus (`DeskHint`). The icon rail is `DESK_LINKS`.
-- Sign out is at the rail foot on `md+` and in the phone header below `md`. It is never a sixth tab.
+- **Owner desk shell:** No phone sticky lockup. `--desk-header-h` is `0` at every width. `md+` destinations live in `DeskRail` (`w-[4.5rem]`, icon-only, `DeskHint` names). Same `DESK_LINKS`: Overview, Inbox, Contacts, Usage (`/wallet`), Profile (`/settings`). Do not put the workspace name in the chrome. Primary destinations do not repeat `DESK_LINKS` labels as page titles, except a short Profile title on `/settings`. Overview keeps a compact workspace name with an optional in-page mark. Inbox, Contacts, and Usage have no product wordmark and no page-name `h1`. Nested tickets keep the chat row only (`DeskBack` + person + Call + WhatsApp + More). Nested contact and settings panels keep `DeskBack` plus a short panel title. Below `md`, the same `DESK_LINKS` render as a fixed bottom tab bar: icon + visible label, at most five items, `min-h-11` (shipped `min-h-12`), `pb-[env(safe-area-inset-bottom)]`, `aria-current="page"`. Bottom tabs stay on nested screens. Root viewport uses `viewportFit: cover`. Icon-only hits show the action name on hover and keyboard focus (`DeskHint`). The icon rail is `DESK_LINKS`.
+- Sign out lives on Profile: muted on the page header and muted again on the account hub. Reuse `POST /api/logout`. It is never a sixth tab, never on Overview, never a rail-foot control, never a phone lockup.
 - Do not also show header text links. Settings nested nav stays an inner sidebar with non-clickable category headers.
 - Primary destinations do not live in a hamburger drawer.
 - Desk motion verbs: **pending** (spinner on the control), **live** (ping on a Live stamp and the Home bulletin), **land** (one-shot wash on a row that just appeared), **shift** (named-property 150ms on hover, selected, and `DeskNotice` enter/exit), **press** (`active:scale-[0.99]` on `btnPrimary`). Surface types: shell none, lists land, detail instant, notice `DeskNotice`, modal enter-static, state shift, empty/loading static or pending, numbers instant, forms shift, routes instant. Skill: `.cursor/skills/desk-motion/SKILL.md`. Catalog: `/dev/motion` when `DASHBOARD_OPEN`.

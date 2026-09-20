@@ -44,7 +44,7 @@ export default async function WalletPage() {
       softSpendLimitKes: tenant.soft_spend_limit_kes,
     });
   } catch {
-    return <DeskError>Could not load wallet.</DeskError>;
+    return <DeskError>Could not load Usage.</DeskError>;
   }
 
   const billedThisMonth = usage.callChargesKes + usage.lineFeeKes;

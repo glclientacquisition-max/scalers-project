@@ -8,7 +8,7 @@
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
-**Chrome:** Greeting eyebrow, compact workspace name (not in the app header, not the word Overview). Nairobi `<time>`. One aside: today + line + wallet + docked CTA.
+**Chrome:** Greeting eyebrow, in-page mark beside the compact workspace name (not sticky, not Sign out, not the word Overview). Nairobi `<time>`. One aside: today + line + prepaid + docked CTA.
 
 **Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
 
@@ -18,7 +18,7 @@
 
 **One blue action per screen.** The aside CTA is the only filled primary. Next to return uses a ghost WhatsApp button (green glyph). Two saturated CTAs would compete; the CTA already routes to the sharpest queue.
 
-**Aside sections.** Today, Line, and Wallet are hairline-separated sections. Values self-label: `Line live` + DID, `KES 0` + Top up. No caps headings on self-evident data rows. Caps eyebrows introduce content regions only (greeting, Next to return). Wallet always shows the balance; `Top up` appears only when low. Line shows the formatted DID (`+254 700 000 000`). Beta workspaces skip the Wallet section entirely (metered, never charged). When the balance lasts 1 to 90 days at the current call pace, a quiet caption says so (`about 3 weeks at this pace`, same math as the Wallet page).
+**Aside sections.** Today, Line, and prepaid balance are hairline-separated sections. Values self-label: `Line live` + DID, `KES 0` + Top up. No caps headings on self-evident data rows. Caps eyebrows introduce content regions only (greeting, Next to return). Prepaid always shows the balance; `Top up` appears only when low. Line shows the formatted DID (`+254 700 000 000`). Beta workspaces skip the prepaid section entirely (metered, never charged). When the balance lasts 1 to 90 days at the current call pace, a quiet caption says so (`about 3 weeks at this pace`, same math as Usage).
 
 **Row density and count weight.** Queue rows are `min-h-12` on phone, `min-h-11` at `lg`. Counts are `text-base font-semibold` so the largest queue (85 to return) holds its own against the blue CTA.
 

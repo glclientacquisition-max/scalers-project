@@ -1,11 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import {
-  DeskPhoneHeader,
-  DeskRail,
-  DeskTabBar,
-  deskMainClass,
-} from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
@@ -37,7 +32,7 @@ async function DeskTabBarLive({
 
 /**
  * Workspace shell for authenticated business owners.
- * md+: DESK_LINKS as a left icon rail. Phone: lockup header + the same list as bottom tabs.
+ * md+: DESK_LINKS as a left icon rail. Phone: the same list as bottom tabs. No sticky lockup.
  */
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const authUser = await getAuthUser();
@@ -61,7 +56,6 @@ export default async function AppShell({ children }: { children: React.ReactNode
         <DeskRailLive tenantId={tenant?.id} vertical={tenant?.vertical} />
       </Suspense>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
-        <DeskPhoneHeader />
         <DeskOffline />
         <main className={deskMainClass}>{children}</main>
         <Suspense fallback={<DeskTabBar />}>

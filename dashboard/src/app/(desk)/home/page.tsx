@@ -35,6 +35,7 @@ import { nicheCopy } from "@/lib/inboxNiche";
 import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { BrandLockup } from "@/components/brand/BrandMark";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
@@ -179,9 +180,12 @@ export default async function HomeOverviewPage() {
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           {nairobiGreeting()}
         </p>
-        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight text-ink">
-          {business}
-        </h1>
+        <div className="mt-1 flex min-w-0 items-center gap-2">
+          <BrandLockup href={null} name="Scalers" size="sm" markOnly />
+          <h1 className="min-w-0 font-display text-xl font-semibold tracking-tight text-ink">
+            {business}
+          </h1>
+        </div>
         <p className="mt-1 font-sans text-[13px] text-ink-soft">
           <time dateTime={today.iso}>{today.label}</time>
         </p>

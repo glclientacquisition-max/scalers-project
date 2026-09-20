@@ -18,8 +18,8 @@ export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
   { href: "/calls", label: "Inbox" },
   { href: "/contacts", label: "Contacts" },
-  { href: "/settings", label: "Business" },
-  { href: "/wallet", label: "Wallet" },
+  { href: "/wallet", label: "Usage" },
+  { href: "/settings", label: "Profile" },
 ] as const;
 
 /** Page frame next to the rail. Ticket pages opt into bleed with `data-desk-bleed`. */
@@ -28,38 +28,6 @@ export const deskMainClass =
 
 function pathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function SignOutButton({ compact }: { compact?: boolean }) {
-  return (
-    <form action="/api/logout" method="post">
-      <button
-        type="submit"
-        aria-label="Sign out"
-        className={[
-          compact
-            ? "inline-flex h-12 w-12 items-center justify-center rounded-xl text-ink-soft hover:bg-surface-muted hover:text-warn"
-            : "min-h-11 rounded-md px-2 text-sm text-ink-soft hover:text-warn",
-          deskShiftClass,
-          focusRingVisible,
-        ].join(" ")}
-      >
-        {compact ? (
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-5 w-5">
-            <path
-              d="M8 4.5H4.5v11H8M8.5 10h7M13 7.5 16.5 10 13 12.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ) : (
-          "Sign out"
-        )}
-      </button>
-    </form>
-  );
 }
 
 function TabIcon({ name, className }: { name: string; className?: string }) {
@@ -112,16 +80,16 @@ function TabIcon({ name, className }: { name: string; className?: string }) {
       </svg>
     );
   }
-  if (name === "Business") {
+  if (name === "Profile") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
+        <circle cx="10" cy="6.5" r="2.5" stroke="currentColor" strokeWidth="1.5" />
         <path
-          d="M4 17V7.5L10 3.5l6 4V17H4Z"
+          d="M4.5 16.5c.7-3.1 2.8-4.75 5.5-4.75s4.8 1.65 5.5 4.75"
           stroke="currentColor"
           strokeWidth="1.5"
-          strokeLinejoin="round"
+          strokeLinecap="round"
         />
-        <path d="M8 17v-5h4v5" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     );
   }
@@ -160,7 +128,7 @@ function inboxLinkAria(label: string, needsCount: number) {
   return formatInboxNavAriaLabel(needsCount) || undefined;
 }
 
-/** md+ destination rail. Same DESK_LINKS as DeskTabBar. Sign out at the foot. */
+/** md+ destination rail. Same DESK_LINKS as DeskTabBar. Sign out lives on Profile. */
 export function DeskRail({
   needsCount = 0,
   homeHref = "/home",
@@ -204,24 +172,7 @@ export function DeskRail({
           );
         })}
       </nav>
-      <div className="flex justify-center pb-3">
-        <DeskHint label="Sign out">
-          <SignOutButton compact />
-        </DeskHint>
-      </div>
     </div>
-  );
-}
-
-/** Phone identity + Sign out. Destinations stay in DeskTabBar. */
-export function DeskPhoneHeader({ homeHref = "/home" }: { homeHref?: string }) {
-  return (
-    <header className="sticky top-0 z-40 isolate border-b border-line/80 bg-surface shadow-none md:hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-        <BrandLockup href={homeHref} name="Scalers" size="sm" priority className="max-w-full" />
-        <SignOutButton />
-      </div>
-    </header>
   );
 }
 

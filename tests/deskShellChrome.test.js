@@ -103,6 +103,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(contacts, /<h1 className=\{pageTitleClass\}>\s*Contacts/);
     assert.doesNotMatch(wallet, /pageTitleClass/);
     assert.doesNotMatch(wallet, /<h1 className=\{pageTitleClass\}>Wallet<\/h1>/);
+    assert.doesNotMatch(wallet, /<h1[\s\S]{0,80}>Usage<\/h1>/);
     assert.match(settingsShell, /<SettingsPageHeader[\s\S]*?index/);
     assert.doesNotMatch(
       settingsUi,
@@ -112,5 +113,27 @@ describe("desk shell chrome", () => {
       settingsUi,
       /<h1 className="mt-1 font-display text-\[clamp\(1\.5rem,2\.4vw,2rem\)\]/
     );
+  });
+
+  it("drops the phone lockup, keeps tabs, and parks Sign out on Profile", () => {
+    const css = read("dashboard/src/app/globals.css");
+    const signOut = read("dashboard/src/components/ui/SignOutButton.tsx");
+    assert.doesNotMatch(layout, /DeskPhoneHeader/);
+    assert.match(layout, /DeskTabBar/);
+    assert.match(css, /--desk-header-h:\s*0px/);
+    assert.doesNotMatch(nav, /SignOutButton/);
+    assert.match(signOut, /action="\/api\/logout"/);
+    assert.match(signOut, />\s*Sign out\s*</);
+    assert.match(settingsUi, /SignOutButton/);
+    assert.match(settingsUi, />Profile</);
+    assert.match(settingsShell, /<SignOutButton/);
+    assert.doesNotMatch(home, /Sign out/);
+    assert.match(home, /BrandLockup/);
+    assert.match(home, /markOnly/);
+    assert.doesNotMatch(home, /pageTitleClass/);
+    assert.doesNotMatch(contacts, /BrandLockup/);
+    assert.doesNotMatch(wallet, /BrandLockup/);
+    assert.match(wallet, /Could not load Usage/);
+    assert.doesNotMatch(wallet, /Could not load wallet/);
   });
 });
