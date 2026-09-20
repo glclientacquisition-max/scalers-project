@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation";
+import { ContactActionDock } from "@/components/ContactActionDock";
+import { ContactNameForm } from "@/components/ContactNameForm";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { deskPreviewCellClass } from "@/components/ui/deskChrome";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
+import { isJunkCallerName } from "@/lib/callerNameQuality";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
 import { callFromContactHref, inboxFromContactHref } from "@/lib/inboxHref";
@@ -68,11 +71,17 @@ export default async function ContactDetailPage({
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
-          <div>
-            <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-              {title}
-            </h1>
-            <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
+          <div className="space-y-4">
+            <div>
+              <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+                {title}
+              </h1>
+              <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
+            </div>
+            {contact.phone ? <ContactActionDock number={contact.phone} /> : null}
+            {isJunkCallerName(contact.name) ? (
+              <ContactNameForm contactId={contact.id} />
+            ) : null}
           </div>
 
           <section className="rounded-2xl border border-line bg-surface p-5">
