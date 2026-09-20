@@ -10,7 +10,7 @@ import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { RowIdentity } from "@/components/ui/deskRow";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { deskEmptyClass, deskPreviewCellClass, deskPreviewClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { deskEmptyClass, deskListTitleClass, deskPreviewCellClass, deskPreviewClass, deskShiftClass } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
@@ -68,6 +68,7 @@ export default async function ContactsPage({
   return (
     <div>
       <header className="space-y-3">
+        <h1 className={deskListTitleClass}>Contacts</h1>
         <DeskIndexLead>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link

@@ -11,7 +11,7 @@ import { WalletTopUpButton } from "@/components/WalletTopUpButton";
 import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
-import { deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -64,18 +64,21 @@ export default async function WalletPage() {
 
   return (
     <div className="max-w-3xl">
-      <header className="flex flex-wrap items-start justify-end gap-4">
-        {usage.isBeta ? (
-          <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-accent/30 bg-accent/5 px-6 py-3 text-sm font-medium text-accent-deep">
-            Free beta
-          </span>
-        ) : (
-          <WalletTopUpButton
-            tenantId={tenant.id}
-            topUpEnabled={topUpConfig.enabled}
-            presets={topUpConfig.presets}
-          />
-        )}
+      <header className="space-y-3">
+        <h1 className={deskListTitleClass}>Usage</h1>
+        <div className="flex flex-wrap items-start justify-end gap-4">
+          {usage.isBeta ? (
+            <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-accent/30 bg-accent/5 px-6 py-3 text-sm font-medium text-accent-deep">
+              Free beta
+            </span>
+          ) : (
+            <WalletTopUpButton
+              tenantId={tenant.id}
+              topUpEnabled={topUpConfig.enabled}
+              presets={topUpConfig.presets}
+            />
+          )}
+        </div>
       </header>
 
       {(prepaidEmpty || prepaidLow || smsExhausted) && !usage.isBeta ? (

@@ -34,6 +34,7 @@ describe("desk control craft", () => {
     assert.match(chrome, /deskShiftClass/);
     assert.match(chrome, /export const deskPreviewClass/);
     assert.match(chrome, /export const deskPreviewCellClass/);
+    assert.match(chrome, /export const deskListTitleClass/);
     assert.match(chrome, /min-w-0 truncate/);
   });
 
