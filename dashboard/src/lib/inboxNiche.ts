@@ -44,7 +44,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
   retail: {
     holdFilter: "Holds",
     jobFilter: "Visits",
-    holdUnit: "to fulfill",
+    holdUnit: "Hold Done",
     jobUnit: "to confirm",
     returnUnit: "to return",
     holdCtaOne: "Hold Done",
@@ -68,7 +68,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
   home_services: {
     holdFilter: "Holds",
     jobFilter: "Visits",
-    holdUnit: "to fulfill",
+    holdUnit: "Hold Done",
     jobUnit: "to confirm",
     returnUnit: "to return",
     holdCtaOne: "Hold Done",
@@ -92,7 +92,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
   hospitality: {
     holdFilter: "Holds",
     jobFilter: "Bookings",
-    holdUnit: "to fulfill",
+    holdUnit: "Hold Done",
     jobUnit: "to confirm",
     returnUnit: "to return",
     holdCtaOne: "Hold Done",
@@ -116,7 +116,7 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
   general: {
     holdFilter: "Holds",
     jobFilter: "Jobs",
-    holdUnit: "to fulfill",
+    holdUnit: "Hold Done",
     jobUnit: "to confirm",
     returnUnit: "to return",
     holdCtaOne: "Hold Done",
