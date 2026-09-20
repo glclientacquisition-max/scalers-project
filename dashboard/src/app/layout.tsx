@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Sora } from "next/font/google";
+import { NotifyHost } from "@/components/ui/DeskNotice";
 import "./globals.css";
 
 const sans = DM_Sans({
@@ -76,6 +77,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <NotifyHost />
       </body>
     </html>
   );

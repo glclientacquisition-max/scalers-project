@@ -142,6 +142,7 @@ describe("inbox archive folder and leave verbs", () => {
   it("offers a 5s Undo toast after Archive and not after Unarchive", () => {
     const undo = read("dashboard/src/lib/inboxArchiveUndo.ts");
     const toast = read("dashboard/src/components/InboxArchiveToast.tsx");
+    const notice = read("dashboard/src/components/ui/DeskNotice.tsx");
     const ui = read("dashboard/src/components/InboxRowUi.tsx");
     assert.match(undo, /INBOX_ARCHIVE_UNDO_MS = 5000/);
     assert.match(undo, /scalers-inbox-archive-undo/);
@@ -151,8 +152,9 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(toast, /min-h-11/);
     assert.match(toast, /busy \? "Saving" : "Undo"/);
     assert.match(toast, /updateLeadStatus\(row\.callId, "new"\)/);
-    assert.match(toast, /z-30/);
-    assert.match(toast, /desk-tabbar-h/);
+    assert.match(toast, /DeskNotice open=\{!!notice\}/);
+    assert.match(notice, /z-30/);
+    assert.match(notice, /desk-tabbar-h/);
     assert.doesNotMatch(toast, /btnPrimary|btnDock|bg-accent-fill/);
     assert.match(ui, /InboxArchiveToast/);
     assert.match(ui, /INBOX_ARCHIVE_UNDO_EVENT/);

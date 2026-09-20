@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { DeskPhoneHeader, DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { btnGhost, btnPrimary, deskShiftClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
+import { useNotify } from "@/components/ui/DeskNotice";
 import { LivePing, RowIdentity, RowStateDot } from "@/components/ui/deskRow";
 
 const SEED = ["seed-a", "seed-b"];
@@ -11,6 +12,7 @@ const SEED = ["seed-a", "seed-b"];
 export function MotionCatalog() {
   const [ids, setIds] = useState<string[]>(SEED);
   const [pending, setPending] = useState(false);
+  const { notify } = useNotify();
   const scopeKey = "catalog";
   const extra = useMemo(() => ids.filter((id) => !SEED.includes(id)), [ids]);
 
@@ -121,6 +123,15 @@ export function MotionCatalog() {
           </h2>
           <button type="button" className={`${btnPrimary} mt-3`}>
             Reply on WhatsApp
+          </button>
+        </section>
+
+        <section className="mt-8" aria-labelledby="notice-heading">
+          <h2 id="notice-heading" className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+            Notice
+          </h2>
+          <button type="button" className={`${btnPrimary} mt-3`} onClick={() => notify("Saved")}>
+            Notify
           </button>
         </section>
         </main>
