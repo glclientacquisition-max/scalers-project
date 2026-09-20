@@ -230,6 +230,7 @@ describe("desk motion wiring", () => {
     assert.match(notice, /export function DeskNotice/);
     assert.match(notice, /export function useNotify/);
     assert.match(notice, /export function NotifyHost/);
+    assert.match(notice, /mx-auto w-full max-w-md/);
     assert.match(notice, /role="status"/);
     assert.match(notice, /desk-tabbar-h/);
     assert.match(notice, /z-30/);

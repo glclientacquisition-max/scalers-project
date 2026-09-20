@@ -11,7 +11,7 @@ import {
 import { usePrefersReducedMotion } from "@/components/ui/usePrefersReducedMotion";
 
 const PLACE_CLASS =
-  "fixed inset-x-0 z-30 flex justify-center px-4 bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px)+0.75rem)] md:bottom-6";
+  "pointer-events-none fixed inset-x-0 z-30 px-4 bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px)+0.75rem)] md:bottom-6";
 
 const NOTIFY_HOLD_MS = 4000;
 
@@ -106,7 +106,7 @@ export function DeskNotice({
 
   return createPortal(
     <div className={PLACE_CLASS} role="status" aria-live="polite" data-desk-notice="">
-      <div className={`w-full max-w-md ${deskNoticeClass} ${phase}`.trim()}>
+      <div className={`pointer-events-auto mx-auto w-full max-w-md ${deskNoticeClass} ${phase}`.trim()}>
         {held.current}
       </div>
     </div>,
