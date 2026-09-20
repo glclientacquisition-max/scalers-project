@@ -9,6 +9,8 @@ import {
   parseDialableContactPhone,
   type ContactCsvPlan,
 } from "@/lib/contactImport";
+import { sanitizeStoredCallerName } from "@/lib/callerNameQuality";
+import { mergeContactIdentity } from "@/lib/contactIdentity";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
@@ -274,4 +276,57 @@ export async function applyContactCsv(
 
   revalidatePath("/contacts");
   return { ok: true, created: payload.length };
+}
+
+function contactMetadata(
+  raw: unknown
+): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  return raw as Record<string, unknown>;
+}
+
+export async function updateContactName(
+  contactId: string,
+  name: string
+): Promise<ContactNotesResult> {
+  const ctx = await loadWorkspace();
+  if (!ctx) return { error: "Not signed in." };
+
+  const id = String(contactId || "").trim();
+  if (!id) return { error: "Missing contact." };
+
+  const incoming = sanitizeStoredCallerName(name);
+  if (!incoming) return { error: "Enter a name." };
+
+  const { data: existing, error: loadError } = await ctx.workspace.client
+    .from("contacts")
+    .select("id, name, metadata")
+    .eq("id", id)
+    .eq("tenant_id", ctx.tenant.id)
+    .maybeSingle();
+
+  if (loadError) return { error: contactsWriteError(loadError.message) };
+  if (!existing) return { error: "Missing contact." };
+
+  const identity = mergeContactIdentity(
+    { name: existing.name, metadata: contactMetadata(existing.metadata) },
+    { name: incoming }
+  );
+  if (!identity.name) return { error: "Enter a name." };
+
+  const { error } = await ctx.workspace.client
+    .from("contacts")
+    .update({
+      name: identity.name,
+      metadata: identity.metadata,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("tenant_id", ctx.tenant.id);
+
+  if (error) return { error: contactsWriteError(error.message) };
+
+  revalidatePath("/contacts");
+  revalidatePath(`/contacts/${id}`);
+  return { ok: true };
 }
