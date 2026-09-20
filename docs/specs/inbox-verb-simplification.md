@@ -1,6 +1,6 @@
 # Inbox verbs: snooze, unread, and the rest
 
-**Status:** Approved 2026-09-18. Phase 1 shipping in this PR.  
+**Status:** Shipped #331. Phase 1 re-verified after #364 / #369 in [`inbox-verb-cut-p0.md`](./inbox-verb-cut-p0.md).  
 **Lane:** Desk UI/UX  
 **Date:** 2026-09-18  
 **Authority:** [`FRONTEND_CONSTITUTION.md`](../frontend/FRONTEND_CONSTITUTION.md) and [`calls.md`](../frontend/design-system/pages/calls.md) outrank this spec.  
@@ -319,4 +319,4 @@ Reply with one of:
 2. **Cut them, with edits.** Name the edit (example: keep Mark done on visit rows).
 3. **Keep them.** Then the follow-up is to finish them: auto-read, duration, a return surface. Do not leave the current shells.
 
-Until that reply, overflow stays six verbs. Owner approved cut snooze and unread on 2026-09-18. Phase 1 is this PR.
+Until that reply, overflow stays six verbs. Owner approved cut snooze and unread on 2026-09-18. Phase 1 shipped in #331 and is locked in [`inbox-verb-cut-p0.md`](./inbox-verb-cut-p0.md).

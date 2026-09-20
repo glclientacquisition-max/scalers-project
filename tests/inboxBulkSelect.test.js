@@ -106,6 +106,8 @@ describe("inbox bulk select", () => {
     assert.doesNotMatch(select, /inboxDelete/);
     assert.doesNotMatch(select, /inboxToggleRead/);
     assert.doesNotMatch(select, /inboxSnooze/);
+    assert.match(select, /if \(kind === "archive" \|\| kind === "unarchive"\) \{\n        patch\(item.id, \{ hidden: true \}\);/);
+    assert.doesNotMatch(select, /kind === "mark_done"[\s\S]{0,400}patch\(item.id, \{ hidden/);
     assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
     assert.match(actions, /status", "confirmed"/);
     assert.match(actions, /status", "fulfilled"/);
