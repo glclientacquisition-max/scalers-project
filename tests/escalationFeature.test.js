@@ -65,6 +65,17 @@ describe('escalation feature contract', () => {
     assert.equal(shaped.soft, false);
   });
 
+  it('shapes a missing notify ledger as failed, not notified', () => {
+    const shaped = shapeEscalationNotifyOutcome({
+      ok: false,
+      reason: 'table_missing',
+    });
+    assert.equal(shaped.stage, 'failed');
+    assert.equal(shaped.ok, false);
+    assert.equal(shaped.soft, false);
+    assert.equal(shaped.reason, 'table_missing');
+  });
+
   it('documents SMS-first channel order', () => {
     assert.deepEqual(NOTIFY_CHANNEL_ORDER[0], 'sms');
     assert.equal(escalationMvpRules().channelOrder[0], 'sms');

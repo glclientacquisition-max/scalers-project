@@ -83,7 +83,7 @@ describe("P0 #4 escalation delivery truth", () => {
 
   it("persists failed when no live channel and does not mark sent", () => {
     assert.match(server, /No live SMS\/WA\/email channel\./);
-    assert.match(server, /ok: false,\s*reason: 'No live SMS\/WA\/email channel\.'/);
+    assert.match(server, /sent\.reason \|\| 'No live SMS\/WA\/email channel\.'/);
     assert.doesNotMatch(
       server,
       /No live SMS\/WA\/email channel[\s\S]{0,400}markEscalationSent/

@@ -99,7 +99,7 @@ export async function claimDeskSms(
       )
     ) {
       console.warn("[sms allowance] consume_sms_units missing");
-      return { allowed: true, reason: "rpc_missing", overage: false };
+      return { allowed: false, reason: "rpc_missing", overage: false };
     }
     console.warn("[sms allowance]", error.message);
     return { allowed: true, reason: "rpc_failed", overage: false };
@@ -115,7 +115,7 @@ export async function claimDeskSms(
   };
 }
 
-async function deskInstanceAlreadySent(
+async function deskLedgerLookup(
   client: SupabaseClient,
   opts: {
     tenantId: string;
@@ -123,8 +123,8 @@ async function deskInstanceAlreadySent(
     kind: string;
     to: string;
   }
-): Promise<boolean> {
-  if (!opts.tenantId || !opts.to) return false;
+): Promise<"sent" | "absent" | "table_missing"> {
+  if (!opts.tenantId || !opts.to) return "absent";
   const { data, error } = await client
     .from("notify_sends")
     .select("id")
@@ -135,12 +135,12 @@ async function deskInstanceAlreadySent(
     if (
       /notify_sends|does not exist|schema cache|relation/i.test(error.message || "")
     ) {
-      return false;
+      return "table_missing";
     }
     console.warn("[notify ledger] instance check", error.message);
-    return false;
+    return "absent";
   }
-  return Boolean(data);
+  return data ? "sent" : "absent";
 }
 
 export async function sendRecordedDeskCallerSms(opts: {
@@ -151,8 +151,12 @@ export async function sendRecordedDeskCallerSms(opts: {
   to: string;
   body: string;
 }): Promise<{ ok: boolean; reason?: string; overage?: boolean }> {
-  if (await deskInstanceAlreadySent(opts.client, opts)) {
+  const prior = await deskLedgerLookup(opts.client, opts);
+  if (prior === "sent") {
     return { ok: false, reason: "instance_already_sent" };
+  }
+  if (prior === "table_missing") {
+    return { ok: false, reason: "table_missing" };
   }
   const claim = await claimDeskSms(opts.client, opts.tenantId, opts.body);
   if (!claim.allowed) {
@@ -174,6 +178,14 @@ export async function sendRecordedDeskCallerSms(opts: {
     delete (rest as { overage?: boolean }).overage;
     ({ error } = await opts.client.from("notify_sends").insert(rest));
   }
-  if (error) console.warn("[notify ledger]", error.message);
+  if (error) {
+    console.warn("[notify ledger]", error.message);
+    if (
+      /notify_sends|does not exist|schema cache|relation/i.test(error.message || "")
+    ) {
+      return { ok: false, reason: "table_missing" };
+    }
+    return { ok: false, reason: "ledger_unrecorded" };
+  }
   return { ok: true, overage: claim.overage };
 }
