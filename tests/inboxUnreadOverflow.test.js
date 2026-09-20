@@ -364,7 +364,7 @@ describe("inbox ticket overflow menu", () => {
     assert.match(ticket, /min-h-11/);
     assert.match(ticket, /z-\[60\]/);
     assert.match(verbs, /export function inboxTicketOverflowActions/);
-    assert.match(ticket, /inboxTicketOverflowActions\(\{ archived, canMarkDone \}\)/);
+    assert.match(ticket, /inboxTicketOverflowActions\(\{ archived \}\)/);
     assert.match(ticket, /action\.label/);
     assert.doesNotMatch(ticket, /id: "pin"/);
     assert.doesNotMatch(ticket, /id: "unread"/);
@@ -375,8 +375,9 @@ describe("inbox ticket overflow menu", () => {
     assert.doesNotMatch(ticket, /Mark unread/);
     assert.doesNotMatch(ticket, /["']Snooze["']/);
     assert.doesNotMatch(ticket, /Unpin/);
-    assert.match(ticket, /id === "mark_done"/);
+    assert.doesNotMatch(ticket, /id === "mark_done"/);
     assert.match(verbs, /label: "Mark done"/);
+    assert.match(verbs, /Mark done lives on the action dock/);
   });
 
   it("list overflow stays Pin, Mark done, Archive on md+", () => {
