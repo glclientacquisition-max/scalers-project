@@ -125,6 +125,90 @@ function eatInstant(now, dayOffsetDays, minutesSinceMidnight) {
   return new Date(targetEat - EAT_OFFSET_MS());
 }
 
+const MONTH_INDEX = Object.freeze({
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+});
+
+function validYmd(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return false;
+  }
+  if (year < 2000 || year > 2100) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const check = new Date(Date.UTC(year, month - 1, day));
+  return (
+    check.getUTCFullYear() === year &&
+    check.getUTCMonth() === month - 1 &&
+    check.getUTCDate() === day
+  );
+}
+
+function eatAbsoluteInstant(year, month, day, minutesSinceMidnight) {
+  const midnightUtc = Date.UTC(year, month - 1, day, 0, 0, 0) - EAT_OFFSET_MS();
+  return new Date(midnightUtc + minutesSinceMidnight * 60 * 1000);
+}
+
+/**
+ * Absolute calendar day in when_text. Used by When+Save so window_* cannot
+ * fall back to today+time for "22 Sep 2026 09:00".
+ * @returns {{ year: number, month: number, day: number } | null}
+ */
+function parseAbsoluteWhenDate(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  const named = /\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?\s+(\d{4})\b/.exec(
+    text
+  );
+  if (named) {
+    const day = Number(named[1]);
+    const month = MONTH_INDEX[named[2].toLowerCase()];
+    const year = Number(named[3]);
+    if (month && validYmd(year, month, day)) return { year, month, day };
+  }
+
+  const iso = /\b(\d{4})-(\d{2})-(\d{2})\b/.exec(text);
+  if (iso) {
+    const year = Number(iso[1]);
+    const month = Number(iso[2]);
+    const day = Number(iso[3]);
+    if (validYmd(year, month, day)) return { year, month, day };
+  }
+
+  const dmy = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/.exec(text);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    if (validYmd(year, month, day)) return { year, month, day };
+  }
+
+  return null;
+}
+
 /**
  * Turn free-text when_text into an EAT instant. Null if unsafe to guess.
  * @param {string} whenText
@@ -148,6 +232,27 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
 
   if (hasToday && hasTomorrow) return { ok: false };
   if (isNowPhrase && (hasTomorrow || weekday || clock != null)) return { ok: false };
+
+  const absolute = parseAbsoluteWhenDate(raw);
+  if (absolute) {
+    if (isNowPhrase) return { ok: false };
+    const absMinutes = minutes != null ? minutes : 10 * 60;
+    const instant = eatAbsoluteInstant(
+      absolute.year,
+      absolute.month,
+      absolute.day,
+      absMinutes
+    );
+    const parts = eatParts(instant);
+    return {
+      ok: true,
+      instant,
+      isNow: false,
+      weekday: parts.weekday,
+      weekdayLong: parts.weekdayLong,
+      minutesSinceMidnight: absMinutes,
+    };
+  }
 
   if (isNowPhrase && minutes == null && !weekday && !hasTomorrow) {
     return {
@@ -300,6 +405,7 @@ module.exports = {
   FULL_DAY,
   SW_FULL_DAY,
   resolveAppointmentWhen,
+  parseAbsoluteWhenDate,
   evaluateAppointmentHours,
   classifyInstant,
   nextOpenDay,

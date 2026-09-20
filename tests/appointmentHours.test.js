@@ -8,6 +8,7 @@ const {
 } = require('../src/conversation/businessHours');
 const {
   resolveAppointmentWhen,
+  parseAbsoluteWhenDate,
   evaluateAppointmentHours,
   classifyInstant,
   formatRequestedWhenLabel,
@@ -126,6 +127,53 @@ describe('resolveAppointmentWhen', () => {
     const out = resolveAppointmentWhen('now', TUE_21);
     assert.equal(out.ok, true);
     assert.equal(out.isNow, true);
+  });
+
+  it('parses absolute DD Mon YYYY instead of today plus time', () => {
+    const now = eat(2026, 9, 20, 11, 0);
+    const hold = resolveAppointmentWhen('21 Sep 2026 14:00', now);
+    assert.equal(hold.ok, true);
+    assert.equal(hold.instant.toISOString(), eat(2026, 9, 21, 14, 0).toISOString());
+    assert.equal(hold.minutesSinceMidnight, 14 * 60);
+
+    const visit = resolveAppointmentWhen('22 Sep 2026 09:00', now);
+    assert.equal(visit.ok, true);
+    assert.equal(visit.instant.toISOString(), eat(2026, 9, 22, 9, 0).toISOString());
+    assert.notEqual(visit.instant.toISOString(), eat(2026, 9, 20, 9, 0).toISOString());
+  });
+
+  it('extracts the calendar day from DD Mon YYYY and similar', () => {
+    assert.deepEqual(parseAbsoluteWhenDate('21 Sep 2026 14:00'), {
+      year: 2026,
+      month: 9,
+      day: 21,
+    });
+    assert.deepEqual(parseAbsoluteWhenDate('22 September 2026 9:00 AM'), {
+      year: 2026,
+      month: 9,
+      day: 22,
+    });
+    assert.deepEqual(parseAbsoluteWhenDate('2026-09-22 09:00'), {
+      year: 2026,
+      month: 9,
+      day: 22,
+    });
+    assert.equal(parseAbsoluteWhenDate('Tuesday 10 AM'), null);
+  });
+
+  it('parses similar absolute dates (long month, ISO, day-first)', () => {
+    const now = eat(2026, 9, 20, 11, 0);
+    const longMonth = resolveAppointmentWhen('22 September 2026 9:00 AM', now);
+    assert.equal(longMonth.ok, true);
+    assert.equal(longMonth.instant.toISOString(), eat(2026, 9, 22, 9, 0).toISOString());
+
+    const iso = resolveAppointmentWhen('2026-09-22 09:00', now);
+    assert.equal(iso.ok, true);
+    assert.equal(iso.instant.toISOString(), eat(2026, 9, 22, 9, 0).toISOString());
+
+    const dmy = resolveAppointmentWhen('22/09/2026 09:00', now);
+    assert.equal(dmy.ok, true);
+    assert.equal(dmy.instant.toISOString(), eat(2026, 9, 22, 9, 0).toISOString());
   });
 });
 

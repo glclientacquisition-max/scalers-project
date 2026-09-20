@@ -82,6 +82,36 @@ describe('visit calendar', () => {
     assert.equal(stamped.window_end, null);
   });
 
+  it('keeps desk When+Save on the same absolute parse as resolveAppointmentWhen', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const desk = fs.readFileSync(
+      path.join(__dirname, '../dashboard/src/lib/visitCalendar.ts'),
+      'utf8'
+    );
+    assert.match(desk, /export function parseAbsoluteWhenDate/);
+    assert.match(desk, /const absolute = parseAbsoluteWhenDate\(text\)/);
+    assert.match(
+      desk,
+      /\\b\(\\d\{1,2\}\)\(\?:st\|nd\|rd\|th\)\?\\s\+\(\[A-Za-z\]\{3,9\}\)\\.\?\\s\+\(\\d\{4\}\)\\b/
+    );
+    assert.match(desk, /stampScheduleWindows/);
+    assert.match(desk, /visitInstant/);
+  });
+
+  it('stamps absolute DD Mon YYYY on the written EAT day, not today', () => {
+    const now = eat(2026, 9, 20, 11, 0);
+    const hold = stampScheduleWindows('21 Sep 2026 14:00', now);
+    assert.equal(hold.when_text, '21 Sep 2026 14:00');
+    assert.equal(hold.window_start, eat(2026, 9, 21, 14, 0).toISOString());
+    assert.equal(hold.window_end, hold.window_start);
+    assert.notEqual(hold.window_start, eat(2026, 9, 20, 14, 0).toISOString());
+
+    const visit = stampScheduleWindows('22 Sep 2026 09:00', now);
+    assert.equal(visit.window_start, eat(2026, 9, 22, 9, 0).toISOString());
+    assert.notEqual(visit.window_start, eat(2026, 9, 20, 9, 0).toISOString());
+  });
+
   it('flags same-hour open visits without treating them as a lock', () => {
     const slot = eat(2026, 9, 8, 10, 0);
     const hours = { resolved: { instant: slot } };
