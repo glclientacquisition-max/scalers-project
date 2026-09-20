@@ -180,9 +180,9 @@ export default async function HomeOverviewPage() {
         <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           {nairobiGreeting()}
         </p>
-        <div className="mt-1 flex min-w-0 items-center gap-2">
-          <BrandLockup href={null} name="Scalers" size="sm" markOnly />
-          <h1 className="min-w-0 font-display text-xl font-semibold tracking-tight text-ink">
+        <div className="mt-1 min-w-0">
+          <BrandLockup href={null} name="Scalers" size="lg" />
+          <h1 className="mt-2 min-w-0 font-display text-xl font-semibold tracking-tight text-ink">
             {business}
           </h1>
         </div>

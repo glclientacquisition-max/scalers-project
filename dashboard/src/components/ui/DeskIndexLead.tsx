@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Tight lead row for DESK_LINKS index pages. No repeated page-name heading. */
+/** Tight lead row under the list-root title (search, Import CSV, balance). */
 export function DeskIndexLead({
   status,
   children,

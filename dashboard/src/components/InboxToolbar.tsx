@@ -11,6 +11,7 @@ import { useInboxPileNav } from "@/components/InboxPileNav";
 import {
   btnGhost,
   deskFieldClass,
+  deskListTitleClass,
   deskShiftClass,
   pageTitleClass,
 } from "@/components/ui/deskChrome";
@@ -94,7 +95,11 @@ export function InboxToolbar({
 
   return (
     <header className="space-y-3">
-      {archived ? <DeskBack href={backHref || callsHref({ q: q || undefined })}>Inbox</DeskBack> : null}
+      {archived ? (
+        <DeskBack href={backHref || callsHref({ q: q || undefined })}>Inbox</DeskBack>
+      ) : (
+        <h1 className={deskListTitleClass}>Inbox</h1>
+      )}
       {archived ? (
         <DeskIndexLead status={<h1 className={pageTitleClass}>Archived</h1>}>
           {searchForm}

@@ -18,7 +18,10 @@ describe("home overview craft", () => {
     assert.match(triage, /export function nairobiDateLabel/);
     assert.doesNotMatch(page, />Overview</);
     assert.match(page, /BrandLockup/);
-    assert.match(page, /markOnly/);
+    assert.match(page, /name="Scalers"/);
+    assert.match(page, /size="lg"/);
+    assert.doesNotMatch(page, /markOnly/);
+    assert.match(page, /\{business\}/);
     assert.doesNotMatch(page, /Sign out/);
   });
 

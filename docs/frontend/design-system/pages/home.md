@@ -8,7 +8,7 @@
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
-**Chrome:** Greeting eyebrow, in-page mark beside the compact workspace name (not sticky, not Sign out, not the word Overview). Nairobi `<time>`. One aside: today + line + prepaid + docked CTA.
+**Chrome:** Greeting eyebrow, large in-page Scalers lockup (`BrandLockup` size `lg`, name visible, not `markOnly`, not sticky, not Sign out, not the word Overview). Workspace name under the lockup. Nairobi `<time>`. One aside: today + line + prepaid + docked CTA.
 
 **Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
 

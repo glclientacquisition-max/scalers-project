@@ -59,7 +59,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(helper, /items in your inbox/i);
   });
 
-  it("drops the Inbox H1, I need you subtitle, and page-head count chip", () => {
+  it("drops the I need you subtitle and page-head count chip", () => {
     assert.doesNotMatch(toolbar, /pageTitleClass.*Inbox|Inbox.*pageTitleClass/);
     assert.doesNotMatch(toolbar, /\{archived \? "Archived" : "Inbox"\}/);
     assert.doesNotMatch(toolbar, /I need you/);
@@ -96,14 +96,24 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(nav, /callsHref\(\{ purpose: "needs"/);
   });
 
-  it("does not repeat DESK_LINKS names as index headings", () => {
-    assert.doesNotMatch(home, /pageTitleClass/);
+  it("puts large DESK_LINKS titles on list roots only", () => {
+    const constitution = read("docs/frontend/FRONTEND_CONSTITUTION.md");
+    const master = read("docs/frontend/design-system/MASTER.md");
+    assert.match(chrome, /export const deskListTitleClass/);
+    assert.match(chrome, /deskListTitleClass =\s*\n\s*"font-display text-3xl/);
+    assert.match(chrome, /sm:text-4xl/);
+    assert.match(constitution, /deskListTitleClass/);
+    assert.match(master, /deskListTitleClass/);
+    assert.doesNotMatch(constitution, /have no product wordmark and no page-name/);
+    assert.match(toolbar, /<h1 className=\{deskListTitleClass\}>Inbox<\/h1>/);
+    assert.doesNotMatch(toolbar, /pageTitleClass.*Inbox|Inbox.*pageTitleClass/);
+    assert.match(toolbar, /<h1 className=\{pageTitleClass\}>Archived<\/h1>/);
+    assert.match(contacts, /<h1 className=\{deskListTitleClass\}>Contacts<\/h1>/);
+    assert.match(wallet, /<h1 className=\{deskListTitleClass\}>Usage<\/h1>/);
+    assert.doesNotMatch(wallet, /<h1 className=\{deskListTitleClass\}>Wallet<\/h1>/);
     assert.doesNotMatch(home, />Overview</);
-    assert.doesNotMatch(contacts, /pageTitleClass/);
-    assert.doesNotMatch(contacts, /<h1 className=\{pageTitleClass\}>\s*Contacts/);
-    assert.doesNotMatch(wallet, /pageTitleClass/);
-    assert.doesNotMatch(wallet, /<h1 className=\{pageTitleClass\}>Wallet<\/h1>/);
-    assert.doesNotMatch(wallet, /<h1[\s\S]{0,80}>Usage<\/h1>/);
+    assert.doesNotMatch(home, /deskListTitleClass/);
+    assert.doesNotMatch(home, /pageTitleClass/);
     assert.match(settingsShell, /<SettingsPageHeader[\s\S]*?index/);
     assert.doesNotMatch(
       settingsUi,
@@ -113,6 +123,25 @@ describe("desk shell chrome", () => {
       settingsUi,
       /<h1 className="mt-1 font-display text-\[clamp\(1\.5rem,2\.4vw,2rem\)\]/
     );
+    assert.doesNotMatch(settingsUi, /deskListTitleClass/);
+
+    const ticket = read("dashboard/src/components/InboxTicketView.tsx");
+    const ticketHeader = ticket.slice(ticket.indexOf("<header"), ticket.indexOf("</header>"));
+    assert.match(ticketHeader, /<DeskBack href=\{backHref\}>Inbox<\/DeskBack>/);
+    assert.doesNotMatch(ticketHeader, /deskListTitleClass/);
+    assert.doesNotMatch(ticketHeader, /<h1[\s\S]{0,120}>Inbox<\/h1>/);
+    assert.doesNotMatch(ticketHeader, /BrandLockup|BrandWordmark/);
+
+    const contactFile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
+    assert.match(contactFile, /<DeskBack href=\{backHref\}>\{backLabel\}<\/DeskBack>/);
+    assert.doesNotMatch(contactFile, /deskListTitleClass/);
+    assert.doesNotMatch(contactFile, /<h1[\s\S]{0,120}>Contacts<\/h1>/);
+    assert.doesNotMatch(contactFile, /BrandLockup|BrandWordmark/);
+
+    const contactImport = read("dashboard/src/app/(desk)/contacts/import/page.tsx");
+    assert.match(contactImport, /<DeskBack href="\/contacts">Contacts<\/DeskBack>/);
+    assert.doesNotMatch(contactImport, /deskListTitleClass/);
+    assert.doesNotMatch(contactImport, /<h1[\s\S]{0,120}>Contacts<\/h1>/);
   });
 
   it("drops the phone lockup, keeps tabs, and parks Sign out on Profile", () => {
@@ -129,7 +158,9 @@ describe("desk shell chrome", () => {
     assert.match(settingsShell, /<SignOutButton/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /BrandLockup/);
-    assert.match(home, /markOnly/);
+    assert.match(home, /name="Scalers"/);
+    assert.match(home, /size="lg"/);
+    assert.doesNotMatch(home, /markOnly/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.doesNotMatch(contacts, /BrandLockup/);
     assert.doesNotMatch(wallet, /BrandLockup/);
