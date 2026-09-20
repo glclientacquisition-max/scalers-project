@@ -9,11 +9,13 @@ function read(rel) {
 
 describe("home overview craft", () => {
   const page = read("dashboard/src/app/(desk)/home/page.tsx");
+  const headerFile = read("dashboard/src/components/HomeOverviewHeader.tsx");
   const triage = read("dashboard/src/lib/callsTriage.ts");
 
   it("titles Overview with the workspace name and a quiet phone mark", () => {
-    const header = page.slice(page.indexOf("<header"), page.indexOf("</header>"));
+    const header = headerFile.slice(headerFile.indexOf("<header"), headerFile.indexOf("</header>"));
     const title = header.slice(header.indexOf("<h1"), header.indexOf("</h1>"));
+    assert.match(page, /<HomeOverviewHeader business=\{business\} today=\{today\} \/>/);
     const lockup = read("dashboard/src/components/brand/BrandMark.tsx");
     const xs = lockup.slice(lockup.indexOf("xs:"), lockup.indexOf("sm:"));
     assert.match(title, /deskListTitleClass/);
@@ -52,6 +54,9 @@ describe("home overview craft", () => {
     assert.doesNotMatch(header, /sticky/);
     assert.doesNotMatch(page, />Overview</);
     assert.doesNotMatch(page, /Sign out/);
+    const devHome = read("dashboard/src/app/dev/home/page.tsx");
+    assert.match(devHome, /HomeOverviewHeader/);
+    assert.match(devHome, /DASHBOARD_OPEN/);
   });
 
   it("maps Inbox queues and does not invent Online", () => {
