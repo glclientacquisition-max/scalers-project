@@ -189,7 +189,7 @@ export function InboxPingTeammate({
     );
 
     return (
-      <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+      <div className="flex w-16 flex-col items-center gap-1">
         <DeskHint label={hint} side="top">
           <button
             ref={btnRef}

@@ -37,7 +37,7 @@ function DockSlot({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+    <div className="flex w-16 flex-col items-center gap-1">
       {children}
       <span className="text-[11px] font-medium leading-none text-ink-soft">{label}</span>
     </div>
@@ -122,7 +122,7 @@ export function InboxTicketActionDock({
       aria-label="Call actions"
       className="shrink-0 border-t border-line bg-surface px-4 py-2"
     >
-      <div className="flex items-start justify-evenly gap-2">
+      <div className="flex items-start justify-center gap-3">
         {showDone ? <DockMarkDone callId={callId} /> : null}
         {showReach && callerPhone ? (
           <DockSlot label="Call">
