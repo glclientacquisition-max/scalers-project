@@ -6,6 +6,7 @@
 
 import type { ReactNode } from "react";
 import { DeskBack } from "@/components/ui/DeskBack";
+import { SignOutButton } from "@/components/ui/SignOutButton";
 import { btnPrimary, deskFieldClass, deskShiftClass } from "@/components/ui/deskChrome";
 
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
@@ -21,7 +22,7 @@ export const settingsSectionClass = "space-y-3";
 
 /** Sticks below the desk shell nav so Save stays visible while scrolling. */
 export const settingsStickyHeaderClass =
-  "sticky top-[var(--desk-header-h,3.75rem)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
+  "sticky top-[var(--desk-header-h,0px)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
 
 export const settingsActionClass =
   `inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
@@ -142,7 +143,7 @@ export const settingsGhostButtonClass =
 export function SettingsBackLink() {
   return (
     <DeskBack href="/settings" className="mb-1 lg:hidden">
-      Business Profile
+      Profile
     </DeskBack>
   );
 }
@@ -177,9 +178,13 @@ export function SettingsPageHeader({
 
   if (index) {
     return (
-      <header className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
-        {line}
+      <header className="mb-4 flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Profile</h1>
+          <p className="mt-1 min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
+          {line}
+        </div>
+        <SignOutButton />
       </header>
     );
   }

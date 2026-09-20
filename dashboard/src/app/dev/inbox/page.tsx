@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { InboxTicketView } from "@/components/InboxTicketView";
-import { DeskPhoneHeader, DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { InboxToolbar } from "@/components/InboxToolbar";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
@@ -187,7 +187,6 @@ export default function DevInboxPage() {
     <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
       <DeskRail needsCount={needYou} homeHref="/dev/inbox" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
-        <DeskPhoneHeader homeHref="/dev/inbox" />
         <main className={deskMainClass}>
         <InboxRowUiProvider>
         <InboxSelectChrome items={ROWS}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DeskPhoneHeader, DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { btnGhost, btnPrimary, deskShiftClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { useNotify } from "@/components/ui/DeskNotice";
@@ -20,7 +20,6 @@ export function MotionCatalog() {
     <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
       <DeskRail homeHref="/dev/motion" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
-        <DeskPhoneHeader homeHref="/dev/motion" />
         <main className={deskMainClass}>
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold tracking-tight text-ink">
           Motion

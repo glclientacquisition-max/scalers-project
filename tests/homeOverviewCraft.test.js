@@ -17,6 +17,9 @@ describe("home overview craft", () => {
     assert.match(page, /<time dateTime=\{today\.iso\}>/);
     assert.match(triage, /export function nairobiDateLabel/);
     assert.doesNotMatch(page, />Overview</);
+    assert.match(page, /BrandLockup/);
+    assert.match(page, /markOnly/);
+    assert.doesNotMatch(page, /Sign out/);
   });
 
   it("maps Inbox queues and does not invent Online", () => {

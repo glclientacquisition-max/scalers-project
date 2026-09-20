@@ -22,22 +22,29 @@ describe("desk phone shell", () => {
     assert.match(nav, /DeskHint/);
     assert.doesNotMatch(nav, /title=\{item.label\}/);
     assert.doesNotMatch(nav, /title="Sign out"/);
-    assert.match(nav, /label="Sign out"/);
+    assert.doesNotMatch(nav, /label="Sign out"/);
+    assert.doesNotMatch(nav, /SignOutButton/);
     assert.match(nav, /label="Scalers"/);
     assert.match(nav, /markOnly/);
     assert.match(nav, /w-\[4\.5rem\]/);
-    assert.match(nav, /SignOutButton compact/);
     assert.match(nav, /label: "Overview"/);
     assert.match(nav, /label: "Inbox"/);
     assert.match(nav, /label: "Contacts"/);
-    assert.match(nav, /label: "Business"/);
+    assert.match(nav, /href: "\/wallet", label: "Usage"/);
+    assert.match(nav, /href: "\/settings", label: "Profile"/);
+    assert.doesNotMatch(nav, /label: "Business"/);
     assert.doesNotMatch(nav, /label: "Business Profile"/);
-    assert.match(nav, /label: "Wallet"/);
+    assert.doesNotMatch(nav, /label: "Wallet"/);
+    assert.ok(
+      nav.indexOf('label: "Usage"') < nav.indexOf('label: "Profile"'),
+      "Usage occupies the old Business slot; Profile occupies the old Wallet slot"
+    );
     assert.doesNotMatch(nav, /Menu/);
     assert.doesNotMatch(nav, /hamburger/i);
     assert.match(layout, /DeskTabBar/);
     assert.match(layout, /DeskRail/);
-    assert.match(layout, /DeskPhoneHeader/);
+    assert.doesNotMatch(layout, /DeskPhoneHeader/);
+    assert.doesNotMatch(nav, /export function DeskPhoneHeader/);
     assert.match(layout, /deskMainClass/);
     assert.match(nav, /deskMainClass/);
     assert.match(nav, /--desk-tabbar-clearance/);
@@ -66,10 +73,16 @@ describe("desk phone shell", () => {
     assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
     assert.match(root, /viewportFit:\s*"cover"/);
     assert.match(css, /--desk-tabbar-h:\s*4rem/);
+    assert.match(css, /--desk-header-h:\s*0px/);
+    assert.doesNotMatch(css, /--desk-header-h:\s*3\.5rem/);
+    assert.doesNotMatch(css, /--desk-header-h:\s*3\.75rem/);
     assert.match(player, /--desk-tabbar-h/);
+    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /--desk-header-h/);
     assert.match(constitution, /bottom tab bar/);
     assert.match(constitution, /icon rail is `DESK_LINKS`/);
     assert.match(constitution, /do not live in a hamburger drawer/);
+    assert.match(constitution, /Overview, Inbox, Contacts, Usage, Profile/);
+    assert.doesNotMatch(constitution, /phone sticky bar/);
     const hint = read("dashboard/src/components/ui/DeskHint.tsx");
     assert.match(hint, /createPortal/);
     assert.match(hint, /role="tooltip"/);

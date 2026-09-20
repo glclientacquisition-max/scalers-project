@@ -16,13 +16,15 @@ describe("work surface jobs on unified inbox", () => {
   const requests = read("dashboard/src/app/(desk)/requests/page.tsx");
   const appointments = read("dashboard/src/app/(desk)/appointments/page.tsx");
 
-  it("keeps Overview Inbox Contacts Business Wallet and Inbox redirects", () => {
+  it("keeps Overview Inbox Contacts Usage Profile and Inbox redirects", () => {
     assert.match(nav, /label: "Overview"/);
     assert.match(nav, /label: "Inbox"/);
     assert.match(nav, /label: "Contacts"/);
-    assert.match(nav, /label: "Business"/);
+    assert.match(nav, /href: "\/wallet", label: "Usage"/);
+    assert.match(nav, /href: "\/settings", label: "Profile"/);
+    assert.doesNotMatch(nav, /label: "Business"/);
     assert.doesNotMatch(nav, /label: "Business Profile"/);
-    assert.match(nav, /label: "Wallet"/);
+    assert.doesNotMatch(nav, /label: "Wallet"/);
     assert.doesNotMatch(nav, /label: "Requests"/);
     assert.doesNotMatch(nav, /label: "Appointments"/);
     assert.match(requests, /\/calls\?purpose=hold/);

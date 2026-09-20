@@ -28,7 +28,7 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | Lead | `--lead` `#B98A1F` | `lead` |
 | WhatsApp glyph | `--whatsapp` `#25D366` | `whatsapp` |
 | Focus glow | `--shadow-focus` | `shadow-focus` |
-| Desk header | `--desk-header-h` | Phone sticky bar. `0` from `md`. |
+| Desk header | `--desk-header-h` | `0` at every width. Phone lockup removed. |
 | Desk tab bar | `--desk-tabbar-h` | `4rem` below `md`, `0` from `md`. Matches `DeskTabBar` min-height. |
 | Desk tab clearance | `--desk-tabbar-clearance` | Phone: tab bar plus `safe-area-inset-bottom` plus `1.5rem`. From `md`: `2.5rem`. Phone `main` padding, `scroll-padding-bottom`, and sticky bottom chrome use this. |
 | Max width | | `max-w-desk` (72rem) |
@@ -96,7 +96,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 - Body: DM Sans
 - Display: Sora on `h1–h3` and `.font-display`
-- Page title: `clamp(1.5rem, 2.4vw, 2rem)` semibold on nested records (`pageTitleClass`). Primary `DESK_LINKS` indexes do not repeat the nav label as an `h1`.
+- Page title: `clamp(1.5rem, 2.4vw, 2rem)` semibold on nested records (`pageTitleClass`). Primary `DESK_LINKS` indexes do not repeat the nav label as an `h1`, except a short Profile title on `/settings`.
 - Table: `text-sm`
 - Meta: `text-xs uppercase tracking-wide text-ink-soft`
 
@@ -117,8 +117,8 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk hint | `DeskHint`. Navy name chip on hover, pointer, and keyboard focus for icon-only hits. Portaled. Escape and scroll dismiss. The control keeps `aria-label`. |
-| Desk rail | `DeskRail` in `DeskNav.tsx`. `md+` only. `w-[4.5rem]`. Same `DESK_LINKS` as the phone tabs. Icon-only 44px hits, `DeskHint` names. Needs you badge on Inbox. Sign out at the foot. Mark-only Scalers at the top. |
-| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` icon rail. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Sign out stays in the phone header. Inbox Needs you count is a 16px corner overlay on the Inbox icon (`deskNavBadgeClass`: `-top-1 -end-1`, `h-4 min-w-4`). Ribbon gradient `from-accent to-accent-fill` (`#0096FF` → `#005CCC`), `text-accent-on-fill`. `1`–`9`, then `9+`. Hidden at 0. `aria-label` includes the count (`Inbox, 3 need you`). Not a second control. |
+| Desk rail | `DeskRail` in `DeskNav.tsx`. `md+` only. `w-[4.5rem]`. Same `DESK_LINKS` as the phone tabs (Overview, Inbox, Contacts, Usage, Profile). Icon-only 44px hits, `DeskHint` names. Needs you badge on Inbox. Mark-only Scalers at the top. Sign out lives on Profile, not at the rail foot. |
+| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` icon rail. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Stays on nested ticket and contact screens. Sign out lives on Profile. Inbox Needs you count is a 16px corner overlay on the Inbox icon (`deskNavBadgeClass`: `-top-1 -end-1`, `h-4 min-w-4`). Ribbon gradient `from-accent to-accent-fill` (`#0096FF` → `#005CCC`), `text-accent-on-fill`. `1`–`9`, then `9+`. Hidden at 0. `aria-label` includes the count (`Inbox, 3 need you`). Not a second control. |
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |
@@ -176,7 +176,7 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 | Empty / loading | `deskEmptyClass`, `(desk)/loading.tsx` | Empty is static. Route pending is the ink spinner. No skeleton pulse. No `animate-pulse` except the pronunciation recording dot. |
 | Numbers | Wallet balance, Home counts, call duration | Instant `tabular-nums`. No count-up. |
 | Form | Fields, field errors | Focus/border: `shift`. Errors mount instantly next to the field. No shake. |
-| Route | Overview, Inbox, Contacts, Wallet, Settings | Instant. The new page's lists land on later inserts only. |
+| Route | Overview, Inbox, Contacts, Usage, Profile | Instant. The new page's lists land on later inserts only. |
 
 Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
 

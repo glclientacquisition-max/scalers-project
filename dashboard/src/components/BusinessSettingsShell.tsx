@@ -19,6 +19,7 @@ import {
 } from "@/lib/businessSettingsNav";
 import { SettingsPageHeader } from "@/components/settingsUi";
 import { ThemePicker } from "@/components/ThemePicker";
+import { SignOutButton } from "@/components/ui/SignOutButton";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 
 function SettingsChevron() {
@@ -157,6 +158,9 @@ export function BusinessSettingsShell({
             </div>
           </div>
         </section>
+        <div className="mt-6">
+          <SignOutButton />
+        </div>
       </div>
     );
   }
