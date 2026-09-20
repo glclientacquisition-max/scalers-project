@@ -58,7 +58,7 @@ type BrandLockupProps = {
   size?: Size;
   className?: string;
   priority?: boolean;
-  /** Icon only. Phone Overview uses `xs`; the md+ destination rail uses `sm`. */
+  /** Icon only. The md+ destination rail uses `sm`. Overview uses the named lockup. */
   markOnly?: boolean;
 };
 

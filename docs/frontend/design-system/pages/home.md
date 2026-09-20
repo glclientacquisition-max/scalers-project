@@ -8,7 +8,7 @@
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
-**Chrome:** `h1` is the workspace name (`deskListTitleClass`, `min-w-0 truncate`). Below `md`, a 24px Scalers mark (`BrandLockup` `size="xs"` `markOnly`, `href={null}`) leads that title row in a `min-h-11` column. The mark is decorative (`aria-hidden`); the `h1` accessible name is `Scalers. {workspace}`. `md+` has no in-page lockup (the rail already has the mark). Date is one muted, truncated meta line under the name (`text-sm text-ink-soft` Nairobi `<time>`), not under the mark. Not sticky, not Sign out, not the word Overview, no time-of-day greeting. One aside: today + line + prepaid + docked CTA.
+**Chrome:** Left-aligned stack, not a centered billboard. Row 1 is a compact Scalers lockup (`BrandLockup` `size="sm"`, name Scalers, `href={null}`, not `markOnly`). Row 2 is the workspace `h1` (`text-lg font-semibold text-ink min-w-0 truncate`). Row 3 is the muted Nairobi date (`text-sm text-ink-soft` `<time>`). Phone and `md+` content column share this stack. The rail still has its own mark; do not add a second giant lockup. Not sticky, not Sign out, not the word Overview, no time-of-day greeting. One aside: today + line + prepaid + docked CTA.
 
 **Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
 
