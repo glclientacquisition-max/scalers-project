@@ -1,10 +1,26 @@
 # Notify SQL catalog (P2)
 
 **Status:** Live probe 2026-09-20 EAT (Platform via Supabase MCP).  
-**Authority:** This probe + Critic vocab [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md). Do not invent Product copy.  
+**Authority (law):** Critic LOCKED PASS packet + [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md) (Scalers Critic PASS 2026-09-20). Do not invent Product copy. This file is ledger/SQL catalog + fail-open harden only.  
 **Canonical SQL:** [`../supabase/notify_send_ledger.sql`](../supabase/notify_send_ledger.sql), [`../supabase/sms_allowance.sql`](../supabase/sms_allowance.sql), [`../supabase/whatsapp_threads.sql`](../supabase/whatsapp_threads.sql) per [`../supabase/README.md`](../supabase/README.md) steps 24c–24f.
 
 This file is a catalog and ALCR apply checklist. It does **not** apply SQL. Ops / SQL Editor apply on the target project.
+
+## Vocab law (Critic LOCKED PASS)
+
+Cite: [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md). Exact labels only:
+
+`opened` | `followed_up` | `sent` | `delivered` | `failed`
+
+- Keep term `followed_up` (no rename).
+- `queued` is optional internal only. Never user-facing as `sent`.
+- Desk intent vs channel outcome are separate fields.
+- **#358:** WA open may clear Needs you as `followed_up`. Channel claim stays `opened`, never `delivered`.
+- Hard bans: `opened` ≠ `sent` ≠ `delivered`. No soft-sent / fail-open `escalation_sent`. No Online / Rings. “Escalation sent” / “Texted the team” only when `sent` for ≥1 live channel. Do not invent notified / alerted unless that claim equals `sent`.
+- `delivered` needs DLR. Else omit.
+- `failed` copy: “Needs human. Notify failed.”
+- No `delivery_status` on `calls`.
+- Out of this PR: Meta Cloud customer send, Instagram, campaigns, desk chrome.
 
 ## Projects
 
@@ -52,7 +68,7 @@ Never apply [`../supabase/foundation_bootstrap.sql`](../supabase/foundation_boot
 
 ALCR missing `notify_sends` / SMS allowance / WhatsApp thread tables is the fail-open lie: ledger insert skipped, sends could still go, status could look **sent** without a durable row. Staging already has the notify ledger stack.
 
-Runtime (this PR): missing `notify_sends` or `consume_sms_units` cannot claim **sent**. Skip or persist `escalation_notify.stage=failed` with reason `table_missing` / `rpc_missing`. Desk copy stays “Needs human. Notify failed.” Soft / `desk_only` is not sent. **opened** is not **delivered**. No `delivery_status` on `calls`.
+Runtime (this PR): missing `notify_sends` or `consume_sms_units` cannot claim `sent` (Critic LOCKED PASS). Skip or persist channel outcome `failed` with reason `table_missing` / `rpc_missing`. Soft / `desk_only` is not `sent`. Desk intent (`opened` / `followed_up`) is a separate field from channel outcome. No `delivery_status` on `calls`.
 
 ## ALCR apply checklist (additive only)
 
@@ -71,7 +87,7 @@ After apply, re-probe tables + `consume_sms_units` before treating ALCR as caugh
 
 ## Honesty map (runtime reasons)
 
-Technical reasons on `escalation_notify.reason` / dispatch. Not Product labels.
+Technical reasons on `escalation_notify.reason` / dispatch. Product labels stay the Critic five in [`../product/DELIVERY_VOCAB.md`](../product/DELIVERY_VOCAB.md).
 
 | Reason | Meaning | Desk / Critic word |
 | --- | --- | --- |
@@ -84,4 +100,4 @@ Technical reasons on `escalation_notify.reason` / dispatch. Not Product labels.
 
 ## Out of scope
 
-whose-turn, verb cut, contact strip, `VOICE_LIVE_TRANSFER`, Baileys, Instagram, campaigns, Meta Cloud customer send, `delivery_status` on `calls`.
+Ledger/SQL design + fail-open harden only. No Meta Cloud customer send, Instagram, campaigns, or desk chrome. Also out: whose-turn, verb cut, contact strip, `VOICE_LIVE_TRANSFER`, Baileys, `delivery_status` on `calls`.
