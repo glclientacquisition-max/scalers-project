@@ -11,8 +11,10 @@ describe("inbox filters and empty states", () => {
   const niche = read("dashboard/src/lib/inboxNiche.ts");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+  const board = read("dashboard/src/components/InboxPileBoard.tsx");
   const purpose = read("dashboard/src/lib/inboxPurpose.ts");
   const harness = read("dashboard/src/app/dev/inbox/page.tsx");
+  const inbox = page + board;
 
   it("uses existing purpose piles, not Unread or Assigned", () => {
     assert.match(niche, /label: "Needs you"/);
@@ -32,8 +34,8 @@ describe("inbox filters and empty states", () => {
     assert.match(entry, /InboxArchivedPhoneRow/);
     assert.match(entry, /InboxArchivedTableRow/);
     assert.match(entry, /label="Archived"/);
-    assert.match(page, /showArchivedEntry/);
-    assert.match(page, /ret=\{inboxRet\}/);
+    assert.match(inbox, /showArchivedEntry/);
+    assert.match(board, /ret=\{ret\}/);
     assert.match(page, /backHref=\{archivedBackHref\}/);
     assert.match(toolbar, /backHref \|\| callsHref/);
     assert.match(entry, /inboxArchivedHref\(ret\)/);
@@ -41,11 +43,12 @@ describe("inbox filters and empty states", () => {
   });
 
   it("keeps phone rows through md so the Action dock is not clipped", () => {
-    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
-    assert.match(page, /lg:hidden/);
-    assert.match(page, /hidden lg:block/);
-    assert.match(page, /minWidthClass="min-w-0"/);
-    assert.doesNotMatch(page, /min-w-\[720px\]/);
+    const inbox = read("dashboard/src/app/(desk)/calls/page.tsx") +
+      read("dashboard/src/components/InboxPileBoard.tsx");
+    assert.match(inbox, /lg:hidden/);
+    assert.match(inbox, /hidden lg:block/);
+    assert.match(inbox, /minWidthClass="min-w-0"/);
+    assert.doesNotMatch(inbox, /min-w-\[720px\]/);
   });
 
   it("debounces search against the existing q param", () => {
@@ -54,11 +57,11 @@ describe("inbox filters and empty states", () => {
   });
 
   it("keeps search-empty, filter-empty, and inbox-empty distinct", () => {
-    assert.match(page, /No matches/);
-    assert.match(page, /Nothing needs you/);
-    assert.match(page, /None archived/);
-    assert.match(page, /Inbox is empty/);
-    assert.doesNotMatch(page, /inboxCaption/);
+    assert.match(inbox, /No matches/);
+    assert.match(inbox, /Nothing needs you/);
+    assert.match(inbox, /None archived/);
+    assert.match(inbox, /Inbox is empty/);
+    assert.doesNotMatch(inbox, /inboxCaption/);
     assert.match(purpose, /\$\{needs\} need you/);
     assert.match(harness, /ROWS.filter\(\(row\) => row.needsYou\)/);
   });

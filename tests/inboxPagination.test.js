@@ -10,12 +10,13 @@ function read(rel) {
 describe("inbox pagination page jump", () => {
   const src = read("dashboard/src/components/ui/Pagination.tsx");
   const calls = read("dashboard/src/app/(desk)/calls/page.tsx");
+  const board = read("dashboard/src/components/InboxPileBoard.tsx");
 
   it("keeps Previous and Next at 44px", () => {
     assert.match(src, /Previous/);
     assert.match(src, /Next/);
     assert.match(src, /min-h-11/);
-    assert.match(calls, /<Pagination/);
+    assert.match(board, /<Pagination/);
   });
 
   it("renders a page input only when totalPages is greater than 5", () => {

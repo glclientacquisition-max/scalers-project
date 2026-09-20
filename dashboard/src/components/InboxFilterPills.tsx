@@ -46,6 +46,7 @@ export function InboxFilterPills({
             >
               <Link
                 href={item.href}
+                prefetch
                 aria-current={isActive ? "page" : undefined}
                 className={[
                   "inline-flex min-h-11 items-center gap-2 rounded-full px-3.5 text-sm font-medium",

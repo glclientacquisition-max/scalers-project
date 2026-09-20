@@ -488,6 +488,7 @@ describe("inbox verb workflows: surfaces as shipped", () => {
   it("FilterTabs have no Unread or Snoozed. Archived is a folder row", () => {
     const niche = read("dashboard/src/lib/inboxNiche.ts");
     const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const board = read("dashboard/src/components/InboxPileBoard.tsx");
     assert.match(niche, /id: "needs"/);
     assert.match(niche, /id: "all"/);
     assert.match(niche, /id: "job"/);
@@ -495,8 +496,8 @@ describe("inbox verb workflows: surfaces as shipped", () => {
     assert.match(niche, /id: "human"/);
     assert.match(niche, /id: "answered"/);
     assert.doesNotMatch(niche, /Unread|Snooze/);
-    assert.match(page, /InboxArchivedPhoneRow/);
-    assert.match(page, /showArchivedEntry/);
+    assert.match(board, /InboxArchivedPhoneRow/);
+    assert.match(board, /showArchivedEntry/);
   });
 
   it("dock verbs stay Confirm, hold Done, Call, WhatsApp. They are not overflow verbs", () => {
