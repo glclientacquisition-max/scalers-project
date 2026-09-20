@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { useInboxQueryItems } from "@/components/InboxPileNav";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
@@ -42,6 +45,7 @@ export function RunSheetToday({
 }) {
   const copy = nicheCopy(vertical);
   const heading = dayHeading(ymd);
+  const rows = useInboxQueryItems(items);
   const placeFor = (item: InboxItem) => item.job?.address_landmark?.trim() || "";
   const clockFor = (item: InboxItem) =>
     purpose === "hold" ? formatHoldClock(item) : formatSlotClock(item);
@@ -67,7 +71,7 @@ export function RunSheetToday({
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="border-y border-line py-12 text-center">
           <p className="font-display text-2xl tracking-tight text-ink">{copy.todayEmpty}</p>
           <Link href={listHref} className={`${btnGhost} mt-6`}>
@@ -77,7 +81,7 @@ export function RunSheetToday({
       ) : (
         <>
           <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
-            {items.map((item) => (
+            {rows.map((item) => (
               <li
                 key={item.id}
                 className="relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0"
@@ -127,7 +131,7 @@ export function RunSheetToday({
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {rows.map((item) => (
                   <tr key={item.id} className="relative border-b border-line last:border-b-0">
                     <td className="px-5 py-3 text-sm font-semibold text-ink">
                       <DeskRowHit

@@ -17,7 +17,7 @@ import type { InboxReturn } from "@/lib/inboxHref";
 import { InboxPileSwipe } from "@/components/InboxPileSwipe";
 import { useInboxPileNav } from "@/components/InboxPileNav";
 import { DeskLandScope } from "@/components/ui/DeskLand";
-import { btnGhost, btnPrimary, deskEmptyClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
+import { btnGhost, btnPrimary, deskEmptyClass, deskShiftClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 
 function EmptyInbox({
   total,
@@ -34,17 +34,29 @@ function EmptyInbox({
   q: string;
   vertical?: string | null;
 }) {
+  const nav = useInboxPileNav();
   const copy = nicheCopy(vertical);
-  if (q) {
+  const query = (nav?.q ?? q).trim();
+  if (query) {
     return (
       <div className={deskEmptyClass}>
         <p className="font-display text-2xl tracking-tight text-ink">No matches</p>
-        <Link
-          href={callsHref({ purpose })}
-          className={`${btnGhost} mt-6`}
-        >
-          Clear search
-        </Link>
+        {nav ? (
+          <button
+            type="button"
+            onClick={() => nav.setQuery("")}
+            className={`mt-6 font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+          >
+            Clear
+          </button>
+        ) : (
+          <Link
+            href={callsHref({ purpose })}
+            className={`mt-6 inline-flex font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+          >
+            Clear
+          </Link>
+        )}
       </div>
     );
   }
@@ -107,10 +119,10 @@ export function InboxPileBoard({
   assembledCount,
   pendingDid,
   did,
-  q,
+  q: urlQ,
   vertical,
   businessName,
-  counts,
+  counts: urlCounts,
   inboxRet,
   viewParams,
   hrefs,
@@ -132,8 +144,11 @@ export function InboxPileBoard({
   const pageRows = nav?.pageRows || [];
   const page = nav?.page ?? 1;
   const paint = nav?.paint ?? "rows";
+  const q = (nav?.q ?? urlQ).trim();
+  const counts = nav?.counts ?? urlCounts;
+  const pileHrefs = nav?.hrefs ?? hrefs;
   const copy = nicheCopy(vertical);
-  const ret: InboxReturn = { ...inboxRet, purpose, page };
+  const ret: InboxReturn = { ...inboxRet, purpose, page, q: q || undefined };
   const showArchivedEntry =
     purpose !== "archived" && counts.archived > 0 && page === 1;
   const empty =
@@ -144,7 +159,7 @@ export function InboxPileBoard({
       {paint === "pending" ? (
         <InboxPileSwipe
           active={purpose}
-          hrefs={hrefs}
+          hrefs={pileHrefs}
           enabled={purpose !== "archived"}
         >
           <div className={deskEmptyClass}>
@@ -154,7 +169,7 @@ export function InboxPileBoard({
       ) : empty ? (
         <InboxPileSwipe
           active={purpose}
-          hrefs={hrefs}
+          hrefs={pileHrefs}
           enabled={purpose !== "archived"}
         >
           <EmptyInbox
@@ -170,7 +185,7 @@ export function InboxPileBoard({
         <>
           <InboxPileSwipe
             active={purpose}
-            hrefs={hrefs}
+            hrefs={pileHrefs}
             enabled={purpose !== "archived"}
           >
             <DeskLandScope
@@ -265,7 +280,7 @@ export function InboxPileBoard({
             pageSize={DEFAULT_PAGE_SIZE}
             total={listed.length}
             href="/calls"
-            params={{ ...viewParams, purpose }}
+            params={{ ...viewParams, purpose, q: q || undefined }}
           />
         </>
       )}

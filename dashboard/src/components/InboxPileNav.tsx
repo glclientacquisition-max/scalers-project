@@ -12,8 +12,12 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
+import { sanitizeSearchQuery } from "@/lib/callsTriage";
+import { inboxArchivedHref } from "@/lib/inboxHref";
 import {
+  countInboxPurposes,
   itemMatchesPurpose,
+  itemMatchesQuery,
   orderInboxItems,
   type InboxItem,
   type InboxPurposeFilterId,
@@ -24,17 +28,22 @@ import { DEFAULT_PAGE_SIZE } from "@/components/ui/Pagination";
 import {
   adjacentPileHrefs,
   filterCachedPile,
+  inboxPileHref,
+  SWIPE_PILES,
 } from "@/lib/inboxSwipe";
 
 type InboxPileNavValue = {
   purpose: InboxPurposeFilterId;
+  q: string;
   hrefs: Partial<Record<string, string>>;
   listed: InboxItem[];
   pageRows: InboxItem[];
   selectRows: InboxItem[];
+  counts: Record<InboxPurposeFilterId, number>;
   page: number;
   paint: "pending" | "empty" | "rows";
   goPile: (next: string) => void;
+  setQuery: (next: string) => void;
   prefetchAdjacent: () => void;
 };
 
@@ -47,11 +56,46 @@ function orderPile(items: InboxItem[], purpose: InboxPurposeFilterId): InboxItem
   return ordered;
 }
 
+function inboxSearchHref(opts: {
+  purpose: string;
+  q: string;
+  view?: string;
+  week?: string;
+  day?: string;
+  from?: string;
+  rpage?: string;
+}): string {
+  const text = sanitizeSearchQuery(opts.q);
+  if (opts.purpose === "archived") {
+    return inboxArchivedHref({
+      purpose: opts.from,
+      view: opts.view,
+      week: opts.week,
+      day: opts.day,
+      page: opts.rpage,
+      q: text || undefined,
+    });
+  }
+  return inboxPileHref(opts.purpose, {
+    q: text,
+    active: opts.purpose,
+    view: opts.view,
+    week: opts.week,
+    day: opts.day,
+  });
+}
+
 export function InboxPileNavProvider({
   purpose,
   items,
   hrefs,
   page: urlPage,
+  q: urlQ = "",
+  view,
+  week,
+  day,
+  from,
+  rpage,
   enableSelect = true,
   children,
 }: {
@@ -59,15 +103,29 @@ export function InboxPileNavProvider({
   items: InboxItem[];
   hrefs: Partial<Record<string, string>>;
   page: number;
+  q?: string;
+  view?: string;
+  week?: string;
+  day?: string;
+  from?: string;
+  rpage?: string;
   enableSelect?: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
   const [localPurpose, setLocalPurpose] = useState(purpose);
   const [localPage, setLocalPage] = useState(urlPage);
+  const [localQ, setLocalQ] = useState(urlQ);
   const pendingRef = useRef<string | null>(null);
+  const pendingQRef = useRef<string | null>(null);
+  const qWait = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hrefsRef = useRef(hrefs);
-  hrefsRef.current = hrefs;
+  const purposeRef = useRef(localPurpose);
+  const qRef = useRef(localQ);
+  const searchOptsRef = useRef({ view, week, day, from, rpage });
+  purposeRef.current = localPurpose;
+  qRef.current = localQ;
+  searchOptsRef.current = { view, week, day, from, rpage };
 
   useEffect(() => {
     if (pendingRef.current) {
@@ -81,6 +139,42 @@ export function InboxPileNavProvider({
     if (pendingRef.current) return;
     setLocalPage(urlPage);
   }, [urlPage]);
+
+  useEffect(() => {
+    if (pendingQRef.current !== null) {
+      if (
+        urlQ === pendingQRef.current ||
+        urlQ === sanitizeSearchQuery(pendingQRef.current)
+      ) {
+        pendingQRef.current = null;
+      }
+      return;
+    }
+    setLocalQ(urlQ);
+  }, [urlQ]);
+
+  useEffect(
+    () => () => {
+      if (qWait.current) clearTimeout(qWait.current);
+    },
+    []
+  );
+
+  const liveHrefs = useMemo(() => {
+    const opts = {
+      q: localQ.trim(),
+      active: localPurpose,
+      view,
+      week,
+      day,
+    };
+    const ids = Object.keys(hrefs).length ? Object.keys(hrefs) : [...SWIPE_PILES];
+    return Object.fromEntries(
+      ids.map((id) => [id, inboxPileHref(id, opts)])
+    ) as Partial<Record<string, string>>;
+  }, [hrefs, localQ, localPurpose, view, week, day]);
+
+  hrefsRef.current = liveHrefs;
 
   const prefetchAdjacent = useCallback(() => {
     const { next, prev } = adjacentPileHrefs(localPurpose, hrefsRef.current);
@@ -96,17 +190,54 @@ export function InboxPileNavProvider({
     if (next === localPurpose) return;
     pendingRef.current = next;
     setLocalPurpose(next as InboxPurposeFilterId);
+    purposeRef.current = next as InboxPurposeFilterId;
     setLocalPage(1);
     const href = hrefsRef.current[next];
     if (href) router.replace(href);
   }, [localPurpose, router]);
 
+  const setQuery = useCallback((next: string) => {
+    const value = next.slice(0, 64);
+    setLocalQ(value);
+    qRef.current = value;
+    pendingQRef.current = value;
+    setLocalPage(1);
+    if (qWait.current) clearTimeout(qWait.current);
+    const sync = () => {
+      const opts = searchOptsRef.current;
+      router.replace(
+        inboxSearchHref({
+          purpose: purposeRef.current,
+          q: qRef.current,
+          view: opts.view,
+          week: opts.week,
+          day: opts.day,
+          from: opts.from,
+          rpage: opts.rpage,
+        })
+      );
+    };
+    if (!value.trim()) {
+      sync();
+      return;
+    }
+    qWait.current = setTimeout(sync, 300);
+  }, [router]);
+
+  const searched = useMemo(() => {
+    const text = localQ.trim();
+    if (!text) return items;
+    return items.filter((item) => itemMatchesQuery(item, text));
+  }, [items, localQ]);
+
+  const counts = useMemo(() => countInboxPurposes(searched), [searched]);
+
   const { rows, paint } = useMemo(
     () =>
-      filterCachedPile(items, localPurpose, (item, pile) =>
+      filterCachedPile(searched, localPurpose, (item, pile) =>
         itemMatchesPurpose(item, pile as InboxPurposeFilterId)
       ),
-    [items, localPurpose]
+    [searched, localPurpose]
   );
 
   const listed = useMemo(
@@ -115,32 +246,38 @@ export function InboxPileNavProvider({
   );
 
   const pageRows = useMemo(() => {
-    const from = (localPage - 1) * DEFAULT_PAGE_SIZE;
-    return listed.slice(from, from + DEFAULT_PAGE_SIZE);
+    const fromIndex = (localPage - 1) * DEFAULT_PAGE_SIZE;
+    return listed.slice(fromIndex, fromIndex + DEFAULT_PAGE_SIZE);
   }, [listed, localPage]);
 
   const value = useMemo(
     () => ({
       purpose: localPurpose,
-      hrefs,
+      q: localQ,
+      hrefs: liveHrefs,
       listed,
       pageRows,
       selectRows: enableSelect ? pageRows : [],
+      counts,
       page: localPage,
       paint,
       goPile,
+      setQuery,
       prefetchAdjacent,
     }),
     [
       localPurpose,
-      hrefs,
+      localQ,
+      liveHrefs,
       listed,
       pageRows,
       localPage,
       paint,
       goPile,
+      setQuery,
       prefetchAdjacent,
       enableSelect,
+      counts,
     ]
   );
 
@@ -151,6 +288,15 @@ export function InboxPileNavProvider({
 
 export function useInboxPileNav() {
   return useContext(InboxPileNavCtx);
+}
+
+export function useInboxQueryItems(items: InboxItem[]): InboxItem[] {
+  const nav = useInboxPileNav();
+  const q = (nav?.q ?? "").trim();
+  return useMemo(
+    () => (q ? items.filter((item) => itemMatchesQuery(item, q)) : items),
+    [items, q]
+  );
 }
 
 export function InboxPileSelectChrome({ children }: { children: ReactNode }) {
