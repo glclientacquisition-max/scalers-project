@@ -86,6 +86,83 @@ export function parseWeekParam(raw: string | undefined, now = new Date()): strin
   return mondayYmd(now);
 }
 
+const MONTH_INDEX: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
+
+function validYmd(year: number, month: number, day: number): boolean {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return false;
+  }
+  if (year < 2000 || year > 2100) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const check = new Date(Date.UTC(year, month - 1, day));
+  return (
+    check.getUTCFullYear() === year &&
+    check.getUTCMonth() === month - 1 &&
+    check.getUTCDate() === day
+  );
+}
+
+/** Absolute calendar day in When text. Desk When+Save must not fall back to today+time. */
+export function parseAbsoluteWhenDate(
+  raw: string
+): { year: number; month: number; day: number } | null {
+  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  const named = /\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?\s+(\d{4})\b/.exec(
+    text
+  );
+  if (named) {
+    const day = Number(named[1]);
+    const month = MONTH_INDEX[named[2].toLowerCase()];
+    const year = Number(named[3]);
+    if (month && validYmd(year, month, day)) return { year, month, day };
+  }
+
+  const iso = /\b(\d{4})-(\d{2})-(\d{2})\b/.exec(text);
+  if (iso) {
+    const year = Number(iso[1]);
+    const month = Number(iso[2]);
+    const day = Number(iso[3]);
+    if (validYmd(year, month, day)) return { year, month, day };
+  }
+
+  const dmy = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/.exec(text);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    if (validYmd(year, month, day)) return { year, month, day };
+  }
+
+  return null;
+}
+
 export function stampScheduleWindows(
   whenText: string,
   now = new Date()
@@ -117,6 +194,7 @@ export function visitInstant(visit: CalendarVisit, now: Date): Date | null {
   const text = String(visit.when_text || "").trim();
   if (!text) return null;
   const lower = text.toLowerCase();
+  const absolute = parseAbsoluteWhenDate(text);
   const clock =
     /\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i.exec(text) ||
     /\b([01]?\d|2[0-3]):([0-5]\d)\b/.exec(text);
@@ -135,6 +213,14 @@ export function visitInstant(visit: CalendarVisit, now: Date): Date | null {
   } else if (/\b(afternoon|mchana)\b/i.test(lower)) minutes = 14 * 60;
   else if (/\b(evening|jioni)\b/i.test(lower)) minutes = 17 * 60;
   else if (/\btonight\b/i.test(lower)) minutes = 19 * 60;
+
+  if (absolute) {
+    const y = String(absolute.year);
+    const m = String(absolute.month).padStart(2, "0");
+    const d = String(absolute.day).padStart(2, "0");
+    const start = ymdToEatMidnight(`${y}-${m}-${d}`);
+    return new Date(start.getTime() + minutes * 60 * 1000);
+  }
 
   const todayKey = eatYmd(now);
   let dayOffset = 0;
