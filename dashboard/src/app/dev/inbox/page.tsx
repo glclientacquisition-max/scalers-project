@@ -83,6 +83,14 @@ const ROWS: InboxItem[] = [
     intent: "book_visit",
   }),
   item({
+    id: "hold-intent",
+    purpose: "hold",
+    callerName: "Kamau",
+    callerPhone: "254700000007",
+    headline: "Hold",
+    intent: "hold_or_pickup",
+  }),
+  item({
     id: "hold",
     purpose: "hold",
     callerName: "Wanjiku",
