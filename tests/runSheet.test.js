@@ -78,11 +78,10 @@ describe("desk visit board", () => {
     assert.equal(mondayYmd(now), "2026-09-14");
     assert.equal(eatYmd(new Date("2026-09-10T10:00:00+03:00")) < mondayYmd(now), true);
     assert.equal(eatYmd(new Date("2026-09-15T10:00:00+03:00")) < mondayYmd(now), false);
-    const sheet = read("dashboard/src/lib/runSheet.ts");
-    const page = read("dashboard/src/app/(desk)/calls/page.tsx");
+    const nav = read("dashboard/src/components/InboxPileNav.tsx");
     assert.match(sheet, /export function isVisitListLeftover/);
     assert.match(sheet, /eatYmd\(instant\) < mondayYmd\(now\)/);
     assert.match(sheet, /export function orderVisitList/);
-    assert.match(page, /orderVisitList\(filtered\)/);
+    assert.match(nav, /orderVisitList\(ordered\)/);
   });
 });

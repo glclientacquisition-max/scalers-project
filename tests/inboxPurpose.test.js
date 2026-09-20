@@ -709,8 +709,8 @@ describe("inboxPurpose source lockstep", () => {
       path.join(__dirname, "..", "dashboard/src/lib/inboxPurpose.ts"),
       "utf8"
     );
-    const page = fs.readFileSync(
-      path.join(__dirname, "..", "dashboard/src/app/(desk)/calls/page.tsx"),
+    const nav = fs.readFileSync(
+      path.join(__dirname, "..", "dashboard/src/components/InboxPileNav.tsx"),
       "utf8"
     );
     assert.match(src, /if \(item\.urgent && item\.needsYou\) return 0;/);
@@ -718,7 +718,7 @@ describe("inboxPurpose source lockstep", () => {
     assert.match(src, /if \(opts\.purpose === "live"\) return true;/);
     assert.match(src, /export function compareInboxRecency/);
     assert.match(src, /filter === "all" \|\| filter === "answered" \|\| filter === "archived" \|\| filter === "hold"/);
-    assert.match(page, /orderInboxItems\(/);
+    assert.match(nav, /orderInboxItems\(/);
     assert.doesNotMatch(src, /if \(item\.needsYou\) return 1;/);
     assert.match(src, /if \(intent === "product_inquiry"\) return "missed";/);
     assert.doesNotMatch(src, /"product_inquiry",\s*"service_inquiry"/);
