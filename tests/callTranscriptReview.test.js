@@ -80,6 +80,17 @@ describe('parseReviewJson', () => {
     assert.equal(parsed.needs_human, false);
     assert.doesNotMatch(parsed.reason, /[\u2014\u2013]/);
     assert.match(parsed.reason, /Atomic Habits/);
+    const exact = parseReviewJson(
+      JSON.stringify({
+        reason: 'Visit request saved — confirm on desk.',
+        done: 'Visit request saved — confirm on desk.',
+        primary_intent: 'book_visit',
+        needs_human: false,
+        confidence: 0.9,
+      })
+    );
+    assert.equal(exact.reason, 'Visit request saved — confirm on desk.');
+    assert.equal(exact.done, 'Visit request saved — confirm on desk.');
     assert.equal(parsed.want, parsed.reason);
     assert.equal(parsed.done, 'None.');
     assert.equal(parsed.next, 'None.');
@@ -205,13 +216,35 @@ describe('mergeTranscriptReview', () => {
       review: {
         reason: 'Mary booked a visit tomorrow.',
         want: 'Mary booked a mattress cleaning visit.',
+        done: 'Visit request saved.',
         primary_intent: 'book_visit',
         needs_human: false,
         confidence: 0.94,
       },
     });
-    assert.match(merged.reason, /Visit request saved/);
-    assert.doesNotMatch(merged.reason, /booked/i);
+    assert.equal(merged.reason, 'Visit request saved — confirm on desk.');
+    assert.equal(merged.done, 'Visit request saved — confirm on desk.');
+    assert.doesNotMatch(merged.reason, /booked a visit|book that for you/i);
+    assert.doesNotMatch(merged.want, /booked/i);
+  });
+
+  it('completes truncated Visit request saved hangup copy', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
+      summary: { reason: 'Visit request saved.' },
+      toolFlags: { ...visitFlags, visitRequested: true },
+      review: {
+        reason: 'Visit request saved.',
+        want: 'Mary wants mattress cleaning tomorrow.',
+        done: 'Visit request saved',
+        primary_intent: 'book_visit',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.reason, 'Visit request saved — confirm on desk.');
+    assert.equal(merged.done, 'Visit request saved — confirm on desk.');
+    assert.match(merged.want, /mattress cleaning/);
     assert.doesNotMatch(merged.want, /booked/i);
   });
 
@@ -602,7 +635,7 @@ describe('post-call contact persist and name extract', () => {
         turns: fatTurns,
         summary: { name: 'Colin', reason: 'Colin asked about Ah, unajua, degrees apartments.' },
         derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
-        toolFlags: visitFlags,
+        toolFlags: { ...visitFlags, visitRequested: true },
       },
       {
         waitMs: 0,
@@ -637,11 +670,13 @@ describe('post-call contact persist and name extract', () => {
     );
     assert.equal(result.ok, true);
     const last = upserts[upserts.length - 1];
+    assert.equal(result.review.merged.reason, 'Visit request saved — confirm on desk.');
+    assert.equal(result.review.merged.done, 'Visit request saved — confirm on desk.');
     assert.match(last.lastReason, /mattress cleaning visit/);
     assert.doesNotMatch(last.lastReason, /unajua/);
-    assert.doesNotMatch(last.lastReason, /booked a visit tomorrow\.$/);
+    assert.doesNotMatch(last.lastReason, /booked a visit|book that for you/i);
     assert.match(result.review.merged.want, /mattress cleaning visit/);
-    assert.equal(result.review.review.done, 'Visit saved.');
+    assert.doesNotMatch(result.review.merged.want, /booked/i);
     assert.equal(result.review.review.mood, 'calm');
   });
 

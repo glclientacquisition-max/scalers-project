@@ -169,12 +169,7 @@ function buildOwnerReason({ callerName, primaryIntent, goal, products, results }
         visit.action === 'update_appointment' ? 'updated a visit' : 'confirmed a visit';
       return clean([`${who} ${verb}`, service, when].filter(Boolean).join('. '), 220);
     }
-    return clean(
-      [VISIT_REQUESTED_NOTE.replace(/\.$/, ''), service, when]
-        .filter(Boolean)
-        .join('. ') + '.',
-      220
-    );
+    return VISIT_REQUESTED_NOTE;
   }
   if (primaryIntent === 'human') {
     return clean(`${who} needs you to return the call.`, 220);
