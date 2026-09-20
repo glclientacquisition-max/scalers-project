@@ -73,7 +73,7 @@ export const deskEmptyClass = "mt-8 border-y border-line py-12 text-center";
 export const pageTitleClass =
   "font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink";
 
-/** WhatsApp/Telegram large title on Inbox, Contacts, Usage list roots. Not sticky. */
+/** Large in-page title: Inbox, Contacts, Usage list roots, and Overview workspace name. Not sticky. */
 export const deskListTitleClass =
   "font-display text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl";
 

@@ -112,7 +112,7 @@ describe("desk shell chrome", () => {
     assert.match(wallet, /<h1 className=\{deskListTitleClass\}>Usage<\/h1>/);
     assert.doesNotMatch(wallet, /<h1 className=\{deskListTitleClass\}>Wallet<\/h1>/);
     assert.doesNotMatch(home, />Overview</);
-    assert.doesNotMatch(home, /deskListTitleClass/);
+    assert.match(home, /deskListTitleClass/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.match(settingsShell, /<SettingsPageHeader[\s\S]*?index/);
     assert.doesNotMatch(
@@ -159,8 +159,10 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /BrandLockup/);
     assert.match(home, /name="Scalers"/);
-    assert.match(home, /size="lg"/);
-    assert.doesNotMatch(home, /markOnly/);
+    assert.match(home, /size="sm"/);
+    assert.match(home, /markOnly/);
+    assert.match(home, /md:hidden/);
+    assert.doesNotMatch(home, /size="lg"/);
     assert.doesNotMatch(home, /nairobiGreeting/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.doesNotMatch(contacts, /BrandLockup/);

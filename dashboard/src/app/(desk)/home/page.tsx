@@ -19,6 +19,7 @@ import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import {
   btnGhost,
   btnPrimary,
+  deskListTitleClass,
   deskPreviewClass,
   deskShiftClass,
   focusRingVisible,
@@ -176,12 +177,13 @@ export default async function HomeOverviewPage() {
   return (
     <div className="w-full min-w-0">
       <header className="min-w-0">
-        <h1 className="min-w-0">
-          <BrandLockup href={null} name="Scalers" size="lg" />
-        </h1>
-        <p className="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-sm text-ink-soft">
-          <span className="min-w-0 truncate">{business}</span>
-          <span aria-hidden="true">·</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 md:hidden" aria-hidden>
+            <BrandLockup href={null} name="Scalers" size="sm" markOnly />
+          </span>
+          <h1 className={`${deskListTitleClass} min-w-0 truncate`}>{business}</h1>
+        </div>
+        <p className="mt-1 text-sm text-ink-soft">
           <time dateTime={today.iso}>{today.label}</time>
         </p>
       </header>

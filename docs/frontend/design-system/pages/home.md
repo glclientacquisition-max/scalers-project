@@ -8,7 +8,7 @@
 3. **What happened** — Calls today as a compact link.
 4. **What to do next** — Niche CTA into the sharpest queue.
 
-**Chrome:** One title: large in-page Scalers lockup (`BrandLockup` size `lg`, name visible, not `markOnly`, not sticky, not Sign out, not the word Overview). One muted meta line under it (`text-sm text-ink-soft`): workspace name, middot, Nairobi `<time>`. Workspace is not a second display title. No time-of-day greeting. One aside: today + line + prepaid + docked CTA.
+**Chrome:** `h1` is the workspace name (`deskListTitleClass`). Below `md`, a small Scalers mark (`BrandLockup` `size="sm"` `markOnly`) leads that title row. `md+` has no in-page lockup (the rail already has the mark). Date is one muted meta line under the title (`text-sm text-ink-soft` Nairobi `<time>`). Not sticky, not Sign out, not the word Overview, no time-of-day greeting. One aside: today + line + prepaid + docked CTA.
 
 **Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
 

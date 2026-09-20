@@ -11,27 +11,31 @@ describe("home overview craft", () => {
   const page = read("dashboard/src/app/(desk)/home/page.tsx");
   const triage = read("dashboard/src/lib/callsTriage.ts");
 
-  it("titles Overview with Scalers lockup and muted workspace meta", () => {
+  it("titles Overview with the workspace name and a quiet phone mark", () => {
     const header = page.slice(page.indexOf("<header"), page.indexOf("</header>"));
+    const title = header.slice(header.indexOf("<h1"), header.indexOf("</h1>"));
+    assert.match(title, /deskListTitleClass/);
+    assert.match(title, /\{business\}/);
+    assert.doesNotMatch(title, /BrandLockup/);
+    assert.doesNotMatch(title, /name="Scalers"/);
+    assert.doesNotMatch(title, /size="lg"/);
+    assert.doesNotMatch(header, /size="lg"/);
     assert.match(header, /BrandLockup/);
     assert.match(header, /name="Scalers"/);
-    assert.match(header, /size="lg"/);
-    assert.doesNotMatch(header, /markOnly/);
-    assert.match(header, /flex min-w-0 flex-wrap items-center gap-2 text-sm text-ink-soft/);
-    assert.match(header, /\{business\}/);
-    assert.match(header, /·/);
+    assert.match(header, /size="sm"/);
+    assert.match(header, /markOnly/);
+    assert.match(header, /md:hidden/);
     assert.match(header, /<time dateTime=\{today\.iso\}>/);
+    assert.match(header, /text-sm text-ink-soft/);
+    assert.doesNotMatch(header, /<span className="min-w-0 truncate">\{business\}<\/span>/);
     assert.match(page, /nairobiDateLabel\(\)/);
     assert.match(triage, /export function nairobiDateLabel/);
     assert.doesNotMatch(page, /nairobiGreeting/);
     assert.doesNotMatch(triage, /nairobiGreeting/);
     assert.doesNotMatch(header, /Good morning|Good afternoon|Good evening|GOOD AFTERNOON/);
     assert.doesNotMatch(header, /uppercase tracking-\[0\.14em\]/);
-    const title = header.slice(header.indexOf("<h1"), header.indexOf("</h1>"));
-    assert.match(title, /BrandLockup/);
-    assert.doesNotMatch(title, /\{business\}/);
-    assert.match(header, /<span className="min-w-0 truncate">\{business\}<\/span>/);
-    assert.doesNotMatch(header, /pageTitleClass|deskListTitleClass|text-3xl/);
+    assert.doesNotMatch(header, /text-center|justify-center/);
+    assert.doesNotMatch(header, /sticky/);
     assert.doesNotMatch(page, />Overview</);
     assert.doesNotMatch(page, /Sign out/);
   });
