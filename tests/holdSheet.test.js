@@ -57,6 +57,7 @@ describe("desk hold board", () => {
     const now = new Date(Date.UTC(2026, 8, 19, 5, 0, 0));
     assert.equal(visitDayKey({ when_text: "tomorrow at 6 PM" }, now) < eatYmd(now), false);
     assert.equal(visitDayKey({ when_text: "Anytime" }, now), null);
+    const sheet = read("dashboard/src/lib/holdSheet.ts");
     const nav = read("dashboard/src/components/InboxPileNav.tsx");
     assert.match(sheet, /export function isHoldListLeftover/);
     assert.match(sheet, /eatYmd\(instant\) < eatYmd\(now\)/);
