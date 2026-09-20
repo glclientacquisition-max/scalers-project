@@ -3,7 +3,7 @@
 **Route:** `/calls`  
 **Job:** One work surface. Brain intent ids are mapped onto owner stamps. Copy follows `tenants.vertical`.
 
-**Outside vs inside.** `/calls` is recognition. `/calls/[id]` is decision. Jakob: who plus one ellipsized preview, like Mail or WhatsApp. Progressive disclosure: hangup copy stays on the record. Working memory: four chunks on a row (who, work, stamp or time, one verb). Von Restorff: that verb is the only fill. Hick: Holds and Visits change columns; they do not grow a second list. Fitts: the dock is `h-12 w-12`. Tesler: Brain taxonomy stays off the row.
+**Outside vs inside.** `/calls` is recognition. `/calls/[id]` is decision. Jakob: who plus one ellipsized preview, like Mail or WhatsApp. Progressive disclosure: hangup copy stays on the record. Working memory: four chunks on a row (who, work, stamp or time, one verb). Needs you may restate that verb as one muted next-step line. Von Restorff: that verb is the only fill. Hick: Holds and Visits change columns; they do not grow a second list. Fitts: the dock is `h-12 w-12`. Tesler: Brain taxonomy stays off the row.
 
 Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitality: Confirm booking / Bookings.
 
@@ -11,11 +11,13 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Tap the identity circle to open the contact. No Open or View link. Blue unread dot and bold preview when a customer event (inbound call, hold, or visit from the caller) is newer than `calls.inbox_read_at`. Opening `/calls/[id]` stamps that field. Needs you stays a pile. The nav badge stays Needs you count (`countInboxPurposes(items).needs`). Confirm, hold Done, Mark done, and Archive drop the badge, not the open.
 
-**Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column.
+**Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column. Needs you may add one next-step line under Work.
 
-**Phone Holds / Visits:** Same two-line row. Isolated Place or hold-type is a table column, not a third phone line.
+**Phone Holds / Visits:** Same two-line row. Isolated Place or hold-type is a table column, not a third phone line. Needs you may still add the next-step line.
 
 **Preview (one line):** Work is `deskPreviewClass`. One ellipsized line. The hangup paragraph, Want, Done, mood, and next live on `/calls/[id]`. Do not stack a second detail line under Work on mixed filters. Table Work cells use `deskPreviewCellClass`. Phone uses the same one-line clamp, never `line-clamp-2` for the summary. Isolated Holds and Visits table cells are also one line (Item or slot, not a stacked subtype).
+
+**Needs you next step:** Rows still in the Needs you pile may show one muted line under the preview (`inboxNeedsYouNextStep`). It restates `inboxListDockRecipe` in words: Confirm visit or Confirm booking, Hold Done, or Call or WhatsApp. Intent-only never uses Confirm or Done language. Live and empty docks omit the line. Not hangup copy. Not a second button.
 
 **Action dock (that trailing cell):**
 - Visit or booking with a job row: **Confirm** (then Done). That verb only.

@@ -1,4 +1,5 @@
-import { itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
+import { nicheCopy } from "@/lib/inboxNiche";
+import { itemInNeedsYouPile, itemIsArchived, type InboxItem } from "@/lib/inboxPurpose";
 
 export type InboxListActionId =
   | "pin"
@@ -51,6 +52,23 @@ export function inboxListDockRecipe(item: InboxItem): InboxListDockRecipe {
   if (inboxCanHoldDone(item)) return "hold_done";
   if (item.callerPhone) return "call_wa";
   return "none";
+}
+
+/**
+ * Needs you next-step line. Restates the list dock in words.
+ * Not a new lead_status. Live and empty docks omit the line.
+ */
+export function inboxNeedsYouNextStep(
+  item: InboxItem,
+  vertical?: string | null
+): string | null {
+  if (!itemInNeedsYouPile(item)) return null;
+  if (item.purpose === "live") return null;
+  const recipe = inboxListDockRecipe(item);
+  if (recipe === "confirm") return nicheCopy(vertical).confirmStamp;
+  if (recipe === "hold_done") return "Hold Done";
+  if (recipe === "call_wa") return "Call or WhatsApp";
+  return null;
 }
 
 /**
