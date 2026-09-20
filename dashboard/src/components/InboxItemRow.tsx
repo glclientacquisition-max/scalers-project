@@ -22,9 +22,9 @@ import {
 } from "@/components/ui/deskRow";
 import { followUpWhatsAppMessage, formatCallWhenRelative } from "@/lib/callsTriage";
 import { contactFromInboxHref, inboxRecordHref, type InboxReturn } from "@/lib/inboxHref";
+import { inboxListDockRecipe } from "@/lib/inboxListVerbs";
 import {
   itemSignalLabel,
-  itemIsArchived,
   type InboxItem,
   type InboxPurposeFilterId,
 } from "@/lib/inboxPurpose";
@@ -117,7 +117,9 @@ function InboxRowWho({
 
 /**
  * Inbox Action dock. One primary verb. Never Open, View, SMS, or email.
- * Job → Confirm. Hold → Done. Else + number → Call then WhatsApp.
+ * Visit requested → Confirm. Confirmed visit → Done. Hold → Done.
+ * Return, intent-only, archived + number → Call then WhatsApp.
+ * Intent-only never Confirm or Done.
  */
 function InboxTrailingAction({
   item,
@@ -126,37 +128,22 @@ function InboxTrailingAction({
   item: InboxItem;
   message: string;
 }) {
-  if (itemIsArchived(item)) {
-    if (!item.callerPhone) return null;
-    return (
-      <InboxDockIdle>
-        <div className="flex shrink-0 items-center justify-end gap-2">
-          <CallLink number={item.callerPhone} />
-          <WhatsAppLink
-            number={item.callerPhone}
-            message={message}
-            variant="icon"
-            callId={item.callId}
-          />
-        </div>
-      </InboxDockIdle>
-    );
-  }
-  if (item.job) {
+  const recipe = inboxListDockRecipe(item);
+  if ((recipe === "confirm" || recipe === "visit_done") && item.job) {
     return (
       <InboxDockIdle>
         <InboxJobActions id={item.job.id} status={item.job.status} extra={false} />
       </InboxDockIdle>
     );
   }
-  if (item.hold) {
+  if (recipe === "hold_done" && item.hold) {
     return (
       <InboxDockIdle>
         <RequestStatusToggle id={item.hold.id} status={item.hold.status} extra={false} />
       </InboxDockIdle>
     );
   }
-  if (item.callerPhone) {
+  if (recipe === "call_wa" && item.callerPhone) {
     return (
       <InboxDockIdle>
         <div className="flex shrink-0 items-center justify-end gap-2">
