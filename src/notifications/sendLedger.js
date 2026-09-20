@@ -212,9 +212,25 @@ function resetInstanceFlights() {
   instanceFlights.clear();
 }
 
+function ledgerTableMissing(found) {
+  return Boolean(found && found.reason === 'table_missing' && !found.id);
+}
+
+function durableSendClaim(recordResult) {
+  if (!recordResult || recordResult.ok) return { ok: true };
+  if (recordResult.reason === 'duplicate') return { ok: true };
+  if (recordResult.reason === 'table_missing') {
+    return { ok: false, reason: 'table_missing' };
+  }
+  if (recordResult.reason === 'insert_failed' || recordResult.reason === 'record_failed') {
+    return { ok: false, reason: 'ledger_unrecorded' };
+  }
+  return { ok: true };
+}
+
 async function instanceAlreadyDelivered(ledger, to) {
   const dests = destKeys(to);
-  if (!ledger?.tenantId || !dests.length) return false;
+  if (!ledger?.tenantId || !dests.length) return { delivered: false };
   try {
     const db = require('../db');
     for (const dest of dests) {
@@ -231,19 +247,30 @@ async function instanceAlreadyDelivered(ledger, to) {
           tenantId: ledger.tenantId,
           idempotencyKey: key,
         });
-        if (found) return true;
+        if (ledgerTableMissing(found)) {
+          return { delivered: false, reason: 'table_missing' };
+        }
+        if (found) return { delivered: true };
       }
     }
   } catch (err) {
+    if (/notify_sends|does not exist|schema cache|relation/i.test(err?.message || '')) {
+      return { delivered: false, reason: 'table_missing' };
+    }
     console.warn('[notify-ledger] instance check skipped:', err?.message || err);
   }
-  return false;
+  return { delivered: false };
 }
 
 async function beginInstanceSend(ledger, to) {
   const flight = claimInstanceFlight(ledger, to);
   if (!flight.ok) return { ok: false, reason: flight.reason, key: null };
-  if (await instanceAlreadyDelivered(ledger, to)) {
+  const prior = await instanceAlreadyDelivered(ledger, to);
+  if (prior.reason === 'table_missing') {
+    releaseInstanceFlight(flight.key);
+    return { ok: false, reason: 'table_missing', key: null };
+  }
+  if (prior.delivered) {
     releaseInstanceFlight(flight.key);
     return { ok: false, reason: 'instance_already_sent', key: null };
   }
@@ -265,18 +292,30 @@ async function claimTenantSms(ledger, body) {
   }
   try {
     const db = require('../db');
-    return await db.consumeSmsUnits({
+    const claim = await db.consumeSmsUnits({
       tenantId: ledger.tenantId,
       units: smsSegments(body),
     });
+    if (claim?.reason === 'rpc_missing') {
+      return { allowed: false, reason: 'rpc_missing', overage: false };
+    }
+    return claim;
   } catch (err) {
+    if (
+      /consume_sms_units|does not exist|schema cache|sms_included_units|sms_used_units/i.test(
+        err?.message || ''
+      )
+    ) {
+      console.warn('[notify-ledger] consume SMS missing:', err?.message || err);
+      return { allowed: false, reason: 'rpc_missing', overage: false };
+    }
     console.warn('[notify-ledger] consume SMS skipped:', err?.message || err);
     return { allowed: true, reason: 'consume_skipped', overage: false };
   }
 }
 
 /**
- * Persist one accepted send. Never throws. Missing table is a no-op.
+ * Persist one accepted send. Never throws. Missing table is not sent.
  */
 async function recordNotifySend(entry = {}) {
   const row = buildLedgerRow(entry);
@@ -315,6 +354,7 @@ module.exports = {
   beginInstanceSend,
   claimInstanceFlight,
   claimTenantSms,
+  durableSendClaim,
   instanceFlightKey,
   idempotencyKey,
   releaseInstanceFlight,

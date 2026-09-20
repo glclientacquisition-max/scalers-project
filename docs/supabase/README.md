@@ -10,6 +10,8 @@ For product notes on wallet/DID, see also:
 - [`docs/BETA_WALLET_PROGRAM.md`](../BETA_WALLET_PROGRAM.md)
 - [`docs/PRODUCTION_DID_POOL.md`](../PRODUCTION_DID_POOL.md)
 
+Production vs staging notify objects: [`docs/platform/NOTIFY_SQL_CATALOG.md`](../platform/NOTIFY_SQL_CATALOG.md). Never apply [`foundation_bootstrap.sql`](./foundation_bootstrap.sql) to ALCR.
+
 ---
 
 ## Reference only (do not “apply” as a migration)

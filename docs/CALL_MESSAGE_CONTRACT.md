@@ -216,7 +216,7 @@ Do not put live Brain dump on the SMS. Omit `general_enquiry` intent, greeting/b
 
 ## 10. Send ledger
 
-Every accepted SMS, WhatsApp, or email writes `notify_sends` (`docs/supabase/notify_send_ledger.sql`). Apply that SQL before counts are durable. Missing table: send still goes, insert is skipped.
+Every accepted SMS, WhatsApp, or email writes `notify_sends` (`docs/supabase/notify_send_ledger.sql`). Apply that SQL before counts are durable. Missing table: skip. Do not claim sent. ALCR vs staging: [`platform/NOTIFY_SQL_CATALOG.md`](./platform/NOTIFY_SQL_CATALOG.md).
 
 | `billed_to` | What |
 | --- | --- |
@@ -237,7 +237,7 @@ Apply `docs/supabase/sms_allowance.sql` after the ledger SQL. Default included i
 | Paid, at cap, on-demand on | Send. `overage = true`. |
 | Platform (`wallet_*`, `outage_*`) | Always send. Never consume tenant units. |
 
-Missing RPC or table: send still goes (staging before apply). Desk caller note at cap returns an error. Appointment / request / escalate saves anyway.
+Missing `notify_sends` table or `consume_sms_units` RPC: do not claim sent. Skip tenant SMS (`table_missing` / `rpc_missing`). WhatsApp / email / desk note still try only when the ledger can record. Appointment / request / escalate still save. Desk caller note at cap returns an error.
 
 **Gemini does not need Supabase access.** The Brain already derives intent, summary, and resolution from live STT during the call and writes them to `calls.summary` / `calls.primary_intent` / `calls.resolution_note`. The notify path reads that row. No second model call, no extra cost, no live DB access from Gemini.
 
@@ -258,4 +258,4 @@ Monthly included SMS is a package cap (`sms_allowance.sql`). This section is the
 | Wallet | Claim RPC: one low, one empty. |
 | Desk caller SMS | Same idempotency key. Double tap returns `Already sent.` Appointment and request rows still save. |
 
-Gate is `beginInstanceSend` before `consume_sms_units`. Missing `notify_sends` table: send still goes (fail open), same as the ledger insert.
+Gate is `beginInstanceSend` before `consume_sms_units`. Missing `notify_sends` table: skip (`table_missing`). A provider accept without a ledger row is not sent.
