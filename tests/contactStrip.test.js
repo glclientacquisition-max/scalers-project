@@ -63,7 +63,18 @@ describe("contact strip copy", () => {
     assert.match(src, /Name this caller/);
     assert.match(src, /Unsaved/);
     assert.match(src, /contactListSubline/);
-    assert.doesNotMatch(src, /Online|last seen|active now|delivered/i);
+    assert.match(src, /CONTACT_STRIP_FACTS/);
+    assert.match(src, /CONTACT_STRIP_REACH = "opened"/);
+    assert.match(src, /CONTACT_STRIP_CRITIC_BANS/);
+    const facts = src.slice(
+      src.indexOf("export const CONTACT_STRIP_FACTS"),
+      src.indexOf("export type ContactStripFact")
+    );
+    assert.match(facts, /Unsaved/);
+    assert.match(facts, /phone/);
+    assert.match(facts, /lastCall/);
+    assert.match(facts, /opened/);
+    assert.doesNotMatch(facts, /delivered|sent|Online|Needs you/);
   });
 });
 
@@ -135,5 +146,39 @@ describe("contact strip chrome", () => {
     assert.match(accept, /No Online, last seen/);
     assert.match(accept, /Contacts list Phase 1 redo/);
     assert.doesNotMatch(list, /ContactStrip/);
+  });
+
+  it("binds Critic hard bans on the strip", () => {
+    const src = read("dashboard/src/lib/contactStrip.ts");
+    assert.match(src, /"Online"/);
+    assert.match(src, /"last seen"/);
+    assert.match(src, /"presence"/);
+    assert.match(src, /"active now"/);
+    assert.match(src, /"delivered"/);
+    assert.match(src, /"sent"/);
+    assert.match(src, /"lead_status"/);
+    assert.match(src, /"Needs you"/);
+    assert.match(src, /"Meta"/);
+    assert.match(strip, /data-contact-strip-reach=\{CONTACT_STRIP_REACH\}/);
+    assert.match(strip, /CONTACT_STRIP_REACH/);
+    assert.doesNotMatch(strip, /\bOnline\b/);
+    assert.doesNotMatch(strip, /last seen|Last seen|active now|Active now/i);
+    assert.doesNotMatch(strip, /presence|LivePing|RowStateDot/);
+    assert.doesNotMatch(strip, /delivered|Delivered|\bsent\b/);
+    assert.doesNotMatch(strip, /lead_status|Needs you|notifyChannels/);
+    assert.doesNotMatch(strip, /Meta|blue tick|lastSeen|typing/i);
+    assert.doesNotMatch(ticket, /data-contact-strip-reach/);
+    assert.match(accept, /Critic PASS \(hard bans\)/);
+    assert.match(accept, /call\/WA \*\*opened\*\* stamp/);
+    assert.match(accept, /No inventing `lead_status` or Needs you/);
+    assert.match(accept, /No Meta activity theater/);
+    assert.match(accept, /opened only \(`tel:` \/ `wa\.me`\)/);
+    assert.match(accept, /One family at ~390/);
+    assert.match(note, /opened only, reach stamp `opened`/);
+    assert.match(note, /Never delivered or sent without channel evidence/);
+    assert.match(master, /call\/WA opened stamp/);
+    assert.match(master, /data-contact-strip-reach="opened"/);
+    assert.match(contactsNote, /call\/WA opened stamp/);
+    assert.match(read("docs/product/DELIVERY_VOCAB.md"), /\*\*opened\*\*/);
   });
 });

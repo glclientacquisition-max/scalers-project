@@ -18,7 +18,7 @@ On call/ticket (and matching person surfaces), a compact **contact strip** shows
 
 1. **Strip content:** avatar · display name (or Unsaved / Name this caller affordance) · **one** factual subline only: last call · Unsaved · phone.  
 2. **Actions:** Call + WhatsApp when phone exists; targets ≥44px; safe-area aware.  
-3. **Honesty (Critic):** Call/WA = **opened** only — never sent/delivered. No Online, last seen, presence dots, “active now.” No new `lead_status` / Needs you / notify invent.  
+3. **Honesty (Critic):** Call/WA = **opened** only. Never sent/delivered without channel evidence. No Online, last seen, presence dots, or active now. No new `lead_status` / Needs you / notify invent. No Meta activity theater.
 4. **Profile:** Tap identity opens existing #362 profile dock; Name this caller unchanged.  
 5. **Responsive:** One composition family at ~390 phone, tablet, desktop — not a second layout language.  
 6. **Scope of surfaces:** Call/ticket detail required; other person surfaces only if already in the same chrome family (no drive-by redesign).  
@@ -40,6 +40,17 @@ On call/ticket (and matching person surfaces), a compact **contact strip** shows
 | Desk Builder | Only if Call/WA / name handlers missing on ticket |
 | Critic | Honesty of subline + opened-not-delivered |
 | Release | Smoke 390 / tablet / desktop |
+
+## Critic PASS (hard bans)
+
+Bind on the strip. Kill the PR if any line fails.
+
+- No Online, last seen, presence dots, or active now.
+- Strip lines factual only: Unsaved, phone, last call, call/WA **opened** stamp. Never delivered or sent without channel evidence. Cite [`DELIVERY_VOCAB.md`](./DELIVERY_VOCAB.md).
+- No inventing `lead_status` or Needs you from the strip.
+- No Meta activity theater (ticks, last seen, typing, presence).
+- Call / WhatsApp = opened only (`tel:` / `wa.me`).
+- One family at ~390, tablet, and desktop.
 
 ## Kill / rollback
 

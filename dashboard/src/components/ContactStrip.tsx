@@ -7,7 +7,7 @@ import {
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
 import { deskPreviewClass } from "@/components/ui/deskChrome";
-import { contactStripTitle } from "@/lib/contactStrip";
+import { CONTACT_STRIP_REACH, contactStripTitle } from "@/lib/contactStrip";
 import { contactListSubline } from "@/lib/contactsLoad";
 import { sanitizeStoredCallerName } from "@/lib/callerNameQuality";
 
@@ -44,7 +44,7 @@ export function ContactStrip({
       </div>
       {number ? (
         <div
-          data-contact-strip-reach=""
+          data-contact-strip-reach={CONTACT_STRIP_REACH}
           className={`${deskRowActionClass} flex shrink-0 items-center justify-end gap-2`}
         >
           <CallLink number={number} />
