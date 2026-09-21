@@ -10,6 +10,7 @@ function read(rel) {
 describe("inbox filters and empty states", () => {
   const niche = read("dashboard/src/lib/inboxNiche.ts");
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
+  const nav = read("dashboard/src/components/InboxPileNav.tsx");
   const page = read("dashboard/src/app/(desk)/calls/page.tsx");
   const board = read("dashboard/src/components/InboxPileBoard.tsx");
   const purpose = read("dashboard/src/lib/inboxPurpose.ts");
@@ -51,19 +52,36 @@ describe("inbox filters and empty states", () => {
     assert.doesNotMatch(inbox, /min-w-\[720px\]/);
   });
 
-  it("debounces search against the existing q param", () => {
-    assert.match(toolbar, /requestSubmit/);
-    assert.match(toolbar, /setTimeout\(\(\) => form\?\.requestSubmit\(\), 300\)/);
+  it("filters the in-memory tape as you type without a Search submit", () => {
+    assert.match(toolbar, /type="search"/);
+    assert.match(toolbar, /value=\{query\}/);
+    assert.doesNotMatch(toolbar, /defaultValue=\{q\}/);
+    assert.doesNotMatch(toolbar, /requestSubmit/);
+    assert.doesNotMatch(toolbar, /type="submit"/);
+    assert.doesNotMatch(toolbar, />Search</);
+    assert.match(nav, /itemMatchesQuery/);
+    assert.match(nav, /countInboxPurposes/);
+    assert.match(nav, /setTimeout\([\s\S]*?300/);
+    assert.match(nav, /router\.replace/);
+    assert.doesNotMatch(nav, /requestSubmit/);
+    assert.match(page, /items=\{assembled\}/);
+    assert.doesNotMatch(page, /<InboxPileNavProvider[\s\S]*?items=\{searched\}/);
   });
 
   it("keeps search-empty, filter-empty, and inbox-empty distinct", () => {
     assert.match(inbox, /No matches/);
+    assert.doesNotMatch(toolbar, /Matches for/);
+    assert.doesNotMatch(inbox, /Clear search/);
+    assert.doesNotMatch(inbox, /Matches for/);
+    assert.match(board, />\s*Clear\s*</);
     assert.match(inbox, /Nothing needs you/);
     assert.match(inbox, /None archived/);
     assert.match(inbox, /Inbox is empty/);
     assert.doesNotMatch(inbox, /inboxCaption/);
     assert.match(purpose, /\$\{needs\} need you/);
     assert.match(harness, /ROWS.filter\(\(row\) => row.needsYou\)/);
+    assert.match(toolbar, /name="purpose"/);
+    assert.match(toolbar, /inboxPileHref\(item\.id/);
   });
 
   it("renders the six purpose piles as snap-scrolling pill chips", () => {

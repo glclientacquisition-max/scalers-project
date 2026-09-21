@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { InboxJobActions } from "@/components/InboxJobActions";
+import { useInboxQueryItems } from "@/components/InboxPileNav";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { btnGhost, deskPreviewClass } from "@/components/ui/deskChrome";
 import type { InboxItem } from "@/lib/inboxPurpose";
@@ -101,11 +104,12 @@ export function VisitWeekCalendar({
   vertical?: string | null;
 }) {
   const copy = nicheCopy(vertical);
+  const rows = useInboxQueryItems(items);
   const byId = new Map<string, InboxItem>();
-  for (const item of items) {
+  for (const item of rows) {
     if (item.job) byId.set(item.job.id, item);
   }
-  const { days, byDay, unscheduled } = groupVisitBoardForWeek(items, monday);
+  const { days, byDay, unscheduled } = groupVisitBoardForWeek(rows, monday);
   const heading = weekHeading(monday);
   const filledDays = days.filter((day) => (byDay[day.key] || []).length > 0);
   const empty = filledDays.length === 0 && unscheduled.length === 0;

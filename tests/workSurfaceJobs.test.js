@@ -85,7 +85,7 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(load, /attachContactIds/);
     assert.match(purpose, /compareInboxSignal/);
     assert.match(purpose, /orderInboxItems/);
-    assert.match(inbox, /orderInboxItems/);
+    assert.match(read("dashboard/src/components/InboxPileNav.tsx"), /orderInboxItems/);
     assert.match(purpose, /if \(!opts\.job\) return copy\.visitGhostStamp/);
     assert.match(purpose, /if \(!opts\.hold\) return copy\.holdGhostStamp/);
     assert.match(purpose, /jobStatus === "requested"/);

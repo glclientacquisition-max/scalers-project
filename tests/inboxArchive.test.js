@@ -136,13 +136,16 @@ describe("inbox archive folder and leave verbs", () => {
   });
 
   it("keeps the Archived folder at 44px and restores the prior pile after search", () => {
+    const nav = read("dashboard/src/components/InboxPileNav.tsx");
     assert.match(folder, /h-11 w-11/);
     assert.match(folder, /min-h-12/);
     assert.match(folder, /tabular-nums/);
     assert.match(folder, /label="Archived"/);
     assert.match(board, /showArchivedEntry/);
-    assert.match(toolbar, /inboxArchivedHref/);
-    assert.match(toolbar, /page: rpage/);
+    assert.match(nav, /inboxArchivedHref/);
+    assert.match(nav, /page: opts.rpage/);
+    assert.match(toolbar, /name="from"/);
+    assert.match(toolbar, /name="rpage"/);
   });
 
   it("offers a 5s Undo toast after Archive and not after Unarchive", () => {

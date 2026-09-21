@@ -30,7 +30,7 @@ describe("DeskBack icon", () => {
   it("keeps ticket and archived href as deep links", () => {
     assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
     assert.match(ticket, /<DeskBack href=\{backHref\}>Inbox<\/DeskBack>/);
-    assert.match(toolbar, /<DeskBack href=\{backHref \|\| callsHref\(\{ q: q \|\| undefined \}\)\}>Inbox<\/DeskBack>/);
+    assert.match(toolbar, /<DeskBack href=\{backHref \|\| callsHref\(\{ q: query \|\| undefined \}\)\}>Inbox<\/DeskBack>/);
     assert.doesNotMatch(ticket, /href="\/calls"/);
     assert.doesNotMatch(ticket, /router\.push\("\/calls"\)/);
   });
