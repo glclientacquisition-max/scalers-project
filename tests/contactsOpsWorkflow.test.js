@@ -48,7 +48,7 @@ describe("contacts ops workflow ACCEPT", () => {
     assert.match(accept, /Rename when name already saved/);
     assert.match(accept, /Inbox threads/);
     assert.match(accept, /390 density/);
-    assert.match(accept, /opened only/);
+    assert.match(accept, /opened-only/);
     assert.match(accept, /Phone stays locked/);
     assert.match(accept, /inboxThreadsFromContactHref/);
     assert.match(note, /one primary \*\*Add\*\*/);

@@ -188,7 +188,7 @@ export function inboxFromContactHref(sp: {
  * `purpose=all` so pile default does not hide other threads. No phone: no href.
  */
 export function inboxThreadsFromContactHref(phone?: string | null): string | null {
-  const text = cleanQuery(phone);
+  const text = cleanQuery(phone || undefined);
   if (!text) return null;
   return inboxReturnHref({ purpose: "all", q: text });
 }
