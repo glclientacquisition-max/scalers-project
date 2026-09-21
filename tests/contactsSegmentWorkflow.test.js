@@ -105,32 +105,40 @@ describe("contacts segment FilterTabs chrome", () => {
     assert.match(accept, /Filter contacts/);
     assert.match(accept, /segment preserved/);
     assert.match(accept, /opened only/);
+    assert.match(accept, /List\/Work/);
+    assert.match(accept, /InboxFilterPills/);
     assert.match(tabs, /filterTabClass/);
     assert.match(tabs, /filterTabCountClass/);
     assert.match(tabs, /overflow-x-auto/);
     assert.match(chrome, /export function filterTabClass/);
     assert.match(chrome, /min-h-11/);
     assert.match(inboxTabs, /<FilterTabs/);
+    assert.match(inboxTabs, /label="Visit sort"/);
+    assert.match(inboxTabs, /label="Work date"/);
     assert.match(page, /<FilterTabs/);
     assert.match(page, /label="Filter contacts"/);
     assert.doesNotMatch(page, /type="range"/);
     assert.doesNotMatch(page, /slider/i);
     assert.doesNotMatch(page, /InboxFilterPills/);
+    assert.doesNotMatch(page, /Needs you|Visits|Holds/);
     assert.match(note, /Filter contacts/);
     assert.match(note, /FilterTabs/);
+    assert.match(note, /List\/Work/);
+    assert.match(note, /InboxFilterPills/);
   });
 
-  it("segments All, Saved, Unsaved, and Recent as FilterTabs items", () => {
+  it("segments All, Saved, and Unsaved as FilterTabs items", () => {
     assert.match(page, /label: "All"/);
     assert.match(page, /label: "Saved"/);
     assert.match(page, /label: "Unsaved"/);
-    assert.match(page, /label: "Recent"/);
+    assert.doesNotMatch(page, /label: "Recent"/);
     assert.match(page, /active=\{saved\}/);
     assert.match(page, /saved: "saved"/);
     assert.match(page, /saved: "unsaved"/);
-    assert.match(page, /saved: "recent"/);
+    assert.doesNotMatch(page, /saved: "recent"/);
     assert.doesNotMatch(page, /ContactQuickPhoneRow|ContactQuickTableRow|ContactQuickRow/);
     assert.doesNotMatch(dev, /ContactQuickPhoneRow|ContactQuickTableRow/);
+    assert.doesNotMatch(dev, /label: "Recent"/);
     assert.equal(
       fs.existsSync(path.join(__dirname, "../dashboard/src/components/ContactQuickRow.tsx")),
       false
@@ -139,7 +147,7 @@ describe("contacts segment FilterTabs chrome", () => {
     assert.match(page, /label: "Last call"/);
     assert.match(page, /label: "Name"/);
     assert.match(page, /active=\{sort\}/);
-    assert.match(note, /All · Saved · Unsaved · Recent/);
+    assert.match(note, /All · Saved · Unsaved only/);
     assert.match(note, /Last call/);
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(page, /[\u2014\u2013]/);

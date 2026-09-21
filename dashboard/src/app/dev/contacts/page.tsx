@@ -107,7 +107,6 @@ export default function DevContactsPage() {
                   { id: "all", label: "All", href: "/dev/contacts" },
                   { id: "saved", label: "Saved", href: "/dev/contacts" },
                   { id: "unsaved", label: "Unsaved", href: "/dev/contacts" },
-                  { id: "recent", label: "Recent", href: "/dev/contacts" },
                 ]}
               />
               <FilterTabs

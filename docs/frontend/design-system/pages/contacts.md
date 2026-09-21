@@ -3,11 +3,11 @@
 **Route:** `/contacts`  
 **Job:** Named callers. Not a CRM.
 
-**Chrome:** Large in-page Contacts title (`deskListTitleClass`). No product wordmark. Search field (`ContactsSearch`, `type="search"`, Name or number) in the lead row. Import and Add wrap under search below `md`, sit on the lead row from `md`. Segments are underline `FilterTabs` (`aria-label` Filter contacts): All · Saved · Unsaved · Recent (`saved=` query). Same chrome as Inbox `FilterTabs` (underline, `min-h-11`, scroll, count chip style). Recent is a FilterTabs item for Phase 1 Recent calls parity, not a second control. Sort is a second `FilterTabs` row (`aria-label` Sort contacts): Last call · Name. Nested contact files and import do not render Contacts as a page title.
+**Chrome:** Large in-page Contacts title (`deskListTitleClass`). No product wordmark. Search field (`ContactsSearch`, `type="search"`, Name or number) in the lead row. Import and Add wrap under search below `md`, sit on the lead row from `md`. Segments are underline `FilterTabs` (`aria-label` Filter contacts): All · Saved · Unsaved (`saved=` query). Same chrome family as Inbox List/Work and Today/Week (`filterTabClass`, `min-h-11`, underline, scroll, count chip style). Not `InboxFilterPills`. Purpose piles (Needs you / Visits / Holds / …) stay Inbox-only. Sort is a second `FilterTabs` row (`aria-label` Sort contacts): Last call · Name. Nested contact files and import do not render Contacts as a page title.
 
 **One family:** Phone (`< md`) is the list row. `md+` is one table. `lg+` is the same table with a Phone column. No third card layout. Hits stay `min-h-11` / `deskHitClass` (`h-12 w-12`). Phone `main` already clears `--desk-tabbar-clearance` (tab bar plus safe area).
 
-**Segments:** All, Saved, Unsaved, and Recent stay on the list. No nested DeskBack for those piles. No Invite Friends. No slider skin.
+**Segments:** All · Saved · Unsaved only. No Recent tab. No nested DeskBack for those piles. No Invite Friends. No slider skin. No purpose pills.
 
 **Row:** Same recipe as Inbox. Avatar, name, one factual subline (`contactListSubline`: Unsaved, phone, or last call). Last call time sits with the timestamp, never "last seen" or "active now". Tap the row to open `/contacts/[id]` with the list segment on the URL (`from=contacts`). No Open column. Phone column from `lg`. If a phone exists, Call + WhatsApp sit in the trailing `deskHitClass` dock (`CallLink` `tel:` + `WhatsAppLink` `wa.me`, opened only). No `callId`. No `lead_status` write-back. No delivered claims. No Online, last seen, presence dots, or live badges. Hangup Want and the four-block summary live on the person file and the call.
 

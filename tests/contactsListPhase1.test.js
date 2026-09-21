@@ -137,13 +137,13 @@ describe("contacts list Phase 1 chrome", () => {
     assert.match(accept, /search \+ sort/);
   });
 
-  it("keeps Recent and Unsaved as FilterTabs piles, not Invite Friends", () => {
-    assert.match(page, /label: "Recent"/);
+  it("keeps Unsaved as a FilterTabs pile, not Invite Friends", () => {
     assert.match(page, /label: "Unsaved"/);
+    assert.doesNotMatch(page, /label: "Recent"/);
     assert.doesNotMatch(page, /ContactQuickPhoneRow|ContactQuickTableRow/);
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(search, /Invite Friends/);
-    assert.match(note, /All · Saved · Unsaved · Recent/);
+    assert.match(note, /All · Saved · Unsaved only/);
     assert.match(accept, /FilterTabs items/);
   });
 

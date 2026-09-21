@@ -51,4 +51,4 @@ Re-open **contact strip** as next desk polish candidate (still behind Funnel maj
 
 ## Segment chrome (2026-09-21)
 
-List segment chrome and click-through Back are locked in [`CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md`](./CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md). Recent and Unsaved stay as FilterTabs items, not a second quick-row control.
+List segment chrome and click-through Back are locked in [`CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md`](./CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md). All · Saved · Unsaved are FilterTabs items. Not Inbox purpose pills.

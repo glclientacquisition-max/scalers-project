@@ -131,11 +131,6 @@ export default async function ContactsPage({
               label: "Unsaved",
               href: contactsHref({ saved: "unsaved", sort, q: q || undefined }),
             },
-            {
-              id: "recent",
-              label: "Recent",
-              href: contactsHref({ saved: "recent", sort, q: q || undefined }),
-            },
           ]}
         />
         <FilterTabs
