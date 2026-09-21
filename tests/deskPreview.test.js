@@ -61,8 +61,9 @@ describe("desk preview truncate", () => {
     );
     assert.match(contacts, /md:hidden/);
     assert.match(phoneRow, /deskPreviewClass/);
-    assert.match(phoneRow, /lastReasonDisplay/);
-    assert.match(phoneRow, /formatCallWhenRelative/);
+    assert.match(phoneRow, /contactListSubline/);
+    assert.match(phone, /function lastCallStamp/);
+    assert.match(phone, /formatCallWhenRelative/);
     assert.doesNotMatch(phoneRow, /font-mono text-sm text-ink/);
     assert.doesNotMatch(phoneRow, /line-clamp-2/);
     assert.match(phoneRow, /<ContactListDock phone=\{row\.phone\} \/>/);

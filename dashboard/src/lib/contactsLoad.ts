@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sanitizeSearchQuery } from "@/lib/callsTriage";
+import { formatCallWhenRelative, sanitizeSearchQuery } from "@/lib/callsTriage";
 import { parseSummary } from "@/lib/supabase";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
@@ -91,6 +91,23 @@ export function contactsHref(opts: {
   if (opts.page && opts.page > 1) q.set("page", String(opts.page));
   const qs = q.toString();
   return qs ? `/contacts?${qs}` : "/contacts";
+}
+
+export function isUnsavedContactName(name?: string | null): boolean {
+  return !String(name || "").trim();
+}
+
+/** List subline: Unsaved, phone, or last call. Never hangup copy or presence. */
+export function contactListSubline(row: {
+  name?: string | null;
+  phone?: string | null;
+  lastContactAt?: string | null;
+}): string {
+  if (isUnsavedContactName(row.name)) return "Unsaved";
+  const phone = String(row.phone || "").trim();
+  if (phone) return phone;
+  if (row.lastContactAt) return formatCallWhenRelative(row.lastContactAt);
+  return "No phone";
 }
 
 export function contactMatchesQuery(

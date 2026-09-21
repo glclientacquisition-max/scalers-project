@@ -54,6 +54,13 @@ function compareContactRows(a, b, sort) {
   return at < bt ? 1 : -1;
 }
 
+function contactListSubline(row) {
+  if (!String(row.name || "").trim()) return "Unsaved";
+  const phone = String(row.phone || "").trim();
+  if (phone) return phone;
+  return "";
+}
+
 function paginateContactRows(rows, page, pageSize) {
   const total = rows.length;
   const from = Math.max(0, (page - 1) * pageSize);
@@ -85,7 +92,17 @@ describe("contacts list Phase 1 helpers", () => {
         .map((row) => row.name),
       ["Amina", "Brian", "Otieno", ""]
     );
+    assert.equal(contactListSubline({ name: null, phone: "+254700000001" }), "Unsaved");
+    assert.equal(contactListSubline({ name: "Amina", phone: "+254700000002" }), "+254700000002");
     const src = read("dashboard/src/lib/contactsLoad.ts");
+    assert.match(src, /export function contactListSubline/);
+    assert.match(src, /return "Unsaved"/);
+    assert.match(src, /formatCallWhenRelative\(row\.lastContactAt\)/);
+    const sublineFn = src.slice(
+      src.indexOf("export function contactListSubline"),
+      src.indexOf("export function contactMatchesQuery")
+    );
+    assert.doesNotMatch(sublineFn, /lastReason|Online|last seen|active now/i);
     assert.match(src, /export function resolveContactSavedFilter/);
     assert.match(src, /value === "saved" \|\| value === "unsaved" \|\| value === "recent"/);
     assert.match(src, /export function resolveContactSort/);
@@ -160,6 +177,17 @@ describe("contacts list Phase 1 chrome", () => {
     assert.match(accept, /Fake Online \/ presence/);
     assert.match(accept, /Contact activity strip/);
     assert.doesNotMatch(page, /ContactActivityStrip|activity strip/i);
+    assert.doesNotMatch(page, /last seen|Last seen|active now|Active now/i);
+    assert.doesNotMatch(row, /last seen|Last seen|active now|Active now/i);
+    assert.doesNotMatch(quick, /last seen|Last seen|active now|Active now/i);
+    assert.doesNotMatch(row, /lastReasonDisplay/);
+    assert.match(row, /contactListSubline/);
+    assert.doesNotMatch(row, /delivered|Delivered/);
+    assert.doesNotMatch(page, /delivered|Delivered/);
+    assert.match(note, /Unsaved, phone, or last call/);
+    assert.match(accept, /No Online, last seen/);
+    assert.match(accept, /opened only/);
+    assert.match(accept, /Contact activity strip is not in this PR/);
   });
 
   it("keeps the profile dock and Name this caller on the existing write path", () => {

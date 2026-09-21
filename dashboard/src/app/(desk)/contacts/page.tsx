@@ -90,7 +90,7 @@ export default async function ContactsPage({
   };
 
   return (
-    <div>
+    <div className="min-w-0 overflow-x-clip">
       <header className="space-y-3">
         {nested ? (
           <DeskBack href={contactsHref({ sort, q: q || undefined })}>Contacts</DeskBack>
@@ -100,11 +100,11 @@ export default async function ContactsPage({
         <DeskIndexLead
           status={nested ? <h1 className={pageTitleClass}>{pileTitle(saved)}</h1> : undefined}
         >
-          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex w-full min-w-0 flex-col gap-2 md:flex-row md:items-center">
             <div className="min-w-0 flex-1">
               <ContactsSearch q={q} saved={saved} sort={sort} />
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <div className="flex min-h-11 shrink-0 flex-wrap items-center justify-end gap-2">
               <Link
                 href="/contacts/import"
                 className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -167,7 +167,7 @@ export default async function ContactsPage({
             ids={rows.map((row) => row.id)}
             scopeKey={`${saved}:${sort}:${q}:${page}`}
           >
-            <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+            <ul className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface md:mt-8 md:hidden">
               {showQuick ? (
                 <>
                   <ContactQuickPhoneRow
@@ -184,36 +184,30 @@ export default async function ContactsPage({
                 <ContactPhoneRow key={row.id} row={row} />
               ))}
             </ul>
-            <div className="mt-8 hidden md:block">
-              <DeskDataTable minWidthClass="min-w-[720px]">
+            <div className="mt-6 hidden min-w-0 md:mt-8 md:block">
+              <DeskDataTable minWidthClass="min-w-0">
                 <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                   <tr>
                     <th
                       scope="col"
-                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-5 lg:py-4"
                     >
                       Name
                     </th>
                     <th
                       scope="col"
-                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                      className="hidden px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:table-cell lg:px-5 lg:py-4"
                     >
                       Phone
                     </th>
                     <th
                       scope="col"
-                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-5 lg:py-4"
                     >
-                      Last reason
+                      Last call
                     </th>
-                    <th
-                      scope="col"
-                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                    >
-                      Last contact
-                    </th>
-                    <th scope="col" className="w-px px-5 py-4">
-                      <span className="sr-only">Actions</span>
+                    <th scope="col" className="w-px px-3 py-3 lg:px-5 lg:py-4">
+                      <span className="sr-only">Call and WhatsApp</span>
                     </th>
                   </tr>
                 </thead>
@@ -223,12 +217,12 @@ export default async function ContactsPage({
                       <ContactQuickTableRow
                         kind="recent"
                         href={contactsHref({ saved: "recent", sort, q: q || undefined })}
-                        colSpan={5}
+                        colSpan={4}
                       />
                       <ContactQuickTableRow
                         kind="unsaved"
                         href={contactsHref({ saved: "unsaved", sort, q: q || undefined })}
-                        colSpan={5}
+                        colSpan={4}
                       />
                     </>
                   ) : null}

@@ -114,30 +114,27 @@ export default function DevContactsPage() {
                 <ContactPhoneRow key={row.id} row={row} />
               ))}
             </ul>
-            <div className="mt-8 hidden md:block">
-              <DeskDataTable minWidthClass="min-w-[720px]">
+            <div className="mt-6 hidden min-w-0 md:mt-8 md:block">
+              <DeskDataTable minWidthClass="min-w-0">
                 <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
                   <tr>
-                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                    <th scope="col" className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-5 lg:py-4">
                       Name
                     </th>
-                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                    <th scope="col" className="hidden px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:table-cell lg:px-5 lg:py-4">
                       Phone
                     </th>
-                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                      Last reason
+                    <th scope="col" className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-5 lg:py-4">
+                      Last call
                     </th>
-                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                      Last contact
-                    </th>
-                    <th scope="col" className="w-px px-5 py-4">
-                      <span className="sr-only">Actions</span>
+                    <th scope="col" className="w-px px-3 py-3 lg:px-5 lg:py-4">
+                      <span className="sr-only">Call and WhatsApp</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <ContactQuickTableRow kind="recent" href="/dev/contacts" colSpan={5} />
-                  <ContactQuickTableRow kind="unsaved" href="/dev/contacts" colSpan={5} />
+                  <ContactQuickTableRow kind="recent" href="/dev/contacts" colSpan={4} />
+                  <ContactQuickTableRow kind="unsaved" href="/dev/contacts" colSpan={4} />
                   {DEV_ROWS.map((row) => (
                     <ContactTableRow key={row.id} row={row} />
                   ))}

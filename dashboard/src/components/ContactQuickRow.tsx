@@ -51,7 +51,7 @@ export function ContactQuickPhoneRow({
   return (
     <li
       className={[
-        "relative flex min-h-12 min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex min-h-14 min-w-0 items-center gap-2 border-t border-line/70 px-3 py-3 first:border-t-0 sm:gap-3 sm:px-4",
         deskShiftClass,
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
@@ -87,7 +87,7 @@ export function ContactQuickTableRow({
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
     >
-      <td colSpan={colSpan} className="relative min-h-12 px-5 py-4">
+      <td colSpan={colSpan} className="relative min-h-14 px-3 py-3.5 lg:px-5 lg:py-4">
         <DeskRowHit href={href} label={label} />
         <div className="flex items-center gap-3">
           <div className={deskRowMutedClass}>

@@ -38,6 +38,13 @@
 Desk UX leads → Builder only if wiring gaps → Critic if presence copy creeps → Release smoke.  
 Chief may unlock Desk for this slice only — **not** Funnel, **not** Platform for funnel.
 
+## Critic PASS (hard bans)
+
+- No Online, last seen, presence dots, or “active now.”
+- Subline factual only: last call, Unsaved, phone. Hangup copy stays on the record.
+- Row Call / WhatsApp is opened only (`tel:` / `wa.me`). Never delivered claims.
+- Contact activity strip is not in this PR.
+
 ## After Phase 1 GO
 
 Re-open **contact strip** as next desk polish candidate (still behind Funnel major if founder timing conflicts — Product default: strip after list GO, Funnel when honesty+notify gate clears; if both ready, Funnel major wins Platform+multi-seat, strip can wait one beat).
