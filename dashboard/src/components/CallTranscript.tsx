@@ -34,7 +34,7 @@ function SpeechBubble({
         aria-label={who}
         className={[
           "max-w-[85%] px-3 py-2 sm:max-w-[75%]",
-          isCaller ? "bg-bubble-caller text-ink" : "bg-surface-muted/70 text-ink",
+          isCaller ? "bg-bubble-caller text-ink" : "bg-surface-muted text-ink",
           isCaller
             ? item.tail
               ? "rounded-2xl rounded-bl-md"
