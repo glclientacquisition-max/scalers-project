@@ -1,47 +1,64 @@
 import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
+import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
+import {
+  ContactQuickPhoneRow,
+  ContactQuickTableRow,
+} from "@/components/ContactQuickRow";
+import { ContactsSearch } from "@/components/ContactsSearch";
 import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { FilterTabs } from "@/components/ui/FilterTabs";
-import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { RowIdentity } from "@/components/ui/deskRow";
-import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
+import { DeskLandScope } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
-import { deskEmptyClass, deskListTitleClass, deskPreviewCellClass, deskPreviewClass, deskShiftClass } from "@/components/ui/deskChrome";
+import {
+  deskEmptyClass,
+  deskListTitleClass,
+  deskShiftClass,
+  pageTitleClass,
+} from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
-import { formatCallWhenRelative } from "@/lib/callsTriage";
+import { sanitizeSearchQuery } from "@/lib/callsTriage";
 import {
   contactsHref,
   loadContactsPage,
   resolveContactSavedFilter,
+  resolveContactSort,
   type ContactSavedFilter,
 } from "@/lib/contactsLoad";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
-const SAVED_FILTERS: { id: ContactSavedFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "saved", label: "Saved" },
-  { id: "unsaved", label: "Unsaved" },
-];
-
-function emptyCopy(saved: ContactSavedFilter): string {
+function emptyCopy(saved: ContactSavedFilter, q: string): string {
+  if (q) return "No matches";
   if (saved === "saved") return "No named callers";
   if (saved === "unsaved") return "No unnamed callers";
+  if (saved === "recent") return "No recent calls";
   return "No callers";
+}
+
+function pileTitle(saved: ContactSavedFilter): string {
+  if (saved === "recent") return "Recent calls";
+  if (saved === "unsaved") return "Unsaved";
+  return "Contacts";
 }
 
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; saved?: string }>;
+  searchParams: Promise<{ page?: string; saved?: string; sort?: string; q?: string }>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const saved = resolveContactSavedFilter(sp.saved);
+  const sort = resolveContactSort(sp.sort);
+  const q = sanitizeSearchQuery(sp.q);
+  const nested = saved === "recent" || saved === "unsaved";
+  const showQuick = saved === "all" && !q;
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -58,47 +75,79 @@ export default async function ContactsPage({
     tenant.id,
     page,
     PAGE_SIZE,
-    saved
+    saved,
+    { q, sort }
   );
 
   if (error) {
     return <DeskError>Could not load contacts.</DeskError>;
   }
 
+  const listParams = {
+    saved: saved === "all" ? undefined : saved,
+    sort: sort === "recent" ? undefined : sort,
+    q: q || undefined,
+  };
+
   return (
     <div>
       <header className="space-y-3">
-        <h1 className={deskListTitleClass}>Contacts</h1>
-        <DeskIndexLead>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Link
-              href="/contacts/import"
-              className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Import CSV
-            </Link>
-            <PhonebookImportButton />
-            <AddContactPanel />
+        {nested ? (
+          <DeskBack href={contactsHref({ sort, q: q || undefined })}>Contacts</DeskBack>
+        ) : (
+          <h1 className={deskListTitleClass}>Contacts</h1>
+        )}
+        <DeskIndexLead
+          status={nested ? <h1 className={pageTitleClass}>{pileTitle(saved)}</h1> : undefined}
+        >
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
+              <ContactsSearch q={q} saved={saved} sort={sort} />
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <Link
+                href="/contacts/import"
+                className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Import CSV
+              </Link>
+              <PhonebookImportButton />
+              <AddContactPanel />
+            </div>
           </div>
         </DeskIndexLead>
         <FilterTabs
-          label="Filter by name"
-          active={saved}
-          items={SAVED_FILTERS.map((item) => ({
-            id: item.id,
-            label: item.label,
-            href: contactsHref({ saved: item.id }),
-          }))}
+          label="Sort contacts"
+          active={sort}
+          items={[
+            {
+              id: "recent",
+              label: "Recent",
+              href: contactsHref({ saved, q: q || undefined, sort: "recent" }),
+            },
+            {
+              id: "name",
+              label: "Name",
+              href: contactsHref({ saved, q: q || undefined, sort: "name" }),
+            },
+          ]}
         />
       </header>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && !showQuick ? (
         <div className={deskEmptyClass}>
           <p className="font-display text-2xl tracking-tight text-ink">
-            {emptyCopy(saved)}
+            {emptyCopy(saved, q)}
           </p>
-          {saved === "all" &&
-          String(tenant.sautikit_virtual_number || "").startsWith("pending:") ? (
+          {q ? (
+            <Link
+              href={contactsHref({ saved, sort })}
+              className={`mt-6 inline-flex font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+            >
+              Clear
+            </Link>
+          ) : saved === "all" &&
+            String(tenant.sautikit_virtual_number || "").startsWith("pending:") ? (
             <p className="mt-2 text-sm text-ink-soft">Number being assigned</p>
           ) : saved === "all" && tenant.sautikit_virtual_number ? (
             <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
@@ -116,112 +165,109 @@ export default async function ContactsPage({
         <>
           <DeskLandScope
             ids={rows.map((row) => row.id)}
-            scopeKey={`${saved}:${page}`}
+            scopeKey={`${saved}:${sort}:${q}:${page}`}
           >
-          <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
-            {rows.map((row) => (
-              <DeskLandSurface
-                as="li"
-                key={row.id}
-                id={row.id}
-                className="relative border-t border-line/70 first:border-t-0"
-              >
-                <Link
-                  href={`/contacts/${row.id}`}
-                  aria-label={row.name?.trim() || "Contact"}
-                  className="flex items-center gap-3 px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-                >
-                  <RowIdentity name={row.name} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className={`min-w-0 text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
-                        {row.name?.trim() || "Unknown"}
-                      </p>
-                      {row.lastContactAt ? (
-                        <p className="shrink-0 text-xs text-ink-soft">
-                          {formatCallWhenRelative(row.lastContactAt)}
-                        </p>
-                      ) : null}
-                    </div>
-                    <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
-                      {row.lastReasonDisplay || "None"}
-                    </p>
-                  </div>
-                </Link>
-              </DeskLandSurface>
-            ))}
-          </ul>
-          <div className="mt-8 hidden md:block">
-            <DeskDataTable minWidthClass="min-w-[720px]">
-              <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                  >
-                    Name
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                  >
-                    Phone
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                  >
-                    Last reason
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                  >
-                    Last contact
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <DeskLandSurface
-                    as="tr"
-                    key={row.id}
-                    id={row.id}
-                    className={`group relative cursor-pointer border-t border-line/70 ${deskShiftClass} hover:bg-accent/[0.04]`}
-                  >
-                    <td className="px-5 py-5 align-top">
-                      <DeskRowHit href={`/contacts/${row.id}`} label={row.name?.trim() || "Contact"} />
-                      <div className={`${deskRowMutedClass} flex items-center gap-3`}>
-                        <RowIdentity name={row.name} />
-                        <p className={`min-w-0 text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
-                          {row.name?.trim() || "Unknown"}
-                        </p>
-                      </div>
-                    </td>
-                    <td className={`${deskRowMutedClass} px-5 py-5 align-top font-mono text-sm text-ink`}>
-                      {row.phone || "No phone"}
-                    </td>
-                    <td className={`${deskRowMutedClass} ${deskPreviewCellClass} px-5 py-5 align-top text-sm text-ink-soft`}>
-                      <p className={deskPreviewClass}>{row.lastReasonDisplay || "None"}</p>
-                    </td>
-                    <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-5 align-top text-sm text-ink-soft`}>
-                      {row.lastContactAt
-                        ? formatCallWhenRelative(row.lastContactAt)
-                        : "None"}
-                    </td>
-                  </DeskLandSurface>
-                ))}
-              </tbody>
-            </DeskDataTable>
-          </div>
+            <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+              {showQuick ? (
+                <>
+                  <ContactQuickPhoneRow
+                    kind="recent"
+                    href={contactsHref({ saved: "recent", sort, q: q || undefined })}
+                  />
+                  <ContactQuickPhoneRow
+                    kind="unsaved"
+                    href={contactsHref({ saved: "unsaved", sort, q: q || undefined })}
+                  />
+                </>
+              ) : null}
+              {rows.map((row) => (
+                <ContactPhoneRow key={row.id} row={row} />
+              ))}
+            </ul>
+            <div className="mt-8 hidden md:block">
+              <DeskDataTable minWidthClass="min-w-[720px]">
+                <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                      Name
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                      Phone
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                      Last reason
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                      Last contact
+                    </th>
+                    <th scope="col" className="w-px px-5 py-4">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {showQuick ? (
+                    <>
+                      <ContactQuickTableRow
+                        kind="recent"
+                        href={contactsHref({ saved: "recent", sort, q: q || undefined })}
+                        colSpan={5}
+                      />
+                      <ContactQuickTableRow
+                        kind="unsaved"
+                        href={contactsHref({ saved: "unsaved", sort, q: q || undefined })}
+                        colSpan={5}
+                      />
+                    </>
+                  ) : null}
+                  {rows.map((row) => (
+                    <ContactTableRow key={row.id} row={row} />
+                  ))}
+                </tbody>
+              </DeskDataTable>
+            </div>
           </DeskLandScope>
-          <Pagination
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            href="/contacts"
-            params={{ saved: saved === "all" ? undefined : saved }}
-          />
+          {rows.length === 0 ? (
+            <div className={deskEmptyClass}>
+              <p className="font-display text-2xl tracking-tight text-ink">
+                {emptyCopy(saved, q)}
+              </p>
+              {saved === "all" &&
+              String(tenant.sautikit_virtual_number || "").startsWith("pending:") ? (
+                <p className="mt-2 text-sm text-ink-soft">Number being assigned</p>
+              ) : saved === "all" && tenant.sautikit_virtual_number ? (
+                <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+                  Call{" "}
+                  <a
+                    href={`tel:${tenant.sautikit_virtual_number}`}
+                    className="font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    {tenant.sautikit_virtual_number}
+                  </a>
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <Pagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              href="/contacts"
+              params={listParams}
+            />
+          )}
         </>
       )}
     </div>

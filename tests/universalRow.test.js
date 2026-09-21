@@ -54,8 +54,11 @@ describe("universal row anatomy", () => {
   });
 
   it("applies the identity circle to Contacts mobile and desktop", () => {
-    const uses = contacts.match(/RowIdentity/g) || [];
+    const list = read("dashboard/src/components/ContactListRow.tsx");
+    const uses = list.match(/RowIdentity/g) || [];
     assert.ok(uses.length >= 3, `import + mobile + desktop, got ${uses.length}`);
+    assert.match(contacts, /<ContactPhoneRow/);
+    assert.match(contacts, /<ContactTableRow/);
   });
 
   it("initials skip phone numbers and placeholders", () => {

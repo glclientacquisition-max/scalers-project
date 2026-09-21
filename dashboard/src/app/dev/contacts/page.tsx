@@ -1,10 +1,18 @@
 import { notFound } from "next/navigation";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactActionDock } from "@/components/ContactActionDock";
+import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
 import { ContactNameForm } from "@/components/ContactNameForm";
+import {
+  ContactQuickPhoneRow,
+  ContactQuickTableRow,
+} from "@/components/ContactQuickRow";
 import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { isJunkCallerName } from "@/lib/callerNameQuality";
+import type { ContactListRow } from "@/lib/contactsLoad";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +41,35 @@ function ProfileLead({
   );
 }
 
+const DEV_ROWS: ContactListRow[] = [
+  {
+    id: "ct-saved",
+    created_at: "2026-09-20T07:00:00.000Z",
+    updated_at: "2026-09-21T07:12:00.000Z",
+    tenant_id: "dev",
+    phone: "+254700000002",
+    name: "Amina",
+    notes: null,
+    last_reason: "Missed the line",
+    metadata: null,
+    lastContactAt: "2026-09-21T07:12:00.000Z",
+    lastReasonDisplay: "Missed the line",
+  },
+  {
+    id: "ct-unsaved",
+    created_at: "2026-09-21T06:40:00.000Z",
+    updated_at: "2026-09-21T06:40:00.000Z",
+    tenant_id: "dev",
+    phone: "+254700000001",
+    name: null,
+    notes: null,
+    last_reason: "Callback",
+    metadata: null,
+    lastContactAt: "2026-09-21T06:40:00.000Z",
+    lastReasonDisplay: "Callback",
+  },
+];
+
 export default function DevContactsPage() {
   if (process.env.DASHBOARD_OPEN !== "true") {
     notFound();
@@ -43,6 +80,46 @@ export default function DevContactsPage() {
       <DeskRail needsCount={0} homeHref="/dev/contacts" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>
+          <section className="mb-10">
+            <h1 className={deskListTitleClass}>Contacts</h1>
+            <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
+              <ContactQuickPhoneRow kind="recent" href="/dev/contacts" />
+              <ContactQuickPhoneRow kind="unsaved" href="/dev/contacts" />
+              {DEV_ROWS.map((row) => (
+                <ContactPhoneRow key={row.id} row={row} />
+              ))}
+            </ul>
+            <div className="mt-8 hidden md:block">
+              <DeskDataTable minWidthClass="min-w-[720px]">
+                <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
+                  <tr>
+                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                      Name
+                    </th>
+                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                      Phone
+                    </th>
+                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                      Last reason
+                    </th>
+                    <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                      Last contact
+                    </th>
+                    <th scope="col" className="w-px px-5 py-4">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ContactQuickTableRow kind="recent" href="/dev/contacts" colSpan={5} />
+                  <ContactQuickTableRow kind="unsaved" href="/dev/contacts" colSpan={5} />
+                  {DEV_ROWS.map((row) => (
+                    <ContactTableRow key={row.id} row={row} />
+                  ))}
+                </tbody>
+              </DeskDataTable>
+            </div>
+          </section>
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
             <section className="max-w-md space-y-5">
               <DeskBack href="/dev/contacts">Contacts</DeskBack>

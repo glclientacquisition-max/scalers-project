@@ -24,8 +24,10 @@ describe("desk rows open the record", () => {
   });
 
   it("opens Inbox, Contacts, and Home from the row", () => {
+    const list = read("dashboard/src/components/ContactListRow.tsx");
     assert.match(inbox, /InboxRowHit/);
-    assert.match(contacts, /DeskRowHit/);
+    assert.match(list, /DeskRowHit/);
+    assert.match(contacts, /ContactPhoneRow/);
     assert.match(home, /DeskRowHit/);
     assert.match(contact, /DeskRowHit/);
   });

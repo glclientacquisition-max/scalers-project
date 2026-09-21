@@ -39,6 +39,16 @@ describe("contactsLoad last-contact wiring", () => {
     "utf8"
   );
 
+  it("exposes search, sort, and Recent calls helpers on the same loader", () => {
+    assert.match(src, /export function resolveContactSort/);
+    assert.match(src, /export function contactMatchesQuery/);
+    assert.match(src, /export function uniqueRecentCallerPhones/);
+    assert.match(src, /saved === "recent"/);
+    assert.match(src, /sanitizeSearchQuery/);
+    assert.doesNotMatch(src, /\bOnline\b/);
+    assert.doesNotMatch(src, /lead_status/);
+  });
+
   it("merges phone activity with contact-id activity instead of short-circuiting", () => {
     assert.match(src, /export function pickLastContactAt/);
     assert.match(src, /lastContactAt: pickLastContactAt\(/);
