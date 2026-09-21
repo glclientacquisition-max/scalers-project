@@ -122,7 +122,6 @@ export default async function CallDetailPage({
   const summaryCard = pickCallOwnerCard(meta);
   const leadStatus = parseLeadStatus(row.lead_status);
   const resolution = parseCallResolution(row.resolution);
-  const title = name || row.caller_number;
   const businessName = tenant.business_name?.trim() || "us";
   const waMessage = followUpWhatsAppMessage({ businessName, name, reason });
   const escalatedTo =
@@ -236,7 +235,8 @@ export default async function CallDetailPage({
         contactHref={
           person?.id ? contactFromCallHref(person.id, row.id, inboxReturn) : null
         }
-        title={title}
+        callerName={name}
+        lastContactAt={row.created_at}
         stamp={stamp}
         purpose={purpose}
         callerPhone={row.caller_number}
