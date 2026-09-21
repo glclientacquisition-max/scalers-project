@@ -10,7 +10,13 @@ import { isJunkCallerName } from "@/lib/callerNameQuality";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
 import { callFromContactHref, inboxFromContactHref } from "@/lib/inboxHref";
-import { loadContactById, loadContactTimeline } from "@/lib/contactsLoad";
+import {
+  contactLastCallFact,
+  contactsReturnHref,
+  loadContactById,
+  loadContactTimeline,
+} from "@/lib/contactsLoad";
+import { contactStripTitle } from "@/lib/contactStrip";
 import { displayContactLastReason } from "@/lib/callSummarySentence";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactTimelineWhat } from "@/components/ContactTimelineWhat";
@@ -36,13 +42,15 @@ export default async function ContactDetailPage({
     day?: string;
     q?: string;
     page?: string;
+    saved?: string;
+    sort?: string;
   }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const callBack = callFromContactHref(sp);
   const inboxBack = inboxFromContactHref(sp);
-  const backHref = callBack || inboxBack || "/contacts";
+  const backHref = callBack || inboxBack || contactsReturnHref(sp);
   const backLabel = callBack ? "Call" : inboxBack ? "Inbox" : "Contacts";
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
@@ -57,8 +65,9 @@ export default async function ContactDetailPage({
   if (!contact) notFound();
 
   const timeline = await loadContactTimeline(workspace.client, tenant.id, contact);
-  const title = contact.name?.trim() || "Unknown";
+  const title = contactStripTitle(contact.name, true);
   const latestCall = timeline.find((entry) => entry.kind === "call");
+  const lastCallFact = contactLastCallFact(latestCall?.createdAt);
   const lastReason = displayContactLastReason({
     name: contact.name,
     phone: contact.phone,
@@ -77,6 +86,9 @@ export default async function ContactDetailPage({
                 {title}
               </h1>
               <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
+              {lastCallFact ? (
+                <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+              ) : null}
             </div>
             {contact.phone ? <ContactActionDock number={contact.phone} /> : null}
             {isJunkCallerName(contact.name) ? (

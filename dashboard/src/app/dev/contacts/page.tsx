@@ -3,10 +3,6 @@ import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactActionDock } from "@/components/ContactActionDock";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
 import { ContactNameForm } from "@/components/ContactNameForm";
-import {
-  ContactQuickPhoneRow,
-  ContactQuickTableRow,
-} from "@/components/ContactQuickRow";
 import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
@@ -14,7 +10,7 @@ import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { deskFieldClass, deskListTitleClass } from "@/components/ui/deskChrome";
 import { isJunkCallerName } from "@/lib/callerNameQuality";
-import type { ContactListRow } from "@/lib/contactsLoad";
+import { contactLastCallFact, type ContactListRow } from "@/lib/contactsLoad";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +19,15 @@ function ProfileLead({
   phone,
   contactId,
   name,
+  lastContactAt,
 }: {
   title: string;
   phone: string;
   contactId: string;
   name: string | null;
+  lastContactAt?: string | null;
 }) {
+  const lastCallFact = contactLastCallFact(lastContactAt);
   return (
     <div className="space-y-4">
       <div>
@@ -36,6 +35,9 @@ function ProfileLead({
           {title}
         </h1>
         <p className="mt-2 font-mono text-sm text-ink">{phone}</p>
+        {lastCallFact ? (
+          <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+        ) : null}
       </div>
       <ContactActionDock number={phone} />
       {isJunkCallerName(name) ? <ContactNameForm contactId={contactId} /> : null}
@@ -99,19 +101,31 @@ export default function DevContactsPage() {
                 />
               </DeskIndexLead>
               <FilterTabs
+                label="Filter contacts"
+                active="all"
+                items={[
+                  { id: "all", label: "All", href: "/dev/contacts" },
+                  { id: "saved", label: "Saved", href: "/dev/contacts" },
+                  { id: "unsaved", label: "Unsaved", href: "/dev/contacts" },
+                  { id: "recent", label: "Recent", href: "/dev/contacts" },
+                ]}
+              />
+              <FilterTabs
                 label="Sort contacts"
                 active="recent"
                 items={[
-                  { id: "recent", label: "Recent", href: "/dev/contacts" },
+                  { id: "recent", label: "Last call", href: "/dev/contacts" },
                   { id: "name", label: "Name", href: "/dev/contacts" },
                 ]}
               />
             </header>
             <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
-              <ContactQuickPhoneRow kind="recent" href="/dev/contacts" />
-              <ContactQuickPhoneRow kind="unsaved" href="/dev/contacts" />
               {DEV_ROWS.map((row) => (
-                <ContactPhoneRow key={row.id} row={row} />
+                <ContactPhoneRow
+                  key={row.id}
+                  row={row}
+                  href={`/contacts/${row.id}?from=contacts`}
+                />
               ))}
             </ul>
             <div className="mt-6 hidden min-w-0 md:mt-8 md:block">
@@ -133,10 +147,12 @@ export default function DevContactsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  <ContactQuickTableRow kind="recent" href="/dev/contacts" colSpan={4} />
-                  <ContactQuickTableRow kind="unsaved" href="/dev/contacts" colSpan={4} />
                   {DEV_ROWS.map((row) => (
-                    <ContactTableRow key={row.id} row={row} />
+                    <ContactTableRow
+                      key={row.id}
+                      row={row}
+                      href={`/contacts/${row.id}?from=contacts`}
+                    />
                   ))}
                 </tbody>
               </DeskDataTable>
@@ -146,10 +162,11 @@ export default function DevContactsPage() {
             <section className="max-w-md space-y-5">
               <DeskBack href="/dev/contacts">Contacts</DeskBack>
               <ProfileLead
-                title="Unknown"
+                title="Name this caller"
                 phone="+254700000001"
                 contactId="ct-unsaved"
                 name={null}
+                lastContactAt="2026-09-21T06:40:00.000Z"
               />
               <section className="rounded-2xl border border-line bg-surface p-5">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
@@ -172,6 +189,7 @@ export default function DevContactsPage() {
                 phone="+254700000002"
                 contactId="ct-saved"
                 name="Amina"
+                lastContactAt="2026-09-21T07:12:00.000Z"
               />
               <section className="rounded-2xl border border-line bg-surface p-5">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">

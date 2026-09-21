@@ -93,6 +93,46 @@ export function contactsHref(opts: {
   return qs ? `/contacts?${qs}` : "/contacts";
 }
 
+export type ContactsListReturn = {
+  saved?: ContactSavedFilter;
+  sort?: ContactSort;
+  q?: string;
+  page?: number;
+};
+
+/** Open a contact file while keeping the list pile for Back. */
+export function contactProfileHref(
+  id: string,
+  opts: ContactsListReturn = {}
+): string {
+  const q = new URLSearchParams();
+  q.set("from", "contacts");
+  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
+  if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
+  const query = sanitizeSearchQuery(opts.q);
+  if (query) q.set("q", query);
+  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  return `/contacts/${id}?${q.toString()}`;
+}
+
+/** Restore `/contacts` from a profile opened on the list. Inbox/call `from` values stay off this path. */
+export function contactsReturnHref(sp: {
+  from?: string;
+  saved?: string;
+  sort?: string;
+  q?: string;
+  page?: string;
+}): string {
+  const from = String(sp.from || "contacts");
+  if (from !== "contacts") return "/contacts";
+  return contactsHref({
+    saved: resolveContactSavedFilter(sp.saved),
+    sort: resolveContactSort(sp.sort),
+    q: sp.q,
+    page: Math.max(1, Number.parseInt(String(sp.page || "1"), 10) || 1),
+  });
+}
+
 export function isUnsavedContactName(name?: string | null): boolean {
   return !String(name || "").trim();
 }
@@ -126,6 +166,13 @@ export function contactMatchesQuery(
     .join(" ")
     .toLowerCase();
   return hay.includes(text.toLowerCase());
+}
+
+/** Profile stamp for the newest call. Not presence. */
+export function contactLastCallFact(at?: string | null): string | null {
+  const iso = String(at || "").trim();
+  if (!iso) return null;
+  return `Last call ${formatCallWhenRelative(iso)}`;
 }
 
 export function compareContactRows(

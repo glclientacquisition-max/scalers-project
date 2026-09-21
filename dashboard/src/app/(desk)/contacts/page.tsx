@@ -1,15 +1,10 @@
 import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
-import {
-  ContactQuickPhoneRow,
-  ContactQuickTableRow,
-} from "@/components/ContactQuickRow";
 import { ContactsSearch } from "@/components/ContactsSearch";
 import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { FilterTabs } from "@/components/ui/FilterTabs";
@@ -19,16 +14,17 @@ import {
   deskEmptyClass,
   deskListTitleClass,
   deskShiftClass,
-  pageTitleClass,
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
 import {
+  contactProfileHref,
   contactsHref,
   loadContactsPage,
   resolveContactSavedFilter,
   resolveContactSort,
   type ContactSavedFilter,
+  type ContactSort,
 } from "@/lib/contactsLoad";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
@@ -41,10 +37,16 @@ function emptyCopy(saved: ContactSavedFilter, q: string): string {
   return "No callers";
 }
 
-function pileTitle(saved: ContactSavedFilter): string {
-  if (saved === "recent") return "Recent calls";
-  if (saved === "unsaved") return "Unsaved";
-  return "Contacts";
+function listQuery(
+  saved: ContactSavedFilter,
+  sort: ContactSort,
+  q: string
+) {
+  return {
+    saved,
+    sort,
+    q: q || undefined,
+  };
 }
 
 export default async function ContactsPage({
@@ -57,8 +59,7 @@ export default async function ContactsPage({
   const saved = resolveContactSavedFilter(sp.saved);
   const sort = resolveContactSort(sp.sort);
   const q = sanitizeSearchQuery(sp.q);
-  const nested = saved === "recent" || saved === "unsaved";
-  const showQuick = saved === "all" && !q;
+  const query = listQuery(saved, sort, q);
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -88,18 +89,13 @@ export default async function ContactsPage({
     sort: sort === "recent" ? undefined : sort,
     q: q || undefined,
   };
+  const listReturn = { ...query, page };
 
   return (
     <div className="min-w-0 overflow-x-clip">
       <header className="space-y-3">
-        {nested ? (
-          <DeskBack href={contactsHref({ sort, q: q || undefined })}>Contacts</DeskBack>
-        ) : (
-          <h1 className={deskListTitleClass}>Contacts</h1>
-        )}
-        <DeskIndexLead
-          status={nested ? <h1 className={pageTitleClass}>{pileTitle(saved)}</h1> : undefined}
-        >
+        <h1 className={deskListTitleClass}>Contacts</h1>
+        <DeskIndexLead>
           <div className="flex w-full min-w-0 flex-col gap-2 md:flex-row md:items-center">
             <div className="min-w-0 flex-1">
               <ContactsSearch q={q} saved={saved} sort={sort} />
@@ -117,12 +113,38 @@ export default async function ContactsPage({
           </div>
         </DeskIndexLead>
         <FilterTabs
+          label="Filter contacts"
+          active={saved}
+          items={[
+            {
+              id: "all",
+              label: "All",
+              href: contactsHref({ sort, q: q || undefined }),
+            },
+            {
+              id: "saved",
+              label: "Saved",
+              href: contactsHref({ saved: "saved", sort, q: q || undefined }),
+            },
+            {
+              id: "unsaved",
+              label: "Unsaved",
+              href: contactsHref({ saved: "unsaved", sort, q: q || undefined }),
+            },
+            {
+              id: "recent",
+              label: "Recent",
+              href: contactsHref({ saved: "recent", sort, q: q || undefined }),
+            },
+          ]}
+        />
+        <FilterTabs
           label="Sort contacts"
           active={sort}
           items={[
             {
               id: "recent",
-              label: "Recent",
+              label: "Last call",
               href: contactsHref({ saved, q: q || undefined, sort: "recent" }),
             },
             {
@@ -134,7 +156,7 @@ export default async function ContactsPage({
         />
       </header>
 
-      {rows.length === 0 && !showQuick ? (
+      {rows.length === 0 ? (
         <div className={deskEmptyClass}>
           <p className="font-display text-2xl tracking-tight text-ink">
             {emptyCopy(saved, q)}
@@ -168,20 +190,12 @@ export default async function ContactsPage({
             scopeKey={`${saved}:${sort}:${q}:${page}`}
           >
             <ul className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface md:mt-8 md:hidden">
-              {showQuick ? (
-                <>
-                  <ContactQuickPhoneRow
-                    kind="recent"
-                    href={contactsHref({ saved: "recent", sort, q: q || undefined })}
-                  />
-                  <ContactQuickPhoneRow
-                    kind="unsaved"
-                    href={contactsHref({ saved: "unsaved", sort, q: q || undefined })}
-                  />
-                </>
-              ) : null}
               {rows.map((row) => (
-                <ContactPhoneRow key={row.id} row={row} />
+                <ContactPhoneRow
+                  key={row.id}
+                  row={row}
+                  href={contactProfileHref(row.id, listReturn)}
+                />
               ))}
             </ul>
             <div className="mt-6 hidden min-w-0 md:mt-8 md:block">
@@ -212,56 +226,24 @@ export default async function ContactsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {showQuick ? (
-                    <>
-                      <ContactQuickTableRow
-                        kind="recent"
-                        href={contactsHref({ saved: "recent", sort, q: q || undefined })}
-                        colSpan={4}
-                      />
-                      <ContactQuickTableRow
-                        kind="unsaved"
-                        href={contactsHref({ saved: "unsaved", sort, q: q || undefined })}
-                        colSpan={4}
-                      />
-                    </>
-                  ) : null}
                   {rows.map((row) => (
-                    <ContactTableRow key={row.id} row={row} />
+                    <ContactTableRow
+                      key={row.id}
+                      row={row}
+                      href={contactProfileHref(row.id, listReturn)}
+                    />
                   ))}
                 </tbody>
               </DeskDataTable>
             </div>
           </DeskLandScope>
-          {rows.length === 0 ? (
-            <div className={deskEmptyClass}>
-              <p className="font-display text-2xl tracking-tight text-ink">
-                {emptyCopy(saved, q)}
-              </p>
-              {saved === "all" &&
-              String(tenant.sautikit_virtual_number || "").startsWith("pending:") ? (
-                <p className="mt-2 text-sm text-ink-soft">Number being assigned</p>
-              ) : saved === "all" && tenant.sautikit_virtual_number ? (
-                <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-                  Call{" "}
-                  <a
-                    href={`tel:${tenant.sautikit_virtual_number}`}
-                    className="font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    {tenant.sautikit_virtual_number}
-                  </a>
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <Pagination
-              page={page}
-              pageSize={PAGE_SIZE}
-              total={total}
-              href="/contacts"
-              params={listParams}
-            />
-          )}
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            href="/contacts"
+            params={listParams}
+          />
         </>
       )}
     </div>

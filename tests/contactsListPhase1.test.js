@@ -117,7 +117,6 @@ describe("contacts list Phase 1 helpers", () => {
 describe("contacts list Phase 1 chrome", () => {
   const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const row = read("dashboard/src/components/ContactListRow.tsx");
-  const quick = read("dashboard/src/components/ContactQuickRow.tsx");
   const search = read("dashboard/src/components/ContactsSearch.tsx");
   const note = read("docs/frontend/design-system/pages/contacts.md");
   const accept = read("docs/product/CONTACTS_LIST_PHASE1_ACCEPT.md");
@@ -125,29 +124,27 @@ describe("contacts list Phase 1 chrome", () => {
   const profile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const dock = read("dashboard/src/components/ContactActionDock.tsx");
 
-  it("ships search and Recent / Name sort on the existing contacts list", () => {
+  it("ships search and Last call / Name sort on the existing contacts list", () => {
     assert.match(page, /<ContactsSearch/);
     assert.match(search, /type="search"/);
     assert.match(search, /Name or number/);
     assert.match(page, /<FilterTabs/);
     assert.match(page, /label="Sort contacts"/);
-    assert.match(page, /label: "Recent"/);
+    assert.match(page, /label: "Last call"/);
     assert.match(page, /label: "Name"/);
     assert.match(load, /resolveContactSort/);
     assert.match(note, /Search field/);
     assert.match(accept, /search \+ sort/);
   });
 
-  it("puts Recent calls and Unsaved quick rows above the list, not Invite Friends", () => {
-    assert.match(page, /<ContactQuickPhoneRow/);
-    assert.match(page, /kind="recent"/);
-    assert.match(page, /kind="unsaved"/);
-    assert.match(quick, /Recent calls/);
-    assert.match(quick, /Unsaved/);
+  it("keeps Recent and Unsaved as FilterTabs piles, not Invite Friends", () => {
+    assert.match(page, /label: "Recent"/);
+    assert.match(page, /label: "Unsaved"/);
+    assert.doesNotMatch(page, /ContactQuickPhoneRow|ContactQuickTableRow/);
     assert.doesNotMatch(page, /Invite Friends/);
-    assert.doesNotMatch(quick, /Invite Friends/);
     assert.doesNotMatch(search, /Invite Friends/);
-    assert.match(note, /Recent calls and Unsaved/);
+    assert.match(note, /All · Saved · Unsaved · Recent/);
+    assert.match(accept, /FilterTabs items/);
   });
 
   it("keeps dense Call + WhatsApp as opened-only when a phone exists", () => {
@@ -167,11 +164,9 @@ describe("contacts list Phase 1 chrome", () => {
   it("does not invent Online, presence, live badges, or a contact activity strip", () => {
     assert.doesNotMatch(page, /\bOnline\b/);
     assert.doesNotMatch(row, /\bOnline\b/);
-    assert.doesNotMatch(quick, /\bOnline\b/);
     assert.doesNotMatch(search, /\bOnline\b/);
     assert.doesNotMatch(page, /LivePing|RowStateDot|presence|activity strip/i);
     assert.doesNotMatch(row, /LivePing|RowStateDot|presence|activity strip/i);
-    assert.doesNotMatch(quick, /LivePing|RowStateDot/);
     assert.match(note, /No Online/);
     assert.match(note, /Do not[\s\S]*ship a contact activity strip/);
     assert.match(accept, /Fake Online \/ presence/);
@@ -179,7 +174,6 @@ describe("contacts list Phase 1 chrome", () => {
     assert.doesNotMatch(page, /ContactActivityStrip|activity strip/i);
     assert.doesNotMatch(page, /last seen|Last seen|active now|Active now/i);
     assert.doesNotMatch(row, /last seen|Last seen|active now|Active now/i);
-    assert.doesNotMatch(quick, /last seen|Last seen|active now|Active now/i);
     assert.doesNotMatch(row, /lastReasonDisplay/);
     assert.match(row, /contactListSubline/);
     assert.doesNotMatch(row, /delivered|Delivered/);
