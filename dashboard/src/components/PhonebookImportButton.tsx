@@ -30,6 +30,14 @@ export async function selectPhonebookContacts(): Promise<ContactSelectResult> {
   return nav.contacts.select(["name", "tel"], { multiple: true });
 }
 
+/** Pick on this device, then hand the CSV to `/contacts/import`. */
+export async function stashPhonebookCsv(): Promise<boolean> {
+  const selected = await selectPhonebookContacts();
+  if (!selected?.length) return false;
+  sessionStorage.setItem(PHONEBOOK_CSV_KEY, csvFromPickedContacts(selected));
+  return true;
+}
+
 export function ContactPickButton({
   available,
   onPick,
@@ -66,9 +74,7 @@ export function PhonebookImportButton() {
   async function pick() {
     setError(null);
     try {
-      const selected = await selectPhonebookContacts();
-      if (!selected?.length) return;
-      sessionStorage.setItem(PHONEBOOK_CSV_KEY, csvFromPickedContacts(selected));
+      if (!(await stashPhonebookCsv())) return;
       router.push("/contacts/import");
     } catch (err) {
       if ((err as { name?: string })?.name === "AbortError") return;

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Tight lead row under the list-root title (search, Import CSV, balance). */
+/** Tight lead row under the list-root title (search, Add, balance). */
 export function DeskIndexLead({
   status,
   children,

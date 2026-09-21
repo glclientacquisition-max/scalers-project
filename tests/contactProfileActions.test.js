@@ -54,9 +54,9 @@ describe("contact profile Name this caller", () => {
   const sql = read("docs/supabase/contacts_and_requests.sql");
 
   it("offers Name this caller on unnamed profiles and stays on the file after Save", () => {
-    assert.match(page, /isJunkCallerName\(contact\.name\)/);
-    assert.match(page, /<ContactNameForm contactId=\{contact\.id\} \/>/);
+    assert.match(page, /<ContactNameForm contactId=\{contact\.id\} initialName=\{contact\.name\} \/>/);
     assert.match(form, /Name this caller/);
+    assert.match(form, /junk \? "Name this caller" : "Name"/);
     assert.match(form, />\s*Save\s*</);
     assert.match(form, /updateContactName/);
     assert.match(form, /router\.refresh\(/);

@@ -308,9 +308,10 @@ export async function updateContactName(
   if (loadError) return { error: contactsWriteError(loadError.message) };
   if (!existing) return { error: "Missing contact." };
 
+  const previousName = sanitizeStoredCallerName(existing.name);
   const identity = mergeContactIdentity(
-    { name: existing.name, metadata: contactMetadata(existing.metadata) },
-    { name: incoming }
+    { name: incoming, metadata: contactMetadata(existing.metadata) },
+    previousName && previousName !== incoming ? { name: previousName } : {}
   );
   if (!identity.name) return { error: "Enter a name." };
 

@@ -1,15 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContact } from "@/app/(desk)/contacts/actions";
-import { mapPickedContacts, isContactPickerAvailable } from "@/lib/contactImport";
-import {
-  ContactPickButton,
-  selectPhonebookContacts,
-} from "@/components/PhonebookImportButton";
+import { isContactPickerAvailable } from "@/lib/contactImport";
+import { stashPhonebookCsv } from "@/components/PhonebookImportButton";
 import {
   compactTextareaExpandHandlers,
+  settingsActionClass,
   settingsFieldClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
@@ -17,12 +16,14 @@ import { DeskDialog } from "@/components/ui/DeskDialog";
 import { pendingSpinnerClass } from "@/components/ui/deskChrome";
 
 type Draft = { name: string; phone: string; notes: string };
+type Mode = "chooser" | "form";
 
 const emptyDraft = (): Draft => ({ name: "", phone: "", notes: "" });
 
 export function AddContactPanel() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>("chooser");
   const [pickerOn, setPickerOn] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([emptyDraft()]);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,7 @@ export function AddContactPanel() {
   }, []);
 
   function reset() {
+    setMode("chooser");
     setDrafts([emptyDraft()]);
     setError(null);
     setExistingId(null);
@@ -43,16 +45,9 @@ export function AddContactPanel() {
     setError(null);
     setExistingId(null);
     try {
-      const selected = await selectPhonebookContacts();
-      const mapped = mapPickedContacts(selected);
-      if (!mapped.length) return;
-      setDrafts(
-        mapped.map((row) => ({
-          name: row.name || "",
-          phone: row.phone || "",
-          notes: "",
-        }))
-      );
+      if (!(await stashPhonebookCsv())) return;
+      setOpen(false);
+      router.push("/contacts/import");
     } catch (err) {
       if ((err as { name?: string })?.name === "AbortError") return;
       setError("Could not read phone contacts.");
@@ -96,22 +91,54 @@ export function AddContactPanel() {
     <>
       <button
         type="button"
+        data-contact-add=""
         onClick={() => {
           reset();
           setOpen(true);
         }}
         className={settingsPrimaryButtonClass}
       >
-        Add contact
+        Add
       </button>
 
       {open ? (
         <DeskDialog
-          title="Add contact"
+          title={mode === "form" ? "Add contact" : "Add"}
           onClose={close}
           pending={pending}
           panelClassName="max-w-lg"
         >
+          {mode === "chooser" ? (
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                className={`${settingsPrimaryButtonClass} w-full`}
+                onClick={() => {
+                  setError(null);
+                  setMode("form");
+                }}
+              >
+                New
+              </button>
+              <Link
+                href="/contacts/import"
+                className={`${settingsActionClass} w-full`}
+                onClick={() => setOpen(false)}
+              >
+                CSV
+              </Link>
+              {pickerOn ? (
+                <button
+                  type="button"
+                  className={`${settingsActionClass} w-full`}
+                  onClick={() => void pickFromPhone()}
+                >
+                  From this phone
+                </button>
+              ) : null}
+              {error ? <p className="text-sm text-warn">{error}</p> : null}
+            </div>
+          ) : (
             <form
               className="mt-5 space-y-4"
               onSubmit={(e) => {
@@ -182,11 +209,17 @@ export function AddContactPanel() {
                     "Save"
                   )}
                 </button>
-                <ContactPickButton
-                  available={pickerOn}
-                  onPick={pickFromPhone}
-                  label="From this phone"
-                />
+                <button
+                  type="button"
+                  disabled={pending}
+                  className={settingsActionClass}
+                  onClick={() => {
+                    setError(null);
+                    setMode("chooser");
+                  }}
+                >
+                  Back
+                </button>
               </div>
 
               {error ? (
@@ -206,6 +239,7 @@ export function AddContactPanel() {
                 </p>
               ) : null}
             </form>
+          )}
         </DeskDialog>
       ) : null}
     </>

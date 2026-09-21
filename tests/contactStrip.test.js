@@ -132,7 +132,7 @@ describe("contact strip chrome", () => {
     assert.match(detail, /contactFromCallHref/);
     assert.match(form, /Name this caller/);
     assert.match(form, /updateContactName/);
-    assert.match(profile, /<ContactNameForm contactId=\{contact.id\} \/>/);
+    assert.match(profile, /<ContactNameForm contactId=\{contact.id\} initialName=\{contact.name\} \/>/);
     assert.doesNotMatch(strip, /<ContactNameForm/);
     assert.doesNotMatch(ticket, /<ContactNameForm/);
     assert.doesNotMatch(strip, /createContact|upsertContact/);

@@ -16,6 +16,7 @@ function load() {
       callFromContactHref,
       contactFromInboxHref,
       inboxFromContactHref,
+      inboxThreadsFromContactHref,
     } from ${JSON.stringify(helperPath)};
     const cases = {
       today: inboxRecordHref("call-1", { purpose: "job", view: "today", day: "2026-09-18" }),
@@ -43,6 +44,8 @@ function load() {
       }),
       inboxBare: inboxFromContactHref({ from: "inbox" }),
       notInbox: inboxFromContactHref({ from: "call", call: "call-1" }),
+      threadsPhone: inboxThreadsFromContactHref("+254700000002"),
+      threadsEmpty: inboxThreadsFromContactHref(""),
       archivedFromJob: inboxArchivedHref({
         purpose: "job",
         view: "week",
@@ -110,6 +113,8 @@ describe("inbox return path", () => {
     assert.equal(hrefs.fromInbox, "/calls?purpose=needs&q=Amina&page=2");
     assert.equal(hrefs.inboxBare, "/calls");
     assert.equal(hrefs.notInbox, null);
+    assert.equal(hrefs.threadsPhone, "/calls?purpose=all&q=%2B254700000002");
+    assert.equal(hrefs.threadsEmpty, null);
   });
 
   it("opens Archived with the prior pile, page, and visit layout", () => {
