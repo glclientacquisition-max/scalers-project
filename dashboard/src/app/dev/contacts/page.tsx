@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactActionDock } from "@/components/ContactActionDock";
+import { ContactKpiStrip } from "@/components/ContactKpiStrip";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
 import { ContactNameForm } from "@/components/ContactNameForm";
 import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
@@ -13,6 +14,10 @@ import { FilterTabs } from "@/components/ui/FilterTabs";
 import { btnGhost, deskFieldClass, deskListTitleClass } from "@/components/ui/deskChrome";
 import { ContactTimeline } from "@/components/ContactTimeline";
 import { inboxThreadsFromContactHref } from "@/lib/inboxHref";
+import {
+  contactPersonFileKpiCards,
+  pickFirstSeenAt,
+} from "@/lib/contactPersonFile";
 import { contactLastCallFact, type ContactListRow, type ContactTimelineEntry } from "@/lib/contactsLoad";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +68,11 @@ const DEV_TIMELINE: ContactTimelineEntry[] = [
       "Asked whether the Saturday morning slot is still free after the first visit ran long",
     detail: "Called back",
     callId: "call-dev-1",
+    href: "/calls/call-dev-1",
     status: "completed",
+    jobStatus: null,
+    stamp: "Answered",
+    purpose: "answered",
   },
   {
     id: "request:dev-1",
@@ -72,14 +81,34 @@ const DEV_TIMELINE: ContactTimelineEntry[] = [
     headline: "Hold the blue dress",
     detail: "open",
     callId: null,
+    href: null,
     status: "open",
+    jobStatus: null,
+    stamp: "Hold",
+    purpose: "hold",
+  },
+];
+
+const DEV_SAVED_HISTORY: ContactTimelineEntry[] = [
+  {
+    id: "appointment:dev-2",
+    kind: "appointment",
+    createdAt: "2026-09-18T10:00:00.000Z",
+    headline: "Carpet",
+    detail: "Tue",
+    callId: "call-dev-2",
+    href: "/calls/call-dev-2",
+    status: "done",
+    jobStatus: "done",
+    stamp: "Visit done",
+    purpose: "job",
   },
 ];
 
 const DEV_ROWS: ContactListRow[] = [
   {
     id: "ct-saved",
-    created_at: "2026-09-20T07:00:00.000Z",
+    created_at: "2026-01-21T07:00:00.000Z",
     updated_at: "2026-09-21T07:12:00.000Z",
     tenant_id: "dev",
     phone: "+254700000002",
@@ -109,6 +138,29 @@ export default function DevContactsPage() {
   if (process.env.DASHBOARD_OPEN !== "true") {
     notFound();
   }
+
+  const unsavedCards = contactPersonFileKpiCards({
+    interactionCount: DEV_TIMELINE.length,
+    visitsDoneCount: DEV_TIMELINE.filter(
+      (entry) => String(entry.jobStatus || "").toLowerCase() === "done"
+    ).length,
+    firstSeenAt: pickFirstSeenAt(
+      DEV_ROWS[1].created_at,
+      ...DEV_TIMELINE.map((entry) => entry.createdAt)
+    ),
+    now: new Date("2026-09-21T08:00:00+03:00"),
+  });
+  const savedCards = contactPersonFileKpiCards({
+    interactionCount: DEV_SAVED_HISTORY.length,
+    visitsDoneCount: DEV_SAVED_HISTORY.filter(
+      (entry) => String(entry.jobStatus || "").toLowerCase() === "done"
+    ).length,
+    firstSeenAt: pickFirstSeenAt(
+      DEV_ROWS[0].created_at,
+      ...DEV_SAVED_HISTORY.map((entry) => entry.createdAt)
+    ),
+    now: new Date("2026-09-21T08:00:00+03:00"),
+  });
 
   return (
     <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
@@ -205,6 +257,7 @@ export default function DevContactsPage() {
                 name={null}
                 lastContactAt="2026-09-21T06:40:00.000Z"
               />
+              <ContactKpiStrip cards={unsavedCards} />
               <section className="rounded-2xl border border-line bg-surface p-5">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                   Last reason
@@ -219,7 +272,7 @@ export default function DevContactsPage() {
                 />
               </section>
               <section>
-                <h2 className="font-display text-2xl tracking-tight text-ink">Timeline</h2>
+                <h2 className="font-display text-2xl tracking-tight text-ink">History</h2>
                 <ContactTimeline entries={DEV_TIMELINE} />
               </section>
             </section>
@@ -232,6 +285,7 @@ export default function DevContactsPage() {
                 name="Amina"
                 lastContactAt="2026-09-21T07:12:00.000Z"
               />
+              <ContactKpiStrip cards={savedCards} />
               <section className="rounded-2xl border border-line bg-surface p-5">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-ink-soft">
                   Last reason
@@ -244,6 +298,10 @@ export default function DevContactsPage() {
                   mood="Urgent"
                   next="Call them back"
                 />
+              </section>
+              <section>
+                <h2 className="font-display text-2xl tracking-tight text-ink">History</h2>
+                <ContactTimeline entries={DEV_SAVED_HISTORY} />
               </section>
             </section>
           </div>

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatCallWhenRelative, sanitizeSearchQuery } from "@/lib/callsTriage";
-import { parseSummary } from "@/lib/supabase";
+import { formatCallWhenRelative, sanitizeSearchQuery, toLead } from "@/lib/callsTriage";
+import { parseCallResolution, parseLeadStatus, parseSummary } from "@/lib/supabase";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
   displayContactLastReason,
@@ -8,6 +8,14 @@ import {
   pickCallOwnerReason,
   pickCallOwnerWant,
 } from "@/lib/callSummarySentence";
+import {
+  contactHistoryEntries,
+  type ContactCallMeta,
+  type ContactTimelineEntry,
+} from "@/lib/contactPersonFile";
+import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
+
+export type { ContactTimelineEntry } from "@/lib/contactPersonFile";
 
 export type ContactRow = {
   id: string;
@@ -24,24 +32,6 @@ export type ContactRow = {
 export type ContactListRow = ContactRow & {
   lastContactAt: string | null;
   lastReasonDisplay: string | null;
-};
-
-export type ContactTimelineEntry = {
-  id: string;
-  kind: "call" | "request" | "appointment";
-  createdAt: string;
-  headline: string;
-  detail: string | null;
-  callId: string | null;
-  status: string | null;
-  ownerReason?: string | null;
-  ownerWant?: string | null;
-  ownerCard?: {
-    want: string | null;
-    done: string | null;
-    mood: string | null;
-    next: string | null;
-  } | null;
 };
 
 const CONTACT_SELECT =
@@ -489,10 +479,84 @@ export async function loadContactById(
   return { contact: (data as ContactRow) || null, error: null };
 }
 
+function uniqueById<T extends { id: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
+}
+
+function asHold(row: {
+  id: string;
+  created_at: string;
+  request_type: string;
+  status: string;
+  item?: string | null;
+  quantity?: string | null;
+  when_text?: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  notes?: string | null;
+  caller_name?: string | null;
+  caller_phone?: string | null;
+  call_id?: string | null;
+}): InboxHold {
+  return {
+    id: row.id,
+    created_at: row.created_at,
+    request_type: row.request_type,
+    status: row.status,
+    item: row.item || null,
+    quantity: row.quantity || null,
+    when_text: row.when_text || null,
+    window_start: row.window_start || null,
+    window_end: row.window_end || null,
+    notes: row.notes || null,
+    caller_name: row.caller_name || null,
+    caller_phone: row.caller_phone || null,
+    call_id: row.call_id || null,
+  };
+}
+
+function asJob(row: {
+  id: string;
+  created_at: string;
+  service_name: string;
+  status: string;
+  when_text?: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  address_landmark?: string | null;
+  notes?: string | null;
+  caller_name?: string | null;
+  caller_phone?: string | null;
+  call_id?: string | null;
+}): InboxJob {
+  return {
+    id: row.id,
+    created_at: row.created_at,
+    service_name: row.service_name,
+    status: row.status,
+    when_text: row.when_text || null,
+    window_start: row.window_start || null,
+    window_end: row.window_end || null,
+    address_landmark: row.address_landmark || null,
+    notes: row.notes || null,
+    caller_name: row.caller_name || null,
+    caller_phone: row.caller_phone || null,
+    call_id: row.call_id || null,
+  };
+}
+
 export async function loadContactTimeline(
   client: SupabaseClient,
   tenantId: string,
-  contact: ContactRow
+  contact: ContactRow,
+  vertical?: string | null
 ): Promise<ContactTimelineEntry[]> {
   const phone = contact.phone;
   const phoneKeys = phone ? storedPhoneCandidates(phone) : [];
@@ -501,7 +565,7 @@ export async function loadContactTimeline(
       ? client
           .from("calls")
           .select(
-            "id, created_at, caller_number, status, summary, primary_intent, resolution"
+            "id, created_at, caller_number, status, summary, primary_intent, resolution, lead_status"
           )
           .eq("tenant_id", tenantId)
           .in("caller_number", phoneKeys)
@@ -510,7 +574,7 @@ export async function loadContactTimeline(
     client
       .from("service_requests")
       .select(
-        "id, created_at, request_type, status, item, notes, call_id, contact_id, caller_phone"
+        "id, created_at, request_type, status, item, quantity, when_text, window_start, window_end, notes, caller_name, caller_phone, call_id, contact_id"
       )
       .eq("tenant_id", tenantId)
       .eq("contact_id", contact.id)
@@ -519,7 +583,7 @@ export async function loadContactTimeline(
       ? client
           .from("service_requests")
           .select(
-            "id, created_at, request_type, status, item, notes, call_id, contact_id, caller_phone"
+            "id, created_at, request_type, status, item, quantity, when_text, window_start, window_end, notes, caller_name, caller_phone, call_id, contact_id"
           )
           .eq("tenant_id", tenantId)
           .in("caller_phone", phoneKeys)
@@ -528,7 +592,7 @@ export async function loadContactTimeline(
     client
       .from("appointments")
       .select(
-        "id, created_at, service_name, status, when_text, notes, call_id, contact_id, caller_phone"
+        "id, created_at, service_name, status, when_text, window_start, window_end, address_landmark, notes, caller_name, caller_phone, call_id, contact_id"
       )
       .eq("tenant_id", tenantId)
       .eq("contact_id", contact.id)
@@ -537,7 +601,7 @@ export async function loadContactTimeline(
       ? client
           .from("appointments")
           .select(
-            "id, created_at, service_name, status, when_text, notes, call_id, contact_id, caller_phone"
+            "id, created_at, service_name, status, when_text, window_start, window_end, address_landmark, notes, caller_name, caller_phone, call_id, contact_id"
           )
           .eq("tenant_id", tenantId)
           .in("caller_phone", phoneKeys)
@@ -545,68 +609,42 @@ export async function loadContactTimeline(
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const entries: ContactTimelineEntry[] = [];
-  const seenReq = new Set<string>();
-  const seenAppt = new Set<string>();
-
+  const leads = (callsRes.data || []).map((row) =>
+    toLead({
+      id: row.id,
+      created_at: row.created_at,
+      tenant_id: tenantId,
+      caller_number: row.caller_number,
+      sautikit_call_sid: null,
+      status: row.status,
+      duration_seconds: null,
+      recording_url: null,
+      summary: row.summary,
+      sentiment: null,
+      lead_status: parseLeadStatus(row.lead_status),
+      resolution: parseCallResolution(row.resolution),
+      primary_intent: row.primary_intent,
+    })
+  );
+  const callMetaById: Record<string, ContactCallMeta> = {};
   for (const row of callsRes.data || []) {
-    const meta = parseSummary(
-      typeof row.summary === "string" ? row.summary : null
-    );
-    const ownerWant = pickCallOwnerWant(meta);
-    const ownerReason = pickCallOwnerReason(meta);
-    entries.push({
-      id: `call:${row.id}`,
-      kind: "call",
-      createdAt: row.created_at,
-      headline:
-        displayContactLastReason({
-          name: contact.name,
-          phone: contact.phone,
-          lastReason: null,
-          latestCallReason: ownerReason || ownerWant,
-        }) ||
-        ownerReason ||
-        ownerWant ||
-        row.primary_intent ||
-        "Call",
-      detail: row.status || null,
-      callId: row.id,
-      status: row.status || null,
-      ownerReason,
-      ownerWant,
+    const meta = parseSummary(typeof row.summary === "string" ? row.summary : null);
+    callMetaById[row.id] = {
+      ownerWant: pickCallOwnerWant(meta),
+      ownerReason: pickCallOwnerReason(meta),
       ownerCard: pickCallOwnerCard(meta),
-    });
+    };
   }
 
-  for (const row of [...(reqById.data || []), ...(reqByPhone.data || [])]) {
-    if (seenReq.has(row.id)) continue;
-    seenReq.add(row.id);
-    entries.push({
-      id: `request:${row.id}`,
-      kind: "request",
-      createdAt: row.created_at,
-      headline: row.item || row.request_type || "Request",
-      detail: row.status || null,
-      callId: row.call_id || null,
-      status: row.status || null,
-    });
-  }
-
-  for (const row of [...(apptById.data || []), ...(apptByPhone.data || [])]) {
-    if (seenAppt.has(row.id)) continue;
-    seenAppt.add(row.id);
-    entries.push({
-      id: `appointment:${row.id}`,
-      kind: "appointment",
-      createdAt: row.created_at,
-      headline: row.service_name || "Visit",
-      detail: row.when_text || row.status || null,
-      callId: row.call_id || null,
-      status: row.status || null,
-    });
-  }
-
-  entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return entries;
+  return contactHistoryEntries({
+    leads,
+    holds: uniqueById(
+      [...(reqById.data || []), ...(reqByPhone.data || [])].map(asHold)
+    ),
+    jobs: uniqueById(
+      [...(apptById.data || []), ...(apptByPhone.data || [])].map(asJob)
+    ),
+    callMetaById,
+    vertical,
+  });
 }
