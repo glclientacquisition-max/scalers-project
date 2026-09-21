@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -14,9 +13,9 @@ import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { InboxSmsDock } from "@/components/InboxSmsDock";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
+import { ContactStrip } from "@/components/ContactStrip";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
-import { RowIdentity } from "@/components/ui/deskRow";
 import {
   deskHitClass,
   deskShiftClass,
@@ -274,7 +273,8 @@ export function InboxTicketView({
   callId,
   backHref,
   contactHref,
-  title,
+  callerName,
+  lastContactAt,
   stamp,
   purpose,
   callerPhone,
@@ -302,7 +302,8 @@ export function InboxTicketView({
   callId: string;
   backHref: string;
   contactHref: string | null;
-  title: string;
+  callerName: string | null;
+  lastContactAt: string | null;
   stamp: string;
   purpose: "live" | "job" | "hold" | "human" | "missed" | "answered";
   callerPhone: string | null;
@@ -416,16 +417,6 @@ export function InboxTicketView({
       window.removeEventListener("pointercancel", up);
     };
   }, [dragging, applySummaryFromClientX]);
-  const identity = (
-    <>
-      <RowIdentity name={title} />
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold text-ink">{title}</span>
-        <InboxPurposeChip purpose={purpose} label={stamp} />
-      </span>
-    </>
-  );
-
   function scroller() {
     if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
       return threadRef.current;
@@ -477,19 +468,15 @@ export function InboxTicketView({
       data-desk-bleed=""
       className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h))] min-h-0 flex-col pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:-mx-6 sm:-mt-10 md:mx-0 md:mb-0 md:mt-0 md:h-full md:pb-0"
     >
-      <header className="shrink-0 border-b border-line bg-surface px-2 py-1 sm:px-4">
+      <header className="shrink-0 border-b border-line bg-surface px-2 py-2 sm:px-4">
         <div className="flex items-center gap-1">
           <DeskBack href={backHref}>Inbox</DeskBack>
-          {contactHref ? (
-            <Link
-              href={contactHref}
-              className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
-            >
-              {identity}
-            </Link>
-          ) : (
-            <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3">{identity}</div>
-          )}
+          <ContactStrip
+            name={callerName}
+            phone={callerPhone}
+            lastContactAt={lastContactAt}
+            profileHref={contactHref}
+          />
           <InboxTicketMore
             callId={callId}
             backHref={backHref}
@@ -525,6 +512,7 @@ export function InboxTicketView({
             data-ticket-summary=""
             className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
           >
+            <InboxPurposeChip purpose={purpose} label={stamp} />
             <TicketSummaryFacts want={want} mood={mood} done={done} />
             {job ? (
               <div className="rounded-2xl bg-surface-muted/60 px-4 py-3">
