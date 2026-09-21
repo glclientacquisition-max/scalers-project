@@ -3,12 +3,10 @@ import { notFound } from "next/navigation";
 import { ContactActionDock } from "@/components/ContactActionDock";
 import { ContactNameForm } from "@/components/ContactNameForm";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
-import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { btnGhost, deskPreviewCellClass } from "@/components/ui/deskChrome";
+import { btnGhost } from "@/components/ui/deskChrome";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { formatCallWhen } from "@/lib/callsTriage";
 import {
   callFromContactHref,
   inboxFromContactHref,
@@ -23,13 +21,7 @@ import {
 import { contactStripTitle } from "@/lib/contactStrip";
 import { displayContactLastReason } from "@/lib/callSummarySentence";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
-import { ContactTimelineWhat } from "@/components/ContactTimelineWhat";
-
-function kindLabel(kind: "call" | "request" | "appointment"): string {
-  if (kind === "request") return "Request";
-  if (kind === "appointment") return "Visit";
-  return "Call";
-}
+import { ContactTimeline } from "@/components/ContactTimeline";
 
 export default async function ContactDetailPage({
   params,
@@ -80,7 +72,7 @@ export default async function ContactDetailPage({
   });
   const threadsHref = inboxThreadsFromContactHref(contact.phone);
   return (
-    <div className="max-w-6xl">
+    <div className="max-w-6xl min-w-0 overflow-x-clip">
       <DeskBack href={backHref}>{backLabel}</DeskBack>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
@@ -135,61 +127,10 @@ export default async function ContactDetailPage({
           </section>
         </aside>
 
-        <div className="min-h-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
+        <div className="min-h-0 min-w-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
           <section>
             <h2 className="font-display text-2xl tracking-tight text-ink">Timeline</h2>
-            {timeline.length === 0 ? (
-              <p className="mt-4 text-sm text-ink-soft">No calls or jobs yet.</p>
-            ) : (
-              <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-surface">
-                <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                      >
-                        When
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                      >
-                        Type
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
-                      >
-                        What
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {timeline.map((entry) => (
-                      <tr
-                        key={entry.id}
-                        className={[
-                          "relative border-t border-line/70",
-                          entry.callId ? "cursor-pointer hover:bg-accent/[0.04]" : "",
-                        ].join(" ")}
-                      >
-                        <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 text-ink-soft`}>
-                          {entry.callId ? (
-                            <DeskRowHit href={`/calls/${entry.callId}`} label="Conversation" />
-                          ) : null}
-                          {formatCallWhen(entry.createdAt)}
-                        </td>
-                        <td className={`${deskRowMutedClass} px-5 py-4 text-ink`}>{kindLabel(entry.kind)}</td>
-                        <td className={`${deskPreviewCellClass} px-5 py-4`}>
-                          <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <ContactTimeline entries={timeline} />
           </section>
         </div>
       </div>

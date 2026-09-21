@@ -11,8 +11,9 @@ import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { btnGhost, deskFieldClass, deskListTitleClass } from "@/components/ui/deskChrome";
+import { ContactTimeline } from "@/components/ContactTimeline";
 import { inboxThreadsFromContactHref } from "@/lib/inboxHref";
-import { contactLastCallFact, type ContactListRow } from "@/lib/contactsLoad";
+import { contactLastCallFact, type ContactListRow, type ContactTimelineEntry } from "@/lib/contactsLoad";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,28 @@ function ProfileLead({
     </div>
   );
 }
+
+const DEV_TIMELINE: ContactTimelineEntry[] = [
+  {
+    id: "call:dev-1",
+    kind: "call",
+    createdAt: "2026-09-21T06:40:00.000Z",
+    headline:
+      "Asked whether the Saturday morning slot is still free after the first visit ran long",
+    detail: "Called back",
+    callId: "call-dev-1",
+    status: "completed",
+  },
+  {
+    id: "request:dev-1",
+    kind: "request",
+    createdAt: "2026-09-20T15:10:00.000Z",
+    headline: "Hold the blue dress",
+    detail: "open",
+    callId: null,
+    status: "open",
+  },
+];
 
 const DEV_ROWS: ContactListRow[] = [
   {
@@ -194,6 +217,10 @@ export default function DevContactsPage() {
                   mood="Urgent"
                   next="Call them back"
                 />
+              </section>
+              <section>
+                <h2 className="font-display text-2xl tracking-tight text-ink">Timeline</h2>
+                <ContactTimeline entries={DEV_TIMELINE} />
               </section>
             </section>
             <section className="max-w-md space-y-5">

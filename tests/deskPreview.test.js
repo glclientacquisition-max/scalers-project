@@ -72,8 +72,12 @@ describe("desk preview truncate", () => {
 
   it("clamps contact timeline What to one line and expands on tap", () => {
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
+    const timeline = read("dashboard/src/components/ContactTimeline.tsx");
     const what = read("dashboard/src/components/ContactTimelineWhat.tsx");
-    assert.match(contact, /ContactTimelineWhat/);
+    assert.match(contact, /<ContactTimeline/);
+    assert.match(timeline, /ContactTimelineWhat/);
+    assert.doesNotMatch(timeline, /min-w-\[560px\]/);
+    assert.match(timeline, /md:hidden/);
     assert.match(what, /deskPreviewClass/);
     assert.match(what, /deskRowActionClass/);
     assert.match(what, /aria-expanded/);
