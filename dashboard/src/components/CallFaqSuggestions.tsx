@@ -141,7 +141,7 @@ export function CallFaqSuggestions({
       )}
 
       {!items ? (
-        <form action={suggestAction} className={thread ? "flex flex-col items-center" : "mt-4"}>
+        <form action={suggestAction} className={thread ? "" : "mt-4"}>
           <input type="hidden" name="tenant_id" value={tenantId} />
           <input type="hidden" name="call_id" value={callId} />
           <button
@@ -152,7 +152,7 @@ export function CallFaqSuggestions({
             }
             className={
               thread
-                ? "inline-flex min-h-11 items-center rounded-full bg-surface-muted/80 px-4 text-xs font-medium text-ink-soft focus:outline-none focus:ring-2 focus:ring-[#0096FF] disabled:opacity-50"
+                ? "min-h-11 text-xs font-medium text-ink-soft focus:outline-none focus:ring-2 focus:ring-[#0096FF] disabled:opacity-50"
                 : btnPrimary
             }
           >

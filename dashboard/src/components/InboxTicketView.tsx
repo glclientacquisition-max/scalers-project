@@ -528,12 +528,20 @@ export function InboxTicketView({
               <p>Duration: {durationLabel}</p>
               {assistLabel ? <p>Assist: {assistLabel}</p> : null}
               {assistNote ? <p className="[overflow-wrap:anywhere]">{assistNote}</p> : null}
-              {escalatedLine ? <p className="[overflow-wrap:anywhere]">{escalatedLine}</p> : null}
+              {escalatedLine ? (
+                <p data-escalation-target="" className="[overflow-wrap:anywhere]">
+                  {escalatedLine}
+                </p>
+              ) : null}
               {escalationDelivery ? (
-                <p className="[overflow-wrap:anywhere]">{escalationDelivery}</p>
+                <p data-escalation-delivery="" className="[overflow-wrap:anywhere]">
+                  {escalationDelivery}
+                </p>
               ) : null}
               {liveConnectLine ? (
-                <p className="[overflow-wrap:anywhere]">{liveConnectLine}</p>
+                <p data-live-connect="" className="[overflow-wrap:anywhere]">
+                  {liveConnectLine}
+                </p>
               ) : null}
               <CallRecording recordingUrl={recordingUrl} />
             </div>
