@@ -9,6 +9,7 @@ const {
 } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
+const { mergeWorkResults } = require('./callResolution');
 const {
   applyLiveCallerFile,
   formatReturningFileForCallState,
@@ -279,6 +280,7 @@ function createBrainState(profile = {}) {
     actions: {
       completedFingerprints: [],
       lastResults: [],
+      savedWork: [],
       openHolds: [],
     },
   };
@@ -508,6 +510,11 @@ function recordActionResults(state, results = []) {
       : {}),
     ...(result.soft ? { soft: true } : {}),
   }));
+  if (!Array.isArray(next.actions.savedWork)) next.actions.savedWork = [];
+  next.actions.savedWork = mergeWorkResults(
+    next.actions.savedWork,
+    next.actions.lastResults
+  );
   if (!Array.isArray(next.actions.openHolds)) next.actions.openHolds = [];
   for (const result of safeResults) {
     if (

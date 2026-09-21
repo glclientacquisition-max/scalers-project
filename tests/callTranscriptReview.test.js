@@ -335,6 +335,23 @@ describe('toolFlagsFromBrain', () => {
     assert.equal(flags.visitSaved, false);
     assert.equal(flags.handoff, true);
   });
+
+  it('keeps visitRequested after a later non-visit tool turn', () => {
+    let state = recordActionResults(createBrainState(), [
+      {
+        action: 'create_appointment',
+        status: 'succeeded',
+        appointmentStatus: 'requested',
+        fingerprint: 'v-keep',
+      },
+    ]);
+    state = recordActionResults(state, [
+      { action: 'save_caller_info', status: 'succeeded', name: 'Amina' },
+    ]);
+    const flags = toolFlagsFromBrain(state);
+    assert.equal(flags.visitSaved, true);
+    assert.equal(flags.visitRequested, true);
+  });
 });
 
 describe('runPostCallTranscriptReview', () => {

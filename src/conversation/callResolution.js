@@ -77,6 +77,48 @@ function lastOkResult(results, actions) {
   return rows.length ? rows[rows.length - 1] : null;
 }
 
+const SPINE_ACTIONS = new Set([
+  'create_appointment',
+  'update_appointment',
+  'create_service_request',
+  'escalate',
+]);
+
+function isSpineResult(row) {
+  return (
+    row &&
+    SPINE_ACTIONS.has(row.action) &&
+    (row.status === 'succeeded' || row.status === 'updated')
+  );
+}
+
+/** Keep last successful visit/hold/escalate across later tool turns. */
+function mergeWorkResults(saved, latest) {
+  const byAction = new Map();
+  for (const row of Array.isArray(saved) ? saved : []) {
+    if (isSpineResult(row)) byAction.set(row.action, row);
+  }
+  for (const row of Array.isArray(latest) ? latest : []) {
+    if (isSpineResult(row)) byAction.set(row.action, row);
+  }
+  const extras = (Array.isArray(latest) ? latest : []).filter(
+    (row) => !isSpineResult(row)
+  );
+  return [...byAction.values(), ...extras];
+}
+
+function hangupResults(state, toolResults) {
+  const latest = Array.isArray(toolResults)
+    ? toolResults
+    : Array.isArray(state?.actions?.lastResults)
+      ? state.actions.lastResults
+      : [];
+  const saved = Array.isArray(state?.actions?.savedWork)
+    ? state.actions.savedWork
+    : [];
+  return mergeWorkResults(saved, latest);
+}
+
 function visitHonestyNote(results) {
   const row = lastOkResult(results, [
     'create_appointment',
@@ -182,11 +224,7 @@ function highWaterPrimaryIntent({ liveIntent, results = [] } = {}) {
  */
 function deriveCallResolution(opts = {}) {
   const state = opts.brainState || {};
-  const results = Array.isArray(opts.toolResults)
-    ? opts.toolResults
-    : Array.isArray(state.actions?.lastResults)
-      ? state.actions.lastResults
-      : [];
+  const results = hangupResults(state, opts.toolResults);
   const turnCount = Number(
     opts.turnCount != null
       ? opts.turnCount
@@ -292,4 +330,6 @@ module.exports = {
   resultStatus,
   visitHonestyNote,
   holdHonestyNote,
+  mergeWorkResults,
+  hangupResults,
 };

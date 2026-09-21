@@ -908,14 +908,16 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
       );
     }
     const profile = callTenantProfiles.get(callSid) || {};
-    schedulePostCallTranscriptReview({
-      callSid,
-      vertical: profile.vertical || '',
-      derived,
-      summary,
-      toolFlags: toolFlagsFromBrain(brainState),
-      turns: Array.isArray(opts.turns) ? opts.turns : null,
-    });
+    if (opts.review !== false) {
+      schedulePostCallTranscriptReview({
+        callSid,
+        vertical: profile.vertical || '',
+        derived,
+        summary,
+        toolFlags: toolFlagsFromBrain(brainState),
+        turns: Array.isArray(opts.turns) ? opts.turns : null,
+      });
+    }
     if (saved) {
       console.log(
         `[${source}] call resolution ${callSid} → ${derived.resolution}` +
@@ -4118,6 +4120,14 @@ async function applyGeminiTools(callSid, parsed) {
   );
   if (savedInfo?.name && savedInfo?.reason && !escalationRequested && !visitSaved) {
     maybeSendWhatsAppNotification(callSid, { midCall: true });
+  }
+  if (visitSaved) {
+    persistCallResolution(callSid, 'tool', { review: false }).catch((err) => {
+      console.warn(
+        `[${callSid}] tool visit persist failed:`,
+        err?.message || err
+      );
+    });
   }
 
   for (const result of execution.results) {
