@@ -86,7 +86,7 @@ describe("contacts segment workflow helpers", () => {
   });
 });
 
-describe("contacts segment FilterTabs chrome", () => {
+describe("contacts segment filter chrome", () => {
   const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const tabs = read("dashboard/src/components/ui/FilterTabs.tsx");
   const chrome = read("dashboard/src/components/ui/deskChrome.ts");
@@ -100,7 +100,7 @@ describe("contacts segment FilterTabs chrome", () => {
   const form = read("dashboard/src/components/ContactNameForm.tsx");
   const dev = read("dashboard/src/app/dev/contacts/page.tsx");
 
-  it("lands the ACCEPT spec and uses shared FilterTabs, not a slider skin", () => {
+  it("lands the ACCEPT spec and uses Inbox pill chips for segments, not a slider skin", () => {
     assert.match(accept, /All · Saved · Unsaved/);
     assert.match(accept, /Filter contacts/);
     assert.match(accept, /segment preserved/);
@@ -115,11 +115,11 @@ describe("contacts segment FilterTabs chrome", () => {
     assert.match(inboxTabs, /<FilterTabs/);
     assert.match(inboxTabs, /label="Visit sort"/);
     assert.match(inboxTabs, /label="Work date"/);
-    assert.match(page, /<FilterTabs/);
+    assert.match(page, /<InboxFilterPills/);
     assert.match(page, /label="Filter contacts"/);
+    assert.match(page, /<FilterTabs/);
     assert.doesNotMatch(page, /type="range"/);
     assert.doesNotMatch(page, /slider/i);
-    assert.doesNotMatch(page, /InboxFilterPills/);
     assert.doesNotMatch(page, /Needs you|Visits|Holds/);
     assert.match(note, /Filter contacts/);
     assert.match(note, /FilterTabs/);
@@ -127,7 +127,7 @@ describe("contacts segment FilterTabs chrome", () => {
     assert.match(note, /InboxFilterPills/);
   });
 
-  it("segments All, Saved, and Unsaved as FilterTabs items", () => {
+  it("segments All, Saved, and Unsaved as pill-chip items", () => {
     assert.match(page, /label: "All"/);
     assert.match(page, /label: "Saved"/);
     assert.match(page, /label: "Unsaved"/);

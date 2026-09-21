@@ -100,16 +100,18 @@ export default async function ContactDetailPage({
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
           <div className="space-y-4">
-            <div>
-              <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-                {title}
-              </h1>
-              <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
-              {lastCallFact ? (
-                <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
-              ) : null}
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+                  {title}
+                </h1>
+                <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
+                {lastCallFact ? (
+                  <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+                ) : null}
+              </div>
+              {contact.phone ? <ContactActionDock number={contact.phone} /> : null}
             </div>
-            {contact.phone ? <ContactActionDock number={contact.phone} /> : null}
             {threadsHref ? (
               <Link
                 href={threadsHref}

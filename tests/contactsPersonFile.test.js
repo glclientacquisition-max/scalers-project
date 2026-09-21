@@ -193,13 +193,14 @@ describe("contacts person-file chrome", () => {
     assert.match(note, /Hide when unknown/);
   });
 
-  it("keeps Contacts list FilterTabs as All Saved Unsaved, not Inbox purpose nouns", () => {
-    assert.match(page, /<FilterTabs/);
+  it("keeps Contacts list nouns as All Saved Unsaved, not Inbox purpose nouns", () => {
+    assert.match(page, /<InboxFilterPills/);
     assert.match(page, /label="Filter contacts"/);
     assert.match(page, /label: "All"/);
     assert.match(page, /label: "Saved"/);
     assert.match(page, /label: "Unsaved"/);
-    assert.doesNotMatch(page, /InboxFilterPills/);
+    assert.match(page, /<FilterTabs/);
+    assert.match(page, /label="Sort contacts"/);
     assert.doesNotMatch(page, /Needs you/);
     assert.doesNotMatch(page, /label: "Human"/);
     assert.doesNotMatch(page, /label: "Answered"/);

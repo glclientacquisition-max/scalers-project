@@ -23,9 +23,9 @@ describe("contact profile action dock", () => {
     assert.match(dock, /variant="icon"/);
     assert.match(read("dashboard/src/components/CallLink.tsx"), /deskHitClass/);
     assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /deskHitClass/);
-    assert.match(dock, /label="Call"/);
-    assert.match(dock, /label="WhatsApp"/);
-    assert.match(dock, /flex w-16 flex-col items-center gap-1/);
+    assert.doesNotMatch(dock, /flex w-16 flex-col items-center gap-1/);
+    assert.doesNotMatch(dock, /label="Call"/);
+    assert.doesNotMatch(dock, /label="WhatsApp"/);
     assert.match(ticketDock, /flex w-16 flex-col items-center gap-1/);
     assert.match(contactsNote, /Call \+ WhatsApp/);
     assert.doesNotMatch(dock, /[\u2014\u2013]/);

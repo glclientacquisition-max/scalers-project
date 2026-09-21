@@ -137,14 +137,14 @@ describe("contacts list Phase 1 chrome", () => {
     assert.match(accept, /search \+ sort/);
   });
 
-  it("keeps Unsaved as a FilterTabs pile, not Invite Friends", () => {
+  it("keeps Unsaved as a Contacts pile, not Invite Friends", () => {
     assert.match(page, /label: "Unsaved"/);
     assert.doesNotMatch(page, /label: "Recent"/);
     assert.doesNotMatch(page, /ContactQuickPhoneRow|ContactQuickTableRow/);
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(search, /Invite Friends/);
     assert.match(note, /All · Saved · Unsaved only/);
-    assert.match(accept, /FilterTabs items/);
+    assert.match(accept, /pill-chip items/);
   });
 
   it("keeps dense Call + WhatsApp as opened-only when a phone exists", () => {

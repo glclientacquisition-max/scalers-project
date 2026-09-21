@@ -22,8 +22,8 @@ Owner opens `/contacts/[id]`, sees History built from that contact's real ticket
    - **Interactions** = count of real assembled call/ticket rows for that contact. Hide when 0.
    - **Visits done** = jobs with status `done` (confirmed completed visits) for that contact. Hide when 0.
    - **Customer since** = earliest stored first-seen / first call / contact `created_at`. Show relative months from that stamp (`N mo`). Hide when no stamp.
-3. **Shared FilterTabs chrome** on the Contacts list: keep **All · Saved · Unsaved** from #386. Same `FilterTabs` component as Inbox List/Work. Do **not** put Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) on Contacts.
-4. **Call / WhatsApp** actions: keep as already shipped (opened-only honesty: `tel:` / `wa.me`).
+3. **Contacts list nouns** stay **All · Saved · Unsaved** from #386. Chrome for those piles is the Inbox purpose pill-chip (`InboxFilterPills`) per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** put Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) on Contacts.
+4. **Call / WhatsApp** actions: opened-only honesty (`tel:` / `wa.me`). Top icons only on the person file. No labeled Call / WhatsApp pills.
 5. Phone-first density at ~390 plus desktop. Match existing desk chrome / FRONTEND_CONSTITUTION / design system. No glass, no KPI wallpaper, no fake Online.
 
 ## KEEP
@@ -32,8 +32,8 @@ Owner opens `/contacts/[id]`, sees History built from that contact's real ticket
 - Notes editable
 - Name this caller / Name + Save
 - Inbox threads link-back
-- FilterTabs All · Saved · Unsaved + sort Last call · Name
-- Call / WA opened-only on list + profile dock
+- All · Saved · Unsaved nouns + sort Last call · Name
+- Call / WA opened-only on list + person-file top icons
 
 ## DEFER (do not ship)
 
