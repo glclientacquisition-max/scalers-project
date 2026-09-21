@@ -6,6 +6,7 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
+import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
@@ -104,7 +105,7 @@ export default async function ContactsPage({
             </div>
           </div>
         </DeskIndexLead>
-        <FilterTabs
+        <InboxFilterPills
           label="Filter contacts"
           active={saved}
           items={[

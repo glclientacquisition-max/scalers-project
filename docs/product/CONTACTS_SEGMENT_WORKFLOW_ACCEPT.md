@@ -6,9 +6,8 @@
 
 ## Product lock (binding, 2026-09-21)
 
-- Contacts segments use the shared **`FilterTabs`** chrome family as Inbox **List/Work** and **Today/Week**: underline, `min-h-11`, scroll, count chip style (`filterTabClass`).
-- Do **not** copy Inbox purpose pills (`InboxFilterPills`: Needs you / Visits / Holds / …). Those stay Inbox-only.
-- Contacts segments: **All · Saved · Unsaved** only. No Recent tab. Sort if present stays the same FilterTabs family (Last call · Name).
+- Contacts segment **nouns** stay **All · Saved · Unsaved**. Sort stays underline `FilterTabs` (Last call · Name), same family as Inbox List/Work.
+- Segment **chrome** is the Inbox purpose pill-chip (`InboxFilterPills`) per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** copy Inbox purpose nouns (Needs you / Visits / Holds / …). Those stay Inbox-only.
 - Critic: PASS if chrome-only. Hard bans: no Online, last seen, or presence; Call/WA opened never delivered; no `lead_status` invent.
 
 ---
@@ -18,10 +17,10 @@
 | Surface | Behavior |
 | --- | --- |
 | **Inbox** | Purpose piles are `InboxFilterPills` (Needs you / All / Visits / Holds / …). **List/Work** and **Today/Week** are underline `FilterTabs`. |
-| **Contacts** | Same `FilterTabs` chrome as Inbox List/Work: **All · Saved · Unsaved** (`saved=` query). `aria-label` Filter contacts. List → `/contacts/[id]` profile. Call/WA on rows = **opened** only. |
-| **Gap founder feels** | Contacts segments must feel identical to Inbox List/Work tabs (one desk pattern), not purpose pills and not a one-off slider. Click-through must be a clear ops path, not a dead end. |
+| **Contacts** | Pill chips (`InboxFilterPills`) with **All · Saved · Unsaved** (`saved=` query). `aria-label` Filter contacts. Sort is underline `FilterTabs`. List → `/contacts/[id]` profile. Call/WA on rows = **opened** only. |
+| **Gap founder feels** | Contacts segments must feel identical to Inbox purpose chips (one desk pill language), not a second underline skin and not Inbox purpose nouns. Click-through must be a clear ops path, not a dead end. |
 
-Phase 1 ACCEPT already required search+sort and Recent/Unsaved quick rows. This brief locks **FilterTabs pattern parity with Inbox List/Work** and documents click-through. Recent is sort (Last call), not a segment.
+Phase 1 ACCEPT already required search+sort and Recent/Unsaved quick rows. This brief locks **All · Saved · Unsaved nouns** plus click-through. Segment chrome is the Inbox purpose pill (`CONTACTS_CHROME_PILL_ACCEPT.md`). Recent is sort (Last call), not a segment.
 
 ## Problem
 
@@ -29,13 +28,13 @@ Contacts filtering and Inbox filtering don’t read as one desk language. Openin
 
 ## Operator outcome
 
-Owner switches Contacts piles the same way they switch Inbox List/Work tabs. Tapping a contact opens a clear phone-first profile with honest actions. Same composition family at ~390 / tablet / desktop.
+Owner switches Contacts piles with the same filled-pill chrome as Inbox purpose. Tapping a contact opens a clear phone-first profile with honest actions. Same composition family at ~390 / tablet / desktop.
 
 ## Acceptance
 
 ### A. One segment pattern (desk-wide)
 
-1. Contacts filters use the **same `FilterTabs` chrome** as Inbox List/Work and Today/Week — underline/active, hit size, scroll, count chip style — not a bespoke slider skin and not `InboxFilterPills`.  
+1. Contacts filters use the **same pill-chip DESIGN** as the Inbox purpose row (`InboxFilterPills`). Nouns stay **All · Saved · Unsaved**. Not a slider skin. Not Inbox purpose nouns.  
 2. Contacts segment set: **All · Saved · Unsaved** only.  
 3. Copy: aria/label plain (“Filter contacts”), no em dashes, no “last seen” / Online.  
 4. Sort (Last call / Name) if present: same FilterTabs family; must not invent presence.
@@ -68,7 +67,7 @@ One composition family: ~390 / tablet / desktop. ≥44px hits. Release smoke all
 - Merge duplicates, Meta presence, CSV import redesign  
 - New lead_status / notify channels  
 - Rebuilding Inbox purpose model  
-- Copying Inbox purpose pills onto Contacts  
+- Copying Inbox purpose nouns onto Contacts  
 
 ## Seat
 
@@ -81,9 +80,9 @@ One composition family: ~390 / tablet / desktop. ≥44px hits. Release smoke all
 
 ## Kill / rollback
 
-If Contacts gets a second segment skin, Inbox purpose pills, Online/last-seen, or WA claimed delivered → revert. Prefer revert over dual patterns.
+If Contacts gets a second segment skin, Inbox purpose nouns, Online/last-seen, or WA claimed delivered → revert. Prefer revert over dual patterns.
 
 ## Verify (TEST)
 
-Contacts FilterTabs match Inbox List/Work chrome → switch All/Saved/Unsaved → open contact → Call/WA opened only → Name this caller works → back keeps segment → check three widths. No Needs you / Visits / Holds pills on Contacts.
+Contacts All/Saved/Unsaved use Inbox pill-chip chrome → switch piles → open contact → Call/WA opened only → Name this caller works → back keeps segment → check three widths. No Needs you / Visits / Holds nouns on Contacts.
 

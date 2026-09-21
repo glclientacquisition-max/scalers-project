@@ -10,6 +10,7 @@ import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
+import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { btnGhost, deskFieldClass, deskListTitleClass } from "@/components/ui/deskChrome";
 import { ContactTimeline } from "@/components/ContactTimeline";
@@ -39,16 +40,18 @@ function ProfileLead({
   const threadsHref = inboxThreadsFromContactHref(phone);
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-          {title}
-        </h1>
-        <p className="mt-2 font-mono text-sm text-ink">{phone}</p>
-        {lastCallFact ? (
-          <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
-        ) : null}
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+            {title}
+          </h1>
+          <p className="mt-2 font-mono text-sm text-ink">{phone}</p>
+          {lastCallFact ? (
+            <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+          ) : null}
+        </div>
+        <ContactActionDock number={phone} />
       </div>
-      <ContactActionDock number={phone} />
       {threadsHref ? (
         <Link href={threadsHref} data-contact-inbox-threads="" className={`${btnGhost} w-full sm:w-auto`}>
           Inbox threads
@@ -190,13 +193,13 @@ export default function DevContactsPage() {
                   </div>
                 </div>
               </DeskIndexLead>
-              <FilterTabs
+              <InboxFilterPills
                 label="Filter contacts"
                 active="all"
                 items={[
-                  { id: "all", label: "All", href: "/dev/contacts" },
-                  { id: "saved", label: "Saved", href: "/dev/contacts" },
-                  { id: "unsaved", label: "Unsaved", href: "/dev/contacts" },
+                  { id: "all", label: "All", href: "/dev/contacts", count: DEV_ROWS.length },
+                  { id: "saved", label: "Saved", href: "/dev/contacts", count: 1 },
+                  { id: "unsaved", label: "Unsaved", href: "/dev/contacts", count: 1 },
                 ]}
               />
               <FilterTabs
