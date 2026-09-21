@@ -4,16 +4,8 @@ import { deskPreviewCellClass } from "@/components/ui/deskChrome";
 import { formatCallWhen } from "@/lib/callsTriage";
 import type { ContactTimelineEntry } from "@/lib/contactsLoad";
 
-function kindLabel(kind: ContactTimelineEntry["kind"]): string {
-  if (kind === "request") return "Request";
-  if (kind === "appointment") return "Visit";
-  return "Call";
-}
-
 function TimelineRowHit({ entry }: { entry: ContactTimelineEntry }) {
-  return entry.callId ? (
-    <DeskRowHit href={`/calls/${entry.callId}`} label="Conversation" />
-  ) : null;
+  return entry.href ? <DeskRowHit href={entry.href} label="Conversation" /> : null;
 }
 
 export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }) {
@@ -29,7 +21,7 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
             key={entry.id}
             className={[
               "relative min-w-0 border-t border-line/70 px-3 py-3 first:border-t-0",
-              entry.callId ? "cursor-pointer" : "",
+              entry.href ? "cursor-pointer" : "",
             ].join(" ")}
           >
             <TimelineRowHit entry={entry} />
@@ -37,7 +29,7 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
               <p className="truncate text-xs tabular-nums text-ink-soft">
                 {formatCallWhen(entry.createdAt)}
               </p>
-              <p className="shrink-0 text-xs text-ink-soft">{kindLabel(entry.kind)}</p>
+              <p className="shrink-0 text-xs text-ink-soft">{entry.stamp}</p>
             </div>
             <div className={`${deskRowActionClass} mt-1 min-w-0`}>
               <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
@@ -75,14 +67,14 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
                 key={entry.id}
                 className={[
                   "relative border-t border-line/70",
-                  entry.callId ? "cursor-pointer hover:bg-accent/[0.04]" : "",
+                  entry.href ? "cursor-pointer hover:bg-accent/[0.04]" : "",
                 ].join(" ")}
               >
                 <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 text-ink-soft`}>
                   <TimelineRowHit entry={entry} />
                   {formatCallWhen(entry.createdAt)}
                 </td>
-                <td className={`${deskRowMutedClass} px-5 py-4 text-ink`}>{kindLabel(entry.kind)}</td>
+                <td className={`${deskRowMutedClass} px-5 py-4 text-ink`}>{entry.stamp}</td>
                 <td className={`${deskPreviewCellClass} px-5 py-4`}>
                   <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
                 </td>

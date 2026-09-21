@@ -18,9 +18,14 @@ import {
   loadContactById,
   loadContactTimeline,
 } from "@/lib/contactsLoad";
+import {
+  contactPersonFileKpiCards,
+  pickFirstSeenAt,
+} from "@/lib/contactPersonFile";
 import { contactStripTitle } from "@/lib/contactStrip";
 import { displayContactLastReason } from "@/lib/callSummarySentence";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
+import { ContactKpiStrip } from "@/components/ContactKpiStrip";
 import { ContactTimeline } from "@/components/ContactTimeline";
 
 export default async function ContactDetailPage({
@@ -60,9 +65,16 @@ export default async function ContactDetailPage({
   }
   if (!contact) notFound();
 
-  const timeline = await loadContactTimeline(workspace.client, tenant.id, contact);
+  const timeline = await loadContactTimeline(
+    workspace.client,
+    tenant.id,
+    contact,
+    tenant.vertical
+  );
   const title = contactStripTitle(contact.name, true);
-  const latestCall = timeline.find((entry) => entry.kind === "call");
+  const latestCall = timeline.find(
+    (entry) => entry.kind === "call" || entry.ownerCard || entry.ownerReason
+  );
   const lastCallFact = contactLastCallFact(latestCall?.createdAt);
   const lastReason = displayContactLastReason({
     name: contact.name,
@@ -71,6 +83,16 @@ export default async function ContactDetailPage({
     latestCallReason: latestCall?.ownerReason || latestCall?.ownerWant || null,
   });
   const threadsHref = inboxThreadsFromContactHref(contact.phone);
+  const kpiCards = contactPersonFileKpiCards({
+    interactionCount: timeline.length,
+    visitsDoneCount: timeline.filter(
+      (entry) => String(entry.jobStatus || "").toLowerCase() === "done"
+    ).length,
+    firstSeenAt: pickFirstSeenAt(
+      contact.created_at,
+      ...timeline.map((entry) => entry.createdAt)
+    ),
+  });
   return (
     <div className="max-w-6xl min-w-0 overflow-x-clip">
       <DeskBack href={backHref}>{backLabel}</DeskBack>
@@ -98,6 +120,7 @@ export default async function ContactDetailPage({
               </Link>
             ) : null}
             <ContactNameForm contactId={contact.id} initialName={contact.name} />
+            <ContactKpiStrip cards={kpiCards} />
           </div>
 
           <section className="rounded-2xl border border-line bg-surface p-5">
@@ -129,7 +152,7 @@ export default async function ContactDetailPage({
 
         <div className="min-h-0 min-w-0 space-y-8 lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
           <section>
-            <h2 className="font-display text-2xl tracking-tight text-ink">Timeline</h2>
+            <h2 className="font-display text-2xl tracking-tight text-ink">History</h2>
             <ContactTimeline entries={timeline} />
           </section>
         </div>
