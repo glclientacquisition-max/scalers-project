@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { btnGhost } from "@/components/ui/deskChrome";
+import { plainOwnerCopy } from "@/lib/deskTicketChat";
 import type { TranscriptRow } from "@/lib/supabase";
 
 const PREVIEW_TURNS = 3;
@@ -11,11 +12,13 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
   const isCaller = speaker === "caller";
   const isSystem = speaker === "system";
 
+  const copy = plainOwnerCopy(turn.text_content);
+
   if (isSystem) {
     return (
       <div className="flex justify-center px-2">
         <p className="max-w-[85%] rounded-full bg-surface-muted/80 px-4 py-1.5 text-center text-xs text-ink-soft [overflow-wrap:anywhere]">
-          {turn.text_content}
+          {copy}
         </p>
       </div>
     );
@@ -40,7 +43,7 @@ function ChatBubble({ turn }: { turn: TranscriptRow }) {
           {isCaller ? "Caller" : "Receptionist"}
         </p>
         <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">
-          {turn.text_content}
+          {copy}
         </p>
       </div>
     </div>
