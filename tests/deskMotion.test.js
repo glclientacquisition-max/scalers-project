@@ -167,9 +167,10 @@ describe("desk motion wiring", () => {
   });
 
   it("lands Contacts rows on the same live refresh", () => {
+    const list = read("dashboard/src/components/ContactListRow.tsx");
     assert.match(contacts, /<DeskLandScope/);
-    assert.match(contacts, /<DeskLandSurface/);
-    assert.match(contacts, /scopeKey=\{`\$\{saved\}:\$\{page\}`\}/);
+    assert.match(list, /<DeskLandSurface/);
+    assert.match(contacts, /scopeKey=\{`\$\{saved\}:\$\{sort\}:\$\{q\}:\$\{page\}`\}/);
   });
 
   it("pings the Home bulletin and keeps dialogs enter-static", () => {

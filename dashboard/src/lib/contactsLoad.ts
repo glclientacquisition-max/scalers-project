@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { formatCallWhenRelative, sanitizeSearchQuery } from "@/lib/callsTriage";
 import { parseSummary } from "@/lib/supabase";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import {
@@ -61,68 +62,148 @@ export function pickLastContactAt(
   return maxIso(byPhone || null, byContactId || null) || updatedAt || null;
 }
 
-export type ContactSavedFilter = "all" | "saved" | "unsaved";
+export type ContactSavedFilter = "all" | "saved" | "unsaved" | "recent";
+export type ContactSort = "recent" | "name";
 
 export function resolveContactSavedFilter(
   raw?: string | null
 ): ContactSavedFilter {
   const value = String(raw || "all").toLowerCase();
-  if (value === "saved" || value === "unsaved") return value;
+  if (value === "saved" || value === "unsaved" || value === "recent") return value;
   return "all";
+}
+
+export function resolveContactSort(raw?: string | null): ContactSort {
+  return String(raw || "").toLowerCase() === "name" ? "name" : "recent";
 }
 
 export function contactsHref(opts: {
   saved?: ContactSavedFilter;
+  sort?: ContactSort;
+  q?: string;
   page?: number;
 }): string {
   const q = new URLSearchParams();
   if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
+  if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
+  const query = sanitizeSearchQuery(opts.q);
+  if (query) q.set("q", query);
   if (opts.page && opts.page > 1) q.set("page", String(opts.page));
   const qs = q.toString();
   return qs ? `/contacts?${qs}` : "/contacts";
 }
 
-export async function loadContactsPage(
-  client: SupabaseClient,
-  tenantId: string,
+export function isUnsavedContactName(name?: string | null): boolean {
+  return !String(name || "").trim();
+}
+
+/** List subline: Unsaved, phone, or last call. Never hangup copy or presence. */
+export function contactListSubline(row: {
+  name?: string | null;
+  phone?: string | null;
+  lastContactAt?: string | null;
+}): string {
+  if (isUnsavedContactName(row.name)) return "Unsaved";
+  const phone = String(row.phone || "").trim();
+  if (phone) return phone;
+  if (row.lastContactAt) return formatCallWhenRelative(row.lastContactAt);
+  return "No phone";
+}
+
+export function contactMatchesQuery(
+  row: {
+    name?: string | null;
+    phone?: string | null;
+    last_reason?: string | null;
+    lastReasonDisplay?: string | null;
+  },
+  q: string
+): boolean {
+  const text = sanitizeSearchQuery(q);
+  if (!text) return true;
+  const hay = [row.name, row.phone, row.lastReasonDisplay, row.last_reason]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return hay.includes(text.toLowerCase());
+}
+
+export function compareContactRows(
+  a: Pick<ContactListRow, "name" | "lastContactAt" | "updated_at">,
+  b: Pick<ContactListRow, "name" | "lastContactAt" | "updated_at">,
+  sort: ContactSort
+): number {
+  if (sort === "name") {
+    const an = String(a.name || "").trim().toLowerCase();
+    const bn = String(b.name || "").trim().toLowerCase();
+    if (!an && bn) return 1;
+    if (an && !bn) return -1;
+    const byName = an.localeCompare(bn, "en");
+    if (byName) return byName;
+  }
+  const at = a.lastContactAt || a.updated_at || "";
+  const bt = b.lastContactAt || b.updated_at || "";
+  if (at === bt) return 0;
+  return at < bt ? 1 : -1;
+}
+
+export function uniqueRecentCallerPhones(
+  rows: Array<{ caller_number?: string | null }>
+): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const row of rows) {
+    const phone = String(row.caller_number || "").trim();
+    if (!phone) continue;
+    const keys = storedPhoneCandidates(phone);
+    if (keys.some((key) => seen.has(key))) continue;
+    for (const key of keys) seen.add(key);
+    ordered.push(phone);
+  }
+  return ordered;
+}
+
+export function rankContactByRecentPhones(
+  phone: string | null | undefined,
+  recentPhones: string[]
+): number {
+  if (!phone) return Number.MAX_SAFE_INTEGER;
+  const keys = new Set(storedPhoneCandidates(phone));
+  for (let i = 0; i < recentPhones.length; i += 1) {
+    if (storedPhoneCandidates(recentPhones[i]).some((key) => keys.has(key))) {
+      return i;
+    }
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+export function paginateContactRows<T>(
+  rows: T[],
   page: number,
-  pageSize: number,
-  saved: ContactSavedFilter = "all"
-): Promise<{ rows: ContactListRow[]; total: number; error: string | null }> {
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
+  pageSize: number
+): { rows: T[]; total: number } {
+  const total = rows.length;
+  const from = Math.max(0, (page - 1) * pageSize);
+  return { rows: rows.slice(from, from + pageSize), total };
+}
 
-  let listedQuery = client
-    .from("contacts")
-    .select(CONTACT_SELECT, { count: "exact" })
-    .eq("tenant_id", tenantId)
-    .order("updated_at", { ascending: false })
-    .range(from, to);
+function contactSearchOr(q: string): string | null {
+  const text = sanitizeSearchQuery(q);
+  if (!text) return null;
+  const needle = text.replace(/,/g, " ").trim();
+  if (!needle) return null;
+  return `name.ilike.%${needle}%,phone.ilike.%${needle}%,last_reason.ilike.%${needle}%`;
+}
 
-  if (saved === "saved") {
-    listedQuery = listedQuery.not("name", "is", null).neq("name", "");
-  } else if (saved === "unsaved") {
-    listedQuery = listedQuery.or("name.is.null,name.eq.");
+function decorateContactRows(
+  contacts: ContactRow[],
+  extras: {
+    byId: Map<string, string | null>;
+    byPhone: Map<string, string | null>;
+    reasonByPhone: Map<string, string | null>;
   }
-
-  const listed = await listedQuery;
-
-  if (listed.error) {
-    return { rows: [], total: 0, error: listed.error.message };
-  }
-
-  const contacts = (listed.data || []) as ContactRow[];
-  const total = listed.count ?? contacts.length;
-  if (contacts.length === 0) {
-    return { rows: [], total, error: null };
-  }
-
-  const extras = await loadLastContactMap(
-    client,
-    tenantId,
-    contacts
-  );
-  const rows = contacts.map((row) => {
+): ContactListRow[] {
+  return contacts.map((row) => {
     const phoneKeys = row.phone ? storedPhoneCandidates(row.phone) : [];
     const latestCallReason =
       phoneKeys
@@ -147,7 +228,108 @@ export async function loadContactsPage(
       }),
     };
   });
+}
 
+export async function loadContactsPage(
+  client: SupabaseClient,
+  tenantId: string,
+  page: number,
+  pageSize: number,
+  saved: ContactSavedFilter = "all",
+  opts: { q?: string; sort?: ContactSort } = {}
+): Promise<{ rows: ContactListRow[]; total: number; error: string | null }> {
+  const q = sanitizeSearchQuery(opts.q);
+  const sort = resolveContactSort(opts.sort);
+  const searchOr = contactSearchOr(q);
+
+  if (saved === "recent") {
+    const recent = await client
+      .from("calls")
+      .select("caller_number, created_at")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (recent.error) {
+      return { rows: [], total: 0, error: recent.error.message };
+    }
+    const recentPhones = uniqueRecentCallerPhones(recent.data || []);
+    const phoneKeys = [
+      ...new Set(recentPhones.flatMap((phone) => storedPhoneCandidates(phone))),
+    ];
+    if (!phoneKeys.length) {
+      return { rows: [], total: 0, error: null };
+    }
+
+    let listedQuery = client
+      .from("contacts")
+      .select(CONTACT_SELECT)
+      .eq("tenant_id", tenantId)
+      .in("phone", phoneKeys);
+    if (searchOr) listedQuery = listedQuery.or(searchOr);
+
+    const listed = await listedQuery;
+    if (listed.error) {
+      return { rows: [], total: 0, error: listed.error.message };
+    }
+
+    const contacts = (listed.data || []) as ContactRow[];
+    if (!contacts.length) {
+      return { rows: [], total: 0, error: null };
+    }
+
+    const extras = await loadLastContactMap(client, tenantId, contacts);
+    const decorated = decorateContactRows(contacts, extras).filter((row) =>
+      contactMatchesQuery(row, q)
+    );
+    decorated.sort((a, b) => {
+      if (sort === "name") return compareContactRows(a, b, "name");
+      const ar = rankContactByRecentPhones(a.phone, recentPhones);
+      const br = rankContactByRecentPhones(b.phone, recentPhones);
+      if (ar !== br) return ar - br;
+      return compareContactRows(a, b, "recent");
+    });
+    return { ...paginateContactRows(decorated, page, pageSize), error: null };
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let listedQuery = client
+    .from("contacts")
+    .select(CONTACT_SELECT, { count: "exact" })
+    .eq("tenant_id", tenantId);
+
+  if (saved === "saved") {
+    listedQuery = listedQuery.not("name", "is", null).neq("name", "");
+  } else if (saved === "unsaved") {
+    listedQuery = listedQuery.or("name.is.null,name.eq.");
+  }
+  if (searchOr) listedQuery = listedQuery.or(searchOr);
+  listedQuery =
+    sort === "name"
+      ? listedQuery
+          .order("name", { ascending: true, nullsFirst: false })
+          .order("updated_at", { ascending: false })
+      : listedQuery.order("updated_at", { ascending: false });
+  listedQuery = listedQuery.range(from, to);
+
+  const listed = await listedQuery;
+
+  if (listed.error) {
+    return { rows: [], total: 0, error: listed.error.message };
+  }
+
+  const contacts = (listed.data || []) as ContactRow[];
+  const total = listed.count ?? contacts.length;
+  if (contacts.length === 0) {
+    return { rows: [], total, error: null };
+  }
+
+  const extras = await loadLastContactMap(client, tenantId, contacts);
+  const rows = decorateContactRows(contacts, extras);
+  if (sort === "recent") {
+    rows.sort((a, b) => compareContactRows(a, b, "recent"));
+  }
   return { rows, total, error: null };
 }
 

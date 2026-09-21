@@ -54,16 +54,20 @@ describe("desk preview truncate", () => {
 
   it("clamps Contacts phone rows to name plus one preview", () => {
     const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
-    const phone = contacts.slice(
-      contacts.indexOf('className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden"'),
-      contacts.indexOf("hidden md:block")
+    const phone = read("dashboard/src/components/ContactListRow.tsx");
+    const phoneRow = phone.slice(
+      phone.indexOf("export function ContactPhoneRow"),
+      phone.indexOf("export function ContactTableRow")
     );
-    assert.match(phone, /deskPreviewClass/);
-    assert.match(phone, /lastReasonDisplay/);
+    assert.match(contacts, /md:hidden/);
+    assert.match(phoneRow, /deskPreviewClass/);
+    assert.match(phoneRow, /contactListSubline/);
+    assert.match(phone, /function lastCallStamp/);
     assert.match(phone, /formatCallWhenRelative/);
-    assert.doesNotMatch(phone, /row\.phone/);
-    assert.doesNotMatch(phone, /line-clamp-2/);
-    assert.doesNotMatch(phone, /font-mono text-sm text-ink/);
+    assert.doesNotMatch(phoneRow, /font-mono text-sm text-ink/);
+    assert.doesNotMatch(phoneRow, /line-clamp-2/);
+    assert.match(phoneRow, /<ContactListDock phone=\{row\.phone\} \/>/);
+    assert.match(phone, /<CallLink number=\{number\} \/>/);
   });
 
   it("clamps contact timeline What to one line and expands on tap", () => {
