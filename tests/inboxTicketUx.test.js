@@ -84,7 +84,7 @@ describe("inbox ticket action chrome", () => {
     assert.match(notes, /caller_inbox_reply/);
     assert.match(notes, /sendRecordedDeskCallerSms/);
     assert.match(dock, /name="reply_id"/);
-    assert.match(ticket, /tone="thread"/);
+    assert.match(ticket, /mode="thread"/);
     assert.doesNotMatch(notes, /caller_appointment_confirmed/);
     assert.match(dock, /aria-label="Send"/);
     assert.match(dock, /title="Send"/);

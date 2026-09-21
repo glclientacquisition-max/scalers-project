@@ -130,6 +130,7 @@ describe("ticket chat follow-ups", () => {
     assert.match(verbs, /Mark done lives on the action dock/);
     assert.match(delivery, /Needs human\. Notify failed\./);
     assert.match(live, /Notify only \(live connect unavailable\)/);
-    assert.doesNotMatch(delivery, /Escalation sent/);
+    assert.match(delivery, /Never "Escalation sent"/);
+    assert.doesNotMatch(delivery, /line: "Escalation sent"/);
   });
 });
