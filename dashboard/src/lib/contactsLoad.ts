@@ -271,7 +271,7 @@ export async function loadContactsPage(
       if (ar !== br) return ar - br;
       return compareContactRows(a, b, "recent");
     });
-    return paginateContactRows(decorated, page, pageSize);
+    return { ...paginateContactRows(decorated, page, pageSize), error: null };
   }
 
   const from = (page - 1) * pageSize;

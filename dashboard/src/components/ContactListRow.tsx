@@ -16,11 +16,12 @@ import { formatCallWhenRelative } from "@/lib/callsTriage";
 import type { ContactListRow as ContactListRowData } from "@/lib/contactsLoad";
 
 function ContactListDock({ phone }: { phone: string | null }) {
-  if (!String(phone || "").trim()) return null;
+  const number = String(phone || "").trim();
+  if (!number) return null;
   return (
     <div className={`${deskRowActionClass} flex shrink-0 items-center justify-end gap-2`}>
-      <CallLink number={phone} />
-      <WhatsAppLink number={phone} variant="icon" />
+      <CallLink number={number} />
+      <WhatsAppLink number={number} variant="icon" />
     </div>
   );
 }

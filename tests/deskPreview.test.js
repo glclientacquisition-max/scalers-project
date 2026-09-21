@@ -65,7 +65,8 @@ describe("desk preview truncate", () => {
     assert.match(phoneRow, /formatCallWhenRelative/);
     assert.doesNotMatch(phoneRow, /font-mono text-sm text-ink/);
     assert.doesNotMatch(phoneRow, /line-clamp-2/);
-    assert.match(phoneRow, /<CallLink number=\{phone\} \/>/);
+    assert.match(phoneRow, /<ContactListDock phone=\{row\.phone\} \/>/);
+    assert.match(phone, /<CallLink number=\{number\} \/>/);
   });
 
   it("clamps contact timeline What to one line and expands on tap", () => {

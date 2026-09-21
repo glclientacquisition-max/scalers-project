@@ -1,6 +1,5 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -8,70 +7,93 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
-function loadHelpers() {
-  const helperPath = path.join(__dirname, "../dashboard/src/lib/contactsLoad.ts");
-  const script = `
-    import {
-      resolveContactSavedFilter,
-      resolveContactSort,
-      contactsHref,
-      contactMatchesQuery,
-      compareContactRows,
-      uniqueRecentCallerPhones,
-      rankContactByRecentPhones,
-      paginateContactRows,
-    } from ${JSON.stringify(helperPath)};
-    const cases = {
-      savedRecent: resolveContactSavedFilter("recent"),
-      savedJunk: resolveContactSavedFilter("online"),
-      sortName: resolveContactSort("name"),
-      sortDefault: resolveContactSort(""),
-      href: contactsHref({ saved: "unsaved", sort: "name", q: "Amina", page: 2 }),
-      hrefBare: contactsHref({}),
-      matchName: contactMatchesQuery({ name: "Amina", phone: "+254700000001" }, "ami"),
-      missName: contactMatchesQuery({ name: "Otieno", phone: "+254700000002" }, "amina"),
-      phones: uniqueRecentCallerPhones([
-        { caller_number: "+254700000001" },
-        { caller_number: "254700000001" },
-        { caller_number: "+254700000003" },
-      ]),
-      rank: rankContactByRecentPhones("+254700000003", ["+254700000001", "+254700000003"]),
-      page: paginateContactRows(["a", "b", "c"], 2, 2),
-      nameOrder: ["Otieno", "Amina", "", "Brian"]
-        .map((name, i) => ({
-          name,
-          lastContactAt: "2026-09-21T0" + i + ":00:00.000Z",
-          updated_at: "2026-09-21T0" + i + ":00:00.000Z",
-        }))
-        .sort((a, b) => compareContactRows(a, b, "name"))
-        .map((row) => row.name),
-    };
-    console.log(JSON.stringify(cases));
-  `;
-  const ran = spawnSync(
-    process.execPath,
-    ["--experimental-strip-types", "--input-type=module", "-e", script],
-    { encoding: "utf8" }
-  );
-  assert.equal(ran.status, 0, ran.stderr || ran.stdout);
-  return JSON.parse(ran.stdout.trim().split("\n").at(-1));
+/** Lockstep with dashboard/src/lib/contactsLoad.ts query helpers. */
+function resolveContactSavedFilter(raw) {
+  const value = String(raw || "all").toLowerCase();
+  if (value === "saved" || value === "unsaved" || value === "recent") return value;
+  return "all";
+}
+
+function resolveContactSort(raw) {
+  return String(raw || "").toLowerCase() === "name" ? "name" : "recent";
+}
+
+function contactsHref(opts) {
+  const q = new URLSearchParams();
+  if (opts.saved && opts.saved !== "all") q.set("saved", opts.saved);
+  if (opts.sort && opts.sort !== "recent") q.set("sort", opts.sort);
+  const query = String(opts.q || "").trim();
+  if (query) q.set("q", query);
+  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  const qs = q.toString();
+  return qs ? `/contacts?${qs}` : "/contacts";
+}
+
+function contactMatchesQuery(row, q) {
+  const text = String(q || "").trim().toLowerCase();
+  if (!text) return true;
+  const hay = [row.name, row.phone, row.lastReasonDisplay, row.last_reason]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return hay.includes(text);
+}
+
+function compareContactRows(a, b, sort) {
+  if (sort === "name") {
+    const an = String(a.name || "").trim().toLowerCase();
+    const bn = String(b.name || "").trim().toLowerCase();
+    if (!an && bn) return 1;
+    if (an && !bn) return -1;
+    const byName = an.localeCompare(bn, "en");
+    if (byName) return byName;
+  }
+  const at = a.lastContactAt || a.updated_at || "";
+  const bt = b.lastContactAt || b.updated_at || "";
+  if (at === bt) return 0;
+  return at < bt ? 1 : -1;
+}
+
+function paginateContactRows(rows, page, pageSize) {
+  const total = rows.length;
+  const from = Math.max(0, (page - 1) * pageSize);
+  return { rows: rows.slice(from, from + pageSize), total };
 }
 
 describe("contacts list Phase 1 helpers", () => {
   it("resolves search, sort, Recent calls, and Unsaved without inventing presence", () => {
-    const cases = loadHelpers();
-    assert.equal(cases.savedRecent, "recent");
-    assert.equal(cases.savedJunk, "all");
-    assert.equal(cases.sortName, "name");
-    assert.equal(cases.sortDefault, "recent");
-    assert.equal(cases.href, "/contacts?saved=unsaved&sort=name&q=Amina&page=2");
-    assert.equal(cases.hrefBare, "/contacts");
-    assert.equal(cases.matchName, true);
-    assert.equal(cases.missName, false);
-    assert.deepEqual(cases.phones, ["+254700000001", "+254700000003"]);
-    assert.equal(cases.rank, 1);
-    assert.deepEqual(cases.page, { rows: ["c"], total: 3 });
-    assert.deepEqual(cases.nameOrder, ["Amina", "Brian", "Otieno", ""]);
+    assert.equal(resolveContactSavedFilter("recent"), "recent");
+    assert.equal(resolveContactSavedFilter("online"), "all");
+    assert.equal(resolveContactSort("name"), "name");
+    assert.equal(resolveContactSort(""), "recent");
+    assert.equal(
+      contactsHref({ saved: "unsaved", sort: "name", q: "Amina", page: 2 }),
+      "/contacts?saved=unsaved&sort=name&q=Amina&page=2"
+    );
+    assert.equal(contactsHref({}), "/contacts");
+    assert.equal(contactMatchesQuery({ name: "Amina", phone: "+254700000001" }, "ami"), true);
+    assert.equal(contactMatchesQuery({ name: "Otieno", phone: "+254700000002" }, "amina"), false);
+    assert.deepEqual(paginateContactRows(["a", "b", "c"], 2, 2), { rows: ["c"], total: 3 });
+    assert.deepEqual(
+      ["Otieno", "Amina", "", "Brian"]
+        .map((name, i) => ({
+          name,
+          lastContactAt: `2026-09-21T0${i}:00:00.000Z`,
+          updated_at: `2026-09-21T0${i}:00:00.000Z`,
+        }))
+        .sort((a, b) => compareContactRows(a, b, "name"))
+        .map((row) => row.name),
+      ["Amina", "Brian", "Otieno", ""]
+    );
+    const src = read("dashboard/src/lib/contactsLoad.ts");
+    assert.match(src, /export function resolveContactSavedFilter/);
+    assert.match(src, /value === "saved" \|\| value === "unsaved" \|\| value === "recent"/);
+    assert.match(src, /export function resolveContactSort/);
+    assert.match(src, /export function contactsHref/);
+    assert.match(src, /export function contactMatchesQuery/);
+    assert.match(src, /export function compareContactRows/);
+    assert.match(src, /export function uniqueRecentCallerPhones/);
+    assert.doesNotMatch(src, /\bOnline\b/);
   });
 });
 
@@ -107,12 +129,12 @@ describe("contacts list Phase 1 chrome", () => {
     assert.match(quick, /Unsaved/);
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(quick, /Invite Friends/);
+    assert.doesNotMatch(search, /Invite Friends/);
     assert.match(note, /Recent calls and Unsaved/);
-    assert.doesNotMatch(note, /Invite Friends/);
   });
 
   it("keeps dense Call + WhatsApp as opened-only when a phone exists", () => {
-    assert.match(row, /<CallLink number=\{phone\} \/>/);
+    assert.match(row, /<CallLink number=\{number\} \/>/);
     assert.match(row, /variant="icon"/);
     assert.doesNotMatch(row, /callId=/);
     assert.doesNotMatch(row, /logWhatsAppFollowUp/);

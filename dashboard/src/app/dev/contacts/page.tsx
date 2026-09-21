@@ -10,7 +10,9 @@ import {
 import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { deskListTitleClass } from "@/components/ui/deskChrome";
+import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
+import { FilterTabs } from "@/components/ui/FilterTabs";
+import { deskFieldClass, deskListTitleClass } from "@/components/ui/deskChrome";
 import { isJunkCallerName } from "@/lib/callerNameQuality";
 import type { ContactListRow } from "@/lib/contactsLoad";
 
@@ -81,7 +83,30 @@ export default function DevContactsPage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>
           <section className="mb-10">
-            <h1 className={deskListTitleClass}>Contacts</h1>
+            <header className="space-y-3">
+              <h1 className={deskListTitleClass}>Contacts</h1>
+              <DeskIndexLead>
+                <label className="sr-only" htmlFor="dev-contacts-search">
+                  Search contacts
+                </label>
+                <input
+                  id="dev-contacts-search"
+                  type="search"
+                  defaultValue=""
+                  placeholder="Name or number"
+                  className={deskFieldClass}
+                  readOnly
+                />
+              </DeskIndexLead>
+              <FilterTabs
+                label="Sort contacts"
+                active="recent"
+                items={[
+                  { id: "recent", label: "Recent", href: "/dev/contacts" },
+                  { id: "name", label: "Name", href: "/dev/contacts" },
+                ]}
+              />
+            </header>
             <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
               <ContactQuickPhoneRow kind="recent" href="/dev/contacts" />
               <ContactQuickPhoneRow kind="unsaved" href="/dev/contacts" />
