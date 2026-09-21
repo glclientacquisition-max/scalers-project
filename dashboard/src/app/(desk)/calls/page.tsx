@@ -4,9 +4,7 @@ import { callsHref, sanitizeSearchQuery } from "@/lib/callsTriage";
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
 import {
   countInboxPurposes,
-  itemMatchesPurpose,
   itemMatchesQuery,
-  orderInboxItems,
   resolvePurposeFilter,
 } from "@/lib/inboxPurpose";
 import {
@@ -81,10 +79,6 @@ export default async function CallsPage({
     : assembled;
   const counts = countInboxPurposes(searched);
   const activeFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
-  const filtered = orderInboxItems(
-    searched.filter((item) => itemMatchesPurpose(item, activeFilter)),
-    activeFilter
-  );
   const rawView = String(sp.view || "");
   const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";
@@ -93,9 +87,6 @@ export default async function CallsPage({
   const boardView = weekView || todayView;
   const monday = parseWeekParam(sp.week);
   const day = parseDayParam(sp.day);
-  const boardItems = boardView ? visitBoardItems(searched) : filtered;
-  const todayItems = todayView ? visitBoardForDay(searched, day) : [];
-  const holdTodayItems = holdTodayView ? holdBoardForDay(searched, day) : [];
 
   const paginationParams: Record<string, string | undefined> = {
     purpose: activeFilter,
@@ -139,9 +130,17 @@ export default async function CallsPage({
     <InboxRowUiProvider teammates={inboxTeammateOptions(tenant.team_directory)}>
     <InboxPileNavProvider
       purpose={activeFilter}
-      items={searched}
+      items={assembled}
+      q={q}
       hrefs={pileHrefs}
       page={boardView || holdTodayView ? 1 : page}
+      view={pileHrefOpts.view}
+      week={pileHrefOpts.week}
+      day={pileHrefOpts.day}
+      from={archivedReturn?.purpose}
+      rpage={
+        archivedReturn?.page != null ? String(archivedReturn.page) : undefined
+      }
       enableSelect={!boardView && !holdTodayView}
     >
     <div>
@@ -170,7 +169,7 @@ export default async function CallsPage({
 
       {todayView ? (
         <RunSheetToday
-          items={todayItems}
+          items={visitBoardForDay(assembled, day)}
           ymd={day}
           prevHref={callsHref({
             purpose: "job",
@@ -191,7 +190,7 @@ export default async function CallsPage({
         />
       ) : holdTodayView ? (
         <RunSheetToday
-          items={holdTodayItems}
+          items={holdBoardForDay(assembled, day)}
           ymd={day}
           purpose="hold"
           prevHref={callsHref({
@@ -213,7 +212,7 @@ export default async function CallsPage({
         />
       ) : weekView ? (
         <VisitWeekCalendar
-          items={boardItems}
+          items={visitBoardItems(assembled)}
           monday={monday}
           prevHref={callsHref({
             purpose: "job",

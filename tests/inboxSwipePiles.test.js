@@ -243,7 +243,9 @@ describe("inbox swipe wiring", () => {
     assert.match(nav, /router\.prefetch/);
     assert.match(pills, /prefetch/);
     assert.match(toolbar, /useInboxPileNav/);
-    assert.match(page, /items=\{searched\}/);
+    assert.match(nav, /itemMatchesQuery/);
+    assert.match(page, /items=\{assembled\}/);
+    assert.doesNotMatch(page, /<InboxPileNavProvider[\s\S]*?items=\{searched\}/);
     assert.doesNotMatch(nav, /async function goPile/);
     assert.match(board, /pendingSpinnerInkClass/);
     assert.match(board, /paint === "pending"/);

@@ -1,18 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { useRef } from "react";
 import { callsHref } from "@/lib/callsTriage";
-import { inboxArchivedHref } from "@/lib/inboxHref";
 import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import { inboxPileHref } from "@/lib/inboxSwipe";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import { useInboxPileNav } from "@/components/InboxPileNav";
 import {
-  btnGhost,
   deskFieldClass,
   deskListTitleClass,
-  deskShiftClass,
   pageTitleClass,
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
@@ -45,6 +40,8 @@ export function InboxToolbar({
 }) {
   const nav = useInboxPileNav();
   const current = nav?.purpose ?? active;
+  const query = nav?.q ?? q;
+  const chipCounts = nav?.counts ?? counts;
   const copy = nicheCopy(vertical);
   const filters = purposeFilters(vertical);
   const archived = current === "archived";
@@ -52,13 +49,12 @@ export function InboxToolbar({
   const todayView = current === "job" && (view === "today" || view === "work");
   const holdToday = current === "hold" && (view === "today" || view === "work");
   const workView = weekView || todayView;
-  const searchWait = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const searchForm = (
     <form
       action="/calls"
       method="get"
-      className="flex w-full min-w-0 gap-2"
+      className="w-full min-w-0"
     >
       <input type="hidden" name="purpose" value={current} />
       {archived && from ? <input type="hidden" name="from" value={from} /> : null}
@@ -78,25 +74,18 @@ export function InboxToolbar({
         id="inbox-search"
         name="q"
         type="search"
-        defaultValue={q}
+        value={query}
         placeholder={copy.searchPlaceholder}
         className={deskFieldClass}
-        onChange={(event) => {
-          const form = event.currentTarget.form;
-          if (searchWait.current) clearTimeout(searchWait.current);
-          searchWait.current = setTimeout(() => form?.requestSubmit(), 300);
-        }}
+        onChange={(event) => nav?.setQuery(event.currentTarget.value)}
       />
-      <button type="submit" className={btnGhost}>
-        Search
-      </button>
     </form>
   );
 
   return (
     <header className="space-y-3">
       {archived ? (
-        <DeskBack href={backHref || callsHref({ q: q || undefined })}>Inbox</DeskBack>
+        <DeskBack href={backHref || callsHref({ q: query || undefined })}>Inbox</DeskBack>
       ) : (
         <h1 className={deskListTitleClass}>Inbox</h1>
       )}
@@ -115,9 +104,9 @@ export function InboxToolbar({
         items={filters.map((item) => ({
           id: item.id,
           label: item.label,
-          count: counts[item.id],
+          count: chipCounts[item.id],
           href: inboxPileHref(item.id, {
-            q,
+            q: query,
             active: current,
             view,
             week,
@@ -135,14 +124,14 @@ export function InboxToolbar({
             {
               id: "list",
               label: "List",
-              href: callsHref({ purpose: "job", q: q || undefined }),
+              href: callsHref({ purpose: "job", q: query || undefined }),
             },
             {
               id: "work",
               label: "Work",
               href: callsHref({
                 purpose: "job",
-                q: q || undefined,
+                q: query || undefined,
                 view: weekView ? "week" : "today",
                 week: weekView ? week : undefined,
                 day: weekView ? undefined : day,
@@ -160,14 +149,14 @@ export function InboxToolbar({
             {
               id: "list",
               label: "List",
-              href: callsHref({ purpose: "hold", q: q || undefined }),
+              href: callsHref({ purpose: "hold", q: query || undefined }),
             },
             {
               id: "work",
               label: "Work",
               href: callsHref({
                 purpose: "hold",
-                q: q || undefined,
+                q: query || undefined,
                 view: "today",
                 day,
               }),
@@ -186,7 +175,7 @@ export function InboxToolbar({
               label: "Today",
               href: callsHref({
                 purpose: "job",
-                q: q || undefined,
+                q: query || undefined,
                 view: "today",
                 day,
               }),
@@ -196,36 +185,13 @@ export function InboxToolbar({
               label: "Week",
               href: callsHref({
                 purpose: "job",
-                q: q || undefined,
+                q: query || undefined,
                 view: "week",
                 week,
               }),
             },
           ]}
         />
-      ) : null}
-
-      {q ? (
-        <p className="text-sm text-ink-soft">
-          Matches for{" "}
-          <span className="font-medium text-ink">&ldquo;{q}&rdquo;</span>.{" "}
-          <Link
-            href={
-              archived
-                ? inboxArchivedHref({
-                    purpose: from,
-                    view,
-                    week,
-                    day,
-                    page: rpage,
-                  })
-                : callsHref({ purpose: current })
-            }
-            className={`font-medium text-accent-deep ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-          >
-            Clear
-          </Link>
-        </p>
       ) : null}
     </header>
   );
