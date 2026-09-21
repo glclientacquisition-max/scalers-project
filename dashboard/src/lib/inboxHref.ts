@@ -182,3 +182,13 @@ export function inboxFromContactHref(sp: {
     page: sp.page,
   });
 }
+
+/**
+ * Person file -> Inbox, scoped with existing search by this caller's phone.
+ * `purpose=all` so pile default does not hide other threads. No phone: no href.
+ */
+export function inboxThreadsFromContactHref(phone?: string | null): string | null {
+  const text = cleanQuery(phone);
+  if (!text) return null;
+  return inboxReturnHref({ purpose: "all", q: text });
+}

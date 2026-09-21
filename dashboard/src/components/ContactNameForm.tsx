@@ -3,11 +3,19 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactName } from "@/app/(desk)/contacts/actions";
+import { isJunkCallerName } from "@/lib/callerNameQuality";
 import { btnPrimary, deskFieldClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
 
-export function ContactNameForm({ contactId }: { contactId: string }) {
+export function ContactNameForm({
+  contactId,
+  initialName = "",
+}: {
+  contactId: string;
+  initialName?: string | null;
+}) {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const junk = isJunkCallerName(initialName);
+  const [name, setName] = useState(junk ? "" : String(initialName || "").trim());
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -36,7 +44,7 @@ export function ContactNameForm({ contactId }: { contactId: string }) {
         htmlFor="contact-name"
         className="text-xs font-medium uppercase tracking-wide text-ink-soft"
       >
-        Name this caller
+        {junk ? "Name this caller" : "Name"}
       </label>
       <input
         id="contact-name"

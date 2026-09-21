@@ -1,15 +1,19 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactActionDock } from "@/components/ContactActionDock";
 import { ContactNameForm } from "@/components/ContactNameForm";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { deskPreviewCellClass } from "@/components/ui/deskChrome";
+import { btnGhost, deskPreviewCellClass } from "@/components/ui/deskChrome";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
-import { isJunkCallerName } from "@/lib/callerNameQuality";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { formatCallWhen } from "@/lib/callsTriage";
-import { callFromContactHref, inboxFromContactHref } from "@/lib/inboxHref";
+import {
+  callFromContactHref,
+  inboxFromContactHref,
+  inboxThreadsFromContactHref,
+} from "@/lib/inboxHref";
 import {
   contactLastCallFact,
   contactsReturnHref,
@@ -74,6 +78,7 @@ export default async function ContactDetailPage({
     lastReason: contact.last_reason,
     latestCallReason: latestCall?.ownerReason || latestCall?.ownerWant || null,
   });
+  const threadsHref = inboxThreadsFromContactHref(contact.phone);
   return (
     <div className="max-w-6xl">
       <DeskBack href={backHref}>{backLabel}</DeskBack>
@@ -91,9 +96,16 @@ export default async function ContactDetailPage({
               ) : null}
             </div>
             {contact.phone ? <ContactActionDock number={contact.phone} /> : null}
-            {isJunkCallerName(contact.name) ? (
-              <ContactNameForm contactId={contact.id} />
+            {threadsHref ? (
+              <Link
+                href={threadsHref}
+                data-contact-inbox-threads=""
+                className={`${btnGhost} w-full sm:w-auto`}
+              >
+                Inbox threads
+              </Link>
             ) : null}
+            <ContactNameForm contactId={contact.id} initialName={contact.name} />
           </div>
 
           <section className="rounded-2xl border border-line bg-surface p-5">

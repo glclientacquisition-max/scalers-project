@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { AddContactPanel } from "@/components/AddContactPanel";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactActionDock } from "@/components/ContactActionDock";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
@@ -8,8 +10,8 @@ import { DeskBack } from "@/components/ui/DeskBack";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { FilterTabs } from "@/components/ui/FilterTabs";
-import { deskFieldClass, deskListTitleClass } from "@/components/ui/deskChrome";
-import { isJunkCallerName } from "@/lib/callerNameQuality";
+import { btnGhost, deskFieldClass, deskListTitleClass } from "@/components/ui/deskChrome";
+import { inboxThreadsFromContactHref } from "@/lib/inboxHref";
 import { contactLastCallFact, type ContactListRow } from "@/lib/contactsLoad";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,7 @@ function ProfileLead({
   lastContactAt?: string | null;
 }) {
   const lastCallFact = contactLastCallFact(lastContactAt);
+  const threadsHref = inboxThreadsFromContactHref(phone);
   return (
     <div className="space-y-4">
       <div>
@@ -40,7 +43,12 @@ function ProfileLead({
         ) : null}
       </div>
       <ContactActionDock number={phone} />
-      {isJunkCallerName(name) ? <ContactNameForm contactId={contactId} /> : null}
+      {threadsHref ? (
+        <Link href={threadsHref} data-contact-inbox-threads="" className={`${btnGhost} w-full sm:w-auto`}>
+          Inbox threads
+        </Link>
+      ) : null}
+      <ContactNameForm contactId={contactId} initialName={name} />
     </div>
   );
 }
@@ -88,17 +96,24 @@ export default function DevContactsPage() {
             <header className="space-y-3">
               <h1 className={deskListTitleClass}>Contacts</h1>
               <DeskIndexLead>
-                <label className="sr-only" htmlFor="dev-contacts-search">
-                  Search contacts
-                </label>
-                <input
-                  id="dev-contacts-search"
-                  type="search"
-                  defaultValue=""
-                  placeholder="Name or number"
-                  className={deskFieldClass}
-                  readOnly
-                />
+                <div className="flex w-full min-w-0 flex-row items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <label className="sr-only" htmlFor="dev-contacts-search">
+                      Search contacts
+                    </label>
+                    <input
+                      id="dev-contacts-search"
+                      type="search"
+                      defaultValue=""
+                      placeholder="Name or number"
+                      className={deskFieldClass}
+                      readOnly
+                    />
+                  </div>
+                  <div className="shrink-0">
+                    <AddContactPanel />
+                  </div>
+                </div>
               </DeskIndexLead>
               <FilterTabs
                 label="Filter contacts"

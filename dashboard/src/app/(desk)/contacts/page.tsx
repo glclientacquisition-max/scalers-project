@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
 import { ContactsSearch } from "@/components/ContactsSearch";
-import { PhonebookImportButton } from "@/components/PhonebookImportButton";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
@@ -96,18 +95,11 @@ export default async function ContactsPage({
       <header className="space-y-3">
         <h1 className={deskListTitleClass}>Contacts</h1>
         <DeskIndexLead>
-          <div className="flex w-full min-w-0 flex-col gap-2 md:flex-row md:items-center">
+          <div className="flex w-full min-w-0 flex-row items-center gap-2">
             <div className="min-w-0 flex-1">
               <ContactsSearch q={q} saved={saved} sort={sort} />
             </div>
-            <div className="flex min-h-11 shrink-0 flex-wrap items-center justify-end gap-2">
-              <Link
-                href="/contacts/import"
-                className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-accent-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                Import CSV
-              </Link>
-              <PhonebookImportButton />
+            <div className="shrink-0">
               <AddContactPanel />
             </div>
           </div>
