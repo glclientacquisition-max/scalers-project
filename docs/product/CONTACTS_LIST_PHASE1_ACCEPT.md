@@ -48,3 +48,7 @@ Chief may unlock Desk for this slice only — **not** Funnel, **not** Platform f
 ## After Phase 1 GO
 
 Re-open **contact strip** as next desk polish candidate (still behind Funnel major if founder timing conflicts — Product default: strip after list GO, Funnel when honesty+notify gate clears; if both ready, Funnel major wins Platform+multi-seat, strip can wait one beat).
+
+## Segment chrome (2026-09-21)
+
+List segment chrome and click-through Back are locked in [`CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md`](./CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md). All · Saved · Unsaved are FilterTabs items. Not Inbox purpose pills.

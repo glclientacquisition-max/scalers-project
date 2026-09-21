@@ -37,7 +37,13 @@ function lastCallStamp(row: ContactListRowData): string | null {
   return row.lastContactAt ? formatCallWhenRelative(row.lastContactAt) : null;
 }
 
-export function ContactPhoneRow({ row }: { row: ContactListRowData }) {
+export function ContactPhoneRow({
+  row,
+  href,
+}: {
+  row: ContactListRowData;
+  href: string;
+}) {
   const title = contactTitle(row);
   const subline = contactListSubline(row);
   const lastCall = lastCallStamp(row);
@@ -47,7 +53,7 @@ export function ContactPhoneRow({ row }: { row: ContactListRowData }) {
       id={row.id}
       className="relative flex min-h-16 min-w-0 items-center gap-2 border-t border-line/70 px-3 py-3 first:border-t-0 sm:gap-3 sm:px-4"
     >
-      <DeskRowHit href={`/contacts/${row.id}`} label={title} />
+      <DeskRowHit href={href} label={title} />
       <div className={deskRowMutedClass}>
         <RowIdentity name={row.name} />
       </div>
@@ -69,7 +75,13 @@ export function ContactPhoneRow({ row }: { row: ContactListRowData }) {
   );
 }
 
-export function ContactTableRow({ row }: { row: ContactListRowData }) {
+export function ContactTableRow({
+  row,
+  href,
+}: {
+  row: ContactListRowData;
+  href: string;
+}) {
   const title = contactTitle(row);
   const subline = contactListSubline(row);
   const lastCall = lastCallStamp(row);
@@ -80,7 +92,7 @@ export function ContactTableRow({ row }: { row: ContactListRowData }) {
       className={`group relative cursor-pointer border-t border-line/70 ${deskShiftClass} hover:bg-accent/[0.04]`}
     >
       <td className="px-3 py-3.5 align-top lg:px-5 lg:py-5">
-        <DeskRowHit href={`/contacts/${row.id}`} label={title} />
+        <DeskRowHit href={href} label={title} />
         <div className={`${deskRowMutedClass} flex min-w-0 items-center gap-3`}>
           <RowIdentity name={row.name} />
           <div className="min-w-0">
