@@ -324,7 +324,7 @@ export default function DevInboxPage() {
             assistLabel="Needs human"
             assistNote={null}
             escalatedLine={null}
-            escalationDelivery={null}
+            escalationDelivery="Needs human. Notify failed."
             liveConnectLine={null}
             escalatePeople={[
               { name: "Wanjiku", role: "Owner", phone: "254700000099" },

@@ -13,7 +13,7 @@
 
 **Summary pane:** Want, Mood, and Done. Job and hold editors. Recording meta. Not duplicated in the thread.
 
-**Thread:** Conversation and FAQ ideas. Jump to latest appears when scrolled away from the bottom.
+**Thread:** One vertical conversation stream. Alignment is who (caller left, receptionist right). No per-bubble Caller / Receptionist stamps. Time only when the Nairobi minute changes. System lines only for Critic-true delivery or escalation (channel + time, or `Needs human. Notify failed.`). Lifecycle noise (`Call ended`) stays off. FAQ ideas is a muted text control at the end, not a pill. Jump to latest appears when scrolled away from the bottom.
 
 **Banner:** Confirm only when an appointments row is requested and the call is not archived. Hold Done only when a service_request is open and the call is not archived. Not for intent-only, Human, or Missed. Sits above the SMS dock, full width.
 
