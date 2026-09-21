@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { CallFaqSuggestions } from "@/components/CallFaqSuggestions";
 import { CallRecording } from "@/components/CallRecording";
 import { CallTranscript } from "@/components/CallTranscript";
 import { InboxHoldEditor } from "@/components/InboxHoldEditor";
@@ -29,6 +28,7 @@ import {
   TICKET_SUMMARY_MIN,
   clampTicketSummaryWidth,
 } from "@/lib/ticketSplit";
+import { plainOwnerCopy } from "@/lib/deskTicketChat";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxPingPerson } from "@/components/InboxPingTeammate";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
@@ -84,19 +84,19 @@ function TicketSummaryFacts({
       {want ? (
         <div>
           <dt className={metaLabelClass}>Want</dt>
-          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{want}</dd>
+          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{plainOwnerCopy(want)}</dd>
         </div>
       ) : null}
       {mood ? (
         <div>
           <dt className={metaLabelClass}>Mood</dt>
-          <dd className="mt-1 text-sm text-ink">{mood}</dd>
+          <dd className="mt-1 text-sm text-ink">{plainOwnerCopy(mood)}</dd>
         </div>
       ) : null}
       {done ? (
         <div>
           <dt className={metaLabelClass}>Done</dt>
-          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{done}</dd>
+          <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{plainOwnerCopy(done)}</dd>
         </div>
       ) : null}
     </dl>
@@ -287,7 +287,6 @@ export function InboxTicketView({
   job,
   hold,
   turns,
-  tenantId,
   recordingUrl,
   durationLabel,
   assistLabel,
@@ -316,7 +315,6 @@ export function InboxTicketView({
   job: InboxJob | null;
   hold: InboxHold | null;
   turns: TranscriptRow[];
-  tenantId: string;
   recordingUrl: string | null;
   durationLabel: string;
   assistLabel: string | null;
@@ -466,6 +464,7 @@ export function InboxTicketView({
   return (
     <div
       data-desk-bleed=""
+      data-ticket-chat=""
       className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h))] min-h-0 flex-col pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:-mx-6 sm:-mt-10 md:mx-0 md:mb-0 md:mt-0 md:h-full md:pb-0"
     >
       <header className="shrink-0 border-b border-line bg-surface px-2 py-2 sm:px-4">
@@ -487,7 +486,7 @@ export function InboxTicketView({
 
       {needsYou && urgency ? (
         <p className="shrink-0 border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm font-medium text-warn sm:px-6">
-          {urgency}
+          {plainOwnerCopy(urgency)}
         </p>
       ) : null}
 
@@ -512,7 +511,7 @@ export function InboxTicketView({
             data-ticket-summary=""
             className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
           >
-            <InboxPurposeChip purpose={purpose} label={stamp} />
+            <InboxPurposeChip purpose={purpose} label={plainOwnerCopy(stamp)} />
             <TicketSummaryFacts want={want} mood={mood} done={done} />
             {job ? (
               <div className="rounded-2xl bg-surface-muted/60 px-4 py-3">
@@ -525,12 +524,14 @@ export function InboxTicketView({
               </div>
             ) : null}
             <div className="space-y-2 text-xs text-ink-soft">
-              <p>Duration: {durationLabel}</p>
-              {assistLabel ? <p>Assist: {assistLabel}</p> : null}
-              {assistNote ? <p className="[overflow-wrap:anywhere]">{assistNote}</p> : null}
+              <p>Duration: {plainOwnerCopy(durationLabel)}</p>
+              {assistLabel ? <p>Assist: {plainOwnerCopy(assistLabel)}</p> : null}
+              {assistNote ? (
+                <p className="[overflow-wrap:anywhere]">{plainOwnerCopy(assistNote)}</p>
+              ) : null}
               {escalatedLine ? (
                 <p data-escalation-target="" className="[overflow-wrap:anywhere]">
-                  {escalatedLine}
+                  {plainOwnerCopy(escalatedLine)}
                 </p>
               ) : null}
               {escalationDelivery ? (
@@ -604,12 +605,6 @@ export function InboxTicketView({
               className="space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
             >
               <CallTranscript turns={turns} mode="thread" />
-              <CallFaqSuggestions
-                tenantId={tenantId}
-                callId={callId}
-                hasTranscript={turns.length > 0}
-                tone="thread"
-              />
             </div>
           </section>
         </div>

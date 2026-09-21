@@ -249,7 +249,6 @@ export default async function CallDetailPage({
         job={job}
         hold={hold}
         turns={turns}
-        tenantId={tenant.id}
         recordingUrl={row.recording_url}
         durationLabel={row.duration_seconds != null ? `${row.duration_seconds}s` : "N/A"}
         assistLabel={

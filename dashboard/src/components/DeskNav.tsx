@@ -13,6 +13,7 @@ import {
   formatAttentionCount,
   formatInboxNavAriaLabel,
 } from "@/lib/deskAttentionCount";
+import { isDeskTicketChatPath } from "@/lib/deskTicketChat";
 
 export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
@@ -176,12 +177,14 @@ export function DeskRail({
   );
 }
 
-/** Phone thumb destinations. Same DESK_LINKS as the desktop rail. */
+/** Phone thumb destinations. Same DESK_LINKS as the desktop rail. Hidden on ticket chat. */
 export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
   const pathname = usePathname();
+  if (isDeskTicketChatPath(pathname)) return null;
 
   return (
     <nav
+      data-desk-tabbar=""
       aria-label="Workspace"
       className="fixed inset-x-0 bottom-0 z-40 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] border-t border-line/80 bg-surface pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
     >

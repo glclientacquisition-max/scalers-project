@@ -8,6 +8,7 @@ import {
   type TranscriptSpeechItem,
   type TranscriptStreamItem,
 } from "@/lib/callTranscriptStream";
+import { plainOwnerCopy } from "@/lib/deskTicketChat";
 import type { TranscriptRow } from "@/lib/supabase";
 
 const PREVIEW_TURNS = 3;
@@ -45,7 +46,7 @@ function SpeechBubble({
         ].join(" ")}
       >
         <p className="whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">
-          {item.text}
+          {plainOwnerCopy(item.text)}
         </p>
         {item.stamp ? (
           <p className="mt-1 text-[11px] text-ink-soft">{item.stamp}</p>
@@ -64,7 +65,7 @@ function FactLine({ item, lead }: { item: TranscriptFactItem; lead: boolean }) {
         lead ? "" : "mt-3",
       ].join(" ")}
     >
-      {item.text}
+      {plainOwnerCopy(item.text)}
     </p>
   );
 }

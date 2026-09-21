@@ -218,12 +218,11 @@ describe("desk motion wiring", () => {
     assert.match(read("dashboard/src/components/CallFaqSuggestions.tsx"), /btnPrimary/);
   });
 
-  it("spins the Inbox SMS polish wand with pending ink", () => {
+  it("spins Inbox SMS Send with pending", () => {
     const dock = read("dashboard/src/components/InboxSmsDock.tsx");
-    assert.match(dock, /pendingSpinnerInkClass/);
-    assert.match(dock, /polishPending/);
     assert.match(dock, /pendingSpinnerClass/);
     assert.match(dock, /sendPending/);
+    assert.doesNotMatch(dock, /polishPending/);
     assert.doesNotMatch(dock, /animate-pulse/);
   });
 

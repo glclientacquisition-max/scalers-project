@@ -286,7 +286,6 @@ export default function DevInboxPage() {
             }}
             hold={null}
             turns={TURNS}
-            tenantId="dev"
             recordingUrl={null}
             durationLabel="48s"
             assistLabel="Handled"
@@ -318,7 +317,6 @@ export default function DevInboxPage() {
             job={null}
             hold={null}
             turns={TURNS}
-            tenantId="dev"
             recordingUrl={null}
             durationLabel="32s"
             assistLabel="Needs human"

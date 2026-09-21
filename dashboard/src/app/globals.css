@@ -187,6 +187,17 @@
   border-color: var(--line);
 }
 
+@media (max-width: 767px) {
+  .desk-theme:has([data-ticket-chat]) {
+    --desk-tabbar-h: 0px;
+    --desk-tabbar-clearance: 0px;
+  }
+
+  .desk-theme:has([data-ticket-chat]) [data-desk-tabbar] {
+    display: none;
+  }
+}
+
 @media (min-width: 768px) {
   :root {
     --desk-header-h: 0px;
