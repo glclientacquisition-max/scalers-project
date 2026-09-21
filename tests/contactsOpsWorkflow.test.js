@@ -121,4 +121,14 @@ describe("contacts ops workflow ACCEPT", () => {
     assert.doesNotMatch(page, /lead_status|Online/);
     assert.doesNotMatch(note, /[\u2014\u2013]/);
   });
+
+  it("makes the person-file Timeline phone-safe without a 560px table floor", () => {
+    const timeline = read("dashboard/src/components/ContactTimeline.tsx");
+    assert.match(profile, /<ContactTimeline entries=\{timeline\} \/>/);
+    assert.match(timeline, /md:hidden/);
+    assert.match(timeline, /hidden min-w-0 overflow-x-auto[\s\S]*md:block/);
+    assert.doesNotMatch(timeline, /min-w-\[560px\]/);
+    assert.match(timeline, /deskPreviewClass|ContactTimelineWhat/);
+    assert.match(note, /Phone is the list row/);
+  });
 });
