@@ -15,10 +15,4 @@ export function contactStripTitle(
   return canName ? "Name this caller" : "Unsaved";
 }
 
-export function contactStripFact(row: {
-  name?: string | null;
-  phone?: string | null;
-  lastContactAt?: string | null;
-}): string {
-  return contactListSubline(row);
-}
+export { contactListSubline };

@@ -80,9 +80,9 @@ describe("contact strip chrome", () => {
   const master = read("docs/frontend/design-system/MASTER.md");
 
   it("lands the ACCEPT spec and one composition family on the ticket", () => {
-    assert.match(accept, /Status: ACCEPT/);
-    assert.match(accept, /one factual subline only/);
-    assert.match(accept, /opened only/);
+    assert.match(accept, /\*\*Status:\*\* ACCEPT/);
+    assert.match(accept, /factual subline only/);
+    assert.match(accept, /\*\*opened\*\* only/);
     assert.match(ticket, /<ContactStrip/);
     assert.match(ticket, /profileHref=\{contactHref\}/);
     assert.match(detail, /lastContactAt=/);

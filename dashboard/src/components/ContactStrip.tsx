@@ -7,7 +7,8 @@ import {
   deskRowMutedClass,
 } from "@/components/ui/deskRowHit";
 import { deskPreviewClass } from "@/components/ui/deskChrome";
-import { contactStripFact, contactStripTitle } from "@/lib/contactStrip";
+import { contactStripTitle } from "@/lib/contactStrip";
+import { contactListSubline } from "@/lib/contactsLoad";
 import { sanitizeStoredCallerName } from "@/lib/callerNameQuality";
 
 export function ContactStrip({
@@ -22,7 +23,7 @@ export function ContactStrip({
   profileHref: string | null;
 }) {
   const title = contactStripTitle(name, Boolean(profileHref));
-  const fact = contactStripFact({ name, phone, lastContactAt });
+  const fact = contactListSubline({ name, phone, lastContactAt });
   const avatarName = sanitizeStoredCallerName(name);
   const number = String(phone || "").trim();
 
