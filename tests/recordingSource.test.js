@@ -87,7 +87,7 @@ test("call detail uses CallRecording and still renders transcript and metadata",
   assert.doesNotMatch(ticket, /variant="empty"/);
   assert.doesNotMatch(ticket, /variant="player"/);
   assert.doesNotMatch(source, /CallAudioPlayer/);
-  assert.match(transcript, /turns\.length === 0/);
+  assert.match(transcript, /stream\.length === 0/);
   assert.match(transcript, /Conversation/);
   assert.match(transcript, /Caller/);
   assert.match(ticket, /Assist/);

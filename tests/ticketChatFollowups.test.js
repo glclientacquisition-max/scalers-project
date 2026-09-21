@@ -117,7 +117,7 @@ describe("ticket chat follow-ups", () => {
     assert.doesNotMatch(dock, /sparkle/i);
     assert.match(callDetail, /No FAQ ideas/);
     assert.match(callDetail, /No Polish wand/);
-    assert.match(callDetail, /Conversation\./);
+    assert.match(callDetail, /One vertical conversation stream/);
   });
 
   it("keeps the action dock, contact strip, and honesty chips", () => {

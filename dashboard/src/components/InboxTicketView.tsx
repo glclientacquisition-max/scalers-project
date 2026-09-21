@@ -530,13 +530,19 @@ export function InboxTicketView({
                 <p className="[overflow-wrap:anywhere]">{plainOwnerCopy(assistNote)}</p>
               ) : null}
               {escalatedLine ? (
-                <p className="[overflow-wrap:anywhere]">{plainOwnerCopy(escalatedLine)}</p>
+                <p data-escalation-target="" className="[overflow-wrap:anywhere]">
+                  {plainOwnerCopy(escalatedLine)}
+                </p>
               ) : null}
               {escalationDelivery ? (
-                <p className="[overflow-wrap:anywhere]">{escalationDelivery}</p>
+                <p data-escalation-delivery="" className="[overflow-wrap:anywhere]">
+                  {escalationDelivery}
+                </p>
               ) : null}
               {liveConnectLine ? (
-                <p className="[overflow-wrap:anywhere]">{liveConnectLine}</p>
+                <p data-live-connect="" className="[overflow-wrap:anywhere]">
+                  {liveConnectLine}
+                </p>
               ) : null}
               <CallRecording recordingUrl={recordingUrl} />
             </div>
