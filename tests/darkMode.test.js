@@ -91,9 +91,9 @@ describe("theme activation", () => {
     assert.match(read("dashboard/src/app/dev/inbox/page.tsx"), /desk-theme/);
   });
 
-  it("keeps the desk header an opaque surface with theme-aware lockup ink", () => {
+  it("keeps lockup ink theme-aware after the phone header was removed", () => {
     const layout = read("dashboard/src/app/(desk)/layout.tsx");
-    assert.match(layout, /bg-surface/);
+    assert.doesNotMatch(layout, /DeskPhoneHeader/);
     assert.doesNotMatch(layout, /bg-surface\/95/);
     assert.doesNotMatch(layout, /backdrop-blur/);
     const lockup = read("dashboard/src/components/brand/BrandMark.tsx");
@@ -152,9 +152,11 @@ describe("desk token hygiene", () => {
 
   it("puts text-ink on every settings field class", () => {
     const ui = read("dashboard/src/components/settingsUi.tsx");
-    assert.match(ui, /export const settingsDenseFieldClass =\s*"[^"]*text-ink/);
-    assert.match(ui, /export const settingsTableFieldClass =\s*"[^"]*text-ink/);
+    assert.match(ui, /export const settingsDenseFieldClass =\s*[`"'][^`"']*text-ink/);
+    assert.match(ui, /export const settingsTableFieldClass =\s*[`"'][^`"']*text-ink/);
     assert.match(ui, /deskFieldClass/);
+    assert.match(ui, /lg:w-\[13\.5rem\]/);
+    assert.match(ui, /focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/);
   });
 
   it("documents the dark system in MASTER", () => {

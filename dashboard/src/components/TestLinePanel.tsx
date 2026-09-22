@@ -24,7 +24,6 @@ import {
   previewErrorCopy,
 } from "@/lib/previewAudio";
 import {
-  settingsPanelHeadingClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
 import { deskShiftClass } from "@/components/ui/deskChrome";
@@ -127,27 +126,23 @@ export function TestLinePanel({
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
-      <header>
-        <h2 className={settingsPanelHeadingClass}>Test</h2>
-      </header>
-
+    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
       <section className="space-y-4" aria-labelledby="test-preview-heading">
         <h3
           id="test-preview-heading"
-          className="text-sm font-medium text-[var(--ink)]"
+          className="text-sm font-medium text-ink"
         >
           Phone preview
         </h3>
 
         {greetingPreview ? (
           <>
-            <blockquote className="border-l-2 border-[var(--accent)]/50 pl-4 text-base leading-relaxed text-[var(--ink)]">
+            <blockquote className="border-l-2 border-accent/50 pl-4 text-base leading-relaxed text-ink">
               “{greetingPreview}”
             </blockquote>
             {voiceLabel ? (
-              <p className="text-xs text-[var(--ink-soft)]">
-                Voice · <span className="text-[var(--ink)]">{voiceLabel}</span>
+              <p className="text-xs text-ink-soft">
+                Voice · <span className="text-ink">{voiceLabel}</span>
                 {lexicon.length
                   ? ` · ${lexicon.length} pronunciation override${lexicon.length === 1 ? "" : "s"}`
                   : null}
@@ -177,17 +172,17 @@ export function TestLinePanel({
                 <source src={phonePreviewUrl} type="audio/wav" />
               </audio>
             ) : phonePreviewError ? (
-              <p className="text-sm text-[var(--warn)]" role="alert">
+              <p className="text-sm text-warn" role="alert">
                 {phonePreviewError}
               </p>
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-[var(--ink-soft)]">
+          <p className="text-sm text-ink-soft">
             Add a business name and assistant name in{" "}
             <Link
               href={businessSettingsHref("train", "identity")}
-              className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+              className="font-medium text-accent-deep underline-offset-2 hover:underline"
             >
               Identity
             </Link>{" "}
@@ -196,30 +191,30 @@ export function TestLinePanel({
         )}
       </section>
 
-      <section className="space-y-3 border-t border-[var(--line)] pt-8" aria-labelledby="test-call-heading">
+      <section className="space-y-3 lg:border-l lg:border-line lg:pl-8" aria-labelledby="test-call-heading">
         <h3
           id="test-call-heading"
-          className="text-sm font-medium text-[var(--ink)]"
+          className="text-sm font-medium text-ink"
         >
           Live call
         </h3>
         {pendingDid || !did ? (
-          <p className="text-sm text-[var(--ink-soft)]">
+          <p className="text-sm text-ink-soft">
             Number pending. Finish setup before calling.
           </p>
         ) : (
           <a
             href={`tel:${did}`}
-            className={`flex min-h-14 w-full items-center justify-center rounded-2xl border border-[var(--line)] bg-surface px-4 py-4 text-center font-display text-[clamp(1.15rem,4vw,1.5rem)] tracking-tight text-[var(--ink)] ${deskShiftClass} hover:border-[var(--accent)]`}
+            className={`flex min-h-14 w-full items-center justify-center rounded-2xl border border-line bg-surface px-4 py-4 text-center font-display text-xl font-semibold tracking-tight text-ink ${deskShiftClass} hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent`}
           >
             {did}
           </a>
         )}
-        <p className="text-xs text-[var(--ink-soft)]">
+        <p className="text-xs text-ink-soft">
           Fix names in{" "}
           <Link
             href={businessSettingsHref("train", "pronunciation")}
-            className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+            className="font-medium text-accent-deep underline-offset-2 hover:underline"
           >
             Pronunciation
           </Link>
@@ -227,7 +222,7 @@ export function TestLinePanel({
           change voice in{" "}
           <Link
             href={businessSettingsHref("train", "tools")}
-            className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+            className="font-medium text-accent-deep underline-offset-2 hover:underline"
           >
             Voice
           </Link>

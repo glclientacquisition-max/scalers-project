@@ -17,7 +17,6 @@ import {
 import {
   settingsChipClass,
   settingsFieldClass,
-  settingsPanelHeadingClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
 import { deskShiftClass } from "@/components/ui/deskChrome";
@@ -68,23 +67,32 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="min-w-0 space-y-4">
-      <h2 className={settingsPanelHeadingClass}>Updates</h2>
-
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
-        <label className="block text-xs font-medium text-ink-soft" htmlFor="bulletin_text">
-          Callers hear
-        </label>
-        <input
-          id="bulletin_text"
-          name="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={160}
-          placeholder="Out of chicken today"
-          className={`${settingsFieldClass} min-w-0`}
-        />
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <label className="block text-xs font-medium text-ink-soft" htmlFor="bulletin_text">
+              Callers hear
+            </label>
+            <input
+              id="bulletin_text"
+              name="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={160}
+              placeholder="Out of chicken today"
+              className={`${settingsFieldClass} min-w-0`}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={postPending || !text.trim()}
+            className={settingsPrimaryButtonClass}
+          >
+            {postPending ? "Posting…" : "Post update"}
+          </button>
+        </div>
 
         <div className="flex flex-wrap gap-2" role="group" aria-label="Update duration">
           {EXPIRY_OPTIONS.map((opt) => {
@@ -101,14 +109,6 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
             );
           })}
         </div>
-
-        <button
-          type="submit"
-          disabled={postPending || !text.trim()}
-          className={settingsPrimaryButtonClass}
-        >
-          {postPending ? "Posting…" : "Post update"}
-        </button>
       </form>
 
       {items.length === 0 ? (

@@ -100,10 +100,12 @@ import {
   compactTextareaExpandHandlers,
   settingsActionClass,
   settingsBlockTitleClass,
+  settingsConsoleClass,
   settingsDenseFieldClass,
   settingsFieldClass,
+  settingsFormGridClass,
   settingsGhostButtonClass,
-  settingsPanelHeadingClass,
+  settingsPanelClass,
   settingsTableFieldClass,
 } from "@/components/settingsUi";
 import {
@@ -746,23 +748,20 @@ export function TenantForm({
 
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
-      <SettingsPageHeader
-        businessName={tenant.business_name?.trim() || "Business"}
-        lineLive={Boolean(lineNumber) && lineNumber !== "Number pending"}
-        lineDetail={
-          Boolean(lineNumber) && lineNumber !== "Number pending" ? lineNumber : ""
-        }
-        showBack
-        action={<TenantSettingsSaveButton pending={pending} />}
-      />
-
-      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+      <div className={settingsConsoleClass}>
         {sidebar}
 
-        <div className="min-w-0 flex-1 space-y-4">
-          {heading ? (
-            <h2 className={settingsPanelHeadingClass}>{heading}</h2>
-          ) : null}
+        <div className={`${settingsPanelClass} space-y-4`}>
+          <SettingsPageHeader
+            businessName={tenant.business_name?.trim() || "Business"}
+            lineLive={Boolean(lineNumber) && lineNumber !== "Number pending"}
+            lineDetail={
+              Boolean(lineNumber) && lineNumber !== "Number pending" ? lineNumber : ""
+            }
+            showBack
+            title={heading}
+            action={<TenantSettingsSaveButton pending={pending} />}
+          />
 
       <input type="hidden" name="id" value={tenant.id} />
       <input type="hidden" name="business_name" value={businessName} />
@@ -793,7 +792,7 @@ export function TenantForm({
       <section className={panel === "identity" ? "space-y-6" : "hidden"}>
         <div className="space-y-3">
           <p className={settingsBlockTitleClass}>Assistant</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={settingsFormGridClass}>
             <div>
               <label className="block text-xs font-medium text-ink-soft" htmlFor="agent_name">
                 Assistant name
@@ -832,36 +831,38 @@ export function TenantForm({
 
         <div className="space-y-3">
           <p className={settingsBlockTitleClass}>Business</p>
-          <div>
-            <label className="block text-xs font-medium text-ink-soft" htmlFor="business_name">
-              Business name
-            </label>
-            <input
-              id="business_name"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="Westlands Books"
-              className={`${denseFieldClass} mt-1`}
-            />
-          </div>
-          <div>
-            <p className="block text-xs font-medium text-ink-soft">Business type</p>
-            <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Business type">
-              {VERTICAL_OPTIONS.map((opt) => {
-                const selected = vertical === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setVertical(opt.id)}
-                    className={choiceChipClass(selected)}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
+          <div className={settingsFormGridClass}>
+            <div>
+              <label className="block text-xs font-medium text-ink-soft" htmlFor="business_name">
+                Business name
+              </label>
+              <input
+                id="business_name"
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="Westlands Books"
+                className={`${denseFieldClass} mt-1`}
+              />
+            </div>
+            <div>
+              <p className="block text-xs font-medium text-ink-soft">Business type</p>
+              <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Business type">
+                {VERTICAL_OPTIONS.map((opt) => {
+                  const selected = vertical === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setVertical(opt.id)}
+                      className={choiceChipClass(selected)}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -1375,7 +1376,9 @@ export function TenantForm({
                       <th className="px-3 py-2.5 font-medium">Price</th>
                       <th className="px-3 py-2.5 font-medium">Category</th>
                       <th className="px-3 py-2.5 font-medium">Stock</th>
-                      <th className="px-3 py-2.5 font-medium w-24">Actions</th>
+                      <th className="px-3 py-2.5 font-medium w-12">
+                        <span className="sr-only">Remove</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line bg-surface">
@@ -1435,15 +1438,16 @@ export function TenantForm({
                               <option value="unknown">Unknown</option>
                             </select>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-2">
                             <button
                               type="button"
                               onClick={() =>
                                 setProducts((prev) => prev.filter((_, i) => i !== index))
                               }
-                              className="text-sm font-medium text-ink-soft hover:text-warn"
+                              className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                              aria-label={`Remove product ${index + 1}`}
                             >
-                              Remove
+                              <TrashIcon className="h-4 w-4" />
                             </button>
                           </td>
                         </tr>
@@ -1468,14 +1472,20 @@ export function TenantForm({
 
       <section className={panel === "hours" ? "space-y-3" : "hidden"}>
         <div className="space-y-3">
-          <div className="space-y-1.5">
+          <div className="overflow-hidden rounded-xl border border-line">
+            <div className="grid grid-cols-[minmax(5.5rem,7rem)_5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+              <span>Day</span>
+              <span>Open</span>
+              <span>Opens</span>
+              <span>Closes</span>
+            </div>
             {DAY_ORDER.map((day) => {
               const slot = hoursSchedule.days[day];
               const open = Boolean(slot);
               return (
                 <div
                   key={day}
-                  className="flex min-w-0 flex-col gap-2 rounded-lg border border-line/70 bg-surface/60 px-3 py-2.5 sm:grid sm:grid-cols-[8.5rem_auto_1fr_1fr] sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0"
+                  className="grid grid-cols-[minmax(5.5rem,7rem)_5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 border-b border-line px-3 py-1.5 last:border-b-0"
                 >
                   <span className="text-sm font-medium text-ink">
                     {DAY_LABELS[day]}
@@ -1484,17 +1494,17 @@ export function TenantForm({
                     type="button"
                     onClick={() => setDayOpen(day, !open)}
                     className={[
-                      "inline-flex min-h-11 w-fit items-center rounded-lg border px-3 text-xs font-medium",
+                      "inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-2 text-xs font-medium",
                       deskShiftClass,
                       open
-                        ? "border-accent bg-accent-soft text-accent"
+                        ? "border-accent bg-accent-soft text-accent-deep"
                         : "border-line text-ink-soft",
                     ].join(" ")}
                   >
                     {open ? "Open" : "Closed"}
                   </button>
                   {open && slot ? (
-                    <div className="flex min-w-0 flex-wrap items-center gap-2 sm:col-span-2">
+                    <>
                       <label className="sr-only" htmlFor={`open-${day}`}>
                         Opens
                       </label>
@@ -1503,9 +1513,8 @@ export function TenantForm({
                         type="time"
                         value={slot.open}
                         onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
-                      <span className="text-xs text-ink-soft">to</span>
                       <label className="sr-only" htmlFor={`close-${day}`}>
                         Closes
                       </label>
@@ -1514,13 +1523,11 @@ export function TenantForm({
                         type="time"
                         value={slot.close}
                         onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="min-h-11 min-w-0 max-w-full flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
                       />
-                    </div>
+                    </>
                   ) : (
-                    <span className="text-xs text-ink-soft sm:col-span-2">
-                      Closed all day
-                    </span>
+                    <span className="col-span-2 text-xs text-ink-soft">Closed</span>
                   )}
                 </div>
               );
@@ -1568,69 +1575,75 @@ export function TenantForm({
             Add place
           </button>
         </div>
-        <div className="space-y-2">
+        <div className="overflow-hidden rounded-xl border border-line">
+          <div className="hidden lg:grid lg:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+            <span>Label</span>
+            <span>Area</span>
+            <span>Landmark</span>
+            <span>Directions</span>
+            <span>Coverage</span>
+            <span className="sr-only">Remove</span>
+          </div>
           {locations.map((loc, index) => (
             <div
               key={`loc-${index}`}
-              className="space-y-2 rounded-xl border border-line bg-surface/60 p-3"
+              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
             >
-              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-                <div className="min-w-0">
-                  <label
-                    className="block text-xs font-medium text-ink-soft"
-                    htmlFor={`loc-label-${index}`}
-                  >
-                    Label
-                  </label>
-                  <input
-                    id={`loc-label-${index}`}
-                    value={loc.label}
-                    onChange={(e) => {
-                      updateLocation(index, "label", e.target.value);
-                      if (index === 0) {
-                        setLocationNotes(
-                          [e.target.value, loc.address, loc.landmark]
-                            .map((s) => s.trim())
-                            .filter(Boolean)
-                            .join(" · ") || locationNotes
-                        );
-                      }
-                    }}
-                    placeholder="Main shop"
-                    className={`${denseFieldClass} mt-1`}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <label
-                    className="block text-xs font-medium text-ink-soft"
-                    htmlFor={`loc-address-${index}`}
-                  >
-                    Area
-                  </label>
-                  <ExpandTextarea
-                    id={`loc-address-${index}`}
-                    value={loc.address}
-                    maxLength={200}
-                    onChange={(value) => {
-                      updateLocation(index, "address", value);
-                      if (index === 0) {
-                        const next = { ...loc, address: value };
-                        setLocationNotes(
-                          [next.label, next.address, next.landmark]
-                            .map((s) => s.trim())
-                            .filter(Boolean)
-                            .join(" · ")
-                        );
-                      }
-                    }}
-                    placeholder="Westlands, Nairobi"
-                    className="min-w-0 break-words [overflow-wrap:anywhere]"
-                  />
-                </div>
-              </div>
-              <div>
+              <div className="min-w-0">
                 <label
-                  className="block text-xs font-medium text-ink-soft"
+                  className="block text-xs font-medium text-ink-soft lg:sr-only"
+                  htmlFor={`loc-label-${index}`}
+                >
+                  Label
+                </label>
+                <input
+                  id={`loc-label-${index}`}
+                  value={loc.label}
+                  onChange={(e) => {
+                    updateLocation(index, "label", e.target.value);
+                    if (index === 0) {
+                      setLocationNotes(
+                        [e.target.value, loc.address, loc.landmark]
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .join(" · ") || locationNotes
+                      );
+                    }
+                  }}
+                  placeholder="Main shop"
+                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                />
+              </div>
+              <div className="min-w-0">
+                <label
+                  className="block text-xs font-medium text-ink-soft lg:sr-only"
+                  htmlFor={`loc-address-${index}`}
+                >
+                  Area
+                </label>
+                <ExpandTextarea
+                  id={`loc-address-${index}`}
+                  value={loc.address}
+                  maxLength={200}
+                  onChange={(value) => {
+                    updateLocation(index, "address", value);
+                    if (index === 0) {
+                      const next = { ...loc, address: value };
+                      setLocationNotes(
+                        [next.label, next.address, next.landmark]
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .join(" · ")
+                      );
+                    }
+                  }}
+                  placeholder="Westlands, Nairobi"
+                  className="min-w-0 break-words [overflow-wrap:anywhere]"
+                />
+              </div>
+              <div className="min-w-0">
+                <label
+                  className="block text-xs font-medium text-ink-soft lg:sr-only"
                   htmlFor={`loc-landmark-${index}`}
                 >
                   Landmark
@@ -1654,15 +1667,15 @@ export function TenantForm({
                     }
                   }}
                   placeholder="Opposite Naivas"
-                  className={`${denseFieldClass} mt-1`}
+                  className={`${denseFieldClass} mt-1 lg:mt-0`}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label
-                  className="block text-xs font-medium text-ink-soft"
+                  className="block text-xs font-medium text-ink-soft lg:sr-only"
                   htmlFor={`loc-directions-${index}`}
                 >
-                  Directions (spoken)
+                  Directions
                 </label>
                 <textarea
                   id={`loc-directions-${index}`}
@@ -1670,12 +1683,12 @@ export function TenantForm({
                   onChange={(e) => updateLocation(index, "directions", e.target.value)}
                   rows={2}
                   placeholder="From Waiyaki Way, turn at the Shell. Left side."
-                  className={`${denseFieldClass} mt-1 leading-relaxed`}
+                  className={`${denseFieldClass} mt-1 leading-relaxed lg:mt-0`}
                 />
               </div>
               <div className="min-w-0">
                 <label
-                  className="block text-xs font-medium text-ink-soft"
+                  className="block text-xs font-medium text-ink-soft lg:sr-only"
                   htmlFor={`loc-coverage-${index}`}
                 >
                   Coverage
@@ -1691,17 +1704,22 @@ export function TenantForm({
                   className="min-w-0 break-words [overflow-wrap:anywhere]"
                 />
               </div>
-              {locations.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLocations((prev) => prev.filter((_, i) => i !== index))
-                  }
-                  className="text-xs text-warn hover:underline"
-                >
-                  Remove location
-                </button>
-              ) : null}
+              <div className="flex items-start justify-end lg:pt-1">
+                {locations.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLocations((prev) => prev.filter((_, i) => i !== index))
+                    }
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                    aria-label={`Remove location ${index + 1}`}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <span className="h-9 w-9" aria-hidden />
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -1712,9 +1730,9 @@ export function TenantForm({
       >
         <div className="space-y-2">
           <p className={settingsBlockTitleClass}>Rules</p>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className={settingsFormGridClass}>
             {POLICY_FIELDS.map((field) => (
-              <div key={field.id} className={field.id === "other" ? "sm:col-span-2" : ""}>
+              <div key={field.id} className={field.id === "other" ? "md:col-span-2" : ""}>
                 <label
                   className="block text-xs font-medium text-ink-soft"
                   htmlFor={`policy-${field.id}`}
@@ -1905,7 +1923,7 @@ export function TenantForm({
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-[var(--ink)]">When a caller needs a human</p>
+          <p className={settingsBlockTitleClass}>Handoff</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
             {HANDOFF_OPTIONS.filter(
               (opt) =>
@@ -1958,73 +1976,70 @@ export function TenantForm({
           </button>
         </div>
 
-        <div className="space-y-2">
+        <div className="overflow-hidden rounded-xl border border-line">
+          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,auto)_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+            <span>Name</span>
+            <span>Handles</span>
+            <span>Phone</span>
+            <span>Email</span>
+            <span>Notify</span>
+            <span className="sr-only">Remove</span>
+          </div>
           {team.map((member, index) => (
-            <div key={`team-${index}`} className="space-y-2 border-b border-line pb-2 last:border-b-0 last:pb-0">
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
-                <div>
-                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-name-${index}`}>
-                    Name
-                  </label>
-                  <input
-                    id={`team-name-${index}`}
-                    value={member.name}
-                    onChange={(e) => updateTeam(index, "name", e.target.value)}
-                    placeholder="Wanjiku Mwangi"
-                    className={`${denseFieldClass} mt-1`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-role-${index}`}>
-                    Handles
-                  </label>
-                  <input
-                    id={`team-role-${index}`}
-                    value={member.role}
-                    onChange={(e) => updateTeam(index, "role", e.target.value)}
-                    placeholder="Orders and payments"
-                    className={`${denseFieldClass} mt-1`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-phone-${index}`}>
-                    Phone
-                  </label>
-                  <input
-                    id={`team-phone-${index}`}
-                    value={member.phone}
-                    onChange={(e) => updateTeam(index, "phone", e.target.value)}
-                    placeholder="+254 700 000 000"
-                    className={`${denseFieldClass} mt-1`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-ink-soft" htmlFor={`team-email-${index}`}>
-                    Email
-                  </label>
-                  <input
-                    id={`team-email-${index}`}
-                    type="email"
-                    value={member.email || ""}
-                    onChange={(e) => updateTeam(index, "email", e.target.value)}
-                    placeholder="wanjiku@shop.co.ke"
-                    className={`${denseFieldClass} mt-1`}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setTeam((prev) =>
-                      prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
-                    )
-                  }
-                  className={`inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
-                  aria-label={`Remove teammate ${index + 1}`}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
+            <div
+              key={`team-${index}`}
+              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,auto)_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
+            >
+              <div className="min-w-0">
+                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-name-${index}`}>
+                  Name
+                </label>
+                <input
+                  id={`team-name-${index}`}
+                  value={member.name}
+                  onChange={(e) => updateTeam(index, "name", e.target.value)}
+                  placeholder="Wanjiku Mwangi"
+                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                />
               </div>
-              <div className="flex flex-wrap gap-2" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
+              <div className="min-w-0">
+                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-role-${index}`}>
+                  Handles
+                </label>
+                <input
+                  id={`team-role-${index}`}
+                  value={member.role}
+                  onChange={(e) => updateTeam(index, "role", e.target.value)}
+                  placeholder="Orders and payments"
+                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-phone-${index}`}>
+                  Phone
+                </label>
+                <input
+                  id={`team-phone-${index}`}
+                  value={member.phone}
+                  onChange={(e) => updateTeam(index, "phone", e.target.value)}
+                  placeholder="+254 700 000 000"
+                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-email-${index}`}>
+                  Email
+                </label>
+                <input
+                  id={`team-email-${index}`}
+                  type="email"
+                  value={member.email || ""}
+                  onChange={(e) => updateTeam(index, "email", e.target.value)}
+                  placeholder="wanjiku@shop.co.ke"
+                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                />
+              </div>
+              <div className="flex flex-wrap gap-1" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
                 {TEAM_NOTIFY_CHIPS.map((chip) => {
                   const selected = member[chip.key] === true;
                   return (
@@ -2039,6 +2054,20 @@ export function TenantForm({
                     </button>
                   );
                 })}
+              </div>
+              <div className="flex items-start justify-end lg:pt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTeam((prev) =>
+                      prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
+                    )
+                  }
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                  aria-label={`Remove teammate ${index + 1}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
             </div>
           ))}
@@ -2060,7 +2089,7 @@ export function TenantForm({
               setFaqPage(Math.floor(faqs.length / FAQ_PAGE_SIZE));
             }}
             disabled={faqs.length >= FAQ_MAX}
-            className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent-deep hover:bg-accent-soft disabled:opacity-60"
+            className={`${settingsGhostButtonClass} disabled:opacity-60`}
           >
             Add FAQ
           </button>
@@ -2094,30 +2123,21 @@ export function TenantForm({
           </div>
         ) : null}
 
-        <div className="space-y-2">
+        <div className="overflow-hidden rounded-xl border border-line">
+          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+            <span>Question</span>
+            <span>Answer</span>
+            <span className="sr-only">Remove</span>
+          </div>
           {visibleFaqs.map((faq, localIndex) => {
             const index = safeFaqPage * FAQ_PAGE_SIZE + localIndex;
             return (
-            <div key={`faq-${index}`} className="space-y-1.5 rounded-xl border border-line bg-surface px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-                  FAQ {index + 1}
-                </p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFaqs((prev) =>
-                      prev.length <= 1 ? [emptyFaq()] : prev.filter((_, i) => i !== index)
-                    )
-                  }
-                  className="text-xs text-ink-soft hover:text-warn"
-                  aria-label={`Remove FAQ ${index + 1}`}
-                >
-                  Remove
-                </button>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`faq-q-${index}`}>
+            <div
+              key={`faq-${index}`}
+              className="grid grid-cols-1 gap-2 border-b border-line px-3 py-2.5 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.5rem] lg:items-start lg:gap-x-3"
+            >
+              <div className="min-w-0">
+                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`faq-q-${index}`}>
                   Question
                 </label>
                 <input
@@ -2130,7 +2150,7 @@ export function TenantForm({
                   aria-describedby={
                     faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
                   }
-                  className={`${fieldClass} mt-1 py-2`}
+                  className={`${fieldClass} mt-1 py-2 lg:mt-0`}
                 />
                 {faqDupIndexes.has(index) ? (
                   <p id={`faq-dup-${index}`} className="mt-1 text-xs text-warn" role="status">
@@ -2138,8 +2158,8 @@ export function TenantForm({
                   </p>
                 ) : null}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-ink-soft" htmlFor={`faq-a-${index}`}>
+              <div className="min-w-0">
+                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`faq-a-${index}`}>
                   Answer
                 </label>
                 <textarea
@@ -2149,11 +2169,25 @@ export function TenantForm({
                   onChange={(e) => updateFaq(index, "answer", e.target.value)}
                   rows={2}
                   placeholder="Yes, free parking behind the building."
-                  className={`${fieldClass} mt-1 py-2 leading-relaxed`}
+                  className={`${fieldClass} mt-1 py-2 leading-relaxed lg:mt-0`}
                 />
                 <p className="mt-0.5 text-xs text-ink-soft">
                   {faq.answer.length}/{FAQ_ANSWER_MAX}
                 </p>
+              </div>
+              <div className="flex items-start justify-end lg:pt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFaqs((prev) =>
+                      prev.length <= 1 ? [emptyFaq()] : prev.filter((_, i) => i !== index)
+                    )
+                  }
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                  aria-label={`Remove FAQ ${index + 1}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
             </div>
             );

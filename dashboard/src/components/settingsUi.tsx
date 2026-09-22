@@ -12,17 +12,31 @@ import { btnPrimary, deskFieldClass, deskShiftClass } from "@/components/ui/desk
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
 
 export const settingsDenseFieldClass =
-  `w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
+  `w-full min-h-11 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
 
 export const settingsTableFieldClass =
-  `w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
+  `w-full min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent`;
 
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
 
-/** Sticks below the desk shell nav so Save stays visible while scrolling. */
+/** Nested settings: compact inner rail + fluid panel. Fills the desk canvas. */
+export const settingsConsoleClass =
+  "flex w-full min-w-0 flex-col gap-6 lg:flex-row lg:items-start lg:gap-8";
+
+export const settingsRailWrapClass =
+  "hidden min-w-0 shrink-0 lg:block lg:w-[13.5rem]";
+
+export const settingsRailClass = "min-w-0 lg:sticky lg:top-4";
+
+export const settingsPanelClass = "min-w-0 flex-1";
+
+export const settingsFormGridClass =
+  "grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2";
+
+/** Sticks to the panel so Save stays docked top-right while scrolling. */
 export const settingsStickyHeaderClass =
-  "sticky top-[var(--desk-header-h,0px)] z-30 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6";
+  "sticky top-[var(--desk-header-h,0px)] z-30 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-canvas/95 py-3 backdrop-blur-sm";
 
 export const settingsActionClass =
   `inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
@@ -30,7 +44,7 @@ export const settingsActionClass =
 export const settingsPrimaryButtonClass = btnPrimary;
 
 export const settingsPanelHeadingClass =
-  "font-display text-xl tracking-tight text-ink";
+  "font-display text-xl font-semibold tracking-tight text-ink";
 
 export const settingsBlockTitleClass =
   "text-[11px] font-bold uppercase tracking-wide text-ink-soft";
@@ -155,6 +169,7 @@ export function SettingsPageHeader({
   action,
   showBack = false,
   index = false,
+  title,
 }: {
   businessName: string;
   lineLive: boolean;
@@ -162,6 +177,7 @@ export function SettingsPageHeader({
   action?: ReactNode;
   showBack?: boolean;
   index?: boolean;
+  title?: string | null;
 }) {
   const line = (
     <p className="text-[13px] text-ink-soft [overflow-wrap:anywhere]">
@@ -193,6 +209,7 @@ export function SettingsPageHeader({
     <header className={settingsStickyHeaderClass}>
       <div className="min-w-0">
         {showBack ? <SettingsBackLink /> : null}
+        {title ? <h1 className={settingsPanelHeadingClass}>{title}</h1> : null}
         {line}
       </div>
       {action}

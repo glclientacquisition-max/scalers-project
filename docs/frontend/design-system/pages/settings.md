@@ -19,9 +19,9 @@ This device    Appearance · Sign out
 
 Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Updates and Test stay under Assistant. Team stays under Alerts. Import stays under Knowledge.
 
-Phone: dense index rows. Tap a row to drill in. `DeskBack` icon, aria-label Profile (`lg:hidden`). lg+: left settings sidebar (group headers + tabs) plus the open panel. Headers are not links.
+Phone: dense index rows. Tap a row to drill in. `DeskBack` icon, aria-label Profile (`lg:hidden`). lg+: nested inner rail (`lg:w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
-Sticky Save on Catalog and Train panels. Updates, Alerts, Import, Test, and Appearance use the same menu without a second compile save.
+Sticky Save on Catalog and Train panels, top-right of the panel header. Updates, Alerts, Import, Test, and Appearance use the same menu without a second compile save.
 
 Bare `/settings` is the hub. lg+ hub shows Appearance in the panel. `?tab=updates` is Updates. `?tab=alerts` is Alerts. `?tab=appearance` is Appearance. Hash `#train` is not routed. `Train` is the verb on Save.
 
@@ -31,11 +31,11 @@ Short in-page title Profile plus compact workspace name and Line live / Number p
 
 Phone index: grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl`).
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity and similar forms use `settingsFormGridClass` (`grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4`). Hours is a compact day / open / close grid. Catalog, FAQs, Team, and Locations are tables on `lg+`. Phone stacks.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
-Density stays 8. Do not double page padding or import landing-scale type, glass, or a generic settings card stack. Do not add Billing or Security sections. Appearance is This device only.
+Density stays 8. Fill the canvas. Do not double page padding or import landing-scale type, glass, or a generic settings card stack. Do not add Billing or Security sections. Appearance is This device only.
 
 ## Panels
 

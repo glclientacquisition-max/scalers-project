@@ -167,6 +167,11 @@ export function settingsPanelHeading(
 ): string | null {
   if (tab === "menu") return null;
   if (tab === "catalog") return "Catalog";
+  if (tab === "updates") return "Updates";
+  if (tab === "alerts") return "Alerts";
+  if (tab === "import") return "Import";
+  if (tab === "test") return "Test";
+  if (tab === "appearance") return "Appearance";
   if (tab !== "train") return null;
   const item = settingsNavItems().find(
     (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel
