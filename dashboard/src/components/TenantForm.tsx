@@ -93,17 +93,19 @@ import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 import {
   ExpandTextarea,
+  SettingsGroup,
   SettingsPageHeader,
+  SettingsRow,
+  SettingsSegmented,
+  SettingsSelect,
+  SettingsStack,
   ToolSwitch,
   TrashIcon,
-  settingsChipClass,
   compactTextareaExpandHandlers,
-  settingsActionClass,
   settingsBlockTitleClass,
   settingsConsoleClass,
   settingsDenseFieldClass,
   settingsFieldClass,
-  settingsFormGridClass,
   settingsGhostButtonClass,
   settingsPanelClass,
   settingsTableFieldClass,
@@ -229,7 +231,6 @@ const initial: SettingsCompileState = {};
 const fieldClass = settingsFieldClass;
 const tableFieldClass = settingsTableFieldClass;
 const denseFieldClass = settingsDenseFieldClass;
-const choiceChipClass = settingsChipClass;
 
 function PolicyTextarea({
   id,
@@ -790,85 +791,58 @@ export function TenantForm({
       <input type="hidden" name="tts_lexicon" value={ttsLexiconJson} />
 
       <section className={panel === "identity" ? "space-y-6" : "hidden"}>
-        <div className="space-y-3">
-          <p className={settingsBlockTitleClass}>Assistant</p>
-          <div className={settingsFormGridClass}>
-            <div>
-              <label className="block text-xs font-medium text-ink-soft" htmlFor="agent_name">
-                Assistant name
-              </label>
-              <input
-                id="agent_name"
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-                placeholder="Aisha"
-                maxLength={40}
-                className={`${denseFieldClass} mt-1`}
-              />
-            </div>
-            <div>
-              <p className="block text-xs font-medium text-ink-soft">Tone</p>
-              <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Tone">
-                {TONE_OPTIONS.map((opt) => {
-                  const selected = tone === opt.id;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setTone(opt.id)}
-                      className={choiceChipClass(selected)}
-                    >
-                      {TONE_LABELS[opt.id]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
+        <SettingsGroup title="Assistant">
+          <SettingsRow label="Assistant name" htmlFor="agent_name">
+            <input
+              id="agent_name"
+              value={agentName}
+              onChange={(e) => setAgentName(e.target.value)}
+              placeholder="Aisha"
+              maxLength={40}
+              className={denseFieldClass}
+            />
+          </SettingsRow>
+          <SettingsRow label="Tone" htmlFor="agent_tone">
+            <SettingsSelect
+              id="agent_tone"
+              label="Tone"
+              value={tone}
+              placeholder="Tone"
+              onChange={(id) => setTone(id)}
+              options={TONE_OPTIONS.map((opt) => ({
+                id: opt.id,
+                label: TONE_LABELS[opt.id],
+              }))}
+            />
+          </SettingsRow>
+        </SettingsGroup>
+
+        <SettingsGroup title="Business">
+          <SettingsRow label="Business name" htmlFor="business_name">
+            <input
+              id="business_name"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="Westlands Books"
+              className={denseFieldClass}
+            />
+          </SettingsRow>
+          <SettingsRow label="Business type" htmlFor="business_vertical">
+            <SettingsSelect
+              id="business_vertical"
+              label="Business type"
+              value={vertical}
+              onChange={setVertical}
+              options={VERTICAL_OPTIONS.map((opt) => ({
+                id: opt.id,
+                label: opt.label,
+              }))}
+            />
+          </SettingsRow>
+        </SettingsGroup>
 
         <div className="space-y-3">
-          <p className={settingsBlockTitleClass}>Business</p>
-          <div className={settingsFormGridClass}>
-            <div>
-              <label className="block text-xs font-medium text-ink-soft" htmlFor="business_name">
-                Business name
-              </label>
-              <input
-                id="business_name"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                placeholder="Westlands Books"
-                className={`${denseFieldClass} mt-1`}
-              />
-            </div>
-            <div>
-              <p className="block text-xs font-medium text-ink-soft">Business type</p>
-              <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Business type">
-                {VERTICAL_OPTIONS.map((opt) => {
-                  const selected = vertical === opt.id;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setVertical(opt.id)}
-                      className={choiceChipClass(selected)}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
             <p className={settingsBlockTitleClass}>Public contacts</p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -896,9 +870,76 @@ export function TenantForm({
           </div>
 
           {socialHandles.channels.length === 0 ? (
-            <p className="text-sm text-ink-soft">No contacts yet.</p>
+            <p className="px-1 text-sm text-ink-soft">No contacts yet.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-line">
+            <>
+            <div className="space-y-3 md:hidden">
+              {socialHandles.channels.map((channel, index) => (
+                <div
+                  key={`social-m-${index}`}
+                  className="space-y-2 rounded-xl border border-line bg-surface p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Contact {index + 1}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => removeSocialChannel(index)}
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-surface hover:text-warn"
+                      aria-label={`Remove contact ${index + 1}`}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-kind-m-${index}`}>
+                      Type
+                    </label>
+                    <select
+                      id={`social-kind-m-${index}`}
+                      value={channel.kind}
+                      onChange={(e) => updateSocialChannel(index, "kind", e.target.value)}
+                      className={`${denseFieldClass} mt-1`}
+                    >
+                      {SOCIAL_CHANNEL_KINDS.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-label-m-${index}`}>
+                      Label
+                    </label>
+                    <input
+                      id={`social-label-m-${index}`}
+                      value={channel.label}
+                      onChange={(e) => updateSocialChannel(index, "label", e.target.value)}
+                      placeholder="Main"
+                      className={`${denseFieldClass} mt-1`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-value-m-${index}`}>
+                      Handle / URL
+                    </label>
+                    <input
+                      id={`social-value-m-${index}`}
+                      value={channel.value}
+                      onChange={(e) => updateSocialChannel(index, "value", e.target.value)}
+                      placeholder={
+                        SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
+                          ?.placeholder || ""
+                      }
+                      className={`${denseFieldClass} mt-1`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block overflow-hidden rounded-xl border border-line">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
@@ -980,6 +1021,7 @@ export function TenantForm({
                 </table>
               </div>
             </div>
+            </>
           )}
         </div>
       </section>
@@ -1470,90 +1512,72 @@ export function TenantForm({
         </div>
       </section>
 
-      <section className={panel === "hours" ? "space-y-3" : "hidden"}>
-        <div className="space-y-3">
-          <div className="overflow-hidden rounded-xl border border-line">
-            <div className="grid grid-cols-[minmax(5.5rem,7rem)_5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-              <span>Day</span>
-              <span>Open</span>
-              <span>Opens</span>
-              <span>Closes</span>
-            </div>
-            {DAY_ORDER.map((day) => {
-              const slot = hoursSchedule.days[day];
-              const open = Boolean(slot);
-              return (
-                <div
-                  key={day}
-                  className="grid grid-cols-[minmax(5.5rem,7rem)_5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 border-b border-line px-3 py-1.5 last:border-b-0"
-                >
-                  <span className="text-sm font-medium text-ink">
-                    {DAY_LABELS[day]}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setDayOpen(day, !open)}
-                    className={[
-                      "inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-2 text-xs font-medium",
-                      deskShiftClass,
-                      open
-                        ? "border-accent bg-accent-soft text-accent-deep"
-                        : "border-line text-ink-soft",
-                    ].join(" ")}
-                  >
-                    {open ? "Open" : "Closed"}
-                  </button>
-                  {open && slot ? (
-                    <>
-                      <label className="sr-only" htmlFor={`open-${day}`}>
-                        Opens
-                      </label>
-                      <input
-                        id={`open-${day}`}
-                        type="time"
-                        value={slot.open}
-                        onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
-                      />
-                      <label className="sr-only" htmlFor={`close-${day}`}>
-                        Closes
-                      </label>
-                      <input
-                        id={`close-${day}`}
-                        type="time"
-                        value={slot.close}
-                        onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
-                      />
-                    </>
-                  ) : (
-                    <span className="col-span-2 text-xs text-ink-soft">Closed</span>
-                  )}
-                </div>
-              );
-            })}
+      <section className={panel === "hours" ? "space-y-6" : "hidden"}>
+        <SettingsGroup title="Days">
+          <div className="grid grid-cols-[minmax(5.5rem,7rem)_2.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+            <span>Day</span>
+            <span>Open</span>
+            <span>Opens</span>
+            <span>Closes</span>
           </div>
+          {DAY_ORDER.map((day) => {
+            const slot = hoursSchedule.days[day];
+            const open = Boolean(slot);
+            return (
+              <div
+                key={day}
+                className="grid grid-cols-[minmax(5.5rem,7rem)_2.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 px-3 py-1.5"
+              >
+                <span className="text-sm font-medium text-ink">
+                  {DAY_LABELS[day]}
+                </span>
+                <ToolSwitch
+                  checked={open}
+                  onChange={(next) => setDayOpen(day, next)}
+                  label={`${DAY_LABELS[day]} open`}
+                />
+                {open && slot ? (
+                  <>
+                    <label className="sr-only" htmlFor={`open-${day}`}>
+                      Opens
+                    </label>
+                    <input
+                      id={`open-${day}`}
+                      type="time"
+                      value={slot.open}
+                      onChange={(e) => setDayTime(day, "open", e.target.value)}
+                      className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                    />
+                    <label className="sr-only" htmlFor={`close-${day}`}>
+                      Closes
+                    </label>
+                    <input
+                      id={`close-${day}`}
+                      type="time"
+                      value={slot.close}
+                      onChange={(e) => setDayTime(day, "close", e.target.value)}
+                      className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                    />
+                  </>
+                ) : (
+                  <span className="col-span-2 text-xs text-ink-soft">Closed</span>
+                )}
+              </div>
+            );
+          })}
+        </SettingsGroup>
 
-          <div>
-            <p className={settingsBlockTitleClass}>When closed</p>
-            <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="When closed">
-              {AFTER_HOURS_OPTIONS.map((opt) => {
-                const selected = afterHoursMode === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setAfterHoursMode(opt.id)}
-                    className={choiceChipClass(selected)}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        <div className="space-y-1.5">
+          <h3 className={`${settingsBlockTitleClass} px-1`}>When closed</h3>
+          <SettingsSegmented
+            label="When closed"
+            value={afterHoursMode}
+            options={AFTER_HOURS_OPTIONS.map((opt) => ({
+              id: opt.id,
+              label: opt.label,
+            }))}
+            onChange={setAfterHoursMode}
+          />
         </div>
       </section>
 
@@ -1726,144 +1750,120 @@ export function TenantForm({
       </section>
 
       <section
-        className={panel === "policies" ? "space-y-3" : "hidden"}
+        className={panel === "policies" ? "space-y-6" : "hidden"}
       >
-        <div className="space-y-2">
-          <p className={settingsBlockTitleClass}>Rules</p>
-          <div className={settingsFormGridClass}>
-            {POLICY_FIELDS.map((field) => (
-              <div key={field.id} className={field.id === "other" ? "md:col-span-2" : ""}>
-                <label
-                  className="block text-xs font-medium text-ink-soft"
-                  htmlFor={`policy-${field.id}`}
-                >
-                  {field.label}
-                </label>
-                <PolicyTextarea
-                  id={`policy-${field.id}`}
-                  value={policies[field.id]}
-                  onChange={(value) =>
-                    setPolicies((prev) => ({ ...prev, [field.id]: value }))
-                  }
-                  placeholder={field.placeholder}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <SettingsGroup title="Rules">
+          {POLICY_FIELDS.map((field) => (
+            <SettingsStack
+              key={field.id}
+              label={field.label}
+              htmlFor={`policy-${field.id}`}
+            >
+              <PolicyTextarea
+                id={`policy-${field.id}`}
+                value={policies[field.id]}
+                onChange={(value) =>
+                  setPolicies((prev) => ({ ...prev, [field.id]: value }))
+                }
+                placeholder={field.placeholder}
+              />
+            </SettingsStack>
+          ))}
+        </SettingsGroup>
 
-        <div>
-          <p className={settingsBlockTitleClass}>When unsure</p>
-          <label className="mt-2 block text-xs font-medium text-ink-soft" htmlFor="unknown_answer_fallback">
-            What to say
-          </label>
-          <PolicyTextarea
-            id="unknown_answer_fallback"
-            value={unknownFallback}
-            onChange={setUnknownFallback}
-            placeholder="A teammate will call you back today."
-          />
-        </div>
+        <SettingsGroup title="When unsure">
+          <SettingsStack label="What to say" htmlFor="unknown_answer_fallback">
+            <PolicyTextarea
+              id="unknown_answer_fallback"
+              value={unknownFallback}
+              onChange={setUnknownFallback}
+              placeholder="A teammate will call you back today."
+            />
+          </SettingsStack>
+        </SettingsGroup>
       </section>
 
             <section className={panel === "tools" ? "space-y-6" : "hidden"}>
-        <div className="space-y-2">
-          <p className={settingsBlockTitleClass}>Voice</p>
-          {voiceOptions.length > 1 ? (
-            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Phone voice profile">
-              {voiceOptions.map((voice, index) => {
-                const selected = sonioxVoiceId === voice.id;
-                return (
-                  <button
-                    key={voice.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    title={voice.description || undefined}
-                    onClick={() => setSonioxVoiceId(voice.id)}
-                    className={choiceChipClass(selected)}
-                  >
-                    Voice option {index + 1}
-                  </button>
-                );
-              })}
-            </div>
-          ) : voiceOptions[0]?.description ? (
-            <p className="text-sm text-ink-soft">{voiceOptions[0].description}</p>
-          ) : (
-            <p className="text-sm text-ink-soft">No voices loaded.</p>
-          )}
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[12rem] flex-1">
-              <label className="block text-xs font-medium text-ink-soft" htmlFor="soniox_voice_label">
-                Voice label
-              </label>
-              <input
-                id="soniox_voice_label"
-                type="text"
-                maxLength={40}
-                value={sonioxVoiceLabel}
-                onChange={(e) => setSonioxVoiceLabel(e.target.value)}
-                placeholder="Shop voice"
-                className={`${denseFieldClass} mt-1`}
+        <SettingsGroup title="Voice">
+          <SettingsRow label="Voice" htmlFor="soniox_voice_id">
+            {voiceOptions.length > 1 ? (
+              <SettingsSelect
+                id="soniox_voice_id"
+                label="Phone voice profile"
+                value={sonioxVoiceId}
+                onChange={setSonioxVoiceId}
+                options={voiceOptions.map((voice, index) => ({
+                  id: voice.id,
+                  label: `Voice option ${index + 1}`,
+                }))}
               />
-            </div>
+            ) : (
+              <p className="text-sm text-ink-soft">
+                {voiceOptions[0]?.description || "No voices loaded."}
+              </p>
+            )}
+          </SettingsRow>
+          <SettingsRow label="Voice label" htmlFor="soniox_voice_label">
+            <input
+              id="soniox_voice_label"
+              type="text"
+              maxLength={40}
+              value={sonioxVoiceLabel}
+              onChange={(e) => setSonioxVoiceLabel(e.target.value)}
+              placeholder="Shop voice"
+              className={denseFieldClass}
+            />
+          </SettingsRow>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
+            <p className="text-sm text-ink-soft">
+              {sonioxVoiceLabel.trim() || sonioxVoiceId
+                ? displaySonioxVoiceLabel(
+                    sonioxVoiceLabel,
+                    sonioxVoiceId,
+                    voiceOptions
+                  )
+                : "No voice selected"}
+            </p>
             <button
               type="button"
               onClick={() => void generateVoiceSample()}
               disabled={voiceSampleLoading}
-              className={settingsActionClass}
+              className={settingsGhostButtonClass}
             >
               {voiceSampleLoading ? "Generating…" : "Hear sample"}
             </button>
           </div>
           {voiceSampleUrl ? (
-            <audio
-              controls
-              preload="metadata"
-              className="max-w-full"
-              onError={() => {
-                URL.revokeObjectURL(voiceSampleUrl);
-                setVoiceSampleUrl(null);
-                setVoiceSampleError(NO_VOICE_SAMPLE_COPY);
-              }}
-            >
-              <source src={voiceSampleUrl} type="audio/wav" />
-            </audio>
+            <div className="px-4 py-2">
+              <audio
+                controls
+                preload="metadata"
+                className="max-w-full"
+                onError={() => {
+                  URL.revokeObjectURL(voiceSampleUrl);
+                  setVoiceSampleUrl(null);
+                  setVoiceSampleError(NO_VOICE_SAMPLE_COPY);
+                }}
+              >
+                <source src={voiceSampleUrl} type="audio/wav" />
+              </audio>
+            </div>
           ) : voiceSampleError ? (
-            <p className="text-xs text-warn" role="alert" data-testid="voice-sample-empty">
+            <p className="px-4 py-2 text-xs text-warn" role="alert" data-testid="voice-sample-empty">
               {voiceSampleError}
             </p>
           ) : null}
-          {sonioxVoiceLabel.trim() || sonioxVoiceId ? (
-            <p className="text-xs text-ink-soft">
-              Selected:{" "}
-              <span className="font-medium text-ink">
-                {displaySonioxVoiceLabel(
-                  sonioxVoiceLabel,
-                  sonioxVoiceId,
-                  voiceOptions
-                )}
-              </span>
-            </p>
-          ) : null}
-        </div>
-        <div className="space-y-2">
-          <p className={settingsBlockTitleClass}>Tools</p>
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+        </SettingsGroup>
+        <SettingsGroup title="Tools">
           {AGENT_TOOL_OPTIONS.map((opt) => {
             const on = agentTools[opt.id];
             return (
-              <div
+              <SettingsRow
                 key={opt.id}
-                className="flex items-center justify-between gap-4 px-3 py-2.5"
+                label={opt.label}
+                hint={on ? opt.onLabel : opt.offLabel}
+                control="switch"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink">{opt.label}</p>
-                  <p className="mt-0.5 text-xs text-ink-soft">
-                    {on ? opt.onLabel : opt.offLabel}
-                  </p>
-                </div>
                 <ToolSwitch
                   checked={on}
                   label={opt.label}
@@ -1874,24 +1874,26 @@ export function TenantForm({
                     }))
                   }
                 />
-              </div>
+              </SettingsRow>
             );
           })}
+        </SettingsGroup>
+        <SettingsGroup title="Handoff">
+          <SettingsRow label="Mode">
+            <p className="text-sm font-medium text-ink">
+              {HANDOFF_OPTIONS.find((opt) => opt.id === handoffMode)?.label ||
+                "Message teammate"}
+            </p>
+          </SettingsRow>
+          <div className="px-4 py-2">
+            <Link
+              href={businessSettingsHref("train", "team")}
+              className={`inline-flex min-h-11 items-center text-sm font-medium text-accent-deep ${deskShiftClass} hover:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
+            >
+              Change in Team
+            </Link>
           </div>
-        </div>
-        <div className="space-y-2">
-          <p className={settingsBlockTitleClass}>Handoff</p>
-          <p className="text-sm font-medium text-ink">
-            {HANDOFF_OPTIONS.find((opt) => opt.id === handoffMode)?.label ||
-              "Message teammate"}
-          </p>
-          <Link
-            href={businessSettingsHref("train", "team")}
-            className={`inline-flex min-h-11 items-center text-sm font-medium text-accent-deep ${deskShiftClass} hover:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
-          >
-            Change in Team
-          </Link>
-        </div>
+        </SettingsGroup>
       </section>
 
 <section
@@ -1922,32 +1924,21 @@ export function TenantForm({
       </section>
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
-        <div className="space-y-2">
-          <p className={settingsBlockTitleClass}>Handoff</p>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handoff mode">
-            {HANDOFF_OPTIONS.filter(
+        <div className="space-y-1.5">
+          <h3 className={`${settingsBlockTitleClass} px-1`}>Handoff</h3>
+          <SettingsSegmented
+            label="Handoff mode"
+            value={handoffMode}
+            options={HANDOFF_OPTIONS.filter(
               (opt) =>
                 opt.id === "callback" ||
                 liveTransferExecutor ||
                 handoffMode === "live_transfer"
-            ).map((opt) => {
-              const selected = handoffMode === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => setHandoffMode(opt.id)}
-                  className={choiceChipClass(selected)}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+            ).map((opt) => ({ id: opt.id, label: opt.label }))}
+            onChange={setHandoffMode}
+          />
           {handoffMode === "live_transfer" ? (
-            <p className="text-xs text-[var(--ink-soft)]">
+            <p className="px-1 text-xs text-[var(--ink-soft)]">
               {liveTransferExecutor
                 ? liveDest
                   ? `Rings ${liveDest.name} during open hours.`
@@ -1957,7 +1948,7 @@ export function TenantForm({
                   : "Coming soon. Today we message a teammate."}
             </p>
           ) : (
-            <p className="text-xs text-[var(--ink-soft)]">
+            <p className="px-1 text-xs text-[var(--ink-soft)]">
               {canMessageTeam
                 ? "SMS, WhatsApp, or email. The AI stays on the line."
                 : "Add a team phone or alert email for messages to land."}
@@ -2039,19 +2030,18 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 lg:mt-0`}
                 />
               </div>
-              <div className="flex flex-wrap gap-1" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
+              <div className="flex flex-wrap items-center gap-3" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
                 {TEAM_NOTIFY_CHIPS.map((chip) => {
                   const selected = member[chip.key] === true;
                   return (
-                    <button
-                      key={chip.key}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => updateTeam(index, chip.key, !selected)}
-                      className={choiceChipClass(selected)}
-                    >
-                      {chip.label}
-                    </button>
+                    <div key={chip.key} className="flex min-h-11 items-center gap-2">
+                      <span className="text-xs font-medium text-ink">{chip.label}</span>
+                      <ToolSwitch
+                        checked={selected}
+                        label={`${chip.label} for ${member.name || `teammate ${index + 1}`}`}
+                        onChange={(next) => updateTeam(index, chip.key, next)}
+                      />
+                    </div>
                   );
                 })}
               </div>
@@ -2078,9 +2068,12 @@ export function TenantForm({
         id="golden-faqs"
         className={panel === "faqs" ? "space-y-3" : "hidden"}
       >
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <p className="text-xs text-ink-soft" aria-live="polite">
-            {filledFaqCount} of {FAQ_MAX}
+        <div className="flex flex-wrap items-end justify-between gap-2 px-1">
+          <p className={settingsBlockTitleClass} aria-live="polite">
+            FAQs
+            <span className="ml-2 font-medium normal-case tracking-normal text-ink-soft">
+              {filledFaqCount} of {FAQ_MAX}
+            </span>
           </p>
           <button
             type="button"
