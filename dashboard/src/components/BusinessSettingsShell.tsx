@@ -18,8 +18,10 @@ import {
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
 import {
+  SettingsGroup,
   SettingsPageHeader,
   settingsConsoleClass,
+  settingsGroupTitleClass,
   settingsPanelClass,
   settingsPanelHeadingClass,
   settingsRailClass,
@@ -28,9 +30,6 @@ import {
 import { ThemePicker } from "@/components/ThemePicker";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { deskShiftClass } from "@/components/ui/deskChrome";
-
-const SETTINGS_GROUP_TITLE_CLASS =
-  "pointer-events-none mb-1.5 select-none px-1 text-xs font-bold uppercase tracking-wide text-gray-500";
 
 function SettingsChevron() {
   return (
@@ -53,9 +52,13 @@ function SettingsChevron() {
 
 function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
   return (
-    <section className="min-w-0 space-y-4">
+    <section className="min-w-0 w-full space-y-6">
       {showHeading ? <h2 className={settingsPanelHeadingClass}>Appearance</h2> : null}
-      <ThemePicker />
+      <SettingsGroup title="Theme">
+        <div className="px-4 py-2">
+          <ThemePicker />
+        </div>
+      </SettingsGroup>
     </section>
   );
 }
@@ -88,7 +91,7 @@ function SettingsMenu({
     >
       {SETTINGS_NAV.map((section, index) => (
         <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
-          <h2 className={SETTINGS_GROUP_TITLE_CLASS}>{section.title}</h2>
+          <h2 className={`${settingsGroupTitleClass} mb-1.5 px-1`}>{section.title}</h2>
           {isRail ? (
             <ul className="space-y-0.5">
               {section.items.map((item) => {
@@ -123,7 +126,7 @@ function SettingsMenu({
               ) : null}
             </ul>
           ) : (
-            <ul className="overflow-hidden rounded-2xl border border-line bg-surface">
+            <ul className="w-full overflow-hidden rounded-xl border border-line bg-surface">
               {section.items.map((item, itemIndex) => {
                 const active = settingsNavItemActive(item.target, tab, trainPanel);
                 const key =

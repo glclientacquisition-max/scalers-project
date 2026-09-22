@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import { SettingsSegmented } from "@/components/settingsUi";
 
 const THEME_KEY = "scalers-desk-theme";
 const CHOICES = [
@@ -46,32 +46,11 @@ export function ThemePicker() {
   };
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="Appearance"
-      className="grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-surface-muted p-1 sm:w-60"
-    >
-      {CHOICES.map((option) => {
-        const active = choice === option.id;
-        return (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => pick(option.id)}
-            className={[
-              `min-h-11 rounded-lg px-3 text-sm font-medium ${deskShiftClass}`,
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-              active
-                ? "bg-surface text-ink shadow-sm"
-                : "text-ink-soft hover:text-ink",
-            ].join(" ")}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
+    <SettingsSegmented
+      label="Appearance"
+      value={choice}
+      options={CHOICES}
+      onChange={pick}
+    />
   );
 }
