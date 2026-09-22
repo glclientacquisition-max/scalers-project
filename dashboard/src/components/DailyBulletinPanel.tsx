@@ -106,8 +106,8 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
       </form>
 
       {items.length === 0 ? (
-        <p className="px-1 text-sm text-ink-soft [overflow-wrap:anywhere]">
-          No live updates. The assistant will use your normal services and FAQs.
+        <p className="px-1 text-sm text-ink-soft">
+          No live updates.
         </p>
       ) : (
         <SettingsGroup title="Live">

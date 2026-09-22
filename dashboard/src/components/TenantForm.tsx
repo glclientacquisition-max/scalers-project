@@ -109,6 +109,7 @@ import {
   settingsGhostButtonClass,
   settingsPanelClass,
   settingsTableFieldClass,
+  settingsTrashButtonClass,
 } from "@/components/settingsUi";
 import {
   TenantSettingsSaveButton,
@@ -203,7 +204,7 @@ const emptyMember = (): TeamDirectoryEntry => ({
   ...EMPTY_TEAM_NOTIFY_FLAGS,
 });
 
-const TEAM_NOTIFY_CHIPS: Array<{
+const TEAM_NOTIFY_FLAGS: Array<{
   key: "receives_escalation" | "receives_inbox" | "receives_ops";
   label: string;
 }> = [
@@ -287,7 +288,7 @@ function CatalogPager({
           type="button"
           disabled={page <= 0}
           onClick={onPrev}
-          className={`min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
+          className={`min-h-11 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
         >
           Previous
         </button>
@@ -298,7 +299,7 @@ function CatalogPager({
           type="button"
           disabled={page >= pageCount - 1}
           onClick={onNext}
-          className={`min-h-9 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
+          className={`min-h-11 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
         >
           Next
         </button>
@@ -886,7 +887,7 @@ export function TenantForm({
                     <button
                       type="button"
                       onClick={() => removeSocialChannel(index)}
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-surface hover:text-warn"
+                      className={settingsTrashButtonClass}
                       aria-label={`Remove contact ${index + 1}`}
                     >
                       <TrashIcon className="h-4 w-4" />
@@ -1009,7 +1010,7 @@ export function TenantForm({
                           <button
                             type="button"
                             onClick={() => removeSocialChannel(index)}
-                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                            className={settingsTrashButtonClass}
                             aria-label={`Remove contact ${index + 1}`}
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -1142,7 +1143,7 @@ export function TenantForm({
                           prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
                         )
                       }
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:bg-surface hover:text-warn"
+                      className={settingsTrashButtonClass}
                       aria-label={`Remove service ${index + 1}`}
                     >
                       <TrashIcon className="h-4 w-4" />
@@ -1262,7 +1263,7 @@ export function TenantForm({
                                   : prev.filter((_, i) => i !== index)
                               )
                             }
-                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                            className={settingsTrashButtonClass}
                             aria-label={`Remove service ${index + 1}`}
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -1372,7 +1373,7 @@ export function TenantForm({
                   <div key={`product-m-${index}`} className="space-y-2 rounded-xl border border-line bg-surface p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Product {index + 1}</p>
-                      <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft hover:text-warn" aria-label={`Remove product ${index + 1}`}>
+                      <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className={settingsTrashButtonClass} aria-label={`Remove product ${index + 1}`}>
                         <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
@@ -1486,7 +1487,7 @@ export function TenantForm({
                               onClick={() =>
                                 setProducts((prev) => prev.filter((_, i) => i !== index))
                               }
-                              className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                              className={settingsTrashButtonClass}
                               aria-label={`Remove product ${index + 1}`}
                             >
                               <TrashIcon className="h-4 w-4" />
@@ -1735,13 +1736,13 @@ export function TenantForm({
                     onClick={() =>
                       setLocations((prev) => prev.filter((_, i) => i !== index))
                     }
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                    className={settingsTrashButtonClass}
                     aria-label={`Remove location ${index + 1}`}
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
                 ) : (
-                  <span className="h-9 w-9" aria-hidden />
+                  <span className="h-11 w-11" aria-hidden />
                 )}
               </div>
             </div>
@@ -2031,15 +2032,15 @@ export function TenantForm({
                 />
               </div>
               <div className="flex flex-wrap items-center gap-3" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
-                {TEAM_NOTIFY_CHIPS.map((chip) => {
-                  const selected = member[chip.key] === true;
+                {TEAM_NOTIFY_FLAGS.map((flag) => {
+                  const selected = member[flag.key] === true;
                   return (
-                    <div key={chip.key} className="flex min-h-11 items-center gap-2">
-                      <span className="text-xs font-medium text-ink">{chip.label}</span>
+                    <div key={flag.key} className="flex min-h-11 items-center gap-2">
+                      <span className="text-xs font-medium text-ink">{flag.label}</span>
                       <ToolSwitch
                         checked={selected}
-                        label={`${chip.label} for ${member.name || `teammate ${index + 1}`}`}
-                        onChange={(next) => updateTeam(index, chip.key, next)}
+                        label={`${flag.label} for ${member.name || `teammate ${index + 1}`}`}
+                        onChange={(next) => updateTeam(index, flag.key, next)}
                       />
                     </div>
                   );
@@ -2053,7 +2054,7 @@ export function TenantForm({
                       prev.length <= 1 ? [emptyMember()] : prev.filter((_, i) => i !== index)
                     )
                   }
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                  className={settingsTrashButtonClass}
                   aria-label={`Remove teammate ${index + 1}`}
                 >
                   <TrashIcon className="h-4 w-4" />
@@ -2107,7 +2108,7 @@ export function TenantForm({
                       return next;
                     })
                   }
-                  className="rounded-xl border border-line bg-surface px-3 py-1.5 text-left text-xs text-ink hover:border-accent"
+                  className={`${settingsGhostButtonClass} text-left`}
                 >
                   {starter.question}
                 </button>
@@ -2176,7 +2177,7 @@ export function TenantForm({
                       prev.length <= 1 ? [emptyFaq()] : prev.filter((_, i) => i !== index)
                     )
                   }
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn`}
+                  className={settingsTrashButtonClass}
                   aria-label={`Remove FAQ ${index + 1}`}
                 >
                   <TrashIcon className="h-4 w-4" />

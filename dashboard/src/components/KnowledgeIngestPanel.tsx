@@ -187,7 +187,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                     disabled={extractPending}
                     className={settingsPrimaryButtonClass}
                   >
-                    {extractPending ? "Finding services…" : "Scan and suggest"}
+                    {extractPending ? "Scanning…" : "Scan"}
                   </button>
                 </div>
               </div>
@@ -211,7 +211,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                     disabled={extractPending}
                     className={settingsPrimaryButtonClass}
                   >
-                    {extractPending ? "Opening page…" : "Scan and suggest"}
+                    {extractPending ? "Scanning…" : "Scan"}
                   </button>
                 </div>
               </div>
@@ -219,9 +219,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
 
             {extractPending ? (
               <p className="text-right text-xs text-ink-soft">
-                {mode === "url"
-                  ? "Usually under 10 seconds. If the site hides its menu, paste instead."
-                  : "Usually a few seconds."}
+                Scanning
               </p>
             ) : null}
           </form>

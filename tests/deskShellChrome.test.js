@@ -156,6 +156,13 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(nav, /SignOutButton/);
     assert.match(signOut, /action="\/api\/logout"/);
     assert.match(signOut, />\s*Sign out\s*</);
+    assert.match(signOut, /const \[confirming, setConfirming\] = useState\(false\)/);
+    assert.match(signOut, /Sign out\?/);
+    assert.match(signOut, />\s*Stay\s*</);
+    assert.match(signOut, /setConfirming\(true\)/);
+    assert.match(signOut, /type="submit"/);
+    assert.match(signOut, /btnPrimary/);
+    assert.match(signOut, /if \(!confirming\)/);
     assert.match(settingsUi, /SignOutButton/);
     assert.match(settingsUi, />Profile</);
     assert.match(settingsShell, /<SignOutButton/);

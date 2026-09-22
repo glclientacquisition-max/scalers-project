@@ -28,7 +28,7 @@ export const PRONUNCIATION_BEST_FLOW = [
   "Practice pack lines (Greeting / Location / Team) and Keep good takes.",
   "On Fix: clear Needs review first (Record preferred, or Approve spelling).",
   "Add a word you heard wrong → Record it (typed spelling is a fallback).",
-  "Find more: Quick scan (transcripts) for names; AI listen (Gemini) for audio drafts.",
+  "Find more: Scan (transcripts) for names; AI listen (Gemini) for audio drafts.",
   "Verify on Test → Play phone preview, then call the live DID.",
 ] as const;
 

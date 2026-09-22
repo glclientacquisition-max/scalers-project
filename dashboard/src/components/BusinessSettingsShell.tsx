@@ -54,7 +54,7 @@ function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
   return (
     <section className="min-w-0 w-full space-y-6">
       {showHeading ? <h2 className={settingsPanelHeadingClass}>Appearance</h2> : null}
-      <SettingsGroup title="Theme">
+      <SettingsGroup title="This device">
         <div className="px-4 py-2">
           <ThemePicker />
         </div>
@@ -177,12 +177,11 @@ function SettingsPanelBody({
   tenant,
   curatedVoices,
 }: {
-  tab: Exclude<BusinessSettingsTab, "menu" | "catalog" | "train">;
+  tab: Exclude<BusinessSettingsTab, "menu" | "catalog" | "train" | "alerts">;
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
 }) {
   if (tab === "updates") return <DailyBulletinPanel tenant={tenant} />;
-  if (tab === "alerts") return <AlertsPanel tenant={tenant} />;
   if (tab === "import") {
     return (
       <div className="space-y-6">
@@ -279,24 +278,34 @@ export function BusinessSettingsShell({
         <div className={settingsConsoleClass}>
           {rail}
           <div className={settingsPanelClass}>
-            <SettingsPageHeader
-              businessName={businessName}
-              lineLive={lineLive}
-              lineDetail={lineDetail}
-              showBack
-              title={heading}
-            />
-            {tab === "updates" ||
-            tab === "alerts" ||
-            tab === "import" ||
-            tab === "test" ||
-            tab === "appearance" ? (
-              <SettingsPanelBody
-                tab={tab}
+            {tab === "alerts" ? (
+              <AlertsPanel
                 tenant={tenant}
-                curatedVoices={curatedVoices}
+                businessName={businessName}
+                lineLive={lineLive}
+                lineDetail={lineDetail}
               />
-            ) : null}
+            ) : (
+              <>
+                <SettingsPageHeader
+                  businessName={businessName}
+                  lineLive={lineLive}
+                  lineDetail={lineDetail}
+                  showBack
+                  title={heading}
+                />
+                {tab === "updates" ||
+                tab === "import" ||
+                tab === "test" ||
+                tab === "appearance" ? (
+                  <SettingsPanelBody
+                    tab={tab}
+                    tenant={tenant}
+                    curatedVoices={curatedVoices}
+                  />
+                ) : null}
+              </>
+            )}
           </div>
         </div>
       )}

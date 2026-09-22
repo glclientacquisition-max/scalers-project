@@ -130,8 +130,39 @@ describe("business settings craft", () => {
     assert.match(shell, /SignOutButton/);
     assert.match(shell, /SettingsSignOutRow/);
     assert.match(shell, /<ThemePicker \/>/);
+    assert.match(shell, /title="This device"/);
     assert.match(nav, /title: "This device"/);
     assert.match(nav, /label: "Appearance"/);
+  });
+
+  it("confirms Sign out before POST /api/logout", () => {
+    const signOut = read("dashboard/src/components/ui/SignOutButton.tsx");
+    assert.match(signOut, /const \[confirming, setConfirming\] = useState\(false\)/);
+    assert.match(signOut, /setConfirming\(true\)/);
+    assert.match(signOut, /if \(!confirming\)/);
+    assert.match(signOut, /Sign out\?/);
+    assert.match(signOut, />\s*Stay\s*</);
+    assert.match(signOut, /action="\/api\/logout"/);
+    assert.match(signOut, /method="post"/);
+    assert.match(signOut, /type="submit"/);
+    assert.match(signOut, /btnPrimary/);
+    assert.match(signOut, /type="button"/);
+    assert.doesNotMatch(
+      signOut.slice(0, signOut.indexOf("if (!confirming)")),
+      /type="submit"/
+    );
+  });
+
+  it("labels Appearance as This device and persists with scalers-desk-theme", () => {
+    const themeLib = read("dashboard/src/lib/deskTheme.ts");
+    const layout = read("dashboard/src/app/layout.tsx");
+    assert.match(theme, /label="This device"/);
+    assert.match(theme, /readDeskTheme/);
+    assert.match(theme, /writeDeskTheme/);
+    assert.match(themeLib, /export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme"/);
+    assert.match(themeLib, /localStorage\.setItem\(DESK_THEME_STORAGE_KEY, choice\)/);
+    assert.match(layout, /DESK_THEME_STORAGE_KEY/);
+    assert.doesNotMatch(theme, /tenant\.|llm_system_prompt/);
   });
 
   it("opens /settings as a destination menu, not a dumped form", () => {
@@ -220,7 +251,18 @@ describe("business settings craft", () => {
     assert.match(form, /label="When closed"/);
     assert.match(form, /<SettingsSelect/);
     assert.match(alerts, /<ToolSwitch/);
+    assert.match(alerts, /ALERTS_SETTINGS_FORM_ID/);
+    assert.match(alerts, /form=\{ALERTS_SETTINGS_FORM_ID\}/);
     assert.match(theme, /SettingsSegmented/);
+    assert.match(theme, /label="This device"/);
+    assert.match(form, /TEAM_NOTIFY_FLAGS/);
+    assert.match(form, /settingsTrashButtonClass/);
+    assert.doesNotMatch(form, /TEAM_NOTIFY_CHIPS/);
+    const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
+    const catalogImport = read("dashboard/src/components/CatalogImportPanel.tsx");
+    assert.match(ingest, /\{extractPending \? "Scanning…" : "Scan"\}/);
+    assert.match(catalogImport, /\{previewPending \? "Scanning…" : "Scan"\}/);
+    assert.doesNotMatch(ingest, /Scan and suggest/);
     assert.match(test, /settingsPrimaryButtonClass/);
     assert.match(test, /Call \{did\}/);
     assert.doesNotMatch(form, /choiceChipClass/);

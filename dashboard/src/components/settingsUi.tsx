@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Shared Business Settings UI tokens and primitives.
  * Keep density, focus rings, selection, and destructive actions consistent.
@@ -45,6 +47,9 @@ export const settingsStickyHeaderClass =
 
 export const settingsActionClass =
   `inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] active:bg-accent/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`;
+
+export const settingsTrashButtonClass =
+  `inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
 
 export const settingsPrimaryButtonClass = btnPrimary;
 
@@ -113,7 +118,7 @@ export function TrashButton({
       onClick={onClick}
       aria-label={label}
       className={[
-        `inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-warn active:bg-surface-muted active:text-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
+        settingsTrashButtonClass,
         className,
       ].join(" ")}
     >
