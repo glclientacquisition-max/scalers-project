@@ -17,6 +17,7 @@ describe("business settings depth", () => {
   const alerts = read("dashboard/src/components/AlertsPanel.tsx");
   const alertsActions = read("dashboard/src/app/(desk)/settings/alertsActions.ts");
   const compileActions = read("dashboard/src/app/(desk)/settings/actions.ts");
+  const nav = read("dashboard/src/lib/businessSettingsNav.ts");
 
   it("orders Assistant before Business and uses example placeholders", () => {
     const assistantName = form.indexOf("Assistant name");
@@ -62,7 +63,7 @@ describe("business settings depth", () => {
   });
 
   it("saves alerts on their own panel to the same tenant columns", () => {
-    assert.match(alerts, />Alerts</);
+    assert.match(nav, /if \(tab === "alerts"\) return "Alerts"/);
     assert.match(alerts, /Alert phone/);
     assert.match(alerts, /Text customers/);
     assert.match(alerts, /Text back missed calls/);

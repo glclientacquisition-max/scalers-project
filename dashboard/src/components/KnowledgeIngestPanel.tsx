@@ -14,7 +14,6 @@ import {
 import {
   settingsActionClass,
   settingsFieldClass,
-  settingsPanelHeadingClass,
   settingsPrimaryButtonClass,
   settingsRadioCardClass,
   compactTextareaExpandHandlers,
@@ -144,10 +143,6 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className={settingsPanelHeadingClass}>Import knowledge</h2>
-      </div>
-
       {!draft ? (
         <div className="space-y-4">
           <div className="grid gap-2 sm:grid-cols-2">

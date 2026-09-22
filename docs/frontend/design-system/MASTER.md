@@ -115,7 +115,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Preview truncate | `deskPreviewClass` (`min-w-0 truncate`) on list copy. Table cells that hold that copy use `deskPreviewCellClass` (`w-full max-w-0`) so the column takes leftover width and the ellipsis can fire. Never `overflow-wrap: anywhere` on a preview. Home queue units stay count nouns. A single short slot (`Tue 14:00`) may replace the unit. A hangup sentence may not. |
 | Pagination | `ui/Pagination.tsx` (`min-h-11` hits) |
 | Field | `deskFieldClass`. Settings: `settingsFieldClass` = `mt-1` + `deskFieldClass` |
-| Sticky save | `settingsStickyHeaderClass` under `--desk-header-h` |
+| Sticky save | `settingsStickyHeaderClass` under `--desk-header-h`. Profile is an inner rail (`lg:w-[13.5rem]`) plus a fluid panel. |
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk hint | `DeskHint`. Navy name chip on hover, pointer, and keyboard focus for icon-only hits. Portaled. Escape and scroll dismiss. The control keeps `aria-label`. |
 | Desk rail | `DeskRail` in `DeskNav.tsx`. `md+` only. `w-[4.5rem]`. Same `DESK_LINKS` as the phone tabs (Overview, Inbox, Contacts, Usage, Profile). Icon-only 44px hits, `DeskHint` names. Needs you badge on Inbox. Mark-only Scalers at the top. Sign out lives on Profile, not at the rail foot. |

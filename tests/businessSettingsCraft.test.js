@@ -118,8 +118,9 @@ describe("business settings craft", () => {
     assert.match(shell, /SettingsChevron/);
     assert.match(shell, /min-h-12/);
     assert.match(shell, /variant: "index" \| "rail"/);
-    assert.match(shell, /hidden min-w-0 lg:block/);
-    assert.match(shell, /lg:sticky/);
+    assert.match(shell, /settingsRailWrapClass/);
+    assert.match(ui, /hidden min-w-0 shrink-0 lg:block lg:w-\[13\.5rem\]/);
+    assert.match(ui, /lg:sticky lg:top-4/);
   });
 
   it("keeps Sign out on Profile and parks Appearance under This device", () => {
@@ -136,7 +137,7 @@ describe("business settings craft", () => {
     assert.match(nav, /return "menu"/);
     assert.match(nav, /if \(tab === "menu"\) return "\/settings"/);
     assert.match(shell, /variant: "index" \| "rail"/);
-    assert.match(shell, /hidden min-w-0 lg:block/);
+    assert.match(shell, /settingsRailWrapClass/);
     assert.match(shell, /SettingsChevron/);
     assert.match(shell, /min-h-12/);
     assert.match(ui, /SettingsBackLink/);
@@ -178,5 +179,28 @@ describe("business settings craft", () => {
     assert.match(save, /active:scale-\[0\.99\]/);
     assert.match(form, /SettingsPageHeader/);
     assert.doesNotMatch(shell, /glass|mesh|MetricCard/);
+  });
+
+  it("fills the lg canvas with an inner rail and a fluid panel", () => {
+    assert.match(shell, /data-settings-console/);
+    assert.match(shell, /settingsConsoleClass/);
+    assert.match(shell, /settingsPanelClass/);
+    assert.match(shell, /settingsRailWrapClass/);
+    assert.doesNotMatch(shell, /max-w-5xl|max-w-xl/);
+    assert.doesNotMatch(test, /max-w-xl/);
+    assert.match(ui, /lg:w-\[13\.5rem\]/);
+    assert.match(ui, /grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2/);
+    assert.match(ui, /min-w-0 flex-1/);
+    assert.match(ui, /text-xl font-semibold/);
+    assert.match(form, /settingsFormGridClass/);
+    assert.match(form, /grid-cols-\[minmax\(5\.5rem,7rem\)_5\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
+    assert.match(form, /lg:grid-cols-\[8rem_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1\.1fr\)_minmax\(0,1\.1fr\)_2\.5rem\]/);
+    assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(10rem,auto\)_2\.5rem\]/);
+    assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.5rem\]/);
+    assert.match(shell, /border-l-2/);
+    assert.match(shell, /border-accent text-accent-deep/);
+    const deskNav = read("dashboard/src/components/DeskNav.tsx");
+    assert.match(deskNav, /data-settings-console/);
+    assert.match(deskNav, /md:has-\[\[data-settings-console\]\]:max-w-none/);
   });
 });
