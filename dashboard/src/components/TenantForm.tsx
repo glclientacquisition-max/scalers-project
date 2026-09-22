@@ -1514,7 +1514,7 @@ export function TenantForm({
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>
         <SettingsGroup title="Days">
-          <div className="grid grid-cols-[minmax(5.5rem,7rem)_2.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+          <div className="grid grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
             <span>Day</span>
             <span>Open</span>
             <span>Opens</span>
@@ -1526,7 +1526,7 @@ export function TenantForm({
             return (
               <div
                 key={day}
-                className="grid grid-cols-[minmax(5.5rem,7rem)_2.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 px-3 py-1.5"
+                className="grid grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 px-3 py-1.5"
               >
                 <span className="text-sm font-medium text-ink">
                   {DAY_LABELS[day]}

@@ -195,7 +195,7 @@ describe("business settings craft", () => {
     assert.match(ui, /min-w-0 flex-1/);
     assert.match(ui, /text-xl font-semibold/);
     assert.match(form, /SettingsGroup/);
-    assert.match(form, /grid-cols-\[minmax\(5\.5rem,7rem\)_2\.75rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
+    assert.match(form, /grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
     assert.match(form, /lg:grid-cols-\[8rem_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1\.1fr\)_minmax\(0,1\.1fr\)_2\.5rem\]/);
     assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(10rem,auto\)_2\.5rem\]/);
     assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.5rem\]/);
