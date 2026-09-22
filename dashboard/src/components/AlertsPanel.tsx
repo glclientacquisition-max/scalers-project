@@ -6,6 +6,7 @@ import type { TenantRow } from "@/lib/supabase";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
 import {
   SettingsGroup,
+  SettingsPageHeader,
   SettingsRow,
   ToolSwitch,
   settingsDenseFieldClass,
@@ -22,7 +23,19 @@ import {
 
 const initial: AlertsActionState = {};
 
-export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
+export const ALERTS_SETTINGS_FORM_ID = "alerts-settings-form";
+
+export function AlertsPanel({
+  tenant,
+  businessName,
+  lineLive,
+  lineDetail,
+}: {
+  tenant: TenantRow;
+  businessName: string;
+  lineLive: boolean;
+  lineDetail: string;
+}) {
   const router = useRouter();
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
     tenant.whatsapp_notification_number || ""
@@ -52,16 +65,28 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="min-w-0 w-full space-y-6">
-      <form action={formAction} className="min-w-0 space-y-6">
-        <div className="mb-4 flex justify-end">
+      <SettingsPageHeader
+        businessName={businessName}
+        lineLive={lineLive}
+        lineDetail={lineDetail}
+        showBack
+        title="Alerts"
+        action={
           <button
             type="submit"
+            form={ALERTS_SETTINGS_FORM_ID}
             disabled={pending}
             className={settingsPrimaryButtonClass}
           >
             {pending ? "Saving…" : "Save"}
           </button>
-        </div>
+        }
+      />
+      <form
+        id={ALERTS_SETTINGS_FORM_ID}
+        action={formAction}
+        className="min-w-0 space-y-6"
+      >
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input
           type="hidden"

@@ -2,52 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { SettingsSegmented } from "@/components/settingsUi";
+import {
+  applyDeskTheme,
+  readDeskTheme,
+  writeDeskTheme,
+  type DeskTheme,
+} from "@/lib/deskTheme";
 
-const THEME_KEY = "scalers-desk-theme";
 const CHOICES = [
   { id: "system", label: "System" },
   { id: "light", label: "Light" },
   { id: "dark", label: "Dark" },
 ] as const;
 
-type DeskTheme = (typeof CHOICES)[number]["id"];
-
-function applyTheme(choice: DeskTheme) {
-  const root = document.documentElement;
-  if (choice === "system") {
-    delete root.dataset.theme;
-  } else {
-    root.dataset.theme = choice;
-  }
-}
-
 /** Device-level appearance for the desk. Instant apply; never a tenant setting. */
 export function ThemePicker() {
   const [choice, setChoice] = useState<DeskTheme>("system");
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(THEME_KEY);
-      if (saved === "light" || saved === "dark") setChoice(saved);
-    } catch {
-      // private mode: system default stands
-    }
+    const saved = readDeskTheme();
+    setChoice(saved);
+    applyDeskTheme(saved);
   }, []);
 
   const pick = (next: DeskTheme) => {
     setChoice(next);
-    try {
-      if (next === "system") localStorage.removeItem(THEME_KEY);
-      else localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // still applies for this session via applyTheme
-    }
-    applyTheme(next);
+    writeDeskTheme(next);
+    applyDeskTheme(next);
   };
 
   return (
     <SettingsSegmented
-      label="Appearance"
+      label="This device"
       value={choice}
       options={CHOICES}
       onChange={pick}

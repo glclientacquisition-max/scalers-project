@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Sora } from "next/font/google";
 import { NotifyHost } from "@/components/ui/DeskNotice";
+import { DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
 import "./globals.css";
 
 const sans = DM_Sans({
@@ -73,7 +74,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'try{var t=localStorage.getItem("scalers-desk-theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}',
+              `try{var t=localStorage.getItem(${JSON.stringify(DESK_THEME_STORAGE_KEY)});if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}`,
           }}
         />
         {children}

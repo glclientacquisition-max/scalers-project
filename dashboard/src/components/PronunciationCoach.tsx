@@ -49,7 +49,8 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import { deskShiftClass, filterTabClass } from "@/components/ui/deskChrome";
+import { deskShiftClass, filterTabClass, btnPrimary } from "@/components/ui/deskChrome";
+import { settingsGhostButtonClass } from "@/components/settingsUi";
 
 type CoachItem = PronunciationSuggestion & {
   status: "todo" | "done" | "skipped";
@@ -751,7 +752,7 @@ export function PronunciationCoach({
                 <button
                   type="button"
                   onClick={() => setMode("fix")}
-                  className="rounded-xl bg-accent-fill px-4 py-2 text-sm font-medium text-accent-on-fill hover:bg-accent-fill-hover"
+                  className={btnPrimary}
                 >
                   Fix a word
                 </button>
@@ -767,7 +768,7 @@ export function PronunciationCoach({
           ) : (
             <>
               {active ? (
-                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-white via-[var(--accent-soft)]/35 to-white px-4 py-4 sm:px-5">
+                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-surface via-accent-soft/35 to-surface px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                       {active.label}
@@ -1282,7 +1283,7 @@ export function PronunciationCoach({
                 type="button"
                 onClick={() => submitQuickAdd("record")}
                 disabled={!addPhrase.trim()}
-                className="rounded-xl bg-accent-fill px-4 py-2 text-sm font-medium text-accent-on-fill hover:bg-accent-fill-hover disabled:opacity-60"
+                className={btnPrimary}
               >
                 Record &amp; train
               </button>
@@ -1356,9 +1357,9 @@ export function PronunciationCoach({
                 type="button"
                 onClick={scanCalls}
                 disabled={minePending || geminiPending}
-                className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+                className={btnPrimary}
               >
-                {minePending ? "Scanning…" : "Quick scan"}
+                {minePending ? "Scanning…" : "Scan"}
               </button>
               <select
                 id="gemini-batch"
@@ -1378,7 +1379,7 @@ export function PronunciationCoach({
                 type="button"
                 onClick={() => runGeminiScan(false)}
                 disabled={geminiPending || minePending}
-                className="rounded-xl border border-[var(--ink)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-60"
+                className={`${settingsGhostButtonClass} disabled:opacity-60`}
               >
                 {geminiPending ? "Listening…" : "AI listen"}
               </button>
@@ -1399,7 +1400,7 @@ export function PronunciationCoach({
                     type="button"
                     onClick={() => runGeminiScan(true)}
                     disabled={geminiPending}
-                    className="rounded-lg bg-accent-fill px-3 py-1.5 text-sm font-medium text-accent-on-fill disabled:opacity-60"
+                    className={btnPrimary}
                   >
                     Confirm
                   </button>
@@ -1409,7 +1410,7 @@ export function PronunciationCoach({
                       setGeminiConfirmOpen(false);
                       setGeminiNote(null);
                     }}
-                    className="rounded-lg px-3 py-1.5 text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                    className={settingsGhostButtonClass}
                   >
                     Cancel
                   </button>
@@ -1422,7 +1423,7 @@ export function PronunciationCoach({
             ) : null}
             {mineState.ok ? (
               <p className="text-xs text-[var(--ink-soft)]" role="status">
-                Quick scan: {mineState.scannedLines ?? 0} lines
+                Scan: {mineState.scannedLines ?? 0} lines
                 {mineState.suggestions?.length
                   ? ` · ${mineState.suggestions.length} sent to Practice`
                   : " · nothing new"}

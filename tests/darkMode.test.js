@@ -81,7 +81,13 @@ describe("dark palette", () => {
 describe("theme activation", () => {
   it("sets data-theme before paint from the per-device choice", () => {
     const layout = read("dashboard/src/app/layout.tsx");
-    assert.match(layout, /localStorage\.getItem\("scalers-desk-theme"\)/);
+    const themeLib = read("dashboard/src/lib/deskTheme.ts");
+    assert.match(themeLib, /export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme"/);
+    assert.match(themeLib, /localStorage\.getItem\(DESK_THEME_STORAGE_KEY\)/);
+    assert.match(themeLib, /localStorage\.setItem\(DESK_THEME_STORAGE_KEY, choice\)/);
+    assert.match(themeLib, /localStorage\.removeItem\(DESK_THEME_STORAGE_KEY\)/);
+    assert.match(layout, /DESK_THEME_STORAGE_KEY/);
+    assert.match(layout, /localStorage\.getItem\(\$\{JSON\.stringify\(DESK_THEME_STORAGE_KEY\)\}\)/);
     assert.match(layout, /document\.documentElement\.dataset\.theme/);
     assert.match(layout, /dangerouslySetInnerHTML/);
   });
@@ -101,19 +107,26 @@ describe("theme activation", () => {
     assert.doesNotMatch(lockup, /text-brand-900/);
   });
 
-  it("offers System, Light, Dark as an instant device preference", () => {
+  it("offers System, Light, Dark as an instant This device preference", () => {
     const picker = read("dashboard/src/components/ThemePicker.tsx");
+    const themeLib = read("dashboard/src/lib/deskTheme.ts");
     const ui = read("dashboard/src/components/settingsUi.tsx");
     assert.match(ui, /role="radiogroup"/);
     assert.match(picker, /SettingsSegmented/);
+    assert.match(picker, /label="This device"/);
+    assert.match(picker, /readDeskTheme/);
+    assert.match(picker, /writeDeskTheme/);
+    assert.match(picker, /applyDeskTheme/);
+    assert.doesNotMatch(picker, /tenant\.|saveAndCompile|llm_system_prompt/);
     for (const label of ['"system"', '"light"', '"dark"']) {
       assert.ok(picker.includes(`id: ${label}`), `choice ${label}`);
     }
-    assert.match(picker, /localStorage\.setItem\(THEME_KEY, next\)/);
-    assert.match(picker, /delete root\.dataset\.theme/);
+    assert.match(themeLib, /delete root\.dataset\.theme/);
+    assert.match(themeLib, /root\.dataset\.theme = choice/);
     const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
     const settingsNav = read("dashboard/src/lib/businessSettingsNav.ts");
     assert.match(shell, /<ThemePicker \/>/);
+    assert.match(shell, /title="This device"/);
     assert.match(settingsNav, /This device/);
     assert.match(settingsNav, /label: "Appearance"/);
   });
