@@ -12,11 +12,14 @@ import {
   type CatalogImportState,
 } from "@/app/(desk)/settings/catalogActions";
 import {
+  SettingsGroup,
+  SettingsRow,
+  SettingsSegmented,
+  ToolSwitch,
   settingsActionClass,
   settingsBlockTitleClass,
   settingsFieldClass,
   settingsPrimaryButtonClass,
-  settingsRadioCardClass,
   compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
 
@@ -97,27 +100,18 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
 
       {!products ? (
         <div className="space-y-3">
-          <div className="grid gap-2 sm:grid-cols-3">
-            {(
+          <SettingsSegmented
+            label="Catalogue source"
+            value={mode}
+            options={
               [
-                { id: "csv" as const, label: "CSV / spreadsheet", blurb: "name,price,category,in_stock" },
-                { id: "paste" as const, label: "Paste list", blurb: "One product per line" },
-                { id: "url" as const, label: "Website", blurb: "Public catalogue page" },
+                { id: "csv" as const, label: "CSV" },
+                { id: "paste" as const, label: "Paste" },
+                { id: "url" as const, label: "Website" },
               ] as const
-            ).map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setMode(opt.id)}
-                className={settingsRadioCardClass(mode === opt.id)}
-              >
-                <span className="font-medium text-ink">{opt.label}</span>
-                <span className="mt-0.5 block text-xs text-ink-soft">
-                  {opt.blurb}
-                </span>
-              </button>
-            ))}
-          </div>
+            }
+            onChange={setMode}
+          />
 
           <form action={previewAction} className="space-y-3">
             <input type="hidden" name="tenant_id" value={tenant.id} />
@@ -183,15 +177,17 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
           <p className="text-sm text-ink-soft">
             {previewState.message || "Tick products to keep."}
           </p>
-          <ul className="max-h-72 space-y-2 overflow-y-auto">
+          <SettingsGroup title="Products">
             {products.map((p, i) => (
-              <li
+              <SettingsRow
                 key={`p-${i}`}
-                className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2 text-sm"
+                label={p.name}
+                hint={[p.price, p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
+                  .filter(Boolean)
+                  .join(" · ")}
+                control="switch"
               >
-                <input
-                  type="checkbox"
-                  className="mt-1"
+                <ToolSwitch
                   checked={selected.has(i)}
                   onChange={() => {
                     const next = new Set(selected);
@@ -199,55 +195,42 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                     else next.add(i);
                     setSelected(next);
                   }}
+                  label={`Keep ${p.name}`}
                 />
-                <div>
-                  <p className="font-medium text-ink">{p.name}</p>
-                  <p className="text-ink-soft">
-                    {[p.price, p.category, p.in_stock ? `stock ${p.in_stock}` : ""]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-              </li>
+              </SettingsRow>
             ))}
-          </ul>
+          </SettingsGroup>
 
           {social && socialHandlesHaveContent(social) ? (
-            <label className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={includeSocial}
-                onChange={(e) => setIncludeSocial(e.target.checked)}
-              />
-              <span>
-                <span className="font-medium">Also save phones / social found</span>
-                <span className="mt-1 block text-ink-soft">
-                  {social.channels
-                    .filter((c) => c.value.trim())
-                    .map((c) => `${c.kind}${c.label ? ` (${c.label})` : ""}: ${c.value}`)
-                    .join(" · ")}
-                </span>
-              </span>
-            </label>
+            <SettingsGroup title="Contacts">
+              <SettingsRow
+                label="Also save phones / social found"
+                hint={social.channels
+                  .filter((c) => c.value.trim())
+                  .map((c) => `${c.kind}${c.label ? ` (${c.label})` : ""}: ${c.value}`)
+                  .join(" · ")}
+                control="switch"
+              >
+                <ToolSwitch
+                  checked={includeSocial}
+                  onChange={setIncludeSocial}
+                  label="Also save phones / social found"
+                />
+              </SettingsRow>
+            </SettingsGroup>
           ) : null}
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setMergeMode("merge")}
-              className={settingsRadioCardClass(mergeMode === "merge")}
-            >
-              Keep existing products
-            </button>
-            <button
-              type="button"
-              onClick={() => setMergeMode("replace")}
-              className={settingsRadioCardClass(mergeMode === "replace")}
-            >
-              Replace catalogue
-            </button>
-          </div>
+          <SettingsSegmented
+            label="Catalogue merge"
+            value={mergeMode}
+            options={
+              [
+                { id: "merge" as const, label: "Keep existing" },
+                { id: "replace" as const, label: "Replace" },
+              ] as const
+            }
+            onChange={setMergeMode}
+          />
 
           <form action={applyAction} className="flex flex-wrap gap-2">
             <input type="hidden" name="tenant_id" value={tenant.id} />

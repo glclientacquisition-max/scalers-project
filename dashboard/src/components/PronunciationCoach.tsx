@@ -49,7 +49,7 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import { deskShiftClass, filterTabClass } from "@/components/ui/deskChrome";
 
 type CoachItem = PronunciationSuggestion & {
   status: "todo" | "done" | "skipped";
@@ -699,10 +699,7 @@ export function PronunciationCoach({
 
       <div className="min-w-0">
         {omitLexiconField ? (
-          <h3
-            id="pronunciation-coach-heading"
-            className="font-display text-xl tracking-tight text-ink"
-          >
+          <h3 id="pronunciation-coach-heading" className="sr-only">
             Pronunciation
           </h3>
         ) : (
@@ -721,7 +718,7 @@ export function PronunciationCoach({
       </div>
 
       <div
-        className="flex flex-wrap gap-1 border-b border-[var(--line)] pb-px"
+        className="flex flex-wrap gap-1 border-b border-line pb-px"
         role="tablist"
         aria-label="Pronunciation studio modes"
       >
@@ -734,15 +731,10 @@ export function PronunciationCoach({
               role="tab"
               aria-selected={selected}
               onClick={() => setMode(m.id)}
-              className={[
-                `-mb-px border-b-2 px-3 py-2 text-sm ${deskShiftClass}`,
-                selected
-                  ? "border-[var(--accent)] font-medium text-[var(--ink)]"
-                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]",
-              ].join(" ")}
+              className={filterTabClass(selected)}
             >
               {m.label}
-              <span className="ml-1.5 text-xs font-normal text-[var(--ink-soft)]">
+              <span className="ml-1.5 text-xs font-normal text-ink-soft">
                 {m.hint}
               </span>
             </button>

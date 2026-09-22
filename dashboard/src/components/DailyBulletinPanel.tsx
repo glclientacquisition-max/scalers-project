@@ -15,11 +15,12 @@ import {
   type BulletinActionState,
 } from "@/app/(desk)/settings/bulletinActions";
 import {
-  settingsChipClass,
+  SettingsGroup,
+  SettingsSegmented,
   settingsFieldClass,
+  settingsGhostButtonClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
-import { deskShiftClass } from "@/components/ui/deskChrome";
 
 const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
@@ -66,67 +67,57 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const flashIsError = Boolean(postState.error || clearState.error);
 
   return (
-    <section className="min-w-0 space-y-4">
+    <section className="min-w-0 w-full space-y-6">
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
-        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="min-w-0 flex-1">
-            <label className="block text-xs font-medium text-ink-soft" htmlFor="bulletin_text">
-              Callers hear
-            </label>
-            <input
-              id="bulletin_text"
-              name="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={160}
-              placeholder="Out of chicken today"
-              className={`${settingsFieldClass} min-w-0`}
-            />
+        <SettingsGroup title="Callers hear">
+          <div className="flex min-w-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label className="sr-only" htmlFor="bulletin_text">
+                Callers hear
+              </label>
+              <input
+                id="bulletin_text"
+                name="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={160}
+                placeholder="Out of chicken today"
+                className={`${settingsFieldClass} mt-0 min-w-0`}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={postPending || !text.trim()}
+              className={settingsPrimaryButtonClass}
+            >
+              {postPending ? "Posting…" : "Post update"}
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={postPending || !text.trim()}
-            className={settingsPrimaryButtonClass}
-          >
-            {postPending ? "Posting…" : "Post update"}
-          </button>
-        </div>
+        </SettingsGroup>
 
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Update duration">
-          {EXPIRY_OPTIONS.map((opt) => {
-            const selected = expiry === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setExpiry(opt.id)}
-                className={settingsChipClass(selected)}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <SettingsSegmented
+          label="Update duration"
+          value={expiry}
+          options={EXPIRY_OPTIONS}
+          onChange={setExpiry}
+        />
       </form>
 
       {items.length === 0 ? (
-        <p className="text-sm text-ink-soft [overflow-wrap:anywhere]">
+        <p className="px-1 text-sm text-ink-soft [overflow-wrap:anywhere]">
           No live updates. The assistant will use your normal services and FAQs.
         </p>
       ) : (
-        <ul className="min-w-0 space-y-3">
+        <SettingsGroup title="Live">
           {items.map((item) => (
-            <li
+            <div
               key={item.id}
-              className="flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3 sm:px-4"
+              className="flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-3"
             >
               <div className="min-w-0 flex-1 basis-[12rem]">
-                <p className="text-xs font-medium uppercase tracking-wide text-accent">
-                  Live now
-                </p>
-                <p className="mt-1 text-sm font-medium text-ink [overflow-wrap:anywhere]">
+                <p className="text-sm font-medium text-ink [overflow-wrap:anywhere]">
                   {item.text}
                 </p>
                 <p className="mt-1 text-xs text-ink-soft">
@@ -139,14 +130,14 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 <button
                   type="submit"
                   disabled={clearPending}
-                  className={`inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-ink-soft ${deskShiftClass} hover:text-warn active:text-warn-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50`}
+                  className={settingsGhostButtonClass}
                 >
                   Clear
                 </button>
               </form>
-            </li>
+            </div>
           ))}
-        </ul>
+        </SettingsGroup>
       )}
 
       {flash ? (
