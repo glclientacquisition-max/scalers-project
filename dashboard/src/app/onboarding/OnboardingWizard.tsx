@@ -8,6 +8,7 @@ import {
 import type { OnboardingTone } from "@/lib/onboarding";
 import { DEFAULT_AGENT_TONE, TONE_LABELS, TONE_OPTIONS } from "@/lib/onboarding";
 import {
+  DEFAULT_VERTICAL,
   VERTICAL_OPTIONS,
   type BusinessVertical,
 } from "@/lib/vertical";
@@ -38,7 +39,7 @@ const initial: OnboardingState = {};
 
 export function OnboardingWizard() {
   const [step, setStep] = useState(0);
-  const [vertical, setVertical] = useState<BusinessVertical | "">("retail");
+  const [vertical, setVertical] = useState<BusinessVertical | "">(DEFAULT_VERTICAL);
   const [servicesPricing, setServicesPricing] = useState("");
   const [hoursLocation, setHoursLocation] = useState("");
   const [landmark, setLandmark] = useState("");
@@ -141,6 +142,9 @@ export function OnboardingWizard() {
                     className={choiceClass(selected)}
                   >
                     <span className="font-medium text-ink">{opt.label}</span>
+                    <span className="mt-0.5 block text-sm text-ink-soft">
+                      {opt.blurb}
+                    </span>
                   </button>
                 );
               })}

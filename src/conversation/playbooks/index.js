@@ -22,7 +22,7 @@ function formatPlaybookForPrompt(profile = {}) {
     return formatHomeServicesPlaybookForPrompt({ handoffMode });
   }
 
-  // Hospitality pack lands later; general uses core rules only.
+  // Hospitality and general have no completion pack yet.
   return '';
 }
 

@@ -105,7 +105,7 @@ Stored in **Supabase `tenants` columns** (not hardcoded in platform code):
 | `daily_bulletin` | Temporary overrides |
 | `tts_lexicon` | Pronunciation overrides |
 | `soniox_voice_id` | Voice selection |
-| `vertical`, `handoff_mode` | Retail / handoff policy |
+| `vertical`, `handoff_mode` | Shop (`retail`) or home services; hospitality/general stored only |
 
 Loaded once per media session in `ensureTenantPrompt()`.
 

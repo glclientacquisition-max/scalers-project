@@ -53,6 +53,8 @@ describe("bookings + holds honesty desk copy", () => {
     assert.doesNotMatch(hospitality, /Confirm bookings/);
     assert.doesNotMatch(hospitality, /Booking not booked/);
     assert.match(niche, /HOSPITALITY_RESERVATIONS_EXIST[\s\S]*HOSPITALITY_RESERVATION_AFFORDANCES/);
+    assert.match(niche, /parsed === "hospitality" && !HOSPITALITY_RESERVATIONS_EXIST/);
+    assert.match(niche, /return NICHE.general/);
     const homeServices = sliceHomeServicesNiche(niche);
     assert.match(homeServices, /jobCtaOne: "Confirm visit"/);
     assert.match(homeServices, /confirmStamp: "Confirm visit"/);

@@ -53,6 +53,12 @@ describe('retail playbooks', () => {
 
     const general = formatPlaybookForPrompt({ vertical: 'general' });
     assert.equal(general, '');
+
+    const shop = formatPlaybookForPrompt({ vertical: 'shop' });
+    assert.match(shop, /RETAIL PLAYBOOK/);
+
+    const hospitality = formatPlaybookForPrompt({ vertical: 'hospitality' });
+    assert.equal(hospitality, '');
   });
 
   it('puts retail playbook into system prompt for retail tenants', () => {

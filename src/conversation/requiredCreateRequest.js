@@ -1,6 +1,7 @@
 // Ensure CREATE_REQUEST tools fire when Brain already decided slots are complete.
 
 const { entityValue } = require('./entityExtraction');
+const { offeredVertical } = require('./vertical');
 
 const REQUEST_INTENTS = new Set([
   'hold',
@@ -25,7 +26,11 @@ function slotsComplete(state = {}) {
 }
 
 function isHomeVisit(state = {}) {
-  return String(state.vertical || '').toLowerCase() === 'home_services';
+  return offeredVertical(state.vertical) === 'home_services';
+}
+
+function isShop(state = {}) {
+  return offeredVertical(state.vertical) === 'retail';
 }
 
 function slot(state, keys) {
@@ -149,6 +154,7 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
     return next;
   }
 
+  if (!isShop(state)) return next;
   if (next.serviceRequest) return next;
   if (!capabilities.createServiceRequest) return next;
   const payload = buildServiceRequest(state);
@@ -162,6 +168,8 @@ function formatCreateRequestDirective(state = {}) {
   if (action !== 'CREATE_REQUEST' || !slotsComplete(state)) return '';
 
   const homeVisit = isHomeVisit(state);
+  const shop = isShop(state);
+  if (!homeVisit && !shop) return '';
   const cancel =
     intentId(state) === 'cancellation' ||
     intentId(state) === 'cancel' ||

@@ -177,7 +177,7 @@ export function assessMvpAnswerReadiness(
     {
       id: "catalogue",
       label: retail
-        ? "Product catalogue (retail)"
+        ? "Product catalogue (shop)"
         : "Product catalogue (optional)",
       required: false,
       ok: hasProducts(input.productCatalog),
