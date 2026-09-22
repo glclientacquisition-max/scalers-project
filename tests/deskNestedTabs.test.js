@@ -26,6 +26,7 @@ function loadHelper() {
       contactFileSlash: isDeskNestedPath("/contacts/abc-123/"),
       contactFileQuery: isDeskNestedPath("/contacts/abc-123?from=contacts"),
       contactImport: isDeskNestedPath("/contacts/import"),
+      devContactFile: isDeskNestedPath("/dev/contacts/file"),
       wallet: isDeskNestedPath("/wallet"),
       settingsHub: isDeskNestedPath("/settings"),
       settingsHubSearch: isDeskNestedPath("/settings", ""),
@@ -75,6 +76,7 @@ describe("desk nested tab hide", () => {
     assert.equal(got.contactFileSlash, true);
     assert.equal(got.contactFileQuery, true);
     assert.equal(got.contactImport, true);
+    assert.equal(got.devContactFile, true);
     assert.equal(got.wallet, false);
     assert.equal(got.settingsHub, false);
     assert.equal(got.settingsHubSearch, false);
