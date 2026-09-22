@@ -16,7 +16,8 @@ export type BusinessSettingsTab =
   | "train"
   | "import"
   | "test"
-  | "alerts";
+  | "alerts"
+  | "appearance";
 
 export function parseBusinessSettingsTab(
   raw: string | undefined | null
@@ -26,7 +27,8 @@ export function parseBusinessSettingsTab(
     raw === "train" ||
     raw === "import" ||
     raw === "test" ||
-    raw === "alerts"
+    raw === "alerts" ||
+    raw === "appearance"
   ) {
     return raw;
   }
@@ -75,52 +77,58 @@ export type SettingsNavItem = {
 };
 
 export type SettingsNavSection = {
-  id: "general" | "knowledge" | "operations" | "line";
+  id: "business" | "receptionist" | "knowledge" | "alerts" | "device";
   title: string;
   items: SettingsNavItem[];
 };
 
 /**
- * Settings destinations. /settings is the menu.
- * Who we are → what we know → how we run → prove the line.
+ * Settings destinations. /settings is the phone index.
+ * Business → Receptionist → Knowledge → Alerts → This device.
+ * Extra shipped panels sit in the closest group. URLs stay `?tab=` / `?panel=`.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
   {
-    id: "general",
-    title: "General",
+    id: "business",
+    title: "Business",
     items: [
-      { label: "Updates", target: { tab: "updates" } },
-      { label: "Assistant", target: { tab: "train", panel: "identity" } },
-      { label: "Team", target: { tab: "train", panel: "team" } },
-      { label: "Alerts", target: { tab: "alerts" } },
-    ],
-  },
-  {
-    id: "knowledge",
-    title: "Knowledge",
-    items: [
-      { label: "Catalog", target: { tab: "catalog" } },
-      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
-      { label: "Import", target: { tab: "import" } },
-    ],
-  },
-  {
-    id: "operations",
-    title: "Operations",
-    items: [
+      { label: "Identity", target: { tab: "train", panel: "identity" } },
       { label: "Hours", target: { tab: "train", panel: "hours" } },
       { label: "Locations", target: { tab: "train", panel: "locations" } },
       { label: "Policies", target: { tab: "train", panel: "policies" } },
     ],
   },
   {
-    id: "line",
-    title: "Line",
+    id: "receptionist",
+    title: "Receptionist",
     items: [
-      { label: "Tools & voice", target: { tab: "train", panel: "tools" } },
+      { label: "Voice", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", target: { tab: "train", panel: "pronunciation" } },
+      { label: "Updates", target: { tab: "updates" } },
       { label: "Test", target: { tab: "test" } },
     ],
+  },
+  {
+    id: "knowledge",
+    title: "Knowledge",
+    items: [
+      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
+      { label: "Catalog", target: { tab: "catalog" } },
+      { label: "Import", target: { tab: "import" } },
+    ],
+  },
+  {
+    id: "alerts",
+    title: "Alerts",
+    items: [
+      { label: "Alerts", target: { tab: "alerts" } },
+      { label: "Team", target: { tab: "train", panel: "team" } },
+    ],
+  },
+  {
+    id: "device",
+    title: "This device",
+    items: [{ label: "Appearance", target: { tab: "appearance" } }],
   },
 ];
 
@@ -133,12 +141,24 @@ export function settingsNavHref(target: SettingsNavTarget): string {
 export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel
+  trainPanel: SettingsPanel,
+  options?: { selectHubAppearance?: boolean }
 ): boolean {
   if (target.tab === "train") {
     return tab === "train" && trainPanel === target.panel;
   }
+  if (
+    target.tab === "appearance" &&
+    options?.selectHubAppearance &&
+    tab === "menu"
+  ) {
+    return true;
+  }
   return tab === target.tab;
+}
+
+export function settingsNavItems(): SettingsNavItem[] {
+  return SETTINGS_NAV.flatMap((section) => section.items);
 }
 
 export function settingsPanelHeading(
@@ -148,11 +168,8 @@ export function settingsPanelHeading(
   if (tab === "menu") return null;
   if (tab === "catalog") return "Catalog";
   if (tab !== "train") return null;
-  for (const section of SETTINGS_NAV) {
-    const item = section.items.find(
-      (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel
-    );
-    if (item) return item.label;
-  }
-  return "Assistant";
+  const item = settingsNavItems().find(
+    (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel
+  );
+  return item?.label ?? "Identity";
 }

@@ -7,34 +7,35 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 
 ## IA
 
-`/settings` is the Profile tab. Bare `/settings` is the account hub: business settings destinations plus muted Sign out. Each settings row is one destination. Same `?tab=` / `?panel=` routes. No new screens.
+`/settings` is the Profile tab. Bare `/settings` is the account hub: destination index plus muted Sign out. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance`. No new field screens.
 
 ```text
-General     Updates · Assistant · Team · Alerts
-Knowledge   Catalog · FAQs · Import
-Operations  Hours · Locations · Policies
-Line        Tools & voice · Pronunciation · Test
+Business       Identity · Hours · Locations · Policies
+Receptionist   Voice · Pronunciation · Updates · Test
+Knowledge      FAQs · Catalog · Import
+Alerts         Alerts · Team
+This device    Appearance · Sign out
 ```
 
-Order is who we are, what we know, how we run, prove the line.
+Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Updates and Test stay under Receptionist. Team stays under Alerts. Import stays under Knowledge.
 
-Mobile: list or detail. `DeskBack` icon, aria-label Profile (`lg:hidden`). Desktop: list beside the open panel.
+Phone: dense index rows. Tap a row to drill in. `DeskBack` icon, aria-label Profile (`lg:hidden`). lg+: left settings sidebar (group headers + tabs) plus the open panel. Headers are not links.
 
-Sticky Save on Catalog and Train panels. Updates, Alerts, Import, and Test use the same menu without a second compile save.
+Sticky Save on Catalog and Train panels. Updates, Alerts, Import, Test, and Appearance use the same menu without a second compile save.
 
-Bare `/settings` is the hub. `?tab=updates` is Updates. `?tab=alerts` is Alerts. Hash `#train` is not routed. `Train` is the verb on Save.
+Bare `/settings` is the hub. lg+ hub shows Appearance in the panel. `?tab=updates` is Updates. `?tab=alerts` is Alerts. `?tab=appearance` is Appearance. Hash `#train` is not routed. `Train` is the verb on Save.
 
 ## Chrome
 
-Short in-page title Profile plus compact workspace name and Line live / Number pending. Do not use `deskListTitleClass` on the hub. Muted Sign out on the hub header and again below the menu (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` plus a short title (Hours, Pronunciation). Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`.
+Short in-page title Profile plus compact workspace name and Line live / Number pending. Do not use `deskListTitleClass` on the hub. Muted Sign out on the hub header and in This device (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` plus a short title (Hours, Pronunciation). Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`.
 
-Menu: grouped destination rows (`min-h-12`, label + chevron). Section titles are non-clickable. Hover, active, and the canonical focus ring.
+Phone index: grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
 Panel titles use `settingsPanelHeadingClass` (`text-xl`).
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
-Density stays 8. Do not double page padding or import landing-scale type, glass, or a generic settings card stack. Do not add Billing, Security, or Appearance sections that this product does not own.
+Density stays 8. Do not double page padding or import landing-scale type, glass, or a generic settings card stack. Do not add Billing or Security sections. Appearance is This device only.
 
 ## Panels
 
@@ -42,22 +43,25 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 
 | Screen | Blocks |
 | --- | --- |
-| Assistant | Assistant (name, tone) → Business (name, type) → Public contacts |
+| Identity | Assistant (name, tone) → Business (name, type) → Public contacts |
 | Alerts | Alert phone, email, notify channels, text customers, text back missed calls |
 | Catalog | Services → Products |
 | Hours | Days → When closed |
 | Locations | Places: label, area, landmark, directions, coverage |
 | Policies | Rules → When unsure |
 | Team | Handoff → People: name, handles, phone, email |
-| Tools & voice | Voice → Tools. Handoff is read-only. Change in Team. |
+| Voice | Voice → Tools. Handoff is read-only. Change in Team. |
+| Pronunciation | Coach |
 | Updates | Callers hear |
 | Import | Paste or Website, then Products |
+| Test | Greeting preview, live call |
+| Appearance | System, Light, Dark |
 
 Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the receptionist prompt.
 
 ## Language
 
-Owner-facing: assistant, train, line. Not “compile prompt” in chrome. Not Agent Persona. Not Escalation Team.
+Owner-facing: assistant, train, line. Not “compile prompt” in chrome. Not Agent Persona. Not Escalation Team. Stark destination labels: Identity, Hours, Voice, Pronunciation, Catalog.
 
 Allowed line copy: Line live / Number pending. Never Online.
 

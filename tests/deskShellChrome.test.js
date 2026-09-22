@@ -159,6 +159,9 @@ describe("desk shell chrome", () => {
     assert.match(settingsUi, /SignOutButton/);
     assert.match(settingsUi, />Profile</);
     assert.match(settingsShell, /<SignOutButton/);
+    assert.match(settingsShell, /uppercase tracking-wide text-gray-500/);
+    assert.match(settingsShell, /data-settings-menu/);
+    assert.match(settingsShell, /SettingsChevron/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /HomeOverviewHeader/);
     assert.match(homeHeader, /BrandLockup/);
