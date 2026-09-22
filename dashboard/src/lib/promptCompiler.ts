@@ -1,5 +1,6 @@
 import { generateGeminiText } from "@/lib/gemini";
 import {
+  canonicalizeAgentTone,
   compilePromptLocally,
   type FaqItem,
   type OnboardingAnswers,
@@ -16,7 +17,7 @@ Output ONLY the final system prompt text — no markdown fences, no preamble.
 
 Requirements for the prompt you write:
 - Start with: You are <Agent Name>, the live phone business assistant for <Business Name> in Kenya.
-- Include an IDENTITY section with: agent name, how to introduce on the first turn ("Hello, this is <Agent> at <Business>. You can speak in English or Kiswahili. How can I help you?"), one steady persona (warm, calm, everyday; do not switch character or recite a script), tone guidance matching the chosen tone, and a mood rule (if the caller is frustrated or angry, drop cheerful filler and stay empathetic and concise).
+- Include an IDENTITY section with: agent name, how to introduce on the first turn ("Hello, this is <Agent> at <Business>. You can speak in English or Kiswahili. How can I help you?"), one steady persona for the whole call (do not switch character or recite a script), tone guidance matching the chosen manner (professional = calm and short; warm = helpful receptionist), and a mood rule (if the caller is frustrated or angry, drop cheerful filler and stay empathetic and concise). Tone is manner only. Do not treat Sheng or language as a tone. Always match EN/SW/Sheng.
 - Include a BUSINESS KNOWLEDGE section with: business name, vertical (if given), services & pricing (as given), hours (as given), locations/landmarks/directions (as given), policies (as given), languages (English, Kiswahili, Sheng — match the caller).
 - If vertical is retail, add a short RETAIL JOB section: fully assist hours, directions, product/price/stock from the PRODUCT CATALOGUE (not from services), holds/pickups (log create_service_request after name+item+when), policies, and social handles when asked; never invent stock/prices; prefer resolving over callback.
 - If vertical is home_services, add a short HOME SERVICES JOB section: fully assist hours, coverage/service area, service/price bands from SERVICES, book visits (create_appointment after service+name+when+landmark), reschedule/cancel via update_appointment. Cleaning jobs (house, carpet, couch, mattress, Airbnb) are visits, not emergencies. Visit SOP: do not say a time is booked or moved until the backend speaks; closed or outside hours, offer another time; same-hour visits are allowed unless policies say one at a time. Escalate only for burst, flood, fire, gas, or shock. Never invent prices/ETAs; prefer resolving over callback.
@@ -35,18 +36,7 @@ Requirements for the prompt you write:
 - Do not include tool markers or ###ENDCALL### — the voice engine appends those.`;
 
 export function parseAgentTone(raw: string): OnboardingTone | null {
-  const v = String(raw || "")
-    .trim()
-    .toLowerCase();
-  if (
-    v === "professional" ||
-    v === "friendly" ||
-    v === "empathetic" ||
-    v === "localized"
-  ) {
-    return v;
-  }
-  return null;
+  return canonicalizeAgentTone(raw);
 }
 
 function stripFences(text: string): string {
@@ -165,7 +155,7 @@ export async function compileReceptionistPrompt(opts: {
     const userText = [
       `Business name: ${opts.businessName}`,
       `Agent name: ${agentName}`,
-      `Tone: ${TONE_LABELS[opts.agentTone]} (${opts.agentTone})`,
+      `Tone: ${TONE_LABELS[opts.agentTone]} (${opts.agentTone}). Manner only. Professional is calm and short. Warm is a helpful receptionist. Do not change language coverage.`,
       `Vertical: ${vertical}`,
       `Handoff mode: ${handoffMode}`,
       "",

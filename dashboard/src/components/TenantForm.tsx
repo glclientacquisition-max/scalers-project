@@ -3,8 +3,12 @@
 import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
-import type { OnboardingTone } from "@/lib/onboarding";
-import { TONE_LABELS } from "@/lib/onboarding";
+import {
+  canonicalizeAgentTone,
+  TONE_LABELS,
+  TONE_OPTIONS,
+  type OnboardingTone,
+} from "@/lib/onboarding";
 import {
   DAY_LABELS,
   DAY_ORDER,
@@ -136,25 +140,6 @@ import {
 
 export type { SettingsPanel } from "@/lib/businessSettingsNav";
 
-const TONE_OPTIONS: { id: OnboardingTone; blurb: string }[] = [
-  {
-    id: "professional",
-    blurb: "Calm and clear",
-  },
-  {
-    id: "friendly",
-    blurb: "Warm and helpful",
-  },
-  {
-    id: "empathetic",
-    blurb: "Steady and caring",
-  },
-  {
-    id: "localized",
-    blurb: "Natural Kenyan voice",
-  },
-];
-
 function initialSonioxVoiceId(
   tenant: TenantRow,
   curated: CuratedSonioxVoice[]
@@ -166,16 +151,7 @@ function initialSonioxVoiceId(
 }
 
 function initialTone(tenant: TenantRow): OnboardingTone | "" {
-  const t = String(tenant.agent_tone || "").toLowerCase();
-  if (
-    t === "professional" ||
-    t === "friendly" ||
-    t === "empathetic" ||
-    t === "localized"
-  ) {
-    return t;
-  }
-  return "";
+  return canonicalizeAgentTone(String(tenant.agent_tone || "")) || "";
 }
 
 function normalizeTeam(
@@ -802,7 +778,11 @@ export function TenantForm({
               className={denseFieldClass}
             />
           </SettingsRow>
-          <SettingsRow label="Tone" htmlFor="agent_tone">
+          <SettingsRow
+            label="Tone"
+            htmlFor="agent_tone"
+            hint={TONE_OPTIONS.find((opt) => opt.id === tone)?.blurb}
+          >
             <SettingsSelect
               id="agent_tone"
               label="Tone"

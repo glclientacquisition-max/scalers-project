@@ -1,10 +1,27 @@
 import { defaultTenantLlmPrompt } from "@/lib/prompts";
 
-export type OnboardingTone =
-  | "professional"
-  | "friendly"
-  | "empathetic"
-  | "localized";
+export type OnboardingTone = "professional" | "warm";
+
+export type ToneOption = {
+  id: OnboardingTone;
+  blurb: string;
+};
+
+/** Stored ids owners can still have from older chips. */
+const TONE_ALIASES: Record<string, OnboardingTone> = {
+  professional: "professional",
+  warm: "warm",
+  friendly: "warm",
+  empathetic: "warm",
+  localized: "warm",
+};
+
+export function canonicalizeAgentTone(raw: string): OnboardingTone | null {
+  const key = String(raw || "")
+    .trim()
+    .toLowerCase();
+  return TONE_ALIASES[key] || null;
+}
 
 export type OnboardingAnswers = {
   servicesPricing: string;
@@ -63,21 +80,22 @@ export function tenantNeedsOnboarding(tenant: {
 
 export const TONE_LABELS: Record<OnboardingTone, string> = {
   professional: "Professional",
-  friendly: "Friendly",
-  empathetic: "Empathetic",
-  localized: "Localized / Sheng",
+  warm: "Warm",
 };
+
+export const TONE_OPTIONS: ToneOption[] = [
+  { id: "professional", blurb: "Calm and short." },
+  { id: "warm", blurb: "Helpful, like a good receptionist." },
+];
+
+export const DEFAULT_AGENT_TONE: OnboardingTone = "warm";
 
 function toneGuidance(tone: OnboardingTone): string {
   switch (tone) {
     case "professional":
-      return "Tone: calm, clear, and professional. Warm but concise.";
-    case "friendly":
-      return "Tone: warm and approachable, like a helpful Kenyan receptionist.";
-    case "empathetic":
-      return "Tone: empathetic and steady. Acknowledge frustration first, then help. Skip cheerful filler when the caller is upset.";
-    case "localized":
-      return "Tone: natural Kenyan receptionist. Light Sheng is fine when the caller uses it; stay clear and respectful.";
+      return "Tone: professional. Calm and short. No extra warmth. Answer the ask and stop.";
+    case "warm":
+      return "Tone: warm. Helpful Kenyan receptionist. Stay brief. Do not chat past the ask.";
   }
 }
 
@@ -164,7 +182,7 @@ ${teamBlock}
 IDENTITY:
 - Your name is ${agentName}. You are one calm person for the whole call. Introduce yourself naturally on the first turn (e.g. "Hello, this is ${agentName} at ${name}. You can speak in English or Kiswahili. How can I help you?"). Do not recite a script or switch character.
 - ${toneGuidance(answers.tone)}
-- Listen to the caller's mood. If they sound frustrated or angry, drop cheerful filler immediately and stay empathetic and concise.
+- Listen to the caller's mood. If they sound frustrated or angry, drop cheerful filler immediately and stay empathetic and concise. This mood rule applies for every tone.
 
 BUSINESS KNOWLEDGE:
 - Business name: ${name}
@@ -182,7 +200,7 @@ ${locationsText}
 ${policiesText}
 - Social & web:
 ${socialText}
-- Languages: English, Kiswahili, and Sheng (automatic — match the caller)
+- Languages: English, Kiswahili, and Sheng (automatic, match the caller). Tone does not change language.
 
 GOLDEN FAQs (authoritative — answer these exactly when asked):
 ${faqBlock}

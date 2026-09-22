@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthenticated, isLegacyAuthenticated } from "@/lib/auth";
+import { canonicalizeAgentTone } from "@/lib/onboarding";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
 export async function POST(request: Request) {
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
     patch.business_hours = body.business_hours.trim();
   }
   if (typeof body.agent_tone === "string") {
-    patch.agent_tone = body.agent_tone.trim();
+    const tone = canonicalizeAgentTone(body.agent_tone);
+    if (tone) patch.agent_tone = tone;
   }
 
   // Owners update via JWT + RLS. Legacy Super Admin desk keeps service role.

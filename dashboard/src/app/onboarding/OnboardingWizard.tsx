@@ -6,7 +6,7 @@ import {
   type OnboardingState,
 } from "./actions";
 import type { OnboardingTone } from "@/lib/onboarding";
-import { TONE_LABELS } from "@/lib/onboarding";
+import { DEFAULT_AGENT_TONE, TONE_LABELS, TONE_OPTIONS } from "@/lib/onboarding";
 import {
   VERTICAL_OPTIONS,
   type BusinessVertical,
@@ -24,8 +24,6 @@ const STEPS = [
   "Hours & location",
   "Tone & handoff",
 ] as const;
-
-const TONE_IDS = Object.keys(TONE_LABELS) as OnboardingTone[];
 
 function choiceClass(selected: boolean): string {
   return [
@@ -45,7 +43,7 @@ export function OnboardingWizard() {
   const [hoursLocation, setHoursLocation] = useState("");
   const [landmark, setLandmark] = useState("");
   const [directions, setDirections] = useState("");
-  const [tone, setTone] = useState<OnboardingTone | "">("");
+  const [tone, setTone] = useState<OnboardingTone | "">(DEFAULT_AGENT_TONE);
   const [handoffMode, setHandoffMode] = useState<HandoffMode>("callback");
   const [agentName, setAgentName] = useState("Receptionist");
   const [state, formAction, pending] = useActionState(completeOnboardingAction, initial);
@@ -231,16 +229,19 @@ export function OnboardingWizard() {
                 className={`mt-2 ${deskFieldClass}`}
               />
               <div className="mt-5 space-y-3">
-                {TONE_IDS.map((id) => {
-                  const selected = tone === id;
+                {TONE_OPTIONS.map((opt) => {
+                  const selected = tone === opt.id;
                   return (
                     <button
-                      key={id}
+                      key={opt.id}
                       type="button"
-                      onClick={() => setTone(id)}
+                      onClick={() => setTone(opt.id)}
                       className={choiceClass(selected)}
                     >
-                      <span className="font-medium text-ink">{TONE_LABELS[id]}</span>
+                      <span className="font-medium text-ink">{TONE_LABELS[opt.id]}</span>
+                      <span className="mt-0.5 block text-sm text-ink-soft">
+                        {opt.blurb}
+                      </span>
                     </button>
                   );
                 })}
