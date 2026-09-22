@@ -141,11 +141,12 @@ const NICHE: Record<BusinessVertical, InboxNicheCopy> = {
 
 export function nicheCopy(vertical?: string | null): InboxNicheCopy {
   const parsed = parseVertical(vertical);
+  if (parsed === "hospitality" && !HOSPITALITY_RESERVATIONS_EXIST) {
+    return NICHE.general;
+  }
   const copy = NICHE[parsed];
   if (parsed !== "hospitality") return copy;
-  return HOSPITALITY_RESERVATIONS_EXIST
-    ? { ...copy, ...HOSPITALITY_RESERVATION_AFFORDANCES }
-    : copy;
+  return { ...copy, ...HOSPITALITY_RESERVATION_AFFORDANCES };
 }
 
 /** Act, tape, book, closed. 08:00 owner, live watcher, visit confirmer. */

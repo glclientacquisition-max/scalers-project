@@ -223,4 +223,35 @@ describe('required create-request injection', () => {
     const result = execution.results.find((row) => row.action === 'create_service_request');
     assert.equal(result.status, 'invalid');
   });
+
+  it('injects a shop hold when the stored vertical is the shop alias', () => {
+    const parsed = ensureRequiredCreateRequest(
+      { spokenText: "I'll put it aside.", serviceRequest: null },
+      retailHoldState({ vertical: 'shop' }),
+      RETAIL_CAPS
+    );
+    assert.equal(parsed.serviceRequest.type, 'hold');
+    assert.equal(parsed.serviceRequest.item, 'Atomic Habits');
+  });
+
+  it('does not inject a hold or visit for hospitality or general', () => {
+    const hospitality = ensureRequiredCreateRequest(
+      { spokenText: "I'll book that table." },
+      retailHoldState({ vertical: 'hospitality' }),
+      RETAIL_CAPS
+    );
+    assert.equal(hospitality.serviceRequest, undefined);
+    assert.equal(hospitality.appointment, undefined);
+
+    const general = ensureRequiredCreateRequest(
+      { spokenText: "I'll book that table." },
+      retailHoldState({ vertical: 'general' }),
+      RETAIL_CAPS
+    );
+    assert.equal(general.serviceRequest, undefined);
+    assert.equal(
+      formatCreateRequestDirective(retailHoldState({ vertical: 'hospitality' })),
+      ''
+    );
+  });
 });

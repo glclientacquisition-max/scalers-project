@@ -64,7 +64,8 @@ import {
 } from "@/lib/faqs";
 import {
   parseVertical,
-  VERTICAL_OPTIONS,
+  verticalBlurb,
+  verticalSettingsOptions,
   type BusinessVertical,
 } from "@/lib/vertical";
 import {
@@ -808,13 +809,17 @@ export function TenantForm({
               className={denseFieldClass}
             />
           </SettingsRow>
-          <SettingsRow label="Business type" htmlFor="business_vertical">
+          <SettingsRow
+            label="Business type"
+            htmlFor="business_vertical"
+            hint={verticalBlurb(vertical)}
+          >
             <SettingsSelect
               id="business_vertical"
               label="Business type"
               value={vertical}
               onChange={setVertical}
-              options={VERTICAL_OPTIONS.map((opt) => ({
+              options={verticalSettingsOptions(vertical).map((opt) => ({
                 id: opt.id,
                 label: opt.label,
               }))}

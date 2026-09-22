@@ -79,6 +79,7 @@ describe('home services playbooks', () => {
 
   it('injects home playbook only for home_services vertical', () => {
     assert.equal(formatPlaybookForPrompt({ vertical: 'retail' }).includes('HOME SERVICES'), false);
+    assert.equal(formatPlaybookForPrompt({ vertical: 'hospitality' }), '');
     const block = formatPlaybookForPrompt({ vertical: 'home_services' });
     assert.match(block, /HOME SERVICES PLAYBOOK/);
     assert.match(block, /create_appointment/);

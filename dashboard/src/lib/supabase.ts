@@ -203,7 +203,7 @@ export type TenantRow = {
   daily_bulletin?: DailyBulletinEntry[] | null;
   /** Receptionist tool toggles: escalate, end_call. */
   agent_tools?: { escalate?: boolean; end_call?: boolean } | null;
-  /** Business pack: general | retail | home_services | hospitality */
+  /** Business pack: Shop is `retail`; home_services; stored hospitality / general */
   vertical?: string | null;
   /** Human handoff: callback | live_transfer */
   handoff_mode?: string | null;
