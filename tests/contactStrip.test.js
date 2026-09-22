@@ -93,7 +93,7 @@ describe("contact strip chrome", () => {
   it("lands the ACCEPT spec and one composition family on the ticket", () => {
     assert.match(accept, /\*\*Status:\*\* ACCEPT/);
     assert.match(accept, /factual subline only/);
-    assert.match(accept, /\*\*opened\*\* only/);
+    assert.match(accept, /Strip is identity/);
     assert.match(ticket, /<ContactStrip/);
     assert.match(ticket, /profileHref=\{contactHref\}/);
     assert.match(detail, /lastContactAt=/);
@@ -103,22 +103,21 @@ describe("contact strip chrome", () => {
     assert.doesNotMatch(strip, /md:hidden|hidden md:|lg:hidden|hidden lg:/);
   });
 
-  it("matches Phase 1 list density: avatar, one preview, opened-only Call and WhatsApp", () => {
+  it("matches Phase 1 list density: avatar, one preview, identity only", () => {
     assert.match(strip, /data-contact-strip/);
     assert.match(strip, /RowIdentity/);
     assert.match(strip, /contactStripTitle/);
     assert.match(strip, /contactListSubline/);
     assert.match(strip, /deskPreviewClass/);
-    assert.match(strip, /<CallLink number=\{number\} \/>/);
-    assert.match(strip, /variant="icon"/);
-    assert.match(strip, /deskRowActionClass/);
+    assert.doesNotMatch(strip, /CallLink/);
+    assert.doesNotMatch(strip, /WhatsAppLink/);
+    assert.doesNotMatch(strip, /deskRowActionClass/);
+    assert.doesNotMatch(strip, /data-contact-strip-reach/);
     assert.match(strip, /DeskRowHit/);
     assert.doesNotMatch(strip, /callId=/);
     assert.doesNotMatch(strip, /logWhatsAppFollowUp/);
     assert.doesNotMatch(strip, /lead_status/);
     assert.doesNotMatch(strip, /updateLeadStatus/);
-    const wa = strip.slice(strip.indexOf("<WhatsAppLink"));
-    assert.doesNotMatch(wa.slice(0, 220), /message=/);
     assert.doesNotMatch(strip, /\bOnline\b/);
     assert.doesNotMatch(strip, /last seen|Last seen|active now|Active now/i);
     assert.doesNotMatch(strip, /delivered|Delivered|LivePing|RowStateDot/);
@@ -142,7 +141,12 @@ describe("contact strip chrome", () => {
     assert.doesNotMatch(strip, /notifyChannels/);
     assert.doesNotMatch(ticket, /<CallLink number=\{callerPhone\} \/>/);
     assert.doesNotMatch(ticket, /<WhatsAppLink/);
-    assert.match(note, /opened only/);
+    const actionDock = read("dashboard/src/components/InboxTicketActionDock.tsx");
+    assert.match(actionDock, /<CallLink number=\{callerPhone\} \/>/);
+    assert.match(actionDock, /<WhatsAppLink/);
+    assert.match(actionDock, /callId=\{callId\}/);
+    assert.match(note, /No Call or WhatsApp in the strip/);
+    assert.match(accept, /Strip does not duplicate them/);
     assert.match(accept, /No Online, last seen/);
     assert.match(accept, /Contacts list Phase 1 redo/);
     assert.doesNotMatch(list, /ContactStrip/);
@@ -159,8 +163,9 @@ describe("contact strip chrome", () => {
     assert.match(src, /"lead_status"/);
     assert.match(src, /"Needs you"/);
     assert.match(src, /"Meta"/);
-    assert.match(strip, /data-contact-strip-reach=\{CONTACT_STRIP_REACH\}/);
-    assert.match(strip, /CONTACT_STRIP_REACH/);
+    assert.match(src, /CONTACT_STRIP_REACH = "opened"/);
+    assert.doesNotMatch(strip, /data-contact-strip-reach/);
+    assert.doesNotMatch(strip, /CallLink|WhatsAppLink/);
     assert.doesNotMatch(strip, /\bOnline\b/);
     assert.doesNotMatch(strip, /last seen|Last seen|active now|Active now/i);
     assert.doesNotMatch(strip, /presence|LivePing|RowStateDot/);
@@ -169,16 +174,17 @@ describe("contact strip chrome", () => {
     assert.doesNotMatch(strip, /Meta|blue tick|lastSeen|typing/i);
     assert.doesNotMatch(ticket, /data-contact-strip-reach/);
     assert.match(accept, /Critic PASS \(hard bans\)/);
-    assert.match(accept, /call\/WA \*\*opened\*\* stamp/);
+    assert.match(accept, /Strip does not duplicate them/);
     assert.match(accept, /No inventing `lead_status` or Needs you/);
     assert.match(accept, /No Meta activity theater/);
-    assert.match(accept, /opened only \(`tel:` \/ `wa\.me`\)/);
+    assert.match(accept, /Call \/ WhatsApp live on the ticket dock/);
     assert.match(accept, /One family at ~390/);
-    assert.match(note, /opened only, reach stamp `opened`/);
+    assert.match(note, /No Call or WhatsApp in the strip/);
     assert.match(note, /Never delivered or sent without channel evidence/);
-    assert.match(master, /call\/WA opened stamp/);
-    assert.match(master, /data-contact-strip-reach="opened"/);
-    assert.match(contactsNote, /call\/WA opened stamp/);
+    assert.match(master, /Identity only/);
+    assert.match(master, /Call \+ WhatsApp live on the ticket Action dock/);
+    assert.doesNotMatch(master, /data-contact-strip-reach="opened"/);
+    assert.match(contactsNote, /Identity only/);
     assert.match(read("docs/product/DELIVERY_VOCAB.md"), /\*\*opened\*\*/);
   });
 });
