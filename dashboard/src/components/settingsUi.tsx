@@ -8,7 +8,6 @@
 
 import type { ReactNode } from "react";
 import { DeskBack } from "@/components/ui/DeskBack";
-import { SignOutButton } from "@/components/ui/SignOutButton";
 import {
   btnPrimary,
   deskFieldClass,
@@ -27,16 +26,17 @@ export const settingsTableFieldClass =
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
 
-/** Nested settings: compact inner rail + fluid panel. Fills the desk canvas. */
+/** Nested settings: compact inner rail + fluid panel. Fills the desk canvas from md. */
 export const settingsConsoleClass =
-  "flex w-full min-w-0 flex-col gap-6 lg:flex-row lg:items-start lg:gap-8";
+  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:gap-8";
 
 export const settingsRailWrapClass =
-  "hidden min-w-0 shrink-0 lg:block lg:w-[13.5rem]";
+  "hidden min-w-0 shrink-0 md:block md:w-[13.5rem]";
 
-export const settingsRailClass = "min-w-0 lg:sticky lg:top-4";
+export const settingsRailClass = "min-w-0 md:sticky md:top-4";
 
-export const settingsPanelClass = "min-w-0 flex-1";
+export const settingsPanelClass =
+  "min-w-0 flex-1 pb-[var(--desk-tabbar-clearance)] md:pb-0";
 
 export const settingsFormGridClass =
   "grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2";
@@ -142,6 +142,7 @@ export function ToolSwitch({
   return (
     <label
       data-settings-toggle=""
+      title={label}
       className={[
         "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-accent",
         disabled ? "cursor-not-allowed opacity-60" : "",
@@ -326,7 +327,7 @@ export const settingsGhostButtonClass =
 
 export function SettingsBackLink() {
   return (
-    <DeskBack href="/settings" className="mb-1 lg:hidden">
+    <DeskBack href="/settings" className="mb-1 md:hidden">
       Profile
     </DeskBack>
   );
@@ -364,13 +365,10 @@ export function SettingsPageHeader({
 
   if (index) {
     return (
-      <header className="mb-4 flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Profile</h1>
-          <p className="mt-1 min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
-          {line}
-        </div>
-        <SignOutButton />
+      <header className="mb-4 min-w-0">
+        <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Profile</h1>
+        <p className="mt-1 min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
+        {line}
       </header>
     );
   }

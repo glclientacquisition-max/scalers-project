@@ -134,7 +134,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={previewPending}
-                    className={settingsPrimaryButtonClass}
+                    className={settingsActionClass}
                   >
                     {previewPending ? "Scanning…" : "Scan"}
                   </button>
@@ -163,7 +163,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   <button
                     type="submit"
                     disabled={previewPending}
-                    className={settingsPrimaryButtonClass}
+                    className={settingsActionClass}
                   >
                     {previewPending ? "Scanning…" : "Scan"}
                   </button>

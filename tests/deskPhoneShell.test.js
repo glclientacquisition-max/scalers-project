@@ -52,6 +52,10 @@ describe("desk phone shell", () => {
     assert.match(css, /scroll-padding-bottom:\s*var\(--desk-tabbar-clearance\)/);
     assert.match(css, /--desk-tabbar-clearance:\s*calc\(var\(--desk-tabbar-h\) \+ env\(safe-area-inset-bottom, 0px\) \+ 1\.5rem\)/);
     assert.match(nav, /min-h-\[calc\(var\(--desk-tabbar-h\)\+env\(safe-area-inset-bottom,0px\)\)\]/);
+    assert.match(nav, /z-50/);
+    assert.match(nav, /whitespace-nowrap/);
+    const tabBar = nav.slice(nav.indexOf("export function DeskTabBar"));
+    assert.doesNotMatch(tabBar, /max-w-full truncate/);
     assert.match(nav, /bg-surface/);
     assert.doesNotMatch(nav, /bg-surface\/95/);
     assert.doesNotMatch(nav, /backdrop-blur/);

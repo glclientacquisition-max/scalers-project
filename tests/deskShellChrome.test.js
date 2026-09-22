@@ -85,6 +85,8 @@ describe("desk shell chrome", () => {
     assert.match(chrome, /-top-1 -end-1/);
     assert.match(chrome, /bg-gradient-to-br from-accent to-accent-fill/);
     assert.match(chrome, /text-accent-on-fill/);
+    assert.match(nav, /z-50/);
+    assert.match(chrome, /z-20/);
     assert.doesNotMatch(chrome, /deskNavBadgeClass =\s*"[^"]*h-5/);
     assert.doesNotMatch(chrome, /deskNavBadgeClass =\s*"[^"]*inset-0/);
     assert.doesNotMatch(chrome, /deskNavBadgeClass =\s*"[^"]*bg-warn/);
@@ -163,14 +165,14 @@ describe("desk shell chrome", () => {
     assert.match(signOut, /type="submit"/);
     assert.match(signOut, /btnPrimary/);
     assert.match(signOut, /if \(!confirming\)/);
-    assert.match(settingsUi, /SignOutButton/);
+    assert.doesNotMatch(settingsUi, /SignOutButton/);
     assert.match(settingsUi, />Profile</);
     assert.match(settingsShell, /<SignOutButton/);
     assert.match(settingsUi, /uppercase tracking-wide text-gray-500/);
     assert.match(settingsShell, /settingsGroupTitleClass/);
     assert.match(settingsShell, /data-settings-menu/);
     assert.match(settingsShell, /SettingsChevron/);
-    assert.match(settingsUi, /lg:w-\[13\.5rem\]/);
+    assert.match(settingsUi, /md:w-\[13\.5rem\]/);
     assert.doesNotMatch(settingsShell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /HomeOverviewHeader/);
