@@ -188,12 +188,14 @@
 }
 
 @media (max-width: 767px) {
-  .desk-theme:has([data-ticket-chat]) {
+  .desk-theme:has([data-ticket-chat]),
+  .desk-theme:has([data-desk-nested]) {
     --desk-tabbar-h: 0px;
     --desk-tabbar-clearance: 0px;
   }
 
-  .desk-theme:has([data-ticket-chat]) [data-desk-tabbar] {
+  .desk-theme:has([data-ticket-chat]) [data-desk-tabbar],
+  .desk-theme:has([data-desk-nested]) [data-desk-tabbar] {
     display: none;
   }
 }

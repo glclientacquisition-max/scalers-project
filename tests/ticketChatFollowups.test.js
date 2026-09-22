@@ -73,7 +73,7 @@ describe("ticket chat follow-ups", () => {
     assert.equal(got.empty, false);
     assert.equal(got.nil, false);
     assert.match(helper, /export function isDeskTicketChatPath/);
-    assert.match(nav, /isDeskTicketChatPath\(pathname\)/);
+    assert.match(nav, /isDeskNestedPath\(pathname\)/);
     assert.match(nav, /return null/);
   });
 

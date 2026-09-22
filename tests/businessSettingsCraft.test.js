@@ -216,6 +216,7 @@ describe("business settings craft", () => {
 
   it("fills the lg canvas with an inner rail and a fluid panel", () => {
     assert.match(shell, /data-settings-console/);
+    assert.match(shell, /data-settings-console="" data-desk-nested=""/);
     assert.match(shell, /settingsConsoleClass/);
     assert.match(shell, /settingsPanelClass/);
     assert.match(shell, /settingsRailWrapClass/);

@@ -216,7 +216,7 @@ export default function DevContactsPage() {
                 <ContactPhoneRow
                   key={row.id}
                   row={row}
-                  href={`/contacts/${row.id}?from=contacts`}
+                  href="/dev/contacts/file"
                 />
               ))}
             </ul>
@@ -243,7 +243,7 @@ export default function DevContactsPage() {
                     <ContactTableRow
                       key={row.id}
                       row={row}
-                      href={`/contacts/${row.id}?from=contacts`}
+                      href="/dev/contacts/file"
                     />
                   ))}
                 </tbody>
