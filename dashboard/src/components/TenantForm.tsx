@@ -352,7 +352,7 @@ export function TenantForm({
   const [unknownFallback, setUnknownFallback] = useState(
     tenant.unknown_answer_fallback || ""
   );
-  const [agentName, setAgentName] = useState(tenant.agent_name || "Receptionist");
+  const [agentName, setAgentName] = useState(tenant.agent_name || "");
   const [tone, setTone] = useState<OnboardingTone | "">(initialTone(tenant));
   const [hoursSchedule, setHoursSchedule] = useState<HoursSchedule>(() =>
     scheduleForForm(tenant.hours_schedule, tenant.business_hours || "")

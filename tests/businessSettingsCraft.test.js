@@ -21,6 +21,10 @@ describe("business settings craft", () => {
     assert.doesNotMatch(shell, /Agent Persona|Escalation Team/);
     assert.doesNotMatch(shell, /\bOnline\b/);
     assert.doesNotMatch(page, /text-5xl|text-6xl/);
+    assert.doesNotMatch(nav, /Receptionist|receptionist/);
+    assert.doesNotMatch(shell, /Receptionist|receptionist/);
+    assert.doesNotMatch(test, /Receptionist|receptionist/);
+    assert.doesNotMatch(form, /Receptionist|receptionist/);
   });
 
   it("uses Line live / Number pending and assistant field copy", () => {
@@ -35,12 +39,15 @@ describe("business settings craft", () => {
 
   it("groups settings by owner job without dropping shipped destinations", () => {
     assert.match(nav, /id: "business"/);
-    assert.match(nav, /id: "receptionist"/);
+    assert.match(nav, /id: "assistant"/);
     assert.match(nav, /id: "knowledge"/);
     assert.match(nav, /id: "alerts"/);
     assert.match(nav, /id: "device"/);
     assert.match(nav, /title: "Business"/);
-    assert.match(nav, /title: "Receptionist"/);
+    assert.match(nav, /title: "Assistant"/);
+    assert.doesNotMatch(nav, /label: "Assistant"/);
+    assert.doesNotMatch(nav, /id: "receptionist"/);
+    assert.doesNotMatch(nav, /title: "Receptionist"/);
     assert.match(nav, /title: "Knowledge"/);
     assert.match(nav, /title: "Alerts"/);
     assert.match(nav, /title: "This device"/);
@@ -85,7 +92,7 @@ describe("business settings craft", () => {
     assert.match(shell, /SETTINGS_NAV/);
     assert.doesNotMatch(shell, />\s*Train\s*</);
     assert.doesNotMatch(nav, /Billing|Security/);
-    assert.doesNotMatch(nav, /id: "general"|id: "operations"|id: "line"/);
+    assert.doesNotMatch(nav, /id: "general"|id: "operations"|id: "line"|id: "receptionist"/);
     assert.match(nav, /businessSettingsHref\("train"/);
     for (const panel of [
       "identity",

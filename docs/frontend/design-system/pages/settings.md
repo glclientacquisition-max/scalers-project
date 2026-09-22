@@ -11,13 +11,13 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 
 ```text
 Business       Identity · Hours · Locations · Policies
-Receptionist   Voice · Pronunciation · Updates · Test
+Assistant      Voice · Pronunciation · Updates · Test
 Knowledge      FAQs · Catalog · Import
 Alerts         Alerts · Team
 This device    Appearance · Sign out
 ```
 
-Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Updates and Test stay under Receptionist. Team stays under Alerts. Import stays under Knowledge.
+Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Updates and Test stay under Assistant. Team stays under Alerts. Import stays under Knowledge.
 
 Phone: dense index rows. Tap a row to drill in. `DeskBack` icon, aria-label Profile (`lg:hidden`). lg+: left settings sidebar (group headers + tabs) plus the open panel. Headers are not links.
 
@@ -57,7 +57,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Test | Greeting preview, live call |
 | Appearance | System, Light, Dark |
 
-Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the receptionist prompt.
+Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
 
 ## Language
 

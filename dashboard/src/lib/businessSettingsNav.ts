@@ -77,14 +77,14 @@ export type SettingsNavItem = {
 };
 
 export type SettingsNavSection = {
-  id: "business" | "receptionist" | "knowledge" | "alerts" | "device";
+  id: "business" | "assistant" | "knowledge" | "alerts" | "device";
   title: string;
   items: SettingsNavItem[];
 };
 
 /**
  * Settings destinations. /settings is the phone index.
- * Business → Receptionist → Knowledge → Alerts → This device.
+ * Business → Assistant → Knowledge → Alerts → This device.
  * Extra shipped panels sit in the closest group. URLs stay `?tab=` / `?panel=`.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
@@ -99,8 +99,8 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
   {
-    id: "receptionist",
-    title: "Receptionist",
+    id: "assistant",
+    title: "Assistant",
     items: [
       { label: "Voice", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", target: { tab: "train", panel: "pronunciation" } },
