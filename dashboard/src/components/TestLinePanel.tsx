@@ -45,7 +45,7 @@ export function TestLinePanel({
   );
   const did = String(tenant.sautikit_virtual_number || "").trim();
   const businessName = String(tenant.business_name || "").trim();
-  const agentName = String(tenant.agent_name || "").trim() || "Receptionist";
+  const agentName = String(tenant.agent_name || "").trim() || "Assistant";
   const sonioxVoiceId = resolveLiveCallVoiceId(
     tenant.soniox_voice_id,
     curatedVoices
@@ -189,7 +189,7 @@ export function TestLinePanel({
               href={businessSettingsHref("train", "identity")}
               className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
             >
-              Assistant
+              Identity
             </Link>{" "}
             to preview the greeting.
           </p>
@@ -229,7 +229,7 @@ export function TestLinePanel({
             href={businessSettingsHref("train", "tools")}
             className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
           >
-            Tools &amp; voice
+            Voice
           </Link>
           .
         </p>

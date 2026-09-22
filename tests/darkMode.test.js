@@ -110,8 +110,10 @@ describe("theme activation", () => {
     assert.match(picker, /localStorage\.setItem\(THEME_KEY, next\)/);
     assert.match(picker, /delete root\.dataset\.theme/);
     const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
+    const settingsNav = read("dashboard/src/lib/businessSettingsNav.ts");
     assert.match(shell, /<ThemePicker \/>/);
-    assert.match(shell, /This device/);
+    assert.match(settingsNav, /This device/);
+    assert.match(settingsNav, /label: "Appearance"/);
   });
 });
 

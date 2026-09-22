@@ -128,7 +128,7 @@ Keep URLs. Nav is Overview, Inbox, Contacts, Usage, Profile. `/wallet` stays the
 | `/contacts` | Named callers | Existing contacts surface. Not a CRM. |
 | `/requests` | Hold Done | Redirect `/calls?purpose=hold` |
 | `/appointments` | Visits book | Redirect `/calls?purpose=job` |
-| `/settings` | Profile. Business settings plus Sign out. | Account hub. Menu then one screen. |
+| `/settings` | Profile. Business settings plus Sign out. | Account hub. Phone index then drill-in. lg+ sidebar + panel. |
 | `/wallet` | Usage. Prepaid KES. | Token-only from this lane. Path stays `/wallet`. |
 
 **Line status (no fake Online):** `Line live` / `Number pending` / `Needs training` from DID + `assessMvpAnswerReadiness`.
