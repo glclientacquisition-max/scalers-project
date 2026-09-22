@@ -6,7 +6,7 @@ import type { TenantRow } from "@/lib/supabase";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
 import {
   settingsDenseFieldClass,
-  settingsPanelHeadingClass,
+  settingsFormGridClass,
   settingsPrimaryButtonClass,
   ToolSwitch,
 } from "@/components/settingsUi";
@@ -51,9 +51,16 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="min-w-0 space-y-4">
-      <h2 className={settingsPanelHeadingClass}>Alerts</h2>
-
       <form action={formAction} className="min-w-0 space-y-3">
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={pending}
+            className={settingsPrimaryButtonClass}
+          >
+            {pending ? "Saving…" : "Save"}
+          </button>
+        </div>
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input
           type="hidden"
@@ -67,7 +74,7 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
           value={JSON.stringify(notifyChannels)}
         />
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className={settingsFormGridClass}>
           <div>
             <label className="block text-xs font-medium text-ink-soft" htmlFor="owner">
               Alert phone
@@ -125,23 +132,15 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={pending}
-          className={settingsPrimaryButtonClass}
-        >
-          {pending ? "Saving…" : "Save"}
-        </button>
+        {flash ? (
+          <p
+            className={`text-sm [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
+            role={flashIsError ? "alert" : undefined}
+          >
+            {flash}
+          </p>
+        ) : null}
       </form>
-
-      {flash ? (
-        <p
-          className={`text-sm [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
-          role={flashIsError ? "alert" : undefined}
-        >
-          {flash}
-        </p>
-      ) : null}
     </section>
   );
 }

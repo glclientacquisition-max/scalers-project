@@ -17,7 +17,14 @@ import {
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
-import { SettingsPageHeader, settingsPanelHeadingClass } from "@/components/settingsUi";
+import {
+  SettingsPageHeader,
+  settingsConsoleClass,
+  settingsPanelClass,
+  settingsPanelHeadingClass,
+  settingsRailClass,
+  settingsRailWrapClass,
+} from "@/components/settingsUi";
 import { ThemePicker } from "@/components/ThemePicker";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { deskShiftClass } from "@/components/ui/deskChrome";
@@ -44,10 +51,10 @@ function SettingsChevron() {
   );
 }
 
-function AppearancePanel() {
+function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
   return (
     <section className="min-w-0 space-y-4">
-      <h2 className={settingsPanelHeadingClass}>Appearance</h2>
+      {showHeading ? <h2 className={settingsPanelHeadingClass}>Appearance</h2> : null}
       <ThemePicker />
     </section>
   );
@@ -77,11 +84,7 @@ function SettingsMenu({
     <nav
       aria-label="Business Profile sections"
       data-settings-menu={variant}
-      className={
-        isRail
-          ? "min-w-0 shrink-0 lg:sticky lg:top-4 lg:w-56"
-          : "min-w-0 w-full"
-      }
+      className={isRail ? settingsRailClass : "min-w-0 w-full"}
     >
       {SETTINGS_NAV.map((section, index) => (
         <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
@@ -102,10 +105,10 @@ function SettingsMenu({
                       href={settingsNavHref(item.target)}
                       aria-current={active ? "page" : undefined}
                       className={[
-                        `flex min-h-11 items-center rounded-lg px-3 text-sm font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`,
+                        `flex min-h-11 items-center border-l-2 px-3 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`,
                         active
-                          ? "bg-accent/10 text-accent-deep"
-                          : "text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
+                          ? "border-accent text-accent-deep"
+                          : "border-transparent text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
                       ].join(" ")}
                     >
                       {item.label}
@@ -136,7 +139,7 @@ function SettingsMenu({
                       href={settingsNavHref(item.target)}
                       aria-current={active ? "page" : undefined}
                       className={[
-                        `flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40`,
+                        `flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent`,
                         active
                           ? "bg-accent/10 text-accent-deep"
                           : "text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
@@ -188,11 +191,11 @@ function SettingsPanelBody({
   if (tab === "test") {
     return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
   }
-  return <AppearancePanel />;
+  return <AppearancePanel showHeading={false} />;
 }
 
 /**
- * Business settings: phone index then drill-in. lg+ sidebar beside the panel.
+ * Business settings: phone index then drill-in. lg+ inner rail beside a fluid panel.
  */
 export function BusinessSettingsShell({
   tenant,
@@ -227,23 +230,23 @@ export function BusinessSettingsShell({
   ].join(":");
 
   const rail = (
-    <div className="hidden min-w-0 lg:block">
+    <div className={settingsRailWrapClass}>
       <SettingsMenu tab={tab} trainPanel={trainPanel} variant="rail" />
     </div>
   );
 
   if (isMenu) {
     return (
-      <div className="w-full min-w-0 max-w-5xl">
+      <div className="w-full min-w-0" data-settings-console="">
         <SettingsPageHeader
           businessName={businessName}
           lineLive={lineLive}
           lineDetail={lineDetail}
           index
         />
-        <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-start">
+        <div className={settingsConsoleClass}>
           {rail}
-          <div className="min-w-0 flex-1">
+          <div className={settingsPanelClass}>
             <div className="lg:hidden">
               <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
             </div>
@@ -257,7 +260,7 @@ export function BusinessSettingsShell({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-5xl">
+    <div className="w-full min-w-0" data-settings-console="">
       {showForm ? (
         <TenantForm
           key={tenantFormKey}
@@ -270,31 +273,29 @@ export function BusinessSettingsShell({
           liveTransferExecutor={liveTransferExecutor}
         />
       ) : (
-        <>
-          <SettingsPageHeader
-            businessName={businessName}
-            lineLive={lineLive}
-            lineDetail={lineDetail}
-            showBack
-          />
-
-          <div className="flex min-w-0 flex-col gap-6 lg:flex-row lg:items-start">
-            {rail}
-            <div className="min-w-0 flex-1">
-              {tab === "updates" ||
-              tab === "alerts" ||
-              tab === "import" ||
-              tab === "test" ||
-              tab === "appearance" ? (
-                <SettingsPanelBody
-                  tab={tab}
-                  tenant={tenant}
-                  curatedVoices={curatedVoices}
-                />
-              ) : null}
-            </div>
+        <div className={settingsConsoleClass}>
+          {rail}
+          <div className={settingsPanelClass}>
+            <SettingsPageHeader
+              businessName={businessName}
+              lineLive={lineLive}
+              lineDetail={lineDetail}
+              showBack
+              title={heading}
+            />
+            {tab === "updates" ||
+            tab === "alerts" ||
+            tab === "import" ||
+            tab === "test" ||
+            tab === "appearance" ? (
+              <SettingsPanelBody
+                tab={tab}
+                tenant={tenant}
+                curatedVoices={curatedVoices}
+              />
+            ) : null}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

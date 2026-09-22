@@ -162,6 +162,8 @@ describe("desk shell chrome", () => {
     assert.match(settingsShell, /uppercase tracking-wide text-gray-500/);
     assert.match(settingsShell, /data-settings-menu/);
     assert.match(settingsShell, /SettingsChevron/);
+    assert.match(settingsUi, /lg:w-\[13\.5rem\]/);
+    assert.doesNotMatch(settingsShell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /HomeOverviewHeader/);
     assert.match(homeHeader, /BrandLockup/);
