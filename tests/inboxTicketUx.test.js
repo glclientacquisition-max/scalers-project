@@ -78,7 +78,7 @@ describe("inbox ticket action chrome", () => {
   it("docks a real SMS send distinct from Confirm auto-SMS", () => {
     assert.match(dock, /sendInboxReplySms/);
     assert.match(dock, /placeholder="SMS"/);
-    assert.match(dock, /WhatsApp uses the icon above/);
+    assert.doesNotMatch(dock, /WhatsApp uses the icon above/);
     assert.match(dock, /rows=\{2\}/);
     assert.match(notes, /export async function sendInboxReplySms/);
     assert.match(notes, /caller_inbox_reply/);
@@ -94,12 +94,13 @@ describe("inbox ticket action chrome", () => {
     assert.doesNotMatch(dock, /\{sendPending \? "Sending" : "Send"\}/);
   });
 
-  it("does not put a polish wand on the SMS dock", () => {
-    assert.doesNotMatch(dock, /aria-label="Polish"/);
-    assert.doesNotMatch(dock, /title="Polish"/);
-    assert.doesNotMatch(dock, /DeskHint label="Polish"/);
-    assert.doesNotMatch(dock, /polishInboxSmsAction/);
-    assert.doesNotMatch(dock, /WandGlyph/);
+  it("puts a polish wand before Send on the SMS dock", () => {
+    assert.match(dock, /aria-label="Polish"/);
+    assert.match(dock, /title="Polish"/);
+    assert.match(dock, /DeskHint label="Polish"/);
+    assert.match(dock, /polishInboxSmsAction/);
+    assert.match(dock, /WandGlyph/);
+    assert.match(dock, /if \(polishState\.text\) setNote\(polishState\.text\)/);
     assert.match(dock, /aria-label="Send"/);
     assert.match(dock, /btnPrimaryFill/);
     assert.match(dock, /disabled=\{sendPending \|\| !canSend\}/);
@@ -113,7 +114,7 @@ describe("inbox ticket action chrome", () => {
     const row = read("dashboard/src/components/InboxItemRow.tsx");
     assert.doesNotMatch(row, /aria-label="Polish"/);
     assert.doesNotMatch(row, /polishInboxSmsAction/);
-    assert.doesNotMatch(ticket, /aria-label="Polish"/);
+    assert.match(ticket, /InboxSmsDock/);
   });
 
   it("does not invent text for an empty draft", () => {
@@ -125,12 +126,12 @@ describe("inbox ticket action chrome", () => {
     assert.doesNotMatch(action, /The team will follow up/);
     assert.doesNotMatch(action, /fallbackPolishCallerNote/);
     assert.doesNotMatch(action, /Hi \$\{/);
-    assert.doesNotMatch(dock, /polishInboxSmsAction/);
+    assert.match(dock, /polishInboxSmsAction/);
   });
 
-  it("keeps polish rewrite off the ticket SMS dock", () => {
-    assert.doesNotMatch(dock, /if \(polishState\.text\) setNote\(polishState\.text\)/);
-    assert.doesNotMatch(dock, /polishInboxSmsAction/);
+  it("rewrites the ticket SMS draft in place", () => {
+    assert.match(dock, /if \(polishState\.text\) setNote\(polishState\.text\)/);
+    assert.match(dock, /polishInboxSmsAction/);
     assert.match(notes, /fallbackPolishInboxDraft/);
     assert.match(notes, /POLISH_INBOX_DRAFT_SYSTEM/);
     assert.match(notes, /generateGeminiText/);

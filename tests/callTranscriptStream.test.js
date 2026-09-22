@@ -107,7 +107,7 @@ describe("ticket chat display chrome", () => {
     const strip = read("dashboard/src/components/ContactStrip.tsx");
     assert.match(strip, /data-contact-strip=/);
     assert.match(strip, /contactListSubline/);
-    assert.match(strip, /CONTACT_STRIP_REACH/);
+    assert.doesNotMatch(strip, /CallLink|WhatsAppLink/);
     assert.doesNotMatch(strip, /CallTranscript/);
   });
 

@@ -28,7 +28,7 @@ export const CONTACT_STRIP_FACTS = [
 
 export type ContactStripFact = (typeof CONTACT_STRIP_FACTS)[number];
 
-/** Call / WhatsApp on the strip. DeskHint stays Call / WhatsApp. Ladder word is opened. */
+/** Call / WhatsApp on the ticket dock. Strip is identity. Ladder word is opened. */
 export const CONTACT_STRIP_REACH = "opened" as const;
 
 export const CONTACT_STRIP_CRITIC_BANS = [

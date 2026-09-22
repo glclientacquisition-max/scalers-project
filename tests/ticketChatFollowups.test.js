@@ -104,19 +104,18 @@ describe("ticket chat follow-ups", () => {
     assert.doesNotMatch(action, /[\u2014\u2013]/);
   });
 
-  it("drops FAQ ideas, Polish, Ask AI, and sparkle chrome from the ticket", () => {
+  it("drops FAQ ideas, Ask AI, and sparkle chrome from the ticket", () => {
     assert.doesNotMatch(ticket, /CallFaqSuggestions/);
     assert.doesNotMatch(ticket, /FAQ ideas/);
     assert.doesNotMatch(ticket, /Find FAQ ideas/);
     assert.doesNotMatch(ticket, /Ask AI/);
     assert.doesNotMatch(ticket, /How can I help/);
     assert.doesNotMatch(ticket, /tenantId/);
-    assert.doesNotMatch(dock, /Polish/);
-    assert.doesNotMatch(dock, /polishInboxSmsAction/);
-    assert.doesNotMatch(dock, /WandGlyph/);
     assert.doesNotMatch(dock, /sparkle/i);
+    assert.match(dock, /polishInboxSmsAction/);
+    assert.match(dock, /WandGlyph/);
     assert.match(callDetail, /No FAQ ideas/);
-    assert.match(callDetail, /No Polish wand/);
+    assert.match(callDetail, /Polish tightens the draft/);
     assert.match(callDetail, /One vertical conversation stream/);
   });
 
