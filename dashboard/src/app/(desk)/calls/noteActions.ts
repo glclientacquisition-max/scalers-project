@@ -9,7 +9,11 @@ import {
 } from "@/lib/polishCallerNote";
 import {
   fallbackPolishInboxDraft,
+  fallbackSuggestInboxSms,
+  formatInboxSmsFacts,
+  inboxSmsFactsFromForm,
   POLISH_INBOX_DRAFT_SYSTEM,
+  SUGGEST_INBOX_SMS_SYSTEM,
 } from "@/lib/polishInboxSms";
 import { parseNotifyChannels } from "@/lib/notifyChannels";
 import { sendRecordedDeskCallerSms } from "@/lib/sendLedger";
@@ -69,7 +73,7 @@ export async function polishCallerNoteAction(
   return { text: fallbackPolishCallerNote(facts), source: "local" };
 }
 
-/** Tighten the Inbox compose draft. Does not invent text for an empty field. */
+/** Tighten a filled Inbox draft, or suggest one packaged SMS when the box is empty. */
 export async function polishInboxSmsAction(
   _prev: PolishCallerNoteState,
   formData: FormData
@@ -78,12 +82,37 @@ export async function polishInboxSmsAction(
   if (!tenant) return { error: "Not signed in." };
 
   const note = String(formData.get("note") || "").trim();
-  if (!note) return { error: "Write a message." };
+  const facts = inboxSmsFactsFromForm(formData);
+  if (!facts.businessName) {
+    facts.businessName = String(tenant.business_name || "").trim();
+  }
+  const packed = formatInboxSmsFacts(facts);
+
+  if (!note) {
+    try {
+      const raw = await generateGeminiText({
+        systemInstruction: SUGGEST_INBOX_SMS_SYSTEM,
+        userText: packed ? `Trusted facts:\n${packed}` : "Trusted facts: none.",
+        temperature: 0.2,
+        maxOutputTokens: 256,
+        timeoutMs: 8000,
+      });
+      const text = stripModelSms(raw);
+      if (text && !/^empty$/i.test(text)) return { text, source: "gemini" };
+    } catch (err) {
+      console.warn("[suggestInboxSms]", err instanceof Error ? err.message : err);
+    }
+    const text = fallbackSuggestInboxSms(facts);
+    if (!text) return { error: "Nothing to send." };
+    return { text, source: "local" };
+  }
 
   try {
     const raw = await generateGeminiText({
       systemInstruction: POLISH_INBOX_DRAFT_SYSTEM,
-      userText: `Owner SMS draft:\n${note}`,
+      userText: packed
+        ? `Trusted facts:\n${packed}\n\nOwner SMS draft:\n${note}`
+        : `Owner SMS draft:\n${note}`,
       temperature: 0.2,
       maxOutputTokens: 256,
       timeoutMs: 8000,

@@ -296,6 +296,7 @@ export default function DevInboxPage() {
             escalatePeople={[]}
             archived={false}
             leadStatus="new"
+            businessName="Workspace"
           />
         </div>
         <div className="mt-10">
@@ -329,6 +330,7 @@ export default function DevInboxPage() {
             ]}
             archived={false}
             leadStatus="new"
+            businessName="Workspace"
           />
         </div>
         </main>

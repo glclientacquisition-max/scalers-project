@@ -57,7 +57,7 @@ describe("inbox ticket action chrome", () => {
     assert.doesNotMatch(threadBlock, /CallFaqSuggestions/);
     assert.doesNotMatch(threadBlock, /InboxJobEditor/);
     assert.doesNotMatch(threadBlock, /CallRecording/);
-    assert.match(ticket, /InboxSmsDock callId=\{callId\} callerPhone=\{callerPhone\}/);
+    assert.match(ticket, /InboxSmsDock[\s\S]*callId=\{callId\}[\s\S]*callerPhone=\{callerPhone\}[\s\S]*facts=\{smsFacts\}/);
   });
 
   it("keeps the purpose stamp read-only and archives from More", () => {
@@ -95,9 +95,10 @@ describe("inbox ticket action chrome", () => {
   });
 
   it("puts a polish wand before Send on the SMS dock", () => {
-    assert.match(dock, /aria-label="Polish"/);
-    assert.match(dock, /title="Polish"/);
-    assert.match(dock, /DeskHint label="Polish"/);
+    assert.match(dock, /wandLabel/);
+    assert.match(dock, /aria-label=\{wandLabel\}/);
+    assert.match(dock, /DeskHint label=\{wandLabel\}/);
+    assert.match(dock, /note\.trim\(\) \? "Polish" : "Suggest"/);
     assert.match(dock, /polishInboxSmsAction/);
     assert.match(dock, /WandGlyph/);
     assert.match(dock, /if \(polishState\.text\) setNote\(polishState\.text\)/);
@@ -109,7 +110,7 @@ describe("inbox ticket action chrome", () => {
 
   it("hides the SMS dock when the call is not Needs you", () => {
     assert.match(ticket, /needsYou && !archived \? \(/);
-    assert.match(ticket, /InboxSmsDock callId=\{callId\} callerPhone=\{callerPhone\}/);
+    assert.match(ticket, /InboxSmsDock[\s\S]*callId=\{callId\}[\s\S]*callerPhone=\{callerPhone\}[\s\S]*facts=\{smsFacts\}/);
     assert.match(dock, /callerPhone/);
     const row = read("dashboard/src/components/InboxItemRow.tsx");
     assert.doesNotMatch(row, /aria-label="Polish"/);
@@ -117,16 +118,19 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /InboxSmsDock/);
   });
 
-  it("does not invent text for an empty draft", () => {
+  it("suggests a packaged SMS when the draft is empty", () => {
     assert.match(notes, /export async function polishInboxSmsAction/);
     const start = notes.indexOf("export async function polishInboxSmsAction");
     const end = notes.indexOf("export async function sendCallerNoteAction", start);
     const action = notes.slice(start, end > start ? end : undefined);
-    assert.match(action, /if \(!note\) return \{ error: "Write a message\." \}/);
-    assert.doesNotMatch(action, /The team will follow up/);
-    assert.doesNotMatch(action, /fallbackPolishCallerNote/);
-    assert.doesNotMatch(action, /Hi \$\{/);
-    assert.match(dock, /polishInboxSmsAction/);
+    assert.match(action, /SUGGEST_INBOX_SMS_SYSTEM/);
+    assert.match(action, /fallbackSuggestInboxSms/);
+    assert.match(action, /Nothing to send/);
+    assert.match(action, /POLISH_INBOX_DRAFT_SYSTEM/);
+    assert.match(action, /Trusted facts/);
+    assert.doesNotMatch(action, /if \(!note\) return \{ error: "Write a message\." \}/);
+    assert.match(dock, /fillPolishForm/);
+    assert.match(dock, /disabled=\{polishPending \|\| sendPending\}/);
   });
 
   it("rewrites the ticket SMS draft in place", () => {

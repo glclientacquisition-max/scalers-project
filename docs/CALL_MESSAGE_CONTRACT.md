@@ -122,7 +122,7 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 | Hold cancelled | Desk | `Hi {Name}, {Business} here. We cancelled the pickup for {item}.` |
 | Order captured | Voice | `Hi {Name}, {Business} here. We have your order for {item}. We will confirm shortly.` |
 | Callback promised | Voice | `Hi {Name}, {Business} here. The team will call you back.` |
-| Owner note | Desk Polish then Send | Gemini rewrite of the owner's note. Owner must tap Send. |
+| Owner note | Desk wand then Send | Empty wand: one packaged SMS from lived facts. Filled wand: tighten the draft. Owner must tap Send. |
 
 **Never**
 
@@ -130,12 +130,12 @@ This is not "anything". Only the rows below. FAQ, price questions, greetings, le
 - Lead dumps, transcripts, recordings, staff directory
 - Escalation or medical detail (callback line only if a callback was actually promised)
 - Marketing or a second follow-up
-- Owner taps **Send** on a polished note. Never auto-send freeform AI text.
+- Owner taps **Send** on the packed SMS. Never auto-send freeform AI text.
 
 **Rules**
 
 - Owner toggle `notify_channels.caller_sms`. Off until they turn it on.
-- Desk: open the call. Change When/Where and Save. Confirm, Done, or Cancel. Note, Polish, Send.
+- Desk: open the call. Change When/Where and Save. Confirm, Done, or Cancel. Wand, then Send.
 - One customer text per trigger. Capture then Confirm is two texts on purpose (received, then confirmed). Capture then Done is two texts (held, then ready).
 - Use the captured name when it is a real name. Otherwise `Hi, {Business} here`.
 - Name the service or item.

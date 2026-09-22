@@ -268,6 +268,7 @@ export default async function CallDetailPage({
         }))}
         archived={archived}
         leadStatus={leadStatus}
+        businessName={businessName}
       />
     </>
   );

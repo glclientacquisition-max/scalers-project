@@ -115,7 +115,8 @@ describe("ticket chat follow-ups", () => {
     assert.match(dock, /polishInboxSmsAction/);
     assert.match(dock, /WandGlyph/);
     assert.match(callDetail, /No FAQ ideas/);
-    assert.match(callDetail, /Polish tightens the draft/);
+    assert.match(callDetail, /Empty wand Suggests one packaged SMS/);
+    assert.match(callDetail, /filled wand Polishes/);
     assert.match(callDetail, /One vertical conversation stream/);
   });
 
