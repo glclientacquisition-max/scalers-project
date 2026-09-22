@@ -43,7 +43,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 
 | Screen | Old control | New control |
 | --- | --- | --- |
-| Identity | Label-above inputs; tone and type chip rows | Grouped rows. Name fields. Tone and type selects. Contacts table `md+`, stacked phone |
+| Identity | Label-above inputs; tone and type chip rows | Grouped rows. Name fields. Tone select: Professional or Warm. Type select. Contacts table `md+`, stacked phone |
 | Alerts | Form grid plus bordered toggle cards | Grouped Contact / Channels / Callers rows. Channel and caller flags are switches. Save filled |
 | Catalog | Services and products tables `md+`, stacked phone | Unchanged tables. Add / paste stay ghost. Bulk apply filled |
 | Hours | Open/Closed chip per day; after-hours chips | Day grid with open switches. When closed is segmented Keep helping / Message only |

@@ -97,7 +97,7 @@ describe('mvp answer readiness', () => {
       sautikitVirtualNumber: 'pending:abc',
       llmSystemPrompt: 'x'.repeat(100),
       agentName: 'Aisha',
-      agentTone: 'friendly',
+      agentTone: 'warm',
       businessHours: 'Monday – Saturday: 9:00 AM – 7:00 PM',
       businessLocations: [{ landmark: 'City Market' }],
       faqs: [{ question: 'Hours?', answer: '9–7' }],
@@ -111,7 +111,7 @@ describe('mvp answer readiness', () => {
       sautikitVirtualNumber: '+254709221536',
       llmSystemPrompt: 'x'.repeat(100),
       agentName: 'Aisha',
-      agentTone: 'friendly',
+      agentTone: 'warm',
       businessHours: 'Monday – Saturday: 9:00 AM – 7:00 PM',
       hoursSchedule: {
         days: { mon: { open: '09:00', close: '19:00' } },

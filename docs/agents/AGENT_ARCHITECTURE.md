@@ -96,7 +96,7 @@ Stored in **Supabase `tenants` columns** (not hardcoded in platform code):
 | Column | Role |
 | --- | --- |
 | `llm_system_prompt` | Compiled receptionist instructions |
-| `agent_name`, `agent_tone` | Persona |
+| `agent_name`, `agent_tone` | Name + manner (`professional` or `warm`) |
 | `services_catalog`, `product_catalog` | Offerings |
 | `faqs`, `business_policies` | Knowledge |
 | `hours_schedule`, `after_hours_mode` | Open/closed behavior |

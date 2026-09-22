@@ -8,6 +8,7 @@ import {
   compileReceptionistPrompt,
   parseAgentTone,
 } from "@/lib/promptCompiler";
+import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
 import {
   formatServicesForCompiler,
   normalizeServicesCatalog,
@@ -317,7 +318,7 @@ export async function applyIngestAction(
   }
 
   const agentTone =
-    parseAgentTone(String(tenant.agent_tone || "")) || "friendly";
+    parseAgentTone(String(tenant.agent_tone || "")) || DEFAULT_AGENT_TONE;
 
   const nextLocations =
     draftLocations.length > 0
