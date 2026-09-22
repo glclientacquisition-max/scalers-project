@@ -162,6 +162,8 @@ describe("contacts person-file chrome", () => {
     assert.match(note, /History/);
     assert.match(note, /ContactKpiStrip/);
     assert.match(note, /itemSignalLabel/);
+    assert.match(note, /data-desk-nested/);
+    assert.match(profile, /data-desk-nested/);
     assert.doesNotMatch(accept, /[\u2014\u2013]/);
     assert.doesNotMatch(note, /[\u2014\u2013]/);
   });

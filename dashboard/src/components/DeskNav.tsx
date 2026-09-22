@@ -13,7 +13,7 @@ import {
   formatAttentionCount,
   formatInboxNavAriaLabel,
 } from "@/lib/deskAttentionCount";
-import { isDeskTicketChatPath } from "@/lib/deskTicketChat";
+import { isDeskNestedPath } from "@/lib/deskTicketChat";
 
 export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
@@ -177,10 +177,10 @@ export function DeskRail({
   );
 }
 
-/** Phone thumb destinations. Same DESK_LINKS as the desktop rail. Hidden on ticket chat. */
+/** Phone thumb destinations. Same DESK_LINKS as the desktop rail. Hidden on nested insides. */
 export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
   const pathname = usePathname();
-  if (isDeskTicketChatPath(pathname)) return null;
+  if (isDeskNestedPath(pathname)) return null;
 
   return (
     <nav

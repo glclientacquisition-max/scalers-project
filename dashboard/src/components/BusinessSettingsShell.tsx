@@ -262,7 +262,7 @@ export function BusinessSettingsShell({
   }
 
   return (
-    <div className="w-full min-w-0" data-settings-console="">
+    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
       {showForm ? (
         <TenantForm
           key={tenantFormKey}

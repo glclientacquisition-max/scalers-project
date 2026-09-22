@@ -94,7 +94,7 @@ export default async function ContactDetailPage({
     ),
   });
   return (
-    <div className="max-w-6xl min-w-0 overflow-x-clip">
+    <div className="max-w-6xl min-w-0 overflow-x-clip" data-desk-nested="">
       <DeskBack href={backHref}>{backLabel}</DeskBack>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">

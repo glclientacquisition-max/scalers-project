@@ -16,7 +16,7 @@ export default async function ContactImportPage() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl" data-desk-nested="">
       <DeskBack href="/contacts">Contacts</DeskBack>
       <h1 className="mt-4 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
         Import

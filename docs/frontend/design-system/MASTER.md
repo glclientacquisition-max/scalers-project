@@ -29,8 +29,8 @@ Defined in `dashboard/src/app/globals.css` and `dashboard/tailwind.config.ts`.
 | WhatsApp glyph | `--whatsapp` `#25D366` | `whatsapp` |
 | Focus glow | `--shadow-focus` | `shadow-focus` |
 | Desk header | `--desk-header-h` | `0` at every width. Phone lockup removed. |
-| Desk tab bar | `--desk-tabbar-h` | `4rem` below `md`, `0` from `md`. Phone ticket chat (`[data-ticket-chat]`) also sets `0`. Matches `DeskTabBar` min-height. |
-| Desk tab clearance | `--desk-tabbar-clearance` | Phone: tab bar plus `safe-area-inset-bottom` plus `1.5rem`. From `md`: `2.5rem`. Phone ticket chat: `0`. Phone `main` padding, `scroll-padding-bottom`, and sticky bottom chrome use this. |
+| Desk tab bar | `--desk-tabbar-h` | `4rem` below `md`, `0` from `md`. Phone nested insides (`[data-ticket-chat]`, `[data-desk-nested]`) also set `0`. Matches `DeskTabBar` min-height. |
+| Desk tab clearance | `--desk-tabbar-clearance` | Phone: tab bar plus `safe-area-inset-bottom` plus `1.5rem`. From `md`: `2.5rem`. Phone nested insides: `0`. Phone `main` padding, `scroll-padding-bottom`, and sticky bottom chrome use this. |
 | Max width | | `max-w-desk` (72rem) |
 | Radius | | `rounded-panel` (0.875rem) |
 | Motion fast | `--motion-fast` | 150ms named transitions |
@@ -119,7 +119,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 | Dialog | `DeskDialog`: overlay, Escape, focus restore. No enter animation. |
 | Desk hint | `DeskHint`. Navy name chip on hover, pointer, and keyboard focus for icon-only hits. Portaled. Escape and scroll dismiss. The control keeps `aria-label`. |
 | Desk rail | `DeskRail` in `DeskNav.tsx`. `md+` only. `w-[4.5rem]`. Same `DESK_LINKS` as the phone tabs (Overview, Inbox, Contacts, Usage, Profile). Icon-only 44px hits, `DeskHint` names. Needs you badge on Inbox. Mark-only Scalers at the top. Sign out lives on Profile, not at the rail foot. |
-| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` icon rail. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Stays on nested contact screens. Hidden on phone ticket chat (`/calls/[id]`, `data-ticket-chat`). `DeskBack` remains the escape. Sign out lives on Profile. Inbox Needs you count is a 16px corner overlay on the Inbox icon (`deskNavBadgeClass`: `-top-1 -end-1`, `h-4 min-w-4`). Ribbon gradient `from-accent to-accent-fill` (`#0096FF` → `#005CCC`), `text-accent-on-fill`. `1`–`9`, then `9+`. Hidden at 0. `aria-label` includes the count (`Inbox, 3 need you`). Not a second control. |
+| Desk tab bar | `DeskTabBar` in `DeskNav.tsx`. Same `DESK_LINKS` as the `md+` icon rail. Fixed, `md:hidden`, icon + label, `min-h-12`, `aria-current`. Stays on list roots (`/home`, `/calls`, `/contacts`, `/wallet`, Profile hub) and Inbox archived. Hidden below `md` on nested insides: ticket chat (`/calls/[id]`, `data-ticket-chat`), contact file (`/contacts/[id]`), contact import (`/contacts/import`), Profile nested panels (`data-desk-nested`). `isDeskNestedPath` unmounts the bar on ticket and contact routes. CSS `:has` zeros `--desk-tabbar-*` and hides `[data-desk-tabbar]` when those marks are present, including Profile `?tab=` panels that stay on `/settings`. `DeskBack` remains the escape. The `md+` rail stays. Sign out lives on Profile. Inbox Needs you count is a 16px corner overlay on the Inbox icon (`deskNavBadgeClass`: `-top-1 -end-1`, `h-4 min-w-4`). Ribbon gradient `from-accent to-accent-fill` (`#0096FF` → `#005CCC`), `text-accent-on-fill`. `1`–`9`, then `9+`. Hidden at 0. `aria-label` includes the count (`Inbox, 3 need you`). Not a second control. |
 | Empty state | `deskEmptyClass`. Title + one link. No marketing paragraph |
 | Owner error | `DeskError` + `ownerFacingError`. Never SQL files, RLS dumps, or repo paths. Log raw diagnostics with `logDeskError`. |
 | Crash | `DeskCrash` + Try again. `(desk)/error.tsx`, `app/error.tsx`, `global-error.tsx`. Never dump `error.message`. |
