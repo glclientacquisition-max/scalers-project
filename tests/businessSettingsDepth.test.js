@@ -21,7 +21,7 @@ describe("business settings depth", () => {
 
   it("orders Assistant before Business and uses example placeholders", () => {
     const assistantName = form.indexOf("Assistant name");
-    const businessBlock = form.indexOf(">Business<");
+    const businessBlock = form.indexOf('title="Business"');
     const contacts = form.indexOf(">Public contacts<");
     assert.ok(assistantName > 0);
     assert.ok(assistantName < businessBlock);
@@ -35,7 +35,7 @@ describe("business settings depth", () => {
 
   it("uses job labels and example-only policy copy", () => {
     assert.match(form, />When closed</);
-    assert.match(form, />When unsure</);
+    assert.match(form, /title="When unsure"/);
     assert.match(form, /What to say/);
     assert.match(form, /placeholder="Wanjiku Mwangi"/);
     assert.match(form, /Add service/);
@@ -78,7 +78,7 @@ describe("business settings depth", () => {
   });
 
   it("edits handoff only on Team", () => {
-    assert.match(form, /aria-label="Handoff mode"/);
+    assert.match(form, /label="Handoff mode"/);
     assert.match(form, /Change in Team/);
     assert.equal((form.match(/setHandoffMode/g) || []).length, 2);
     assert.doesNotMatch(form, /aria-label="Handoff"/);

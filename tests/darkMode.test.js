@@ -103,7 +103,9 @@ describe("theme activation", () => {
 
   it("offers System, Light, Dark as an instant device preference", () => {
     const picker = read("dashboard/src/components/ThemePicker.tsx");
-    assert.match(picker, /role="radiogroup"/);
+    const ui = read("dashboard/src/components/settingsUi.tsx");
+    assert.match(ui, /role="radiogroup"/);
+    assert.match(picker, /SettingsSegmented/);
     for (const label of ['"system"', '"light"', '"dark"']) {
       assert.ok(picker.includes(`id: ${label}`), `choice ${label}`);
     }

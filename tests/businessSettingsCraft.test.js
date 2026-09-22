@@ -15,6 +15,8 @@ describe("business settings craft", () => {
   const save = read("dashboard/src/components/TenantSettingsSaveButton.tsx");
   const page = read("dashboard/src/app/(desk)/settings/page.tsx");
   const nav = read("dashboard/src/lib/businessSettingsNav.ts");
+  const alerts = read("dashboard/src/components/AlertsPanel.tsx");
+  const theme = read("dashboard/src/components/ThemePicker.tsx");
 
   it("keeps assistant chrome and does not invent Online", () => {
     assert.match(form, /Assistant name/);
@@ -110,9 +112,9 @@ describe("business settings craft", () => {
   });
 
   it("uses non-clickable group headers and a phone index of destination rows", () => {
-    assert.match(shell, /SETTINGS_GROUP_TITLE_CLASS/);
-    assert.match(shell, /uppercase tracking-wide text-gray-500/);
-    assert.match(shell, /pointer-events-none/);
+    assert.match(shell, /settingsGroupTitleClass/);
+    assert.match(ui, /uppercase tracking-wide text-gray-500/);
+    assert.match(ui, /pointer-events-none/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
     assert.match(shell, /lg:hidden/);
     assert.match(shell, /SettingsChevron/);
@@ -192,8 +194,8 @@ describe("business settings craft", () => {
     assert.match(ui, /grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2/);
     assert.match(ui, /min-w-0 flex-1/);
     assert.match(ui, /text-xl font-semibold/);
-    assert.match(form, /settingsFormGridClass/);
-    assert.match(form, /grid-cols-\[minmax\(5\.5rem,7rem\)_5\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
+    assert.match(form, /SettingsGroup/);
+    assert.match(form, /grid-cols-\[minmax\(5\.5rem,7rem\)_2\.75rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
     assert.match(form, /lg:grid-cols-\[8rem_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1\.1fr\)_minmax\(0,1\.1fr\)_2\.5rem\]/);
     assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(10rem,auto\)_2\.5rem\]/);
     assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.5rem\]/);
@@ -202,5 +204,25 @@ describe("business settings craft", () => {
     const deskNav = read("dashboard/src/components/DeskNav.tsx");
     assert.match(deskNav, /data-settings-console/);
     assert.match(deskNav, /md:has-\[\[data-settings-console\]\]:max-w-none/);
+  });
+
+  it("uses native switches for booleans and accent-fill for Save", () => {
+    assert.match(ui, /data-settings-toggle/);
+    assert.match(ui, /type="checkbox"/);
+    assert.match(ui, /role="switch"/);
+    assert.match(ui, /min-h-11 min-w-11/);
+    assert.match(ui, /bg-accent-fill/);
+    assert.match(ui, /focus-within:ring-2 focus-within:ring-accent/);
+    assert.match(save, /btnPrimaryFill/);
+    assert.match(form, /<ToolSwitch/);
+    assert.match(form, /setDayOpen\(day, next\)/);
+    assert.match(form, /SettingsSegmented/);
+    assert.match(form, /label="When closed"/);
+    assert.match(form, /<SettingsSelect/);
+    assert.match(alerts, /<ToolSwitch/);
+    assert.match(theme, /SettingsSegmented/);
+    assert.match(test, /settingsPrimaryButtonClass/);
+    assert.match(test, /Call \{did\}/);
+    assert.doesNotMatch(form, /choiceChipClass/);
   });
 });
