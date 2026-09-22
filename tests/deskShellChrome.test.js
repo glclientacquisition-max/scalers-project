@@ -159,7 +159,8 @@ describe("desk shell chrome", () => {
     assert.match(settingsUi, /SignOutButton/);
     assert.match(settingsUi, />Profile</);
     assert.match(settingsShell, /<SignOutButton/);
-    assert.match(settingsShell, /uppercase tracking-wide text-gray-500/);
+    assert.match(settingsUi, /uppercase tracking-wide text-gray-500/);
+    assert.match(settingsShell, /settingsGroupTitleClass/);
     assert.match(settingsShell, /data-settings-menu/);
     assert.match(settingsShell, /SettingsChevron/);
     assert.match(settingsUi, /lg:w-\[13\.5rem\]/);

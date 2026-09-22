@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { NotifyChannelPicker } from "@/components/NotifyChannelPicker";
 import {
-  settingsDenseFieldClass,
-  settingsFormGridClass,
-  settingsPrimaryButtonClass,
+  SettingsGroup,
+  SettingsRow,
   ToolSwitch,
+  settingsDenseFieldClass,
+  settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
 import {
   parseNotifyChannels,
@@ -50,9 +51,9 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
   const flashIsError = Boolean(state.error);
 
   return (
-    <section className="min-w-0 space-y-4">
-      <form action={formAction} className="min-w-0 space-y-3">
-        <div className="flex justify-end">
+    <section className="min-w-0 w-full space-y-6">
+      <form action={formAction} className="min-w-0 space-y-6">
+        <div className="mb-4 flex justify-end">
           <button
             type="submit"
             disabled={pending}
@@ -74,63 +75,54 @@ export function AlertsPanel({ tenant }: { tenant: TenantRow }) {
           value={JSON.stringify(notifyChannels)}
         />
 
-        <div className={settingsFormGridClass}>
-          <div>
-            <label className="block text-xs font-medium text-ink-soft" htmlFor="owner">
-              Alert phone
-            </label>
+        <SettingsGroup title="Contact">
+          <SettingsRow label="Alert phone" htmlFor="owner">
             <input
               id="owner"
               value={ownerWhatsapp}
               onChange={(e) => setOwnerWhatsapp(e.target.value)}
               placeholder="+254 700 000 000"
-              className={`${settingsDenseFieldClass} mt-1`}
+              className={settingsDenseFieldClass}
             />
-          </div>
-          <div>
-            <label
-              className="block text-xs font-medium text-ink-soft"
-              htmlFor="alert_email"
-            >
-              Email
-            </label>
+          </SettingsRow>
+          <SettingsRow label="Email" htmlFor="alert_email">
             <input
               id="alert_email"
               type="email"
               value={alertEmail}
               onChange={(e) => setAlertEmail(e.target.value)}
               placeholder="owner@shop.co.ke"
-              className={`${settingsDenseFieldClass} mt-1`}
+              className={settingsDenseFieldClass}
             />
-          </div>
-        </div>
+          </SettingsRow>
+        </SettingsGroup>
 
         <NotifyChannelPicker
           value={notifyChannels}
           onChange={setNotifyChannels}
-          heading={null}
+          heading="Channels"
         />
 
-        <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
-          <p className="text-sm font-medium text-ink">Text customers</p>
-          <ToolSwitch
-            checked={Boolean(notifyChannels.caller_sms)}
-            onChange={(next) =>
-              setNotifyChannels({ ...notifyChannels, caller_sms: next })
-            }
-            label="Text customers"
-          />
-        </div>
-        <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-3">
-          <p className="text-sm font-medium text-ink">Text back missed calls</p>
-          <ToolSwitch
-            checked={Boolean(notifyChannels.missed_textback)}
-            onChange={(next) =>
-              setNotifyChannels({ ...notifyChannels, missed_textback: next })
-            }
-            label="Text back missed calls"
-          />
-        </div>
+        <SettingsGroup title="Callers">
+          <SettingsRow label="Text customers" control="switch">
+            <ToolSwitch
+              checked={Boolean(notifyChannels.caller_sms)}
+              onChange={(next) =>
+                setNotifyChannels({ ...notifyChannels, caller_sms: next })
+              }
+              label="Text customers"
+            />
+          </SettingsRow>
+          <SettingsRow label="Text back missed calls" control="switch">
+            <ToolSwitch
+              checked={Boolean(notifyChannels.missed_textback)}
+              onChange={(next) =>
+                setNotifyChannels({ ...notifyChannels, missed_textback: next })
+              }
+              label="Text back missed calls"
+            />
+          </SettingsRow>
+        </SettingsGroup>
 
         {flash ? (
           <p

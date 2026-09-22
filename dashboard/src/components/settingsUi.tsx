@@ -7,7 +7,12 @@
 import type { ReactNode } from "react";
 import { DeskBack } from "@/components/ui/DeskBack";
 import { SignOutButton } from "@/components/ui/SignOutButton";
-import { btnPrimary, deskFieldClass, deskShiftClass } from "@/components/ui/deskChrome";
+import {
+  btnPrimary,
+  deskFieldClass,
+  deskShiftClass,
+  filterTabClass,
+} from "@/components/ui/deskChrome";
 
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
 
@@ -47,7 +52,11 @@ export const settingsPanelHeadingClass =
   "font-display text-xl font-semibold tracking-tight text-ink";
 
 export const settingsBlockTitleClass =
-  "text-[11px] font-bold uppercase tracking-wide text-ink-soft";
+  "text-[11px] font-bold uppercase tracking-wide text-gray-500";
+
+/** Non-clickable group header. Same dialect as the Profile rail. */
+export const settingsGroupTitleClass =
+  "pointer-events-none mb-0 select-none text-xs font-bold uppercase tracking-wide text-gray-500";
 
 export function settingsRadioCardClass(selected: boolean) {
   return [
@@ -113,6 +122,7 @@ export function TrashButton({
   );
 }
 
+/** Native checkbox drawn as a switch. 44px hit. On-state accent-fill. Focus ring accent. */
 export function ToolSwitch({
   checked,
   onChange,
@@ -125,29 +135,184 @@ export function ToolSwitch({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => {
-        if (disabled) return;
-        onChange(!checked);
-      }}
+    <label
+      data-settings-toggle=""
       className={[
-        `relative inline-flex h-7 w-12 shrink-0 items-center rounded-full ${deskShiftClass} hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`,
+        "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-accent",
         disabled ? "cursor-not-allowed opacity-60" : "",
-        checked && !disabled ? "bg-accent" : "bg-line",
       ].join(" ")}
     >
-      <span
-        className={[
-          `inline-block h-5 w-5 rounded-full bg-surface shadow ${deskShiftClass}`,
-          checked && !disabled ? "translate-x-6" : "translate-x-1",
-        ].join(" ")}
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        disabled={disabled}
+        aria-label={label}
+        onChange={(e) => {
+          if (disabled) return;
+          onChange(e.target.checked);
+        }}
+        className="sr-only"
       />
-    </button>
+      <span
+        aria-hidden
+        className={[
+          `relative inline-flex h-7 w-12 shrink-0 items-center rounded-full ${deskShiftClass}`,
+          checked && !disabled ? "bg-accent-fill" : "bg-line",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            `inline-block h-5 w-5 rounded-full bg-surface shadow ${deskShiftClass}`,
+            checked && !disabled ? "translate-x-6" : "translate-x-1",
+          ].join(" ")}
+        />
+      </span>
+    </label>
+  );
+}
+
+export const SettingsToggle = ToolSwitch;
+
+export function SettingsGroup({
+  title,
+  action,
+  children,
+}: {
+  title?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0 w-full space-y-1.5">
+      {title || action ? (
+        <div className="flex min-h-8 items-end justify-between gap-3 px-1">
+          {title ? <h3 className={settingsGroupTitleClass}>{title}</h3> : <span />}
+          {action}
+        </div>
+      ) : null}
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export function SettingsRow({
+  label,
+  htmlFor,
+  hint,
+  control = "field",
+  children,
+}: {
+  label: ReactNode;
+  htmlFor?: string;
+  hint?: string;
+  control?: "field" | "switch";
+  children: ReactNode;
+}) {
+  const switchRow = control === "switch";
+  return (
+    <div className="flex min-h-12 w-full items-center gap-3 px-4 py-2">
+      <div className={switchRow ? "min-w-0 flex-1" : "w-[7.5rem] shrink-0 sm:w-36"}>
+        <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+          {label}
+        </label>
+        {hint ? <p className="mt-0.5 text-xs text-ink-soft">{hint}</p> : null}
+      </div>
+      <div className={switchRow ? "shrink-0" : "min-w-0 flex-1"}>{children}</div>
+    </div>
+  );
+}
+
+export function SettingsStack({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5 px-4 py-3">
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+export function SettingsSegmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: readonly { id: T; label: string }[];
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="w-full min-w-0 border-b border-line">
+      <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
+        {options.map((opt) => {
+          const selected = value === opt.id;
+          return (
+            <li key={opt.id} className="shrink-0">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onChange(opt.id)}
+                className={filterTabClass(selected)}
+              >
+                {opt.label}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function SettingsSelect<T extends string>({
+  id,
+  value,
+  onChange,
+  options,
+  label,
+  placeholder,
+}: {
+  id: string;
+  value: T | "";
+  onChange: (value: T) => void;
+  options: readonly { id: T; label: string }[];
+  label?: string;
+  placeholder?: string;
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      aria-label={label}
+      onChange={(e) => onChange(e.target.value as T)}
+      className={`${settingsDenseFieldClass} min-w-0`}
+    >
+      {placeholder || value === "" ? (
+        <option value="" disabled={value !== ""}>
+          {placeholder || "Select"}
+        </option>
+      ) : null}
+      {options.map((opt) => (
+        <option key={opt.id} value={opt.id}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
   );
 }
 

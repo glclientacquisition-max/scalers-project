@@ -21,7 +21,7 @@ Shipped panels that do not map 1:1 sit in the closest group. Locations and Polic
 
 Phone: dense index rows. Tap a row to drill in. `DeskBack` icon, aria-label Profile (`lg:hidden`). lg+: nested inner rail (`lg:w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
-Sticky Save on Catalog and Train panels, top-right of the panel header. Updates, Alerts, Import, Test, and Appearance use the same menu without a second compile save.
+Sticky Save on Catalog and Train panels, top-right of the panel header. Updates, Alerts, Import, Test, and Appearance use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
 
 Bare `/settings` is the hub. lg+ hub shows Appearance in the panel. `?tab=updates` is Updates. `?tab=alerts` is Alerts. `?tab=appearance` is Appearance. Hash `#train` is not routed. `Train` is the verb on Save.
 
@@ -29,9 +29,9 @@ Bare `/settings` is the hub. lg+ hub shows Appearance in the panel. `?tab=update
 
 Short in-page title Profile plus compact workspace name and Line live / Number pending. Do not use `deskListTitleClass` on the hub. Muted Sign out on the hub header and in This device (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` plus a short title (Hours, Pronunciation). Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`.
 
-Phone index: grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
+Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity and similar forms use `settingsFormGridClass` (`grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4`). Hours is a compact day / open / close grid. Catalog, FAQs, Team, and Locations are tables on `lg+`. Phone stacks.
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` underline tabs. Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
@@ -41,21 +41,22 @@ Density stays 8. Fill the canvas. Do not double page padding or import landing-s
 
 Inside each destination, group by owner job. Placeholders are examples, not instructions. No `e.g.` prefixes.
 
-| Screen | Blocks |
-| --- | --- |
-| Identity | Assistant (name, tone) → Business (name, type) → Public contacts |
-| Alerts | Alert phone, email, notify channels, text customers, text back missed calls |
-| Catalog | Services → Products |
-| Hours | Days → When closed |
-| Locations | Places: label, area, landmark, directions, coverage |
-| Policies | Rules → When unsure |
-| Team | Handoff → People: name, handles, phone, email |
-| Voice | Voice → Tools. Handoff is read-only. Change in Team. |
-| Pronunciation | Coach |
-| Updates | Callers hear |
-| Import | Paste or Website, then Products |
-| Test | Greeting preview, live call |
-| Appearance | System, Light, Dark |
+| Screen | Old control | New control |
+| --- | --- | --- |
+| Identity | Label-above inputs; tone and type chip rows | Grouped rows. Name fields. Tone and type selects. Contacts table `md+`, stacked phone |
+| Alerts | Form grid plus bordered toggle cards | Grouped Contact / Channels / Callers rows. Channel and caller flags are switches. Save filled |
+| Catalog | Services and products tables `md+`, stacked phone | Unchanged tables. Add / paste stay ghost. Bulk apply filled |
+| Hours | Open/Closed chip per day; after-hours chips | Day grid with open switches. When closed is segmented Keep helping / Message only |
+| Locations | Places table `lg+`, stacked phone | Unchanged dense table. Add place ghost |
+| Policies | Two-column textarea grid | Grouped Rules stacks. When unsure stack |
+| Team | Handoff chips. Notify chips | Handoff segmented. Escalate / Inbox / Ops switches. People table `lg+` |
+| Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. Tool switches. Hear sample ghost. Handoff read-only |
+| Pronunciation | Coach with duplicate heading | Coach. Embedded heading is sr-only. Studio modes use underline tabs |
+| Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
+| Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
+| Test | Generate preview filled plus large tel control | One filled control: Call when live, else Generate preview. The other is ghost |
+| Appearance | Three filled segment pills | System / Light / Dark underline tabs |
+| Sign out | Ghost | Ghost |
 
 Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
 

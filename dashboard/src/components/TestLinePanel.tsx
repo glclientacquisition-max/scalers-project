@@ -24,9 +24,10 @@ import {
   previewErrorCopy,
 } from "@/lib/previewAudio";
 import {
+  SettingsGroup,
+  settingsGhostButtonClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
-import { deskShiftClass } from "@/components/ui/deskChrome";
 
 /**
  * Business Settings → Test
@@ -43,6 +44,7 @@ export function TestLinePanel({
     "pending:"
   );
   const did = String(tenant.sautikit_virtual_number || "").trim();
+  const lineLive = Boolean(did) && !pendingDid;
   const businessName = String(tenant.business_name || "").trim();
   const agentName = String(tenant.agent_name || "").trim() || "Assistant";
   const sonioxVoiceId = resolveLiveCallVoiceId(
@@ -126,109 +128,102 @@ export function TestLinePanel({
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
-      <section className="space-y-4" aria-labelledby="test-preview-heading">
-        <h3
-          id="test-preview-heading"
-          className="text-sm font-medium text-ink"
-        >
-          Phone preview
-        </h3>
+    <div className="min-w-0 w-full space-y-6">
+      <SettingsGroup title="Preview">
+        <div className="space-y-3 px-4 py-3">
+          {greetingPreview ? (
+            <>
+              <blockquote className="border-l-2 border-accent/50 pl-4 text-base leading-relaxed text-ink">
+                “{greetingPreview}”
+              </blockquote>
+              {voiceLabel ? (
+                <p className="text-xs text-ink-soft">
+                  Voice · <span className="text-ink">{voiceLabel}</span>
+                  {lexicon.length
+                    ? ` · ${lexicon.length} pronunciation override${lexicon.length === 1 ? "" : "s"}`
+                    : null}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => generatePhonePreview()}
+                disabled={phonePreviewLoading}
+                className={
+                  lineLive
+                    ? settingsGhostButtonClass
+                    : `${settingsPrimaryButtonClass} w-full sm:w-auto sm:min-w-[12rem]`
+                }
+              >
+                {phonePreviewLoading ? "Generating…" : "Generate preview"}
+              </button>
+              {phonePreviewUrl ? (
+                <audio
+                  controls
+                  preload="metadata"
+                  className="w-full max-w-md"
+                  onError={() => {
+                    URL.revokeObjectURL(phonePreviewUrl);
+                    setPhonePreviewUrl(null);
+                    setPhonePreviewError(NO_VOICE_SAMPLE_COPY);
+                  }}
+                >
+                  <source src={phonePreviewUrl} type="audio/wav" />
+                </audio>
+              ) : phonePreviewError ? (
+                <p className="text-sm text-warn" role="alert">
+                  {phonePreviewError}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm text-ink-soft">
+              Add a business name and assistant name in{" "}
+              <Link
+                href={businessSettingsHref("train", "identity")}
+                className="font-medium text-accent-deep underline-offset-2 hover:underline"
+              >
+                Identity
+              </Link>{" "}
+              to preview the greeting.
+            </p>
+          )}
+        </div>
+      </SettingsGroup>
 
-        {greetingPreview ? (
-          <>
-            <blockquote className="border-l-2 border-accent/50 pl-4 text-base leading-relaxed text-ink">
-              “{greetingPreview}”
-            </blockquote>
-            {voiceLabel ? (
-              <p className="text-xs text-ink-soft">
-                Voice · <span className="text-ink">{voiceLabel}</span>
-                {lexicon.length
-                  ? ` · ${lexicon.length} pronunciation override${lexicon.length === 1 ? "" : "s"}`
-                  : null}
-              </p>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => generatePhonePreview()}
-              disabled={phonePreviewLoading}
+      <SettingsGroup title="Line">
+        <div className="space-y-3 px-4 py-3">
+          {lineLive ? (
+            <a
+              href={`tel:${did}`}
               className={`${settingsPrimaryButtonClass} w-full sm:w-auto sm:min-w-[12rem]`}
             >
-              {phonePreviewLoading ? "Generating…" : "Generate preview"}
-            </button>
-
-            {phonePreviewUrl ? (
-              <audio
-                controls
-                preload="metadata"
-                className="w-full max-w-md"
-                onError={() => {
-                  URL.revokeObjectURL(phonePreviewUrl);
-                  setPhonePreviewUrl(null);
-                  setPhonePreviewError(NO_VOICE_SAMPLE_COPY);
-                }}
-              >
-                <source src={phonePreviewUrl} type="audio/wav" />
-              </audio>
-            ) : phonePreviewError ? (
-              <p className="text-sm text-warn" role="alert">
-                {phonePreviewError}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-sm text-ink-soft">
-            Add a business name and assistant name in{" "}
+              Call {did}
+            </a>
+          ) : (
+            <p className="text-sm text-ink-soft">
+              Number pending. Finish setup before calling.
+            </p>
+          )}
+          <p className="text-xs text-ink-soft">
+            Fix names in{" "}
             <Link
-              href={businessSettingsHref("train", "identity")}
+              href={businessSettingsHref("train", "pronunciation")}
               className="font-medium text-accent-deep underline-offset-2 hover:underline"
             >
-              Identity
-            </Link>{" "}
-            to preview the greeting.
+              Pronunciation
+            </Link>
+            {" · "}
+            change voice in{" "}
+            <Link
+              href={businessSettingsHref("train", "tools")}
+              className="font-medium text-accent-deep underline-offset-2 hover:underline"
+            >
+              Voice
+            </Link>
+            .
           </p>
-        )}
-      </section>
-
-      <section className="space-y-3 lg:border-l lg:border-line lg:pl-8" aria-labelledby="test-call-heading">
-        <h3
-          id="test-call-heading"
-          className="text-sm font-medium text-ink"
-        >
-          Live call
-        </h3>
-        {pendingDid || !did ? (
-          <p className="text-sm text-ink-soft">
-            Number pending. Finish setup before calling.
-          </p>
-        ) : (
-          <a
-            href={`tel:${did}`}
-            className={`flex min-h-14 w-full items-center justify-center rounded-2xl border border-line bg-surface px-4 py-4 text-center font-display text-xl font-semibold tracking-tight text-ink ${deskShiftClass} hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent`}
-          >
-            {did}
-          </a>
-        )}
-        <p className="text-xs text-ink-soft">
-          Fix names in{" "}
-          <Link
-            href={businessSettingsHref("train", "pronunciation")}
-            className="font-medium text-accent-deep underline-offset-2 hover:underline"
-          >
-            Pronunciation
-          </Link>
-          {" · "}
-          change voice in{" "}
-          <Link
-            href={businessSettingsHref("train", "tools")}
-            className="font-medium text-accent-deep underline-offset-2 hover:underline"
-          >
-            Voice
-          </Link>
-          .
-        </p>
-      </section>
+        </div>
+      </SettingsGroup>
     </div>
   );
 }

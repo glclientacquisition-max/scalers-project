@@ -12,10 +12,13 @@ import {
   type IngestExtractState,
 } from "@/app/(desk)/settings/ingestActions";
 import {
+  SettingsGroup,
+  SettingsRow,
+  SettingsSegmented,
+  ToolSwitch,
   settingsActionClass,
   settingsFieldClass,
   settingsPrimaryButtonClass,
-  settingsRadioCardClass,
   compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
 
@@ -145,32 +148,17 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
     <section className="space-y-4">
       {!draft ? (
         <div className="space-y-4">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(
+          <SettingsSegmented
+            label="Import source"
+            value={mode}
+            options={
               [
-                {
-                  id: "paste" as const,
-                  label: "Paste",
-                },
-                {
-                  id: "url" as const,
-                  label: "Website",
-                },
+                { id: "paste" as const, label: "Paste" },
+                { id: "url" as const, label: "Website" },
               ] as const
-            ).map((opt) => {
-              const selected = mode === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setMode(opt.id)}
-                  className={settingsRadioCardClass(selected)}
-                >
-                  <span className="font-medium text-ink">{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
+            }
+            onChange={setMode}
+          />
 
           <form action={extractAction} className="space-y-3">
             <input type="hidden" name="tenant_id" value={tenant.id} />
@@ -257,152 +245,107 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
               Object.values(draft.policies).some((v) =>
                 String(v || "").trim()
               ))) ? (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-ink">
-                Business details
-              </h3>
-              <ul className="space-y-2">
+            <SettingsGroup title="Business details">
                 {draft.businessNameSuggestion ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                  <SettingsRow
+                    label="Rename business to"
+                    hint={draft.businessNameSuggestion}
+                    control="switch"
+                  >
+                    <ToolSwitch
                       checked={renameBusiness}
-                      onChange={(e) => setRenameBusiness(e.target.checked)}
-                      aria-label="Rename business from import"
+                      onChange={setRenameBusiness}
+                      label="Rename business from import"
                     />
-                    <span>
-                      <span className="font-medium text-ink">
-                        Rename business to
-                      </span>
-                      <span className="mt-0.5 block text-ink-soft">
-                        {draft.businessNameSuggestion}
-                      </span>
-                      <span className="mt-1 block text-xs text-ink-soft">
-                        Off by default so we don&apos;t overwrite the wrong workspace.
-                      </span>
-                    </span>
-                  </li>
+                  </SettingsRow>
                 ) : null}
                 {draft.vertical ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                  <SettingsRow
+                    label="Business type"
+                    hint={draft.vertical}
+                    control="switch"
+                  >
+                    <ToolSwitch
                       checked={includeVertical}
-                      onChange={(e) => setIncludeVertical(e.target.checked)}
-                      aria-label="Apply business type"
+                      onChange={setIncludeVertical}
+                      label="Apply business type"
                     />
-                    <span>
-                      <span className="font-medium text-ink">
-                        Business type
-                      </span>
-                      <span className="mt-0.5 block text-ink-soft">
-                        {draft.vertical}
-                      </span>
-                    </span>
-                  </li>
+                  </SettingsRow>
                 ) : null}
                 {draft.locations?.length ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                  <SettingsRow
+                    label="Location"
+                    hint={draft.locations
+                      .map((loc) =>
+                        [loc.label, loc.address, loc.landmark, loc.coverage_notes]
+                          .filter(Boolean)
+                          .join(" · ")
+                      )
+                      .join(" · ")}
+                    control="switch"
+                  >
+                    <ToolSwitch
                       checked={includeLocations}
-                      onChange={(e) => setIncludeLocations(e.target.checked)}
-                      aria-label="Apply location"
+                      onChange={setIncludeLocations}
+                      label="Apply location"
                     />
-                    <span>
-                      <span className="font-medium text-ink">
-                        Location
-                      </span>
-                      {draft.locations.map((loc, i) => (
-                        <span
-                          key={`loc-${i}`}
-                          className="mt-0.5 block text-ink-soft"
-                        >
-                          {[loc.label, loc.address, loc.landmark, loc.coverage_notes]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                      ))}
-                    </span>
-                  </li>
+                  </SettingsRow>
                 ) : null}
                 {draft.hoursNotes || draft.hoursSchedule ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                  <SettingsRow
+                    label="Hours"
+                    hint={
+                      draft.hoursNotes ||
+                      "Weekly schedule extracted from the brief"
+                    }
+                    control="switch"
+                  >
+                    <ToolSwitch
                       checked={includeHours}
-                      onChange={(e) => setIncludeHours(e.target.checked)}
-                      aria-label="Apply hours"
+                      onChange={setIncludeHours}
+                      label="Apply hours"
                     />
-                    <span>
-                      <span className="font-medium text-ink">Hours</span>
-                      <span className="mt-0.5 block text-ink-soft">
-                        {draft.hoursNotes ||
-                          "Weekly schedule extracted from the brief"}
-                      </span>
-                    </span>
-                  </li>
+                  </SettingsRow>
                 ) : null}
                 {draft.policies &&
                 Object.values(draft.policies).some((v) =>
                   String(v || "").trim()
                 ) ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                  <SettingsRow
+                    label="Policies"
+                    hint={Object.entries(draft.policies)
+                      .filter(([, v]) => String(v || "").trim())
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(" · ")}
+                    control="switch"
+                  >
+                    <ToolSwitch
                       checked={includePolicies}
-                      onChange={(e) => setIncludePolicies(e.target.checked)}
-                      aria-label="Apply policies"
+                      onChange={setIncludePolicies}
+                      label="Apply policies"
                     />
-                    <span>
-                      <span className="font-medium text-ink">
-                        Policies
-                      </span>
-                      {Object.entries(draft.policies)
-                        .filter(([, v]) => String(v || "").trim())
-                        .map(([k, v]) => (
-                          <span
-                            key={k}
-                            className="mt-0.5 block text-ink-soft"
-                          >
-                            {k}: {v}
-                          </span>
-                        ))}
-                    </span>
-                  </li>
+                  </SettingsRow>
                 ) : null}
                 {draft.contactPhone ? (
-                  <li className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                  <SettingsRow
+                    label="Sales / WhatsApp phone"
+                    hint={draft.contactPhone}
+                    control="switch"
+                  >
+                    <ToolSwitch
                       checked={includeContactPhone}
-                      onChange={(e) => setIncludeContactPhone(e.target.checked)}
-                      aria-label="Apply contact phone"
+                      onChange={setIncludeContactPhone}
+                      label="Apply contact phone"
                     />
-                    <span>
-                      <span className="font-medium text-ink">
-                        Sales / WhatsApp phone
-                      </span>
-                      <span className="mt-0.5 block text-ink-soft">
-                        {draft.contactPhone}
-                      </span>
-                    </span>
-                  </li>
+                  </SettingsRow>
                 ) : null}
-              </ul>
-            </div>
+            </SettingsGroup>
           ) : null}
 
           {draft.services.length ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-medium text-ink">Services</h3>
+            <SettingsGroup
+              title="Services"
+              action={
                 <button
                   type="button"
                   className="text-xs font-medium text-accent-deep"
@@ -418,41 +361,31 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                     ? "Clear all"
                     : "Select all"}
                 </button>
-              </div>
-              <ul className="space-y-2">
+              }
+            >
                 {draft.services.map((s, i) => (
-                  <li
+                  <SettingsRow
                     key={`svc-${i}`}
-                    className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
+                    label={s.name}
+                    hint={[s.price_range, s.notes].filter(Boolean).join(" · ")}
+                    control="switch"
                   >
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                    <ToolSwitch
                       checked={selectedServices.has(i)}
                       onChange={() =>
                         toggle(selectedServices, i, setSelectedServices)
                       }
-                      aria-label={`Keep service ${s.name}`}
+                      label={`Keep service ${s.name}`}
                     />
-                    <div className="min-w-0">
-                      <p className="font-medium text-ink">{s.name}</p>
-                      {s.price_range ? (
-                        <p className="text-sm text-ink-soft">{s.price_range}</p>
-                      ) : null}
-                      {s.notes ? (
-                        <p className="text-sm text-ink-soft">{s.notes}</p>
-                      ) : null}
-                    </div>
-                  </li>
+                  </SettingsRow>
                 ))}
-              </ul>
-            </div>
+            </SettingsGroup>
           ) : null}
 
           {draft.faqs.length ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-medium text-ink">FAQs</h3>
+            <SettingsGroup
+              title="FAQs"
+              action={
                 <button
                   type="button"
                   className="text-xs font-medium text-accent-deep"
@@ -471,141 +404,111 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                 >
                   {selectedFaqs.size === draft.faqs.length ? "Clear all" : "Select all"}
                 </button>
-              </div>
-              <ul className="space-y-2">
+              }
+            >
                 {draft.faqs.map((f, i) => (
-                  <li
-                    key={`faq-${i}`}
-                    className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={selectedFaqs.has(i)}
-                      onChange={() => toggle(selectedFaqs, i, setSelectedFaqs)}
-                      aria-label={`Keep FAQ ${f.question || i + 1}`}
-                    />
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div>
-                        <label
-                          className="block text-xs font-medium text-ink-soft"
-                          htmlFor={`ingest-faq-q-${i}`}
-                        >
-                          Question
-                        </label>
-                        <input
-                          id={`ingest-faq-q-${i}`}
-                          value={f.question}
-                          maxLength={FAQ_QUESTION_MAX}
-                          onChange={(e) =>
-                            updateDraftFaq(i, "question", e.target.value)
-                          }
-                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          className="block text-xs font-medium text-ink-soft"
-                          htmlFor={`ingest-faq-a-${i}`}
-                        >
-                          Answer
-                        </label>
-                        <textarea
-                          id={`ingest-faq-a-${i}`}
-                          value={f.answer}
-                          maxLength={FAQ_ANSWER_MAX}
-                          rows={2}
-                          onChange={(e) =>
-                            updateDraftFaq(i, "answer", e.target.value)
-                          }
-                          className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink leading-relaxed outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
-                        />
-                      </div>
+                  <div key={`faq-${i}`} className="space-y-2 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-ink">FAQ {i + 1}</p>
+                      <ToolSwitch
+                        checked={selectedFaqs.has(i)}
+                        onChange={() => toggle(selectedFaqs, i, setSelectedFaqs)}
+                        label={`Keep FAQ ${f.question || i + 1}`}
+                      />
                     </div>
-                  </li>
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-ink-soft"
+                        htmlFor={`ingest-faq-q-${i}`}
+                      >
+                        Question
+                      </label>
+                      <input
+                        id={`ingest-faq-q-${i}`}
+                        value={f.question}
+                        maxLength={FAQ_QUESTION_MAX}
+                        onChange={(e) =>
+                          updateDraftFaq(i, "question", e.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-ink-soft"
+                        htmlFor={`ingest-faq-a-${i}`}
+                      >
+                        Answer
+                      </label>
+                      <textarea
+                        id={`ingest-faq-a-${i}`}
+                        value={f.answer}
+                        maxLength={FAQ_ANSWER_MAX}
+                        rows={2}
+                        onChange={(e) =>
+                          updateDraftFaq(i, "answer", e.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink leading-relaxed outline-none placeholder:text-ink-soft/70 focus:border-accent focus:ring-2 focus:ring-accent/40"
+                      />
+                    </div>
+                  </div>
                 ))}
-              </ul>
-            </div>
+            </SettingsGroup>
           ) : null}
 
           {draft.team.length ? (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-ink">Team (optional)</h3>
-              <ul className="space-y-2">
+            <SettingsGroup title="Team">
                 {draft.team.map((t, i) => (
-                  <li
+                  <SettingsRow
                     key={`team-${i}`}
-                    className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
+                    label={t.name}
+                    hint={
+                      [t.role, t.phone, t.email].filter(Boolean).join(" · ") ||
+                      "No contact yet"
+                    }
+                    control="switch"
                   >
-                    <input
-                      type="checkbox"
-                      className="mt-1"
+                    <ToolSwitch
                       checked={selectedTeam.has(i)}
                       onChange={() => toggle(selectedTeam, i, setSelectedTeam)}
-                      aria-label={`Keep teammate ${t.name}`}
+                      label={`Keep teammate ${t.name}`}
                     />
-                    <div className="min-w-0 text-sm">
-                      <p className="font-medium text-ink">
-                        {t.name}
-                        {t.role ? ` · ${t.role}` : ""}
-                      </p>
-                      <p className="text-ink-soft">
-                        {[t.phone, t.email].filter(Boolean).join(" · ") || "No contact yet"}
-                      </p>
-                    </div>
-                  </li>
+                  </SettingsRow>
                 ))}
-              </ul>
-            </div>
+            </SettingsGroup>
           ) : null}
 
           {draft.unknownAnswerFallback ? (
-            <label className="flex gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={includeUnknown}
-                onChange={(e) => setIncludeUnknown(e.target.checked)}
-              />
-              <span>
-                <span className="font-medium text-ink">
-                  If we don&apos;t offer something, say:
-                </span>
-                <span className="mt-1 block text-ink-soft">
-                  {draft.unknownAnswerFallback}
-                </span>
-              </span>
-            </label>
+            <SettingsGroup title="When unsure">
+              <SettingsRow
+                label="If we don't offer something, say"
+                hint={draft.unknownAnswerFallback}
+                control="switch"
+              >
+                <ToolSwitch
+                  checked={includeUnknown}
+                  onChange={setIncludeUnknown}
+                  label="If we don't offer something, say"
+                />
+              </SettingsRow>
+            </SettingsGroup>
           ) : null}
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-ink">
-              Keep your current list, or start fresh?
+          <div className="space-y-1.5">
+            <p className="px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+              Keep or replace
             </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setMergeMode("merge")}
-                className={settingsRadioCardClass(mergeMode === "merge")}
-              >
-                <span className="font-medium">Keep my current list</span>
-                <span className="mt-0.5 block text-xs text-ink-soft">
-                  Safe choice. We add the new ones you tick; nothing already
-                  saved gets deleted.
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMergeMode("replace_services_faqs")}
-                className={settingsRadioCardClass(mergeMode === "replace_services_faqs")}
-              >
-                <span className="font-medium">Start fresh</span>
-                <span className="mt-0.5 block text-xs text-ink-soft">
-                  Clears your old services &amp; FAQs. Only what you tick now
-                  stays.
-                </span>
-              </button>
-            </div>
+            <SettingsSegmented
+              label="Keep your current list, or start fresh?"
+              value={mergeMode}
+              options={
+                [
+                  { id: "merge" as const, label: "Keep my current list" },
+                  { id: "replace_services_faqs" as const, label: "Start fresh" },
+                ] as const
+              }
+              onChange={setMergeMode}
+            />
           </div>
 
           <form action={applyAction} className="flex flex-wrap gap-2">
