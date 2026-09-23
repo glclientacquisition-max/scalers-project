@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ContactTimelineWhat } from "@/components/ContactTimelineWhat";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { deskFieldClass, deskPreviewCellClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { btnGhost, deskFieldClass, deskPreviewCellClass, deskShiftClass } from "@/components/ui/deskChrome";
 import { formatCallWhen } from "@/lib/callsTriage";
 import {
+  CONTACT_HISTORY_PAGE,
   contactHistoryChips,
   contactHistoryGroupCopy,
+  pageContactHistory,
   type ContactHistoryFilter,
   type ContactHistoryRow,
 } from "@/lib/contactHistoryView";
@@ -79,8 +81,15 @@ export function ContactHistory({
   const pathname = usePathname();
   const search = useSearchParams();
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
+  const [shown, setShown] = useState(CONTACT_HISTORY_PAGE);
   const chips = contactHistoryChips();
   const [value, setValue] = useState(q);
+  const visible = pageContactHistory(rows, shown);
+  const remaining = Math.max(0, rows.length - visible.length);
+
+  useEffect(() => {
+    setShown(CONTACT_HISTORY_PAGE);
+  }, [filter, q]);
 
   function syncQuery(next: string) {
     const params = new URLSearchParams(search.toString());
@@ -128,7 +137,7 @@ export function ContactHistory({
       ) : (
         <>
           <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
-            {rows.map((row) =>
+            {visible.map((row) =>
               row.kind === "single" ? (
                 <SinglePhone key={row.entry.id} entry={row.entry} />
               ) : (
@@ -171,7 +180,7 @@ export function ContactHistory({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) =>
+                {visible.map((row) =>
                   row.kind === "single" ? (
                     <SingleTable key={row.entry.id} entry={row.entry} />
                   ) : (
@@ -191,6 +200,16 @@ export function ContactHistory({
               </tbody>
             </table>
           </div>
+          {remaining > 0 ? (
+            <button
+              type="button"
+              data-contact-history-more=""
+              onClick={() => setShown((n) => n + CONTACT_HISTORY_PAGE)}
+              className={`${btnGhost} mt-3 w-full`}
+            >
+              View more
+            </button>
+          ) : null}
         </>
       )}
     </section>

@@ -217,7 +217,7 @@ export default async function ContactDetailPage({
           <ContactNotesForm contactId={contact.id} initial={contact.notes || ""} />
         </aside>
 
-        <div className="min-h-0 min-w-0 space-y-6 lg:col-span-8 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1">
+        <div className="min-h-0 min-w-0 space-y-6 lg:col-span-8">
           {insight || spark.some((day) => day.count > 0) ? (
             <div className="space-y-3">
               <ContactSparkline days={spark} />
