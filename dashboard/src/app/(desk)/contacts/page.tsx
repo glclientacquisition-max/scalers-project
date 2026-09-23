@@ -7,7 +7,6 @@ import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
-import { FilterTabs } from "@/components/ui/FilterTabs";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import {
@@ -17,7 +16,8 @@ import {
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
-import { ContactPileCards } from "@/components/ContactPileCards";
+import { ContactPileStrip } from "@/components/ContactPileStrip";
+import { ContactSortSelect } from "@/components/ContactSortSelect";
 import {
   contactProfileHref,
   contactsFavouritesHref,
@@ -98,7 +98,10 @@ export default async function ContactsPage({
   return (
     <div className="min-w-0 overflow-x-clip">
       <header className="space-y-3">
-        <h1 className={deskListTitleClass}>Contacts</h1>
+        <div className="flex min-w-0 items-end justify-between gap-3">
+          <h1 className={deskListTitleClass}>Contacts</h1>
+          <p className="pb-1 text-sm tabular-nums text-ink-soft">{total} people</p>
+        </div>
         <DeskIndexLead>
           <div className="flex w-full min-w-0 flex-row items-center gap-2">
             <div className="min-w-0 flex-1">
@@ -109,50 +112,41 @@ export default async function ContactsPage({
             </div>
           </div>
         </DeskIndexLead>
-        <ContactPileCards
+        <ContactPileStrip
           recents={piles.recents}
           favourites={piles.favourites}
+          unsaved={piles.unsaved}
           recentsHref={contactsRecentsHref({ sort, q: q || undefined })}
           favouritesHref={contactsFavouritesHref({ sort, q: q || undefined })}
+          unsavedHref={contactsHref({ saved: "unsaved", sort, q: q || undefined })}
           active={saved}
         />
-        <InboxFilterPills
-          label="Filter contacts"
-          active={saved}
-          items={[
-            {
-              id: "all",
-              label: "All",
-              href: contactsHref({ sort, q: q || undefined }),
-            },
-            {
-              id: "saved",
-              label: "Saved",
-              href: contactsHref({ saved: "saved", sort, q: q || undefined }),
-            },
-            {
-              id: "unsaved",
-              label: "Unsaved",
-              href: contactsHref({ saved: "unsaved", sort, q: q || undefined }),
-            },
-          ]}
-        />
-        <FilterTabs
-          label="Sort contacts"
-          active={sort}
-          items={[
-            {
-              id: "recent",
-              label: "Last call",
-              href: contactsHref({ saved, q: q || undefined, sort: "recent" }),
-            },
-            {
-              id: "name",
-              label: "Name",
-              href: contactsHref({ saved, q: q || undefined, sort: "name" }),
-            },
-          ]}
-        />
+        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 flex-1">
+            <InboxFilterPills
+              label="Filter contacts"
+              active={saved}
+              items={[
+                {
+                  id: "all",
+                  label: "All",
+                  href: contactsHref({ sort, q: q || undefined }),
+                },
+                {
+                  id: "saved",
+                  label: "Saved",
+                  href: contactsHref({ saved: "saved", sort, q: q || undefined }),
+                },
+                {
+                  id: "unsaved",
+                  label: "Unsaved",
+                  href: contactsHref({ saved: "unsaved", sort, q: q || undefined }),
+                },
+              ]}
+            />
+          </div>
+          <ContactSortSelect saved={saved} sort={sort} q={q} />
+        </div>
       </header>
 
       {rows.length === 0 ? (

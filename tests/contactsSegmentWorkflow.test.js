@@ -117,13 +117,12 @@ describe("contacts segment filter chrome", () => {
     assert.match(inboxTabs, /label="Work date"/);
     assert.match(page, /<InboxFilterPills/);
     assert.match(page, /label="Filter contacts"/);
-    assert.match(page, /<FilterTabs/);
+    assert.match(page, /<ContactSortSelect/);
     assert.doesNotMatch(page, /type="range"/);
     assert.doesNotMatch(page, /slider/i);
     assert.doesNotMatch(page, /Needs you|Visits|Holds/);
     assert.match(note, /Filter contacts/);
-    assert.match(note, /FilterTabs/);
-    assert.match(note, /List\/Work/);
+    assert.match(note, /ContactSortSelect/);
     assert.match(note, /InboxFilterPills/);
   });
 
@@ -143,10 +142,6 @@ describe("contacts segment filter chrome", () => {
       fs.existsSync(path.join(__dirname, "../dashboard/src/components/ContactQuickRow.tsx")),
       false
     );
-    assert.match(page, /label="Sort contacts"/);
-    assert.match(page, /label: "Last call"/);
-    assert.match(page, /label: "Name"/);
-    assert.match(page, /active=\{sort\}/);
     assert.match(note, /All · Saved · Unsaved only/);
     assert.match(note, /Last call/);
     assert.doesNotMatch(page, /Invite Friends/);
@@ -167,7 +162,7 @@ describe("contacts segment filter chrome", () => {
   });
 
   it("shows name or Name this caller, phone, last-call fact, and opened-only Call/WA", () => {
-    assert.match(profile, /contactStripTitle/);
+    assert.match(form, /contactStripTitle/);
     assert.match(profile, /contactLastCallFact/);
     assert.match(profile, /<ContactActionDock/);
     assert.match(profile, /<ContactNameForm/);

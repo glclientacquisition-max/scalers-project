@@ -156,13 +156,22 @@ export function isUnsavedContactName(name?: string | null): boolean {
   return !String(name || "").trim();
 }
 
-/** List subline: Unsaved, phone, or last call. Never hangup copy or presence. */
+/** Primary list text: saved name, or the phone when unnamed. */
+export function contactListTitle(row: {
+  name?: string | null;
+  phone?: string | null;
+}): string {
+  if (!isUnsavedContactName(row.name)) return String(row.name || "").trim();
+  return String(row.phone || "").trim() || "No phone";
+}
+
+/** List subline: Unknown caller, phone, or last call. Never hangup copy or presence. */
 export function contactListSubline(row: {
   name?: string | null;
   phone?: string | null;
   lastContactAt?: string | null;
 }): string {
-  if (isUnsavedContactName(row.name)) return "Unsaved";
+  if (isUnsavedContactName(row.name)) return "Unknown caller";
   const phone = String(row.phone || "").trim();
   if (phone) return phone;
   if (row.lastContactAt) return formatCallWhenRelative(row.lastContactAt);
@@ -413,8 +422,8 @@ export async function loadContactsPage(
 export async function loadContactPileCounts(
   client: SupabaseClient,
   tenantId: string
-): Promise<{ recents: number; favourites: number }> {
-  const [recent, favourites] = await Promise.all([
+): Promise<{ recents: number; favourites: number; unsaved: number }> {
+  const [recent, favourites, unsaved] = await Promise.all([
     client
       .from("calls")
       .select("caller_number")
@@ -426,10 +435,16 @@ export async function loadContactPileCounts(
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
       .not("metadata->>favourite_at", "is", null),
+    client
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .or("name.is.null,name.eq."),
   ]);
   return {
     recents: uniqueRecentCallerPhones(recent.data || []).length,
     favourites: favourites.count ?? 0,
+    unsaved: unsaved.count ?? 0,
   };
 }
 

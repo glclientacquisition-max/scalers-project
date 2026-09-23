@@ -169,8 +169,8 @@ describe("contacts person-file chrome", () => {
   });
 
   it("renders History from assembled tickets and taps through to a real call", () => {
-    assert.match(profile, />History</);
-    assert.match(profile, /<ContactTimeline entries=\{timeline\} \/>/);
+    assert.match(profile, /<ContactHistory/);
+    assert.match(profile, /groupContactTimeline/);
     assert.match(timeline, /entry\.stamp/);
     assert.match(timeline, /entry\.href/);
     assert.doesNotMatch(timeline, /kindLabel|return "Request"|return "Call"/);
@@ -184,7 +184,7 @@ describe("contacts person-file chrome", () => {
   });
 
   it("shows sourced KPI cards only and hides unknown ones", () => {
-    assert.match(profile, /<ContactKpiStrip cards=\{kpiCards\} \/>/);
+    assert.match(profile, /<ContactKpiStrip cards=\{kpiCards\}/);
     assert.match(profile, /contactPersonFileKpiCards/);
     assert.match(strip, /data-contact-kpi-strip/);
     assert.match(strip, /data-contact-kpi=\{card\.id\}/);
@@ -201,8 +201,7 @@ describe("contacts person-file chrome", () => {
     assert.match(page, /label: "All"/);
     assert.match(page, /label: "Saved"/);
     assert.match(page, /label: "Unsaved"/);
-    assert.match(page, /<FilterTabs/);
-    assert.match(page, /label="Sort contacts"/);
+    assert.match(page, /<ContactSortSelect/);
     assert.doesNotMatch(page, /Needs you/);
     assert.doesNotMatch(page, /label: "Human"/);
     assert.doesNotMatch(page, /label: "Answered"/);
