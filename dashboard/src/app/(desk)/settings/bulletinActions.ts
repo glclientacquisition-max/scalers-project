@@ -55,6 +55,7 @@ async function saveBulletin(
     return ownerSaveFailed("bulletin", error.message);
   }
   revalidatePath("/settings");
+  revalidatePath("/home");
   return {};
 }
 
