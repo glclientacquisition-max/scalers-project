@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactActionDock } from "@/components/ContactActionDock";
+import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
 import { ContactNameForm } from "@/components/ContactNameForm";
+import { RowIdentity } from "@/components/ui/deskRow";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { btnGhost } from "@/components/ui/deskChrome";
-import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
@@ -12,6 +14,7 @@ import {
   inboxFromContactHref,
   inboxThreadsFromContactHref,
 } from "@/lib/inboxHref";
+import { isContactFavourite } from "@/lib/contactFavourite";
 import {
   contactLastCallFact,
   contactsReturnHref,
@@ -95,23 +98,30 @@ export default async function ContactDetailPage({
   });
   return (
     <div className="max-w-6xl min-w-0 overflow-x-clip" data-desk-nested="">
-      <DeskBack href={backHref}>{backLabel}</DeskBack>
-
-      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-8">
         <aside className="space-y-5 lg:col-span-4 lg:sticky lg:top-24 lg:self-start">
           <div className="space-y-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-                  {title}
-                </h1>
-                <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
-                {lastCallFact ? (
-                  <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
-                ) : null}
+            <DeskRecordLead
+              back={<DeskBack href={backHref}>{backLabel}</DeskBack>}
+              trail={contact.phone ? <ContactActionDock number={contact.phone} /> : null}
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <RowIdentity name={contact.name} size="lg" />
+                <div className="min-w-0 flex-1">
+                  <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+                    {title}
+                  </h1>
+                  <p className="mt-2 font-mono text-sm text-ink">{contact.phone || "No phone"}</p>
+                  {lastCallFact ? (
+                    <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+                  ) : null}
+                </div>
               </div>
-              {contact.phone ? <ContactActionDock number={contact.phone} /> : null}
-            </div>
+            </DeskRecordLead>
+            <ContactFavouriteButton
+              contactId={contact.id}
+              favourite={isContactFavourite(contact.metadata)}
+            />
             {threadsHref ? (
               <Link
                 href={threadsHref}

@@ -7,7 +7,7 @@
  */
 
 import type { ReactNode } from "react";
-import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import {
   btnPrimary,
@@ -326,7 +326,7 @@ export const settingsGhostButtonClass =
 
 export function SettingsBackLink() {
   return (
-    <DeskBack href="/settings" className="mb-1 lg:hidden">
+    <DeskBack href="/settings" className="lg:hidden">
       Profile
     </DeskBack>
   );
@@ -377,10 +377,18 @@ export function SettingsPageHeader({
 
   return (
     <header className={settingsStickyHeaderClass}>
-      <div className="min-w-0">
-        {showBack ? <SettingsBackLink /> : null}
-        {title ? <h1 className={settingsPanelHeadingClass}>{title}</h1> : null}
-        {line}
+      <div className="min-w-0 flex-1">
+        {showBack ? (
+          <DeskRecordLead align="center" back={<SettingsBackLink />}>
+            {title ? <h1 className={settingsPanelHeadingClass}>{title}</h1> : null}
+            {line}
+          </DeskRecordLead>
+        ) : (
+          <>
+            {title ? <h1 className={settingsPanelHeadingClass}>{title}</h1> : null}
+            {line}
+          </>
+        )}
       </div>
       {action}
     </header>

@@ -13,7 +13,7 @@ import { InboxSmsDock } from "@/components/InboxSmsDock";
 import { RequestStatusToggle } from "@/components/RequestStatusToggle";
 import { InboxTicketActionDock } from "@/components/InboxTicketActionDock";
 import { ContactStrip } from "@/components/ContactStrip";
-import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskHint } from "@/components/ui/DeskHint";
 import {
   deskHitClass,
@@ -468,20 +468,24 @@ export function InboxTicketView({
       className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h))] min-h-0 flex-col pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:-mx-6 sm:-mt-10 md:mx-0 md:mb-0 md:mt-0 md:h-full md:pb-0"
     >
       <header className="shrink-0 border-b border-line bg-surface px-2 py-2 sm:px-4">
-        <div className="flex items-center gap-1">
-          <DeskBack href={backHref}>Inbox</DeskBack>
+        <DeskRecordLead
+          align="center"
+          back={<DeskBack href={backHref}>Inbox</DeskBack>}
+          trail={
+            <InboxTicketMore
+              callId={callId}
+              backHref={backHref}
+              archived={archived}
+            />
+          }
+        >
           <ContactStrip
             name={callerName}
             phone={callerPhone}
             lastContactAt={lastContactAt}
             profileHref={contactHref}
           />
-          <InboxTicketMore
-            callId={callId}
-            backHref={backHref}
-            archived={archived}
-          />
-        </div>
+        </DeskRecordLead>
       </header>
 
       {needsYou && urgency ? (

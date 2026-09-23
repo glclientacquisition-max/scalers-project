@@ -89,4 +89,4 @@ Columns (`lg+` table, same data as the phone row; phone rows stay through `md` s
 
 **Errors:** Failed Confirm or Done shows "Could not save." under the button. Do not log that as the owner UI.
 
-**Back:** `DeskBack`, icon-only chevron, 44px muted ghost. `aria-label` / `title` is Inbox. No visible "Inbox" or "Back to Inbox". Returns to the same pile, search, page, and visit layout (List / Today / Week). Archived stores that return on the folder link (`from`, `rpage`, view params) so DeskBack restores it, not only `q`.
+**Back:** `DeskBack` in `DeskRecordLead`. Icon-only chevron, 44px muted ghost. `aria-label` / `title` is Inbox. No visible "Inbox" or "Back to Inbox". Never a solo back row. Ticket: one header row with person plus More. Archived: one lead row with the Archived title, then search. Returns to the same pile, search, page, and visit layout (List / Today / Week). Archived stores that return on the folder link (`from`, `rpage`, view params) so DeskBack restores it, not only `q`.

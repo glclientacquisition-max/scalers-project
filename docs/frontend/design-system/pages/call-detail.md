@@ -19,6 +19,6 @@
 
 **SMS dock:** Shown when `needsYou` and the call is not archived. Growing input, Polish, then Send. Polish tightens the draft (`polishInboxSmsAction`). It does not invent an empty message. Send stays the filled primary. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm or Done. WhatsApp stays on the action dock. No second caption. Spans the viewport under the split so Send stays docked at the bottom.
 
-**Back:** `DeskBack`, icon-only chevron, 44px muted ghost. `aria-label` / `title` is Inbox. `DeskHint` shows Inbox on hover. Sits in the header row with the contact, not on its own text row.
+**Back:** `DeskBack` in `DeskRecordLead` (`align="center"`). Icon-only chevron, 44px muted ghost. `aria-label` / `title` is Inbox. `DeskHint` shows Inbox on hover. Sits in the header row with the contact and More. Same lead recipe as the contact file. Never a solo back row.
 
 **One recording.** A single `CallRecording` in the summary pane.
