@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { ContactActionDock } from "@/components/ContactActionDock";
+import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
 import { ContactKpiStrip } from "@/components/ContactKpiStrip";
+import { RowIdentity } from "@/components/ui/deskRow";
 import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import {
@@ -37,11 +39,17 @@ export default function DevContactFilePage() {
                 back={<DeskBack href="/dev/contacts">Contacts</DeskBack>}
                 trail={<ContactActionDock number="+254700000002" />}
               >
-                <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-                  Amina
-                </h1>
-                <p className="mt-2 font-mono text-sm text-ink">+254700000002</p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <RowIdentity name="Amina" size="lg" />
+                  <div className="min-w-0 flex-1">
+                    <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+                      Amina
+                    </h1>
+                    <p className="mt-2 font-mono text-sm text-ink">+254700000002</p>
+                  </div>
+                </div>
               </DeskRecordLead>
+              <ContactFavouriteButton contactId="ct-saved" favourite={false} />
               <ContactKpiStrip cards={cards} />
             </div>
           </div>

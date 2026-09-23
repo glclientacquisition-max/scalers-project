@@ -14,9 +14,10 @@ export function deskRowInitials(name: string | null | undefined): string {
   return (first + last).toUpperCase();
 }
 
-function PersonGlyph() {
+function PersonGlyph({ size = "md" }: { size?: "md" | "lg" }) {
+  const box = size === "lg" ? "h-7 w-7" : "h-4 w-4";
   return (
-    <svg viewBox="0 0 16 16" fill="currentColor" className="h-4 w-4">
+    <svg viewBox="0 0 16 16" fill="currentColor" className={box}>
       <circle cx="8" cy="5.2" r="2.6" />
       <path d="M2.8 13.6c.7-2.5 2.8-3.9 5.2-3.9s4.5 1.4 5.2 3.9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
@@ -27,14 +28,21 @@ function PersonGlyph() {
  * Neutral circle. Never tinted by state and never rainbow by name: it only
  * signals "this row is a person". State lives in the dot and the type weight.
  */
-export function RowIdentity({ name }: { name?: string | null }) {
+export function RowIdentity({
+  name,
+  size = "md",
+}: {
+  name?: string | null;
+  size?: "md" | "lg";
+}) {
   const initials = deskRowInitials(name);
+  const box =
+    size === "lg"
+      ? "flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-lg font-semibold text-ink-soft"
+      : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-xs font-semibold text-ink-soft";
   return (
-    <span
-      aria-hidden
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface-muted text-xs font-semibold text-ink-soft"
-    >
-      {initials || <PersonGlyph />}
+    <span aria-hidden className={box}>
+      {initials || <PersonGlyph size={size} />}
     </span>
   );
 }

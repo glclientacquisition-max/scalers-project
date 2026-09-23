@@ -17,9 +17,13 @@ import {
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
+import { ContactPileCards } from "@/components/ContactPileCards";
 import {
   contactProfileHref,
+  contactsFavouritesHref,
   contactsHref,
+  contactsRecentsHref,
+  loadContactPileCounts,
   loadContactsPage,
   resolveContactSavedFilter,
   resolveContactSort,
@@ -34,6 +38,7 @@ function emptyCopy(saved: ContactSavedFilter, q: string): string {
   if (saved === "saved") return "No named callers";
   if (saved === "unsaved") return "No unnamed callers";
   if (saved === "recent") return "No recent calls";
+  if (saved === "favourite") return "No favourites";
   return "No callers";
 }
 
@@ -71,14 +76,13 @@ export default async function ContactsPage({
     return <DeskError>Not signed in.</DeskError>;
   }
 
-  const { rows, total, error } = await loadContactsPage(
-    workspace.client,
-    tenant.id,
-    page,
-    PAGE_SIZE,
-    saved,
-    { q, sort }
-  );
+  const [{ rows, total, error }, piles] = await Promise.all([
+    loadContactsPage(workspace.client, tenant.id, page, PAGE_SIZE, saved, {
+      q,
+      sort,
+    }),
+    loadContactPileCounts(workspace.client, tenant.id),
+  ]);
 
   if (error) {
     return <DeskError>Could not load contacts.</DeskError>;
@@ -105,6 +109,13 @@ export default async function ContactsPage({
             </div>
           </div>
         </DeskIndexLead>
+        <ContactPileCards
+          recents={piles.recents}
+          favourites={piles.favourites}
+          recentsHref={contactsRecentsHref({ sort, q: q || undefined })}
+          favouritesHref={contactsFavouritesHref({ sort, q: q || undefined })}
+          active={saved}
+        />
         <InboxFilterPills
           label="Filter contacts"
           active={saved}

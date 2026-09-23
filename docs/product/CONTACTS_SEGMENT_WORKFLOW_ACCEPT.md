@@ -20,7 +20,7 @@
 | **Contacts** | Pill chips (`InboxFilterPills`) with **All · Saved · Unsaved** (`saved=` query). `aria-label` Filter contacts. Sort is underline `FilterTabs`. List → `/contacts/[id]` profile. Call/WA on rows = **opened** only. |
 | **Gap founder feels** | Contacts segments must feel identical to Inbox purpose chips (one desk pill language), not a second underline skin and not Inbox purpose nouns. Click-through must be a clear ops path, not a dead end. |
 
-Phase 1 ACCEPT already required search+sort and Recent/Unsaved quick rows. This brief locks **All · Saved · Unsaved nouns** plus click-through. Segment chrome is the Inbox purpose pill (`CONTACTS_CHROME_PILL_ACCEPT.md`). Recent is sort (Last call), not a segment.
+Phase 1 ACCEPT already required search+sort and Recent/Unsaved quick rows. This brief locks **All · Saved · Unsaved nouns** plus click-through. Segment chrome is the Inbox purpose pill (`CONTACTS_CHROME_PILL_ACCEPT.md`). Recent is sort (Last call), not a segment. Recents and Favourites are rate cards on the list, not pill nouns and not `DESK_LINKS`.
 
 ## Problem
 
