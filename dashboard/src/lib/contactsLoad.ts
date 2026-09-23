@@ -14,6 +14,10 @@ import {
   type ContactTimelineEntry,
 } from "@/lib/contactPersonFile";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
+import {
+  contactFavouriteAt,
+  isContactFavourite,
+} from "@/lib/contactFavourite";
 
 export type { ContactTimelineEntry } from "@/lib/contactPersonFile";
 
@@ -52,14 +56,21 @@ export function pickLastContactAt(
   return maxIso(byPhone || null, byContactId || null) || updatedAt || null;
 }
 
-export type ContactSavedFilter = "all" | "saved" | "unsaved" | "recent";
+export type ContactSavedFilter =
+  | "all"
+  | "saved"
+  | "unsaved"
+  | "recent"
+  | "favourite";
 export type ContactSort = "recent" | "name";
 
 export function resolveContactSavedFilter(
   raw?: string | null
 ): ContactSavedFilter {
   const value = String(raw || "all").toLowerCase();
-  if (value === "saved" || value === "unsaved" || value === "recent") return value;
+  if (value === "saved" || value === "unsaved" || value === "recent" || value === "favourite") {
+    return value;
+  }
   return "all";
 }
 
@@ -81,6 +92,24 @@ export function contactsHref(opts: {
   if (opts.page && opts.page > 1) q.set("page", String(opts.page));
   const qs = q.toString();
   return qs ? `/contacts?${qs}` : "/contacts";
+}
+
+/** Recents pile. Not a pill noun. */
+export function contactsRecentsHref(opts: {
+  sort?: ContactSort;
+  q?: string;
+  page?: number;
+}): string {
+  return contactsHref({ ...opts, saved: "recent" });
+}
+
+/** Favourites pile. Not a pill noun. */
+export function contactsFavouritesHref(opts: {
+  sort?: ContactSort;
+  q?: string;
+  page?: number;
+}): string {
+  return contactsHref({ ...opts, saved: "favourite" });
 }
 
 export type ContactsListReturn = {
@@ -340,6 +369,8 @@ export async function loadContactsPage(
     listedQuery = listedQuery.not("name", "is", null).neq("name", "");
   } else if (saved === "unsaved") {
     listedQuery = listedQuery.or("name.is.null,name.eq.");
+  } else if (saved === "favourite") {
+    listedQuery = listedQuery.not("metadata->>favourite_at", "is", null);
   }
   if (searchOr) listedQuery = listedQuery.or(searchOr);
   listedQuery =
@@ -363,11 +394,43 @@ export async function loadContactsPage(
   }
 
   const extras = await loadLastContactMap(client, tenantId, contacts);
-  const rows = decorateContactRows(contacts, extras);
-  if (sort === "recent") {
+  const rows = decorateContactRows(contacts, extras).filter((row) =>
+    saved !== "favourite" ? true : isContactFavourite(row.metadata)
+  );
+  if (saved === "favourite" && sort === "recent") {
+    rows.sort((a, b) => {
+      const at = contactFavouriteAt(a.metadata) || "";
+      const bt = contactFavouriteAt(b.metadata) || "";
+      if (at !== bt) return at < bt ? 1 : -1;
+      return compareContactRows(a, b, "recent");
+    });
+  } else if (sort === "recent") {
     rows.sort((a, b) => compareContactRows(a, b, "recent"));
   }
   return { rows, total, error: null };
+}
+
+export async function loadContactPileCounts(
+  client: SupabaseClient,
+  tenantId: string
+): Promise<{ recents: number; favourites: number }> {
+  const [recent, favourites] = await Promise.all([
+    client
+      .from("calls")
+      .select("caller_number")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    client
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .not("metadata->>favourite_at", "is", null),
+  ]);
+  return {
+    recents: uniqueRecentCallerPhones(recent.data || []).length,
+    favourites: favourites.count ?? 0,
+  };
 }
 
 async function loadLastContactMap(

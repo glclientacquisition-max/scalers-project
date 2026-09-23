@@ -4,7 +4,10 @@ import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactActionDock } from "@/components/ContactActionDock";
+import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
 import { ContactKpiStrip } from "@/components/ContactKpiStrip";
+import { ContactPileCards } from "@/components/ContactPileCards";
+import { RowIdentity } from "@/components/ui/deskRow";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
 import { ContactNameForm } from "@/components/ContactNameForm";
 import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
@@ -47,14 +50,20 @@ function ProfileLead({
         back={back}
         trail={<ContactActionDock number={phone} />}
       >
-        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-          {title}
-        </h1>
-        <p className="mt-2 font-mono text-sm text-ink">{phone}</p>
-        {lastCallFact ? (
-          <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
-        ) : null}
+        <div className="flex min-w-0 items-start gap-3">
+          <RowIdentity name={name} size="lg" />
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+              {title}
+            </h1>
+            <p className="mt-2 font-mono text-sm text-ink">{phone}</p>
+            {lastCallFact ? (
+              <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+            ) : null}
+          </div>
+        </div>
       </DeskRecordLead>
+      <ContactFavouriteButton contactId={contactId} favourite={contactId === "ct-saved"} />
       {threadsHref ? (
         <Link href={threadsHref} data-contact-inbox-threads="" className={`${btnGhost} w-full sm:w-auto`}>
           Inbox threads
@@ -196,6 +205,13 @@ export default function DevContactsPage() {
                   </div>
                 </div>
               </DeskIndexLead>
+              <ContactPileCards
+                recents={2}
+                favourites={1}
+                recentsHref="/dev/contacts"
+                favouritesHref="/dev/contacts"
+                active="all"
+              />
               <InboxFilterPills
                 label="Filter contacts"
                 active="all"
