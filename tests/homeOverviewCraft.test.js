@@ -56,6 +56,7 @@ describe("home overview craft", () => {
     const devHome = read("dashboard/src/app/dev/home/page.tsx");
     assert.match(devHome, /HomeOverviewHeader/);
     assert.match(devHome, /DASHBOARD_OPEN/);
+    assert.match(devHome, /DailyBulletinPanel/);
   });
 
   it("maps Inbox queues and does not invent Online", () => {
