@@ -6,6 +6,13 @@ import type { ContactTimelineEntry } from "@/lib/contactPersonFile";
 /** Consecutive same-purpose rows inside this window collapse. Easy to tune. */
 export const CONTACT_HISTORY_GROUP_MS = 15 * 60 * 1000;
 
+/** First page of History. View more adds another page. Not one long dump. */
+export const CONTACT_HISTORY_PAGE = 12;
+
+export function pageContactHistory<T>(rows: T[], shown: number): T[] {
+  return rows.slice(0, Math.max(CONTACT_HISTORY_PAGE, shown));
+}
+
 export type ContactHistoryFilter =
   | "all"
   | "missed"

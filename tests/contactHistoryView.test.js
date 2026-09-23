@@ -35,6 +35,10 @@ function contactHistoryInsight(entries) {
   return `${missed} of ${total} interactions are missed. Same-day retries may need a callback.`;
 }
 
+function pageContactHistory(rows, shown) {
+  return rows.slice(0, Math.max(12, shown));
+}
+
 describe("contact history grouping", () => {
   it("groups consecutive missed calls and never swallows a different type", () => {
     const rows = groupContactTimeline([
@@ -64,5 +68,20 @@ describe("contact history grouping", () => {
       purpose: i < 6 ? "missed" : "answered",
     }));
     assert.match(contactHistoryInsight(many), /6 of 8 interactions are missed/);
+  });
+});
+
+describe("contact history view more", () => {
+  it("pages History instead of dumping every row", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => i);
+    assert.deepEqual(pageContactHistory(rows, 12), rows.slice(0, 12));
+    assert.deepEqual(pageContactHistory(rows, 24), rows.slice(0, 24));
+    const src = require("node:fs").readFileSync(
+      require("node:path").join(__dirname, "..", "dashboard/src/components/ContactHistory.tsx"),
+      "utf8"
+    );
+    assert.match(src, /View more/);
+    assert.match(src, /data-contact-history-more/);
+    assert.match(src, /pageContactHistory/);
   });
 });
