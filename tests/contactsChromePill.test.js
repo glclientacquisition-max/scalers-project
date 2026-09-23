@@ -55,13 +55,12 @@ describe("contacts chrome pill ACCEPT", () => {
     assert.doesNotMatch(dev, /label: "Needs you"|label: "Visits"|label: "Holds"/);
   });
 
-  it("keeps Last call and Name as underline FilterTabs", () => {
-    const sortCall = page.match(/<FilterTabs[\s\S]*?\/>/);
-    assert.ok(sortCall, "sort stays FilterTabs");
-    assert.match(sortCall[0], /label="Sort contacts"/);
-    assert.match(sortCall[0], /label: "Last call"/);
-    assert.match(sortCall[0], /label: "Name"/);
-    assert.match(page, /active=\{sort\}/);
+  it("keeps Last call and Name as a labeled Sort select", () => {
+    assert.match(page, /<ContactSortSelect/);
+    const sort = read("dashboard/src/components/ContactSortSelect.tsx");
+    assert.match(sort, /aria-label="Sort contacts"/);
+    assert.match(sort, />Last call</);
+    assert.match(sort, />Name</);
   });
 
   it("keeps one opened-only Call and WhatsApp pair as top icons on the person file", () => {
@@ -85,9 +84,9 @@ describe("contacts chrome pill ACCEPT", () => {
   });
 
   it("does not change #389 History or KPI honesty", () => {
-    assert.match(profile, />History</);
-    assert.match(profile, /<ContactTimeline entries=\{timeline\} \/>/);
-    assert.match(profile, /<ContactKpiStrip cards=\{kpiCards\} \/>/);
+    assert.match(profile, /<ContactHistory/);
+    assert.match(profile, /groupContactTimeline/);
+    assert.match(profile, /<ContactKpiStrip cards=\{kpiCards\}/);
     assert.match(kpi, /export function contactPersonFileKpiCards/);
     assert.match(kpi, /label: "Visits done"/);
     assert.match(kpi, /interactionCount > 0/);

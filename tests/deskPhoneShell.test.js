@@ -26,7 +26,7 @@ describe("desk phone shell", () => {
     assert.doesNotMatch(nav, /SignOutButton/);
     assert.match(nav, /label="Scalers"/);
     assert.match(nav, /markOnly/);
-    assert.match(nav, /w-\[4\.5rem\]/);
+    assert.match(nav, /w-\[5\.5rem\]/);
     assert.match(nav, /label: "Overview"/);
     assert.match(nav, /label: "Inbox"/);
     assert.match(nav, /label: "Contacts"/);

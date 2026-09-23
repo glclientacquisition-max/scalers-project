@@ -55,7 +55,7 @@ function compareContactRows(a, b, sort) {
 }
 
 function contactListSubline(row) {
-  if (!String(row.name || "").trim()) return "Unsaved";
+  if (!String(row.name || "").trim()) return "Unknown caller";
   const phone = String(row.phone || "").trim();
   if (phone) return phone;
   return "";
@@ -92,11 +92,11 @@ describe("contacts list Phase 1 helpers", () => {
         .map((row) => row.name),
       ["Amina", "Brian", "Otieno", ""]
     );
-    assert.equal(contactListSubline({ name: null, phone: "+254700000001" }), "Unsaved");
+    assert.equal(contactListSubline({ name: null, phone: "+254700000001" }), "Unknown caller");
     assert.equal(contactListSubline({ name: "Amina", phone: "+254700000002" }), "+254700000002");
     const src = read("dashboard/src/lib/contactsLoad.ts");
     assert.match(src, /export function contactListSubline/);
-    assert.match(src, /return "Unsaved"/);
+    assert.match(src, /return "Unknown caller"/);
     assert.match(src, /formatCallWhenRelative\(row\.lastContactAt\)/);
     const sublineFn = src.slice(
       src.indexOf("export function contactListSubline"),
@@ -128,10 +128,8 @@ describe("contacts list Phase 1 chrome", () => {
     assert.match(page, /<ContactsSearch/);
     assert.match(search, /type="search"/);
     assert.match(search, /Name or number/);
-    assert.match(page, /<FilterTabs/);
-    assert.match(page, /label="Sort contacts"/);
-    assert.match(page, /label: "Last call"/);
-    assert.match(page, /label: "Name"/);
+    assert.match(page, /<ContactSortSelect/);
+    assert.match(page, /<InboxFilterPills/);
     assert.match(load, /resolveContactSort/);
     assert.match(note, /Search field/);
     assert.match(accept, /search \+ sort/);

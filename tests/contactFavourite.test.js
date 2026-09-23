@@ -55,7 +55,7 @@ describe("contact favourite metadata", () => {
 
 describe("contacts recents and favourites rate cards", () => {
   const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
-  const cards = read("dashboard/src/components/ContactPileCards.tsx");
+  const cards = read("dashboard/src/components/ContactPileStrip.tsx");
   const profile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const button = read("dashboard/src/components/ContactFavouriteButton.tsx");
   const actions = read("dashboard/src/app/(desk)/contacts/actions.ts");
@@ -70,14 +70,14 @@ describe("contacts recents and favourites rate cards", () => {
     assert.match(page, /label: "Unsaved"/);
     assert.doesNotMatch(page, /label: "Recent"/);
     assert.doesNotMatch(page, /saved: "recent"/);
-    assert.match(page, /<ContactPileCards/);
+    assert.match(page, /<ContactPileStrip/);
     assert.match(page, /contactsRecentsHref/);
     assert.match(page, /contactsFavouritesHref/);
-    assert.match(cards, /title: "Recents"/);
-    assert.match(cards, /title: "Favourites"/);
-    assert.match(cards, /data-contact-pile-cards/);
+    assert.match(cards, /label: "recent"/);
+    assert.match(cards, /label: "favourites"/);
+    assert.match(cards, /data-contact-pile-strip/);
     assert.match(note, /All · Saved · Unsaved only/);
-    assert.match(note, /ContactPileCards/);
+    assert.match(note, /ContactPileStrip/);
     assert.match(note, /No Recent tab/);
     assert.doesNotMatch(nav, /Favourites|Recents/);
   });
@@ -86,7 +86,7 @@ describe("contacts recents and favourites rate cards", () => {
     assert.match(profile, /<ContactFavouriteButton/);
     assert.match(profile, /isContactFavourite\(contact\.metadata\)/);
     assert.match(button, /Add to Favourites/);
-    assert.match(button, /Remove from Favourites/);
+    assert.match(button, /Favourited/);
     assert.match(actions, /export async function updateContactFavourite/);
     assert.match(actions, /withContactFavourite/);
     assert.match(helpers, /favourite_at/);
