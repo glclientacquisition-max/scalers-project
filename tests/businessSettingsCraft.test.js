@@ -121,7 +121,7 @@ describe("business settings craft", () => {
     assert.match(shell, /min-h-12/);
     assert.match(shell, /variant: "index" \| "rail"/);
     assert.match(shell, /settingsRailWrapClass/);
-    assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-\[13\.5rem\]/);
+    assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-max md:max-w-\[13\.5rem\]/);
     assert.match(ui, /md:sticky md:top-4/);
   });
 
@@ -227,7 +227,7 @@ describe("business settings craft", () => {
     assert.match(shell, /settingsRailWrapClass/);
     assert.doesNotMatch(shell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(test, /max-w-xl/);
-    assert.match(ui, /md:w-\[13\.5rem\]/);
+    assert.match(ui, /md:w-max md:max-w-\[13\.5rem\]/);
     assert.match(ui, /md:flex-row/);
     assert.match(ui, /grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2/);
     assert.match(ui, /min-w-0 flex-1/);
@@ -334,5 +334,49 @@ describe("business settings craft", () => {
       form,
       /<span className="text-xs font-medium text-ink">\{flag\.label\}<\/span>/
     );
+  });
+
+  it("packs Profile sub-strips instead of stretching them across the pane", () => {
+    const segmented = ui.slice(
+      ui.indexOf("export function SettingsSegmented"),
+      ui.indexOf("export function SettingsSelect")
+    );
+    assert.match(segmented, /data-settings-strip=/);
+    assert.match(segmented, /inline-flex max-w-full min-w-0/);
+    assert.match(segmented, /flex max-w-full justify-start gap-1/);
+    assert.match(segmented, /className="shrink-0"/);
+    assert.match(segmented, /overflow-x-auto/);
+    assert.doesNotMatch(segmented, /justify-between/);
+    assert.doesNotMatch(segmented, /flex-1/);
+    assert.doesNotMatch(segmented, /w-full min-w-0 border-b/);
+
+    assert.match(ui, /md:justify-start md:gap-4/);
+    assert.doesNotMatch(
+      ui.slice(
+        ui.indexOf("export const settingsConsoleClass"),
+        ui.indexOf("export const settingsRailWrapClass")
+      ),
+      /justify-between|flex-1|md:gap-8/
+    );
+
+    const rail = shell.slice(
+      shell.indexOf("const isRail = variant === \"rail\""),
+      shell.indexOf('ul className="w-full overflow-hidden')
+    );
+    assert.match(rail, /inline-flex min-h-11 w-full items-center justify-start/);
+    assert.match(rail, /w-max max-w-full space-y-0.5/);
+    assert.doesNotMatch(rail, /justify-between/);
+    assert.doesNotMatch(rail, /flex-1/);
+    assert.doesNotMatch(rail, /mt-6/);
+
+    const coach = read("dashboard/src/components/PronunciationCoach.tsx");
+    const tablistStart = coach.indexOf('aria-label="Pronunciation studio modes"');
+    const tablist = coach.slice(tablistStart - 220, tablistStart + 420);
+    assert.match(tablist, /data-settings-strip=/);
+    assert.match(tablist, /inline-flex max-w-full justify-start gap-1/);
+    assert.match(tablist, /overflow-x-auto/);
+    assert.doesNotMatch(tablist, /justify-between/);
+    assert.doesNotMatch(tablist, /flex-1/);
+    assert.doesNotMatch(tablist, /flex-wrap gap-1 border-b/);
   });
 });

@@ -719,9 +719,10 @@ export function PronunciationCoach({
       </div>
 
       <div
-        className="flex flex-wrap gap-1 border-b border-line pb-px"
+        className="inline-flex max-w-full justify-start gap-1 overflow-x-auto [scrollbar-width:thin]"
         role="tablist"
         aria-label="Pronunciation studio modes"
+        data-settings-strip=""
       >
         {modes.map((m) => {
           const selected = mode === m.id;
@@ -732,7 +733,7 @@ export function PronunciationCoach({
               role="tab"
               aria-selected={selected}
               onClick={() => setMode(m.id)}
-              className={filterTabClass(selected)}
+              className={`${filterTabClass(selected)} shrink-0`}
             >
               {m.label}
               <span className="ml-1.5 text-xs font-normal text-ink-soft">

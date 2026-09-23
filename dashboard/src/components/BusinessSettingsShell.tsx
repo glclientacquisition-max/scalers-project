@@ -90,10 +90,10 @@ function SettingsMenu({
       className={isRail ? settingsRailClass : "min-w-0 w-full"}
     >
       {SETTINGS_NAV.map((section, index) => (
-        <section key={section.id} className={index === 0 ? undefined : "mt-6"}>
+        <section key={section.id} className={index === 0 ? undefined : "mt-4"}>
           <h2 className={`${settingsGroupTitleClass} mb-1.5 px-1`}>{section.title}</h2>
           {isRail ? (
-            <ul className="space-y-0.5">
+            <ul className="w-max max-w-full space-y-0.5">
               {section.items.map((item) => {
                 const active = settingsNavItemActive(item.target, tab, trainPanel, {
                   selectHubAppearance: true,
@@ -108,7 +108,7 @@ function SettingsMenu({
                       href={settingsNavHref(item.target)}
                       aria-current={active ? "page" : undefined}
                       className={[
-                        `flex min-h-11 items-center border-l-2 px-3 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`,
+                        `inline-flex min-h-11 w-full items-center justify-start border-l-2 px-3 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`,
                         active
                           ? "border-accent text-accent-deep"
                           : "border-transparent text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
