@@ -44,6 +44,7 @@ import {
 } from "@/lib/inboxOverflowPlace";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
+import { emptyInboxSmsFacts, type InboxSmsFacts } from "@/lib/polishInboxSms";
 
 function JumpGlyph() {
   return (
@@ -269,6 +270,33 @@ function InboxTicketMore({
   );
 }
 
+function ticketSmsFacts(opts: {
+  businessName: string;
+  callerName: string | null;
+  want: string | null;
+  purpose: string;
+  job: InboxJob | null;
+  hold: InboxHold | null;
+}): InboxSmsFacts {
+  const job = opts.job;
+  const hold = opts.hold;
+  return {
+    ...emptyInboxSmsFacts(),
+    businessName: String(opts.businessName || "").trim(),
+    callerName: String(opts.callerName || "").trim(),
+    want: String(opts.want || "").trim(),
+    purpose: String(opts.purpose || "").trim(),
+    jobStatus: String(job?.status || "").trim(),
+    jobService: String(job?.service_name || "").trim(),
+    jobWhen: String(job?.when_text || "").trim(),
+    jobPlace: String(job?.address_landmark || "").trim(),
+    holdStatus: String(hold?.status || "").trim(),
+    holdType: String(hold?.request_type || "").trim(),
+    holdItem: String(hold?.item || "").trim(),
+    holdWhen: String(hold?.when_text || "").trim(),
+  };
+}
+
 export function InboxTicketView({
   callId,
   backHref,
@@ -297,6 +325,7 @@ export function InboxTicketView({
   escalatePeople,
   archived,
   leadStatus,
+  businessName,
 }: {
   callId: string;
   backHref: string;
@@ -325,6 +354,7 @@ export function InboxTicketView({
   escalatePeople: InboxPingPerson[];
   archived: boolean;
   leadStatus: string | null;
+  businessName: string;
 }) {
   const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -346,6 +376,14 @@ export function InboxTicketView({
   const showActionDock = canMarkDone || Boolean(callerPhone) || canPing;
   const dockedAction =
     canConfirm || canHoldDone || (needsYou && !archived) || showActionDock;
+  const smsFacts = ticketSmsFacts({
+    businessName,
+    callerName,
+    want,
+    purpose,
+    job,
+    hold,
+  });
 
   useEffect(() => {
     void inboxMarkSeen(callId);
@@ -654,7 +692,11 @@ export function InboxTicketView({
       ) : null}
 
       {needsYou && !archived ? (
-        <InboxSmsDock callId={callId} callerPhone={callerPhone} />
+        <InboxSmsDock
+          callId={callId}
+          callerPhone={callerPhone}
+          facts={smsFacts}
+        />
       ) : null}
     </div>
   );

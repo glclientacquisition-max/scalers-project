@@ -72,6 +72,7 @@ Core runtime modules:
 11. Compiled `llm_system_prompt` is written by Desk compiler; owners do not edit raw prompt in UI. Stale compiled prompts that force name capture fight resolution-first runtime — recompile after Brain policy changes.
 12. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`.
 13. Returning callers: load a compact phone file at call setup (`getCallerMemory` → CONTEXT HEADER). After a confirmed spoken name, bind that same phone card to the speaker (shared line: primary keeps the visit; alternate does not). The file may include last reason, the next visit, and up to two recent bookings. Never dump prior transcripts. Instant greeting stays brand-first and local.
+14. Ticket chat wand: empty Suggests one packaged customer SMS from lived facts on that ticket (visit, hold, Want). A filled draft is Polished in place. Facts beat Gemini. Never dump the transcript. Never say booked on a requested visit or ready on an open hold. Owner Send.
 
 ## Test / verify
 
