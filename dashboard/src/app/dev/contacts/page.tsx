@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
@@ -7,7 +8,7 @@ import { ContactKpiStrip } from "@/components/ContactKpiStrip";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
 import { ContactNameForm } from "@/components/ContactNameForm";
 import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
-import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
@@ -29,29 +30,31 @@ function ProfileLead({
   contactId,
   name,
   lastContactAt,
+  back,
 }: {
   title: string;
   phone: string;
   contactId: string;
   name: string | null;
   lastContactAt?: string | null;
+  back?: ReactNode;
 }) {
   const lastCallFact = contactLastCallFact(lastContactAt);
   const threadsHref = inboxThreadsFromContactHref(phone);
   return (
     <div className="space-y-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-            {title}
-          </h1>
-          <p className="mt-2 font-mono text-sm text-ink">{phone}</p>
-          {lastCallFact ? (
-            <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
-          ) : null}
-        </div>
-        <ContactActionDock number={phone} />
-      </div>
+      <DeskRecordLead
+        back={back}
+        trail={<ContactActionDock number={phone} />}
+      >
+        <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+          {title}
+        </h1>
+        <p className="mt-2 font-mono text-sm text-ink">{phone}</p>
+        {lastCallFact ? (
+          <p className="mt-1 text-sm text-ink-soft">{lastCallFact}</p>
+        ) : null}
+      </DeskRecordLead>
       {threadsHref ? (
         <Link href={threadsHref} data-contact-inbox-threads="" className={`${btnGhost} w-full sm:w-auto`}>
           Inbox threads
@@ -252,13 +255,13 @@ export default function DevContactsPage() {
           </section>
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
             <section className="max-w-md space-y-5">
-              <DeskBack href="/dev/contacts">Contacts</DeskBack>
               <ProfileLead
                 title="Name this caller"
                 phone="+254700000001"
                 contactId="ct-unsaved"
                 name={null}
                 lastContactAt="2026-09-21T06:40:00.000Z"
+                back={<DeskBack href="/dev/contacts">Contacts</DeskBack>}
               />
               <ContactKpiStrip cards={unsavedCards} />
               <section className="rounded-2xl border border-line bg-surface p-5">
@@ -280,13 +283,13 @@ export default function DevContactsPage() {
               </section>
             </section>
             <section className="max-w-md space-y-5">
-              <DeskBack href="/dev/contacts">Contacts</DeskBack>
               <ProfileLead
                 title="Amina"
                 phone="+254700000002"
                 contactId="ct-saved"
                 name="Amina"
                 lastContactAt="2026-09-21T07:12:00.000Z"
+                back={<DeskBack href="/dev/contacts">Contacts</DeskBack>}
               />
               <ContactKpiStrip cards={savedCards} />
               <section className="rounded-2xl border border-line bg-surface p-5">
