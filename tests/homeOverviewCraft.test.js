@@ -56,6 +56,7 @@ describe("home overview craft", () => {
     const devHome = read("dashboard/src/app/dev/home/page.tsx");
     assert.match(devHome, /HomeOverviewHeader/);
     assert.match(devHome, /DASHBOARD_OPEN/);
+    assert.match(devHome, /DailyBulletinPanel/);
   });
 
   it("maps Inbox queues and does not invent Online", () => {
@@ -105,6 +106,17 @@ describe("home overview craft", () => {
     assert.match(page, /aria-label="Wallet"/);
     assert.match(page, /Top up/);
     assert.match(page, /KES \{kes\.toLocaleString/);
+  });
+
+  it("posts Updates with the Settings bulletin panel", () => {
+    assert.match(page, /<DailyBulletinPanel tenant=\{tenant\} \/>/);
+    assert.match(page, />\s*Updates\s*</);
+    assert.doesNotMatch(page, /aria-label="Live updates"/);
+    assert.doesNotMatch(page, />Manage</);
+    const actions = read("dashboard/src/app/(desk)/settings/bulletinActions.ts");
+    assert.match(actions, /revalidatePath\("\/home"\)/);
+    const note = read("docs/frontend/design-system/pages/home.md");
+    assert.match(note, /DailyBulletinPanel/);
   });
 
   it("keeps one blue action and shows Next to return on phone", () => {

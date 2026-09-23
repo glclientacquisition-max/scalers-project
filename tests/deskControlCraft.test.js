@@ -31,6 +31,8 @@ describe("desk control craft", () => {
     assert.match(chrome, /pendingSpinnerClass/);
     assert.match(chrome, /deskFieldClass/);
     assert.match(chrome, /filterTabClass/);
+    assert.match(chrome, /deskRateCardClass/);
+    assert.match(chrome, /deskRateCardRowClass/);
     assert.match(chrome, /deskShiftClass/);
     assert.match(chrome, /export const deskPreviewClass/);
     assert.match(chrome, /export const deskPreviewCellClass/);

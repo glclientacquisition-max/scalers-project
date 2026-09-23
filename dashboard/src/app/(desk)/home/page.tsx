@@ -9,20 +9,16 @@ import {
   walletKes,
 } from "@/lib/callsTriage";
 import { inboxRecordHref } from "@/lib/inboxHref";
-import {
-  formatBulletinEndLabel,
-  liveBulletinItems,
-} from "@/lib/dailyBulletin";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { assessMvpAnswerReadiness } from "@/lib/mvpAnswerReadiness";
 import { lineStatusLabel, resolveLineStatus } from "@/lib/lineStatus";
 import {
-  btnGhost,
   btnPrimary,
   deskPreviewClass,
   deskShiftClass,
   focusRingVisible,
 } from "@/components/ui/deskChrome";
+import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import {
   homeBriefing,
   homeDigestLine,
@@ -62,8 +58,6 @@ export default async function HomeOverviewPage() {
   const isBeta = isBetaBilling(tenant.billing_enforcement);
   const lowWallet = !isBeta && kes < 200;
   const business = tenant.business_name?.trim() || "your workspace";
-  const liveUpdates = liveBulletinItems(tenant.daily_bulletin);
-  const primaryUpdate = liveUpdates[0] ?? null;
   const today = nairobiDateLabel();
 
   const readiness = assessMvpAnswerReadiness({
@@ -183,33 +177,9 @@ export default async function HomeOverviewPage() {
         </div>
       ) : null}
 
-      {primaryUpdate ? (
-        <aside aria-label="Live updates" className="mt-6 w-full min-w-0">
-          <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-[color-mix(in_srgb,var(--accent-soft)_70%,var(--card))] px-4 py-3">
-            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-accent-deep">
-                  <LivePing />
-                  Updates
-                  {liveUpdates.length > 1 ? ` ${liveUpdates.length} live` : ""}
-                </p>
-                <p className={`mt-1 font-display text-base tracking-tight text-ink ${deskPreviewClass}`}>
-                  {primaryUpdate.text}
-                </p>
-                <p className="mt-1 text-xs text-ink-soft">
-                  {formatBulletinEndLabel(primaryUpdate.ends_at)}
-                </p>
-              </div>
-              <Link href={businessSettingsHref("updates")} className={btnGhost}>
-                Manage
-              </Link>
-            </div>
-          </div>
-        </aside>
-      ) : null}
-
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
-        <section className="min-w-0 lg:col-span-7" aria-labelledby="work-heading">
+        <div className="min-w-0 lg:col-span-7">
+        <section className="min-w-0" aria-labelledby="work-heading">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2
               id="work-heading"
@@ -357,6 +327,20 @@ export default async function HomeOverviewPage() {
             </>
           ) : null}
         </section>
+
+        <section className="mt-6 min-w-0" aria-labelledby="updates-heading">
+          <h2
+            id="updates-heading"
+            className="flex items-center gap-2 font-display text-xl tracking-tight text-ink"
+          >
+            <LivePing />
+            Updates
+          </h2>
+          <div className="mt-3">
+            <DailyBulletinPanel tenant={tenant} />
+          </div>
+        </section>
+        </div>
 
         <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5">
           <div className="overflow-hidden rounded-2xl border border-line bg-surface">

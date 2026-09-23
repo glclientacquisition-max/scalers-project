@@ -252,10 +252,12 @@ describe("inbox swipe wiring", () => {
   });
 
   it("scrolls the active chip on a snap strip that never wraps", () => {
+    const chrome = read("dashboard/src/components/ui/deskChrome.ts");
     assert.match(pills, /scrollIntoView/);
-    assert.match(pills, /flex-nowrap/);
-    assert.match(pills, /snap-x snap-mandatory/);
-    assert.match(pills, /overflow-x-auto/);
+    assert.match(pills, /deskRateCardRowClass/);
+    assert.match(chrome, /flex-nowrap/);
+    assert.match(chrome, /snap-x snap-mandatory/);
+    assert.match(chrome, /overflow-x-auto/);
     assert.match(pills, /bg-gradient-to-l from-surface/);
     assert.doesNotMatch(pills, /md:flex-wrap|md:overflow-visible|max-md/);
     assert.match(toolbar, /inboxPileHref\(item\.id/);

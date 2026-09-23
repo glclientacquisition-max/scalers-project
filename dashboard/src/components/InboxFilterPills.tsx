@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import {
+  deskRateCardClass,
+  deskRateCardCountClass,
+  deskRateCardRowClass,
+} from "@/components/ui/deskChrome";
 
 export type InboxFilterPillItem = {
   id: string;
@@ -35,7 +39,7 @@ export function InboxFilterPills({
 
   return (
     <nav aria-label={label} className="relative">
-      <ul className="-mx-1 flex flex-nowrap snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul className={deskRateCardRowClass}>
         {items.map((item) => {
           const isActive = active === item.id;
           return (
@@ -48,23 +52,11 @@ export function InboxFilterPills({
                 href={item.href}
                 prefetch
                 aria-current={isActive ? "page" : undefined}
-                className={[
-                  "inline-flex min-h-11 items-center gap-2 rounded-full px-3.5 text-sm font-medium",
-                  deskShiftClass,
-                  "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
-                  isActive
-                    ? "bg-[#005CCC] text-white"
-                    : "bg-surface-muted text-ink hover:bg-[#0096FF]/10",
-                ].join(" ")}
+                className={deskRateCardClass(isActive)}
               >
                 {item.label}
                 {typeof item.count === "number" ? (
-                  <span
-                    className={[
-                      "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-xs tabular-nums",
-                      isActive ? "bg-white/20 text-white" : "bg-surface text-ink-soft",
-                    ].join(" ")}
-                  >
+                  <span className={deskRateCardCountClass(isActive)}>
                     {item.count}
                   </span>
                 ) : null}
