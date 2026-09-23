@@ -739,7 +739,11 @@ export function TenantForm({
             }
             showBack
             title={heading}
-            action={<TenantSettingsSaveButton pending={pending} />}
+            action={
+              panel === "pronunciation" ? undefined : (
+                <TenantSettingsSaveButton pending={pending} />
+              )
+            }
           />
 
       <input type="hidden" name="id" value={tenant.id} />
@@ -1165,10 +1169,10 @@ export function TenantForm({
 
           <div className="hidden md:block overflow-hidden rounded-xl border border-line">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
+              <table className="w-full table-fixed text-sm">
                 <thead>
                   <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
-                    <th className="px-3 py-2.5 font-medium">Name</th>
+                    <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
                     <th className="px-3 py-2.5 font-medium">Price</th>
                     <th className="px-3 py-2.5 font-medium">Notes</th>
                     <th className="px-3 py-2.5 font-medium">Out of scope</th>
@@ -1182,7 +1186,7 @@ export function TenantForm({
                     const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
                     return (
                       <tr key={`service-${index}`} className="align-middle">
-                        <td className="px-3 py-2">
+                        <td className="min-w-0 truncate px-3 py-2">
                           <label className="sr-only" htmlFor={`svc-name-${index}`}>
                             Service name
                           </label>
@@ -1195,7 +1199,7 @@ export function TenantForm({
                                 ? "Book sourcing / special orders"
                                 : "Home cleaning"
                             }
-                            className={tableFieldClass}
+                            className={`${tableFieldClass} truncate`}
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -1397,10 +1401,10 @@ export function TenantForm({
             </div>
             <div className="hidden md:block overflow-hidden rounded-xl border border-line">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+                <table className="w-full table-fixed text-sm">
                   <thead>
                     <tr className="border-b border-line bg-surface-canvas text-left text-xs font-medium uppercase tracking-wide text-ink-soft">
-                      <th className="px-3 py-2.5 font-medium">Name</th>
+                      <th className="min-w-0 px-3 py-2.5 font-medium">Name</th>
                       <th className="px-3 py-2.5 font-medium">Price</th>
                       <th className="px-3 py-2.5 font-medium">Category</th>
                       <th className="px-3 py-2.5 font-medium">Stock</th>
@@ -1414,7 +1418,7 @@ export function TenantForm({
                       const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                       return (
                         <tr key={`product-${index}`} className="align-middle">
-                          <td className="px-3 py-2">
+                          <td className="min-w-0 truncate px-3 py-2">
                             <label className="sr-only" htmlFor={`prod-name-${index}`}>
                               Product name
                             </label>
@@ -1423,7 +1427,7 @@ export function TenantForm({
                               value={product.name}
                               onChange={(e) => updateProduct(index, "name", e.target.value)}
                               placeholder="Atomic Habits"
-                              className={tableFieldClass}
+                              className={`${tableFieldClass} truncate`}
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -1499,8 +1503,8 @@ export function TenantForm({
       </section>
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>
-        <SettingsGroup title="Days">
-          <div className="grid grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+        <SettingsGroup title="Hours">
+          <div className="hidden bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500 lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
             <span>Day</span>
             <span>Open</span>
             <span>Opens</span>
@@ -1510,61 +1514,103 @@ export function TenantForm({
             const slot = hoursSchedule.days[day];
             const open = Boolean(slot);
             return (
-              <div
-                key={day}
-                className="grid grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 px-3 py-1.5"
-              >
-                <span className="text-sm font-medium text-ink">
-                  {DAY_LABELS[day]}
-                </span>
-                <ToolSwitch
-                  checked={open}
-                  onChange={(next) => setDayOpen(day, next)}
-                  label={`${DAY_LABELS[day]} open`}
-                />
+              <div key={day} className="px-4 py-2 lg:px-3 lg:py-1.5">
+                <div className="flex min-h-12 items-center justify-between gap-3 lg:hidden">
+                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                    {DAY_LABELS[day]}
+                  </span>
+                  <ToolSwitch
+                    checked={open}
+                    onChange={(next) => setDayOpen(day, next)}
+                    label={`${DAY_LABELS[day]} open`}
+                  />
+                </div>
                 {open && slot ? (
-                  <>
-                    <label className="sr-only" htmlFor={`open-${day}`}>
-                      Opens
-                    </label>
-                    <input
-                      id={`open-${day}`}
-                      type="time"
-                      value={slot.open}
-                      onChange={(e) => setDayTime(day, "open", e.target.value)}
-                      className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
-                    />
-                    <label className="sr-only" htmlFor={`close-${day}`}>
-                      Closes
-                    </label>
-                    <input
-                      id={`close-${day}`}
-                      type="time"
-                      value={slot.close}
-                      onChange={(e) => setDayTime(day, "close", e.target.value)}
-                      className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
-                    />
-                  </>
-                ) : (
-                  <span className="col-span-2 text-xs text-ink-soft">Closed</span>
-                )}
+                  <div className="mt-2 space-y-2 lg:hidden">
+                    <div className="min-w-0">
+                      <label
+                        className="block text-xs font-medium text-ink-soft"
+                        htmlFor={`open-m-${day}`}
+                      >
+                        Opens
+                      </label>
+                      <input
+                        id={`open-m-${day}`}
+                        type="time"
+                        value={slot.open}
+                        onChange={(e) => setDayTime(day, "open", e.target.value)}
+                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <label
+                        className="block text-xs font-medium text-ink-soft"
+                        htmlFor={`close-m-${day}`}
+                      >
+                        Closes
+                      </label>
+                      <input
+                        id={`close-m-${day}`}
+                        type="time"
+                        value={slot.close}
+                        onChange={(e) => setDayTime(day, "close", e.target.value)}
+                        className="mt-1 min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <div className="hidden lg:grid lg:grid-cols-[minmax(5.5rem,7rem)_3.5rem_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-x-3">
+                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                    {DAY_LABELS[day]}
+                  </span>
+                  <ToolSwitch
+                    checked={open}
+                    onChange={(next) => setDayOpen(day, next)}
+                    label={`${DAY_LABELS[day]} open`}
+                  />
+                  {open && slot ? (
+                    <>
+                      <label className="sr-only" htmlFor={`open-${day}`}>
+                        Opens
+                      </label>
+                      <input
+                        id={`open-${day}`}
+                        type="time"
+                        value={slot.open}
+                        onChange={(e) => setDayTime(day, "open", e.target.value)}
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                      />
+                      <label className="sr-only" htmlFor={`close-${day}`}>
+                        Closes
+                      </label>
+                      <input
+                        id={`close-${day}`}
+                        type="time"
+                        value={slot.close}
+                        onChange={(e) => setDayTime(day, "close", e.target.value)}
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
+                      />
+                    </>
+                  ) : (
+                    <span className="col-span-2 text-xs text-ink-soft">Closed</span>
+                  )}
+                </div>
               </div>
             );
           })}
+          <div className="space-y-1.5 px-4 py-3">
+            <p className="text-sm font-medium text-ink">When closed</p>
+            <SettingsSegmented
+              label="When closed"
+              value={afterHoursMode}
+              options={AFTER_HOURS_OPTIONS.map((opt) => ({
+                id: opt.id,
+                label: opt.label,
+              }))}
+              onChange={setAfterHoursMode}
+            />
+          </div>
         </SettingsGroup>
-
-        <div className="space-y-1.5">
-          <h3 className={`${settingsBlockTitleClass} px-1`}>When closed</h3>
-          <SettingsSegmented
-            label="When closed"
-            value={afterHoursMode}
-            options={AFTER_HOURS_OPTIONS.map((opt) => ({
-              id: opt.id,
-              label: opt.label,
-            }))}
-            onChange={setAfterHoursMode}
-          />
-        </div>
       </section>
 
       <section
@@ -1599,7 +1645,7 @@ export function TenantForm({
               key={`loc-${index}`}
               className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 truncate">
                 <label
                   className="block text-xs font-medium text-ink-soft lg:sr-only"
                   htmlFor={`loc-label-${index}`}
@@ -1621,10 +1667,10 @@ export function TenantForm({
                     }
                   }}
                   placeholder="Main shop"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
                 />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 truncate">
                 <label
                   className="block text-xs font-medium text-ink-soft lg:sr-only"
                   htmlFor={`loc-address-${index}`}
@@ -1648,7 +1694,7 @@ export function TenantForm({
                     }
                   }}
                   placeholder="Westlands, Nairobi"
-                  className="min-w-0 break-words [overflow-wrap:anywhere]"
+                  className="min-w-0 truncate break-words [overflow-wrap:anywhere]"
                 />
               </div>
               <div className="min-w-0">
@@ -1954,7 +2000,7 @@ export function TenantForm({
         </div>
 
         <div className="overflow-hidden rounded-xl border border-line">
-          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,auto)_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Name</span>
             <span>Handles</span>
             <span>Phone</span>
@@ -1965,9 +2011,9 @@ export function TenantForm({
           {team.map((member, index) => (
             <div
               key={`team-${index}`}
-              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,auto)_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
+              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 truncate">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-name-${index}`}>
                   Name
                 </label>
@@ -1976,7 +2022,7 @@ export function TenantForm({
                   value={member.name}
                   onChange={(e) => updateTeam(index, "name", e.target.value)}
                   placeholder="Wanjiku Mwangi"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
                 />
               </div>
               <div className="min-w-0">
@@ -2003,7 +2049,7 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 lg:mt-0`}
                 />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 truncate">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-email-${index}`}>
                   Email
                 </label>
@@ -2013,15 +2059,14 @@ export function TenantForm({
                   value={member.email || ""}
                   onChange={(e) => updateTeam(index, "email", e.target.value)}
                   placeholder="wanjiku@shop.co.ke"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
+                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-3" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
+              <div className="flex min-w-0 items-center justify-start gap-0.5" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
                 {TEAM_NOTIFY_FLAGS.map((flag) => {
                   const selected = member[flag.key] === true;
                   return (
-                    <div key={flag.key} className="flex min-h-11 items-center gap-2">
-                      <span className="text-xs font-medium text-ink">{flag.label}</span>
+                    <div key={flag.key} title={flag.label} className="flex min-h-11 min-w-11 items-center justify-center">
                       <ToolSwitch
                         checked={selected}
                         label={`${flag.label} for ${member.name || `teammate ${index + 1}`}`}

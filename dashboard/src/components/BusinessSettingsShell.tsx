@@ -197,7 +197,7 @@ function SettingsPanelBody({
 }
 
 /**
- * Business settings: phone index then drill-in. lg+ inner rail beside a fluid panel.
+ * Business settings: phone index then drill-in. md+ inner rail beside a fluid panel.
  */
 export function BusinessSettingsShell({
   tenant,
@@ -249,10 +249,10 @@ export function BusinessSettingsShell({
         <div className={settingsConsoleClass}>
           {rail}
           <div className={settingsPanelClass}>
-            <div className="lg:hidden">
+            <div className="md:hidden">
               <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
             </div>
-            <div className="hidden lg:block">
+            <div className="hidden md:block">
               <AppearancePanel />
             </div>
           </div>

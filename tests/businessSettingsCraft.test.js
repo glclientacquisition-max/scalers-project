@@ -116,17 +116,21 @@ describe("business settings craft", () => {
     assert.match(ui, /uppercase tracking-wide text-gray-500/);
     assert.match(ui, /pointer-events-none/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
-    assert.match(shell, /lg:hidden/);
+    assert.match(shell, /md:hidden/);
     assert.match(shell, /SettingsChevron/);
     assert.match(shell, /min-h-12/);
     assert.match(shell, /variant: "index" \| "rail"/);
     assert.match(shell, /settingsRailWrapClass/);
-    assert.match(ui, /hidden min-w-0 shrink-0 lg:block lg:w-\[13\.5rem\]/);
-    assert.match(ui, /lg:sticky lg:top-4/);
+    assert.match(ui, /hidden min-w-0 shrink-0 md:block md:w-\[13\.5rem\]/);
+    assert.match(ui, /md:sticky md:top-4/);
   });
 
   it("keeps Sign out on Profile and parks Appearance under This device", () => {
-    assert.match(ui, /SignOutButton/);
+    const header = ui.slice(
+      ui.indexOf("export function SettingsPageHeader"),
+      ui.indexOf("compactTextareaExpandHandlers")
+    );
+    assert.doesNotMatch(header, /SignOutButton/);
     assert.match(shell, /SignOutButton/);
     assert.match(shell, /SettingsSignOutRow/);
     assert.match(shell, /<ThemePicker \/>/);
@@ -186,8 +190,9 @@ describe("business settings craft", () => {
     assert.match(form, /prod-name-m-/);
     assert.match(form, /prod-cat-m-/);
     assert.match(form, /className="hidden md:block overflow-hidden rounded-xl border border-line"/);
-    assert.match(form, /min-w-\[720px\]/);
-    assert.match(form, /min-w-\[640px\]/);
+    assert.match(form, /table-fixed/);
+    assert.doesNotMatch(form, /min-w-\[720px\]/);
+    assert.doesNotMatch(form, /min-w-\[640px\]/);
   });
 
   it("wraps location area and coverage so long values stay readable", () => {
@@ -214,7 +219,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(shell, /glass|mesh|MetricCard/);
   });
 
-  it("fills the lg canvas with an inner rail and a fluid panel", () => {
+  it("fills the md canvas with an inner rail and a fluid panel", () => {
     assert.match(shell, /data-settings-console/);
     assert.match(shell, /data-settings-console="" data-desk-nested=""/);
     assert.match(shell, /settingsConsoleClass/);
@@ -222,14 +227,15 @@ describe("business settings craft", () => {
     assert.match(shell, /settingsRailWrapClass/);
     assert.doesNotMatch(shell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(test, /max-w-xl/);
-    assert.match(ui, /lg:w-\[13\.5rem\]/);
+    assert.match(ui, /md:w-\[13\.5rem\]/);
+    assert.match(ui, /md:flex-row/);
     assert.match(ui, /grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2/);
     assert.match(ui, /min-w-0 flex-1/);
     assert.match(ui, /text-xl font-semibold/);
     assert.match(form, /SettingsGroup/);
-    assert.match(form, /grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
+    assert.match(form, /lg:grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);
     assert.match(form, /lg:grid-cols-\[8rem_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1\.1fr\)_minmax\(0,1\.1fr\)_2\.5rem\]/);
-    assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(10rem,auto\)_2\.5rem\]/);
+    assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)_auto_2\.5rem\]/);
     assert.match(form, /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.2fr\)_2\.5rem\]/);
     assert.match(shell, /border-l-2/);
     assert.match(shell, /border-accent text-accent-deep/);
@@ -267,5 +273,66 @@ describe("business settings craft", () => {
     assert.match(test, /settingsPrimaryButtonClass/);
     assert.match(test, /Call \{did\}/);
     assert.doesNotMatch(form, /choiceChipClass/);
+  });
+
+  it("clears the phone tab bar and keeps Hours When closed in the Hours group", () => {
+    assert.match(ui, /settingsPanelClass/);
+    assert.match(ui, /pb-\[var\(--desk-tabbar-clearance\)\]/);
+    assert.match(form, /title="Hours"/);
+    const hoursStart = form.indexOf('title="Hours"');
+    const hoursChunk = form.slice(hoursStart, hoursStart + 9000);
+    assert.match(hoursChunk, /label="When closed"/);
+    assert.match(form, /lg:hidden/);
+    assert.doesNotMatch(
+      form,
+      /grid grid-cols-\[minmax\(5\.5rem,7rem\)_3\.5rem_minmax\(0,1fr\)_minmax\(0,1fr\)\]/
+    );
+  });
+
+  it("selects Appearance on the hub rail, not Identity", () => {
+    const activeFn = nav.slice(
+      nav.indexOf("export function settingsNavItemActive"),
+      nav.indexOf("export function settingsNavItems")
+    );
+    assert.match(shell, /selectHubAppearance: true/);
+    assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
+    assert.match(activeFn, /target\.tab === "appearance"/);
+    assert.match(activeFn, /tab === "menu"/);
+    assert.doesNotMatch(activeFn, /tab === "menu" && trainPanel/);
+  });
+
+  it("keeps one filled primary per settings panel", () => {
+    const ingest = read("dashboard/src/components/KnowledgeIngestPanel.tsx");
+    const catalogImport = read("dashboard/src/components/CatalogImportPanel.tsx");
+    const coach = read("dashboard/src/components/PronunciationCoach.tsx");
+    assert.match(ingest, /settingsPrimaryButtonClass/);
+    assert.match(catalogImport, /settingsActionClass/);
+    const catalogScan = catalogImport.slice(
+      catalogImport.indexOf("{previewPending ? \"Scanning…\" : \"Scan\"}") - 180,
+      catalogImport.indexOf("{previewPending ? \"Scanning…\" : \"Scan\"}") + 40
+    );
+    assert.match(catalogScan, /settingsActionClass/);
+    assert.doesNotMatch(catalogScan, /settingsPrimaryButtonClass/);
+    assert.match(form, /panel === "pronunciation" \? undefined/);
+    assert.match(coach, /btnPrimary/);
+    assert.match(form, /settingsGhostButtonClass/);
+    assert.match(form, /Add service/);
+    assert.match(form, /Add 3/);
+    assert.match(save, /min-h-11/);
+    assert.doesNotMatch(save, /min-h-14/);
+    assert.doesNotMatch(save, /w-full/);
+  });
+
+  it("truncates dense settings tables and uses icon-only team notify", () => {
+    assert.match(form, /min-w-0 truncate/);
+    assert.match(form, /table-fixed/);
+    assert.doesNotMatch(form, /min-w-\[720px\]/);
+    assert.doesNotMatch(form, /min-w-\[640px\]/);
+    assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
+    assert.match(form, /title=\{flag\.label\}/);
+    assert.doesNotMatch(
+      form,
+      /<span className="text-xs font-medium text-ink">\{flag\.label\}<\/span>/
+    );
   });
 });

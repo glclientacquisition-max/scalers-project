@@ -186,19 +186,19 @@ export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
     <nav
       data-desk-tabbar=""
       aria-label="Workspace"
-      className="fixed inset-x-0 bottom-0 z-40 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] border-t border-line/80 bg-surface pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 bg-surface pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
     >
       <ul className="flex">
         {DESK_LINKS.map((item) => {
           const active = pathActive(pathname, item.href);
           return (
-            <li key={item.href} className="min-w-0 flex-1">
+            <li key={item.href} className="min-w-0 flex-1 overflow-visible">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 aria-label={inboxLinkAria(item.label, needsCount)}
                 className={[
-                  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[11px] leading-none",
+                  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight",
                   deskShiftClass,
                   focusRingVisible,
                   active
@@ -207,7 +207,9 @@ export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
                 ].join(" ")}
               >
                 <TabIconWithBadge name={item.label} count={needsCount} />
-                <span className="max-w-full truncate">{item.label}</span>
+                <span className="max-w-full whitespace-nowrap text-center">
+                  {item.label}
+                </span>
               </Link>
             </li>
           );
