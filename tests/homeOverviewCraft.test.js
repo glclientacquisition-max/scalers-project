@@ -107,6 +107,17 @@ describe("home overview craft", () => {
     assert.match(page, /KES \{kes\.toLocaleString/);
   });
 
+  it("posts Updates with the Settings bulletin panel", () => {
+    assert.match(page, /<DailyBulletinPanel tenant=\{tenant\} \/>/);
+    assert.match(page, />\s*Updates\s*</);
+    assert.doesNotMatch(page, /aria-label="Live updates"/);
+    assert.doesNotMatch(page, />Manage</);
+    const actions = read("dashboard/src/app/(desk)/settings/bulletinActions.ts");
+    assert.match(actions, /revalidatePath\("\/home"\)/);
+    const note = read("docs/frontend/design-system/pages/home.md");
+    assert.match(note, /DailyBulletinPanel/);
+  });
+
   it("keeps one blue action and shows Next to return on phone", () => {
     assert.match(page, /variant="ghost"/);
     assert.doesNotMatch(page, /variant="primary"/);

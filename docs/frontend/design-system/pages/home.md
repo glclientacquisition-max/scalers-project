@@ -16,7 +16,9 @@
 
 **Next to return.** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one truncated reason (`deskPreviewClass`). Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link. On phone (`lg:hidden`) it is a compact row under Work. At `lg` it is the left-column card (`hidden lg:block`).
 
-**One blue action per screen.** The aside CTA is the only filled primary. Next to return uses a ghost WhatsApp button (green glyph). Two saturated CTAs would compete; the CTA already routes to the sharpest queue.
+**Updates.** Same `DailyBulletinPanel` as Profile `?tab=updates`. Callers hear, duration, Post update, Clear. Writes `daily_bulletin` through `bulletinActions`. Always on Home after Work (and Next to return when that row exists). Not a second persist path. Post update stays filled and docked to the field.
+
+**One blue action per screen.** The aside CTA is the work primary. Next to return uses a ghost WhatsApp button (green glyph). Post update is the Updates primary, docked to Callers hear.
 
 **Aside sections.** Today, Line, and prepaid balance are hairline-separated sections. Values self-label: `Line live` + DID, `KES 0` + Top up. No caps headings on self-evident data rows. Caps eyebrows introduce content regions only (Next to return). Prepaid always shows the balance; `Top up` appears only when low. Line shows the formatted DID (`+254 700 000 000`). Beta workspaces skip the prepaid section entirely (metered, never charged). When the balance lasts 1 to 90 days at the current call pace, a quiet caption says so (`about 3 weeks at this pace`, same math as Usage).
 
