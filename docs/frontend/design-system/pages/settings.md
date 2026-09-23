@@ -130,6 +130,8 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 
 ### Updates (`?tab=updates`)
 
+Same `DailyBulletinPanel` as Home. One persist path (`bulletinActions` → `daily_bulletin`).
+
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
 | Callers hear | input | `daily_bulletin` text | Assistant on calls |
