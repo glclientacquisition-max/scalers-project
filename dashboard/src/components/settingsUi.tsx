@@ -12,8 +12,9 @@ import { SignOutButton } from "@/components/ui/SignOutButton";
 import {
   btnPrimary,
   deskFieldClass,
+  deskRateCardClass,
+  deskRateCardRowClass,
   deskShiftClass,
-  filterTabClass,
 } from "@/components/ui/deskChrome";
 
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
@@ -261,18 +262,23 @@ export function SettingsSegmented<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="w-full min-w-0 border-b border-line">
-      <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      data-settings-strip=""
+      className="relative min-w-0 w-full"
+    >
+      <ul className={deskRateCardRowClass}>
         {options.map((opt) => {
           const selected = value === opt.id;
           return (
-            <li key={opt.id} className="shrink-0">
+            <li key={opt.id} className="snap-start shrink-0">
               <button
                 type="button"
                 role="radio"
                 aria-checked={selected}
                 onClick={() => onChange(opt.id)}
-                className={filterTabClass(selected)}
+                className={deskRateCardClass(selected)}
               >
                 {opt.label}
               </button>

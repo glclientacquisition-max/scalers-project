@@ -256,6 +256,9 @@ describe("business settings craft", () => {
     assert.match(alerts, /form=\{ALERTS_SETTINGS_FORM_ID\}/);
     assert.match(theme, /SettingsSegmented/);
     assert.match(theme, /label="This device"/);
+    assert.match(ui, /deskRateCardClass/);
+    assert.match(ui, /deskRateCardRowClass/);
+    assert.doesNotMatch(ui, /filterTabClass/);
     assert.match(form, /TEAM_NOTIFY_FLAGS/);
     assert.match(form, /settingsTrashButtonClass/);
     assert.doesNotMatch(form, /TEAM_NOTIFY_CHIPS/);

@@ -31,7 +31,7 @@ Short in-page title Profile plus compact workspace name and Line live / Number p
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` underline tabs. Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
@@ -55,7 +55,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
 | Test | Generate preview filled plus large tel control | One filled control: Call when live, else Generate preview. The other is ghost |
-| Appearance | Three filled segment pills | System / Light / Dark underline tabs. Label **This device**. `localStorage["scalers-desk-theme"]` |
+| Appearance | Three filled segment pills | System / Light / Dark rate cards. Label **This device**. `localStorage["scalers-desk-theme"]` |
 | Sign out | Ghost, instant POST | Ghost until confirm. **Sign out?** then filled **Sign out** / ghost **Stay**. POST `/api/logout` only after confirm |
 
 Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
@@ -64,7 +64,7 @@ Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notif
 
 Scope: **this device** (browser only), **whole business** (tenant row, every owner), **assistant on calls** (after Save and train, or a live panel write that the compiler already reads).
 
-One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclusive options are `SettingsSegmented`. Four-plus exclusive are `SettingsSelect`. Destructive and session actions stay ghost until confirm.
+One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclusive options are `SettingsSegmented` rate cards. Four-plus exclusive are `SettingsSelect`. Destructive and session actions stay ghost until confirm.
 
 ### Identity (`?tab=train&panel=identity`)
 
@@ -135,7 +135,7 @@ Same `DailyBulletinPanel` as Home. One persist path (`bulletinActions` → `dail
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
 | Callers hear | input | `daily_bulletin` text | Assistant on calls |
-| Update duration | segmented (3) | bulletin `expiry` | Assistant on calls |
+| Update duration | rate cards (3) | bulletin `expiry` | Assistant on calls |
 | Post update | filled, docked | insert live bulletin | Assistant on calls |
 | Clear | ghost | expire that item | Assistant on calls |
 

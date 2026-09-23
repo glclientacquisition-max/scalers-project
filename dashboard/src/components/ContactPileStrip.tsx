@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { deskShiftClass } from "@/components/ui/deskChrome";
+import {
+  deskRateCardClass,
+  deskRateCardCountClass,
+  deskRateCardRowClass,
+} from "@/components/ui/deskChrome";
 import type { ContactSavedFilter } from "@/lib/contactsLoad";
 
 export function ContactPileStrip({
@@ -31,35 +35,31 @@ export function ContactPileStrip({
   ];
 
   return (
-    <nav
-      data-contact-pile-strip=""
-      aria-label="Contact piles"
-      className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft"
-    >
-      {items.map((item, index) => {
-        const isActive = active === item.id;
-        return (
-          <span key={item.id} className="inline-flex min-w-0 items-center gap-3">
-            {index > 0 ? (
-              <span aria-hidden="true" className="h-3 w-px bg-line" />
-            ) : null}
-            <Link
-              href={item.href}
-              data-contact-pile={item.id}
-              aria-current={isActive ? "page" : undefined}
-              className={[
-                "inline-flex min-h-11 items-center gap-1.5 tabular-nums",
-                deskShiftClass,
-                "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
-                isActive ? "font-semibold text-ink" : "hover:text-ink",
-              ].join(" ")}
-            >
-              <span>{item.value}</span>
-              <span>{item.label}</span>
-            </Link>
-          </span>
-        );
-      })}
+    <nav data-contact-pile-strip="" aria-label="Contact piles" className="relative">
+      <ul className={deskRateCardRowClass}>
+        {items.map((item) => {
+          const isActive = active === item.id;
+          return (
+            <li key={item.id} className="snap-start shrink-0">
+              <Link
+                href={item.href}
+                data-contact-pile={item.id}
+                aria-current={isActive ? "page" : undefined}
+                className={deskRateCardClass(isActive)}
+              >
+                {item.label}
+                <span className={deskRateCardCountClass(isActive)}>
+                  {item.value}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface to-transparent"
+      />
     </nav>
   );
 }

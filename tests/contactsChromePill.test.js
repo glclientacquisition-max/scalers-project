@@ -47,8 +47,10 @@ describe("contacts chrome pill ACCEPT", () => {
     assert.doesNotMatch(purposeCall[0], /label: "VIP"/);
     assert.doesNotMatch(purposeCall[0], /label: "Cold"/);
     assert.doesNotMatch(page, /SEGMENT/);
-    assert.match(pills, /rounded-full/);
-    assert.match(pills, /bg-\[#005CCC\] text-white/);
+    const chrome = read("dashboard/src/components/ui/deskChrome.ts");
+    assert.match(pills, /deskRateCardClass/);
+    assert.match(chrome, /rounded-full/);
+    assert.match(chrome, /bg-\[#005CCC\] text-white/);
     assert.match(pills, /item\.count/);
     assert.doesNotMatch(pills, /filterTabClass/);
     assert.match(dev, /<InboxFilterPills/);
