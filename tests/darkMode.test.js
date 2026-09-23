@@ -170,7 +170,7 @@ describe("desk token hygiene", () => {
     assert.match(ui, /export const settingsDenseFieldClass =\s*[`"'][^`"']*text-ink/);
     assert.match(ui, /export const settingsTableFieldClass =\s*[`"'][^`"']*text-ink/);
     assert.match(ui, /deskFieldClass/);
-    assert.match(ui, /lg:w-\[13\.5rem\]/);
+    assert.match(ui, /md:w-max md:max-w-\[13\.5rem\]/);
     assert.match(ui, /focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/);
   });
 

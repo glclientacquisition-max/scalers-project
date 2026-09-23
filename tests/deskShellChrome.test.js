@@ -172,7 +172,7 @@ describe("desk shell chrome", () => {
     assert.match(settingsShell, /settingsGroupTitleClass/);
     assert.match(settingsShell, /data-settings-menu/);
     assert.match(settingsShell, /SettingsChevron/);
-    assert.match(settingsUi, /md:w-\[13\.5rem\]/);
+    assert.match(settingsUi, /md:w-max md:max-w-\[13\.5rem\]/);
     assert.doesNotMatch(settingsShell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /HomeOverviewHeader/);

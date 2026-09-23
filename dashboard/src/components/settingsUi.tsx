@@ -26,12 +26,12 @@ export const settingsTableFieldClass =
 /** Sole-panel sections stay flush (no top rule); use when stacking blocks inside one panel. */
 export const settingsSectionClass = "space-y-3";
 
-/** Nested settings: compact inner rail + fluid panel. Fills the desk canvas from md. */
+/** Nested settings: packed inner rail + fluid panel. Fills the desk canvas from md. */
 export const settingsConsoleClass =
-  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:gap-8";
+  "flex w-full min-w-0 flex-col gap-6 md:flex-row md:items-start md:justify-start md:gap-4";
 
 export const settingsRailWrapClass =
-  "hidden min-w-0 shrink-0 md:block md:w-[13.5rem]";
+  "hidden min-w-0 shrink-0 md:block md:w-max md:max-w-[13.5rem]";
 
 export const settingsRailClass = "min-w-0 md:sticky md:top-4";
 
@@ -262,8 +262,13 @@ export function SettingsSegmented<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="w-full min-w-0 border-b border-line">
-      <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:thin]">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      data-settings-strip=""
+      className="inline-flex max-w-full min-w-0"
+    >
+      <ul className="flex max-w-full justify-start gap-1 overflow-x-auto [scrollbar-width:thin]">
         {options.map((opt) => {
           const selected = value === opt.id;
           return (
