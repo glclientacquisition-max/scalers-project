@@ -33,7 +33,7 @@ Method: route-by-route code review against constitution; spot-check of dev harne
 | Work queue row 1 | Label is **Needs you** but `href` is `purpose=human` and count is `toReturn` only | Home spec: three queues are return calls, holds, visits. Inbox **Needs you** is the full open-work pile. Label/filter/count disagree (Hick, single source of truth) | **High** | Rename row to niche return label; link to the correct pile (`needs` or dedicated return filter); align count |
 | Work queue row 1 | CTA when returns exist routes to `purpose=human`, not **Needs you** | Same mismatch; owner lands on Human subset, not the briefing queue they tapped | **Med** | Use same pile as row link |
 | Next to return | Block is `hidden lg:block` | By design on desktop; mobile owners get no "next return" card | **Low** | Optional compact row under Work on phone |
-| Live updates card | Instructional **Manage** ghost beside bulletin | Acceptable; watch for second blue CTA competing with aside primary | **Low** | Keep ghost; ensure one filled CTA on viewport |
+| Live updates card | Home now mounts `DailyBulletinPanel` (Post update + Clear) | Two filled blues: Post update docked to the field, aside CTA for work | **Low** | Keep one persist path; do not add a Manage ghost |
 
 ### `/calls` (Inbox list)
 
