@@ -128,8 +128,11 @@ describe("inbox ticket action chrome", () => {
     assert.match(action, /Nothing to send/);
     assert.match(action, /POLISH_INBOX_DRAFT_SYSTEM/);
     assert.match(action, /Trusted facts/);
+    assert.match(action, /DASHBOARD_OPEN/);
+    assert.match(action, /tenant\?\.business_name/);
     assert.doesNotMatch(action, /if \(!note\) return \{ error: "Write a message\." \}/);
     assert.match(dock, /fillPolishForm/);
+    assert.match(dock, /startTransition/);
     assert.match(dock, /disabled=\{polishPending \|\| sendPending\}/);
   });
 

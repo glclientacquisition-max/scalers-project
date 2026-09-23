@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import {
   polishInboxSmsAction,
   sendInboxReplySms,
@@ -168,7 +168,9 @@ export function InboxSmsDock({
                 if (polishPending || sendPending) return;
                 const fd = new FormData();
                 fillPolishForm(fd);
-                polishAction(fd);
+                startTransition(() => {
+                  polishAction(fd);
+                });
               }}
             >
               {polishPending ? (

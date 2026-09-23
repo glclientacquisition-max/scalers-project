@@ -78,13 +78,20 @@ export async function polishInboxSmsAction(
   _prev: PolishCallerNoteState,
   formData: FormData
 ): Promise<PolishCallerNoteState> {
-  const tenant = await getCurrentTenant();
-  if (!tenant) return { error: "Not signed in." };
+  let tenant = null;
+  try {
+    tenant = await getCurrentTenant();
+  } catch {
+    tenant = null;
+  }
+  if (!tenant && process.env.DASHBOARD_OPEN !== "true") {
+    return { error: "Not signed in." };
+  }
 
   const note = String(formData.get("note") || "").trim();
   const facts = inboxSmsFactsFromForm(formData);
   if (!facts.businessName) {
-    facts.businessName = String(tenant.business_name || "").trim();
+    facts.businessName = String(tenant?.business_name || "").trim();
   }
   const packed = formatInboxSmsFacts(facts);
 
