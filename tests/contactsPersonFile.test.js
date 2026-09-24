@@ -59,7 +59,7 @@ function contactPersonFileKpiCards(opts) {
     });
   }
   const months = customerSinceMonths(opts.firstSeenAt, opts.now);
-  if (months != null) {
+  if (months != null && months > 0) {
     cards.push({
       id: "customerSince",
       label: "Customer since",
@@ -94,6 +94,15 @@ describe("contacts person-file KPI lock", () => {
     );
     assert.deepEqual(
       contactPersonFileKpiCards({
+        interactionCount: 9,
+        visitsDoneCount: 0,
+        firstSeenAt: "2026-09-21T07:00:00+03:00",
+        now,
+      }),
+      [{ id: "interactions", label: "Interactions", value: "9" }]
+    );
+    assert.deepEqual(
+      contactPersonFileKpiCards({
         interactionCount: 0,
         visitsDoneCount: 0,
         firstSeenAt: null,
@@ -109,6 +118,7 @@ describe("contacts person-file KPI lock", () => {
     assert.match(src, /label: "Visits done"/);
     assert.match(src, /interactionCount > 0/);
     assert.match(src, /visitsDoneCount > 0/);
+    assert.match(src, /months != null && months > 0/);
     assert.doesNotMatch(src, /\bOnline\b/);
     assert.doesNotMatch(src, /last seen/);
     assert.doesNotMatch(src, /\bVIP\b/);

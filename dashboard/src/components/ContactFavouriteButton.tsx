@@ -36,12 +36,12 @@ export function ContactFavouriteButton({
         onClick={toggle}
         aria-pressed={favourite}
         className={[
-          "inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium",
+          "inline-flex min-h-11 items-center text-sm font-medium",
           deskShiftClass,
           "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
           favourite
-            ? "bg-[#005CCC] text-white"
-            : "bg-surface-muted text-ink hover:bg-[#0096FF]/10",
+            ? "rounded-full bg-[#005CCC] px-3.5 text-white"
+            : "rounded-md text-[#005CCC] hover:underline",
         ].join(" ")}
       >
         {pending ? (
