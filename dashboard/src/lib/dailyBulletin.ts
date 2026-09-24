@@ -74,6 +74,21 @@ export function eatDateTimeLocal(from = new Date()): string {
   return `${num("year")}-${num("month")}-${num("day")}T${num("hour")}:${num("minute")}`;
 }
 
+export function eatDateLocal(from = new Date()): string {
+  return eatDateTimeLocal(from).slice(0, 10);
+}
+
+export function eatTimeLocal(from = new Date()): string {
+  return eatDateTimeLocal(from).slice(11, 16);
+}
+
+export function joinEatDateTime(date: string, time: string): string {
+  const day = String(date || "").trim();
+  const clock = String(time || "").trim() || "00:00";
+  if (!day) return "";
+  return `${day}T${clock}`;
+}
+
 /** Read a Nairobi `datetime-local` as an instant. */
 export function parseEatDateTimeLocal(raw: string): Date | null {
   const match = EAT_LOCAL.exec(String(raw || "").trim());
@@ -222,6 +237,23 @@ export function formatBulletinWindowLabel(
     return start ? `Starts ${start}. ${endLabel}` : endLabel;
   }
   return endLabel;
+}
+
+export function formatBulletinComposePreview(opts: {
+  expiry: BulletinExpiry;
+  startsLocal?: string;
+  endsLocal?: string;
+  now?: Date;
+}): string {
+  const window = resolveBulletinWindow(opts);
+  if (!window.ok) return window.error;
+  const now = opts.now || new Date();
+  const start = new Date(window.starts_at);
+  const from =
+    !Number.isNaN(start.getTime()) && start > now
+      ? `From ${formatEatStamp(window.starts_at)}`
+      : "From now";
+  return `${from}. ${formatBulletinEndLabel(window.ends_at, now)}.`;
 }
 
 export function canPostBulletin(

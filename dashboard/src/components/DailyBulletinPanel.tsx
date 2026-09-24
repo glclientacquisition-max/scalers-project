@@ -1,13 +1,16 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import {
   deskBulletinItems,
-  eatDateTimeLocal,
+  eatDateLocal,
+  eatTimeLocal,
   endOfEatDay,
+  formatBulletinComposePreview,
   formatBulletinWindowLabel,
+  joinEatDateTime,
   type BulletinExpiry,
   type BulletinItem,
 } from "@/lib/dailyBulletin";
@@ -28,25 +31,33 @@ const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
   { id: "tomorrow", label: "Until tomorrow night" },
   { id: "manual", label: "Until I clear it" },
-  { id: "schedule", label: "Set times" },
+  { id: "schedule", label: "Pick" },
 ];
+
+const START_OPTIONS = [
+  { id: "now", label: "Now" },
+  { id: "later", label: "Later" },
+] as const;
 
 const initial: BulletinActionState = {};
 
-function defaultStartLocal(): string {
-  return eatDateTimeLocal();
-}
-
-function defaultEndLocal(): string {
-  return eatDateTimeLocal(new Date(endOfEatDay()));
+function tonightParts() {
+  const end = new Date(endOfEatDay());
+  return { date: eatDateLocal(end), time: eatTimeLocal(end) };
 }
 
 export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
+  const tonight = tonightParts();
   const [text, setText] = useState("");
   const [expiry, setExpiry] = useState<BulletinExpiry>("today");
-  const [startsLocal, setStartsLocal] = useState(defaultStartLocal);
-  const [endsLocal, setEndsLocal] = useState(defaultEndLocal);
+  const [startWhen, setStartWhen] = useState<(typeof START_OPTIONS)[number]["id"]>(
+    "now"
+  );
+  const [startDate, setStartDate] = useState(eatDateLocal);
+  const [startTime, setStartTime] = useState(eatTimeLocal);
+  const [endDate, setEndDate] = useState(tonight.date);
+  const [endTime, setEndTime] = useState(tonight.time);
   const [items, setItems] = useState<BulletinItem[]>(() =>
     deskBulletinItems(tenant.daily_bulletin)
   );
@@ -57,6 +68,23 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const [clearState, clearAction, clearPending] = useActionState(
     clearBulletinAction,
     initial
+  );
+
+  const startsLocal =
+    expiry === "schedule" && startWhen === "later"
+      ? joinEatDateTime(startDate, startTime)
+      : "";
+  const endsLocal =
+    expiry === "schedule" ? joinEatDateTime(endDate, endTime) : "";
+
+  const preview = useMemo(
+    () =>
+      formatBulletinComposePreview({
+        expiry,
+        startsLocal,
+        endsLocal,
+      }),
+    [expiry, startsLocal, endsLocal]
   );
 
   useEffect(() => {
@@ -84,6 +112,8 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
+        <input type="hidden" name="starts_at" value={startsLocal} />
+        <input type="hidden" name="ends_at" value={endsLocal} />
         <SettingsGroup title="Callers hear">
           <div className="flex min-w-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
@@ -111,50 +141,76 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
         </SettingsGroup>
 
         <SettingsSegmented
-          label="Update duration"
+          label="Until"
           value={expiry}
           options={EXPIRY_OPTIONS}
           onChange={setExpiry}
         />
 
         {expiry === "schedule" ? (
-          <SettingsGroup title="Timeline">
-            <div className="grid min-w-0 grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-2">
-              <div className="min-w-0">
-                <label
-                  htmlFor="bulletin_starts_at"
-                  className="text-xs font-medium uppercase tracking-wide text-ink-soft"
-                >
-                  Starts
+          <div className="min-w-0 space-y-3">
+            <div className="min-w-0 space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                From
+              </p>
+              <SettingsSegmented
+                label="From"
+                value={startWhen}
+                options={START_OPTIONS}
+                onChange={setStartWhen}
+              />
+              {startWhen === "later" ? (
+                <div className="grid min-w-0 grid-cols-2 gap-2">
+                  <label className="min-w-0">
+                    <span className="sr-only">Start date</span>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className={`${settingsFieldClass} mt-0 min-w-0`}
+                    />
+                  </label>
+                  <label className="min-w-0">
+                    <span className="sr-only">Start time</span>
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className={`${settingsFieldClass} mt-0 min-w-0`}
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+            <div className="min-w-0 space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                Until
+              </p>
+              <div className="grid min-w-0 grid-cols-2 gap-2">
+                <label className="min-w-0">
+                  <span className="sr-only">End date</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className={`${settingsFieldClass} mt-0 min-w-0`}
+                  />
                 </label>
-                <input
-                  id="bulletin_starts_at"
-                  name="starts_at"
-                  type="datetime-local"
-                  value={startsLocal}
-                  onChange={(e) => setStartsLocal(e.target.value)}
-                  className={`${settingsFieldClass} min-w-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label
-                  htmlFor="bulletin_ends_at"
-                  className="text-xs font-medium uppercase tracking-wide text-ink-soft"
-                >
-                  Ends
+                <label className="min-w-0">
+                  <span className="sr-only">End time</span>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className={`${settingsFieldClass} mt-0 min-w-0`}
+                  />
                 </label>
-                <input
-                  id="bulletin_ends_at"
-                  name="ends_at"
-                  type="datetime-local"
-                  value={endsLocal}
-                  onChange={(e) => setEndsLocal(e.target.value)}
-                  className={`${settingsFieldClass} min-w-0`}
-                />
               </div>
             </div>
-          </SettingsGroup>
+          </div>
         ) : null}
+
+        <p className="px-1 text-sm text-ink-soft">{preview}</p>
       </form>
 
       {items.length === 0 ? (

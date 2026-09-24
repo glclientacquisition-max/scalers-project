@@ -18,6 +18,13 @@ function parseEatDateTimeLocal(raw) {
   return Number.isNaN(instant.getTime()) ? null : instant;
 }
 
+function joinEatDateTime(date, time) {
+  const day = String(date || "").trim();
+  const clock = String(time || "").trim() || "00:00";
+  if (!day) return "";
+  return `${day}T${clock}`;
+}
+
 function resolveBulletinWindow(opts) {
   const now = opts.now || new Date();
   if (opts.expiry !== "schedule") {
@@ -65,14 +72,20 @@ describe("daily bulletin window", () => {
     });
     assert.equal(openEnd.ok, true);
     assert.equal(openEnd.ends_at, null);
+    assert.equal(
+      joinEatDateTime("2026-09-26", "14:00"),
+      "2026-09-26T14:00"
+    );
   });
 
-  it("posts starts_at and ends_at from Set times and lists scheduled rows on the desk", () => {
+  it("posts starts_at and ends_at from Pick using date and time fields", () => {
     const lib = read("dashboard/src/lib/dailyBulletin.ts");
     const actions = read("dashboard/src/app/(desk)/settings/bulletinActions.ts");
     const panel = read("dashboard/src/components/DailyBulletinPanel.tsx");
     assert.match(lib, /export type BulletinExpiry = .*\| "schedule"/);
     assert.match(lib, /export function parseEatDateTimeLocal/);
+    assert.match(lib, /export function joinEatDateTime/);
+    assert.match(lib, /export function formatBulletinComposePreview/);
     assert.match(lib, /export function resolveBulletinWindow/);
     assert.match(lib, /export function deskBulletinItems/);
     assert.match(lib, /export function formatBulletinWindowLabel/);
@@ -81,14 +94,15 @@ describe("daily bulletin window", () => {
     assert.match(actions, /formData.get\("ends_at"\)/);
     assert.match(actions, /deskBulletinItems/);
     assert.match(actions, /Update is set\. Callers hear it after the start\./);
-    assert.match(panel, /id: "schedule", label: "Set times"/);
-    assert.match(panel, /type="datetime-local"/);
+    assert.match(panel, /id: "schedule", label: "Pick"/);
+    assert.match(panel, /label: "Now"/);
+    assert.match(panel, /label: "Later"/);
+    assert.match(panel, /type="date"/);
+    assert.match(panel, /type="time"/);
+    assert.doesNotMatch(panel, /datetime-local/);
     assert.match(panel, /name="starts_at"/);
     assert.match(panel, /name="ends_at"/);
-    assert.match(panel, /htmlFor="bulletin_starts_at"/);
-    assert.match(panel, /htmlFor="bulletin_ends_at"/);
-    assert.match(panel, /\bStarts\b/);
-    assert.match(panel, /\bEnds\b/);
+    assert.match(panel, /formatBulletinComposePreview/);
     assert.match(panel, /deskBulletinItems/);
     assert.match(panel, /formatBulletinWindowLabel/);
     assert.doesNotMatch(panel, /[\u2014\u2013]/);
