@@ -70,6 +70,23 @@ export function RowStateDot({ show, live }: { show: boolean; live?: boolean }) {
   );
 }
 
+/** Muted thumbtack next to time. Inbox pin only. Not Favourites. Not a hit. */
+export function InboxPinMark({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span
+      data-inbox-pin=""
+      role="img"
+      aria-label="Pinned"
+      className="inline-flex h-3.5 w-3.5 shrink-0 text-ink-soft"
+    >
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-full w-full">
+        <path d="M5.2 1.6h5.6c.4 0 .7.3.7.7v1.1c0 1.4-.8 2.6-2 3.2v.6h1.4v1.2H8.7V14.4H7.3V8.4H5.3V7.2h1.4v-.6c-1.2-.6-2-1.8-2-3.2V2.3c0-.4.3-.7.7-.7Z" />
+      </svg>
+    </span>
+  );
+}
+
 /** Name/headline weight: semibold while unread, medium once opened. */
 export function deskRowWeightClass(unread: boolean): string {
   return unread ? "font-semibold text-ink" : "font-medium text-ink";
