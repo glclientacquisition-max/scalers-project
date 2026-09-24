@@ -167,24 +167,49 @@ function sautikitSendLooksFailed(status, json) {
   return false;
 }
 
-async function postWhatsAppMessage(payload) {
-  const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
-  if (sautikitSendLooksFailed(status, json)) {
-    throwWhatsAppSendError(status, json, text);
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sautikitTransient(status, err) {
+  const code = Number(status || err?.status);
+  return code === 502 || code === 503 || code === 504 || err?.reason === 'upstream';
+}
+
+async function postWhatsAppMessage(payload, { tries = 3 } = {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= tries; attempt += 1) {
+    try {
+      const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
+      if (sautikitSendLooksFailed(status, json)) {
+        if (sautikitTransient(status) && attempt < tries) {
+          console.warn(`[whatsapp] send ${status} upstream; retry ${attempt}/${tries}`);
+          await sleep(250 * attempt);
+          continue;
+        }
+        throwWhatsAppSendError(status, json, text);
+      }
+      const messageId = whatsAppMessageId(json);
+      console.log(
+        '[whatsapp] send accepted',
+        JSON.stringify({
+          to: payload.to,
+          type: payload.type,
+          template: payload.template?.name || null,
+          language: payload.template?.language_code || null,
+          status,
+          messageId,
+        })
+      );
+      return json && typeof json === 'object' ? { ...json, messageId } : { messageId, raw: json };
+    } catch (err) {
+      lastErr = err;
+      if (!sautikitTransient(err.status, err) || attempt >= tries) throw err;
+      console.warn(`[whatsapp] send failed (${err.reason || err.status}); retry ${attempt}/${tries}`);
+      await sleep(250 * attempt);
+    }
   }
-  const messageId = whatsAppMessageId(json);
-  console.log(
-    '[whatsapp] send accepted',
-    JSON.stringify({
-      to: payload.to,
-      type: payload.type,
-      template: payload.template?.name || null,
-      language: payload.template?.language_code || null,
-      status,
-      messageId,
-    })
-  );
-  return json && typeof json === 'object' ? { ...json, messageId } : { messageId, raw: json };
+  throw lastErr;
 }
 
 function templateSendRetryable(err) {

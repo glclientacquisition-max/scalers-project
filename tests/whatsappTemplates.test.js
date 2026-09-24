@@ -362,6 +362,32 @@ describe('staff WhatsApp templates', () => {
     );
   });
 
+  it('retries a SautiKit 502 before giving up', async () => {
+    process.env.SAUTIKIT_API_KEY = 'k';
+    process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
+    let hits = 0;
+    mock.method(global, 'fetch', async () => {
+      hits += 1;
+      if (hits < 3) {
+        return { ok: false, status: 502, text: async () => '<!DOCTYPE html> bad gateway' };
+      }
+      return {
+        ok: true,
+        status: 202,
+        text: async () => JSON.stringify({ messages: [{ id: 'wamid.RETRY' }] }),
+      };
+    });
+    const json = await sendOwnerWhatsApp({
+      to: '254711000000',
+      kind: 'escalation',
+      windowOpen: false,
+      body: 'Escalation for Wanjiku. Shop\nCaller: Jane',
+      lead: { businessName: 'Shop', name: 'Jane', callerNumber: '254711', reason: 'Ask' },
+    });
+    assert.equal(hits, 3);
+    assert.equal(json.messageId, 'wamid.RETRY');
+  });
+
   it('retries the approved first template when the kind name is missing', async () => {
     process.env.SAUTIKIT_API_KEY = 'k';
     process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
