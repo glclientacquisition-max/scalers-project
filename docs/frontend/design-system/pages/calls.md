@@ -9,7 +9,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Chrome:** Large in-page Inbox title (`deskListTitleClass`). Not sticky. No product wordmark. Needs you count overlays the Inbox nav icon (`formatAttentionCount`, `9+` at 10, ribbon `from-accent to-accent-fill`). Search field, then purpose pills. The field is the control (`type="search"`). Typing filters the in-memory tape with `itemMatchesQuery`. `router.replace` syncs shareable `?q=` after a debounce. Nested Archived keeps its compact title. Nested tickets do not render Inbox as a page title. Search placeholder matches the niche.
 
-**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Tap the identity circle to open the contact. No Open or View link. Blue unread dot and bold preview when a customer event (inbound call, hold, or visit from the caller) is newer than `calls.inbox_read_at`. Opening `/calls/[id]` stamps that field. Needs you stays a pile. The nav badge stays Needs you count (`countInboxPurposes(items).needs`). Confirm, hold Done, Mark done, and Archive drop the badge, not the open.
+**Row (one recipe):** iOS Mail + Material list + WhatsApp. Who first. Work second. Stamp or time as meta. Trailing slot holds **one** primary verb. Tap the row (name, work, stamp, time) to open the conversation. Tap the identity circle to open the contact. No Open or View link. Blue unread dot and bold preview when a customer event (inbound call, hold, or visit from the caller) is newer than `calls.inbox_read_at`. Opening `/calls/[id]` stamps that field. Owner Pin writes `inbox_pinned_at`, sorts the row to the top of the current pile, and shows `InboxPinMark` (muted thumbtack) next to time. Not auto-pin. Not Contacts Favourites. Needs you stays a pile. The nav badge stays Needs you count (`countInboxPurposes(items).needs`). Confirm, hold Done, Mark done, and Archive drop the badge, not the open.
 
 **Phone mixed:** Who left, time right, one work preview. No stamp chip under the preview. Stamp lives in the table Needed column. Needs you may add one next-step line under Work.
 
@@ -26,7 +26,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 - No number: empty.
 - Not in this cell: Open, View, Send SMS, email, Archive. SMS stays on the call when Text customers is on.
 
-**Overflow (md+ More, right-click):** Pin / Unpin. Mark done on a return call (`inboxCanMarkDone`). Archive on live rows. Unarchive on Archived. Hairline between stay and leave. No Select (checkboxes are already visible). Never Snooze or Unread. Hover More on desktop. More is `hidden md:inline-flex`. Long-press on phone enters bulk select. It does not open a contact-named sheet. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp.
+**Overflow (md+ More, right-click):** Pin / Unpin. Mark done on a return call (`inboxCanMarkDone`). Archive on live rows. Unarchive on Archived. Hairline between stay and leave. No Select (checkboxes are already visible). Never Snooze or Unread. Hover More on desktop. More is `hidden md:inline-flex`. Long-press on phone enters bulk select. It does not open a contact-named sheet. The dock stays Confirm, Done, or Call plus WhatsApp. More sits left of that dock. The desktop menu right-aligns to More and flips up in a short viewport so it never covers Call or WhatsApp. After Pin, the thumbtack sits with the timestamp on table and phone rows.
 
 Not list verbs: Select, Snooze, Mute, Assign, Label, Delete, Mark unread. Bulk header bar: Close, count, then only verbs true for every selected row. Archive if none are archived. Unarchive if all are archived. Confirm if every row is a requested visit. Hold Done if every row is an open hold. Mark done if every row passes `inboxCanMarkDone`. Pin stays on the row overflow. Mixed selection can show only Close. Archive also shows that Undo toast. No More sheet on the bulk bar.
 
@@ -84,6 +84,7 @@ Columns (`lg+` table, same data as the phone row; phone rows stay through `md` s
 **Icons (Inbox only):**
 - WhatsApp glyph, green on white, `h-12 w-12`, `rounded-xl`. Only when WhatsApp is the row verb (return call).
 - Call glyph (`CallLink`): rounded handset in brand blue, light accent wash, `h-12 w-12`. Sits left of WhatsApp. Never a filled primary. Never a desk-telephone silhouette.
+- Pin mark (`InboxPinMark`): muted thumbtack next to time when pinned. Not a 44px hit. Not the Contacts Favourites star.
 - No icon pack. No decorative row icons. Stamps stay words (Confirm visit, Pickup, Human asked).
 - Confirm / Done / Call / WhatsApp are `h-12 w-12`. List: that verb only. Call detail uses the same hit on the ticket action dock (Mark done, Call, WhatsApp, Ping). Transcript is the right pane from `lg`; stack below `lg`. Icon-only Call, WhatsApp, More, Back, and Send name themselves on hover (`DeskHint`).
 

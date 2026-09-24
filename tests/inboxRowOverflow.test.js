@@ -104,9 +104,14 @@ describe("inbox row overflow menu", () => {
     assert.doesNotMatch(overflow, /close\(\);\n    router.refresh/);
   });
 
-  it("does not render Pin UI on the list", () => {
-    assert.doesNotMatch(row, /InboxPinMark/);
+  it("marks pinned rows next to time, not as Favourites", () => {
+    const mark = read("dashboard/src/components/ui/deskRow.tsx");
+    assert.match(row, /InboxPinMark show=\{Boolean\(item\.pinnedAt\)\}/);
+    assert.match(mark, /export function InboxPinMark/);
+    assert.match(mark, /data-inbox-pin/);
+    assert.match(mark, /aria-label="Pinned"/);
     assert.doesNotMatch(row, /Favorites/);
+    assert.doesNotMatch(row, /favourite_at/);
   });
 
   it("right-aligns More to the trigger instead of covering Call and WhatsApp", () => {
