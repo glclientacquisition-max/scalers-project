@@ -4,7 +4,7 @@ import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
 import { ContactNameForm } from "@/components/ContactNameForm";
 import { ContactKpiStrip } from "@/components/ContactKpiStrip";
 import { RowIdentity } from "@/components/ui/deskRow";
-import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import {
   contactPersonFileKpiCards,
@@ -30,7 +30,7 @@ export default function DevContactFilePage() {
   });
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+    <div className={deskShellClass}>
       <DeskRail needsCount={0} homeHref="/dev/contacts" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>
