@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useInboxRowLocal } from "@/components/InboxRowUi";
 import { CallLink } from "@/components/CallLink";
 import { InboxJobActions } from "@/components/InboxJobActions";
 import { InboxPurposeChip } from "@/components/InboxPurposeChip";
@@ -103,10 +106,12 @@ function InboxWhenMeta({
   className?: string;
   textClassName?: string;
 }) {
+  const [local] = useInboxRowLocal(item.id);
+  const pinnedAt = local.pinnedAt === undefined ? item.pinnedAt : local.pinnedAt;
   return (
     <span className={className}>
       <RowStateDot show={item.unread} live={live} />
-      <InboxPinMark show={Boolean(item.pinnedAt)} />
+      <InboxPinMark show={Boolean(pinnedAt)} />
       <span className={textClassName}>{text}</span>
     </span>
   );

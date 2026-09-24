@@ -23,6 +23,7 @@ import {
 
 export type InboxRowLocal = {
   hidden: boolean;
+  pinnedAt?: string | null;
 };
 
 const EMPTY: InboxRowLocal = {

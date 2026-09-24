@@ -28,6 +28,7 @@ import {
 } from "@/lib/inboxLeadActions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import {
+  inboxItemWithLocal,
   inboxOverflowActions,
   type InboxListAction,
   type InboxListActionId,
@@ -134,8 +135,9 @@ export function InboxRowShell({
     busyRef.current = true;
     setPendingId(id);
     setError(null);
+    const view = inboxItemWithLocal(item, local);
     let res: { error?: string; ok?: boolean } = { ok: true };
-    if (id === "pin" || id === "unpin") res = await inboxTogglePin(item);
+    if (id === "pin" || id === "unpin") res = await inboxTogglePin(view);
     if (id === "mark_done") res = await inboxMarkDone(item);
     if (id === "archive") res = await inboxArchive(item);
     if (id === "unarchive") res = await inboxUnarchive(item);
@@ -151,11 +153,13 @@ export function InboxRowShell({
     if (id === "archive" || id === "unarchive") {
       patch({ hidden: true });
     }
+    if (id === "pin") patch({ pinnedAt: new Date().toISOString() });
+    if (id === "unpin") patch({ pinnedAt: null });
     setOpen(false);
     router.refresh();
   };
 
-  const actions: OverflowAction[] = inboxOverflowActions(item);
+  const actions: OverflowAction[] = inboxOverflowActions(inboxItemWithLocal(item, local));
 
   if (local.hidden) return null;
 
@@ -235,8 +239,9 @@ export function InboxRowShell({
 export function InboxRowMore({ item }: { item: InboxItem }) {
   const menu = useInboxRowMenu();
   const ui = useInboxRowUi();
+  const [local] = useInboxRowLocal(item.id);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const actions = inboxOverflowActions(item);
+  const actions = inboxOverflowActions(inboxItemWithLocal(item, local));
   if (!menu || ui?.selecting || actions.length === 0) return null;
   return (
     <DeskHint label="More" side="top">
