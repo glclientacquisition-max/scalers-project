@@ -20,7 +20,7 @@ describe("contacts chrome pill ACCEPT", () => {
   const timeline = read("dashboard/src/components/ContactTimeline.tsx");
 
   it("lands the ACCEPT spec without Funnel, VIP, Online, or Inbox purpose nouns", () => {
-    assert.match(accept, /All · Saved · Unsaved/);
+    assert.match(accept, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(accept, /InboxFilterPills/);
     assert.match(accept, /top Call and WhatsApp icons/);
     assert.match(accept, /opened only/i);
@@ -28,7 +28,7 @@ describe("contacts chrome pill ACCEPT", () => {
     assert.doesNotMatch(accept, /[\u2014\u2013]/);
     assert.doesNotMatch(note, /[\u2014\u2013]/);
     assert.match(note, /InboxFilterPills/);
-    assert.match(note, /All · Saved · Unsaved/);
+    assert.match(note, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(master, /Contacts segments/);
   });
 
@@ -36,9 +36,13 @@ describe("contacts chrome pill ACCEPT", () => {
     const purposeCall = page.match(/<InboxFilterPills[\s\S]*?\/>/);
     assert.ok(purposeCall, "Contacts segments are InboxFilterPills");
     assert.match(purposeCall[0], /label="Filter contacts"/);
-    assert.match(purposeCall[0], /label: "All"/);
-    assert.match(purposeCall[0], /label: "Saved"/);
-    assert.match(purposeCall[0], /label: "Unsaved"/);
+    assert.match(purposeCall[0], /contactFilterPills/);
+    const load = read("dashboard/src/lib/contactsLoad.ts");
+    assert.match(load, /label: "All"/);
+    assert.match(load, /label: "Recents"/);
+    assert.match(load, /label: "Favourites"/);
+    assert.match(load, /label: "Saved"/);
+    assert.match(load, /label: "Unsaved"/);
     assert.doesNotMatch(purposeCall[0], /label: "Needs you"/);
     assert.doesNotMatch(purposeCall[0], /label: "Visits"/);
     assert.doesNotMatch(purposeCall[0], /label: "Holds"/);

@@ -6,7 +6,7 @@
 
 ## Product lock (binding, 2026-09-21)
 
-- Contacts segment **nouns** stay **All · Saved · Unsaved**. Sort stays underline `FilterTabs` (Last call · Name), same family as Inbox List/Work.
+- Contacts segment **nouns** stay **All · Recents · Favourites · Saved · Unsaved** on one `InboxFilterPills` row. Sort stays `ContactSortSelect` (Last call · Name).
 - Segment **chrome** is the Inbox purpose pill-chip (`InboxFilterPills`) per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** copy Inbox purpose nouns (Needs you / Visits / Holds / …). Those stay Inbox-only.
 - Critic: PASS if chrome-only. Hard bans: no Online, last seen, or presence; Call/WA opened never delivered; no `lead_status` invent.
 
@@ -17,10 +17,10 @@
 | Surface | Behavior |
 | --- | --- |
 | **Inbox** | Purpose piles are `InboxFilterPills` (Needs you / All / Visits / Holds / …). **List/Work** and **Today/Week** are underline `FilterTabs`. |
-| **Contacts** | Pill chips (`InboxFilterPills`) with **All · Saved · Unsaved** (`saved=` query). `aria-label` Filter contacts. Sort is underline `FilterTabs`. List → `/contacts/[id]` profile. Call/WA on rows = **opened** only. |
+| **Contacts** | Pill chips (`InboxFilterPills`) with **All · Recents · Favourites · Saved · Unsaved** (`saved=` query). `aria-label` Filter contacts. Recents and Favourites on that row. Unsaved once. Sort is `ContactSortSelect`. List → `/contacts/[id]` profile. Call/WA on rows = **opened** only. |
 | **Gap founder feels** | Contacts segments must feel identical to Inbox purpose chips (one desk pill language), not a second underline skin and not Inbox purpose nouns. Click-through must be a clear ops path, not a dead end. |
 
-Phase 1 ACCEPT already required search+sort and Recent/Unsaved quick rows. This brief locks **All · Saved · Unsaved nouns** plus click-through. Segment chrome is the Inbox purpose pill (`CONTACTS_CHROME_PILL_ACCEPT.md`). Recent is sort (Last call), not a segment. Recents and Favourites are strip counts on the list, not pill nouns and not `DESK_LINKS`.
+Phase 1 ACCEPT already required search+sort. This brief locks **All · Recents · Favourites · Saved · Unsaved** on one chip row plus click-through. Segment chrome is the Inbox purpose pill (`CONTACTS_CHROME_PILL_ACCEPT.md`). Last call is sort, not a second Recent chip. Not `DESK_LINKS`.
 
 ## Problem
 
@@ -34,8 +34,8 @@ Owner switches Contacts piles with the same filled-pill chrome as Inbox purpose.
 
 ### A. One segment pattern (desk-wide)
 
-1. Contacts filters use the **same pill-chip DESIGN** as the Inbox purpose row (`InboxFilterPills`). Nouns stay **All · Saved · Unsaved**. Not a slider skin. Not Inbox purpose nouns.  
-2. Contacts segment set: **All · Saved · Unsaved** only.  
+1. Contacts filters use the **same pill-chip DESIGN** as the Inbox purpose row (`InboxFilterPills`). Nouns stay **All · Recents · Favourites · Saved · Unsaved**. Not a slider skin. Not Inbox purpose nouns.  
+2. Contacts segment set: one row. Unsaved once. No second pile strip.  
 3. Copy: aria/label plain (“Filter contacts”), no em dashes, no “last seen” / Online.  
 4. Sort (Last call / Name) if present: same FilterTabs family; must not invent presence.
 

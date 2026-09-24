@@ -136,12 +136,13 @@ describe("contacts list Phase 1 chrome", () => {
   });
 
   it("keeps Unsaved as a Contacts pile, not Invite Friends", () => {
-    assert.match(page, /label: "Unsaved"/);
-    assert.doesNotMatch(page, /label: "Recent"/);
+    assert.match(page, /contactFilterPills/);
+    assert.match(load, /label: "Unsaved"/);
+    assert.match(load, /label: "Recents"/);
     assert.doesNotMatch(page, /ContactQuickPhoneRow|ContactQuickTableRow/);
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(search, /Invite Friends/);
-    assert.match(note, /All · Saved · Unsaved only/);
+    assert.match(note, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(accept, /pill-chip items/);
   });
 

@@ -16,13 +16,11 @@ import {
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
-import { ContactPileStrip } from "@/components/ContactPileStrip";
 import { ContactSortSelect } from "@/components/ContactSortSelect";
 import {
+  contactFilterPills,
   contactProfileHref,
-  contactsFavouritesHref,
   contactsHref,
-  contactsRecentsHref,
   loadContactPileCounts,
   loadContactsPage,
   resolveContactSavedFilter,
@@ -112,37 +110,18 @@ export default async function ContactsPage({
             </div>
           </div>
         </DeskIndexLead>
-        <ContactPileStrip
-          recents={piles.recents}
-          favourites={piles.favourites}
-          unsaved={piles.unsaved}
-          recentsHref={contactsRecentsHref({ sort, q: q || undefined })}
-          favouritesHref={contactsFavouritesHref({ sort, q: q || undefined })}
-          unsavedHref={contactsHref({ saved: "unsaved", sort, q: q || undefined })}
-          active={saved}
-        />
         <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0 flex-1">
             <InboxFilterPills
               label="Filter contacts"
               active={saved}
-              items={[
-                {
-                  id: "all",
-                  label: "All",
-                  href: contactsHref({ sort, q: q || undefined }),
-                },
-                {
-                  id: "saved",
-                  label: "Saved",
-                  href: contactsHref({ saved: "saved", sort, q: q || undefined }),
-                },
-                {
-                  id: "unsaved",
-                  label: "Unsaved",
-                  href: contactsHref({ saved: "unsaved", sort, q: q || undefined }),
-                },
-              ]}
+              items={contactFilterPills({
+                sort,
+                q: q || undefined,
+                recents: piles.recents,
+                favourites: piles.favourites,
+                unsaved: piles.unsaved,
+              })}
             />
           </div>
           <ContactSortSelect saved={saved} sort={sort} q={q} />

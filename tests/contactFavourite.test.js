@@ -55,7 +55,7 @@ describe("contact favourite metadata", () => {
 
 describe("contacts recents and favourites rate cards", () => {
   const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
-  const cards = read("dashboard/src/components/ContactPileStrip.tsx");
+  const load = read("dashboard/src/lib/contactsLoad.ts");
   const profile = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
   const button = read("dashboard/src/components/ContactFavouriteButton.tsx");
   const actions = read("dashboard/src/app/(desk)/contacts/actions.ts");
@@ -63,22 +63,23 @@ describe("contacts recents and favourites rate cards", () => {
   const note = read("docs/frontend/design-system/pages/contacts.md");
   const nav = read("dashboard/src/components/DeskNav.tsx");
 
-  it("keeps All Saved Unsaved pills and puts Recents Favourites on rate cards", () => {
+  it("puts Recents Favourites Saved Unsaved on one Inbox filter row", () => {
     assert.match(page, /<InboxFilterPills/);
-    assert.match(page, /label: "All"/);
-    assert.match(page, /label: "Saved"/);
-    assert.match(page, /label: "Unsaved"/);
-    assert.doesNotMatch(page, /label: "Recent"/);
-    assert.doesNotMatch(page, /saved: "recent"/);
-    assert.match(page, /<ContactPileStrip/);
-    assert.match(page, /contactsRecentsHref/);
-    assert.match(page, /contactsFavouritesHref/);
-    assert.match(cards, /label: "recent"/);
-    assert.match(cards, /label: "favourites"/);
-    assert.match(cards, /data-contact-pile-strip/);
-    assert.match(note, /All · Saved · Unsaved only/);
-    assert.match(note, /ContactPileStrip/);
-    assert.match(note, /No Recent tab/);
+    assert.match(page, /contactFilterPills/);
+    assert.doesNotMatch(page, /<ContactPileStrip/);
+    assert.ok(
+      !fs.existsSync(path.join(__dirname, "..", "dashboard/src/components/ContactPileStrip.tsx")),
+      "duplicate pile strip is gone"
+    );
+    assert.match(load, /label: "All"/);
+    assert.match(load, /label: "Recents"/);
+    assert.match(load, /label: "Favourites"/);
+    assert.match(load, /label: "Saved"/);
+    assert.match(load, /label: "Unsaved"/);
+    assert.equal((load.match(/label: "Unsaved"/g) || []).length, 1);
+    assert.match(note, /All · Recents · Favourites · Saved · Unsaved/);
+    assert.match(note, /Unsaved appears once/);
+    assert.doesNotMatch(note, /No Recent tab/);
     assert.doesNotMatch(nav, /Favourites|Recents/);
   });
 

@@ -155,7 +155,7 @@ describe("contacts person-file chrome", () => {
     assert.match(accept, /Interactions/);
     assert.match(accept, /Visits done/);
     assert.match(accept, /Customer since/);
-    assert.match(accept, /All · Saved · Unsaved/);
+    assert.match(accept, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(accept, /opened-only/);
     assert.match(accept, /inboxRecordHref/);
     assert.match(accept, /Hide when 0/);
@@ -198,9 +198,7 @@ describe("contacts person-file chrome", () => {
   it("keeps Contacts list nouns as All Saved Unsaved, not Inbox purpose nouns", () => {
     assert.match(page, /<InboxFilterPills/);
     assert.match(page, /label="Filter contacts"/);
-    assert.match(page, /label: "All"/);
-    assert.match(page, /label: "Saved"/);
-    assert.match(page, /label: "Unsaved"/);
+    assert.match(page, /contactFilterPills/);
     assert.match(page, /<ContactSortSelect/);
     assert.doesNotMatch(page, /Needs you/);
     assert.doesNotMatch(page, /label: "Human"/);
