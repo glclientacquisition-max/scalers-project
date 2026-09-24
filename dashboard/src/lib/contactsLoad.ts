@@ -94,7 +94,7 @@ export function contactsHref(opts: {
   return qs ? `/contacts?${qs}` : "/contacts";
 }
 
-/** Recents pile. Not a pill noun. */
+/** Recents filter. Same chip row as All. */
 export function contactsRecentsHref(opts: {
   sort?: ContactSort;
   q?: string;
@@ -103,13 +103,55 @@ export function contactsRecentsHref(opts: {
   return contactsHref({ ...opts, saved: "recent" });
 }
 
-/** Favourites pile. Not a pill noun. */
+/** Favourites filter. Same chip row as All. */
 export function contactsFavouritesHref(opts: {
   sort?: ContactSort;
   q?: string;
   page?: number;
 }): string {
   return contactsHref({ ...opts, saved: "favourite" });
+}
+
+/** One Contacts filter row. Recents and Favourites live here. Unsaved once. */
+export function contactFilterPills(opts: {
+  sort?: ContactSort;
+  q?: string;
+  recents?: number;
+  favourites?: number;
+  unsaved?: number;
+}): Array<{
+  id: ContactSavedFilter;
+  label: string;
+  href: string;
+  count?: number;
+}> {
+  const query = { sort: opts.sort, q: opts.q };
+  return [
+    { id: "all", label: "All", href: contactsHref(query) },
+    {
+      id: "recent",
+      label: "Recents",
+      href: contactsRecentsHref(query),
+      count: opts.recents,
+    },
+    {
+      id: "favourite",
+      label: "Favourites",
+      href: contactsFavouritesHref(query),
+      count: opts.favourites,
+    },
+    {
+      id: "saved",
+      label: "Saved",
+      href: contactsHref({ ...query, saved: "saved" }),
+    },
+    {
+      id: "unsaved",
+      label: "Unsaved",
+      href: contactsHref({ ...query, saved: "unsaved" }),
+      count: opts.unsaved,
+    },
+  ];
 }
 
 export type ContactsListReturn = {

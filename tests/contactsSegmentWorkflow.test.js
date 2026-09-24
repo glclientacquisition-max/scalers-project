@@ -101,7 +101,7 @@ describe("contacts segment filter chrome", () => {
   const dev = read("dashboard/src/app/dev/contacts/page.tsx");
 
   it("lands the ACCEPT spec and uses Inbox pill chips for segments, not a slider skin", () => {
-    assert.match(accept, /All · Saved · Unsaved/);
+    assert.match(accept, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(accept, /Filter contacts/);
     assert.match(accept, /segment preserved/);
     assert.match(accept, /opened only/);
@@ -127,22 +127,22 @@ describe("contacts segment filter chrome", () => {
   });
 
   it("segments All, Saved, and Unsaved as pill-chip items", () => {
-    assert.match(page, /label: "All"/);
-    assert.match(page, /label: "Saved"/);
-    assert.match(page, /label: "Unsaved"/);
-    assert.doesNotMatch(page, /label: "Recent"/);
+    assert.match(page, /contactFilterPills/);
     assert.match(page, /active=\{saved\}/);
-    assert.match(page, /saved: "saved"/);
-    assert.match(page, /saved: "unsaved"/);
-    assert.doesNotMatch(page, /saved: "recent"/);
+    const load = read("dashboard/src/lib/contactsLoad.ts");
+    assert.match(load, /label: "All"/);
+    assert.match(load, /label: "Saved"/);
+    assert.match(load, /label: "Unsaved"/);
+    assert.match(load, /label: "Recents"/);
+    assert.match(load, /saved: "recent"/);
     assert.doesNotMatch(page, /ContactQuickPhoneRow|ContactQuickTableRow|ContactQuickRow/);
     assert.doesNotMatch(dev, /ContactQuickPhoneRow|ContactQuickTableRow/);
-    assert.doesNotMatch(dev, /label: "Recent"/);
+    assert.match(dev, /contactFilterPills/);
     assert.equal(
       fs.existsSync(path.join(__dirname, "../dashboard/src/components/ContactQuickRow.tsx")),
       false
     );
-    assert.match(note, /All · Saved · Unsaved only/);
+    assert.match(note, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(note, /Last call/);
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(page, /[\u2014\u2013]/);

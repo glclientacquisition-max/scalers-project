@@ -6,7 +6,6 @@ import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactActionDock } from "@/components/ContactActionDock";
 import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
 import { ContactKpiStrip } from "@/components/ContactKpiStrip";
-import { ContactPileStrip } from "@/components/ContactPileStrip";
 import { ContactSortSelect } from "@/components/ContactSortSelect";
 import { RowIdentity } from "@/components/ui/deskRow";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
@@ -23,7 +22,12 @@ import {
   contactPersonFileKpiCards,
   pickFirstSeenAt,
 } from "@/lib/contactPersonFile";
-import { contactLastCallFact, type ContactListRow, type ContactTimelineEntry } from "@/lib/contactsLoad";
+import {
+  contactFilterPills,
+  contactLastCallFact,
+  type ContactListRow,
+  type ContactTimelineEntry,
+} from "@/lib/contactsLoad";
 
 export const dynamic = "force-dynamic";
 
@@ -208,24 +212,15 @@ export default function DevContactsPage() {
                   </div>
                 </div>
               </DeskIndexLead>
-              <ContactPileStrip
-                recents={2}
-                favourites={1}
-                unsaved={1}
-                recentsHref="/dev/contacts"
-                favouritesHref="/dev/contacts"
-                unsavedHref="/dev/contacts"
-                active="all"
-              />
               <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <InboxFilterPills
                   label="Filter contacts"
                   active="all"
-                  items={[
-                    { id: "all", label: "All", href: "/dev/contacts", count: DEV_ROWS.length },
-                    { id: "saved", label: "Saved", href: "/dev/contacts", count: 1 },
-                    { id: "unsaved", label: "Unsaved", href: "/dev/contacts", count: 1 },
-                  ]}
+                  items={contactFilterPills({
+                    recents: 2,
+                    favourites: 1,
+                    unsaved: 1,
+                  }).map((item) => ({ ...item, href: "/dev/contacts" }))}
                 />
                 <ContactSortSelect saved="all" sort="recent" q="" />
               </div>
