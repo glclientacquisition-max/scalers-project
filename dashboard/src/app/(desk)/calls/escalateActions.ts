@@ -113,6 +113,10 @@ export async function pingTeammateAction(opts: {
       | null;
     revalidatePath(`/calls/${callId}`);
 
+    if (String(json?.reason || "") === "instance_already_sent") {
+      return { ok: true, line: "Already pinged this ticket." };
+    }
+
     if (!res.ok || !json?.ok) {
       const delivery = formatEscalationDelivery({
         escalated_to: { name: teammate.name, role: teammate.role, phone: teammate.phone },

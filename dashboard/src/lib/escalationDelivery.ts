@@ -56,6 +56,10 @@ export function formatEscalationDelivery(
     };
     const channels = liveChannels(row.channels);
     const stage = String(row.stage || "");
+    const reason = String((row as { reason?: unknown }).reason || "").trim();
+    if (reason === "instance_already_sent") {
+      return { state: "sent", line: "Already pinged this ticket." };
+    }
     if (row.ok === true && row.soft !== true && stage === "notified" && channels.length) {
       const bits = channels.map((item) => {
         const label = channelLabel(String(item.channel));

@@ -128,6 +128,7 @@ describe("ticket chat follow-ups", () => {
     assert.match(action, /label="WhatsApp"/);
     assert.match(verbs, /Mark done lives on the action dock/);
     assert.match(delivery, /Needs human\. Notify failed\./);
+    assert.match(delivery, /Already pinged this ticket/);
     assert.match(live, /Notify only \(live connect unavailable\)/);
     assert.match(delivery, /Never "Escalation sent"/);
     assert.doesNotMatch(delivery, /line: "Escalation sent"/);

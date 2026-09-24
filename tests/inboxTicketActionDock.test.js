@@ -44,6 +44,11 @@ describe("ticket action dock", () => {
     assert.doesNotMatch(ping, /useTransition/);
     const escalate = read("dashboard/src/app/(desk)/calls/escalateActions.ts");
     assert.match(escalate, /language: "en"/);
+    assert.match(escalate, /instance_already_sent/);
+    assert.match(escalate, /Already pinged this ticket/);
+    const delivery = read("dashboard/src/lib/escalationDelivery.ts");
+    assert.match(delivery, /instance_already_sent/);
+    assert.match(delivery, /Already pinged this ticket/);
     assert.match(escalate, /revalidatePath\(`\/calls\/\$\{callId\}`\)/);
     assert.doesNotMatch(escalate, /revalidatePath\("\/home"\)/);
     assert.doesNotMatch(escalate, /revalidatePath\("\/calls"\)/);
