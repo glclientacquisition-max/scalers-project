@@ -3263,6 +3263,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         callId: call.id || null,
         callSid,
         kind: 'escalation',
+        force,
       },
     });
 

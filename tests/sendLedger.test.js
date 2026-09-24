@@ -311,6 +311,19 @@ describe('per-instance send limits', () => {
     }
   });
 
+  it('lets a desk force ping resend after a prior instance', async () => {
+    const restore = stubDb({
+      findNotifySend: async () => ({ id: 'row-1' }),
+    });
+    try {
+      const gate = await beginInstanceSend({ ...ledger, force: true }, '254711000000');
+      assert.equal(gate.ok, true);
+      releaseInstanceFlight(gate.key);
+    } finally {
+      restore();
+    }
+  });
+
   it('skips when any channel already delivered, without consuming SMS', async () => {
     let consumed = 0;
     const restore = stubDb({

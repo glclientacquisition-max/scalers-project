@@ -28,7 +28,7 @@ const KIND_DEFAULT_NAME = Object.freeze({
 
 /** First Meta-approved Utility on the Scalers WABA. Unblocks every staff event. */
 const APPROVED_FIRST_TEMPLATE = 'scalers_staff_alert';
-const APPROVED_FIRST_TEMPLATE_LANG = 'en';
+const APPROVED_FIRST_TEMPLATE_LANG = 'en_US';
 const GENERIC_DEFAULT_NAME = APPROVED_FIRST_TEMPLATE;
 const LEGACY_GENERIC_NAMES = Object.freeze(['missed_call_lead']);
 

@@ -287,6 +287,17 @@ async function processWhatsAppReceived(opts = {}) {
       duplicates += 1;
       continue;
     }
+    if (st.status === 'failed' || st.status === 'undelivered') {
+      console.warn(
+        '[whatsapp] delivery failed',
+        JSON.stringify({
+          wamid: st.wamid,
+          recipient: st.recipientId,
+          status: st.status,
+          errors: st.raw?.errors || st.raw?.error || null,
+        })
+      );
+    }
     if (typeof persistStatus === 'function') {
       await persistStatus(st);
     }
