@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 
 /**
  * Local chrome harness (no desk login). DASHBOARD_OPEN=true only.
@@ -10,7 +10,7 @@ export default function DevDeskShellPage() {
   }
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+    <div className={deskShellClass}>
       <DeskRail needsCount={3} homeHref="/dev/desk-shell" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>
