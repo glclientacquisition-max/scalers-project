@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
@@ -50,12 +50,12 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+    <div className={deskShellClass}>
       {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
       <Suspense fallback={<DeskRail />}>
         <DeskRailLive tenantId={tenant?.id} vertical={tenant?.vertical} />
       </Suspense>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <DeskOffline />
         <main className={deskMainClass}>{children}</main>
         <Suspense fallback={<DeskTabBar />}>

@@ -108,7 +108,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const flashIsError = Boolean(postState.error || clearState.error);
 
   return (
-    <section className="min-w-0 w-full space-y-6">
+    <section className="min-w-0 w-full space-y-3">
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />

@@ -55,7 +55,10 @@ describe("desk phone shell", () => {
     assert.match(nav, /bg-surface/);
     assert.doesNotMatch(nav, /bg-surface\/95/);
     assert.doesNotMatch(nav, /backdrop-blur/);
-    assert.match(layout, /overflow-x-clip/);
+    assert.match(layout, /deskShellClass/);
+    assert.match(nav, /export const deskShellClass/);
+    assert.match(nav, /h-dvh min-h-dvh min-w-0 overflow-hidden/);
+    assert.match(nav, /min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto/);
     assert.doesNotMatch(layout, /context=\{businessName\}/);
     const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");
     assert.match(inboxRow, /export function InboxPhoneRow/);

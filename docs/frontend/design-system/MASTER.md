@@ -171,7 +171,7 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 
 | Type | Surfaces | Motion |
 | --- | --- | --- |
-| Shell | `DeskRail`, phone header, tab bar | None. Rail width is static `4.5rem`. Do not animate `h-dvh` or scroll containers. |
+| Shell | `deskShellClass` + `DeskRail` + tab bar | None. Shell is `h-dvh overflow-hidden`. Main (`deskMainClass`) is `min-h-0 overflow-y-auto`. Do not animate `h-dvh` or scroll containers. The light body canvas must not show under the desk. |
 | List | Inbox queue, Contacts, wallet ledger | `land` on a live insert after first paint. Row hover/selected: `shift`. Stable keys (`item.id`). No enter-stagger. No layout reorder. |
 | Detail | Ticket transcript, contact profile, action dock | Instant swap. Key the route by record id. Panel chrome does not slide. |
 | Notice | Archive undo, Saved | `DeskNotice` + `useNotify`. Enter `translateY(12px)`, exit `translateY(8px)`, opacity. Transform only. `role="status"`. One pattern. |
