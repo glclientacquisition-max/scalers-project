@@ -81,7 +81,7 @@ export function InboxPinMark({ show }: { show: boolean }) {
       className="inline-flex h-3.5 w-3.5 shrink-0 text-ink-soft"
     >
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden className="h-full w-full">
-        <path d="M10 1.6H6l.25 2.15H4.15a.65.65 0 0 0-.62.84l.5 1.55c.18.55-.2 1.13-.77 1.24L3 7.5v1.15h3.35V14.4h1.3V8.65H11V7.5l-.26-.12c-.57-.11-.95-.69-.77-1.24l.5-1.55a.65.65 0 0 0-.62-.84H7.75L8 1.6h2Z" />
+        <path d="M5.2 1.6h5.6c.4 0 .7.3.7.7v1.1c0 1.4-.8 2.6-2 3.2v.6h1.4v1.2H8.7V14.4H7.3V8.4H5.3V7.2h1.4v-.6c-1.2-.6-2-1.8-2-3.2V2.3c0-.4.3-.7.7-.7Z" />
       </svg>
     </span>
   );
