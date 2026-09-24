@@ -135,8 +135,9 @@ Same `DailyBulletinPanel` as Home. One persist path (`bulletinActions` → `dail
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
 | Callers hear | input | `daily_bulletin` text | Assistant on calls |
-| Update duration | rate cards (3) | bulletin `expiry` | Assistant on calls |
-| Post update | filled, docked | insert live bulletin | Assistant on calls |
+| Update duration | rate cards (4) | bulletin `expiry` | Assistant on calls |
+| Starts / Ends | `datetime-local` when Set times | `starts_at` / `ends_at` (EAT) | Assistant on calls after start |
+| Post update | filled, docked | insert bulletin | Assistant on calls |
 | Clear | ghost | expire that item | Assistant on calls |
 
 ### Test (`?tab=test`)

@@ -7,7 +7,7 @@ export type BulletinItem = {
   created_at: string | null;
 };
 
-export type BulletinExpiry = "today" | "tomorrow" | "manual";
+export type BulletinExpiry = "today" | "tomorrow" | "manual" | "schedule";
 
 const MAX_ACTIVE = 5;
 const MAX_TEXT = 160;
@@ -56,16 +56,50 @@ export function startOfEatNow(from = new Date()): string {
   return from.toISOString();
 }
 
+const EAT_LOCAL = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+
+/** `datetime-local` value in Africa/Nairobi. */
+export function eatDateTimeLocal(from = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Nairobi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(from);
+  const num = (type: string) =>
+    parts.find((p) => p.type === type)?.value || "00";
+  return `${num("year")}-${num("month")}-${num("day")}T${num("hour")}:${num("minute")}`;
+}
+
+/** Read a Nairobi `datetime-local` as an instant. */
+export function parseEatDateTimeLocal(raw: string): Date | null {
+  const match = EAT_LOCAL.exec(String(raw || "").trim());
+  if (!match) return null;
+  const instant = new Date(
+    `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00+03:00`
+  );
+  return Number.isNaN(instant.getTime()) ? null : instant;
+}
+
+export function isBulletinEnded(item: BulletinItem, now = new Date()): boolean {
+  if (!item.ends_at) return false;
+  const end = new Date(item.ends_at);
+  return !Number.isNaN(end.getTime()) && now > end;
+}
+
+export function isBulletinScheduled(item: BulletinItem, now = new Date()): boolean {
+  if (!item.starts_at) return false;
+  const start = new Date(item.starts_at);
+  return !Number.isNaN(start.getTime()) && now < start;
+}
+
 export function isBulletinLive(item: BulletinItem, now = new Date()): boolean {
   if (!item.active) return false;
-  if (item.starts_at) {
-    const start = new Date(item.starts_at);
-    if (!Number.isNaN(start.getTime()) && now < start) return false;
-  }
-  if (item.ends_at) {
-    const end = new Date(item.ends_at);
-    if (!Number.isNaN(end.getTime()) && now > end) return false;
-  }
+  if (isBulletinScheduled(item, now)) return false;
+  if (isBulletinEnded(item, now)) return false;
   return true;
 }
 
@@ -74,6 +108,16 @@ export function liveBulletinItems(
   now = new Date()
 ): BulletinItem[] {
   return normalizeBulletin(raw).filter((item) => isBulletinLive(item, now));
+}
+
+/** Desk list: live plus not-yet-started. Ended and cleared stay off. */
+export function deskBulletinItems(
+  raw: unknown,
+  now = new Date()
+): BulletinItem[] {
+  return normalizeBulletin(raw).filter(
+    (item) => item.active && !isBulletinEnded(item, now)
+  );
 }
 
 export function formatBulletinEndLabel(
@@ -117,16 +161,74 @@ export function resolveExpiryEndsAt(
   expiry: BulletinExpiry,
   now = new Date()
 ): string | null {
-  if (expiry === "manual") return null;
+  if (expiry === "manual" || expiry === "schedule") return null;
   if (expiry === "tomorrow") return endOfEatDay(now, 1);
   return endOfEatDay(now, 0);
+}
+
+export function resolveBulletinWindow(opts: {
+  expiry: BulletinExpiry;
+  startsLocal?: string;
+  endsLocal?: string;
+  now?: Date;
+}):
+  | { ok: true; starts_at: string; ends_at: string | null }
+  | { ok: false; error: string } {
+  const now = opts.now || new Date();
+  if (opts.expiry !== "schedule") {
+    return {
+      ok: true,
+      starts_at: startOfEatNow(now),
+      ends_at: resolveExpiryEndsAt(opts.expiry, now),
+    };
+  }
+
+  const startsLocal = String(opts.startsLocal || "").trim();
+  const endsLocal = String(opts.endsLocal || "").trim();
+  const start = startsLocal ? parseEatDateTimeLocal(startsLocal) : now;
+  if (startsLocal && !start) return { ok: false, error: "Set a valid start." };
+  const end = endsLocal ? parseEatDateTimeLocal(endsLocal) : null;
+  if (endsLocal && !end) return { ok: false, error: "Set a valid end." };
+  if (end && start && start >= end) {
+    return { ok: false, error: "End must be after start." };
+  }
+  return {
+    ok: true,
+    starts_at: (start || now).toISOString(),
+    ends_at: end ? end.toISOString() : null,
+  };
+}
+
+function formatEatStamp(iso: string): string {
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return "";
+  return instant.toLocaleString("en-KE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Africa/Nairobi",
+  });
+}
+
+export function formatBulletinWindowLabel(
+  item: BulletinItem,
+  now = new Date()
+): string {
+  const endLabel = formatBulletinEndLabel(item.ends_at, now);
+  if (isBulletinScheduled(item, now) && item.starts_at) {
+    const start = formatEatStamp(item.starts_at);
+    return start ? `Starts ${start}. ${endLabel}` : endLabel;
+  }
+  return endLabel;
 }
 
 export function canPostBulletin(
   existing: BulletinItem[],
   now = new Date()
 ): { ok: true } | { ok: false; error: string } {
-  const live = liveBulletinItems(existing, now);
+  const live = deskBulletinItems(existing, now);
   if (live.length >= MAX_ACTIVE) {
     return {
       ok: false,

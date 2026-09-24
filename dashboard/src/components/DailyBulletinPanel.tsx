@@ -4,8 +4,10 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import {
-  formatBulletinEndLabel,
-  liveBulletinItems,
+  deskBulletinItems,
+  eatDateTimeLocal,
+  endOfEatDay,
+  formatBulletinWindowLabel,
   type BulletinExpiry,
   type BulletinItem,
 } from "@/lib/dailyBulletin";
@@ -26,16 +28,27 @@ const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
   { id: "tomorrow", label: "Until tomorrow night" },
   { id: "manual", label: "Until I clear it" },
+  { id: "schedule", label: "Set times" },
 ];
 
 const initial: BulletinActionState = {};
+
+function defaultStartLocal(): string {
+  return eatDateTimeLocal();
+}
+
+function defaultEndLocal(): string {
+  return eatDateTimeLocal(new Date(endOfEatDay()));
+}
 
 export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [expiry, setExpiry] = useState<BulletinExpiry>("today");
+  const [startsLocal, setStartsLocal] = useState(defaultStartLocal);
+  const [endsLocal, setEndsLocal] = useState(defaultEndLocal);
   const [items, setItems] = useState<BulletinItem[]>(() =>
-    liveBulletinItems(tenant.daily_bulletin)
+    deskBulletinItems(tenant.daily_bulletin)
   );
   const [postState, postAction, postPending] = useActionState(
     postBulletinAction,
@@ -47,7 +60,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   );
 
   useEffect(() => {
-    setItems(liveBulletinItems(tenant.daily_bulletin));
+    setItems(deskBulletinItems(tenant.daily_bulletin));
   }, [tenant.daily_bulletin]);
 
   useEffect(() => {
@@ -103,6 +116,45 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           options={EXPIRY_OPTIONS}
           onChange={setExpiry}
         />
+
+        {expiry === "schedule" ? (
+          <SettingsGroup title="Timeline">
+            <div className="grid min-w-0 grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <label
+                  htmlFor="bulletin_starts_at"
+                  className="text-xs font-medium uppercase tracking-wide text-ink-soft"
+                >
+                  Starts
+                </label>
+                <input
+                  id="bulletin_starts_at"
+                  name="starts_at"
+                  type="datetime-local"
+                  value={startsLocal}
+                  onChange={(e) => setStartsLocal(e.target.value)}
+                  className={`${settingsFieldClass} min-w-0`}
+                />
+              </div>
+              <div className="min-w-0">
+                <label
+                  htmlFor="bulletin_ends_at"
+                  className="text-xs font-medium uppercase tracking-wide text-ink-soft"
+                >
+                  Ends
+                </label>
+                <input
+                  id="bulletin_ends_at"
+                  name="ends_at"
+                  type="datetime-local"
+                  value={endsLocal}
+                  onChange={(e) => setEndsLocal(e.target.value)}
+                  className={`${settingsFieldClass} min-w-0`}
+                />
+              </div>
+            </div>
+          </SettingsGroup>
+        ) : null}
       </form>
 
       {items.length === 0 ? (
@@ -110,7 +162,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           No live updates.
         </p>
       ) : (
-        <SettingsGroup title="Live">
+        <SettingsGroup title="Posted">
           {items.map((item) => (
             <div
               key={item.id}
@@ -121,7 +173,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                   {item.text}
                 </p>
                 <p className="mt-1 text-xs text-ink-soft">
-                  {formatBulletinEndLabel(item.ends_at)}
+                  {formatBulletinWindowLabel(item)}
                 </p>
               </div>
               <form action={clearAction} className="shrink-0">
