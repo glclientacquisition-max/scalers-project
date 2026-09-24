@@ -88,6 +88,8 @@ describe("contacts recents and favourites rate cards", () => {
     assert.match(profile, /isContactFavourite\(contact\.metadata\)/);
     assert.match(button, /Add to Favourites/);
     assert.match(button, /Favourited/);
+    assert.match(button, /text-\[#005CCC\] hover:underline/);
+    assert.doesNotMatch(button, /bg-surface-muted/);
     assert.match(actions, /export async function updateContactFavourite/);
     assert.match(actions, /withContactFavourite/);
     assert.match(helpers, /favourite_at/);

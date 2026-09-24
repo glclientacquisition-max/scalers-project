@@ -110,7 +110,7 @@ export function contactPersonFileKpiCards(opts: {
     });
   }
   const months = customerSinceMonths(opts.firstSeenAt, opts.now);
-  if (months != null) {
+  if (months != null && months > 0) {
     cards.push({
       id: "customerSince",
       label: "Customer since",
