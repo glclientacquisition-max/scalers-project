@@ -95,6 +95,15 @@ describe("inbox row overflow menu", () => {
     assert.doesNotMatch(overflow, /id === "mark_done"[\s\S]{0,400}patch\(\{ hidden/);
   });
 
+  it("closes after a successful run and keeps the menu on desk tokens", () => {
+    assert.match(overflow, /busyRef\.current = true/);
+    assert.match(overflow, /setOpen\(false\)/);
+    assert.match(overflow, /createPortal\(<div className="desk-theme">\{menu\}<\/div>, document.body\)/);
+    assert.match(overflow, /pendingId === action.id \? "Saving"/);
+    assert.doesNotMatch(overflow, /\{busy \? "Saving" : action.label\}/);
+    assert.doesNotMatch(overflow, /close\(\);\n    router.refresh/);
+  });
+
   it("does not render Pin UI on the list", () => {
     assert.doesNotMatch(row, /InboxPinMark/);
     assert.doesNotMatch(row, /Favorites/);
