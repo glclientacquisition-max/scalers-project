@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import { CallLink } from "@/components/CallLink";
 import { InboxPingTeammate, type InboxPingPerson } from "@/components/InboxPingTeammate";
@@ -48,7 +48,7 @@ function DockMarkDone({ callId }: { callId: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const name = pending ? "Saving" : done ? "Done" : "Mark done";
 
   return (
@@ -57,19 +57,23 @@ function DockMarkDone({ callId }: { callId: string }) {
         <button
           type="button"
           disabled={pending || done}
+          aria-busy={pending}
           aria-label={name}
           title={name}
           onClick={() => {
+            if (pending || done) return;
             setError(null);
-            startTransition(async () => {
+            setPending(true);
+            void (async () => {
               const res = await updateLeadStatus(callId, "resolved");
+              setPending(false);
               if (!res.ok) {
                 setError(res.error || "Could not mark done.");
                 return;
               }
               setDone(true);
               router.refresh();
-            });
+            })();
           }}
           className={[
             deskHitClass,

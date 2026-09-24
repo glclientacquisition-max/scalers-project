@@ -104,14 +104,13 @@ export async function pingTeammateAction(opts: {
         callerName,
         reason,
         force: true,
+        language: "en",
       }),
       cache: "no-store",
     });
     const json = (await res.json().catch(() => null)) as
       | { ok?: boolean; reason?: string; escalation_notify?: Record<string, unknown> }
       | null;
-    revalidatePath("/home");
-    revalidatePath("/calls");
     revalidatePath(`/calls/${callId}`);
 
     if (!res.ok || !json?.ok) {
@@ -157,8 +156,6 @@ async function persistNotifyFailed(
   if (error) {
     return ownerSaveFailed("ping-teammate", error.message, note);
   }
-  revalidatePath("/home");
-  revalidatePath("/calls");
   revalidatePath(`/calls/${callId}`);
   return { failed: true, line: note, error: note };
 }
