@@ -21,7 +21,7 @@ Owner opens `/contacts/[id]`, sees History built from that contact's real ticket
 2. **KPI strip.** Show each card only when its source exists; omit/hide if unknown or empty. Locked derivations:
    - **Interactions** = count of real assembled call/ticket rows for that contact. Hide when 0.
    - **Visits done** = jobs with status `done` (confirmed completed visits) for that contact. Hide when 0.
-   - **Customer since** = earliest stored first-seen / first call / contact `created_at`. Show relative months from that stamp (`N mo`). Hide when no stamp.
+   - **Customer since** = earliest stored first-seen / first call / contact `created_at`. Show relative months from that stamp (`N mo`). Hide when no stamp or the month count is 0.
 3. **Contacts list nouns** stay **All · Recents · Favourites · Saved · Unsaved** on one `InboxFilterPills` row per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** put Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) on Contacts.
 4. **Call / WhatsApp** actions: opened-only honesty (`tel:` / `wa.me`). Top icons only on the person file. No labeled Call / WhatsApp pills.
 5. Phone-first density at ~390 plus desktop. Match existing desk chrome / FRONTEND_CONSTITUTION / design system. No glass, no KPI wallpaper, no fake Online.

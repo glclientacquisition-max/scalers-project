@@ -58,6 +58,8 @@ describe("contact profile Name this caller", () => {
     assert.match(form, /Name this caller/);
     assert.match(form, /junk \? "Name this caller" : "Name"/);
     assert.match(form, />\s*Save\s*</);
+    assert.match(form, /flex min-w-0 flex-wrap items-center gap-2/);
+    assert.match(form, /text-lg font-semibold/);
     assert.match(form, /updateContactName/);
     assert.match(form, /router\.refresh\(/);
     assert.match(form, /pendingSpinnerClass/);

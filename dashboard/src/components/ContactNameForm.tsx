@@ -31,6 +31,7 @@ export function ContactNameForm({
   const [open, setOpen] = useState(variant === "row" ? false : junk);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const heading = title || contactStripTitle(initialName, true);
 
   function save() {
     setError(null);
@@ -48,7 +49,7 @@ export function ContactNameForm({
   const form = (
     <form
       data-contact-name-form=""
-      className={variant === "row" ? "flex min-w-0 flex-wrap items-center gap-2" : "space-y-2"}
+      className="flex min-w-0 flex-wrap items-center gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         save();
@@ -63,13 +64,9 @@ export function ContactNameForm({
         onChange={(e) => setName(e.target.value)}
         autoComplete="name"
         autoCapitalize="words"
-        className={deskFieldClass}
+        className={`${deskFieldClass} min-w-0 flex-1`}
       />
-      <button
-        type="submit"
-        disabled={pending}
-        className={`${btnPrimary} gap-2 ${variant === "row" ? "" : "w-full sm:w-auto"}`}
-      >
+      <button type="submit" disabled={pending} className={`${btnPrimary} shrink-0 gap-2`}>
         {pending ? <span aria-hidden="true" className={pendingSpinnerClass} /> : null}
         <span>Save</span>
       </button>
@@ -96,27 +93,33 @@ export function ContactNameForm({
 
   return (
     <div data-contact-name-form="" className="min-w-0">
-      <div className="flex min-w-0 items-start gap-1">
-        <h1 className="min-w-0 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-          {title || contactStripTitle(initialName, true)}
+      {junk ? (
+        <h1 className="min-w-0 text-lg font-semibold leading-tight tracking-tight text-ink">
+          {heading}
         </h1>
-        <button
-          type="button"
-          aria-label="Edit name"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className={`${deskHitClass} text-ink-soft ${deskShiftClass} ${focusRingVisible}`}
-        >
-          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
-            <path
-              d="M12.4 4.4l3.2 3.2-8.3 8.3H4.1v-3.2l8.3-8.3Z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
+      ) : (
+        <div className="flex min-w-0 items-start gap-1">
+          <h1 className="min-w-0 font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
+            {heading}
+          </h1>
+          <button
+            type="button"
+            aria-label="Edit name"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className={`${deskHitClass} text-ink-soft ${deskShiftClass} ${focusRingVisible}`}
+          >
+            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+              <path
+                d="M12.4 4.4l3.2 3.2-8.3 8.3H4.1v-3.2l8.3-8.3Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
       {open ? <div className="mt-2">{form}</div> : null}
     </div>
   );
