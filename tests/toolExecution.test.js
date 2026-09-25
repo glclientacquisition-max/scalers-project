@@ -428,9 +428,9 @@ describe('validated tool execution', () => {
       },
     });
     assert.equal(execution.results[0].status, 'succeeded');
-    assert.match(
+    assert.equal(
       formatToolConfirmation(execution.results, 'en'),
-      /noted that for the team/i
+      "I've sent that to the team."
     );
   });
 

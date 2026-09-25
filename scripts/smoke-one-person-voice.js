@@ -71,7 +71,7 @@ async function smokeOperationalBooking() {
   });
   checkLine('operational greeting', greeting, {
     allowLong: true,
-    mustInclude: [/Done and Dusted, this is Shy/i, /How can I help/i],
+    mustInclude: [/Done and Dusted Cleaning Services, this is Shy/i, /How can I help/i],
     mustNotInclude: [
       /English or Kiswahili/i,
       /I am an AI/i,
