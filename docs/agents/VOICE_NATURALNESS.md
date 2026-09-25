@@ -144,4 +144,4 @@ Shipped Voice work that already targets this (do not redo before the freeze): se
 - Speed program (do not crank): [`VOICE_SPEED_CONSISTENCY.md`](./VOICE_SPEED_CONSISTENCY.md)
 - Live SID log: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md)
 - Brain CX map (lists, phatic): [`CALLER_EXPERIENCE_EXCELLENCE.md`](./CALLER_EXPERIENCE_EXCELLENCE.md) F7
-- OSS research (turn-taking steals, what not to swap): [`../specs/voice-human-naturalness-research.md`](../specs/voice-human-naturalness-research.md)
+- OSS research (turn-taking steals, what not to swap, five live follow-ups): [`../specs/voice-human-naturalness-research.md`](../specs/voice-human-naturalness-research.md)
