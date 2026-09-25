@@ -19,6 +19,10 @@ const {
   returningFileFromCard,
 } = require('./callerMemory');
 const {
+  looksLikeExistingVisitTalk,
+  looksLikePastBookingTalk,
+} = require('./visitTalk');
+const {
   isRepairSignal,
   applyRepairObservation,
   markRepairProgress,
@@ -121,18 +125,6 @@ function looksLikeCancelOrReschedule(value) {
   );
 }
 
-function looksLikeExistingVisitTalk(value) {
-  return /\b(my visit|my appointment|the visit|that visit|ziara yangu|ile ziara|still coming|confirm(ing)? (the |my )?(visit|appointment))\b/i.test(
-    value
-  );
-}
-
-function looksLikePastBookingTalk(value) {
-  return /\b(last (time|visit|job|booking|appointment)|previous (visit|booking|job)|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
-    String(value || '')
-  );
-}
-
 function inferIntent(text, opts = {}) {
   const value = String(text || '').trim().toLowerCase();
   const vertical = String(opts.vertical || '').toLowerCase();
@@ -155,7 +147,7 @@ function inferIntent(text, opts = {}) {
   if (
     Array.isArray(opts.returning?.recentBookings) &&
     opts.returning.recentBookings.length &&
-    looksLikePastBookingTalk(value)
+    (looksLikePastBookingTalk(value) || looksLikeExistingVisitTalk(value))
   ) {
     return 'general_enquiry';
   }

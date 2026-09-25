@@ -265,6 +265,21 @@ describe('returning-caller card', () => {
     });
     assert.equal(speakVisit.action, 'ANSWER');
     assert.match(speakVisit.reason, /open visit/i);
+
+    const bookings = observeCallerTurn(named, {
+      text: 'What are my bookings?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+    });
+    assert.equal(bookings.intent, 'general_enquiry');
+    const speakBookings = determineNextBestAction({
+      state: bookings,
+      capabilities: { createServiceRequest: true, createAppointment: true },
+    });
+    assert.equal(speakBookings.action, 'ANSWER');
+    assert.match(speakBookings.reason, /open visit|recent bookings/i);
+    assert.notEqual(speakBookings.action, 'CREATE_REQUEST');
   });
 
   it('binds the household file after the primary name is confirmed on a shared line', () => {

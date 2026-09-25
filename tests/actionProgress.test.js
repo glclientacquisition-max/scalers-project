@@ -234,4 +234,20 @@ assert.match(
   /^Okay\.?$/i
 );
 
+// Live leftover HD_bc9f610692de: bookings ask after the name was already in
+// must not speech-guarantee another name ask.
+assert.doesNotMatch(
+  pickSpeechGuaranteeLine({
+    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    brainState: {
+      intent: 'booking',
+      caller: { name: 'Alvin', nameConfirmed: true },
+      goal: { missingSlots: ['name'] },
+    },
+    language: 'en',
+    userText: 'What are my bookings?',
+  }),
+  /May I have your name/i
+);
+
 console.log('actionProgress tests passed.');
