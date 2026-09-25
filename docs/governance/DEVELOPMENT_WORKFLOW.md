@@ -20,7 +20,7 @@ TEST          — lane test gates (see below)
   ↓
 REVIEW        — PR with clear description; no unrelated changes
   ↓
-STAGING       — UNKNOWN today (see ../operations/ENVIRONMENTS.md)
+STAGING       — Desk URL pin: ../operations/STAGING_DESK_ALIAS.md
   ↓
 BETA          — beta tenants; billing_enforcement=off default
   ↓
