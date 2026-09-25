@@ -59,6 +59,9 @@ describe("business settings depth", () => {
     assert.match(bulletin, /Out of chicken today/);
     assert.match(bulletin, /SettingsSegmented/);
     assert.match(bulletin, /Until tonight/);
+    assert.match(bulletin, /Pick/);
+    assert.match(bulletin, /type="date"/);
+    assert.match(bulletin, /type="time"/);
     assert.match(faqs, /Westlands, opposite Naivas/);
     assert.doesNotMatch(ingest, /Paste your menu/);
     assert.doesNotMatch(form, /Super Admin can add them/);
