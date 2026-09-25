@@ -5,10 +5,9 @@ import { randomUUID } from "crypto";
 import { isAuthenticated } from "@/lib/auth";
 import {
   canPostBulletin,
-  liveBulletinItems,
+  deskBulletinItems,
   normalizeBulletin,
-  resolveExpiryEndsAt,
-  startOfEatNow,
+  resolveBulletinWindow,
   validateBulletinText,
   type BulletinExpiry,
   type BulletinItem,
@@ -76,7 +75,16 @@ export async function postBulletinAction(
 
   const expiryRaw = String(formData.get("expiry") || "today").trim().toLowerCase();
   const expiry: BulletinExpiry =
-    expiryRaw === "tomorrow" || expiryRaw === "manual" ? expiryRaw : "today";
+    expiryRaw === "tomorrow" || expiryRaw === "manual" || expiryRaw === "schedule"
+      ? expiryRaw
+      : "today";
+
+  const window = resolveBulletinWindow({
+    expiry,
+    startsLocal: String(formData.get("starts_at") || ""),
+    endsLocal: String(formData.get("ends_at") || ""),
+  });
+  if (!window.ok) return { error: window.error };
 
   const gate = canPostBulletin(loaded.items);
   if (!gate.ok) return { error: gate.error };
@@ -86,22 +94,27 @@ export async function postBulletinAction(
     id: randomUUID(),
     text: validated.text,
     active: true,
-    starts_at: startOfEatNow(now),
-    ends_at: resolveExpiryEndsAt(expiry, now),
+    starts_at: window.starts_at,
+    ends_at: window.ends_at,
     created_at: now.toISOString(),
   };
 
-  // Keep recent history lightly pruned (live + last 20 inactive).
-  const live = liveBulletinItems(loaded.items, now);
+  const open = deskBulletinItems(loaded.items, now);
   const inactive = loaded.items
-    .filter((row) => !live.some((l) => l.id === row.id))
+    .filter((row) => !open.some((l) => l.id === row.id))
     .slice(-20);
 
-  const next = [...live, item, ...inactive];
+  const next = [...open, item, ...inactive];
   const saved = await saveBulletin(loaded.tenantId, next);
   if (saved.error) return { error: saved.error };
 
-  return { ok: true, message: "Update is live for the next call." };
+  const scheduled = new Date(window.starts_at) > now;
+  return {
+    ok: true,
+    message: scheduled
+      ? "Update is set. Callers hear it after the start."
+      : "Update is live for the next call.",
+  };
 }
 
 export async function clearBulletinAction(
