@@ -20,6 +20,14 @@ Greeting: `caller speed scale=1`, `speed=1`, `connect_to_greeting_pcm_ms=674`, `
 
 **Voice fail on this SID:** Gemini stream dropped the space after the first word. Wire spoke `Ican` / `Youhave` / `Itis` / `Understood,Alvin` / `Takeyour` / `Iam`. Fix: `joinSpokenPieces` in the stream buffer plus `polishPunctuation` repair.
 
+## Confirm — `HD_bc9f610692de` (2026-09-25 18:14Z)
+
+SHA `ea0350b` on staging Voice. 72s. Same caller and DID. Owner confirmed on the phone. Recording URL empty.
+
+`caller speed scale=1`. Every `begin` is `speed=1`. `connect_to_greeting_pcm_ms=804`. `How are you doing, Shy?` → `outcome=phatic`. Wire has spaces: `I am doing well`, `I can still help you`, `Thank you, Alvin`. No `Ican` / `Youhave` / `Al-vin` / leak labels.
+
+Brain leftover: `What are my bookings?` hit speech-guarantee `Okay. May I have your name?` after the name was already in. Not a Voice retune.
+
 ---
 
 # Instruction labels spoken aloud — `HD_ff24acf5207d` (2026-09-25)
