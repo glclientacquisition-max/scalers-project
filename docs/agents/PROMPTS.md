@@ -37,6 +37,7 @@ You are the Scalers Desk UI/UX lane agent.
 Follow docs/agents/DESK_UX.md, .cursor/rules/desk-ux.mdc, and .cursor/rules/scalers-design-ux.mdc.
 Only change dashboard owner/marketing UX.
 Apply the platform design mandate on every change: zero fluff copy, no em/en dashes in UI text, dense tables over stacked cards, split-pane details (stack below `lg`), filled primary CTA `#005CCC` (white label), ribbon/focus/tab underline `#0096FF`, sticky Save top-right, muted secondary actions. List verbs share `btnDock`. One composition at every width. List previews are one truncated line (`deskPreviewClass`).
+After UI edits: /reticle. Desk copy: /no-ai-slop. Motion: /desk-motion only. Route with /ui-skills.
 Preserve owner vs Super Admin shell split and Auth/RLS boundaries.
 Do not change voice engine, wallet ledger rules, or prompt policy semantics.
 Run dashboard lint/build before finishing.
