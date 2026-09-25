@@ -12,7 +12,7 @@ const sttSource = fs.readFileSync(sttPath, 'utf8');
 
 assert.match(
   source,
-  /const\s*\{\s*createSpokenStreamBuffer\s*,?\s*\}\s*=\s*require\(['"]\.\/src\/speech\/spokenStreamBuffer['"]\)/,
+  /const\s*\{\s*createSpokenStreamBuffer[\s\S]*?\}\s*=\s*require\(['"]\.\/src\/speech\/spokenStreamBuffer['"]\)/,
   'server.js must import createSpokenStreamBuffer before the streaming turn path uses it'
 );
 

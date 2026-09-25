@@ -215,7 +215,10 @@ const {
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
 } = require('./src/speech/turnTaking');
-const { createSpokenStreamBuffer } = require('./src/speech/spokenStreamBuffer');
+const {
+  createSpokenStreamBuffer,
+  joinSpokenPieces,
+} = require('./src/speech/spokenStreamBuffer');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -4373,7 +4376,7 @@ async function runGeminiTurnStreaming(
           thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
           const delta = extractGeminiText(chunk);
           if (!delta) continue;
-          fullText += delta;
+          fullText = joinSpokenPieces(fullText, delta);
           const pieces = buffer.push(delta);
           for (const piece of pieces) {
             if (shouldAbort?.()) break;

@@ -1,3 +1,27 @@
+# Staging DID review — `HD_0ef68f8e7930` (2026-09-25 17:57Z)
+
+SHA `df462cb` (`#426` on Railway staging Voice). 144s. Caller `+254790381872` → `+254709221536`. Recording URL empty. Score from desk transcript + `spoken=` + `[voice-timing]`.
+
+Greeting: `caller speed scale=1`, `speed=1`, `connect_to_greeting_pcm_ms=674`, `cached=0`. Instant closed-hours opener. No leak labels. No `Al-vin`. Every later `begin` stayed `speed=1`. Filler warmup logged `Mm-hmm` / `Sawa` / `Poa` with `silent: true` (not on the wire).
+
+| ID | Result | Evidence |
+| --- | --- | --- |
+| V1 | pass | Sentence flushes. No fragment restart. |
+| V2 | pass | Tiny acks were warmup, not their own caller-facing turn. |
+| V3 | pass | `spoken="Nice to speak with you, Alvin."` |
+| V4 | pass | `8 A M` is the AM spoken form. |
+| V5 | pass | `How are you doing, Shy?` → `outcome=phatic`, no thinking-ack. First turn STT was `Uh, woke up, Shy.` so the matcher never saw how-are-you. |
+| V6 | pass | `idle_nudge` after the caller had spoken; line was `How can I help?` |
+| V7 | pass | `filler=1` on one turn only. |
+| V8 | pass | Scale 1 for the whole call. Caller did not ask faster. |
+| V9 | pass | Barge cancelled the in-flight line. |
+| B2 | note | `Alvin is the name.` then `Okay. May I have your name?` Brain. |
+| B3 | note | `Takeyour time, Alvin.` Brain holding line. |
+
+**Voice fail on this SID:** Gemini stream dropped the space after the first word. Wire spoke `Ican` / `Youhave` / `Itis` / `Understood,Alvin` / `Takeyour` / `Iam`. Fix: `joinSpokenPieces` in the stream buffer plus `polishPunctuation` repair.
+
+---
+
 # Instruction labels spoken aloud — `HD_ff24acf5207d` (2026-09-25)
 
 Staging DID `+254709221536`, SHA `ba5b53f` (`cursor/ticket-done-sms-ping-679d`, not first-forward). After a truncated closer, Gemini spoke control text:

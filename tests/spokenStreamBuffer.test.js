@@ -3,6 +3,7 @@
 
 const assert = require('assert');
 const {
+  joinSpokenPieces,
   stripMarkersForSpeech,
   splitSpeakableChunks,
   createSpokenStreamBuffer,
@@ -20,6 +21,26 @@ function test(name, fn) {
     process.exitCode = 1;
   }
 }
+
+console.log('joinSpokenPieces');
+test('inserts a space when Gemini drops it between words', () => {
+  assert.strictEqual(joinSpokenPieces('I', 'can help with that, Alvin.'), 'I can help with that, Alvin.');
+  assert.strictEqual(joinSpokenPieces('You', 'have a carpet cleaning visit.'), 'You have a carpet cleaning visit.');
+  assert.strictEqual(joinSpokenPieces('Understood,', 'Alvin.'), 'Understood, Alvin.');
+  assert.strictEqual(joinSpokenPieces('I ', 'can help'), 'I can help');
+  assert.strictEqual(joinSpokenPieces('Hello.', ' How are you?'), 'Hello. How are you?');
+  assert.strictEqual(joinSpokenPieces('Carpet cle', 'aning ranges'), 'Carpet cleaning ranges');
+});
+
+test('HD_0ef68f8e7930 stream deltas speak with spaces', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [
+    ...buf.push('I'),
+    ...buf.push('can help with that, Alvin.'),
+    ...buf.finish(),
+  ];
+  assert.deepStrictEqual(emitted, ['I can help with that, Alvin.']);
+});
 
 console.log('stripMarkersForSpeech');
 test('removes complete tool blocks', () => {

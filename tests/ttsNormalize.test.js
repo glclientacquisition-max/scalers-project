@@ -338,6 +338,31 @@ test('thousands and decimals are not list markers', () => {
   );
 });
 
+test('HD_0ef68f8e7930 glued openers get a space before TTS', () => {
+  assert.strictEqual(
+    prepareForTts('Ican help with that, Alvin.', { callLanguage: 'en' }).text,
+    'I can help with that, Alvin.'
+  );
+  assert.strictEqual(
+    prepareForTts('Youhave a carpet cleaning visit requested for tomorrow at 8 AM.', {
+      callLanguage: 'en',
+    }).text,
+    'You have a carpet cleaning visit requested for tomorrow at 8 A M.'
+  );
+  assert.strictEqual(
+    prepareForTts('Understood,Alvin.', { callLanguage: 'en' }).text,
+    'Understood, Alvin.'
+  );
+  assert.strictEqual(
+    prepareForTts('Takeyour time, Alvin.', { callLanguage: 'en' }).text,
+    'Take your time, Alvin.'
+  );
+  assert.strictEqual(
+    prepareForTts('Iam doing well, Alvin, thank you for asking.', { callLanguage: 'en' }).text,
+    'I am doing well, Alvin, thank you for asking.'
+  );
+});
+
 test('and/or and ampersand speak as words', () => {
   assert.match(prepareForTts('Pay by M-Pesa and/or cash.', { callLanguage: 'en' }).text, /and or cash/);
   assert.match(prepareForTts('Done & Dusted.', { callLanguage: 'en' }).text, /Done and Dusted/);
