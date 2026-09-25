@@ -172,15 +172,55 @@ function matchCardPerson(card, spokenName) {
 
 function returningFileUsable(file) {
   if (!file || typeof file !== 'object') return false;
-  if (file.fileRole === 'primary') return true;
-  if (file.fileRole === 'alternate' || file.fileRole === 'other') return false;
-  return !file.sharedLine;
+  return file.fileRole === 'primary' && Boolean(file.identityBound);
 }
 
 function speakerKnownOnFile(file) {
   if (!file || typeof file !== 'object') return false;
-  if (file.identityBound) return true;
-  return Boolean(file.greetByName && !file.sharedLine);
+  return Boolean(file.identityBound);
+}
+
+function fileHasHistory(card) {
+  if (!card || typeof card !== 'object') return false;
+  return Boolean(
+    card.lastReason ||
+      card.nextAppointment ||
+      card.nextVisit ||
+      (Array.isArray(card.openRequests) && card.openRequests.length) ||
+      (Array.isArray(card.recentBookings) && card.recentBookings.length)
+  );
+}
+
+function speakerPendingOnFile(file) {
+  if (!file || typeof file !== 'object') return false;
+  if (speakerKnownOnFile(file)) return false;
+  return Boolean(
+    file.sharedLine ||
+      file.name ||
+      file.fileOwnerName ||
+      file.filePending ||
+      fileHasHistory(file)
+  );
+}
+
+function digitsPhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+/**
+ * Until this call binds the speaker, hide this phone's visits from OPEN VISITS
+ * so a previous caller's job cannot look like occupancy for whoever is on the line.
+ */
+function selectOpenVisitsForPrompt(visits, card) {
+  const rows = Array.isArray(visits) ? visits : [];
+  if (!card || typeof card !== 'object') return rows;
+  if (returningFileUsable(card)) return rows;
+  const phone = digitsPhone(card.phone);
+  if (!phone) return [];
+  return rows.filter((row) => {
+    const rowPhone = digitsPhone(row?.caller_phone || row?.phone);
+    return !rowPhone || rowPhone !== phone;
+  });
 }
 
 function liveCallerFileStamp(card) {
@@ -267,10 +307,13 @@ function applyLiveCallerFile(profile, state) {
 
 function returningFileFromCard(card) {
   if (!card || typeof card !== 'object') return null;
-  const fileRole =
-    card.fileRole ||
-    (card.greetByName && !card.sharedLine ? 'primary' : null);
-  const usable = returningFileUsable({ ...card, fileRole });
+  const identityBound = Boolean(card.identityBound);
+  const fileRole = card.fileRole || null;
+  const usable = returningFileUsable({ ...card, fileRole, identityBound });
+  const fileOwnerName = fileOwnerNameOf(card);
+  const filePending =
+    !identityBound &&
+    Boolean(card.sharedLine || card.name || fileOwnerName || fileHasHistory(card));
   return {
     sharedLine: Boolean(card.sharedLine),
     greetByName: Boolean(card.greetByName),
@@ -281,10 +324,12 @@ function returningFileFromCard(card) {
     nextVisitWhen: usable ? card.nextVisitWhen || null : null,
     openRequests: usable && Array.isArray(card.openRequests) ? card.openRequests : [],
     recentBookings: usable && Array.isArray(card.recentBookings) ? card.recentBookings : [],
-    identityBound: Boolean(card.identityBound) || Boolean(fileRole === 'primary' && !card.sharedLine),
-    boundName: card.boundName || (usable ? card.name : null) || null,
+    identityBound,
+    boundName: identityBound ? card.boundName || card.name || null : null,
     fileRole,
-    fileOwnerName: fileOwnerNameOf(card),
+    fileOwnerName,
+    filePending,
+    phone: card.phone || null,
   };
 }
 
@@ -292,6 +337,7 @@ function formatReturningCallerForPrompt(card) {
   if (!card || typeof card !== 'object') return '';
   const usable = returningFileUsable(card);
   const known = speakerKnownOnFile(card);
+  const fileWho = card.fileOwnerName || card.name;
   let identity;
   if (known && usable && card.name) {
     identity = `${card.name} (returning caller; use this name; do not re-ask to confirm it)`;
@@ -299,12 +345,10 @@ function formatReturningCallerForPrompt(card) {
     const who = card.boundName || card.name || 'this speaker';
     identity = `${who} (this speaker on a shared line; not the household file; do not invent their history)`;
   } else if (card.sharedLine) {
-    const hint = card.fileOwnerName || card.name
-      ? `file name ${card.fileOwnerName || card.name}; `
-      : '';
+    const hint = fileWho ? `file name ${fileWho}; ` : '';
     identity = `shared line (${hint}confirm who is speaking; do not assume the name)`;
-  } else if (card.greetByName && card.name) {
-    identity = `${card.name} (returning caller; use this name; do not re-ask to confirm it)`;
+  } else if (fileWho) {
+    identity = `phone file for ${fileWho}; speaker not bound; ask who is speaking; do not use this name or visit until they say it`;
   } else {
     identity = 'unknown (do not invent a name)';
   }
@@ -330,12 +374,18 @@ function formatReturningCallerForPrompt(card) {
     lines.push(`- Recent bookings: ${recentBookings.join('; ')}`);
   }
   if (notes) lines.push(`- Note: ${notes}`);
-  lines.push(
-    '- First reasoned turn must use this file. Do not start a first-meeting name SOP.'
-  );
-  if (card.sharedLine && !known) {
+  if (!known) {
     lines.push(
-      '- Shared line: ask who is speaking before using the file name or attaching a visit.'
+      '- Speaker is not bound on this call. Ask who is speaking. Do not attach last reason or a visit yet. Do not greet them as the file name.'
+    );
+  } else {
+    lines.push(
+      '- First reasoned turn must use this file. Do not start a first-meeting name SOP.'
+    );
+  }
+  if (!known) {
+    lines.push(
+      '- Ask who is speaking before using the file name or attaching a visit. Do not assume the previous caller is on the line.'
     );
   } else if (known && !usable) {
     lines.push(
@@ -363,8 +413,15 @@ function formatReturningCallerForPrompt(card) {
 
 function formatReturningFileForCallState(returning) {
   if (!returning || typeof returning !== 'object') return '';
-  if (returning.sharedLine && !speakerKnownOnFile(returning)) {
-    return '- Returning file: shared line. Ask who is speaking. Do not use the file name. Do not attach a visit yet.';
+  if (!speakerKnownOnFile(returning)) {
+    const who = returning.fileOwnerName || returning.name;
+    if (returning.sharedLine) {
+      return '- Returning file: shared line. Ask who is speaking. Do not use the file name. Do not attach a visit yet.';
+    }
+    if (who) {
+      return `- Returning file: phone file for ${who}. Speaker not bound. Ask who is speaking before using this name or visit.`;
+    }
+    return '- Returning file: phone file on this number. Speaker not bound. Ask who is speaking before attaching a visit.';
   }
   if (!returningFileUsable(returning)) {
     const who = returning.boundName || returning.name || 'this speaker';
@@ -392,12 +449,6 @@ function seedCallerFromMemory(caller = {}, card) {
   const next = { ...caller };
   if (!card || typeof card !== 'object') return next;
   if (card.phone && !next.phone) next.phone = card.phone;
-  if (card.greetByName && card.name) {
-    if (!next.name || namesMatch(next.name, card.name)) {
-      next.name = card.name;
-      next.nameConfirmed = true;
-    }
-  }
   return next;
 }
 
@@ -416,6 +467,7 @@ async function attachCallerMemory(profile, deps = {}) {
     }
     const card = await getCallerMemory({ tenantId, phone });
     if (card) profile.callerMemory = card;
+    else delete profile.callerMemory;
   } catch (err) {
     console.warn(
       `[${callSid}] caller memory load failed:`,
@@ -440,5 +492,7 @@ module.exports = {
   returningFileFromCard,
   returningFileUsable,
   seedCallerFromMemory,
+  selectOpenVisitsForPrompt,
   speakerKnownOnFile,
+  speakerPendingOnFile,
 };

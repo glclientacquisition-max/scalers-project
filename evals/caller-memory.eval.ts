@@ -102,10 +102,13 @@ evalite("Returning-caller card", {
           return 0;
         }
         if (expected.greetByName) {
-          if (output.greetByName !== true || output.seededName !== "Jane") return 0;
-          if (output.nameConfirmed !== true) return 0;
-          if (!/First reasoned turn/.test(block)) return 0;
-          if (!/Last reason is the default/.test(block)) return 0;
+          if (output.greetByName !== true) return 0;
+          if (output.seededName) return 0;
+          if (output.nameConfirmed) return 0;
+          if (!/speaker not bound/i.test(block)) return 0;
+          if (!/who is speaking/i.test(block)) return 0;
+          if (/Last reason is the default/.test(block)) return 0;
+          if (/Atomic Habits/.test(block)) return 0;
         } else if (output.greetByName === true || output.seededName) {
           return 0;
         }

@@ -41,7 +41,7 @@ Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain t
 Desk structured fields (hours, services, FAQs, team, bulletin, tone)
   → Gemini prompt compiler → tenants.llm_system_prompt
 Voice loads tenant profile per call
-  → structured Brain state (goal / intent / entities / language / repair), seeded from a returning-caller card when the phone is known
+  → structured Brain state (goal / intent / entities / language / repair), with a phone-keyed returning-caller card as a candidate until this call binds the speaker
   → authority policy + next-best-action
   → buildSystemPrompt + CONTEXT HEADER + LIVE GROUND TRUTH + CALL STATE
   → Gemini response plan → validated tool request
@@ -71,7 +71,7 @@ Core runtime modules:
 10. Call summary / primary intent persist instantly from Brain state + tools (STT text). Gemini does **not** hear live audio. Hangup `primary_intent` is a high-water mark from saved tools (visit, hold, escalate) so a last-turn FAQ cannot stamp Answered over saved work. Live turn intent still follows the latest ask so hours after a booking can be answered. After hangup, a fire-and-forget hangup job (`src/conversation/callTranscriptReview.js`) upserts a `contacts` row (name may stay null) and runs a **narrow name extract** (name or `NONE`) plus the **transcript review** (Flash-Lite, ~8s timeout) that writes `owner_review` `{want, done, mood, next, reason}`. `reason` stays the Inbox one-liner. `want` is the call Summary Want block and `contacts.last_reason`. Merge still only upgrades `needs_human` when rules agree and does not undo a saved hold, visit, or escalate. Kill switch for review only: `POST_CALL_GEMINI_REVIEW=off`. Contact persist still runs. Ignore STT fragments/backchannels as caller name or goal text; prefer `human` when handoff was requested. Do not send the four-block card on owner SMS until proven.
 11. Compiled `llm_system_prompt` is written by Desk compiler; owners do not edit raw prompt in UI. Stale compiled prompts that force name capture fight resolution-first runtime — recompile after Brain policy changes.
 12. Tool side-effects go through existing DB helpers (`saveCallerInfo`, `saveEscalation`, …). Call outcomes persist via `deriveCallResolution` / `setCallResolution`.
-13. Returning callers: load a compact phone file at call setup (`getCallerMemory` → CONTEXT HEADER). After a confirmed spoken name, bind that same phone card to the speaker (shared line: primary keeps the visit; alternate does not). The file may include last reason, the next visit, and up to two recent bookings. Never dump prior transcripts. Instant greeting stays brand-first and local.
+13. Returning callers: load a compact phone file at call setup (`getCallerMemory` → CONTEXT HEADER). The file is a candidate keyed by phone, not the speaker. After a confirmed spoken name on this call, bind that card (shared or unique line: primary keeps the visit; alternate or a different name does not). Until that bind, do not seed `nameConfirmed`, do not greet them as the file name, and do not attach last reason or visit. Instant greeting stays brand-first and local. Never dump prior transcripts.
 14. Ticket chat wand: empty Suggests one packaged customer SMS from lived facts on that ticket (visit, hold, Want). A filled draft is Polished in place. Facts beat Gemini. Never dump the transcript. Never say booked on a requested visit or ready on an open hold. Owner Send.
 
 ## Test / verify

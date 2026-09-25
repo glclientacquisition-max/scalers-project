@@ -6,6 +6,7 @@ const {
   buildCallerMemoryCard,
   formatReturningCallerForPrompt,
   seedCallerFromMemory,
+  selectOpenVisitsForPrompt,
 } = require('../src/conversation/callerMemory');
 const { createBrainState, formatBrainStateForPrompt } = require('../src/conversation/brainState');
 const { buildSystemPrompt } = require('../src/prompts');
@@ -78,7 +79,7 @@ describe('returning-caller card', () => {
     assert.doesNotMatch(prompt, /RETURNING CALLER/);
   });
 
-  it('injects the card into CONTEXT HEADER and seeds Brain state on a unique line', () => {
+  it('injects the card as a candidate and does not seed the previous speaker', () => {
     const card = buildCallerMemoryCard({
       contact: {
         phone: '+254700000001',
@@ -93,16 +94,23 @@ describe('returning-caller card', () => {
     });
     assert.match(prompt, /RETURNING CALLER/);
     assert.match(prompt, /Jane/);
-    assert.match(prompt, /Atomic Habits/);
-    assert.match(prompt, /First reasoned turn/);
+    assert.match(prompt, /speaker not bound/i);
+    assert.match(prompt, /who is speaking/i);
+    assert.doesNotMatch(prompt, /Atomic Habits/);
+    const block = formatReturningCallerForPrompt(card);
+    assert.doesNotMatch(block, /returning caller; use this name/i);
+    assert.doesNotMatch(block, /First reasoned turn/);
 
     const state = createBrainState({ callerMemory: card });
-    assert.equal(state.caller.name, 'Jane');
-    assert.equal(state.caller.nameConfirmed, true);
+    assert.equal(state.caller.name, null);
+    assert.equal(state.caller.nameConfirmed, false);
     assert.equal(state.caller.phone, '+254700000001');
-    assert.match(formatBrainStateForPrompt(state), /confirmed/i);
-    assert.match(formatBrainStateForPrompt(state), /Returning file/);
+    assert.equal(state.returning.identityBound, false);
+    assert.equal(state.returning.nextVisit, null);
+    assert.equal(state.returning.lastReason, null);
+    assert.match(formatBrainStateForPrompt(state), /Speaker not bound/);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /Got it, Jane/);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /open visit/i);
   });
 
   it('does not seed a name on a shared line', () => {
@@ -142,11 +150,21 @@ describe('returning-caller card', () => {
         }),
     });
     assert.equal(named.callerMemory.name, 'Jane');
+
+    const stale = { id: 'tenant-1', callerMemory: { name: 'Stale' } };
+    await attachCallerMemory(stale, {
+      callSid: 'CA3',
+      getCall: async () => ({ tenant_id: 'tenant-1', from_number: '+254700000009' }),
+      getCallerMemory: async () => null,
+    });
+    assert.equal(stale.callerMemory, undefined);
   });
 
-  it('routes first turn to the open visit instead of a new book', () => {
+  it('asks who is speaking on a unique line before using the open visit', () => {
     const { observeCallerTurn, inferIntent } = require('../src/conversation/brainState');
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
     const { determineNextBestAction } = require('../src/conversation/nextBestAction');
+    const { pickPhaticReply } = require('../src/conversation/dynamicSpeech');
     const card = buildCallerMemoryCard({
       contact: {
         phone: '+254700000001',
@@ -159,31 +177,71 @@ describe('returning-caller card', () => {
         when_text: 'Tuesday 10 AM',
       },
     });
-    assert.match(formatReturningCallerForPrompt(card), /create_appointment unless they ask for a new job/);
+    assert.doesNotMatch(formatReturningCallerForPrompt(card), /create_appointment unless they ask for a new job/);
+    assert.match(formatReturningCallerForPrompt(card), /speaker not bound/i);
+    assert.doesNotMatch(formatReturningCallerForPrompt(card), /carpet cleaning/);
+    assert.equal(
+      pickPhaticReply({ language: 'en', callerMemory: card }),
+      "I'm well. Who is calling?"
+    );
 
-    const seeded = createBrainState({
-      vertical: 'home_services',
-      callerMemory: card,
+    const profile = { vertical: 'home_services', callerMemory: card };
+    const seeded = createBrainState(profile);
+    assert.doesNotMatch(formatBrainStateForPrompt(seeded), /open visit/i);
+    assert.match(formatBrainStateForPrompt(seeded), /Speaker not bound/);
+
+    const hello = observeCallerTurn(seeded, {
+      text: 'Hello',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
     });
-    assert.match(formatBrainStateForPrompt(seeded), /open visit/i);
+    const who = determineNextBestAction({
+      state: hello,
+      capabilities: { createServiceRequest: true, createAppointment: true },
+    });
+    assert.equal(who.action, 'ASK_CLARIFICATION');
+    assert.equal(who.slot, 'name');
+    assert.match(who.reason, /who is speaking/i);
+
+    const named = observeCallerTurn(seeded, {
+      text: 'My name is Alex',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('My name is Alex', {
+        profile,
+        state: seeded,
+      }),
+    });
+    assert.equal(named.caller.name, 'Alex');
+    assert.equal(named.caller.nameConfirmed, true);
+    assert.equal(named.returning.fileRole, 'primary');
+    assert.equal(named.returning.nextVisit, 'carpet cleaning, Tuesday 10 AM');
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /create_appointment unless they ask for a new job/);
+    assert.match(formatBrainStateForPrompt(named), /open visit/i);
+    assert.equal(
+      pickPhaticReply({ language: 'en', callerMemory: profile.callerMemory }),
+      "I'm well. I have your visit on file. Is that why you called?"
+    );
 
     assert.equal(
-      inferIntent('Move my visit to Friday', { returning: seeded.returning }),
+      inferIntent('Move my visit to Friday', { returning: named.returning }),
       'cancellation'
     );
     assert.equal(
       inferIntent('Need carpet cleaning tomorrow Rongai', {
         vertical: 'home_services',
-        returning: seeded.returning,
+        returning: named.returning,
       }),
       'booking'
     );
 
-    const moved = observeCallerTurn(seeded, {
+    const moved = observeCallerTurn(named, {
       text: 'Move my visit to Friday',
       detectedLanguage: 'en',
       resolvedLanguage: 'en',
-      profile: { vertical: 'home_services', callerMemory: card },
+      profile,
     });
     assert.equal(moved.intent, 'cancellation');
     const decision = determineNextBestAction({
@@ -193,11 +251,11 @@ describe('returning-caller card', () => {
     assert.equal(decision.action, 'ASK_CLARIFICATION');
     assert.equal(decision.slot, 'when');
 
-    const vague = observeCallerTurn(seeded, {
+    const vague = observeCallerTurn(named, {
       text: 'Calling about my visit',
       detectedLanguage: 'en',
       resolvedLanguage: 'en',
-      profile: { vertical: 'home_services', callerMemory: card },
+      profile,
     });
     assert.equal(vague.intent, 'general_enquiry');
     const speakVisit = determineNextBestAction({
@@ -395,12 +453,30 @@ describe('returning-caller card', () => {
       'couch cleaning, 3 March',
     ]);
     assert.doesNotMatch(card.recentBookings.join(' '), /mattress clean/);
-    const block = formatReturningCallerForPrompt(card);
+    const unboundBlock = formatReturningCallerForPrompt(card);
+    assert.match(unboundBlock, /speaker not bound/i);
+    assert.doesNotMatch(unboundBlock, /Recent bookings/);
+    assert.doesNotMatch(unboundBlock, /carpet cleaning, last Tuesday/);
+
+    const profile = { vertical: 'home_services', callerMemory: card };
+    const unbound = createBrainState(profile);
+    assert.doesNotMatch(formatBrainStateForPrompt(unbound), /recent carpet cleaning/);
+
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    const state = observeCallerTurn(unbound, {
+      text: 'My name is Jane',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('My name is Jane', {
+        profile,
+        state: unbound,
+      }),
+    });
+    const block = formatReturningCallerForPrompt(profile.callerMemory);
     assert.match(block, /Recent bookings: carpet cleaning, last Tuesday; couch cleaning, 3 March/);
     assert.match(block, /Do not read them aloud as a list/);
     assert.doesNotMatch(block, /fumigation/);
-
-    const state = createBrainState({ vertical: 'home_services', callerMemory: card });
     assert.match(formatBrainStateForPrompt(state), /recent carpet cleaning/);
     assert.equal(
       inferIntent('Last time you came for carpet', { returning: state.returning }),
@@ -410,7 +486,7 @@ describe('returning-caller card', () => {
       text: 'Last time you came for carpet',
       detectedLanguage: 'en',
       resolvedLanguage: 'en',
-      profile: { vertical: 'home_services', callerMemory: card },
+      profile,
     });
     const decision = determineNextBestAction({
       state: asked,
@@ -422,5 +498,41 @@ describe('returning-caller card', () => {
 
     const asOther = bindCallerMemoryCard(card, 'Brian');
     assert.deepEqual(asOther.recentBookings, []);
+  });
+
+  it('hides this phone file visit from OPEN VISITS until the speaker is bound', () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        metadata: {},
+      },
+    });
+    const visits = [
+      {
+        when_text: 'Tue 10 AM',
+        service_name: 'Carpet',
+        status: 'requested',
+        caller_phone: '+254700000001',
+      },
+      {
+        when_text: 'Wed 2 PM',
+        service_name: 'Sofa',
+        status: 'requested',
+        caller_phone: '+254700000099',
+      },
+    ];
+    const pending = selectOpenVisitsForPrompt(visits, card);
+    assert.equal(pending.length, 1);
+    assert.equal(pending[0].service_name, 'Sofa');
+
+    const bound = bindCallerMemoryCard(card, 'Jane');
+    const owned = selectOpenVisitsForPrompt(visits, bound);
+    assert.equal(owned.length, 2);
+
+    const other = bindCallerMemoryCard(card, 'Brian');
+    const stripped = selectOpenVisitsForPrompt(visits, other);
+    assert.equal(stripped.length, 1);
+    assert.equal(stripped[0].service_name, 'Sofa');
   });
 });
