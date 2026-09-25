@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
 import { resolveWalletBalanceKes } from "@/lib/wallet";
@@ -134,6 +135,7 @@ export async function adjustTenantWallet(opts: {
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {
+  await connection();
   const admin = getSupabaseAdmin();
   const since = new Date();
   since.setDate(since.getDate() - 7);
