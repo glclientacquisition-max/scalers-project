@@ -120,6 +120,8 @@ Do not crank TTS speed to sound more human. Freeze `/healthz` `gitSha` + `voiceP
 
 Protocol: [`VOICE_NATURALNESS.md`](./VOICE_NATURALNESS.md). Scanner: `node scripts/score-voice-naturalness.js --file turns.json`. Isolated-string listen pass remains `npm run tts:listen-harness`.
 
+OSS setups that already sound human, and which pieces transfer onto Soniox: [`../specs/voice-human-naturalness-research.md`](../specs/voice-human-naturalness-research.md). Do not crank speed from that note.
+
 ## Good first tickets
 
 - Staging spike: Stream-stop → `<Dial>` (see [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) Spike 0). Do not enable `liveTransfer` until that spike is green.
