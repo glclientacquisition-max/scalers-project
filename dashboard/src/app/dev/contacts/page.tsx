@@ -21,8 +21,6 @@ import {
 } from "@/lib/contactPersonFile";
 import { contactLastCallFact, type ContactListRow, type ContactTimelineEntry } from "@/lib/contactsLoad";
 
-export const dynamic = "force-dynamic";
-
 function ProfileLead({
   title,
   phone,

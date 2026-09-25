@@ -31,6 +31,9 @@ import { formatEscalationDelivery } from "@/lib/escalationDelivery";
 import { formatLiveConnectStamp } from "@/lib/deskLiveTransfer";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 
+// instant = false: request-time desk data under the owner auth shell.
+export const instant = false;
+
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
 

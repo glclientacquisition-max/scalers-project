@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import type { User } from "@supabase/supabase-js";
@@ -23,16 +24,16 @@ function tokenMatches(token: string | undefined): boolean {
 }
 
 /** Shared-password cookie session (ops / demo). */
-export async function isLegacyAuthenticated(): Promise<boolean> {
+export const isLegacyAuthenticated = cache(async (): Promise<boolean> => {
   const password = process.env.DASHBOARD_PASSWORD;
   if (!password) {
     return process.env.DASHBOARD_OPEN === "true";
   }
   const jar = await cookies();
   return tokenMatches(jar.get(COOKIE)?.value) || tokenMatches(jar.get(LEGACY_COOKIE)?.value);
-}
+});
 
-export async function getAuthUser(): Promise<User | null> {
+export const getAuthUser = cache(async (): Promise<User | null> => {
   try {
     const supabase = await createSupabaseServerClient();
     const {
@@ -42,7 +43,7 @@ export async function getAuthUser(): Promise<User | null> {
   } catch {
     return null;
   }
-}
+});
 
 /** True if Supabase Auth session OR legacy shared-password cookie is valid. */
 export async function isAuthenticated(): Promise<boolean> {

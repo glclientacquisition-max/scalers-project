@@ -6,6 +6,9 @@ import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
 
+// instant = false: request-time Super Admin data under the admin auth shell.
+export const instant = false;
+
 function Kpi({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-surface px-5 py-4">

@@ -4,6 +4,9 @@ import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 
+// instant = false: request-time desk data under the owner auth shell.
+export const instant = false;
+
 export default async function ContactImportPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {

@@ -13,6 +13,9 @@ import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 
+// instant = false: request-time desk data under the owner auth shell.
+export const instant = false;
+
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
   if (kind === "line_rental") return "Line fee";

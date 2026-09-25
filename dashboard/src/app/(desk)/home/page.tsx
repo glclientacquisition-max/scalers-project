@@ -41,6 +41,9 @@ import {
   walletRunwayLabel,
 } from "@/lib/wallet";
 
+// instant = false: request-time desk data under the owner auth shell.
+export const instant = false;
+
 export default async function HomeOverviewPage() {
   const tenant = await getCurrentTenant();
   if (!tenant) {

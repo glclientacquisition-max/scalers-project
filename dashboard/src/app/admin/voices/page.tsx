@@ -6,6 +6,9 @@ import {
   type PlatformSonioxVoiceRow,
 } from "@/lib/sonioxVoiceCatalog";
 
+// instant = false: request-time Super Admin data under the admin auth shell.
+export const instant = false;
+
 export default async function AdminVoicesPage() {
   let voices: PlatformSonioxVoiceRow[] = [];
   let loadError: string | null = null;

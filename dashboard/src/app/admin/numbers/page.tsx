@@ -5,6 +5,9 @@ import { SautikitSyncButton } from "@/components/SautikitSyncButton";
 import { logAdminError } from "@/lib/adminErrors";
 import { listDidPool, listPendingTenants } from "@/lib/didPool";
 
+// instant = false: request-time Super Admin data under the admin auth shell.
+export const instant = false;
+
 export default async function AdminNumbersPage() {
   let pool;
   let pendingBusinesses;
