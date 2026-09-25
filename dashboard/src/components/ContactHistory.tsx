@@ -106,13 +106,13 @@ export function ContactHistory({
       </div>
       <div className="mt-3">
         <label className="sr-only" htmlFor="contact-history-search">
-          Search this history
+          Search
         </label>
         <input
           id="contact-history-search"
           type="search"
           value={value}
-          placeholder="Search this history"
+          placeholder="Search"
           className={deskFieldClass}
           onChange={(event) => {
             const next = event.currentTarget.value.slice(0, 64);

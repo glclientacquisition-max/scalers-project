@@ -1,7 +1,5 @@
-/** Shared list page size for Inbox, Contacts, and Usage. */
 export const DEFAULT_PAGE_SIZE = 25;
 
-/** Keep a page query inside the real page count. Empty lists stay on page 1. */
 export function clampListPage(page: number, total: number, pageSize: number): number {
   const size = Math.max(1, Math.floor(pageSize) || 1);
   const pages = Math.max(1, Math.ceil(Math.max(0, total) / size));

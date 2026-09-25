@@ -252,17 +252,19 @@ export function InboxPileNavProvider({
     setLocalPage(next);
     const text = sanitizeSearchQuery(localQ);
     if (localPurpose === "archived") {
-      const q = new URLSearchParams();
-      q.set("purpose", "archived");
-      if (text) q.set("q", text);
-      if (from) q.set("from", from);
-      const back = Number.parseInt(String(rpage || ""), 10);
-      if (Number.isFinite(back) && back > 1) q.set("rpage", String(back));
-      if (next > 1) q.set("page", String(next));
-      if (view) q.set("view", view);
-      if (week) q.set("week", week);
-      if (day) q.set("day", day);
-      router.replace(`/calls?${q.toString()}`);
+      router.replace(
+        inboxArchivedHref(
+          {
+            purpose: from,
+            q: text || undefined,
+            page: rpage,
+            view,
+            week,
+            day,
+          },
+          next
+        )
+      );
       return;
     }
     router.replace(

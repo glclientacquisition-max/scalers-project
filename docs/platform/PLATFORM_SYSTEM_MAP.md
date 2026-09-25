@@ -134,7 +134,7 @@ Tools that write the business: `save_caller_info`, `create_service_request`, `cr
 
 Code for cold Dial is real: `queuePendingLiveTransfer`, `/voice/transfer`, `saveTransferAttempt`, billing helpers. ADR-0004 executor is **superseded**: StreamStopped rides `events_url` (cannot return Dial); Redirect after `<Stream connect="true"/>` did not run on staging (`HD_ae71b5349f5e`, `HD_4f14d4d55244`). Next lab is **conference + REST outbound**, not another WS-close.
 
-Desk Train copy today (`TenantForm.tsx`): if the executor env is **off**, live_transfer shows “Coming soon. Today we message {name}.” If someone turns `VOICE_LIVE_TRANSFER=on` on the **desk** host without a working conference, the same panel will say **“Rings {name} during open hours.”** That is the remaining lie. Voice host and Vercel env must stay **off** until a human actually rings.
+Desk Train copy today (`TenantForm.tsx`): if the executor env is **off**, live_transfer shows “Messages {name}.” If someone turns `VOICE_LIVE_TRANSFER=on` on the **desk** host without a working conference, the same panel will say **“Rings {name} during open hours.”** That is the remaining lie. Voice host and Vercel env must stay **off** until a human actually rings.
 
 Call detail already stamps `live_connect` when escalate runs and transfer did not (`Notify only (live connect unavailable)`). Keep that.
 

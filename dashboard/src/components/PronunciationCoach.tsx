@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ListPager } from "@/components/ui/ListPager";
+import { Pagination } from "@/components/ui/Pagination";
 import {
   useActionState,
   useEffect,
@@ -220,7 +220,6 @@ export function PronunciationCoach({
     const fd = new FormData();
     fd.set("id", tenantId);
     loadQueueAction(fd);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   useEffect(() => {
@@ -769,7 +768,7 @@ export function PronunciationCoach({
           ) : (
             <>
               {active ? (
-                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-surface via-accent-soft/35 to-surface px-4 py-4 sm:px-5">
+                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-surface px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                       {active.label}
@@ -1048,7 +1047,7 @@ export function PronunciationCoach({
                   );
                 })}
               </ul>
-              <ListPager
+              <Pagination
                 page={safeLexiconPage + 1}
                 pageSize={LEXICON_PAGE_SIZE}
                 total={lexicon.length}
@@ -1075,7 +1074,6 @@ export function PronunciationCoach({
 
       {mode === "fix" ? (
         <div className="space-y-8">
-          {/* 1) Needs review — decisions first */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
