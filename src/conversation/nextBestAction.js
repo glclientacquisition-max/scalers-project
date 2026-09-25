@@ -3,6 +3,10 @@
 
 const { ACTIONS, authorizeAction } = require('./brainPolicy');
 const { returningFileUsable } = require('./callerMemory');
+const {
+  looksLikeExistingVisitTalk,
+  looksLikePastBookingTalk,
+} = require('./visitTalk');
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -13,18 +17,6 @@ const DIRECT_ANSWER_INTENTS = new Set([
 ]);
 
 const REQUEST_INTENTS = new Set(['hold', 'order', 'booking', 'cancellation']);
-
-function looksLikeExistingVisitTalk(value) {
-  return /\b(my visit|my appointment|the visit|that visit|ziara yangu|ile ziara|still coming|confirm(ing)? (the |my )?(visit|appointment))\b/i.test(
-    String(value || '')
-  );
-}
-
-function looksLikePastBookingTalk(value) {
-  return /\b(last (time|visit|job|booking|appointment)|previous (visit|booking|job)|last time you (came|were)|ile mara|mara ya mwisho)\b/i.test(
-    String(value || '')
-  );
-}
 
 function determineNextBestAction({ state, capabilities = {} } = {}) {
   const intent = String(state?.intent || 'unknown');
@@ -100,7 +92,10 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       };
     }
     const pastTalk =
-      looksLikePastBookingTalk(said) || looksLikePastBookingTalk(latest);
+      looksLikePastBookingTalk(said) ||
+      looksLikePastBookingTalk(latest) ||
+      looksLikeExistingVisitTalk(said) ||
+      looksLikeExistingVisitTalk(latest);
     if (
       pastTalk &&
       Array.isArray(returning?.recentBookings) &&
@@ -163,6 +158,29 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   }
 
   if (REQUEST_INTENTS.has(intent)) {
+    const said = String(state?.goal?.description || '');
+    const latest = String(
+      (state?.conversation?.answersReceived || []).slice(-1)[0] || ''
+    );
+    const fileTalk =
+      looksLikeExistingVisitTalk(said) ||
+      looksLikeExistingVisitTalk(latest) ||
+      looksLikePastBookingTalk(said) ||
+      looksLikePastBookingTalk(latest);
+    const returning = state?.returning;
+    if (
+      fileTalk &&
+      returningFileUsable(returning) &&
+      (returning?.nextVisit ||
+        (Array.isArray(returning?.recentBookings) && returning.recentBookings.length))
+    ) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason: returning?.nextVisit
+          ? 'Unique returning line with an open visit. Speak to that visit. Do not start a new book or re-ask the name. If they want it moved, collect only the new when.'
+          : 'Returning file has recent bookings. Speak to the matching past job. Do not read them as a list. Do not start a new book unless they ask for a new job.',
+      };
+    }
     const request = authorizeAction(ACTIONS.CREATE_REQUEST, capabilities);
     const homeVisit =
       String(state?.vertical || '').toLowerCase() === 'home_services';
