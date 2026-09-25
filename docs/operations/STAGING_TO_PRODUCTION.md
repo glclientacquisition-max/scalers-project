@@ -43,7 +43,7 @@ If Voice: land on cursor/staging-voice-468b (Railway auto-deploys)
       ↓
 Confirm staging /healthz.gitSha, then DID test
       ↓
-Test Desk on Vercel preview or scalers-staging.vercel.app
+Test Desk on scalers-staging.vercel.app (same SHA as Voice)
       ↓
 PR → CI green → merge to main
       ↓
