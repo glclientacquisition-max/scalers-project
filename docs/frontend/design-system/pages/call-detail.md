@@ -17,7 +17,7 @@
 
 **Banner:** Confirm only when an appointments row is requested and the call is not archived. Hold Done only when a service_request is open and the call is not archived. Not for intent-only, Human, or Missed. Sits above the SMS dock, full width.
 
-**SMS dock:** Shown when `needsYou` and the call is not archived. Growing input, Polish, then Send. Polish tightens the draft (`polishInboxSmsAction`). It does not invent an empty message. Send stays the filled primary. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm or Done. WhatsApp stays on the action dock. No second caption. Spans the viewport under the split so Send stays docked at the bottom.
+**SMS dock:** Shown on the open ticket. Mark done does not hide it. Hidden when archived. Growing input, Polish, then Send. Polish tightens the draft (`polishInboxSmsAction`). It does not invent an empty message. Send stays the filled primary. Uses `sendInboxReplySms`, distinct from auto-SMS on Confirm or Done. WhatsApp stays on the action dock. No second caption. Spans the viewport under the split so Send stays docked at the bottom.
 
 **Back:** `DeskBack` in `DeskRecordLead` (`align="center"`). Icon-only chevron, 44px muted ghost. `aria-label` / `title` is Inbox. `DeskHint` shows Inbox on hover. Sits in the header row with the contact and More. Same lead recipe as the contact file. Never a solo back row.
 

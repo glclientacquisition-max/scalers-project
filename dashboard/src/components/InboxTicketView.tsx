@@ -657,7 +657,7 @@ export function InboxTicketView({
         </div>
       ) : null}
 
-      {needsYou && !archived ? (
+      {!archived ? (
         <InboxSmsDock callId={callId} callerPhone={callerPhone} />
       ) : null}
     </div>

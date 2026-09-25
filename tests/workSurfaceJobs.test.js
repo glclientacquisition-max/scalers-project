@@ -94,6 +94,6 @@ describe("work surface jobs on unified inbox", () => {
     assert.match(composer, /Send SMS/);
     assert.match(composer, /if \(!callerSmsOn\) return null/);
     assert.match(read("dashboard/src/components/InboxSmsDock.tsx"), /sendInboxReplySms/);
-    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /needsYou && !archived/);
+    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /\{!archived \? \(/);
   });
 });

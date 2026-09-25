@@ -139,5 +139,6 @@ describe("P0 #5 desk ping teammate", () => {
     assert.match(server, /app\.post\('\/internal\/desk\/escalate'/);
     assert.match(server, /force: req\.body\?\.force !== false/);
     assert.match(server, /const force = escalate\.force === true/);
+    assert.match(server, /kind: 'escalation',\s*force,/);
   });
 });

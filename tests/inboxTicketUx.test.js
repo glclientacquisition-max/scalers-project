@@ -22,7 +22,7 @@ describe("inbox ticket action chrome", () => {
     assert.match(ticket, /border border-line bg-surface text-ink/);
     assert.match(ticket, /sr-only">Jump to latest/);
     assert.match(ticket, /InboxSmsDock/);
-    assert.match(ticket, /needsYou && !archived \? \(/);
+    assert.match(ticket, /\{!archived \? \(/);
     assert.doesNotMatch(detail, /LeadStatusToggle/);
     assert.doesNotMatch(ticket, /LeadStatusToggle/);
     assert.doesNotMatch(detail, /MarkLeadDoneButton/);
@@ -107,8 +107,8 @@ describe("inbox ticket action chrome", () => {
     assert.doesNotMatch(dock, /[\u2014\u2013]/);
   });
 
-  it("hides the SMS dock when the call is not Needs you", () => {
-    assert.match(ticket, /needsYou && !archived \? \(/);
+  it("keeps the SMS dock after Mark done and hides it when archived", () => {
+    assert.match(ticket, /\{!archived \? \(/);
     assert.match(ticket, /InboxSmsDock callId=\{callId\} callerPhone=\{callerPhone\}/);
     assert.match(dock, /callerPhone/);
     const row = read("dashboard/src/components/InboxItemRow.tsx");
