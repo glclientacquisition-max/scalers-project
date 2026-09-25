@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AddContactPanel } from "@/components/AddContactPanel";
 import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
 import { ContactsSearch } from "@/components/ContactsSearch";
@@ -8,7 +9,8 @@ import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { DeskLandScope } from "@/components/ui/DeskLand";
-import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
+import { Pagination } from "@/components/ui/Pagination";
+import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
   deskEmptyClass,
   deskListTitleClass,
@@ -84,6 +86,11 @@ export default async function ContactsPage({
 
   if (error) {
     return <DeskError>Could not load contacts.</DeskError>;
+  }
+
+  const safePage = clampListPage(page, total, PAGE_SIZE);
+  if (safePage !== page) {
+    redirect(contactsHref({ saved, sort, q, page: safePage }));
   }
 
   const listParams = {

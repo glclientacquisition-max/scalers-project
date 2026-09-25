@@ -200,6 +200,11 @@ export function ContactHistory({
               </tbody>
             </table>
           </div>
+          {rows.length > CONTACT_HISTORY_PAGE ? (
+            <p className="mt-3 text-sm text-ink-soft">
+              1-{visible.length} of {rows.length}
+            </p>
+          ) : null}
           {remaining > 0 ? (
             <button
               type="button"

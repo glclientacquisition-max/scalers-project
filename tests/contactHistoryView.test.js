@@ -81,6 +81,7 @@ describe("contact history view more", () => {
       "utf8"
     );
     assert.match(src, /View more/);
+    assert.match(src, /1-\{visible\.length\} of \{rows\.length\}/);
     assert.match(src, /data-contact-history-more/);
     assert.match(src, /pageContactHistory/);
   });
