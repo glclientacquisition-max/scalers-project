@@ -81,7 +81,7 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | --- | --- |
 | Supabase | `sgcdncjxauhsbunobmob` (no production data) |
 | Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`) |
-| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`) |
+| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`; pin: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md)) |
 | SautiKit | Test DID(s) pointing at staging voice URL |
 
 Validate database changes on staging before production. Never use production credentials for staging tests.
