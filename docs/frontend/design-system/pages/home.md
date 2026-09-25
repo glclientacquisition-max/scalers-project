@@ -20,7 +20,7 @@
 
 **One blue action per screen.** The aside CTA is the work primary. Next to return uses a ghost WhatsApp button (green glyph). Post update is the Updates primary, docked to Callers hear.
 
-**Aside sections.** Today, Line, and prepaid balance are hairline-separated sections. Values self-label: `Line live` + DID, `KES 0` + Top up. No caps headings on self-evident data rows. Caps eyebrows introduce content regions only (Next to return). Prepaid always shows the balance; `Top up` appears only when low. Line shows the formatted DID (`+254 700 000 000`). Beta workspaces skip the prepaid section entirely (metered, never charged). When the balance lasts 1 to 90 days at the current call pace, a quiet caption says so (`about 3 weeks at this pace`, same math as Usage).
+**Aside sections.** Today, Line, and prepaid balance are hairline-separated sections. Values self-label: `Line live` + DID, `KES 0` + Top up. No caps headings on self-evident data rows. Caps eyebrows introduce content regions only (Next to return). Prepaid always shows the balance; `Top up` appears only when low. Line shows the formatted DID (`+254 700 000 000`). Beta workspaces skip the prepaid section entirely (metered, never charged). When the balance lasts 1 to 90 days at the current call pace, a quiet caption says so (`about 3 weeks at this pace`). Home uses the light duration query and inbound rate. Usage can pass month call spend into the same `runwayDaysAtPace` helper.
 
 **Row density and count weight.** Queue rows are `min-h-12` on phone, `min-h-11` at `lg`. Counts are `text-base font-semibold` so the largest queue (85 to return) holds its own against the blue CTA.
 

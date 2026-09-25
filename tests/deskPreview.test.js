@@ -52,6 +52,16 @@ describe("desk preview truncate", () => {
     assert.doesNotMatch(home, /overflow-wrap:anywhere/);
   });
 
+  it("clamps Usage ledger previews to one line on phone and table", () => {
+    const wallet = read("dashboard/src/app/(desk)/wallet/page.tsx");
+    assert.match(wallet, /md:hidden/);
+    assert.match(wallet, /hidden md:block/);
+    assert.match(wallet, /deskPreviewClass/);
+    assert.match(wallet, /deskPreviewCellClass/);
+    assert.doesNotMatch(wallet, /line-clamp-2/);
+    assert.doesNotMatch(wallet, /overflow-wrap:anywhere/);
+  });
+
   it("clamps Contacts phone rows to name plus one preview", () => {
     const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
     const phone = read("dashboard/src/components/ContactListRow.tsx");

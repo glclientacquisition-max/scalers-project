@@ -52,7 +52,8 @@ describe("wallet runway", () => {
   it("renders the owner ledger as a dense table", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
     assert.match(page, /recentLedger\.map/);
-    assert.match(page, /<table className="mt-2 w-full text-left text-sm">/);
+    assert.match(page, /DeskDataTable/);
+    assert.match(page, /hidden md:block/);
     assert.match(page, /px-4 py-2/);
     assert.doesNotMatch(page, /divide-y divide-line/);
     assert.doesNotMatch(page, /getWalletLedger|rpc\(/);

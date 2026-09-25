@@ -5,16 +5,23 @@ import {
   WALLET_RATE_KES_PER_MINUTE,
   WALLET_TRANSFER_RATE_KES_PER_MINUTE,
   getTenantUsageSummary,
+  walletRunwayLabel,
+  type WalletLedgerRow,
 } from "@/lib/wallet";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 import { WalletTopUpButton } from "@/components/WalletTopUpButton";
 import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
-import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
-
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
+import { DeskDataTable } from "@/components/ui/DeskDataTable";
+import {
+  deskListTitleClass,
+  deskPreviewCellClass,
+  deskPreviewClass,
+  deskShiftClass,
+} from "@/components/ui/deskChrome";
+import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { inboxRecordHref } from "@/lib/inboxHref";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -23,6 +30,32 @@ function kindLabel(kind: string): string {
   if (kind === "topup") return "Top-up";
   if (kind === "trial_credit") return "Trial credit";
   return kind;
+}
+
+function ledgerCallHref(row: WalletLedgerRow): string | null {
+  if (row.kind !== "call_charge") return null;
+  const id = String(row.reference_id || "").trim();
+  return id ? inboxRecordHref(id) : null;
+}
+
+function ledgerAmountClass(credit: boolean): string {
+  return credit ? "text-accent-deep" : "text-ink";
+}
+
+function LedgerAmount({
+  amountKes,
+  className,
+}: {
+  amountKes: number;
+  className?: string;
+}) {
+  const credit = amountKes > 0;
+  return (
+    <span className={`tabular-nums font-medium ${ledgerAmountClass(credit)} ${className || ""}`}>
+      {credit ? "+" : ""}
+      {amountKes.toLocaleString("en-KE")}
+    </span>
+  );
 }
 
 export default async function WalletPage() {
@@ -64,24 +97,25 @@ export default async function WalletPage() {
     hasSmsMeter &&
     smsUsed >= smsIncluded &&
     !tenant.on_demand_usage_enabled;
+  const runway =
+    !usage.isBeta ? walletRunwayLabel(usage.daysRemainingAtPace) : null;
+  const monthKes = usage.isBeta ? usage.estimatedCostKes : billedThisMonth;
 
   return (
-    <div className="max-w-3xl">
-      <header className="space-y-3">
+    <div className="max-w-3xl min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <h1 className={deskListTitleClass}>Usage</h1>
-        <div className="flex flex-wrap items-start justify-end gap-4">
-          {usage.isBeta ? (
-            <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-accent/30 bg-accent/5 px-6 py-3 text-sm font-medium text-accent-deep">
-              Free beta
-            </span>
-          ) : (
-            <WalletTopUpButton
-              tenantId={tenant.id}
-              topUpEnabled={topUpConfig.enabled}
-              presets={topUpConfig.presets}
-            />
-          )}
-        </div>
+        {usage.isBeta ? (
+          <span className="inline-flex min-h-11 items-center rounded-xl border border-accent/30 bg-accent/5 px-4 text-sm font-medium text-accent-deep">
+            Free beta
+          </span>
+        ) : (
+          <WalletTopUpButton
+            tenantId={tenant.id}
+            topUpEnabled={topUpConfig.enabled}
+            presets={topUpConfig.presets}
+          />
+        )}
       </header>
 
       {(prepaidEmpty || prepaidLow || smsExhausted) && !usage.isBeta ? (
@@ -91,21 +125,21 @@ export default async function WalletPage() {
               {prepaidEmpty
                 ? tenant.on_demand_usage_enabled
                   ? "Prepaid empty. On-demand is on."
-                  : "Prepaid empty. Top up or enable on-demand below."
+                  : "Prepaid empty. Top up or turn on on-demand."
                 : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
             </p>
           ) : null}
           {smsExhausted ? (
             <p className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
-              Included SMS used. Enable on-demand or wait for the next pack.
+              Included SMS used. Turn on on-demand or wait for the next pack.
             </p>
           ) : null}
         </div>
       ) : null}
 
-      <section className="mt-8 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+      <section className="mt-6 rounded-2xl border border-line bg-surface p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-6">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
               Prepaid balance
             </p>
@@ -117,40 +151,53 @@ export default async function WalletPage() {
             >
               KES {usage.walletBalanceKes.toLocaleString("en-KE")}
             </p>
-            <p className="mt-2 text-sm text-ink-soft">
-              {usage.isBeta ? "Metered. No charges during beta." : "Line fee and call minutes"}
-            </p>
+            {runway ? (
+              <p className="mt-2 text-sm text-ink-soft">{runway}</p>
+            ) : (
+              <p className="mt-2 text-sm text-ink-soft">
+                {usage.isBeta ? "Metered. No charges." : "Line fee and minutes"}
+              </p>
+            )}
           </div>
           <dl className="grid min-w-[12rem] gap-4 sm:grid-cols-2">
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">
                 {usage.isBeta ? "Est. month" : "Billed month"}
               </dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
-                KES{" "}
-                {(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString(
-                  "en-KE"
-                )}
+              <dd className="mt-1 text-lg font-semibold tabular-nums text-ink">
+                KES {monthKes.toLocaleString("en-KE")}
               </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Calls</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">{usage.callsThisMonth}</dd>
+              <dd className="mt-1 text-lg font-semibold tabular-nums text-ink">
+                {usage.callsThisMonth}
+              </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Minutes</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">{usage.minutesThisMonth}</dd>
+              <dd className="mt-1 text-lg font-semibold tabular-nums text-ink">
+                {usage.minutesThisMonth.toLocaleString("en-KE")}
+              </dd>
             </div>
+            {usage.transferMinutesThisMonth > 0 ? (
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-ink-soft">Transfer</dt>
+                <dd className="mt-1 text-lg font-semibold tabular-nums text-ink">
+                  {usage.transferMinutesThisMonth.toLocaleString("en-KE")}
+                </dd>
+              </div>
+            ) : null}
             <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
+              <dd className="mt-1 text-lg font-semibold tabular-nums text-ink">
                 KES {usage.lineFeeKes.toLocaleString("en-KE")}
               </dd>
             </div>
             {hasSmsMeter ? (
               <div>
                 <dt className="text-xs uppercase tracking-wide text-ink-soft">SMS</dt>
-                <dd className="mt-1 text-lg font-semibold text-ink">
+                <dd className="mt-1 text-lg font-semibold tabular-nums text-ink">
                   {smsUsed.toLocaleString("en-KE")} / {smsIncluded.toLocaleString("en-KE")}
                 </dd>
               </div>
@@ -158,28 +205,28 @@ export default async function WalletPage() {
           </dl>
         </div>
 
-        <dl className="mt-8 grid gap-3 border-t border-line pt-6 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+        <dl className="mt-8 grid gap-3 border-t border-line pt-6 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="text-ink-soft">Inbound</dt>
-            <dd className="mt-1 font-medium text-ink">
+            <dd className="mt-1 font-medium tabular-nums text-ink">
               KES {WALLET_RATE_KES_PER_MINUTE}/min
             </dd>
           </div>
           <div>
             <dt className="text-ink-soft">Live transfer</dt>
-            <dd className="mt-1 font-medium text-ink">
+            <dd className="mt-1 font-medium tabular-nums text-ink">
               KES {WALLET_TRANSFER_RATE_KES_PER_MINUTE}/min
             </dd>
           </div>
           <div>
             <dt className="text-ink-soft">Line rental</dt>
-            <dd className="mt-1 font-medium text-ink">
+            <dd className="mt-1 font-medium tabular-nums text-ink">
               KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
             </dd>
           </div>
           <div>
             <dt className="text-ink-soft">Call charges</dt>
-            <dd className="mt-1 font-medium text-ink">
+            <dd className="mt-1 font-medium tabular-nums text-ink">
               KES {usage.callChargesKes.toLocaleString("en-KE")}
             </dd>
           </div>
@@ -190,63 +237,95 @@ export default async function WalletPage() {
         <OnDemandUsagePanel
           tenantId={tenant.id}
           enabled={Boolean(tenant.on_demand_usage_enabled)}
-          isBeta={usage.isBeta}
-          walletBalanceKes={usage.walletBalanceKes}
-          lowThresholdKes={lowThreshold}
         />
       </div>
 
-      <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
-        <h2 className="px-4 pt-4 font-display text-xl tracking-tight text-ink">Recent activity</h2>
+      <section className="mt-6">
+        <h2 className="font-display text-xl tracking-tight text-ink">Recent activity</h2>
         {usage.recentLedger.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-ink-soft">
+          <p className="mt-3 text-sm text-ink-soft">
             {usage.isBeta ? "No charges during beta." : "No ledger entries yet."}
           </p>
         ) : (
-          <table className="mt-2 w-full text-left text-sm">
-            <thead className="border-b border-line text-ink-soft">
-              <tr>
-                <th scope="col" className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                  When
-                </th>
-                <th scope="col" className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                  Kind
-                </th>
-                <th
-                  scope="col"
-                  className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-[0.14em]"
-                >
-                  KES
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <ul className="mt-3 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">
               {usage.recentLedger.map((row) => {
-                const credit = row.amount_kes > 0;
+                const href = ledgerCallHref(row);
+                const title = kindLabel(row.kind);
+                const when = new Date(row.created_at).toLocaleString("en-KE");
+                const preview = row.note?.trim() || when;
                 return (
-                  <tr key={row.id} className="border-t border-line/70">
-                    <td className="whitespace-nowrap px-4 py-2 text-ink-soft">
-                      {new Date(row.created_at).toLocaleString("en-KE")}
-                    </td>
-                    <td className={`${deskPreviewCellClass} px-4 py-2`}>
-                      <p className={deskPreviewClass}>
-                        <span className="font-medium text-ink">{kindLabel(row.kind)}</span>
-                        {row.note ? <span className="text-ink-soft"> · {row.note}</span> : null}
-                      </p>
-                    </td>
-                    <td
-                      className={`px-4 py-2 text-right font-medium tabular-nums ${
-                        credit ? "text-accent-deep" : "text-ink"
-                      }`}
-                    >
-                      {credit ? "+" : ""}
-                      {row.amount_kes.toLocaleString("en-KE")}
-                    </td>
-                  </tr>
+                  <li
+                    key={row.id}
+                    className={`relative flex min-h-16 min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0 ${deskShiftClass}`}
+                  >
+                    <DeskRowHit href={href} label={title} />
+                    <div className={`${deskRowMutedClass} min-w-0 flex-1`}>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className={`text-sm font-semibold text-ink ${deskPreviewClass}`}>
+                          {title}
+                        </p>
+                        <LedgerAmount amountKes={row.amount_kes} className="shrink-0 text-sm" />
+                      </div>
+                      <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>{preview}</p>
+                    </div>
+                  </li>
                 );
               })}
-            </tbody>
-          </table>
+            </ul>
+            <div className="mt-3 hidden min-w-0 md:block">
+              <DeskDataTable minWidthClass="min-w-0">
+                <thead className="border-b border-line text-ink-soft">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                      When
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                      Kind
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                      KES
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usage.recentLedger.map((row) => {
+                    const href = ledgerCallHref(row);
+                    const title = kindLabel(row.kind);
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`relative border-t border-line/70 ${href ? `cursor-pointer ${deskShiftClass} hover:bg-accent/[0.04]` : ""}`}
+                      >
+                        <td className="whitespace-nowrap px-4 py-2 text-ink-soft">
+                          {href ? <DeskRowHit href={href} label={title} /> : null}
+                          {new Date(row.created_at).toLocaleString("en-KE")}
+                        </td>
+                        <td className={`${deskPreviewCellClass} px-4 py-2`}>
+                          <p className={deskPreviewClass}>
+                            <span className="font-medium text-ink">{title}</span>
+                            {row.note ? <span className="text-ink-soft"> · {row.note}</span> : null}
+                          </p>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <LedgerAmount amountKes={row.amount_kes} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </DeskDataTable>
+            </div>
+          </>
         )}
       </section>
     </div>

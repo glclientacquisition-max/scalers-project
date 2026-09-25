@@ -1,5 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import {
+  estimatedCallCostKes as estimatedCallCostKesMath,
+  isLiveTransferSummary,
+  minutesFromCallRows,
+  runwayDaysAtPace as runwayDaysAtPaceMath,
+  splitCallMinutes,
+} from "@/lib/walletMath";
+
+export { isLiveTransferSummary, splitCallMinutes };
 
 /** Retail rate card (KES). AI usage is bundled into the per-minute rate. */
 export const WALLET_RATE_KES_PER_MINUTE = Number(
@@ -54,6 +63,8 @@ export type TenantUsageSummary = {
   callsThisMonth: number;
   secondsThisMonth: number;
   minutesThisMonth: number;
+  inboundMinutesThisMonth: number;
+  transferMinutesThisMonth: number;
   estimatedCostKes: number;
   callChargesKes: number;
   lineFeeKes: number;
@@ -151,41 +162,29 @@ export function isBetaBilling(billingEnforcement?: string | null): boolean {
   return (billingEnforcement || "off") === "off";
 }
 
-/** Month-to-date call minutes from durations or the AI minutes column. */
-function minutesFromCallRows(
-  rows: { duration_seconds: number | null; ai_processing_minutes: number | null }[]
-): { seconds: number; minutes: number } {
-  let seconds = 0;
-  let minutesFromCol = 0;
-  let usedAiCol = false;
-  for (const row of rows) {
-    seconds += Math.max(0, Number(row.duration_seconds) || 0);
-    if (
-      row.ai_processing_minutes != null &&
-      Number.isFinite(Number(row.ai_processing_minutes))
-    ) {
-      minutesFromCol += Number(row.ai_processing_minutes);
-      usedAiCol = true;
-    }
-  }
-  return {
-    seconds,
-    minutes: usedAiCol
-      ? Math.round(minutesFromCol * 10) / 10
-      : Math.round((seconds / 60) * 10) / 10,
-  };
-}
-
 /** Days the prepaid balance lasts at the current call pace. Null when no pace or no balance. */
 export function runwayDaysAtPace(opts: {
   minutesThisMonth: number;
   dayOfMonth: number;
   balanceKes: number;
+  spentKesThisMonth?: number;
 }): number | null {
-  const minutesPerDay = opts.minutesThisMonth / Math.max(1, opts.dayOfMonth);
-  if (minutesPerDay <= 0 || opts.balanceKes <= 0) return null;
-  const kesPerDay = minutesPerDay * WALLET_RATE_KES_PER_MINUTE;
-  return Math.max(0, Math.round(opts.balanceKes / kesPerDay));
+  return runwayDaysAtPaceMath({
+    ...opts,
+    inboundRate: WALLET_RATE_KES_PER_MINUTE,
+  });
+}
+
+export function estimatedCallCostKes(
+  inboundMinutes: number,
+  transferMinutes: number
+): number {
+  return estimatedCallCostKesMath(
+    inboundMinutes,
+    transferMinutes,
+    WALLET_RATE_KES_PER_MINUTE,
+    WALLET_TRANSFER_RATE_KES_PER_MINUTE
+  );
 }
 
 /** Light runway read for surfaces that only need the pace caption (Home). One calls query. */
@@ -275,7 +274,7 @@ export async function getTenantUsageSummary(
   const [callsRes, ledgerRes, chargesRes] = await Promise.all([
     client
       .from("calls")
-      .select("duration_seconds, ai_processing_minutes")
+      .select("duration_seconds, ai_processing_minutes, summary")
       .eq("tenant_id", tenantId)
       .gte("created_at", since),
     client
@@ -295,9 +294,16 @@ export async function getTenantUsageSummary(
   if (callsRes.error) throw callsRes.error;
 
   const rows = callsRes.data || [];
-  const { seconds, minutes: minutesThisMonth } = minutesFromCallRows(rows);
+  const split = splitCallMinutes(rows);
+  const seconds = split.seconds;
+  const minutesThisMonth = split.minutes;
+  const inboundMinutesThisMonth = split.inboundMinutes;
+  const transferMinutesThisMonth = split.transferMinutes;
 
-  const estimatedCostKes = Math.round(minutesThisMonth * WALLET_RATE_KES_PER_MINUTE);
+  const estimatedCostKes = estimatedCallCostKes(
+    inboundMinutesThisMonth,
+    transferMinutesThisMonth
+  );
 
   let callChargesKes = 0;
   let lineFeeKes = 0;
@@ -314,6 +320,7 @@ export async function getTenantUsageSummary(
     minutesThisMonth,
     dayOfMonth,
     balanceKes: walletBalanceKes,
+    spentKesThisMonth: isBeta ? estimatedCostKes : callChargesKes,
   });
 
   const recentLedger: WalletLedgerRow[] = !ledgerRes.error
@@ -341,6 +348,8 @@ export async function getTenantUsageSummary(
     callsThisMonth: rows.length,
     secondsThisMonth: seconds,
     minutesThisMonth,
+    inboundMinutesThisMonth,
+    transferMinutesThisMonth,
     estimatedCostKes,
     callChargesKes,
     lineFeeKes,

@@ -16,9 +16,6 @@ export function OnDemandUsagePanel({
 }: {
   tenantId: string;
   enabled: boolean;
-  isBeta: boolean;
-  walletBalanceKes: number;
-  lowThresholdKes: number;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveOnDemandUsage, initial);
