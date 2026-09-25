@@ -98,7 +98,10 @@ export function inboxReturnFromSearch(sp: {
 }
 
 /** Open the Archived folder while keeping the pile the owner came from. */
-export function inboxArchivedHref(ret: InboxReturn = {}): string {
+export function inboxArchivedHref(
+  ret: InboxReturn = {},
+  archivedPage?: number | string
+): string {
   const q = new URLSearchParams();
   q.set("purpose", "archived");
   const text = cleanQuery(ret.q);
@@ -107,6 +110,8 @@ export function inboxArchivedHref(ret: InboxReturn = {}): string {
   if (id && id !== "archived") q.set("from", id);
   const page = pageNum(ret.page);
   if (page) q.set("rpage", String(page));
+  const folder = pageNum(archivedPage);
+  if (folder) q.set("page", String(folder));
   applyViewQuery(q, ret, id);
   return `/calls?${q.toString()}`;
 }

@@ -12,11 +12,13 @@ Replace the narrow “DID pool” ops page with a **Super Admin** control center
 
 | Role | Who | Access |
 | --- | --- | --- |
-| Super Admin (ops) | Legacy login `admin@scalers.local` + `DASHBOARD_PASSWORD` | `/admin/*` |
+| Super Admin (ops) | Username + access code (Better Auth). Host `admin.scalers.co.ke` when `ADMIN_HOST` is set. | `/admin/*` |
 | Business owner | Supabase Auth signup/login | Own `/calls` + `/settings` only |
 
 Requirements:
-- Super Admin routes must reject business-owner sessions (redirect to `/calls`).
+- Super Admin routes must reject business-owner sessions (redirect to `/home`).
+- Ops sign in at `/admin/login` with a username and access code. Not email. Env: `ADMIN_OPERATORS` or `ADMIN_ACCESS_CODE` + `ADMIN_USERNAMES`.
+- When `ADMIN_HOST=admin.scalers.co.ke`, the app host redirects `/admin` there. Add that hostname on the same Vercel project.
 - All admin mutations use the service-role server client (never expose service key to the browser).
 - Destructive actions require an explicit confirmation step.
 
@@ -93,7 +95,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Prompt wizard / onboarding questionnaire.
 - Dynamic SautiKit DID purchase API.
 - Multi-user roles inside a business (admin/member invites).
-- Google OAuth for Super Admin (keep shared ops password until SSO).
+- Google OAuth for Super Admin.
 
 ---
 

@@ -58,7 +58,7 @@ Same phone. Contact row exists. Open visit or last reason on the card.
 
 | Excellence | Gap |
 | --- | --- |
-| Instant greeting stays brand-first (latency). First *reasoned* turn uses the card: do not re-ask name; offer to move the open visit if that is why they called. | Card is injected. Instant TTS does **not** greet by name (by design). Many calls still sound like a first meeting because Gemini ignores RETURNING CALLER or last reason. |
+| Instant greeting stays brand-first (latency). First reasoned turn asks who is speaking. After this call binds the file owner, do not re-ask; offer to move the open visit if that is why they called. | Card is injected. Unique lines used to seed `nameConfirmed` from the previous speaker. Bind-before-use is the runtime contract. Instant TTS does **not** greet by name (by design). |
 | “Move my visit” updates the same row. | Playbook exists. Live pack #8 is not a CI gate. |
 
 ### 3. Shared homestead phone
@@ -67,7 +67,7 @@ Primary contact is Mama. Son calls from the same number. `alternate_names` set.
 
 | Excellence | Gap |
 | --- | --- |
-| Ask who is speaking. Do not say “Hi Jane.” Do not attach the son’s visit to Mama’s name. | Spec and seed rules exist. Live confirmation of identity is thin. Wrong-name SMS (`Haijawekwa`, `Calling`) still poisons the file for the next call. |
+| Ask who is speaking. Do not say “Hi Jane.” Do not attach the son’s visit to Mama’s name. Unique lines now ask the same bind question; a second name is not required before that ask. | Spec and seed rules exist. Wrong-name SMS (`Haijawekwa`, `Calling`) still poisons the candidate file for the next call. |
 
 ### 4. Panic emergency (burst pipe)
 

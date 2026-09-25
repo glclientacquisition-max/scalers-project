@@ -319,6 +319,7 @@ export function collectKnownCallerNames({
     callerMemory?: {
       fileOwnerName?: string | null;
       greetByName?: boolean;
+      identityBound?: boolean;
       fileRole?: string | null;
       name?: string | null;
       alternateNames?: string[];
@@ -340,10 +341,10 @@ export function collectKnownCallerNames({
   if (card?.fileOwnerName) {
     push(
       card.fileOwnerName,
-      card.greetByName && card.fileRole === "primary" ? "memory" : "file"
+      card.identityBound && card.fileRole === "primary" ? "memory" : "file"
     );
   }
-  if (card?.name) push(card.name, card.greetByName ? "memory" : "file");
+  if (card?.name) push(card.name, card.identityBound ? "memory" : "file");
   for (const alt of card?.alternateNames || []) push(alt, "alternate");
   push(state?.caller?.name, "state");
   return names;

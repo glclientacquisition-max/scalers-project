@@ -23,7 +23,7 @@ Every staff send uses a **Utility** template on the Scalers WhatsApp Business ac
 Do not submit caller templates in this batch. Do not submit quick-reply Confirm / Done buttons. Inbound is not wired. A button would look like it works and do nothing.
 
 **Category:** Utility  
-**Language:** English (`en`; set `SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en_US` if Manager requires it)  
+**Language:** English (US) (`en_US`). Set `SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en` only if Manager stored plain `en`.  
 **Header:** none  
 **Footer:** `Scalers`  
 **Buttons:** none  
@@ -33,7 +33,7 @@ After approval, set on the voice host:
 
 ```
 SAUTIKIT_WHATSAPP_TEMPLATE=scalers_staff_alert
-SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en
+SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en_US
 SAUTIKIT_WHATSAPP_TEMPLATE_LEAD=scalers_lead
 SAUTIKIT_WHATSAPP_TEMPLATE_ESCALATION=scalers_escalation
 SAUTIKIT_WHATSAPP_TEMPLATE_APPOINTMENT=scalers_visit
@@ -45,6 +45,8 @@ SAUTIKIT_WHATSAPP_TEMPLATE_OUTAGE=scalers_outage
 Kind env wins. If a kind name is unset, that event uses `SAUTIKIT_WHATSAPP_TEMPLATE` when set to a non-legacy name. If that is unset (or still `missed_call_lead`), the send path uses `scalers_staff_alert`. Do not set kind env until that kind name is Active.
 
 Desk: `NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE=true` (default on).
+
+A SautiKit `202` is not delivery. Meta error `131042` means the WhatsApp Business account has no currency. Session text inside an open 24h window can still arrive. Template pings do not, until WhatsApp Manager billing has a country and currency. The desk then shows "WhatsApp billing is not set."
 
 ## Bodies to paste
 
@@ -138,7 +140,7 @@ Do this in **WhatsApp Manager** on the **Scalers** WABA (Cloud `phone_number_id`
 3. Account tools → **Message templates** → **Create template**.
 4. Category: **Utility**. Not Marketing. Not Authentication.
 5. Name: exact table name (`scalers_staff_alert` first). Lowercase, underscores, no spaces.
-6. Language: **English (US)** in Manager. If sends then fail on language, set Railway `SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en_US`.
+6. Language: **English (US)** in Manager. Code defaults to `en_US`. Set Railway `SAUTIKIT_WHATSAPP_TEMPLATE_LANG=en` only if Manager stored plain `en`.
 7. Header: **None**. Footer: `Scalers`. Buttons: **None**.
 8. Body: paste from this file. Keep `{{1}}` `{{2}}` `{{3}}` as numbered variables.
 9. **Add sample** before submit. Meta rejects templates with empty samples.

@@ -10,10 +10,10 @@
 | Environment | Voice | Desk | Database | Status |
 | --- | --- | --- | --- | --- |
 | **Development** | Local `npm start` + tunnel | Local `npm run dev` | Supabase project (dev) | **ACTIVE** |
-| **Staging** | Staging deploy (optional) | Vercel preview | `sgcdncjxauhsbunobmob` (`scalers-staging`) | **ACTIVE** (Phase 3E) |
+| **Staging** | Railway `staging` on `cursor/staging-voice-468b` | Vercel `scalers-staging` on `cursor/staging-voice-468b` | `sgcdncjxauhsbunobmob` (`scalers-staging`) | **ACTIVE** |
 | **Production** | Railway (referenced) | Vercel (referenced) | ALCR `fjxcdccgyhnvnnlnovcl` | **ACTIVE** |
 
-**Governance gap:** Staging is not defined in the repository. Do not assume a staging environment exists.
+Staging Desk and Voice both follow **`cursor/staging-voice-468b`**. See [`DEVELOPMENT_WORKFLOW.md`](../governance/DEVELOPMENT_WORKFLOW.md).
 
 ---
 
@@ -80,9 +80,10 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | Component | Staging target |
 | --- | --- |
 | Supabase | `sgcdncjxauhsbunobmob` (no production data) |
-| Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`) |
-| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`) |
-| SautiKit | Test DID(s) pointing at staging voice URL |
+| Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`, branch `cursor/staging-voice-468b`) |
+| Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`, same branch). Production builds from any other branch are ignored. Why the URL used to flip: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md). |
+| Git branch | **`cursor/staging-voice-468b`**. Promote is squash-merge to `main`. Approved desk work that never reached `main` ships in the desk-stack PR onto `main` so it cannot vanish again. |
+| SautiKit | Test DID `+254709221536` pointing at staging voice URL |
 
 Validate database changes on staging before production. Never use production credentials for staging tests.
 
@@ -114,7 +115,8 @@ Validate database changes on staging before production. Never use production cre
 - `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_*`, `SAUTIKIT_*`, `SAUTIKIT_ADMIN_OPS_KEY`
 - `VOICE_PUBLIC_BASE_URL`, `VOICE_INTERNAL_SECRET`
-- `DASHBOARD_PASSWORD` (legacy Super Admin)
+- `BETTER_AUTH_SECRET`, `ADMIN_ACCESS_CODE` / `ADMIN_OPERATORS`, `ADMIN_HOST` (Super Admin)
+- `DASHBOARD_PASSWORD` (HMAC leftover)
 
 ### Cross-service secrets that must match
 

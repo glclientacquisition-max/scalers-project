@@ -20,11 +20,11 @@ TEST          — lane test gates (see below)
   ↓
 REVIEW        — PR with clear description; no unrelated changes
   ↓
-STAGING       — UNKNOWN today (see ../operations/ENVIRONMENTS.md)
+STAGING       — land on `cursor/staging-voice-468b` (see below)
   ↓
 BETA          — beta tenants; billing_enforcement=off default
   ↓
-PRODUCTION    — Railway voice + Vercel desk promote
+PRODUCTION    — squash-merge staging branch into `main`
 ```
 
 For AI agents, the mandatory sequence for significant changes:
@@ -65,6 +65,27 @@ Pick **one lane per PR**. Full contracts: `AGENTS.md` + `docs/agents/{LANE}.md`.
 **Historical branches:** Existing `cursor/*` branches are not renamed. Cloud agents may continue `cursor/<name>-d058` pattern until explicitly migrated.
 
 `main` is stable, production-capable code.
+
+## Staging branch (Desk + Voice)
+
+One integration branch: **`cursor/staging-voice-468b`**. Not a second git repo.
+
+| App | Follows | Official URL |
+| --- | --- | --- |
+| Staging Voice | Railway `scalers staging` → this branch | `https://scalers-staging-staging.up.railway.app` |
+| Staging Desk | Vercel `scalers-staging` production deploys from this branch. Production builds from any other branch are ignored. | `https://scalers-staging.vercel.app` |
+| Production Voice | Railway `scalers-project` → `main` | `https://scalers-project-production.up.railway.app` |
+| Production Desk | Vercel `scalers-project` → `main` | `https://scalers-project.vercel.app` |
+
+Day to day:
+
+1. Feature branch (one lane). PR preview on Desk is a glance only.
+2. Merge or push the work onto `cursor/staging-voice-468b`.
+3. Confirm Voice `/healthz.gitSha` and open `scalers-staging.vercel.app`. Call `+254709221536`.
+4. Open a PR **from that branch into `main`**. In Cursor / GitHub: **Mark as ready**, then **Squash and merge**. That is the promote. It ships everything already on the staging branch.
+5. Do not Vercel-Promote a preview onto `scalers-project`. Do not merge feature PRs straight to `main` to get a DID or staging-desk test.
+
+To ship one feature only: keep other unfinished work off the staging branch, or open a separate PR of that feature into `main` after it was tested on staging.
 
 ---
 

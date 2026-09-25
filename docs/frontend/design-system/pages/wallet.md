@@ -5,6 +5,6 @@
 
 **Hierarchy:** Large in-page Usage title (`deskListTitleClass`). No Wallet H1 and no product wordmark. Prepaid balance is the primary figure (`text-3xl sm:text-4xl`). Month billed, calls, minutes, and line fee are supporting facts (`text-lg`), not a second dashboard.
 
-**Keep:** rates, ledger as a dense table, on-demand, SMS used/included, top-up, beta caption. Do not invent KPIs.
+**Keep:** rates, ledger as a dense table, on-demand, SMS used/included, top-up, beta caption. Do not invent KPIs. Activity uses `Pagination` at 25 rows (`?page=`). A page past the end returns to the last page.
 
 **Warn:** `bg-warn-soft` when prepaid is empty or under the low threshold.

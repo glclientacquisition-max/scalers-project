@@ -101,7 +101,7 @@ describe("contacts segment filter chrome", () => {
   const dev = read("dashboard/src/app/dev/contacts/page.tsx");
 
   it("lands the ACCEPT spec and uses Inbox pill chips for segments, not a slider skin", () => {
-    assert.match(accept, /All · Saved · Unsaved/);
+    assert.match(accept, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(accept, /Filter contacts/);
     assert.match(accept, /segment preserved/);
     assert.match(accept, /opened only/);
@@ -117,37 +117,32 @@ describe("contacts segment filter chrome", () => {
     assert.match(inboxTabs, /label="Work date"/);
     assert.match(page, /<InboxFilterPills/);
     assert.match(page, /label="Filter contacts"/);
-    assert.match(page, /<FilterTabs/);
+    assert.match(page, /<ContactSortSelect/);
     assert.doesNotMatch(page, /type="range"/);
     assert.doesNotMatch(page, /slider/i);
     assert.doesNotMatch(page, /Needs you|Visits|Holds/);
     assert.match(note, /Filter contacts/);
-    assert.match(note, /FilterTabs/);
-    assert.match(note, /List\/Work/);
+    assert.match(note, /ContactSortSelect/);
     assert.match(note, /InboxFilterPills/);
   });
 
   it("segments All, Saved, and Unsaved as pill-chip items", () => {
-    assert.match(page, /label: "All"/);
-    assert.match(page, /label: "Saved"/);
-    assert.match(page, /label: "Unsaved"/);
-    assert.doesNotMatch(page, /label: "Recent"/);
+    assert.match(page, /contactFilterPills/);
     assert.match(page, /active=\{saved\}/);
-    assert.match(page, /saved: "saved"/);
-    assert.match(page, /saved: "unsaved"/);
-    assert.doesNotMatch(page, /saved: "recent"/);
+    const load = read("dashboard/src/lib/contactsLoad.ts");
+    assert.match(load, /label: "All"/);
+    assert.match(load, /label: "Saved"/);
+    assert.match(load, /label: "Unsaved"/);
+    assert.match(load, /label: "Recents"/);
+    assert.match(load, /saved: "recent"/);
     assert.doesNotMatch(page, /ContactQuickPhoneRow|ContactQuickTableRow|ContactQuickRow/);
     assert.doesNotMatch(dev, /ContactQuickPhoneRow|ContactQuickTableRow/);
-    assert.doesNotMatch(dev, /label: "Recent"/);
+    assert.match(dev, /contactFilterPills/);
     assert.equal(
       fs.existsSync(path.join(__dirname, "../dashboard/src/components/ContactQuickRow.tsx")),
       false
     );
-    assert.match(page, /label="Sort contacts"/);
-    assert.match(page, /label: "Last call"/);
-    assert.match(page, /label: "Name"/);
-    assert.match(page, /active=\{sort\}/);
-    assert.match(note, /All · Saved · Unsaved only/);
+    assert.match(note, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(note, /Last call/);
     assert.doesNotMatch(page, /Invite Friends/);
     assert.doesNotMatch(page, /[\u2014\u2013]/);
@@ -167,7 +162,7 @@ describe("contacts segment filter chrome", () => {
   });
 
   it("shows name or Name this caller, phone, last-call fact, and opened-only Call/WA", () => {
-    assert.match(profile, /contactStripTitle/);
+    assert.match(form, /contactStripTitle/);
     assert.match(profile, /contactLastCallFact/);
     assert.match(profile, /<ContactActionDock/);
     assert.match(profile, /<ContactNameForm/);

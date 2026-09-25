@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { InboxTicketView } from "@/components/InboxTicketView";
-import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { InboxToolbar } from "@/components/InboxToolbar";
 import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
 import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
@@ -190,7 +190,7 @@ export default function DevInboxPage() {
   const needYou = ROWS.filter((row) => row.needsYou).length;
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+    <div className={deskShellClass}>
       <DeskRail needsCount={needYou} homeHref="/dev/inbox" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>

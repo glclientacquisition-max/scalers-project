@@ -86,10 +86,12 @@ describe("inbox filters and empty states", () => {
 
   it("renders the six purpose piles as snap-scrolling pill chips", () => {
     const pills = read("dashboard/src/components/InboxFilterPills.tsx");
-    assert.match(pills, /snap-x snap-mandatory/);
+    const chrome = read("dashboard/src/components/ui/deskChrome.ts");
+    assert.match(pills, /deskRateCardRowClass/);
     assert.match(pills, /snap-start/);
-    assert.match(pills, /rounded-full/);
-    assert.match(pills, /bg-\[#005CCC\] text-white/);
+    assert.match(pills, /deskRateCardClass/);
+    assert.match(chrome, /rounded-full/);
+    assert.match(chrome, /bg-\[#005CCC\] text-white/);
     assert.match(pills, /bg-gradient-to-l from-surface/);
     assert.match(pills, /item\.count/);
     assert.doesNotMatch(pills, /border-b-2/);

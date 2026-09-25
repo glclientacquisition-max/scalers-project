@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { btnGhost, btnPrimary, deskShiftClass, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { DeskLandScope, DeskLandSurface } from "@/components/ui/DeskLand";
 import { useNotify } from "@/components/ui/DeskNotice";
@@ -17,7 +17,7 @@ export function MotionCatalog() {
   const extra = useMemo(() => ids.filter((id) => !SEED.includes(id)), [ids]);
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+    <div className={deskShellClass}>
       <DeskRail homeHref="/dev/motion" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>

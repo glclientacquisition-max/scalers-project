@@ -444,7 +444,7 @@ describe("inbox verb workflows: surfaces as shipped", () => {
   it("overflow drops unread and snooze and calls inboxOverflowActions", () => {
     const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
-    assert.match(overflow, /inboxOverflowActions\(item\)/);
+    assert.match(overflow, /inboxOverflowActions\(inboxItemWithLocal\(item, local\)\)/);
     assert.match(verbs, /export function inboxOverflowActions/);
     assert.match(verbs, /label: "Archive"/);
     assert.match(verbs, /label: "Unarchive"/);

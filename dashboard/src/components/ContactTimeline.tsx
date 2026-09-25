@@ -1,4 +1,5 @@
 import { ContactTimelineWhat } from "@/components/ContactTimelineWhat";
+import { InboxPurposeChip } from "@/components/InboxPurposeChip";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { deskPreviewCellClass } from "@/components/ui/deskChrome";
 import { formatCallWhen } from "@/lib/callsTriage";
@@ -29,7 +30,7 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
               <p className="truncate text-xs tabular-nums text-ink-soft">
                 {formatCallWhen(entry.createdAt)}
               </p>
-              <p className="shrink-0 text-xs text-ink-soft">{entry.stamp}</p>
+              <InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />
             </div>
             <div className={`${deskRowActionClass} mt-1 min-w-0`}>
               <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
@@ -74,7 +75,9 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
                   <TimelineRowHit entry={entry} />
                   {formatCallWhen(entry.createdAt)}
                 </td>
-                <td className={`${deskRowMutedClass} px-5 py-4 text-ink`}>{entry.stamp}</td>
+                <td className={`${deskRowMutedClass} px-5 py-4`}>
+                  <InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />
+                </td>
                 <td className={`${deskPreviewCellClass} px-5 py-4`}>
                   <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
                 </td>

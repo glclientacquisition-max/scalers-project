@@ -89,7 +89,7 @@ describe("inbox bulk select", () => {
     assert.doesNotMatch(select, /hidden opacity-0/);
     assert.doesNotMatch(select, /group-hover:opacity-100/);
     assert.doesNotMatch(verbs, /id: "select"/);
-    assert.match(overflow, /inboxOverflowActions\(item\)/);
+    assert.match(overflow, /inboxOverflowActions\(inboxItemWithLocal\(item, local\)\)/);
     assert.match(overflow, /ui\?\.enter\(item\.id\)/);
     assert.match(ui, /enter:/);
     assert.match(ui, /toggle:/);

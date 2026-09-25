@@ -7,12 +7,13 @@
  */
 
 import type { ReactNode } from "react";
-import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import {
   btnPrimary,
   deskFieldClass,
+  deskRateCardClass,
+  deskRateCardRowClass,
   deskShiftClass,
-  filterTabClass,
 } from "@/components/ui/deskChrome";
 
 export const settingsFieldClass = `mt-1 ${deskFieldClass}`;
@@ -266,19 +267,19 @@ export function SettingsSegmented<T extends string>({
       role="radiogroup"
       aria-label={label}
       data-settings-strip=""
-      className="inline-flex max-w-full min-w-0"
+      className="relative min-w-0 w-full"
     >
-      <ul className="flex max-w-full justify-start gap-1 overflow-x-auto [scrollbar-width:thin]">
+      <ul className={deskRateCardRowClass}>
         {options.map((opt) => {
           const selected = value === opt.id;
           return (
-            <li key={opt.id} className="shrink-0">
+            <li key={opt.id} className="snap-start shrink-0">
               <button
                 type="button"
                 role="radio"
                 aria-checked={selected}
                 onClick={() => onChange(opt.id)}
-                className={filterTabClass(selected)}
+                className={deskRateCardClass(selected)}
               >
                 {opt.label}
               </button>
@@ -332,7 +333,7 @@ export const settingsGhostButtonClass =
 
 export function SettingsBackLink() {
   return (
-    <DeskBack href="/settings" className="mb-1 md:hidden">
+    <DeskBack href="/settings" className="lg:hidden">
       Profile
     </DeskBack>
   );
@@ -380,10 +381,18 @@ export function SettingsPageHeader({
 
   return (
     <header className={settingsStickyHeaderClass}>
-      <div className="min-w-0">
-        {showBack ? <SettingsBackLink /> : null}
-        {title ? <h1 className={settingsPanelHeadingClass}>{title}</h1> : null}
-        {line}
+      <div className="min-w-0 flex-1">
+        {showBack ? (
+          <DeskRecordLead align="center" back={<SettingsBackLink />}>
+            {title ? <h1 className={settingsPanelHeadingClass}>{title}</h1> : null}
+            {line}
+          </DeskRecordLead>
+        ) : (
+          <>
+            {title ? <h1 className={settingsPanelHeadingClass}>{title}</h1> : null}
+            {line}
+          </>
+        )}
       </div>
       {action}
     </header>

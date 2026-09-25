@@ -10,9 +10,14 @@ import {
 } from "@/app/(desk)/calls/inboxTriageActions";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
+function isDeskHarness() {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/dev/");
+}
+
 /** Same handler as ticket Mark done (`MarkLeadDoneButton` → `updateLeadStatus`). */
 export async function inboxMarkDone(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
+  if (isDeskHarness()) return { ok: true };
   return updateLeadStatus(item.callId, "resolved");
 }
 
@@ -25,6 +30,7 @@ export async function inboxWhatsAppFollowUp(item: InboxItem) {
 /** Same handler as ticket Archive (`MarkLeadArchiveButton` → `updateLeadStatus`). */
 export async function inboxArchive(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
+  if (isDeskHarness()) return { ok: true };
   return updateLeadStatus(item.callId, "archived");
 }
 
@@ -49,6 +55,7 @@ export async function inboxHoldDone(item: InboxItem) {
 /** Same handler as ticket Unarchive (`MarkLeadUnarchiveButton` → `updateLeadStatus`). */
 export async function inboxUnarchive(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
+  if (isDeskHarness()) return { ok: true };
   return updateLeadStatus(item.callId, "new");
 }
 
@@ -71,6 +78,7 @@ export async function inboxToggleMute(item: InboxItem) {
 
 export async function inboxTogglePin(item: InboxItem) {
   if (!item.callId) return { error: "Missing call." };
+  if (isDeskHarness()) return { ok: true };
   return writeInboxPin(item.callId, item.pinnedAt);
 }
 

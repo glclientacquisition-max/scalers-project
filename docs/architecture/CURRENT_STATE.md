@@ -58,7 +58,7 @@ See also: [`../governance/REPOSITORY_INVENTORY.md`](../governance/REPOSITORY_INV
 | API routes | `dashboard/src/app/api/` | Auth, admin, pronunciation preview, voices |
 
 **FACT:** Owner shell uses Supabase Auth JWT + RLS.  
-**FACT:** Super Admin uses legacy shared-password cookie (`DASHBOARD_PASSWORD`) — see [`../governance/SOURCE_OF_TRUTH.md`](../governance/SOURCE_OF_TRUTH.md).
+**FACT:** Super Admin uses Better Auth username + access code (`/admin/login`). Optional host `admin.scalers.co.ke`. HMAC `DASHBOARD_PASSWORD` is transition-only.
 
 ---
 

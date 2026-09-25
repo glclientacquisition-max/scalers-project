@@ -7,7 +7,7 @@ Accepted
 Contacts, service requests, and appointments already persist. Post-call review upserts a contact by phone. The next live call still created empty Brain state, so the Business Assistant treated every visit as a first meeting. Full transcript replay would blow the prompt, add latency, and invite invented history.
 
 ## Decision
-At call setup, load a compact returning-caller card (`getCallerMemory`) and inject it into CONTEXT HEADER. Seed Brain state from that card. Do not retrieve transcripts or add embeddings. Instant greeting stays local and brand-first.
+At call setup, load a compact returning-caller card (`getCallerMemory`) and inject it into CONTEXT HEADER. The card is a phone-keyed candidate. Do not seed the speaker as the previous name. Bind after a confirmed spoken name on this call. Do not retrieve transcripts or add embeddings. Instant greeting stays local and brand-first.
 
 ## Alternatives considered
 - Dump prior transcripts into Gemini: rejected (latency, cost, PII, hallucination).
@@ -16,7 +16,7 @@ At call setup, load a compact returning-caller card (`getCallerMemory`) and inje
 - External CRM (Twenty) as the live file: rejected for the tenant Desk this quarter.
 
 ## Consequences
-Brain depends on a Platform read helper. Shared lines must not be greeted by the primary name. Evalite scores the card shape without requiring the Vercel AI SDK on the live wire.
+Brain depends on a Platform read helper. Shared lines must not be greeted by the primary name. Unique named lines must not treat the next speaker as the previous caller until this call binds. Evalite scores the card shape without requiring the Vercel AI SDK on the live wire.
 
 ## Date
 2026-09-10
