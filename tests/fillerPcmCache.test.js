@@ -62,7 +62,7 @@ async function main() {
   const quiet = Buffer.alloc(3200);
   quiet.writeInt16LE(800, 0);
   const stored = putFillerPcm('even-out', quiet);
-  assert.ok(Math.abs(stored.readInt16LE(0)) > 800);
+  assert.strictEqual(stored.readInt16LE(0), 800);
 
   const phrases = commonAckPhrases();
   assert.ok(phrases.includes('Mm-hmm.'));

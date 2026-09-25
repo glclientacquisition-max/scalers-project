@@ -36,7 +36,7 @@ Caller stops
 4. Filler cancel / overlap races (partially fixed in PR #74).
 5. No per-turn timing logs → hard to know if a “slow call” was STT, LLM, or TTS.
 6. Pace/loudness drift: EN vs SW TTS speed, quiet fillers vs loud replies, no phone-level gain. Locked by `VOICE_PROFILE`.
-7. Greeting / filler cache even-out then `VOICE_TTS_GAIN`, while live replies get gain only. Sounds like a different booth after hello. Mapped in [`../specs/voice-human-naturalness-research.md`](../specs/voice-human-naturalness-research.md).
+7. ~~Greeting / filler cache even-out then gain.~~ Cached clips now store raw PCM. `sendPcmToMedia` applies `VOICE_TTS_GAIN` on cache and live. Greeting key includes profile speed.
 
 ---
 
@@ -77,7 +77,7 @@ Ship the levers that raise *average* speed and reduce variance without live A/B 
 | Don’t flush mid-thought (`…and.`) / skip interrupt-only Gemini turns | Live DID `HD_0cdf315f02e9` | Done |
 | Cached micro-ack PCM per locale (optional) | Instant ack when LLM is actually slow | Done |
 | Greeting always instant + tenant warm before first PCM | No default-name greeting flash | This PR |
-| Same PCM path for cached greeting/filler and live replies | Stop quality drift after hello (even-out + gain vs gain only) | Next. Spec follow-up. |
+| Same PCM path for cached greeting/filler and live replies | Stop quality drift after hello (even-out + gain vs gain only) | Done. Raw cache + greeting speed key. |
 | Extract media session from `server.js` | Safer iteration on turn loop | Next |
 
 Live evidence + next Brain hand-offs: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md). Silent-answer 402 incident: [`SONIOX_BILLING_SILENCE_2026-09-02.md`](./SONIOX_BILLING_SILENCE_2026-09-02.md).

@@ -1,6 +1,7 @@
 const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  greetingPcmKey,
   lookupGreetingPcm,
   putGreetingPcm,
   resetGreetingPcmCache,
@@ -32,6 +33,36 @@ describe('greeting PCM cache', () => {
     assert.ok(hit.pcm);
     assert.equal(hit.pcm.length, 4000);
     assert.equal(greetingPcmCacheSize(), 1);
+  });
+
+  it('keys greeting PCM by profile speed so a pace change cannot replay a stale clip', () => {
+    const a = greetingPcmKey({
+      voiceId: null,
+      language: 'en',
+      spokenText: 'Hi, this is Aisha.',
+      speed: 1,
+    });
+    const b = greetingPcmKey({
+      voiceId: null,
+      language: 'en',
+      spokenText: 'Hi, this is Aisha.',
+      speed: 1.06,
+    });
+    assert.notEqual(a, b);
+    assert.match(a, /\|1\|/);
+    assert.match(b, /\|1\.06\|/);
+  });
+
+  it('stores greeting PCM without even-out so playback matches live gain', () => {
+    const quiet = Buffer.alloc(3200);
+    quiet.writeInt16LE(800, 0);
+    const miss = lookupGreetingPcm({
+      text: 'Hello from Aisha.',
+      businessName: 'Shop',
+      agentName: 'Aisha',
+    });
+    const stored = putGreetingPcm(miss.key, quiet);
+    assert.equal(stored.readInt16LE(0), 800);
   });
 });
 

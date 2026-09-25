@@ -31,7 +31,7 @@ Prior SHA `23debf0` left staging at 05:01Z. Voice knobs did not move. Do not mix
 
 Re-read `/healthz` immediately before the three calls. If `gitSha` moved, that is a new freeze. Do not mix SIDs across SHAs unless Voice knobs and the media path are unchanged.
 
-**Do not change** `VOICE_PROFILE`, `SONIOX_TTS_SPEED*`, `VOICE_TTS_GAIN`, `VOICE_FILLER`, or `VOICE_STREAM_EARLY_*` to chase roboticness. Three freeze calls are scored. Next Voice PR is V5.
+**Do not change** `VOICE_PROFILE`, `SONIOX_TTS_SPEED*`, `VOICE_TTS_GAIN`, `VOICE_FILLER`, or `VOICE_STREAM_EARLY_*` to chase roboticness. Three freeze calls are scored. V5 matcher is in code. This follow-up is greeting/filler PCM + remaining leak prose.
 
 ## Evidence triad (every call)
 
@@ -114,7 +114,7 @@ If N1 fails, still run N2 and N3 on the same SHA. The set is the measurement.
 
 Detail: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md).
 
-**Next Voice PR:** V5. Stop treating bare `Okay` / `ok` as how-are-you in `looksLikePhaticCallerTurn`. Do not crank speed or gain. Speech-guarantee on ANSWER is a later Voice ticket.
+**V5 matcher is in code.** Bare `Okay` / `ok` / `fine` / `great` are not how-are-you. Wellbeing answers still need `I'm` / `I am`. Do not crank speed or gain. Speech-guarantee on ANSWER is a later Voice ticket. This implementation PR: greeting/filler PCM matches live gain, greeting key includes speed, remaining Brain prose leaks stripped before TTS.
 
 ## After the three calls
 

@@ -1,12 +1,12 @@
 // Process-level thinking-ack PCM so a slow Gemini turn can speak instantly.
 // Keyed by catalog voice × TTS language × spoken text × speed.
+// Store raw PCM. sendPcmToMedia applies VOICE_TTS_GAIN, same as live replies.
 
 const { randomUUID } = require('crypto');
 const { pickContextualAck } = require('../conversation/dynamicSpeech');
 const { prepareForTts } = require('./ttsNormalize');
 const { speedForLanguage } = require('./sonioxTts');
 const { resolveSonioxVoice } = require('./sonioxVoice');
-const { evenOutPcmS16le } = require('./pcmUtil');
 
 const MAX_ENTRIES = 48;
 const CACHED_FILLER_STREAM_PREFIX = 'cached-filler-';
@@ -54,9 +54,7 @@ function getFillerPcm(key) {
 function putFillerPcm(key, pcm) {
   if (!key || !pcm || !pcm.length) return null;
   if (cache.has(key)) cache.delete(key);
-  // Even-out full clips only (≥100 ms). 20 ms frames would pump.
-  let stored = Buffer.from(pcm);
-  if (stored.length >= 3200) stored = evenOutPcmS16le(stored);
+  const stored = Buffer.from(pcm);
   cache.set(key, stored);
   while (cache.size > MAX_ENTRIES) {
     const oldest = cache.keys().next().value;

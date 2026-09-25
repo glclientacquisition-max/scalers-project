@@ -1,9 +1,10 @@
 // Process-level tenant greeting PCM so answer-to-first-audio is not dead air.
-// Keyed by catalog voice × TTS language × spoken greeting text.
+// Keyed by catalog voice × TTS language × profile speed × spoken greeting text.
+// Store raw PCM. sendPcmToMedia applies VOICE_TTS_GAIN, same as live replies.
 
 const { prepareForTts } = require('./ttsNormalize');
 const { resolveSonioxVoice } = require('./sonioxVoice');
-const { evenOutPcmS16le } = require('./pcmUtil');
+const { speedForLanguage } = require('./voiceProfile');
 const { mergeIdentityLexicon } = require('./pronunciationLexicon');
 
 const MAX_ENTRIES = 32;
@@ -16,11 +17,12 @@ function isGreetingCacheEnabled() {
   return raw !== 'off' && raw !== '0' && raw !== 'false';
 }
 
-function greetingPcmKey({ voiceId, language, spokenText }) {
+function greetingPcmKey({ voiceId, language, spokenText, speed }) {
   const voice = resolveSonioxVoice(voiceId);
   const lang = language === 'sw' ? 'sw' : 'en';
   const text = String(spokenText || '').trim();
-  return `${voice}|${lang}|${text}`;
+  const pace = String(speed ?? '');
+  return `${voice}|${lang}|${pace}|${text}`;
 }
 
 function lookupGreetingPcm({
@@ -41,6 +43,7 @@ function lookupGreetingPcm({
     voiceId,
     language: lang,
     spokenText: prepared.text,
+    speed: speedForLanguage(lang),
   });
   return { key, prepared, extraLexicon: extras, pcm: getGreetingPcm(key) };
 }
@@ -56,8 +59,7 @@ function getGreetingPcm(key) {
 function putGreetingPcm(key, pcm) {
   if (!key || !pcm || !pcm.length) return null;
   if (cache.has(key)) cache.delete(key);
-  let stored = Buffer.from(pcm);
-  if (stored.length >= 3200) stored = evenOutPcmS16le(stored);
+  const stored = Buffer.from(pcm);
   cache.set(key, stored);
   while (cache.size > MAX_ENTRIES) {
     const oldest = cache.keys().next().value;

@@ -224,6 +224,18 @@ test('prepareForTts drops a bare NP_FALSE token', () => {
   assert.strictEqual(prepared.text, '');
 });
 
+test('prepareForTts drops Speak this spelling, VISIT COMMIT, and Alvin said', () => {
+  const prepared = prepareForTts(
+    'Speak this spelling once in the next line. VISIT COMMIT (think this; never say it as a script): Alvin said they want carpet cleaning.',
+    { callLanguage: 'en' }
+  );
+  assert.doesNotMatch(
+    prepared.text,
+    /Speak this spelling|VISIT COMMIT|think this|never say it as a script|Alvin said/i
+  );
+  assert.match(prepared.text, /they want carpet cleaning/i);
+});
+
 test('prepareForTts full pipeline', () => {
   const prepared = prepareForTts('Call +254712345678 about mpesa in Thika…', {
     callLanguage: 'en',

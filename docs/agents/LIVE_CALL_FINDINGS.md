@@ -6,7 +6,7 @@ Staging DID `+254709221536`, SHA `ba5b53f` (`cursor/ticket-done-sms-ping-679d`, 
 
 Desk transcript stored the same block. Later turns copied the format because raw `geminiParts` went back into history.
 
-Fix: `src/speech/spokenInstructionLeak.js` strips those labels before TTS (`spokenStreamBuffer`, `prepareForTts`) and before Gemini history (`geminiVoice` clone). Prompt forbids reciting the tags.
+Fix: `src/speech/spokenInstructionLeak.js` strips those labels before TTS (`spokenStreamBuffer`, `prepareForTts`) and before Gemini history (`geminiVoice` clone). Prompt forbids reciting the tags. Follow-up: also strip `Speak this spelling once`, `VISIT COMMIT`, and `Name said` / `the caller said` narration. `You said` / `I said` stay.
 
 ---
 

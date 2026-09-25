@@ -161,6 +161,39 @@ test('does not speak ASR_CORRECTION_PROMPT / RETOTI / NP_FALSE from HD_ff24acf52
   assert.match(joined, /Tunashukuru sana/);
 });
 
+test('does not speak Speak this spelling / VISIT COMMIT / Alvin said', () => {
+  const buf = createSpokenStreamBuffer();
+  const leaked =
+    'Speak this spelling once in the next line. VISIT COMMIT (think this; never say it as a script): Alvin said they want carpet cleaning.';
+  const emitted = [...buf.push(leaked), ...buf.finish()];
+  const joined = emitted.join(' ');
+  assert.doesNotMatch(
+    joined,
+    /Speak this spelling|VISIT COMMIT|think this|never say it as a script|Alvin said/i
+  );
+  assert.match(joined, /they want carpet cleaning/i);
+});
+
+test('keeps You said and I said confirmations', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [
+    ...buf.push('You said Thursday. I said ten.'),
+    ...buf.finish(),
+  ];
+  const joined = emitted.join(' ');
+  assert.match(joined, /You said Thursday/);
+  assert.match(joined, /I said ten/);
+});
+
+test('holds an incomplete Speak this suffix while streaming', () => {
+  const buf = createSpokenStreamBuffer();
+  assert.deepStrictEqual(buf.push('Sawa. Speak this spell'), []);
+  const emitted = [...buf.push('ing once. Thursday works.'), ...buf.finish()];
+  const joined = emitted.join(' ');
+  assert.doesNotMatch(joined, /Speak this spelling/i);
+  assert.match(joined, /Thursday works/);
+});
+
 test('holds an incomplete ASR_ label until the token finishes', () => {
   const buf = createSpokenStreamBuffer();
   assert.deepStrictEqual(buf.push('ASR_CORREC'), []);
