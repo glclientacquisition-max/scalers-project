@@ -320,6 +320,9 @@ describe('Brain state and next-best-action', () => {
     assert.equal(extractName('I am Alvin'), 'Alvin');
     assert.equal(extractName("I'm Alvin"), 'Alvin');
     assert.equal(extractName('This is Alvin'), 'Alvin');
+    assert.equal(extractName('Alvin is the name'), 'Alvin');
+    assert.equal(extractName('Alvin is calling'), 'Alvin');
+    assert.equal(extractName('that is the name'), null);
     assert.equal(extractName('Naitwa Alvin'), 'Alvin');
     assert.equal(extractName('I am looking for cleaning'), null);
     assert.equal(extractName("It's Alvin", { firstMissing: 'name' }), 'Alvin');
@@ -536,5 +539,63 @@ describe('Brain state and next-best-action', () => {
     });
     assert.notEqual(decision.slot, 'name');
     assert.doesNotMatch(String(decision.reason), /who is speaking/i);
+  });
+
+  it('confirms Alvin is the name and answers the file on What are my bookings', () => {
+    const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+    const { inferIntent } = require('../src/conversation/brainState');
+    const { pickSpeechGuaranteeLine } = require('../src/conversation/dynamicSpeech');
+    const card = {
+      name: 'Alvin',
+      sharedLine: true,
+      greetByName: false,
+      alternateNames: ['Brian'],
+      lastReason: 'carpet Thursday',
+      nextAppointment: 'carpet, Thursday 10 AM',
+      recentBookings: ['couch cleaning, 3 March'],
+    };
+    const profile = { callerMemory: card };
+    const seeded = createBrainState(profile);
+
+    const named = observeCallerTurn(seeded, {
+      text: 'Alvin is the name.',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+      entities: extractConversationEntities('Alvin is the name.', {
+        profile,
+        state: seeded,
+      }),
+    });
+    assert.equal(named.caller.name, 'Alvin');
+    assert.equal(named.caller.nameConfirmed, true);
+    assert.equal(named.returning.fileRole, 'primary');
+
+    assert.equal(
+      inferIntent('What are my bookings?', { returning: named.returning }),
+      'general_enquiry'
+    );
+
+    const asked = observeCallerTurn(named, {
+      text: 'What are my bookings?',
+      detectedLanguage: 'en',
+      resolvedLanguage: 'en',
+      profile,
+    });
+    const decision = determineNextBestAction({
+      state: asked,
+      capabilities: { saveCallerInfo: true, createAppointment: true },
+    });
+    assert.equal(decision.action, 'ANSWER');
+    assert.notEqual(decision.slot, 'name');
+    assert.doesNotMatch(String(decision.reason), /who is speaking|Shared line/i);
+
+    const guarantee = pickSpeechGuaranteeLine({
+      nextBestAction: decision,
+      brainState: asked,
+      language: 'en',
+      userText: 'What are my bookings?',
+    });
+    assert.doesNotMatch(guarantee, /May I have your name/i);
   });
 });
