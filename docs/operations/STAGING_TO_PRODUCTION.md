@@ -74,6 +74,8 @@ Use when the change is application code only (UI, voice logic, prompts in repo).
 
 Desk preview URLs are not Voice. Railway staging does not auto-build PR branches. `main` is the promotion vehicle, not the test vehicle.
 
+**Staging desk URL:** `scalers-staging.vercel.app` is pinned off `main`. A merge to `main` must not steal that alias. See [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md). Put a stack on that URL by updating `cursor/staging-live-679d` and assigning the alias. Do not promote a random feature SHA as project production.
+
 ### Merge
 
 1. Open PR → wait for **CI** green.

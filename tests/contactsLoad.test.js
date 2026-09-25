@@ -44,6 +44,10 @@ describe("contactsLoad last-contact wiring", () => {
     assert.match(src, /export function contactMatchesQuery/);
     assert.match(src, /export function uniqueRecentCallerPhones/);
     assert.match(src, /saved === "recent"/);
+    assert.match(src, /export function contactsRecentsHref/);
+    assert.match(src, /export function contactsFavouritesHref/);
+    assert.match(src, /export async function loadContactPileCounts/);
+    assert.match(src, /saved === "favourite"/);
     assert.match(src, /sanitizeSearchQuery/);
     assert.doesNotMatch(src, /\bOnline\b/);
     assert.doesNotMatch(src, /lead_status/);

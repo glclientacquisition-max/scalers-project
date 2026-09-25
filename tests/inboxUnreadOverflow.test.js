@@ -383,7 +383,7 @@ describe("inbox ticket overflow menu", () => {
   it("list overflow stays Pin, Mark done, Archive on md+", () => {
     const overflow = read("dashboard/src/components/InboxRowOverflow.tsx");
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
-    assert.match(overflow, /inboxOverflowActions\(item\)/);
+    assert.match(overflow, /inboxOverflowActions\(inboxItemWithLocal\(item, local\)\)/);
     assert.match(overflow, /placeInboxOverflowMenu/);
     assert.match(overflow, /createPortal/);
     assert.match(overflow, /document\.body/);

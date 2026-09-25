@@ -404,7 +404,7 @@ describe('platform send payload', () => {
     });
     assert.equal(payload.type, 'template');
     assert.equal(payload.template.name, 'scalers_staff_alert');
-    assert.equal(payload.template.language_code, 'en');
+    assert.equal(payload.template.language_code, 'en_US');
     assert.equal(payload.template.components[0].parameters.length, 3);
   });
 

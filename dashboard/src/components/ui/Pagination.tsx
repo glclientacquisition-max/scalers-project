@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { deskShiftClass } from "@/components/ui/deskChrome";
+import { listPageSpan } from "@/lib/listPage";
+
+export { DEFAULT_PAGE_SIZE, clampListPage } from "@/lib/listPage";
 
 type Props = {
   page: number;
@@ -35,7 +38,7 @@ function pagerControlClass(enabled: boolean) {
 
 /** Server-friendly previous/next pager for list pages. */
 export function Pagination({ page, pageSize, total, href, params }: Props) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const span = listPageSpan(page, pageSize, total);
   if (total <= pageSize) {
     return (
       <p className="mt-4 text-sm text-ink-soft">
@@ -44,8 +47,7 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
     );
   }
 
-  const from = (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
+  const { page: safePage, from, to, pages: totalPages } = span;
   const jumpId = `page-jump-${href.replace(/\W/g, "") || "list"}`;
 
   return (
@@ -54,8 +56,8 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
         {from}-{to} of {total}
       </p>
       <div className="flex items-center gap-2">
-        {page > 1 ? (
-          <Link href={buildHref(href, page - 1, params)} className={pagerControlClass(true)}>
+        {safePage > 1 ? (
+          <Link href={buildHref(href, safePage - 1, params)} className={pagerControlClass(true)}>
             Previous
           </Link>
         ) : (
@@ -77,7 +79,7 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
               type="number"
               min={1}
               max={totalPages}
-              defaultValue={page}
+              defaultValue={safePage}
               className={`h-11 w-14 rounded-lg border border-line bg-surface px-2 text-center text-sm tabular-nums text-ink-soft ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-[#0096FF]`}
             />
             <button
@@ -89,11 +91,11 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
           </form>
         ) : (
           <span className="px-1 text-sm text-ink-soft">
-            {page} / {totalPages}
+            {safePage} / {totalPages}
           </span>
         )}
-        {page < totalPages ? (
-          <Link href={buildHref(href, page + 1, params)} className={pagerControlClass(true)}>
+        {safePage < totalPages ? (
+          <Link href={buildHref(href, safePage + 1, params)} className={pagerControlClass(true)}>
             Next
           </Link>
         ) : (
@@ -104,4 +106,3 @@ export function Pagination({ page, pageSize, total, href, params }: Props) {
   );
 }
 
-export const DEFAULT_PAGE_SIZE = 25;

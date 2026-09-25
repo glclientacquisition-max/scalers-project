@@ -142,34 +142,36 @@ export function DeskRail({
   return (
     <div
       data-desk-rail=""
-      className="hidden h-dvh w-[4.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
+      className="hidden h-dvh w-[5.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">
           <BrandLockup href={homeHref} name="Scalers" size="sm" markOnly priority />
         </DeskHint>
       </div>
-      <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1.5 pt-1">
+      <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1 pt-1">
         {DESK_LINKS.map((item) => {
           const active = pathActive(pathname, item.href);
           return (
-            <DeskHint key={item.href} label={item.label}>
-              <Link
-                href={item.href}
-                aria-label={inboxLinkAria(item.label, needsCount) || item.label}
-                aria-current={active ? "page" : undefined}
-                className={[
-                  "inline-flex h-12 w-12 items-center justify-center rounded-xl",
-                  deskShiftClass,
-                  focusRingVisible,
-                  active
-                    ? "bg-accent/10 text-accent-deep"
-                    : "text-ink-soft hover:bg-surface-muted hover:text-ink",
-                ].join(" ")}
-              >
-                <TabIconWithBadge name={item.label} count={needsCount} />
-              </Link>
-            </DeskHint>
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-label={inboxLinkAria(item.label, needsCount) || item.label}
+              aria-current={active ? "page" : undefined}
+              className={[
+                "flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5",
+                deskShiftClass,
+                focusRingVisible,
+                active
+                  ? "bg-accent/10 text-accent-deep"
+                  : "text-ink-soft hover:bg-surface-muted hover:text-ink",
+              ].join(" ")}
+            >
+              <TabIconWithBadge name={item.label} count={needsCount} />
+              <span className="max-w-full truncate text-[10px] font-medium leading-none">
+                {item.label}
+              </span>
+            </Link>
           );
         })}
       </nav>

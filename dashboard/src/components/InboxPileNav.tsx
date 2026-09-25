@@ -13,7 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
-import { inboxArchivedHref } from "@/lib/inboxHref";
+import { inboxArchivedHref, inboxReturnHref } from "@/lib/inboxHref";
 import {
   countInboxPurposes,
   itemMatchesPurpose,
@@ -24,7 +24,7 @@ import {
 } from "@/lib/inboxPurpose";
 import { orderHoldList } from "@/lib/holdSheet";
 import { orderVisitList } from "@/lib/runSheet";
-import { DEFAULT_PAGE_SIZE } from "@/components/ui/Pagination";
+import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
   adjacentPileHrefs,
   filterCachedPile,
@@ -136,11 +136,6 @@ export function InboxPileNavProvider({
   }, [purpose]);
 
   useEffect(() => {
-    if (pendingRef.current) return;
-    setLocalPage(urlPage);
-  }, [urlPage]);
-
-  useEffect(() => {
     if (pendingQRef.current !== null) {
       if (
         urlQ === pendingQRef.current ||
@@ -245,10 +240,49 @@ export function InboxPileNavProvider({
     [rows, localPurpose]
   );
 
+  useEffect(() => {
+    if (pendingRef.current) return;
+    if (pendingQRef.current !== null) return;
+    const pages = Math.max(1, Math.ceil(listed.length / DEFAULT_PAGE_SIZE) || 1);
+    if (urlPage <= pages) {
+      setLocalPage(urlPage);
+      return;
+    }
+    const next = pages;
+    setLocalPage(next);
+    const text = sanitizeSearchQuery(localQ);
+    if (localPurpose === "archived") {
+      const q = new URLSearchParams();
+      q.set("purpose", "archived");
+      if (text) q.set("q", text);
+      if (from) q.set("from", from);
+      const back = Number.parseInt(String(rpage || ""), 10);
+      if (Number.isFinite(back) && back > 1) q.set("rpage", String(back));
+      if (next > 1) q.set("page", String(next));
+      if (view) q.set("view", view);
+      if (week) q.set("week", week);
+      if (day) q.set("day", day);
+      router.replace(`/calls?${q.toString()}`);
+      return;
+    }
+    router.replace(
+      inboxReturnHref({
+        purpose: localPurpose,
+        q: text || undefined,
+        page: next,
+        view,
+        week,
+        day,
+      })
+    );
+  }, [urlPage, listed.length, localPurpose, localQ, view, week, day, from, rpage, router]);
+
+  const safePage = clampListPage(localPage, listed.length, DEFAULT_PAGE_SIZE);
+
   const pageRows = useMemo(() => {
-    const fromIndex = (localPage - 1) * DEFAULT_PAGE_SIZE;
+    const fromIndex = (safePage - 1) * DEFAULT_PAGE_SIZE;
     return listed.slice(fromIndex, fromIndex + DEFAULT_PAGE_SIZE);
-  }, [listed, localPage]);
+  }, [listed, safePage]);
 
   const value = useMemo(
     () => ({
@@ -259,7 +293,7 @@ export function InboxPileNavProvider({
       pageRows,
       selectRows: enableSelect ? pageRows : [],
       counts,
-      page: localPage,
+      page: safePage,
       paint,
       goPile,
       setQuery,
@@ -271,7 +305,7 @@ export function InboxPileNavProvider({
       liveHrefs,
       listed,
       pageRows,
-      localPage,
+      safePage,
       paint,
       goPile,
       setQuery,

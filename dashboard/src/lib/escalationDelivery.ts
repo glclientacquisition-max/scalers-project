@@ -56,6 +56,13 @@ export function formatEscalationDelivery(
     };
     const channels = liveChannels(row.channels);
     const stage = String(row.stage || "");
+    const reason = String((row as { reason?: unknown }).reason || "").trim();
+    if (reason === "instance_already_sent") {
+      return { state: "sent", line: "Already pinged this ticket." };
+    }
+    if (reason === "whatsapp_billing" || /131042/.test(reason)) {
+      return { state: "failed", line: "WhatsApp billing is not set." };
+    }
     if (row.ok === true && row.soft !== true && stage === "notified" && channels.length) {
       const bits = channels.map((item) => {
         const label = channelLabel(String(item.channel));

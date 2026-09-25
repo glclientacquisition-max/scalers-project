@@ -13,7 +13,7 @@ import {
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
-import { DeskBack } from "@/components/ui/DeskBack";
+import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 
 export function InboxToolbar({
   active,
@@ -85,16 +85,23 @@ export function InboxToolbar({
   return (
     <header className="space-y-3">
       {archived ? (
-        <DeskBack href={backHref || callsHref({ q: query || undefined })}>Inbox</DeskBack>
-      ) : (
-        <h1 className={deskListTitleClass}>Inbox</h1>
-      )}
-      {archived ? (
-        <DeskIndexLead status={<h1 className={pageTitleClass}>Archived</h1>}>
+        <DeskIndexLead
+          status={
+            <DeskRecordLead
+              align="center"
+              back={<DeskBack href={backHref || callsHref({ q: query || undefined })}>Inbox</DeskBack>}
+            >
+              <h1 className={pageTitleClass}>Archived</h1>
+            </DeskRecordLead>
+          }
+        >
           {searchForm}
         </DeskIndexLead>
       ) : (
-        <DeskIndexLead>{searchForm}</DeskIndexLead>
+        <>
+          <h1 className={deskListTitleClass}>Inbox</h1>
+          <DeskIndexLead>{searchForm}</DeskIndexLead>
+        </>
       )}
 
       {archived ? null : (

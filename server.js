@@ -1191,6 +1191,37 @@ async function handleVoiceIncoming(req, res) {
   }
 }
 
+async function noteWhatsAppDeliveryFailed(row = {}) {
+  const status = String(row.status || '');
+  if (status !== 'failed' && status !== 'undelivered') return;
+  const wamid = String(row.wamid || '').trim();
+  if (!wamid) return;
+  const errors = Array.isArray(row.raw?.errors) ? row.raw.errors : [];
+  const code = Number(errors[0]?.code);
+  const reason = code === 131042 ? 'whatsapp_billing' : 'whatsapp_delivery_failed';
+  try {
+    const sent = await db.findNotifySendByProviderMessageId(wamid);
+    if (!sent?.call_sid) return;
+    await db.mergeCallSummaryMeta({
+      callSid: sent.call_sid,
+      patch: {
+        escalation_sent: false,
+        whatsapp_sent: false,
+        escalation_notify: {
+          ok: false,
+          soft: false,
+          stage: 'failed',
+          channels: [],
+          reason,
+          at: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (err) {
+    console.warn('[whatsapp] delivery note failed:', err?.message || err);
+  }
+}
+
 async function handleWhatsAppWebhook(req, res) {
   res.sendStatus(200);
   try {
@@ -1219,7 +1250,10 @@ async function handleWhatsAppWebhook(req, res) {
       body,
       headers: req.headers,
       persistInbound: (row) => db.persistPlatformWhatsAppInbound(row),
-      persistStatus: (row) => db.persistWhatsAppStatus(row),
+      persistStatus: async (row) => {
+        await db.persistWhatsAppStatus(row);
+        await noteWhatsAppDeliveryFailed(row);
+      },
       markRead: (wamid) => markWhatsAppRead(wamid),
       sendText: async ({ to, body }) => {
         const json = await sendOwnerWhatsApp({ to, body, windowOpen: true });
@@ -3438,6 +3472,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         callId: call.id || null,
         callSid,
         kind: 'escalation',
+        force,
       },
     });
 

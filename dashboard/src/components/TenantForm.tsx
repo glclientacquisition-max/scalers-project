@@ -96,6 +96,7 @@ import {
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
+import { ListPager } from "@/components/ui/ListPager";
 import {
   ExpandTextarea,
   SettingsGroup,
@@ -240,48 +241,24 @@ function CatalogPager({
   pageSize,
   total,
   noun,
-  onPrev,
-  onNext,
+  onPage,
 }: {
+  /** Zero-based page. */
   page: number;
   pageSize: number;
   total: number;
   noun: string;
-  onPrev: () => void;
-  onNext: () => void;
+  onPage: (page: number) => void;
 }) {
-  if (total <= 0) return null;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const from = page * pageSize + 1;
-  const to = Math.min(total, (page + 1) * pageSize);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-canvas px-3 py-3">
-      <p className="text-xs text-ink-soft">
-        {from}-{to} of {total} {noun}
-        {total === 1 ? "" : "s"}
-      </p>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={page <= 0}
-          onClick={onPrev}
-          className={`min-h-11 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
-        >
-          Previous
-        </button>
-        <span className="text-xs text-ink-soft">
-          {page + 1} / {pageCount}
-        </span>
-        <button
-          type="button"
-          disabled={page >= pageCount - 1}
-          onClick={onNext}
-          className={`min-h-11 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink ${deskShiftClass} hover:border-accent/40 hover:text-accent-deep active:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-40`}
-        >
-          Next
-        </button>
-      </div>
-    </div>
+    <ListPager
+      page={page + 1}
+      pageSize={pageSize}
+      total={total}
+      noun={noun}
+      onPage={(next) => onPage(next - 1)}
+      className="border-t border-line bg-surface-canvas px-3 py-3"
+    />
   );
 }
 
@@ -1162,8 +1139,7 @@ export function TenantForm({
               pageSize={SERVICE_PAGE_SIZE}
               total={services.length}
               noun="service"
-              onPrev={() => setServicePage((p) => Math.max(0, p - 1))}
-              onNext={() => setServicePage((p) => Math.min(servicePageCount - 1, p + 1))}
+              onPage={setServicePage}
             />
           </div>
 
@@ -1269,8 +1245,7 @@ export function TenantForm({
               pageSize={SERVICE_PAGE_SIZE}
               total={services.length}
               noun="service"
-              onPrev={() => setServicePage((p) => Math.max(0, p - 1))}
-              onNext={() => setServicePage((p) => Math.min(servicePageCount - 1, p + 1))}
+              onPage={setServicePage}
             />
           </div>
 
@@ -1395,8 +1370,7 @@ export function TenantForm({
                 pageSize={PRODUCT_PAGE_SIZE}
                 total={products.length}
                 noun="product"
-                onPrev={() => setProductPage((p) => Math.max(0, p - 1))}
-                onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
+                onPage={setProductPage}
               />
             </div>
             <div className="hidden md:block overflow-hidden rounded-xl border border-line">
@@ -1493,8 +1467,7 @@ export function TenantForm({
                 pageSize={PRODUCT_PAGE_SIZE}
                 total={products.length}
                 noun="product"
-                onPrev={() => setProductPage((p) => Math.max(0, p - 1))}
-                onNext={() => setProductPage((p) => Math.min(productPageCount - 1, p + 1))}
+                onPage={setProductPage}
               />
             </div>
             </>
@@ -2221,8 +2194,7 @@ export function TenantForm({
             pageSize={FAQ_PAGE_SIZE}
             total={faqs.length}
             noun="FAQ"
-            onPrev={() => setFaqPage((p) => Math.max(0, p - 1))}
-            onNext={() => setFaqPage((p) => Math.min(faqPageCount - 1, p + 1))}
+            onPage={setFaqPage}
           />
         </div>
       </section>

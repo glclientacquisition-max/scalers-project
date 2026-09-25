@@ -10,6 +10,8 @@
 const SAUTIKIT_API_BASE = process.env.SAUTIKIT_API_BASE || 'https://api.sautikit.com';
 const { isWhatsAppSessionOpen, normalizeWhatsAppContactId } = require('../sautikit/whatsappInbound');
 const {
+  APPROVED_FIRST_TEMPLATE,
+  APPROVED_FIRST_TEMPLATE_LANG,
   bodyComponentsFromParameters,
   buildStaffWhatsAppTemplate,
   genericTemplateName,
@@ -143,7 +145,114 @@ function mapWhatsAppSendError(status, json, text) {
     reason = 'template_not_found';
   } else if (code === 132000 || /parameter/i.test(message)) reason = 'template_param_mismatch';
   else if (code === 131026 || /not a whatsapp/i.test(message)) reason = 'not_whatsapp_user';
+  else if (code === 131042 || /currency is not configured|payment issue/i.test(message)) {
+    reason = 'whatsapp_billing';
+  }
   return { status, code, reason, message };
+}
+
+function whatsAppMessageId(json) {
+  if (!json || typeof json !== 'object') return null;
+  const messages = json.messages || json.data?.messages;
+  if (Array.isArray(messages) && messages[0]) {
+    const nested = messages[0].id || messages[0].message_id || messages[0].wamid;
+    if (nested) return String(nested);
+  }
+  const id = json.wamid || json.message_id || json.messageId || json.id;
+  return id ? String(id) : null;
+}
+
+function sautikitSendLooksFailed(status, json) {
+  if (status !== 200 && status !== 202) return true;
+  if (!json || typeof json !== 'object') return false;
+  if (json.error || json.errors) return true;
+  if (json.ok === false) return true;
+  return false;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sautikitTransient(status, err) {
+  const code = Number(status || err?.status);
+  return code === 502 || code === 503 || code === 504 || err?.reason === 'upstream';
+}
+
+async function postWhatsAppMessage(payload, { tries = 3 } = {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= tries; attempt += 1) {
+    try {
+      const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
+      if (sautikitSendLooksFailed(status, json)) {
+        if (sautikitTransient(status) && attempt < tries) {
+          console.warn(`[whatsapp] send ${status} upstream; retry ${attempt}/${tries}`);
+          await sleep(250 * attempt);
+          continue;
+        }
+        throwWhatsAppSendError(status, json, text);
+      }
+      const messageId = whatsAppMessageId(json);
+      console.log(
+        '[whatsapp] send accepted',
+        JSON.stringify({
+          to: payload.to,
+          type: payload.type,
+          template: payload.template?.name || null,
+          language: payload.template?.language_code || null,
+          status,
+          messageId,
+        })
+      );
+      return json && typeof json === 'object' ? { ...json, messageId } : { messageId, raw: json };
+    } catch (err) {
+      lastErr = err;
+      if (!sautikitTransient(err.status, err) || attempt >= tries) throw err;
+      console.warn(`[whatsapp] send failed (${err.reason || err.status}); retry ${attempt}/${tries}`);
+      await sleep(250 * attempt);
+    }
+  }
+  throw lastErr;
+}
+
+function templateSendRetryable(err) {
+  const reason = String(err?.reason || '');
+  const message = String(err?.message || '');
+  return (
+    reason === 'template_not_found' ||
+    reason === 'template_param_mismatch' ||
+    /language|translation|template/i.test(message)
+  );
+}
+
+async function sendTemplateWithFallback(opts = {}) {
+  const first = buildWhatsAppTemplatePayload(opts);
+  const attempts = [first];
+  const seen = new Set([`${first.template.name}:${first.template.language_code}`]);
+  for (const language of [APPROVED_FIRST_TEMPLATE_LANG, 'en_US', 'en']) {
+    const next = buildWhatsAppTemplatePayload({
+      ...opts,
+      templateName: APPROVED_FIRST_TEMPLATE,
+      language,
+    });
+    const key = `${next.template.name}:${next.template.language_code}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    attempts.push(next);
+  }
+  let lastErr;
+  for (const payload of attempts) {
+    try {
+      return await postWhatsAppMessage(payload);
+    } catch (err) {
+      lastErr = err;
+      if (!templateSendRetryable(err)) throw err;
+      console.warn(
+        `[whatsapp] template send failed (${err.reason || err.message}); retrying approved first template`
+      );
+    }
+  }
+  throw lastErr;
 }
 
 function throwWhatsAppSendError(status, json, text) {
@@ -210,16 +319,15 @@ async function sendOwnerWhatsApp({
     }
   }
   const payload = buildWhatsAppSendPayload({ to, body, lead, windowOpen: open, kind });
-  const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
-  if (status !== 202 && status !== 200) {
-    throwWhatsAppSendError(status, json, text);
+  if (open) {
+    return postWhatsAppMessage(payload);
   }
-  return json;
+  return sendTemplateWithFallback({ to, body, lead, kind });
 }
 
 /**
  * Always send a Cloud API template (never session text).
- * Default name/language: approved first template `scalers_staff_alert` / `en`.
+ * Default name/language: approved first template `scalers_staff_alert` / `en_US`.
  */
 async function sendWhatsAppTemplate({
   to,
@@ -243,11 +351,15 @@ async function sendWhatsAppTemplate({
     lead,
   });
   if (dryRun) return { dryRun: true, payload };
-  const { status, json, text } = await sautikitWhatsAppPost('/v1/whatsapp/messages', payload);
-  if (status !== 202 && status !== 200) {
-    throwWhatsAppSendError(status, json, text);
-  }
-  return json;
+  return sendTemplateWithFallback({
+    to,
+    templateName: payload.template.name,
+    language: payload.template.language_code,
+    components: payload.template.components,
+    kind,
+    body,
+    lead,
+  });
 }
 
 async function markWhatsAppRead(wamid) {
@@ -268,6 +380,7 @@ async function markWhatsAppRead(wamid) {
 
 module.exports = {
   isWhatsAppConfigured,
+  whatsAppMessageId,
   normalizeWhatsAppTo,
   buildLeadText,
   platformWhatsAppSender,

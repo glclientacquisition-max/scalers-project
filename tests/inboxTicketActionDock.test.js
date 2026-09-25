@@ -35,6 +35,26 @@ describe("ticket action dock", () => {
     assert.match(ping, /deskHitClass/);
     assert.doesNotMatch(dock, /[\u2014\u2013]/);
     assert.doesNotMatch(ping, /[\u2014\u2013]/);
+    assert.match(dock, /pendingSpinnerInkClass/);
+    assert.match(dock, /aria-busy=\{pending\}/);
+    assert.doesNotMatch(dock, /useTransition/);
+    assert.match(ping, /pendingSpinnerInkClass/);
+    assert.match(ping, /aria-busy=\{pending\}/);
+    assert.match(ping, /Pinging/);
+    assert.doesNotMatch(ping, /useTransition/);
+    const escalate = read("dashboard/src/app/(desk)/calls/escalateActions.ts");
+    assert.match(escalate, /language: "en"/);
+    assert.match(escalate, /instance_already_sent/);
+    assert.match(escalate, /Already pinged this ticket/);
+    const delivery = read("dashboard/src/lib/escalationDelivery.ts");
+    assert.match(delivery, /instance_already_sent/);
+    assert.match(delivery, /Already pinged this ticket/);
+    assert.match(delivery, /WhatsApp billing is not set/);
+    assert.match(read("server.js"), /whatsapp_billing/);
+    assert.match(read("src/notifications/whatsapp.js"), /131042/);
+    assert.match(escalate, /revalidatePath\(`\/calls\/\$\{callId\}`\)/);
+    assert.doesNotMatch(escalate, /revalidatePath\("\/home"\)/);
+    assert.doesNotMatch(escalate, /revalidatePath\("\/calls"\)/);
   });
 
   it("keeps Archive on More and leaves lead_status rules in the shipped helpers", () => {

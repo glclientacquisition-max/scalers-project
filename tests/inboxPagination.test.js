@@ -30,6 +30,21 @@ describe("inbox pagination page jump", () => {
     assert.doesNotMatch(src, /[\u2014\u2013]/);
   });
 
+  it("clamps a page past the end and shares that helper", () => {
+    const listPage = read("dashboard/src/lib/listPage.ts")
+      .replace(/export /g, "")
+      .replace(/: number/g, "");
+    const api = new Function(`${listPage}; return { clampListPage, listPageSpan };`)();
+    assert.equal(api.clampListPage(9, 40, 25), 2);
+    assert.equal(api.clampListPage(1, 0, 25), 1);
+    assert.deepEqual(api.listPageSpan(9, 25, 40), { page: 2, from: 26, to: 40, pages: 2 });
+    assert.match(read("dashboard/src/components/InboxPileNav.tsx"), /clampListPage/);
+    assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /clampListPage/);
+    assert.match(read("dashboard/src/components/ui/ListPager.tsx"), /min-h-11/);
+    assert.match(read("dashboard/src/components/PronunciationCoach.tsx"), /<ListPager/);
+    assert.match(read("dashboard/src/components/TenantForm.tsx"), /<ListPager/);
+  });
+
   it("does not replace Prev/Next with the jump control", () => {
     const jumpAt = src.indexOf("totalPages > 5");
     const prevAt = src.indexOf("Previous");
