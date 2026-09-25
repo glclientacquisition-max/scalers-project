@@ -1,6 +1,7 @@
-import { generateId, z, type BetterAuthPlugin, type Session, type User } from "better-auth";
+import { generateId, type BetterAuthPlugin, type Session, type User } from "better-auth";
 import { APIError, createAuthEndpoint } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
+import { z } from "zod";
 import { verifyAdminAccess } from "@/lib/adminOperators";
 
 const SESSION_MS = 60 * 60 * 24 * 14;
