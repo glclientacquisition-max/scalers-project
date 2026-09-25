@@ -38,7 +38,7 @@ Ponytail constraint on all later work: search existing components first; no new 
 | Package | `dashboard/` (`dashboard` npm name). Not a monorepo workspace. |
 | Deploy | Vercel, root directory `dashboard` |
 | Auth (owners) | Supabase SSR + RLS (`dashboard/src/lib/auth.ts`, `(desk)/layout.tsx`) |
-| Auth (ops) | Legacy HMAC cookie `DASHBOARD_PASSWORD` (`isLegacyAuthenticated`) |
+| Auth (ops) | Better Auth username + access code (`/admin/login`). HMAC leftover. |
 | Middleware | **None.** Gates live in layouts and page redirects. |
 | Component library | **None.** No shadcn, Radix, or icon package. |
 | Tests | **None** in `dashboard/`. Lane gate is `npm run lint` + `npm run build`. |

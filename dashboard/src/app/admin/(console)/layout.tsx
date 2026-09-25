@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { AdminNav } from "@/components/AdminNav";
-import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
+import { getAdminSession, getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 
 // instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
@@ -12,8 +12,11 @@ export const instant = false;
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!(await isLegacyAuthenticated())) {
-    redirect((await getAuthUser()) ? "/home" : "/login");
+    redirect((await getAuthUser()) ? "/home" : "/admin/login");
   }
+
+  const adminSession = await getAdminSession();
+  const operatorName = adminSession?.user?.name || "ops";
 
   return (
     <div className="min-h-screen lg:flex">
@@ -40,7 +43,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
         <div className="mt-auto hidden border-t border-white/10 px-5 py-5 lg:block">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-sky-200/55">
-            Scalers Platform
+            {operatorName}
           </p>
           <form action="/api/logout" method="post" className="mt-3">
             <button type="submit" className="text-sm text-sky-200/80 hover:text-white">

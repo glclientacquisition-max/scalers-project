@@ -133,7 +133,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | Subsystem | Source of truth | Path | Evidence | Alternatives | Status |
 | --- | --- | --- | --- | --- | --- |
 | Owner sessions | Supabase Auth JWT | `dashboard/src/lib/auth.ts` | `(desk)/layout` gates | `DASHBOARD_OPEN` dev bypass | CORE |
-| Super Admin | Legacy cookie | `isLegacyAuthenticated()` | `admin/layout.tsx` redirect | Supabase RBAC | LEGACY |
+| Super Admin | Better Auth username + access code | `dashboard/src/lib/admin-auth.ts`, `/admin/login` | `admin.scalers.co.ke` when `ADMIN_HOST` is set | HMAC `DASHBOARD_PASSWORD` cookie | CORE |
 | Voice / signup provisioner | Service role | `SUPABASE_SERVICE_ROLE_KEY` | `supabaseClient.js`, admin APIs | — | CORE |
 
 ---
