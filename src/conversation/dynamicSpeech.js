@@ -265,7 +265,7 @@ function pickPhaticReply(opts = {}) {
   const lang = confirmationLanguage(opts.language);
   const card = opts.callerMemory;
   if (card && typeof card === 'object') {
-    if (card.sharedLine && !speakerKnownOnFile(card)) {
+    if (!speakerKnownOnFile(card)) {
       return lang === 'en'
         ? "I'm well. Who is calling?"
         : 'Nzuri. Ni nani anayepiga?';
