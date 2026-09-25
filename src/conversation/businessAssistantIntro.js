@@ -1,21 +1,20 @@
 /**
  * Business assistant introduction — canonical phone opener.
  *
- * Top-level rules (MVP unanswered-call path):
- * 1. Brand first — business name is the hero signal in the first sentence.
- * 2. Agent named — callers know who is speaking.
- * 3. Offering is compiled from services on file for later turns, not spoken on
- *    the first open (callers drop during a catalog dump).
- * 4. After identity, say they can speak English or Kiswahili (once, in English).
- *    Then match the language they actually use. Do not open with Habari.
- * 5. English-default on first open — do not lottery-open in Kiswahili before
- *    the caller has spoken (prevents sticky language flip).
- * 6. One invite — how can I help (or message/closed honesty).
- * 7. Closed honesty — identity, closed/bulletin, language invite, one question.
+ * First-forward rules (Kenya unanswered / forwarded line):
+ * 1. Shop first, then the named person, then one question.
+ * 2. Do not list services on the first open (callers drop on a catalog dump).
+ * 3. Do not invite language on first audio. Match after they speak.
+ * 4. English-default on first open. Do not lottery-open with Habari.
+ * 5. Closed honesty stays one short clause, then the same question.
+ * 6. Message-only still asks for a name.
+ * 7. Never speak a default shop name ("the business").
  */
 
-const LANGUAGE_INVITE =
-  'You can speak in English or Kiswahili.';
+const LANGUAGE_INVITE = 'You can speak in English or Kiswahili.';
+
+const FORBIDDEN_FIRST_OPEN =
+  /\b(thank you for calling|you('ve| have) reached|we help with|owner is away|i am an ai|virtual assistant|intelligent agent|press [0-9]|stay on the line|english or kiswahili)\b/i;
 
 function eatTimeOfDay(date = new Date()) {
   const hour = (date.getUTCHours() + 3) % 24; // Africa/Nairobi ≈ UTC+3
@@ -29,6 +28,20 @@ function cleanName(value, fallback) {
   return text || fallback;
 }
 
+function isDefaultShopName(value) {
+  const shop = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return !shop || /^the business$/i.test(shop);
+}
+
+function isDefaultAgentName(value) {
+  const agent = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return !agent || /^receptionist$/i.test(agent);
+}
+
 function shortenNotice(notice, max = 90) {
   let short = String(notice || '').replace(/\s+/g, ' ').trim();
   if (!short) return '';
@@ -38,13 +51,14 @@ function shortenNotice(notice, max = 90) {
 }
 
 /**
- * Time-of-day opener in English (first contact only).
- * @returns {'Good morning'|'Hello'|'Good evening'}
+ * Time-of-day first-word swap. Does not add a second sentence.
+ * Afternoon stays shop-first with no Hello.
+ * @returns {string} prefix including trailing ", " or ""
  */
-function englishDayOpener(tod) {
-  if (tod === 'morning') return 'Good morning';
-  if (tod === 'evening') return 'Good evening';
-  return 'Hello';
+function dayWordPrefix(tod) {
+  if (tod === 'morning') return 'Good morning, ';
+  if (tod === 'evening') return 'Good evening, ';
+  return '';
 }
 
 function asServiceArray(raw) {
@@ -83,6 +97,7 @@ function isSpeakableOfferingName(name) {
 /**
  * One short spoken clause about what the business offers.
  * Grounded only in services catalog / services notes — never invents.
+ * Kept for later turns / desk preview. Never spoken on first open.
  * @returns {string} e.g. "We help with books, special orders, and delivery." or ""
  */
 function summarizeOfferingForIntro(opts = {}) {
@@ -100,7 +115,6 @@ function summarizeOfferingForIntro(opts = {}) {
     if (fromCatalog.length === 1) list = fromCatalog[0];
     else if (fromCatalog.length === 2) list = `${fromCatalog[0]} and ${fromCatalog[1]}`;
     else list = `${fromCatalog[0]}, ${fromCatalog[1]}, and ${fromCatalog[2]}`;
-    // Soften catalog labels that already start with verbs.
     const clause = /^(we |our )/i.test(list)
       ? list
       : `We help with ${list.toLowerCase()}.`;
@@ -111,10 +125,8 @@ function summarizeOfferingForIntro(opts = {}) {
     .replace(/\s+/g, ' ')
     .trim();
   if (!notes) return '';
-  // First sentence / line only — keep the opener short.
   const first = notes.split(/(?<=[.!?])\s+|\n/)[0] || notes;
   if (first.length < 8 || first.length > 90) return '';
-  // Skip if it looks like a full pricing dump.
   if ((first.match(/,/g) || []).length >= 4) return '';
   return formatOfferingClause(first);
 }
@@ -126,12 +138,29 @@ function formatOfferingClause(raw) {
   if (!text) return '';
   if (text.length > 96) text = `${text.slice(0, 93).trim()}...`;
   if (!/[.!?…]$/.test(text)) text = `${text}.`;
-  // Prefer "We help with…" / already complete sentences.
   if (!/^(we |our )/i.test(text) && text.length < 70) {
     text = `We help with ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
     if (!/[.!?…]$/.test(text)) text = `${text}.`;
   }
   return text;
+}
+
+/**
+ * Shop-first identity. Morning/evening is a first-word swap only.
+ * @returns {string} e.g. "ChapterOne Bookstore, this is Aisha."
+ */
+function composeOpenerIdentity(opts = {}) {
+  const businessName = cleanName(
+    opts.businessName || process.env.BUSINESS_NAME,
+    'the business'
+  );
+  const agentName = cleanName(opts.agentName, '');
+  const tod = eatTimeOfDay(opts.now || new Date());
+  const day = dayWordPrefix(tod);
+  if (!isDefaultAgentName(agentName)) {
+    return `${day}${businessName}, this is ${agentName}.`;
+  }
+  return `${day}${businessName}.`;
 }
 
 /**
@@ -153,40 +182,30 @@ function formatOfferingClause(raw) {
  * @returns {string}
  */
 function composeBusinessAssistantIntro(opts = {}) {
-  const businessName = cleanName(
-    opts.businessName || process.env.BUSINESS_NAME,
-    'the business'
-  );
-  const agentName = cleanName(opts.agentName, 'Receptionist');
-  const tod = eatTimeOfDay(opts.now || new Date());
-  const opener = englishDayOpener(tod);
   const afterHoursMode =
     String(opts.afterHoursMode || 'serve').trim().toLowerCase() === 'message'
       ? 'message'
       : 'serve';
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
-
-  // One steady persona. Do not randomize greetings (that reads as many characters).
-  const identity = `${opener}, this is ${agentName} at ${businessName}.`;
+  const identity = composeOpenerIdentity(opts);
+  const help = 'How can I help?';
+  const nameAsk = 'May I have your name?';
 
   if (closureNotice) {
-    const follow =
-      afterHoursMode === 'message'
-        ? 'I can still take a message. May I have your name?'
-        : 'Even so, I can still help. How can I help you?';
-    return `${identity} ${LANGUAGE_INVITE} ${closureNotice} ${follow}`;
+    const follow = afterHoursMode === 'message' ? nameAsk : help;
+    return `${identity} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === 'message') {
-    return `${identity} We're closed right now, but I can take a message. ${LANGUAGE_INVITE} May I have your name?`;
+    return `${identity} We're closed now. ${nameAsk}`;
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. ${LANGUAGE_INVITE} How can I help you?`;
+    return `${identity} We're closed now. ${help}`;
   }
 
-  return `${identity} ${LANGUAGE_INVITE} How can I help you?`;
+  return `${identity} ${help}`;
 }
 
 /**
@@ -196,7 +215,7 @@ function previewBusinessAssistantIntro(opts = {}) {
   return composeBusinessAssistantIntro({
     ...opts,
     variant: 0,
-    now: opts.now || new Date('2026-08-13T10:00:00.000Z'), // stable afternoon EAT for previews unless overridden
+    now: opts.now || new Date('2026-08-13T10:00:00.000Z'),
   });
 }
 
@@ -205,7 +224,8 @@ function introLooksValid(line, businessName, agentName) {
     .replace(/["“”']/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!text || text.length > 280) return false;
+  if (!text || text.length > 220) return false;
+  if (FORBIDDEN_FIRST_OPEN.test(text)) return false;
   const name = String(businessName || '').trim();
   if (name && !/^the business$/i.test(name)) {
     const nameToken = name.split(/\s+/)[0];
@@ -220,19 +240,26 @@ function introLooksValid(line, businessName, agentName) {
   if (agent && agent.length >= 2 && !/^receptionist$/i.test(agent)) {
     if (!text.toLowerCase().includes(agent.toLowerCase())) return false;
   }
-  // First open must not be Kiswahili-led. English invite is required so callers know they can switch.
   if (/^\s*habari\b/i.test(text)) return false;
-  if (!/english or kiswahili/i.test(text)) return false;
+  if (
+    !/\bhow can i help\b/i.test(text) &&
+    !/\bmay i have your name\b/i.test(text)
+  ) {
+    return false;
+  }
   return true;
 }
 
 module.exports = {
   eatTimeOfDay,
-  englishDayOpener,
   LANGUAGE_INVITE,
+  FORBIDDEN_FIRST_OPEN,
   summarizeOfferingForIntro,
+  composeOpenerIdentity,
   composeBusinessAssistantIntro,
   previewBusinessAssistantIntro,
   introLooksValid,
   shortenNotice,
+  isDefaultShopName,
+  isDefaultAgentName,
 };

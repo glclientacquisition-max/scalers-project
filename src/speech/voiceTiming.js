@@ -83,6 +83,34 @@ function createVoiceTurnTiming(callSid, opts = {}) {
  * @param {{ first_pcm_ms?: number|null, first_chunk_ms?: number|null }} summary
  * @returns {number|null}
  */
+/**
+ * Time from answer / forward (media connect) to first greeting PCM.
+ * Separate from first_pcm_ms after the caller stops.
+ */
+function logConnectToGreetingPcm({
+  callSid,
+  connectedAt,
+  firstPcmAt,
+  cached = false,
+} = {}) {
+  const start = Number(connectedAt);
+  const pcmAt = Number(firstPcmAt);
+  const ms =
+    Number.isFinite(start) && Number.isFinite(pcmAt)
+      ? Math.max(0, Math.round(pcmAt - start))
+      : null;
+  const sid = String(callSid || 'unknown');
+  console.log(
+    `[voice-timing][${sid}] connect_to_greeting_pcm_ms=${ms ?? '-'}` +
+      ` cached=${cached ? 1 : 0}`
+  );
+  return {
+    callSid: sid,
+    connect_to_greeting_pcm_ms: ms,
+    cached: cached ? 1 : 0,
+  };
+}
+
 function persistableLatencyMs(summary = {}) {
   const n = summary.first_pcm_ms ?? summary.first_chunk_ms;
   if (n == null || !Number.isFinite(Number(n))) return null;
@@ -151,4 +179,5 @@ module.exports = {
   createVoiceTurnTiming,
   persistableLatencyMs,
   createCallTranscript,
+  logConnectToGreetingPcm,
 };

@@ -399,6 +399,50 @@ function listLexiconEntries() {
   }));
 }
 
+function escapeLexiconMatch(name) {
+  return String(name || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/ /g, '\\s+');
+}
+
+/**
+ * Shop + agent extras for first PCM. Skip names Kenya already respells
+ * so Eye-sha / Chapter One stay. Tenant extras win on the same match.
+ */
+function identityLexiconEntries({ businessName, agentName } = {}) {
+  const out = [];
+  const add = (raw, priority) => {
+    const name = String(raw || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!name) return;
+    if (/^the business$/i.test(name) || /^receptionist$/i.test(name)) return;
+    if (isBlockedMatch(name)) return;
+    const kenyaSay = applyLexicon(name, 'en', []);
+    if (kenyaSay && kenyaSay !== name) return;
+    const match = escapeLexiconMatch(name);
+    if (!match) return;
+    out.push({
+      match,
+      say: sanitizeSayForm(name) || name,
+      langs: ['en', 'sw', 'sheng'],
+      priority,
+    });
+  };
+  add(businessName, 180);
+  add(agentName, 175);
+  return out;
+}
+
+function mergeIdentityLexicon(extra, identity = {}) {
+  const extras = parseLexiconOverrides(extra);
+  const identityEntries = identityLexiconEntries(identity);
+  if (!identityEntries.length) return extras;
+  return [...extras, ...identityEntries];
+}
+
 module.exports = {
   KENYA_LEXICON,
   applyLexicon,
@@ -407,4 +451,6 @@ module.exports = {
   envLexiconOverrides,
   isBlockedMatch,
   sanitizeSayForm,
+  identityLexiconEntries,
+  mergeIdentityLexicon,
 };

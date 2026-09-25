@@ -5,6 +5,7 @@ const {
   createVoiceTurnTiming,
   persistableLatencyMs,
   createCallTranscript,
+  logConnectToGreetingPcm,
 } = require('../src/speech/voiceTiming');
 
 const t0 = Date.now() - 50;
@@ -55,3 +56,13 @@ log.stampFromSummary({ first_pcm_ms: 210 });
 assert.strictEqual(log.turns()[2].latencyMs, 940);
 assert.strictEqual(log.turns()[3].latencyMs, null);
 console.log('createCallTranscript stamps first agent after last caller.');
+
+const connect = logConnectToGreetingPcm({
+  callSid: 'sid-greet',
+  connectedAt: 1_000,
+  firstPcmAt: 1_840,
+  cached: true,
+});
+assert.strictEqual(connect.connect_to_greeting_pcm_ms, 840);
+assert.strictEqual(connect.cached, 1);
+console.log('connect_to_greeting_pcm_ms logs answer-to-first-greeting PCM.');

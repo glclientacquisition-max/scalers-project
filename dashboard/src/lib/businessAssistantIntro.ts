@@ -1,7 +1,7 @@
 /**
  * Desk mirror of src/conversation/businessAssistantIntro.js
- * Keep rules in sync: brand-first, agent named, English/Kiswahili invite, one help question.
- * Open and closed: no services list. Do not open with Habari.
+ * Keep rules in sync: shop first, named person, one help question.
+ * Open and closed: no services list, no language invite. Do not open with Habari.
  */
 
 export const LANGUAGE_INVITE = "You can speak in English or Kiswahili.";
@@ -28,10 +28,10 @@ function eatTimeOfDay(date: Date): "morning" | "afternoon" | "evening" {
   return "evening";
 }
 
-function englishDayOpener(tod: "morning" | "afternoon" | "evening"): string {
-  if (tod === "morning") return "Good morning";
-  if (tod === "evening") return "Good evening";
-  return "Hello";
+function dayWordPrefix(tod: "morning" | "afternoon" | "evening"): string {
+  if (tod === "morning") return "Good morning, ";
+  if (tod === "evening") return "Good evening, ";
+  return "";
 }
 
 function cleanName(value: unknown, fallback: string): string {
@@ -39,6 +39,13 @@ function cleanName(value: unknown, fallback: string): string {
     .replace(/\s+/g, " ")
     .trim();
   return text || fallback;
+}
+
+function isDefaultAgentName(value: unknown): boolean {
+  const agent = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return !agent || /^receptionist$/i.test(agent);
 }
 
 function shortenNotice(notice: unknown, max = 90): string {
@@ -65,7 +72,7 @@ function formatOfferingClause(raw: string): string {
   return text;
 }
 
-/** One short spoken clause from catalog / notes — never invent. */
+/** One short spoken clause from catalog / notes — never invent. Not spoken on first open. */
 export function summarizeOfferingForIntro(
   opts: Pick<
     BusinessAssistantIntroOpts,
@@ -106,7 +113,18 @@ export function summarizeOfferingForIntro(
   return formatOfferingClause(first);
 }
 
-/** Deterministic Test/Settings preview (primary English brand-first line). */
+function composeOpenerIdentity(opts: BusinessAssistantIntroOpts = {}): string {
+  const businessName = cleanName(opts.businessName, "the business");
+  const agentName = cleanName(opts.agentName, "");
+  const tod = eatTimeOfDay(opts.now || new Date());
+  const day = dayWordPrefix(tod);
+  if (!isDefaultAgentName(agentName)) {
+    return `${day}${businessName}, this is ${agentName}.`;
+  }
+  return `${day}${businessName}.`;
+}
+
+/** Deterministic Test/Settings preview (shop-first English line). */
 export function previewBusinessAssistantIntro(
   opts: BusinessAssistantIntroOpts = {}
 ): string {
@@ -120,33 +138,28 @@ export function previewBusinessAssistantIntro(
 export function composeBusinessAssistantIntro(
   opts: BusinessAssistantIntroOpts = {}
 ): string {
-  const businessName = cleanName(opts.businessName, "the business");
-  const agentName = cleanName(opts.agentName, "Receptionist");
-  const tod = eatTimeOfDay(opts.now || new Date());
-  const opener = englishDayOpener(tod);
   const afterHoursMode =
     String(opts.afterHoursMode || "serve").trim().toLowerCase() === "message"
       ? "message"
       : "serve";
   const closureNotice = shortenNotice(opts.closureNotice);
   const closed = opts.isOpen === false;
-  const identity = `${opener}, this is ${agentName} at ${businessName}.`;
+  const identity = composeOpenerIdentity(opts);
+  const help = "How can I help?";
+  const nameAsk = "May I have your name?";
 
   if (closureNotice) {
-    const follow =
-      afterHoursMode === "message"
-        ? "I can still take a message. May I have your name?"
-        : "Even so, I can still help. How can I help you?";
-    return `${identity} ${LANGUAGE_INVITE} ${closureNotice} ${follow}`;
+    const follow = afterHoursMode === "message" ? nameAsk : help;
+    return `${identity} ${closureNotice} ${follow}`;
   }
 
   if (closed && afterHoursMode === "message") {
-    return `${identity} We're closed right now, but I can take a message. ${LANGUAGE_INVITE} May I have your name?`;
+    return `${identity} We're closed now. ${nameAsk}`;
   }
 
   if (closed) {
-    return `${identity} We're closed now, but I can still help. ${LANGUAGE_INVITE} How can I help you?`;
+    return `${identity} We're closed now. ${help}`;
   }
 
-  return `${identity} ${LANGUAGE_INVITE} How can I help you?`;
+  return `${identity} ${help}`;
 }

@@ -1,3 +1,20 @@
+# First-forward acceptance buckets (2026-09-25)
+
+Do not treat raw hangup as Shy failed. Kenya flash under 3s with no speech is often airtime protocol, not an AI reject.
+
+Classifier: `src/conversation/firstForwardAcceptance.js`. Persisted on `calls.summary.first_forward` (existing JSON). No dashboard chart.
+
+| Bucket | Signal | Judge assistant? |
+| --- | --- | --- |
+| `flash` | Duration under 3s, no STT | No |
+| `heard_greeting_drop` | Greeting PCM played, silent drop under 15s | No |
+| `barged_job` | Barge-in with a job noun | Yes |
+| `first_turn_goal` | Caller turn 1 has a goal, not empty / only hello / hangup | Yes |
+
+Connect-to-greeting is a Voice log: `[voice-timing][sid] connect_to_greeting_pcm_ms=N cached=0|1`. That is answer/forward to first greeting PCM, not `first_pcm_ms` after the caller stops.
+
+---
+
 # Bare Okay. is not how-are-you (2026-09-16)
 
 Live miss: freeze N1 `HD_d0f042f5d960` and N3 `HD_391a57aae9e9`. Closer `Okay.` matched `looksLikePhaticCallerTurn` because `okay|ok|fine|great` did not require `I'm`. Media path spoke the shared-line line `I'm well. Who is calling?` at 210–301 ms. NBA was `END` (N1) or `ASK_CLARIFICATION` (N3), not a how-are-you.

@@ -103,19 +103,26 @@ async function generateDynamicGreeting(opts) {
           : 'Open/closed status is unknown; do not claim the shop is closed.';
 
   const maxWords = closureNotice ? 36 : 28;
+  const dayLead =
+    tod === 'morning'
+      ? `Good morning, ${businessName}, this is ${agentName}.`
+      : tod === 'evening'
+        ? `Good evening, ${businessName}, this is ${agentName}.`
+        : `${businessName}, this is ${agentName}.`;
   const instruction = `You are ${agentName}, the live phone business assistant for ${businessName} in Kenya.
 Write ONE short spoken greeting to open the call (max ${maxWords} words).
 Sound like one calm person picking up the shop phone.
-Lead with who you are at the business, for example: "${tod === 'morning' ? 'Good morning' : tod === 'evening' ? 'Good evening' : 'Hello'}, this is ${agentName} at ${businessName}."
+Lead with the shop then your name, for example: "${dayLead} How can I help?"
 You MUST include the exact business name "${businessName}".
 You MUST include your name ${agentName}.
 Do not use IVR lines like "you've reached" or "thank you for calling".
 Do not list services or prices in the greeting. Grounded offerings wait until they ask.
-You MUST say exactly: "You can speak in English or Kiswahili."
+Do not say they can speak in English or Kiswahili. Language match happens after they speak.
 It is ${tod} in Nairobi. ${openLine}
-Use clear English for this first greeting (the caller has not spoken yet — do not open with Habari).
+Use clear English for this first greeting (the caller has not spoken yet. Do not open with Habari).
 No quotes, no markdown, never say "the business" as a placeholder.
-End with one open question: How can I help you? (or the closed/message follow from the status line).`;
+Never say you are an AI, virtual assistant, or intelligent agent.
+End with one open question: How can I help? (or the closed/message follow from the status line).`;
 
   const task = opts
     .generateText({
@@ -188,6 +195,71 @@ function shouldSpeakThinkingAck(text) {
  * Local reply when the caller only greets or asks how we are.
  * Live miss: HD_3bf5d73422fd Gemini listed couch/carpet/mattress after "How are you doing?"
  */
+function normalizeCallerAsk(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[?'"!.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Who is this / nani wewe. Not a robot ask.
+ */
+function looksLikeIdentityQuestion(text) {
+  const t = normalizeCallerAsk(text);
+  if (!t) return false;
+  if (looksLikeRobotQuestion(t)) return false;
+  return (
+    /^(who are you|who is this|who am i speaking (to|with)|who is speaking|what(?:'s| is) your name)$/.test(
+      t
+    ) ||
+    /^(wewe ni nani|nani wewe|nani huyu|jina lako nani|wewe nani)$/.test(t)
+  );
+}
+
+/**
+ * Direct robot / AI ask only. Do not treat "who are you" as this.
+ */
+function looksLikeRobotQuestion(text) {
+  const t = normalizeCallerAsk(text);
+  if (!t) return false;
+  return (
+    /\b(are you (a |an )?(robot|ai|bot|machine|virtual assistant|intelligent agent))\b/.test(
+      t
+    ) ||
+    /^(ni robot|wewe ni robot|wewe ni ai|are you ai)\b/.test(t) ||
+    /\bni robot\b/.test(t)
+  );
+}
+
+/**
+ * Name + shop only. Live bar: "I am Shy from Done and Dusted."
+ * Disclose AI only when they asked robot.
+ */
+function pickIdentityReply(opts = {}) {
+  const agent = String(opts.agentName || '').replace(/\s+/g, ' ').trim();
+  const shop = String(opts.businessName || '').replace(/\s+/g, ' ').trim();
+  const named = agent && !/^receptionist$/i.test(agent) ? agent : '';
+  const brand = shop && !/^the business$/i.test(shop) ? shop : '';
+  const who =
+    named && brand
+      ? `I am ${named} from ${brand}.`
+      : named
+        ? `I am ${named}.`
+        : brand
+          ? `This is ${brand}.`
+          : 'How can I help?';
+  if (opts.discloseAi) {
+    if (named && brand) {
+      return `Yes. I am ${named} from ${brand}. How can I help?`;
+    }
+    if (brand) return `Yes. This is ${brand}. How can I help?`;
+    return `Yes. ${who} How can I help?`;
+  }
+  return who;
+}
+
 function pickPhaticReply(opts = {}) {
   const lang = confirmationLanguage(opts.language);
   const card = opts.callerMemory;
@@ -597,6 +669,9 @@ module.exports = {
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
   looksLikePhaticCallerTurn,
+  looksLikeIdentityQuestion,
+  looksLikeRobotQuestion,
+  pickIdentityReply,
   shouldSpeakThinkingAck,
   pickPhaticReply,
   looksLikeSpokenServiceDump,
