@@ -307,9 +307,12 @@ function collectKnownCallerNames({ profile = null, state = null } = {}) {
   }
   const card = profile?.callerMemory;
   if (card?.fileOwnerName) {
-    push(card.fileOwnerName, card.greetByName && card.fileRole === 'primary' ? 'memory' : 'file');
+    push(
+      card.fileOwnerName,
+      card.identityBound && card.fileRole === 'primary' ? 'memory' : 'file'
+    );
   }
-  if (card?.name) push(card.name, card.greetByName ? 'memory' : 'file');
+  if (card?.name) push(card.name, card.identityBound ? 'memory' : 'file');
   for (const alt of card?.alternateNames || []) push(alt, 'alternate');
   push(state?.caller?.name, 'state');
   return names;

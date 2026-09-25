@@ -123,5 +123,33 @@ test('buildLiveGroundTruth lists open visits for booking', () => {
   assert.match(truth, /Same-hour visits are allowed/);
 });
 
+test('buildLiveGroundTruth hides this phone file visit until the speaker is bound', () => {
+  const truth = buildLiveGroundTruth({
+    servicesCatalog: [{ name: 'Carpet cleaning' }],
+    callerMemory: {
+      phone: '+254700000001',
+      name: 'Jane',
+      greetByName: true,
+    },
+    openAppointments: [
+      {
+        when_text: 'Tue 10 AM',
+        service_name: 'Jane carpet',
+        status: 'requested',
+        caller_phone: '+254700000001',
+      },
+      {
+        when_text: 'Wed 2 PM',
+        service_name: 'Other sofa',
+        status: 'requested',
+        caller_phone: '+254700000099',
+      },
+    ],
+  });
+  assert.match(truth, /OPEN VISITS/);
+  assert.match(truth, /Other sofa/);
+  assert.doesNotMatch(truth, /Jane carpet/);
+});
+
 console.log(`\n${passed} passed`);
 if (process.exitCode) process.exit(process.exitCode);

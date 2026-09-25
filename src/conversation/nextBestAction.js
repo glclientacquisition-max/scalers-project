@@ -2,7 +2,7 @@
 // The LLM interprets language; this module decides the safest useful action class.
 
 const { ACTIONS, authorizeAction } = require('./brainPolicy');
-const { returningFileUsable } = require('./callerMemory');
+const { returningFileUsable, speakerPendingOnFile } = require('./callerMemory');
 const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
@@ -68,11 +68,13 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
 
   if (intent === 'unknown' || intent === 'general_enquiry') {
     const returning = state?.returning;
-    if (returning?.sharedLine && state?.caller?.nameConfirmed !== true) {
+    if (speakerPendingOnFile(returning) && state?.caller?.nameConfirmed !== true) {
       return {
         action: ACTIONS.ASK_CLARIFICATION,
         slot: 'name',
-        reason: 'Shared line. Ask who is speaking. Do not use the file name.',
+        reason: returning.sharedLine
+          ? 'Shared line. Ask who is speaking. Do not use the file name.'
+          : 'Phone file is a candidate. Ask who is speaking before using the file name or visit.',
       };
     }
     const said = String(state?.goal?.description || '');

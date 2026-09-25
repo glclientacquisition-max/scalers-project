@@ -50,6 +50,18 @@ assert.equal(
     language: 'en',
     callerMemory: { nextAppointment: 'carpet, Tuesday', greetByName: true },
   }),
+  "I'm well. Who is calling?"
+);
+assert.equal(
+  pickPhaticReply({
+    language: 'en',
+    callerMemory: {
+      nextAppointment: 'carpet, Tuesday',
+      greetByName: true,
+      identityBound: true,
+      fileRole: 'primary',
+    },
+  }),
   "I'm well. I have your visit on file. Is that why you called?"
 );
 assert.equal(

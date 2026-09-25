@@ -15,7 +15,7 @@ const {
   formatReturningFileForCallState,
   returningFileUsable,
   seedCallerFromMemory,
-  speakerKnownOnFile,
+  speakerPendingOnFile,
   returningFileFromCard,
 } = require('./callerMemory');
 const {
@@ -624,7 +624,7 @@ function formatBrainStateForPrompt(state) {
     formatHearAgainForPrompt(value),
     formatReturningFileForCallState(value.returning),
     value.conversation?.phatic
-      ? value.returning?.sharedLine && !speakerKnownOnFile(value.returning)
+      ? speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then who is calling. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
