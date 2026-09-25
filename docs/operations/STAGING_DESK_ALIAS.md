@@ -24,7 +24,11 @@ Evidence on 2026-09-25:
 
 Production desk is a different project (`scalers-project`). Production voice is Railway. Do not change those from this pin.
 
-## The pin
+## The durable fix
+
+Ship the approved desk stack to `main`. The URL tracks `main`. Sideways merges of Contacts, Updates, Inbox, and Ping never reach this alias until they are on `main`.
+
+## The pin (only while a stack is still off main)
 
 Vercel project `scalers-staging` now:
 
