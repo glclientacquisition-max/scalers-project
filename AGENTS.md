@@ -71,7 +71,7 @@ Distinguish documentation work from architectural rewrites. Governance PRs must 
 
 ## Agent skills
 
-Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review) plus **desk-motion**, **reticle**, **chisle**, **ui-skills**, and **no-ai-slop**. They do **not** replace lanes. Index: [`.cursor/skills/README.md`](.cursor/skills/README.md).
+Composable Matt Pocock skills in `.cursor/skills/` (grill-with-docs, wayfinder, tdd, code-review) plus **desk-motion**, **reticle**, **chisle**, **ui-skills**, and **no-ai-slop**. Vercel/Next packs from `npx skills` live in `.agents/skills/` and are linked from `.cursor/skills/`. They do **not** replace lanes. Index: [`.cursor/skills/README.md`](.cursor/skills/README.md).
 
 ### Issue tracker
 
