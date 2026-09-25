@@ -8,17 +8,18 @@
 ## Lifecycle
 
 ```
-PR → CI (unit tests, lint, build)
-  ↓ if Voice: staging-voice-deploy.yml on the PR branch
-  ↓ confirm staging /healthz.gitSha matches the PR commit
-  ↓ DID test on staging Voice
-  ↓ merge to main
+PR or push → cursor/staging-voice-468b
+  ↓ Railway staging Voice + Vercel scalers-staging deploy that branch
+  ↓ confirm staging /healthz.gitSha and scalers-staging.vercel.app
+  ↓ DID + desk test
+  ↓ PR staging branch → main (Ready for review, then squash-merge)
+  ↓ production Desk (scalers-project) and production Voice follow main
   ↓ staging-validate.yml (DB smoke)
   ↓ release candidate approval
   ↓ production (human-approved SQL + deploy)
 ```
 
-Desk still gets Vercel preview URLs per PR. Voice does not. Run **Deploy staging Voice** from the PR branch (`confirm_target=staging`) before any DID test. Do not merge to `main` to make Railway pick up a Voice fix.
+Official staging Desk is `https://scalers-staging.vercel.app`. Official staging Voice is Railway. Both run **`cursor/staging-voice-468b`**. Vercel `scalers-staging` skips production builds that are not that branch, so a `main` merge does not overwrite the staging Desk URL. Feature PRs still get a preview URL for a UI glance. Do not Vercel-Promote a preview onto `scalers-project`. Promote is squash-merge to `main`. Leave **scalers-project** production branch on `main`. Optional: set **scalers-staging → Settings → Git → Production Branch** to `cursor/staging-voice-468b` so the official URL auto-assigns on every staging-branch push.
 
 ---
 

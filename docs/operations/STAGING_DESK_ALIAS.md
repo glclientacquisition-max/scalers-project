@@ -30,13 +30,15 @@ Ship the approved desk stack to `main`. The URL tracks `main`. Sideways merges o
 
 ## The pin (only while a stack is still off main)
 
+Day-to-day staging Voice and Desk land on `cursor/staging-voice-468b` (#424). This pin does not replace that branch.
+
 Vercel project `scalers-staging` now:
 
 1. **Ignores git builds from `main`.** Ignored Build Step exits 0 when `VERCEL_GIT_COMMIT_REF` is `main`.
 2. **Does not auto-assign the production alias.** `autoAssignCustomDomains` is off. A new production deploy does not steal `scalers-staging.vercel.app`.
-3. **Serves `cursor/staging-live-679d`.** That branch is the desk stack tip. Move the alias with an explicit assign, not a random feature SHA.
+3. **Serves an explicit assigned SHA** while approved desk work is off `main`. Do not point the alias at a random feature SHA.
 
-`cursor/staging-live-679d` is a pointer. Fast-forward or reset it to the stack tip you want owners to see. Then assign `scalers-staging.vercel.app` to that deployment.
+`cursor/staging-live-679d` is an optional pointer. Fast-forward or reset it to the stack tip you want owners to see. Then assign `scalers-staging.vercel.app` to that deployment.
 
 Do not put an `ignoreCommand` in `dashboard/vercel.json`. That file is shared with production `scalers-project`.
 
