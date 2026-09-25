@@ -94,7 +94,7 @@ describe('returning-caller card', () => {
     });
     assert.match(prompt, /RETURNING CALLER/);
     assert.match(prompt, /Jane/);
-    assert.match(prompt, /speaker not bound/i);
+    assert.match(prompt, /not bound/i);
     assert.match(prompt, /who is speaking/i);
     assert.doesNotMatch(prompt, /Atomic Habits/);
     const block = formatReturningCallerForPrompt(card);
@@ -108,7 +108,7 @@ describe('returning-caller card', () => {
     assert.equal(state.returning.identityBound, false);
     assert.equal(state.returning.nextVisit, null);
     assert.equal(state.returning.lastReason, null);
-    assert.match(formatBrainStateForPrompt(state), /Speaker not bound/);
+    assert.match(formatBrainStateForPrompt(state), /not bound/);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /Got it, Jane/);
     assert.doesNotMatch(formatBrainStateForPrompt(state), /open visit/i);
   });
@@ -178,7 +178,7 @@ describe('returning-caller card', () => {
       },
     });
     assert.doesNotMatch(formatReturningCallerForPrompt(card), /create_appointment unless they ask for a new job/);
-    assert.match(formatReturningCallerForPrompt(card), /speaker not bound/i);
+    assert.match(formatReturningCallerForPrompt(card), /not bound/i);
     assert.doesNotMatch(formatReturningCallerForPrompt(card), /carpet cleaning/);
     assert.equal(
       pickPhaticReply({ language: 'en', callerMemory: card }),
@@ -188,7 +188,7 @@ describe('returning-caller card', () => {
     const profile = { vertical: 'home_services', callerMemory: card };
     const seeded = createBrainState(profile);
     assert.doesNotMatch(formatBrainStateForPrompt(seeded), /open visit/i);
-    assert.match(formatBrainStateForPrompt(seeded), /Speaker not bound/);
+    assert.match(formatBrainStateForPrompt(seeded), /not bound/);
 
     const hello = observeCallerTurn(seeded, {
       text: 'Hello',
@@ -217,8 +217,9 @@ describe('returning-caller card', () => {
     assert.equal(named.caller.name, 'Alex');
     assert.equal(named.caller.nameConfirmed, true);
     assert.equal(named.returning.fileRole, 'primary');
-    assert.equal(named.returning.nextVisit, 'carpet cleaning, Tuesday 10 AM');
-    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /create_appointment unless they ask for a new job/);
+    assert.equal(named.returning.nextVisit, 'carpet cleaning | Tuesday 10 AM');
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Open: visit \| carpet cleaning/);
+    assert.match(formatReturningCallerForPrompt(profile.callerMemory), /Open first/);
     assert.match(formatBrainStateForPrompt(named), /open visit/i);
     assert.equal(
       pickPhaticReply({ language: 'en', callerMemory: profile.callerMemory }),
@@ -301,7 +302,7 @@ describe('returning-caller card', () => {
     assert.equal(named.caller.name, 'Amina');
     assert.equal(named.caller.nameConfirmed, true);
     assert.equal(named.returning.fileRole, 'primary');
-    assert.equal(named.returning.nextVisit, 'carpet cleaning, Tuesday 10 AM');
+    assert.equal(named.returning.nextVisit, 'carpet cleaning | Tuesday 10 AM');
     assert.match(formatBrainStateForPrompt(named), /open visit/i);
     assert.doesNotMatch(formatBrainStateForPrompt(named), /Ask who is speaking/);
     assert.match(formatReturningCallerForPrompt(profile.callerMemory), /use this name/i);
@@ -361,7 +362,7 @@ describe('returning-caller card', () => {
     assert.equal(named.returning.fileRole, 'alternate');
     assert.equal(named.returning.nextVisit, null);
     assert.equal(named.returning.lastReason, null);
-    assert.match(formatBrainStateForPrompt(named), /Not the household file/);
+    assert.match(formatBrainStateForPrompt(named), /not the household file/i);
     assert.doesNotMatch(formatBrainStateForPrompt(named), /Ask who is speaking/);
     assert.doesNotMatch(formatReturningCallerForPrompt(profile.callerMemory), /carpet cleaning/);
     assert.equal(
@@ -449,14 +450,14 @@ describe('returning-caller card', () => {
       ],
     });
     assert.deepEqual(card.recentBookings, [
-      'carpet cleaning, last Tuesday',
-      'couch cleaning, 3 March',
+      'carpet cleaning | last Tuesday | done',
+      'couch cleaning | 3 March | done',
     ]);
     assert.doesNotMatch(card.recentBookings.join(' '), /mattress clean/);
     const unboundBlock = formatReturningCallerForPrompt(card);
-    assert.match(unboundBlock, /speaker not bound/i);
-    assert.doesNotMatch(unboundBlock, /Recent bookings/);
-    assert.doesNotMatch(unboundBlock, /carpet cleaning, last Tuesday/);
+    assert.match(unboundBlock, /not bound/i);
+    assert.doesNotMatch(unboundBlock, /History:/);
+    assert.doesNotMatch(unboundBlock, /carpet cleaning/);
 
     const profile = { vertical: 'home_services', callerMemory: card };
     const unbound = createBrainState(profile);
@@ -474,10 +475,11 @@ describe('returning-caller card', () => {
       }),
     });
     const block = formatReturningCallerForPrompt(profile.callerMemory);
-    assert.match(block, /Recent bookings: carpet cleaning, last Tuesday; couch cleaning, 3 March/);
-    assert.match(block, /Do not read them aloud as a list/);
+    assert.match(block, /History: carpet cleaning \| last Tuesday \| done/);
+    assert.match(block, /History: couch cleaning \| 3 March \| done/);
+    assert.match(block, /History only if they mention that job/);
     assert.doesNotMatch(block, /fumigation/);
-    assert.match(formatBrainStateForPrompt(state), /recent carpet cleaning/);
+    assert.match(formatBrainStateForPrompt(state), /Caller file history:.*carpet cleaning/);
     assert.equal(
       inferIntent('Last time you came for carpet', { returning: state.returning }),
       'general_enquiry'
@@ -534,5 +536,113 @@ describe('returning-caller card', () => {
     const stripped = selectOpenVisitsForPrompt(visits, other);
     assert.equal(stripped.length, 1);
     assert.equal(stripped[0].service_name, 'Sofa');
+  });
+
+  it('formats a bound lived file as labeled Open Last History Place rows', () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        last_reason: 'carpet Tuesday',
+        notes: 'prefers morning',
+        metadata: {
+          caller_profile: {
+            standing: 'Usually carpet. Morning. Kiswahili.',
+            language: 'sw',
+            typical_job: 'carpet cleaning',
+            landmark: 'Rongai',
+          },
+        },
+      },
+      openRequests: [
+        { request_type: 'hold', item: 'Atomic Habits', when_text: 'Saturday' },
+      ],
+      nextAppointment: {
+        service_name: 'mattress clean',
+        when_text: 'Friday',
+        status: 'requested',
+        address_landmark: 'Rongai',
+      },
+      recentAppointments: [
+        {
+          id: 'appt-1',
+          service_name: 'carpet cleaning',
+          when_text: 'last Tuesday',
+          status: 'done',
+          address_landmark: 'Rongai',
+        },
+        {
+          id: 'appt-2',
+          service_name: 'carpet cleaning',
+          when_text: 'March',
+          status: 'done',
+        },
+      ],
+    });
+    assert.equal(card.place, 'Rongai');
+    assert.equal(card.usualJob, 'carpet cleaning');
+    assert.equal(card.language, 'sw');
+    assert.match(card.nextAppointment, /mattress clean \| Friday \| requested \| Rongai/);
+    assert.equal(card.openRequests[0], 'hold | Atomic Habits | Saturday');
+
+    const unbound = formatReturningCallerForPrompt(card);
+    assert.doesNotMatch(unbound, /Open:/);
+    assert.doesNotMatch(unbound, /History:/);
+    assert.doesNotMatch(unbound, /Place:/);
+
+    const bound = bindCallerMemoryCard(card, 'Jane');
+    const block = formatReturningCallerForPrompt(bound);
+    assert.match(block, /Speaker: Jane \(bound; use this name\)/);
+    assert.match(block, /Open: visit \| mattress clean \| Friday \| requested \| Rongai/);
+    assert.match(block, /Open: hold \| Atomic Habits \| Saturday/);
+    assert.match(block, /Last: carpet Tuesday/);
+    assert.match(block, /History: carpet cleaning \| last Tuesday \| done \| Rongai/);
+    assert.match(block, /Place: Rongai/);
+    assert.match(block, /Usual: carpet cleaning/);
+    assert.match(block, /Standing: Usually carpet. Morning. Kiswahili./);
+    assert.match(block, /Language: sw/);
+    assert.match(block, /Note: prefers morning/);
+    assert.match(block, /Open first/);
+    assert.doesNotMatch(block, /Caller:/);
+
+    const state = createBrainState({ callerMemory: bound });
+    const callState = formatBrainStateForPrompt(state);
+    assert.match(callState, /Caller file speaker: Jane \(bound\)/);
+    assert.match(callState, /Caller file open visit: mattress clean/);
+    assert.match(callState, /Caller file open request: hold \| Atomic Habits/);
+    assert.match(callState, /Caller file history:.*carpet cleaning/);
+    assert.match(callState, /Caller file place: Rongai/);
+  });
+
+  it('does not copy household standing onto an alternate speaker', () => {
+    const card = buildCallerMemoryCard({
+      contact: {
+        phone: '+254700000002',
+        name: 'Amina',
+        last_reason: 'carpet Tuesday',
+        metadata: {
+          alternate_names: [{ name: 'Brian' }],
+          caller_profile: {
+            standing: 'Usually carpet.',
+            persons: {
+              brian: { standing: 'Asks about soaps.', language: 'en' },
+            },
+          },
+        },
+      },
+      nextAppointment: { service_name: 'carpet cleaning', when_text: 'Tuesday' },
+    });
+    const asBrian = bindCallerMemoryCard(card, 'Brian');
+    assert.equal(asBrian.nextAppointment, null);
+    assert.equal(asBrian.standing, 'Asks about soaps.');
+    assert.equal(asBrian.language, 'en');
+    const brianBlock = formatReturningCallerForPrompt(asBrian);
+    assert.match(brianBlock, /Standing: Asks about soaps./);
+    assert.doesNotMatch(brianBlock, /Open:/);
+    assert.doesNotMatch(brianBlock, /carpet cleaning/);
+
+    const asAmina = bindCallerMemoryCard(asBrian, 'Amina');
+    assert.match(asAmina.nextAppointment, /carpet cleaning/);
+    assert.equal(asAmina.standing, 'Usually carpet.');
   });
 });

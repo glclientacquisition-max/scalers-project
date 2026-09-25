@@ -105,7 +105,7 @@ evalite("Returning-caller card", {
           if (output.greetByName !== true) return 0;
           if (output.seededName) return 0;
           if (output.nameConfirmed) return 0;
-          if (!/speaker not bound/i.test(block)) return 0;
+          if (!/not bound/i.test(block)) return 0;
           if (!/who is speaking/i.test(block)) return 0;
           if (/Last reason is the default/.test(block)) return 0;
           if (/Atomic Habits/.test(block)) return 0;

@@ -15,6 +15,7 @@ Lanes: Brain + Platform read helper. Spec: `docs/specs/caller-memory.md`. ADR-00
 - Instant TTS opener unchanged (this PR)
 - Evalite scores card shape without wrapping `@google/genai` (this PR)
 - Bind-before-use on unique and shared lines (this PR)
+- Bound lived file is labeled Open / Last / History / Place rows the model can cite (this PR)
 
 ## Not yet specified
 

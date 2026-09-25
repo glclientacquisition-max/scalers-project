@@ -14,13 +14,13 @@ The next call from a known tenant phone does not start empty. Brain receives a c
 2. `hydrateCallerMemory` → `getCallerMemory({ tenantId, from_number })`. Compact card on `profile.callerMemory`. Gemini `contents` and `callBrainStates` are per `callSid`. A different number is a fresh Brain. The same number is the same **phone** file.
 3. `createBrainState` copies the phone only. It does not set `caller.name` or `nameConfirmed`.
 4. First reasoned turn. `RETURNING CALLER` names the file as a candidate. CALL STATE: speaker not bound. NBA on hello / how-are-you: ask who is speaking. Phatic: `I'm well. Who is calling?` Last reason, open visit, and recent bookings stay hidden. OPEN VISITS omits this phone's rows so the previous job cannot look like occupancy for whoever is on the line.
-5. Caller says a name. `applyCallerNameConfirmation` + `bindCallerMemoryCard`. Primary (file owner or unique unnamed line): unlock last reason / visit / recent bookings. Alternate or a different name: identity only. Then do not re-ask.
+5. Caller says a name. `applyCallerNameConfirmation` + `bindCallerMemoryCard`. Primary (file owner or unique unnamed line): unlock the lived file (Open, Last, History, Place). Alternate or a different name: identity only, plus that person's standing if `caller_profile.persons` has it. Then do not re-ask.
 6. Hangup still upserts `contacts` by phone (`persistCompletedCallContact`). That write can still poison the next call's candidate file. It must not bind the next speaker.
 
 ## Decisions
 
 1. **Key:** tenant + stored phone (Kenya E.164 when possible). No embeddings. No transcript replay.
-2. **Card fields:** name, shared-line flag, last reason, up to two open service requests, one next appointment (requested or confirmed), up to two recent bookings (done or earlier visits, not the next open one). Clip each string. Drop transcript-like notes.
+2. **Card fields:** name, shared-line flag, last reason, up to two open service requests, one next appointment (requested or confirmed, with status and landmark when stored), up to two recent bookings (status and landmark when stored), Place, Usual, optional standing/language from `metadata.caller_profile`. Clip each string. Drop transcript-like notes.
 3. **Greet by name** on the card means a unique primary name exists (`alternate_names` empty). It does **not** confirm the speaker. Instant TTS never greets by that name.
 4. **Instant TTS greeting stays brand-first.** Do not wait on Gemini or lengthen the opener with history. The card is for the first Gemini turn via CONTEXT HEADER + Brain state.
 5. **Do not seed Brain name.** Unique and shared lines leave `caller.name` empty until this call confirms a spoken name.
@@ -37,7 +37,9 @@ The next call from a known tenant phone does not start empty. Brain receives a c
 - `createBrainState({ callerMemory })` copies phone only. It does not set `nameConfirmed`.
 - `getCallerMemory` returns null when the contacts table is missing or no row matches. `attachCallerMemory` then deletes any stale card on the profile.
 - After a confirmed name, `bindCallerMemoryCard` / `observeCallerTurn` attach the household visit only when the speaker matches the primary file name.
-- Up to two recent bookings appear in `RETURNING CALLER` / CALL STATE when the speaker owns the file. They are not read aloud as a list.
+- Bound file is labeled rows the model can cite: Speaker, Open (visit / hold), Last, History (up to two), Place, Usual, Standing, Language, Note. Do not read them aloud as a list.
+- Place and Usual come from appointment rows (landmark; a job seen at least twice). Standing / language overlay `contacts.metadata.caller_profile` when present. No new DB helper.
+- Up to two recent bookings appear as History when the speaker owns the file.
 
 ## Tests
 
