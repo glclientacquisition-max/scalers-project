@@ -49,4 +49,4 @@ Done when MASTER still lists only these verbs, reduced-motion kills the new clas
 
 ## Refuse
 
-Lottie, Framer Motion, the `motion` package, `motion/react`, GSAP, animate.css, decorative canvas, glass shimmer, landing-rise on desk, `animate-pulse` except the pronunciation recording dot, a second live loop, row enter-stagger, dialog zoom, overlay fade, skeleton shimmer that invents numbers, `transition-all`, page crossfades, `layoutId`, springs, number count-up, animating width/height/top/left/margin/box-shadow on notices.
+Lottie, Framer Motion, the `motion` package, `motion/react`, GSAP, animate.css, decorative canvas, glass shimmer, landing-rise on desk, `animate-pulse` except the pronunciation recording dot, a second live loop, row enter-stagger, dialog zoom, overlay fade, skeleton shimmer that invents numbers, `transition-all`, page crossfades, `layoutId`, springs, number count-up, animating width/height/top/left/margin/box-shadow on notices. Remote ui-skills motion packs (`improve-animations`, `12-principles-of-animation`, `fixing-motion-performance`) lose to this file.
