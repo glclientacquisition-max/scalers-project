@@ -292,6 +292,42 @@ assert.match(
   'media greeting must be the local instant opener after tenant names load'
 );
 
+assert.match(
+  source,
+  /connect_to_greeting_pcm_ms/,
+  'media path must log answer-to-first-greeting PCM, not only first_pcm_ms after the caller stops'
+);
+
+assert.match(
+  source,
+  /lookupGreetingPcm/,
+  'tenant greeting clip must be cached so TTS-ready wait is not dead air'
+);
+
+assert.match(
+  source,
+  /isDefaultShopName/,
+  'greeting must not speak a default-name opener'
+);
+
+assert.match(
+  source,
+  /mergeIdentityLexicon/,
+  'first greeting PCM must run shop and agent names through the lexicon'
+);
+
+assert.match(
+  source,
+  /pickIdentityReply/,
+  'who-are-you must be a local name-plus-shop line'
+);
+
+assert.match(
+  source,
+  /persistFirstForwardAcceptance/,
+  'hangup must persist first-forward acceptance on existing call summary JSON'
+);
+
 assert.doesNotMatch(
   source,
   /tenantWarm\s*\.then\(async/,

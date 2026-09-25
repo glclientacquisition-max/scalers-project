@@ -71,7 +71,13 @@ async function smokeOperationalBooking() {
   });
   checkLine('operational greeting', greeting, {
     allowLong: true,
-    mustInclude: [/this is Shy at Done and Dusted/i, /English or Kiswahili/i, /How can I help you/i],
+    mustInclude: [/Done and Dusted Cleaning Services, this is Shy/i, /How can I help/i],
+    mustNotInclude: [
+      /English or Kiswahili/i,
+      /I am an AI/i,
+      /We help with/i,
+      /stay on the line/i,
+    ],
   });
 
   const progress = pickActionProgress('CREATE_REQUEST', 'en');
@@ -130,7 +136,7 @@ async function smokeOperationalBooking() {
   );
   checkLine('operational escalate noted', escalateConfirm, {
     enMidCall: true,
-    mustInclude: [/^Okay, I've noted/],
+    mustInclude: [/^I've sent that to the team/],
   });
 
   const handoff = pickClarifyProgress({
@@ -148,9 +154,9 @@ async function smokeOperationalBooking() {
   checkLine('operational ack', ack, { enMidCall: true });
 
   const openers = [progress, saved, hold, escalateProgress, escalateConfirm, handoff];
-  const okayFamily = openers.filter((line) => /^Okay/i.test(line));
-  if (okayFamily.length !== openers.length) {
-    fail('operational one person', `expected Okay family on mid-call lines: ${openers.join(' | ')}`);
+  const samePerson = openers.filter((line) => /^(Okay|I've sent that to the team)/i.test(line));
+  if (samePerson.length !== openers.length) {
+    fail('operational one person', `expected same-person mid-call lines: ${openers.join(' | ')}`);
   }
   console.log('✓ operational booking path stays one person');
 }

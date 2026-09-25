@@ -38,6 +38,12 @@ const {
   newCachedFillerStreamId,
   warmFillerAckPcm,
 } = require('./src/speech/fillerPcmCache');
+const {
+  isGreetingCacheEnabled,
+  lookupGreetingPcm,
+  putGreetingPcm,
+} = require('./src/speech/greetingPcmCache');
+const { mergeIdentityLexicon } = require('./src/speech/pronunciationLexicon');
 const { classifySonioxError } = require('./src/speech/sonioxErrors');
 const { getSonioxProviderHealth } = require('./src/speech/sonioxProviderHealth');
 const {
@@ -137,6 +143,40 @@ const callBrainStates = new Map();
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
+/** First-forward hangup signals keyed by callSid (calls.summary.first_forward). */
+const callFirstForward = new Map();
+
+function patchFirstForward(callSid, patch = {}) {
+  if (!callSid || !patch || typeof patch !== 'object') return;
+  const prev = callFirstForward.get(callSid) || {};
+  callFirstForward.set(callSid, { ...prev, ...patch });
+}
+
+async function persistFirstForwardAcceptance(callSid, durationSeconds) {
+  if (!callSid) return null;
+  const signals = callFirstForward.get(callSid) || {};
+  const classified = classifyFirstForwardAcceptance({
+    durationSeconds,
+    greetingPlayed: signals.greetingPlayed,
+    hasStt: signals.hasStt,
+    bargedJob: signals.bargedJob,
+    bargeText: signals.bargeText,
+    firstCallerTurn: signals.firstCallerTurn,
+    connectToGreetingPcmMs: signals.connectToGreetingPcmMs,
+  });
+  try {
+    await db.mergeCallSummaryMeta({
+      callSid,
+      patch: { first_forward: classified },
+    });
+    console.log(
+      `[first-forward][${callSid}] bucket=${classified.bucket || 'none'} judge=${classified.judge ? 1 : 0}`
+    );
+  } catch (err) {
+    console.warn(`[first-forward][${callSid}] persist failed:`, err?.message || err);
+  }
+  return classified;
+}
 /** SautiKit UUID call_id → Stream session SID (HD_…) for recording attach. */
 const sidByProviderCallId = new Map();
 const providerCallIdBySid = new Map();
@@ -160,6 +200,9 @@ const {
   shouldSkipCallerTurn,
   shouldSpeakThinkingAck,
   looksLikePhaticCallerTurn,
+  looksLikeIdentityQuestion,
+  looksLikeRobotQuestion,
+  pickIdentityReply,
   pickPhaticReply,
   polishSpokenReply,
 } = require('./src/conversation/dynamicSpeech');
@@ -178,7 +221,16 @@ const {
   createAgentReplayMemory,
 } = require('./src/speech/overlapHold');
 const { createIdleNudgeController } = require('./src/speech/idleNudge');
-const { createVoiceTurnTiming, createCallTranscript } = require('./src/speech/voiceTiming');
+const {
+  createVoiceTurnTiming,
+  createCallTranscript,
+  logConnectToGreetingPcm,
+} = require('./src/speech/voiceTiming');
+const { isDefaultShopName } = require('./src/conversation/businessAssistantIntro');
+const {
+  classifyFirstForwardAcceptance,
+  looksLikeJobNoun,
+} = require('./src/conversation/firstForwardAcceptance');
 const { mergeInterimHypothesis } = require('./src/speech/interimBarge');
 const { sautikitWebhookGuard } = require('./src/sautikit/webhook');
 const {
@@ -951,6 +1003,7 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
     });
     // Best-effort outcome while Brain state may still be in memory.
     await persistCallResolution(callSid, source, { turns });
+    await persistFirstForwardAcceptance(callSid, durationSeconds);
     if (updated) {
       // Fire-and-forget: SMS latency must not hold the webhook open.
       maybeSendMissedTextback({ callSid, call: updated }).catch((err) =>
@@ -1602,6 +1655,38 @@ mediaWss.on('connection', (ws, req) => {
     return summary;
   }
   let greetingStarted = false;
+  let greetingAwaitingFirstPcm = false;
+  const firstForward = {
+    greetingPlayed: false,
+    greetingLogged: false,
+    hasStt: false,
+    bargedJob: false,
+    bargeText: '',
+    firstCallerTurn: '',
+    connectToGreetingPcmMs: null,
+  };
+
+  function noteGreetingPcm({ cached = false } = {}) {
+    if (firstForward.greetingLogged) return;
+    firstForward.greetingLogged = true;
+    firstForward.greetingPlayed = true;
+    greetingAwaitingFirstPcm = false;
+    const at = Date.now();
+    const logged = logConnectToGreetingPcm({
+      callSid: sidLabel(),
+      connectedAt,
+      firstPcmAt: at,
+      cached,
+    });
+    firstForward.connectToGreetingPcmMs = logged.connect_to_greeting_pcm_ms;
+    if (sessionCallSid) {
+      patchFirstForward(sessionCallSid, {
+        greetingPlayed: true,
+        connectToGreetingPcmMs: logged.connect_to_greeting_pcm_ms,
+      });
+    }
+  }
+
   /** Soniox 402/fatal: speak a local fallback once, then hang up. */
   let speechOutageStarted = false;
   let profileLoaded = false;
@@ -1900,10 +1985,13 @@ mediaWss.on('connection', (ws, req) => {
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
     // One owner for TTS language + pronunciation prep (per-utterance + sticky call lang).
+    const extraLexicon = Array.isArray(opts.extraLexicon)
+      ? opts.extraLexicon
+      : mergeIdentityLexicon(ttsLexiconOverrides, { businessName, agentName });
     const prepared = prepareForTts(text, {
       callLanguage,
       language: opts.language,
-      extraLexicon: ttsLexiconOverrides,
+      extraLexicon,
     });
     console.log(
       `[ws/media][${sidLabel()}] tts prep lang=${prepared.language}` +
@@ -1919,7 +2007,11 @@ mediaWss.on('connection', (ws, req) => {
         alreadyPrepared: true,
         speed: speedForLanguage(prepared.language),
         speedScale: ttsSpeedScale,
-        capture: Boolean(opts.isFiller && isFillerCacheEnabled() && ttsSpeedScale === 1),
+        capture: Boolean(
+          ((opts.isFiller && isFillerCacheEnabled()) ||
+            (opts.isGreeting && isGreetingCacheEnabled())) &&
+            ttsSpeedScale === 1
+        ),
       });
       activeOutboundStreamId = session.streamId;
       if (opts.isFiller) fillerStreamId = session.streamId;
@@ -1936,6 +2028,14 @@ mediaWss.on('connection', (ws, req) => {
         !spoken.cancelled
       ) {
         putFillerPcm(opts.fillerCacheKey, spoken.pcm);
+      }
+      if (
+        opts.isGreeting &&
+        opts.greetingCacheKey &&
+        spoken?.pcm?.length &&
+        !spoken.cancelled
+      ) {
+        putGreetingPcm(opts.greetingCacheKey, spoken.pcm);
       }
       return { ok: true };
     } catch (err) {
@@ -2031,6 +2131,18 @@ mediaWss.on('connection', (ws, req) => {
         );
       }
       return decision;
+    }
+    if (looksLikeJobNoun(text)) {
+      firstForward.bargedJob = true;
+      firstForward.bargeText = String(text || '').trim();
+      if (sessionCallSid) {
+        patchFirstForward(sessionCallSid, {
+          bargedJob: true,
+          bargeText: firstForward.bargeText,
+          hasStt: true,
+          firstCallerTurn: firstForward.firstCallerTurn || firstForward.bargeText,
+        });
+      }
     }
     cancelSpeech(`${source}/${decision.reason}`);
     return decision;
@@ -2224,6 +2336,25 @@ mediaWss.on('connection', (ws, req) => {
     let spokeThisTurn = false;
     let progressAlreadySpoken = false;
     try {
+      if (looksLikeRobotQuestion(clean) || looksLikeIdentityQuestion(clean)) {
+        const identityLine = pickIdentityReply({
+          agentName,
+          businessName,
+          discloseAi: looksLikeRobotQuestion(clean),
+        });
+        console.log(
+          `[ws/media][${callKey}] identity local reply lang=${callLanguage}: ${identityLine}`
+        );
+        callTranscript.pushAgent(identityLine);
+        messages.push({ role: 'assistant', content: identityLine, local: true });
+        turnTiming.markFirstSpokenChunk();
+        await speakText(identityLine);
+        spokeThisTurn = true;
+        logTurnTiming(turnTiming, { outcome: 'identity' });
+        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+        return;
+      }
+
       if (looksLikePhaticCallerTurn(clean)) {
         const phaticLine = pickPhaticReply({
           language: callLanguage,
@@ -2704,6 +2835,16 @@ mediaWss.on('connection', (ws, req) => {
     }
     console.log(`[ws/media][${sidLabel()}] caller_turn_processed`);
     heardCallerUtterance = true;
+    if (!firstForward.firstCallerTurn) {
+      firstForward.firstCallerTurn = text;
+      firstForward.hasStt = true;
+      if (sessionCallSid) {
+        patchFirstForward(sessionCallSid, {
+          hasStt: true,
+          firstCallerTurn: text,
+        });
+      }
+    }
     runCallerTurn(text).catch((err) => {
       console.error(`[ws/media][${sidLabel()}] runCallerTurn error:`, err?.message || err);
     });
@@ -2858,6 +2999,7 @@ mediaWss.on('connection', (ws, req) => {
           return;
         }
         if (activeTurnTiming) activeTurnTiming.markFirstPcm();
+        if (greetingAwaitingFirstPcm) noteGreetingPcm({ cached: false });
         if (ws.readyState === WebSocket.OPEN) sendPcmToMedia(ws, pcm);
         // Live clone-voice audio means we can record downtime clips for the next outage.
         scheduleOutageClipWarm({ voiceId: tenantSonioxVoiceId });
@@ -2916,42 +3058,19 @@ mediaWss.on('connection', (ws, req) => {
     resolveTtsReady(null);
   }
 
-  // Greet once the tenant profile is loaded (correct business/agent name) and TTS is up.
-  // TTS connects in parallel with tenant fetch so first PCM is not serial.
+  // Greet once the tenant profile is loaded (correct shop name). Cached PCM
+  // plays before TTS-ready wait so answer-to-greeting is not dead air.
   (async () => {
     if (greetingStarted) return;
     greetingStarted = true;
     try {
       await ensureTenantPrompt();
-      let readyTts = await ttsReadyPromise;
       if (speechOutageStarted) return;
-      if (
-        readyTts &&
-        ttsVoiceNeedsSwap(ttsSessionVoiceId, tenantSonioxVoiceId)
-      ) {
-        console.log(
-          `[ws/media][${sidLabel()}] tts voice swap ${ttsSessionVoiceId} → ${resolveSonioxVoice(tenantSonioxVoiceId)}`
-        );
-        try {
-          readyTts.close();
-        } catch {
-          /* ignore */
-        }
-        tts = null;
-        try {
-          const next = bindMediaTts(tenantSonioxVoiceId);
-          readyTts = await next.ready.then(() => next);
-        } catch (err) {
-          console.error(`[ws/media] Soniox TTS voice swap failed:`, err?.message || err);
-          readyTts = null;
-          tts = null;
-        }
-      }
-      if (!readyTts) {
+      if (isDefaultShopName(businessName)) {
         console.warn(
-          `[ws/media][${sidLabel()}] greeting skipped — TTS not ready`
+          `[ws/media][${sidLabel()}] greeting skipped — default shop name`
         );
-        await handleSpeechProviderOutage('tts not ready');
+        await handleSpeechProviderOutage('default shop name');
         return;
       }
 
@@ -2972,11 +3091,62 @@ mediaWss.on('connection', (ws, req) => {
         `[ws/media][${sidLabel()}] greeting mode=instant agent=${agentName} open=${openStatus} afterHours=${afterHoursMode} bulletinClosed=${Boolean(closureNotice)}: ${greetingLine}`
       );
 
-      const spoken = await speakText(greetingLine);
-      if (spoken?.outage || speechOutageStarted) return;
-      if (spoken?.ok) {
+      const found = lookupGreetingPcm({
+        voiceId: tenantSonioxVoiceId,
+        text: greetingLine,
+        extraLexicon: ttsLexiconOverrides,
+        businessName,
+        agentName,
+      });
+      if (found.pcm && isGreetingCacheEnabled()) {
+        noteGreetingPcm({ cached: true });
+        await playCachedFillerPcm(found.pcm, { text: greetingLine });
         callTranscript.pushAgent(greetingLine);
         messages.push({ role: 'assistant', content: greetingLine, local: true });
+      } else {
+        let readyTts = await ttsReadyPromise;
+        if (speechOutageStarted) return;
+        if (
+          readyTts &&
+          ttsVoiceNeedsSwap(ttsSessionVoiceId, tenantSonioxVoiceId)
+        ) {
+          console.log(
+            `[ws/media][${sidLabel()}] tts voice swap ${ttsSessionVoiceId} → ${resolveSonioxVoice(tenantSonioxVoiceId)}`
+          );
+          try {
+            readyTts.close();
+          } catch {
+            /* ignore */
+          }
+          tts = null;
+          try {
+            const next = bindMediaTts(tenantSonioxVoiceId);
+            readyTts = await next.ready.then(() => next);
+          } catch (err) {
+            console.error(`[ws/media] Soniox TTS voice swap failed:`, err?.message || err);
+            readyTts = null;
+            tts = null;
+          }
+        }
+        if (!readyTts || !tts) {
+          console.warn(
+            `[ws/media][${sidLabel()}] greeting skipped — TTS not ready`
+          );
+          await handleSpeechProviderOutage('tts not ready');
+          return;
+        }
+
+        greetingAwaitingFirstPcm = true;
+        const spoken = await speakText(greetingLine, {
+          isGreeting: true,
+          greetingCacheKey: found.key,
+          extraLexicon: found.extraLexicon,
+        });
+        if (spoken?.outage || speechOutageStarted) return;
+        if (spoken?.ok) {
+          callTranscript.pushAgent(greetingLine);
+          messages.push({ role: 'assistant', content: greetingLine, local: true });
+        }
       }
       if (tts && isFillerCacheEnabled()) {
         void warmFillerAckPcm({
@@ -2997,6 +3167,10 @@ mediaWss.on('connection', (ws, req) => {
     } catch (err) {
       console.error(`[ws/media][${sidLabel()}] greeting failed:`, err?.message || err);
       try {
+        if (isDefaultShopName(businessName) || !tts) {
+          await handleSpeechProviderOutage('greeting failed');
+          return;
+        }
         const fallback = buildGreeting(businessName, {
           agentName,
           servicesCatalog: brainProfile.servicesCatalog,
@@ -3005,7 +3179,8 @@ mediaWss.on('connection', (ws, req) => {
           afterHoursMode,
           closureNotice,
         });
-        await speakText(fallback);
+        greetingAwaitingFirstPcm = true;
+        await speakText(fallback, { isGreeting: true });
         messages.push({ role: 'assistant', content: fallback, local: true });
       } catch {
         /* ignore */

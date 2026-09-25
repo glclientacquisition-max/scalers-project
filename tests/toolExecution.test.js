@@ -428,9 +428,9 @@ describe('validated tool execution', () => {
       },
     });
     assert.equal(execution.results[0].status, 'succeeded');
-    assert.match(
+    assert.equal(
       formatToolConfirmation(execution.results, 'en'),
-      /noted that for the team/i
+      "I've sent that to the team."
     );
   });
 
@@ -718,7 +718,7 @@ describe('validated tool execution', () => {
     );
   });
 
-  it('confirms stay-on-the-line when escalate queued a live transfer', async () => {
+  it('never promises a live bridge after escalate, even if transfer was queued', async () => {
     const parsed = parseGeminiResponse(
       'Okay. ###TOOL###{"escalate":{"teammate":"Owner","name":"Kim","reason":"wants owner"}}###ENDTOOL###'
     );
@@ -730,7 +730,28 @@ describe('validated tool execution', () => {
       },
     });
     assert.equal(execution.results[0].transfer, true);
-    assert.equal(formatToolConfirmation(execution.results, 'en'), 'Okay, stay on the line.');
+    const spoken = formatToolConfirmation(execution.results, 'en');
+    assert.equal(spoken, "I've sent that to the team.");
+    assert.doesNotMatch(spoken, /stay on the line/i);
+    assert.doesNotMatch(spoken, /press 0/i);
+    assert.doesNotMatch(spoken, /press 1/i);
+    assert.doesNotMatch(spoken, /transfer/i);
+    assert.doesNotMatch(spoken, /connecting you/i);
+  });
+
+  it('keeps escalate confirm honest across channels and languages', () => {
+    const forbidden = /stay on the line|press 0|press 1|baki kwenye line|connecting you|i('ll| will) transfer|live (dial|transfer)/i;
+    const lines = [
+      formatToolConfirmation([{ action: 'escalate', status: 'succeeded', transfer: true }], 'en'),
+      formatToolConfirmation([{ action: 'escalate', status: 'succeeded', soft: true, channel: 'desk_note' }], 'en'),
+      formatToolConfirmation([{ action: 'escalate', status: 'succeeded', channel: 'sms' }], 'en'),
+      formatToolConfirmation([{ action: 'escalate', status: 'succeeded', channel: 'sms' }], 'sw'),
+      formatToolConfirmation([{ action: 'escalate', status: 'succeeded', transfer: true }], 'sheng'),
+    ];
+    for (const line of lines) {
+      assert.match(line, /sent that to the team|nimeituma kwa timu/i);
+      assert.doesNotMatch(line, forbidden);
+    }
   });
 
   it('turns malformed marker JSON into a caller-safe failure', async () => {
@@ -860,7 +881,7 @@ describe('validated tool execution', () => {
         [{ action: 'escalate', status: 'succeeded', channel: 'sms' }],
         'sw'
       ),
-      'Sawa, nimewatumia SMS timu.'
+      'Nimeituma kwa timu.'
     );
   });
 });

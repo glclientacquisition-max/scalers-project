@@ -26,7 +26,7 @@ Also OK: tiny Gemini tool-parse helpers inside `server.js` **only** when Brain t
 
 **MVP product job:** Onboard a business → the DID answers unanswered calls efficiently (greet, hours/location/FAQ, message/hold/escalate, notify). Full-assist resolution remains the north star (`docs/BUSINESS_INTELLIGENCE_ROADMAP.md`) but does not block MVP. Gate: `docs/MVP_SHIP_AND_TEST.md` + `npm run test:mvp`.
 
-**First-open introduction:** Brand-first English greeting via `src/conversation/businessAssistantIntro.js`: one steady person (`Hello, this is {agent} at {business}. You can speak in English or Kiswahili. How can I help you?`). Do not list services on the opener, open or closed. Closed adds honesty then still help. Offering stays in live ground truth for later turns. Do not lottery-open in Kiswahili. After the caller speaks, match and stay in their language.
+**First-open introduction:** Shop-first English greeting via `src/conversation/businessAssistantIntro.js`: `{Shop}, this is {Name}. How can I help?` Morning/evening may swap the first word only. Do not invite language on first audio. Do not list services on the opener, open or closed. Closed adds a short honesty clause, then the same question. Message-only still asks for a name. Offering stays in live ground truth for later turns. Do not lottery-open in Kiswahili. After the caller speaks, match and stay in their language. Who-are-you is name + shop only. Robot ask gets one short yes + shop + still help. Human ask is escalate notify, never a fake Dial.
 
 ## Do not touch
 

@@ -18,7 +18,7 @@ function formatVoiceLanguagesLine() {
 function tenantLanguagePolicy() {
   return [
     'BUSINESS VOICE LANGUAGES (automatic): English, Kiswahili, and Sheng.',
-    'The first open already said they can speak English or Kiswahili. Do not repeat that invite.',
+    'Do not invite English or Kiswahili on a later turn. After they speak, match and stay.',
     'Mirror the caller naturally: English → English, Kiswahili → Kiswahili, Sheng → light natural Sheng.',
     'If the caller mixes, mirror their mix lightly. Prefer clear short sentences.',
     'Do not invent or force slang. Local Kenyan languages (Kikuyu, Luo, etc.) are not enabled yet — if heard, reply in Kiswahili or English.',

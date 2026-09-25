@@ -1110,25 +1110,9 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
 
   if (meaningful.status === 'succeeded') {
-    if (meaningful.transfer) {
-      if (sw) return 'Sawa, baki kwenye line.';
-      if (sheng) return 'Poa, stay on the line.';
-      return 'Okay, stay on the line.';
-    }
-    if (meaningful.soft) {
-      if (sw) return 'Sawa, nimewaandikia timu; watakufuatilia.';
-      if (sheng) return 'Poa, nime-note kwa team; watakufuatilia.';
-      return "Okay, I've noted that for the team to follow up.";
-    }
-    const channel = String(meaningful.channel || '').toLowerCase();
-    if (/\bsms\b/.test(channel)) {
-      if (sw) return 'Sawa, nimewatumia SMS timu.';
-      if (sheng) return 'Poa, nime-SMS team.';
-      return "Okay, I've texted the team.";
-    }
-    if (sw) return 'Sawa, nimeituma kwa timu.';
-    if (sheng) return 'Poa, nimeituma kwa team.';
-    return "Okay, I've sent it to the team.";
+    if (sw) return 'Nimeituma kwa timu.';
+    if (sheng) return "I've sent that to the team.";
+    return "I've sent that to the team.";
   }
   if (meaningful.status === 'invalid') {
     const missing = Array.isArray(meaningful.missingSlots)
