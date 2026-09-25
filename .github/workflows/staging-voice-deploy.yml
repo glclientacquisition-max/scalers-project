@@ -1,6 +1,6 @@
-# Deploy THIS git commit to Railway staging Voice.
-# Desk previews are not Voice. Railway does not build PR branches by default.
-# Do not merge to main to get a DID test.
+# One-off: deploy THIS git commit to Railway staging Voice.
+# Default path: land on cursor/staging-voice-468b (Railway staging follows that branch).
+# Desk previews are not Voice. Do not merge to main to get a DID test.
 #
 # GitHub → Actions → Deploy staging Voice → Run workflow from the PR branch.
 # Type `staging` in confirm_target. Then check /healthz.gitSha before calling.

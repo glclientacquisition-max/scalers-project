@@ -19,7 +19,7 @@ PR or push → cursor/staging-voice-468b
   ↓ production (human-approved SQL + deploy)
 ```
 
-Official staging Desk is `https://scalers-staging.vercel.app`. Official staging Voice is Railway. Both should run **`cursor/staging-voice-468b`**. Feature PRs still get a Vercel preview URL for a UI glance. Do not treat that preview as the DID test, and do not Vercel-Promote a preview onto `scalers-project` (production Desk). Promote is merge to `main`. In Vercel, set **scalers-staging → Settings → Git → Production Branch** to `cursor/staging-voice-468b` so later pushes keep the official staging URL. Leave **scalers-project** production branch on `main`.
+Official staging Desk is `https://scalers-staging.vercel.app`. Official staging Voice is Railway. Both run **`cursor/staging-voice-468b`**. Vercel `scalers-staging` skips production builds that are not that branch, so a `main` merge does not overwrite the staging Desk URL. Feature PRs still get a preview URL for a UI glance. Do not Vercel-Promote a preview onto `scalers-project`. Promote is squash-merge to `main`. Leave **scalers-project** production branch on `main`. Optional: set **scalers-staging → Settings → Git → Production Branch** to `cursor/staging-voice-468b` so the official URL auto-assigns on every staging-branch push.
 
 ---
 

@@ -74,8 +74,8 @@ Desk preview URLs are not Voice. Railway staging does not auto-build PR branches
 
 ### Merge
 
-1. Open PR → wait for **CI** green.
-2. Merge to `main`.
+1. Open a PR from **`cursor/staging-voice-468b` → `main`**. Wait for **CI** green.
+2. In Cursor / GitHub: **Mark as ready**, then **Squash and merge**. That is the promote. Do not Vercel-Promote a preview onto `scalers-project`.
 3. Confirm **staging-validate** workflow green on `main` (smoke + schema).
 
 ### Deploy production (manual)
@@ -167,8 +167,8 @@ After env changes: **redeploy** the affected Vercel/Railway service.
 
 | You changed… | Staging action | Production action |
 | --- | --- | --- |
-| React / Next.js desk UI | Test on `scalers-staging.vercel.app` | Deploy `scalers-project` Vercel |
-| `server.js` / voice lane | Deploy PR commit via `staging-voice-deploy.yml`, confirm `/healthz.gitSha`, then test DID | Deploy production Railway |
+| React / Next.js desk UI | Land on `cursor/staging-voice-468b`, test on `scalers-staging.vercel.app` | Squash-merge staging → `main` (Vercel `scalers-project` follows `main`) |
+| `server.js` / voice lane | Land on `cursor/staging-voice-468b`, confirm `/healthz.gitSha`, then test DID `+254709221536`. One-off PR deploys can still use `staging-voice-deploy.yml` | Squash-merge staging → `main` (Railway production follows `main`) |
 | New SQL script | Apply on `sgcdncjxauhsbunobmob` | Approved apply on ALCR |
 | Grant / RLS only | SQL on staging | Approved SQL on ALCR |
 | GitHub Actions / docs only | CI on PR | Merge; no app deploy unless needed |
