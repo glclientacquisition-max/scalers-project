@@ -10,7 +10,7 @@ const SLOW_EN =
   /\b(slower|slow down|speak (?:more )?slowly|talk (?:more )?slowly|too fast|too quick(?:ly)?|not so fast)\b/i;
 const SLOW_SW = /\b(polepole|ongea\s+polepole|sema\s+polepole|punguza\s+mwendo)\b/i;
 const FAST_EN =
-  /\b(faster|speed up|speak (?:more )?quickly|talk faster|too slow|quicker)\b/i;
+  /\b(faster|speed up|speak (?:more )?quickly|talk faster|too slow|quicker|go faster|increase (?:the |your )?speed)\b/i;
 // "haraka" alone is not enough: "kuja haraka" (come quickly) is not a speed ask.
 const FAST_SW = /\b((?:ongea|sema|zungumza)\s+haraka|haraka\s+zaidi)\b/i;
 const RESET_EN = /\b(normal speed|back to normal|as usual|usual speed)\b/i;

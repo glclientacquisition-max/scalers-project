@@ -252,6 +252,18 @@ assert.match(
 
 assert.match(
   source,
+  /let ttsSpeedScale = 1/,
+  'each media session must start caller TTS scale at 1'
+);
+
+assert.match(
+  source,
+  /caller speed scale=1/,
+  'greeting must reset caller TTS scale so the last call cannot keep top speed'
+);
+
+assert.match(
+  source,
   /gitSha: resolveVoiceGitSha\(\)/,
   'healthz must expose gitSha so staging Voice can be verified without merging to main'
 );

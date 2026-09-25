@@ -146,7 +146,7 @@ Follow-up from the owner: on the `a2c0c86c` call the caller asked "slower" / "po
 
 Default-speed guarantees (owner ask: normal speed stays the default, consistently):
 
-- Every call starts at scale 1 — the scale is per-connection state in the media handler, so a slowed pace never leaks into the next call.
+- Every call starts at scale 1. Greeting forces `ttsSpeedScale = 1` again so a faster ask cannot ride the next answer. "Increase the speed" / "go faster" step the same as "faster".
 - Scale 1 is exactly the profile speed (`speedEn`/`speedSw`, both 1.0 on balanced); the wire sends the identical value as before this feature.
 - The scale only moves on an explicit caller request and holds steady between them; one stream keeps one speed, so a sentence never changes pace mid-utterance.
 - "slower" then "faster" returns to exactly 1; "normal speed" / "kama kawaida" resets to 1 from any step.
