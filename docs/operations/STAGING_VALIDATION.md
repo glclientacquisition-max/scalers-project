@@ -8,9 +8,9 @@
 ## Lifecycle
 
 ```
-PR → CI (unit tests, lint, build)
-  ↓ if Voice: staging-voice-deploy.yml on the PR branch
-  ↓ confirm staging /healthz.gitSha matches the PR commit
+PR or push → cursor/staging-voice-468b
+  ↓ Railway staging Voice auto-deploys that branch
+  ↓ confirm staging /healthz.gitSha matches the staging commit
   ↓ DID test on staging Voice
   ↓ merge to main
   ↓ staging-validate.yml (DB smoke)
@@ -18,7 +18,7 @@ PR → CI (unit tests, lint, build)
   ↓ production (human-approved SQL + deploy)
 ```
 
-Desk still gets Vercel preview URLs per PR. Voice does not. Run **Deploy staging Voice** from the PR branch (`confirm_target=staging`) before any DID test. Do not merge to `main` to make Railway pick up a Voice fix.
+Desk still gets Vercel preview URLs per PR. Voice does not. Railway staging Voice follows **`cursor/staging-voice-468b`** (no commit pin). Land Voice/Brain DID work on that branch, confirm `/healthz.gitSha`, call the staging DID, then PR into `main`. The older **Deploy staging Voice** workflow (`confirm_target=staging`) still works for a one-off PR commit. Do not merge to `main` to make Railway pick up a Voice fix.
 
 ---
 
