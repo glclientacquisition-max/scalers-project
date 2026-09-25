@@ -1,11 +1,11 @@
 # Research: human voice, not robotic
 
-**Status:** Research. No runtime change.  
+**Status:** Research plus Voice runtime for cache path and remaining leak prose.  
 **Lane:** Voice. Brain owns wording. Do not retune `SONIOX_TTS_SPEED*` or `VOICE_TTS_GAIN` from this note.  
 **Date:** 2026-09-25  
 **Job:** Steal setups from open-source voice stacks that already sound like people, then map only what fits SautiKit + Soniox + Gemini on a Kenya mobile.
 
-Protocol we already score live DID with: [`../agents/VOICE_NATURALNESS.md`](../agents/VOICE_NATURALNESS.md). Freeze next Voice PR is still **V5**. This spec does not replace that freeze.
+Protocol we already score live DID with: [`../agents/VOICE_NATURALNESS.md`](../agents/VOICE_NATURALNESS.md). V5 matcher is in `looksLikePhaticCallerTurn`. This spec does not replace the freeze triad.
 
 ---
 
@@ -211,15 +211,15 @@ Brain tickets stay Brain: F7 lists, name re-ask, invented holds.
 
 ## Live follow-up: five caller complaints (2026-09-25)
 
-Owner agreed with the OSS verdict, then named five remaining sounds. Code evidence only. **No runtime change in this spec.** Freeze next Voice PR is still **V5**. Do not enable `VOICE_STREAM_EARLY_*`. Do not retune `SONIOX_TTS_SPEED*` or `VOICE_TTS_GAIN`.
+Owner agreed with the OSS verdict, then named five remaining sounds. Runtime for cache path and remaining leak prose landed in the Voice implementation PR. Do not enable `VOICE_STREAM_EARLY_*`. Do not retune `SONIOX_TTS_SPEED*` or `VOICE_TTS_GAIN`. V5 (bare `Okay` is not how-are-you) is already in `looksLikePhaticCallerTurn`.
 
-| Caller said | What it is | Already shipped | Remaining hole |
-| --- | --- | --- | --- |
-| Same speed from the first word. Human stress, not script-read. | Greeting clip vs live TTS use different PCM paths | Profile speed 1.0 EN/SW. Exclamation → period | Greeting cache key omits speed. Cached clip is even-out then gain; live is gain only |
-| Same exact speed on every call unless the caller asks | Per-call `ttsSpeedScale` starts at 1. V8 steps 0.15 on slower / faster / reset (0.7–1.3) | Yes. N3 `HD_391a57aae9e9` proved the wire | Greeting cache can replay a clip rendered at a stale profile speed |
-| Instruction leaks | Label stripper after `HD_ff24acf5207d` | `ASR_CORRECTION_PROMPT`, `RETOTI`, `NP_FALSE`, `CONTROL_VOICE`, `NEXT_BEST_ACTION`, snake labels, two meta clauses | Plain Brain copy still speaks: `Speak this spelling once`, `VISIT COMMIT`, narration (`Alvin said`) |
-| Voice quality changes over time | Greeting / filler cache vs live reply | Same catalog voice per tenant | First play of a clip is live+gain. Later plays are even-out+gain. Process cache. Language-flip clone risk |
-| Word-by-word sounds robotic. Full sentence is good. Not `Al-vin` / comma dumps / `Alvin said` | Soniox treats each flush as a finished utterance | Sentence-only default (`VOICE_STREAM_EARLY_*=0`). V2 tiny-lead-in. V3 `Al-vin` → `Alvin`. Speed-doc early flush superseded in this PR | Tenant lexicon can still inject hyphen say-forms. Narration (`Alvin said`) is Brain |
+| Caller said | What it is | Status |
+| --- | --- | --- |
+| Same speed from the first word. Human stress, not script-read. | Greeting clip vs live TTS | Shipped: cache stores raw PCM. `sendPcmToMedia` applies 1.38 on both. Greeting key includes profile speed. |
+| Same exact speed on every call unless the caller asks | Per-call `ttsSpeedScale` starts at 1. V8 steps 0.15 | Shipped. Greeting key is now `voice\|lang\|speed\|text`. |
+| Instruction leaks | Label stripper after `HD_ff24acf5207d` | Shipped labels plus `Speak this spelling once`, `VISIT COMMIT`, `the caller said`, `Alvin said`. `You said` / `I said` stay. Lists stay Brain. |
+| Voice quality changes over time | Greeting / filler cache vs live reply | Shipped: no even-out on cache store. Language-flip clone is still ticket 4. |
+| Word-by-word sounds robotic. Full sentence is good. Not `Al-vin` / comma dumps / `Alvin said` | Soniox treats each flush as a finished utterance | Sentence-only default. Narrator strip shipped. Tenant hyphen keep-list still Desk. |
 
 ### 1. Same speed from the first word (not script-read)
 
@@ -228,7 +228,7 @@ Owner agreed with the OSS verdict, then named five remaining sounds. Code eviden
 That is not the start-of-call miss. The miss is **two loudness / contour paths**:
 
 1. Cache miss (first call after boot, or new greeting text): `speakText` → Soniox at profile speed → `sendPcmToMedia` applies `VOICE_TTS_GAIN` (1.38) only.
-2. Cache hit: `putGreetingPcm` / `putFillerPcm` runs `evenOutPcmS16le` (peak toward 20000, max 1.8×) on store. Playback is `playCachedFillerPcm` → `sendPcmToMedia` applies 1.38 **again**.
+2. Cache hit (before this PR): `putGreetingPcm` / `putFillerPcm` ran `evenOutPcmS16le` then `sendPcmToMedia` applied 1.38 again. Cache now stores raw PCM. Playback is gain only, same as live.
 
 Human stress is a full-sentence contour. Script-read is a fragment restart: Soniox finishes the thought, then starts a new one. That is V1, not a speed-knob miss. Sentence-only flush is the fix. Early word flush is how it comes back.
 
@@ -245,24 +245,15 @@ Already the contract:
 
 Cross-call sameness is the process-level greeting cache. Same `voice|lang|text` clip for every caller. That is what we want **if** the clip was rendered at today's profile speed.
 
-Hole: `greetingPcmKey` is `voice|lang|text`. No speed. `fillerPcmKey` is `voice|lang|speed|text` and uses `speedForLanguage`, not the per-call scale (scale≠1 already bypasses). If `SONIOX_TTS_SPEED*` or `VOICE_PROFILE` changes without a process restart that also clears the greeting map (32 entries, LRU), the next call can open at yesterday's pace.
-
-Next Voice ticket (after V5, one PR): put profile speed in the greeting key, or reset the greeting cache when the profile speed changes. Do not persist `ttsSpeedScale` across calls.
+`greetingPcmKey` is now `voice|lang|speed|text` via `speedForLanguage`, same idea as fillers. `ttsSpeedScale !== 1` still bypasses the filler cache. Do not persist `ttsSpeedScale` across calls.
 
 ### 3. Instruction leaks
 
 Shipped stripper: `src/speech/spokenInstructionLeak.js`, wired in `spokenStreamBuffer`, `prepareForTts`, and Gemini history clone. Tests cover the `HD_ff24acf5207d` block.
 
-Still speakable because they are **English orders**, not `SNAKE_LABEL:`:
+Stripper now also drops `Speak this spelling once`, `VISIT COMMIT`, `think this; never say it as a script`, `the caller said` / `the user said`, and sentence `Name said` narration. `You said` / `I said` stay. Lists / F7 stay Brain.
 
-| Leak | Source | Why the stripper misses it |
-| --- | --- | --- |
-| `Speak this spelling once in the next line.` | `formatNameConfirmForPrompt` in `src/conversation/brainState.js` | No snake label. Gemini copies the line. |
-| `VISIT COMMIT (think this; never say it as a script)` | `src/prompts.js` | Prompt heading. If it leaks, it is prose. |
-| `Alvin said` / `the caller said` | Model narration of the last turn | Not a control tag. Sounds like a script reader. |
-| `Sure.` + playbook recitation | Brain lists / F7 | Voice already holds tiny lead-ins. Lists stay Brain. |
-
-Voice ticket (after V5): extend the stripper with those prose clauses and a `said` narrator pattern. Brain ticket (not this lane): stop injecting speakable orders; keep `VISIT COMMIT` off the spoken path.
+Brain should still stop injecting speakable orders. Voice strips them if they leak.
 
 Do not put `[do not say this]` tags in Gemini text. Soniox will read the brackets. The existing stripper exists because that already happened.
 
@@ -272,12 +263,10 @@ Not a random Soniox clone swap on every turn. Same `tenants.soniox_voice_id` for
 
 What the caller hears as "the voice changed":
 
-1. **Even-out only on cache store.** First greeting after boot is live+1.38. The next call with the same text is even-out+1.38. Fillers do the same after `warmFillerAckPcm`. That is quality drift **across calls on one process**.
-2. **Greeting vs reply in one call.** Cached opener is peak-normalized. The first Gemini sentence is not. Sounds like a different booth after "hello".
-3. **Fragment vs sentence** if anyone sets `VOICE_STREAM_EARLY_CHARS` / `WORDS` above 0. Each fragment is a new utterance. Articulation and loudness restart. Default is 0. Leave it.
-4. **Language flip.** EN clone spoken as SW (or the reverse) if `soniox_voice_id` stays a US EN voice. Ticket 4 in the table below. Not a gain retune.
-
-Fix shape (one Voice PR, after V5): store greeting/filler PCM without `evenOut`, or even-out live replies the same way **on the full utterance only** (never on 20 ms frames; that pumps). Include profile speed in the greeting key. Do not change 1.38.
+1. **Even-out only on cache store.** Fixed: greeting and filler caches store raw PCM. Both paths get 1.38 on send.
+2. **Greeting vs reply in one call.** Same send path after the cache fix.
+3. **Fragment vs sentence** if anyone sets `VOICE_STREAM_EARLY_CHARS` / `WORDS` above 0. Default is 0. Leave it.
+4. **Language flip.** EN clone spoken as SW (or the reverse) if `soniox_voice_id` stays a US EN voice. Ticket 4 in the OSS table. Not a gain retune.
 
 `VOICE_SPEED_CONSISTENCY.md` Phase 1 example is now `VOICE_TTS_GAIN=1.38` to match freeze / `voiceProfile.js` `balanced`. That is a doc align, not a retune.
 
@@ -297,18 +286,9 @@ Do **not** enable early flush to chase `first_pcm_ms`. [`VOICE_SPEED_CONSISTENCY
 Remaining:
 
 - Tenant lexicon `alvin` → `Al-vin` was the `HD_3f7ed2a5f526` extra word. Sanitizer should collapse it on parse. If a Desk say-form still has a hyphen the keep-list does not cover, it will speak as two words.
-- `Alvin,,,,said` after polish is `Alvin, said` or `Alvin said`. The comma dump is a fragment flush or a Gemini list. The `said` is narration. Strip the narrator; do not add more commas.
+- `Alvin said` narrator is stripped before TTS. Comma dumps stay a fragment-flush miss if anyone enables early flush.
 
-### Follow-up tickets (do not jump V5)
-
-One Voice PR each. Score freeze triad after each.
-
-| After | Ticket | Owner | Do not touch |
-| --- | --- | --- | --- |
-| V5 | Greeting + filler PCM: same even-out policy as live; greeting key includes profile speed | Voice cache | Gain, `SONIOX_TTS_SPEED*` |
-| V5 | Strip `Speak this spelling once`, `VISIT COMMIT`, and `X said` narrator before TTS | Voice stripper. Brain stops injecting the orders | Prompt rewrite in Voice |
-
-Speed-doc early-flush plan is already inverted in this research PR. `VOICE_STREAM_EARLY_*` stays 0.
+Cache path, greeting speed key, and remaining leak prose shipped in the Voice implementation PR. `VOICE_STREAM_EARLY_*` stays 0. Next freeze score is still the V1–V9 triad on staging DID. Language-flip clone remains the later timbre ticket.
 
 ---
 

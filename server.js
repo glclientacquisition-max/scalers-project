@@ -215,7 +215,10 @@ const {
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
 } = require('./src/speech/turnTaking');
-const { createSpokenStreamBuffer } = require('./src/speech/spokenStreamBuffer');
+const {
+  createSpokenStreamBuffer,
+  joinSpokenPieces,
+} = require('./src/speech/spokenStreamBuffer');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -3100,6 +3103,10 @@ mediaWss.on('connection', (ws, req) => {
     try {
       await ensureTenantPrompt();
       if (speechOutageStarted) return;
+      // Every answered call starts at profile pace. A faster ask on the last
+      // call must not ride this greeting or the rest of this session.
+      ttsSpeedScale = 1;
+      console.log(`[ws/media][${sidLabel()}] caller speed scale=1`);
       if (isDefaultShopName(businessName)) {
         console.warn(
           `[ws/media][${sidLabel()}] greeting skipped — default shop name`
@@ -3239,17 +3246,32 @@ mediaWss.on('connection', (ws, req) => {
             }
 
             const meta = parsed.metadata || parsed;
-            const maybeSid =
+            const incomingCallSid =
               meta.callSid ||
-              meta.sessionId ||
               meta.call_sid ||
               meta.call_id ||
+              parsed.callSid ||
+              null;
+            const maybeSid =
+              incomingCallSid ||
+              meta.sessionId ||
               meta.streamSid ||
               parsed.sessionId ||
               parsed.streamSid ||
               null;
+            if (
+              incomingCallSid &&
+              sessionCallSid &&
+              String(incomingCallSid) !== String(sessionCallSid)
+            ) {
+              ttsSpeedScale = 1;
+              console.log(
+                `[ws/media][${sessionCallSid}] caller speed scale=1 (new callSid=${incomingCallSid})`
+              );
+            }
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
+              ttsSpeedScale = 1;
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
               ensureTenantPrompt().catch(() => {});
             }
@@ -4389,7 +4411,7 @@ async function runGeminiTurnStreaming(
           thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
           const delta = extractGeminiText(chunk);
           if (!delta) continue;
-          fullText += delta;
+          fullText = joinSpokenPieces(fullText, delta);
           const pieces = buffer.push(delta);
           for (const piece of pieces) {
             if (shouldAbort?.()) break;

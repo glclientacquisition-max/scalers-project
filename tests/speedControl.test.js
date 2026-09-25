@@ -26,7 +26,15 @@ for (const text of [
 }
 
 // --- detector: faster ---
-for (const text of ['Faster please.', 'Speed up.', 'You are too slow.', 'Ongea haraka kidogo.']) {
+for (const text of [
+  'Faster please.',
+  'Speed up.',
+  'You are too slow.',
+  'Ongea haraka kidogo.',
+  'Increase the speed.',
+  'Can you increase your speed?',
+  'Go faster.',
+]) {
   const hit = detectSpeedRequest(text);
   assert.ok(hit && hit.action === 'faster', `expected faster for: ${text}`);
 }

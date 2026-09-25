@@ -12,7 +12,7 @@ const sttSource = fs.readFileSync(sttPath, 'utf8');
 
 assert.match(
   source,
-  /const\s*\{\s*createSpokenStreamBuffer\s*,?\s*\}\s*=\s*require\(['"]\.\/src\/speech\/spokenStreamBuffer['"]\)/,
+  /const\s*\{\s*createSpokenStreamBuffer[\s\S]*?\}\s*=\s*require\(['"]\.\/src\/speech\/spokenStreamBuffer['"]\)/,
   'server.js must import createSpokenStreamBuffer before the streaming turn path uses it'
 );
 
@@ -248,6 +248,18 @@ assert.match(
   source,
   /speed: speedForLanguage\(prepared\.language\)/,
   'speakText must pass the profile speed into Soniox TTS'
+);
+
+assert.match(
+  source,
+  /let ttsSpeedScale = 1/,
+  'each media session must start caller TTS scale at 1'
+);
+
+assert.match(
+  source,
+  /caller speed scale=1/,
+  'greeting must reset caller TTS scale so the last call cannot keep top speed'
 );
 
 assert.match(
