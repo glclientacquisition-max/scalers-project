@@ -15,6 +15,18 @@ Imported and adapted (2026-09):
 | `/ui-skills` | [ibelick/ui-skills](https://github.com/ibelick/ui-skills) | Route to `/baseline-ui`, `/improve-ui`, `/fixing-accessibility`. |
 | `/no-ai-slop` | [petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop) + [unslop](https://github.com/cursor/plugins/blob/main/pstack/skills/unslop/SKILL.md) | Stark desk copy and drafts. |
 
+`npx skills` installs (canonical copies in `.agents/skills/`, linked here). Lockfile: [`skills-lock.json`](../../skills-lock.json).
+
+| Skill | From | Job |
+| --- | --- | --- |
+| `/vercel-react-best-practices` | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | React and Next.js performance rules. |
+| `/web-design-guidelines` | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | Web Interface Guidelines review. Constitution and `/ui-skills` win on desk. |
+| `/vercel-react-native-skills` | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | React Native and Expo performance rules. |
+| `/next-best-practices` | [vercel-labs/next-skills@dc1de9c](https://github.com/vercel-labs/next-skills/tree/dc1de9caf7612d73f56a8dec3cb1bd6c9ec096b9) | Next.js file conventions, RSC, data, async APIs. |
+| `/next-cache-components` | [vercel-labs/next-skills@dc1de9c](https://github.com/vercel-labs/next-skills/tree/dc1de9caf7612d73f56a8dec3cb1bd6c9ec096b9) | Cache Components reference (`use cache`, `cacheLife`, `cacheTag`). |
+| `/next-cache-components-adoption` | [vercel/next.js](https://github.com/vercel/next.js) | Turn on Cache Components and clear blocking routes. |
+| `/next-cache-components-optimizer` | [vercel/next.js](https://github.com/vercel/next.js) | Grow a route's static shell under Cache Components. |
+
 ## Use with lanes
 
 1. Read `AGENTS.md` and the lane contract first.
