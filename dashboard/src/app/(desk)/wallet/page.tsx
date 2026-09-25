@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
 import {
   WALLET_LINE_FEE_KES_PER_MONTH,
@@ -11,7 +12,9 @@ import { WalletTopUpButton } from "@/components/WalletTopUpButton";
 import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
+import { Pagination } from "@/components/ui/Pagination";
 import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -22,7 +25,13 @@ function kindLabel(kind: string): string {
   return kind;
 }
 
-export default async function WalletPage() {
+export default async function WalletPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const sp = await searchParams;
+  const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return <DeskNoWorkspace />;
@@ -36,6 +45,8 @@ export default async function WalletPage() {
   let usage;
   try {
     usage = await getTenantUsageSummary(workspace.client, tenant.id, {
+      ledgerPage: page,
+      ledgerPageSize: DEFAULT_PAGE_SIZE,
       walletKes: tenant.wallet_balance_kes,
       telecomKes: tenant.telecom_wallet_balance_kes,
       aiUsd: tenant.ai_wallet_balance_usd,
@@ -45,6 +56,11 @@ export default async function WalletPage() {
     });
   } catch {
     return <DeskError>Could not load Usage.</DeskError>;
+  }
+
+  const safePage = clampListPage(page, usage.ledgerTotal, DEFAULT_PAGE_SIZE);
+  if (safePage !== page) {
+    redirect(safePage > 1 ? `/wallet?page=${safePage}` : "/wallet");
   }
 
   const billedThisMonth = usage.callChargesKes + usage.lineFeeKes;
@@ -194,7 +210,7 @@ export default async function WalletPage() {
       </div>
 
       <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
-        <h2 className="px-4 pt-4 font-display text-xl tracking-tight text-ink">Recent activity</h2>
+        <h2 className="px-4 pt-4 font-display text-xl tracking-tight text-ink">Activity</h2>
         {usage.recentLedger.length === 0 ? (
           <p className="px-4 py-3 text-sm text-ink-soft">
             {usage.isBeta ? "No charges during beta." : "No ledger entries yet."}
@@ -245,6 +261,16 @@ export default async function WalletPage() {
             </tbody>
           </table>
         )}
+        {usage.ledgerTotal > 0 ? (
+          <div className="px-4 pb-4">
+            <Pagination
+              page={safePage}
+              pageSize={DEFAULT_PAGE_SIZE}
+              total={usage.ledgerTotal}
+              href="/wallet"
+            />
+          </div>
+        ) : null}
       </section>
     </div>
   );
