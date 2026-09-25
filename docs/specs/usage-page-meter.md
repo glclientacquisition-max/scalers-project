@@ -1,6 +1,6 @@
 # Usage page meter
 
-**Status:** Implementing  
+**Status:** Implementing in #422  
 **Lane:** Desk UI/UX + Ops display math  
 **Route:** `/wallet` (nav name Usage). Path stays `/wallet`.
 

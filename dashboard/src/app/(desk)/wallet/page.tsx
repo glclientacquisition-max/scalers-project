@@ -273,7 +273,7 @@ export default async function WalletPage() {
                 );
               })}
             </ul>
-            <div className="mt-3 hidden min-w-0 md:block">
+            <div className="mt-3 hidden md:block min-w-0">
               <DeskDataTable minWidthClass="min-w-0">
                 <thead className="border-b border-line text-ink-soft">
                   <tr>
