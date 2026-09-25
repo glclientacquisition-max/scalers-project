@@ -7,6 +7,7 @@ const {
   introLooksValid,
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
+const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 
 /**
@@ -320,7 +321,10 @@ function stripSpokenHedges(text, opts = {}) {
 }
 
 function polishSpokenReply(text, opts = {}) {
-  return trimSpokenServiceDump(stripSpokenHedges(text, opts), opts);
+  return trimSpokenServiceDump(
+    stripSpokenHedges(stripSpokenInstructionLeaks(text, { final: true }), opts),
+    opts
+  );
 }
 
 /**

@@ -150,6 +150,31 @@ test('does not speak outcome claims or leftover prose after a tool block', () =>
   assert.strictEqual((joined.match(/We are closed right now/g) || []).length, 0);
 });
 
+test('does not speak ASR_CORRECTION_PROMPT / RETOTI / NP_FALSE from HD_ff24acf5207d', () => {
+  const buf = createSpokenStreamBuffer();
+  const leaked =
+    'NP_FALSE ASR_CORRECTION_PROMPT: The user\'s input seems truncated or quiet. Ask for missing details or to repeat gently. RETOTI: Sawa, Alvin! Tunashukuru sana.';
+  const emitted = [...buf.push(leaked), ...buf.finish()];
+  const joined = emitted.join(' ');
+  assert.doesNotMatch(joined, /ASR_CORRECTION_PROMPT|RETOTI|NP_FALSE|truncated or quiet|repeat gently/i);
+  assert.match(joined, /Sawa, Alvin/);
+  assert.match(joined, /Tunashukuru sana/);
+});
+
+test('holds an incomplete ASR_ label until the token finishes', () => {
+  const buf = createSpokenStreamBuffer();
+  assert.deepStrictEqual(buf.push('ASR_CORREC'), []);
+  const emitted = [
+    ...buf.push(
+      'TION_PROMPT: The user\'s input seems truncated or quiet. RETOTI: Sawa.'
+    ),
+    ...buf.finish(),
+  ];
+  const joined = emitted.join(' ');
+  assert.doesNotMatch(joined, /ASR_CORRECTION_PROMPT|RETOTI|truncated or quiet/i);
+  assert.match(joined, /Sawa/);
+});
+
 test('does not speak a premature that-time-works claim', () => {
   const buf = createSpokenStreamBuffer();
   const emitted = [

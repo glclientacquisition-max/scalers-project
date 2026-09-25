@@ -1,6 +1,8 @@
 // Gemini voice-turn helpers. LLM interprets; this module keeps the
 // request shape valid and bounds hang time so the caller is never left silent.
 
+const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
+
 const CONTEXT_WINDOW = 16;
 const DEFAULT_TURN_TIMEOUT_MS = 8000;
 
@@ -31,6 +33,13 @@ function extractThoughtSignature(response) {
   return '';
 }
 
+function sanitizePartText(part) {
+  if (!part || typeof part.text !== 'string' || !part.text) return part;
+  const text = stripSpokenInstructionLeaks(part.text, { final: true });
+  if (text === part.text) return part;
+  return { ...part, text };
+}
+
 function cloneGeminiPart(part) {
   if (!part || typeof part !== 'object') return null;
   const cloned = {};
@@ -39,7 +48,9 @@ function cloneGeminiPart(part) {
   const signature = part.thoughtSignature || part.thought_signature;
   if (signature) cloned.thoughtSignature = String(signature);
   if (!cloned.text && !cloned.thoughtSignature && !cloned.thought) return null;
-  return cloned;
+  const cleaned = sanitizePartText(cloned);
+  if (!cleaned.text && !cleaned.thoughtSignature && !cleaned.thought) return null;
+  return cleaned;
 }
 
 function extractGeminiParts(response) {
