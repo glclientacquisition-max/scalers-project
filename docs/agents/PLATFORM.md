@@ -11,9 +11,9 @@ Use for database migrations, auth membership, environment/deploy, and any change
 | `docs/supabase/**` | Canonical SQL migrations / schema notes |
 | `src/db.js`, `src/lib/supabaseClient.js` | Voice-facing DB surface |
 | `db.js` (root shim if present) | Compatibility export |
-| `dashboard/src/lib/auth.ts` | Auth session helpers / role gates |
+| `dashboard/src/lib/auth.ts`, `admin-auth.ts`, `adminOperators.ts`, `adminHost.ts` | Auth session helpers / Super Admin Better Auth |
 | `dashboard/src/lib/supabase/**`, `supabase.ts`, `tenant.ts` | Supabase clients + tenant resolution |
-| `dashboard/src/app/api/login/**`, `api/logout/**`, `api/tenant/**` | Auth/session APIs |
+| `dashboard/src/app/api/login/**`, `api/logout/**`, `api/auth/**`, `api/admin/session/**`, `api/tenant/**` | Auth/session APIs |
 | `docs/ARCHITECTURE_MIGRATION_BLUEPRINT.md`, `TARGET_MODULE_LAYOUT.md`, `PRODUCTION_CUTOVER.md` | Platform architecture docs |
 | `Dockerfile`, `railway.toml`, `render.yaml`, root `.env.example` structure | Deploy / env skeleton |
 | `.cursor/mcp.json` | Cursor Railway MCP (Voice deploy tooling) |

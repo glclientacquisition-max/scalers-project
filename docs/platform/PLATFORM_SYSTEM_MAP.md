@@ -53,7 +53,7 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Packages / SKUs | Reserved email + seat columns | `docs/supabase/package_entitlements.sql`; [`../PACKAGES.md`](../PACKAGES.md) | **docs-only** | No shop UI. Do not gate email or invites. |
 | DID pool | Assign / release Kenya numbers | `sautikit_did_pool`; admin APIs; [`../PRODUCTION_DID_POOL.md`](../PRODUCTION_DID_POOL.md) | **live** | `+254709221536` must never be `available`. |
 | Auth (owner) | Supabase Auth JWT + RLS | `dashboard/src/lib/auth.ts`; `docs/supabase/owner_rls.sql` | **live** | Service role never in `NEXT_PUBLIC_*`. |
-| Auth (Super Admin) | Shared-password cookie | `isLegacyAuthenticated()`; `/admin` | **legacy** | Not owner auth. Do not market as SSO. |
+| Auth (Super Admin) | Better Auth username + access code | `admin-auth.ts`; `/admin/login`; `ADMIN_HOST` | **live** | Not owner auth. HMAC leftover only. |
 | Deploy | Voice Railway, desk Vercel, DB Supabase | `Dockerfile`, `railway.toml`, `dashboard/vercel.json` | **live** | Stay on Vercel through the wedge. Cloudflare = later spike only. |
 | Module split | `src/telephony/`, `LLM_PROVIDER` | [`../TARGET_MODULE_LAYOUT.md`](../TARGET_MODULE_LAYOUT.md) | **docs-only** | `server.js` is still the orchestrator. Do not rewrite it in this ladder step. |
 | RAG / embeddings | `knowledge_chunks` | Blueprint + BI roadmap | **docs-only** | Not in `src/`. Do not plan mid-call retrieve. |

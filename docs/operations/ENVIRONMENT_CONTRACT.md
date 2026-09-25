@@ -58,7 +58,10 @@
 | `GEMINI_API_KEY` | `.env` | Staging env | Prod env | Never |
 | `SAUTIKIT_API_KEY` | Test keys | Test/staging keys | Production keys | Never |
 | `VOICE_INTERNAL_SECRET` | Must match desk | Must match desk | Must match desk | Never |
-| `DASHBOARD_PASSWORD` | Optional dev bypass | Staging if used | Legacy Super Admin | Never |
+| `DASHBOARD_PASSWORD` | Optional HMAC leftover | Staging if used | Transition Super Admin | Never |
+| `BETTER_AUTH_SECRET` | Better Auth cookie signing | Staging | Super Admin | Never |
+| `ADMIN_ACCESS_CODE` / `ADMIN_OPERATORS` | Super Admin door code(s) | Staging | Super Admin | Never |
+| `ADMIN_HOST` | `admin.scalers.co.ke` | Staging if used | Super Admin host split | `NEXT_PUBLIC_ADMIN_HOST` only |
 
 **Rule:** No `NEXT_PUBLIC_*` variable may contain service_role or provider admin keys.
 

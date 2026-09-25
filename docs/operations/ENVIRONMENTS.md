@@ -115,7 +115,8 @@ Validate database changes on staging before production. Never use production cre
 - `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_*`, `SAUTIKIT_*`, `SAUTIKIT_ADMIN_OPS_KEY`
 - `VOICE_PUBLIC_BASE_URL`, `VOICE_INTERNAL_SECRET`
-- `DASHBOARD_PASSWORD` (legacy Super Admin)
+- `BETTER_AUTH_SECRET`, `ADMIN_ACCESS_CODE` / `ADMIN_OPERATORS`, `ADMIN_HOST` (Super Admin)
+- `DASHBOARD_PASSWORD` (HMAC leftover)
 
 ### Cross-service secrets that must match
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { SESSION_COOKIE, sessionCookieValue } from "@/lib/auth";
+import { adminLoginHref } from "@/lib/adminHost";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 export async function POST(request: NextRequest) {
@@ -10,23 +10,11 @@ export async function POST(request: NextRequest) {
     .toLowerCase();
   const password = String(form.get("password") || "");
 
-  // Legacy shared-password desk (ops / demo) when email omitted or reserved.
-  const legacyPassword = process.env.DASHBOARD_PASSWORD || "";
-  if (
-    legacyPassword &&
-    password === legacyPassword &&
-    (!email || email === "admin@scalers.local" || email === "admin@sauti.local")
-  ) {
-    // Platform operators go straight to the Super Admin console.
-    const res = NextResponse.redirect(new URL("/admin", request.url), 303);
-    res.cookies.set(SESSION_COOKIE, sessionCookieValue(), {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 14,
-    });
-    return res;
+  if (email === "admin@scalers.local" || email === "admin@sauti.local") {
+    return NextResponse.redirect(
+      new URL(adminLoginHref(process.env, request.headers.get("host")), request.url),
+      303
+    );
   }
 
   if (!email || !password) {
