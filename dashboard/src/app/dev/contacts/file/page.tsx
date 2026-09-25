@@ -8,8 +8,6 @@ import {
   pickFirstSeenAt,
 } from "@/lib/contactPersonFile";
 
-export const dynamic = "force-dynamic";
-
 /**
  * Nested contact file harness (no desk login). DASHBOARD_OPEN=true only.
  * Phone tabs should hide. The md+ rail stays.

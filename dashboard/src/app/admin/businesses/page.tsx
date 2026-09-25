@@ -3,6 +3,9 @@ import { AdminBusinessesPanel } from "@/components/AdminBusinessesPanel";
 import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
 
+// instant = false: request-time Super Admin data under the admin auth shell.
+export const instant = false;
+
 export default async function AdminBusinessesPage() {
   let overview;
   try {

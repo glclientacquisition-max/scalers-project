@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   // Keep Next rooted on the dashboard package (monorepo-safe).
   outputFileTracingRoot: path.join(__dirname),
   turbopack: {

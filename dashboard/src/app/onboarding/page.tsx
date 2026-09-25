@@ -6,6 +6,9 @@ import { getCurrentTenant } from "@/lib/tenant";
 import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 import { OnboardingWizard } from "./OnboardingWizard";
 
+// instant = false: owner cookie session must run before the wizard.
+export const instant = false;
+
 function OnboardingExit() {
   return (
     <form action="/api/logout" method="post">

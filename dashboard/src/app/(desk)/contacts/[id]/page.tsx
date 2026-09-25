@@ -28,6 +28,9 @@ import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactKpiStrip } from "@/components/ContactKpiStrip";
 import { ContactTimeline } from "@/components/ContactTimeline";
 
+// instant = false: request-time desk data under the owner auth shell.
+export const instant = false;
+
 export default async function ContactDetailPage({
   params,
   searchParams,

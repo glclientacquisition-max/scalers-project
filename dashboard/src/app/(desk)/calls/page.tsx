@@ -33,6 +33,9 @@ import {
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
+// instant = false: request-time desk data under the owner auth shell.
+export const instant = false;
+
 export default async function CallsPage({
   searchParams,
 }: {

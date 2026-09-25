@@ -3,6 +3,9 @@ import { AdminWalletsPanel } from "@/components/AdminWalletsPanel";
 import { logAdminError } from "@/lib/adminErrors";
 import { listAdminWallets } from "@/lib/adminWallets";
 
+// instant = false: request-time Super Admin data under the admin auth shell.
+export const instant = false;
+
 export default async function AdminWalletsPage() {
   let overview;
   try {

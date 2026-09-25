@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSupabaseAdmin, type TenantRow } from "@/lib/supabase";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { defaultTenantLlmPrompt } from "@/lib/prompts";
@@ -63,10 +64,10 @@ function isMissingProfileColumnError(message: string): boolean {
  * - Supabase Auth owners → anon/SSR client (JWT + RLS)
  * - Legacy Super Admin cookie → service role (bypasses RLS for ops/demo desk)
  */
-export async function createWorkspaceDataClient(): Promise<{
+export const createWorkspaceDataClient = cache(async (): Promise<{
   client: SupabaseClient;
   mode: "owner" | "legacy";
-} | null> {
+} | null> => {
   const user = await getAuthUser();
   if (user) {
     return { client: await createSupabaseServerClient(), mode: "owner" };
@@ -75,10 +76,10 @@ export async function createWorkspaceDataClient(): Promise<{
     return { client: getSupabaseAdmin(), mode: "legacy" };
   }
   return null;
-}
+});
 
 /** Resolve the signed-in user's tenant (via tenant_members), or legacy first-active. */
-export async function getCurrentTenant(): Promise<TenantRow | null> {
+export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
   const user = await getAuthUser();
 
   if (user) {
@@ -247,7 +248,7 @@ export async function getCurrentTenant(): Promise<TenantRow | null> {
   }
 
   return null;
-}
+});
 
 /** Claim next available DID from sautikit_did_pool (no-op if already assigned / pool empty). */
 export async function assignDidFromPool(tenantId: string): Promise<string | null> {

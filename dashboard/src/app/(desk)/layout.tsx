@@ -8,6 +8,9 @@ import { loadCachedInboxNeedsCount } from "@/lib/inboxLoad";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
 import { getCurrentTenant } from "@/lib/tenant";
 
+// instant = false: owner cookie session must run before chrome. Do not wrap the gate in Suspense.
+export const instant = false;
+
 async function DeskRailLive({
   tenantId,
   vertical,

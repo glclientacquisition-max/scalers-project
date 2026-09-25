@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
@@ -47,7 +48,9 @@ export default function LoginPage({
               placeholder="••••••••"
             />
           </div>
-          <LoginError searchParams={searchParams} />
+          <Suspense fallback={null}>
+            <LoginError searchParams={searchParams} />
+          </Suspense>
           <button type="submit" className={`${btnPrimary} w-full`}>
             Sign in
           </button>

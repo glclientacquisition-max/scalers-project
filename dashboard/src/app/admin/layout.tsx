@@ -3,6 +3,9 @@ import { BrandLockup } from "@/components/brand/BrandMark";
 import { AdminNav } from "@/components/AdminNav";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 
+// instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
+export const instant = false;
+
 /**
  * Super Admin shell.
  * Mobile: top brand + horizontal nav. Desktop: navy sidebar + content.

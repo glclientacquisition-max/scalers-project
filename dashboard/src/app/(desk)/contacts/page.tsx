@@ -27,6 +27,9 @@ import {
   type ContactSort,
 } from "@/lib/contactsLoad";
 
+// instant = false: request-time desk data under the owner auth shell.
+export const instant = false;
+
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 function emptyCopy(saved: ContactSavedFilter, q: string): string {
