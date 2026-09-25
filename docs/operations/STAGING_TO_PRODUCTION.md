@@ -39,15 +39,13 @@ Staging and production **do not sync automatically**. Promote **code**, **SQL**,
 ```
 Change on branch
       ↓
-PR → CI green
-      ↓
-If Voice: staging-voice-deploy.yml on the PR branch
+If Voice: land on cursor/staging-voice-468b (Railway auto-deploys)
       ↓
 Confirm staging /healthz.gitSha, then DID test
       ↓
-Test Desk on Vercel preview or scalers-staging.vercel.app
+Test Desk on scalers-staging.vercel.app (same SHA as Voice)
       ↓
-Merge to main
+PR → CI green → merge to main
       ↓
 staging-validate.yml green (DB smoke on main)
       ↓
@@ -70,14 +68,14 @@ Use when the change is application code only (UI, voice logic, prompts in repo).
 - [ ] `npm run test:mvp` — pass
 - [ ] `cd dashboard && npm run lint && npm run build` — pass
 - [ ] Feature tested on **staging Desk** (`scalers-staging.vercel.app`)
-- [ ] If voice-impacting: deploy the **PR commit** to Railway staging first. Do not merge to `main` to get a Voice test. Run `.github/workflows/staging-voice-deploy.yml` (`workflow_dispatch` on the PR branch). Then `GET https://scalers-staging-staging.up.railway.app/healthz` and confirm `gitSha` matches the PR commit. Only then call the staging test DID.
+- [ ] If voice-impacting: land the commit on **`cursor/staging-voice-468b`** first (Railway staging follows that branch). Do not merge to `main` to get a Voice test. Then `GET https://scalers-staging-staging.up.railway.app/healthz` and confirm `gitSha` matches the staging-branch commit. Only then call the staging test DID. One-off PR deploys can still use `.github/workflows/staging-voice-deploy.yml` (`workflow_dispatch`, `confirm_target=staging`).
 
 Desk preview URLs are not Voice. Railway staging does not auto-build PR branches. `main` is the promotion vehicle, not the test vehicle.
 
 ### Merge
 
-1. Open PR → wait for **CI** green.
-2. Merge to `main`.
+1. Open a PR from **`cursor/staging-voice-468b` → `main`**. Wait for **CI** green.
+2. In Cursor / GitHub: **Mark as ready**, then **Squash and merge**. That is the promote. Do not Vercel-Promote a preview onto `scalers-project`.
 3. Confirm **staging-validate** workflow green on `main` (smoke + schema).
 
 ### Deploy production (manual)
@@ -169,8 +167,8 @@ After env changes: **redeploy** the affected Vercel/Railway service.
 
 | You changed… | Staging action | Production action |
 | --- | --- | --- |
-| React / Next.js desk UI | Test on `scalers-staging.vercel.app` | Deploy `scalers-project` Vercel |
-| `server.js` / voice lane | Deploy PR commit via `staging-voice-deploy.yml`, confirm `/healthz.gitSha`, then test DID | Deploy production Railway |
+| React / Next.js desk UI | Land on `cursor/staging-voice-468b`, test on `scalers-staging.vercel.app` | Squash-merge staging → `main` (Vercel `scalers-project` follows `main`) |
+| `server.js` / voice lane | Land on `cursor/staging-voice-468b`, confirm `/healthz.gitSha`, then test DID `+254709221536`. One-off PR deploys can still use `staging-voice-deploy.yml` | Squash-merge staging → `main` (Railway production follows `main`) |
 | New SQL script | Apply on `sgcdncjxauhsbunobmob` | Approved apply on ALCR |
 | Grant / RLS only | SQL on staging | Approved SQL on ALCR |
 | GitHub Actions / docs only | CI on PR | Merge; no app deploy unless needed |
