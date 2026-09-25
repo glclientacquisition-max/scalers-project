@@ -1,6 +1,8 @@
 // Buffer Gemini streamed text → flushable spoken chunks for Soniox TTS.
 // Holds back tool markers (###TOOL### / ###ENDCALL###) so they are never spoken.
 
+const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
+
 /**
  * Strip complete tool blocks and end-call markers for speech.
  * When final=false, also truncates incomplete marker prefixes.
@@ -31,7 +33,7 @@ function stripMarkersForSpeech(raw, opts = {}) {
     s = s.slice(0, cut);
   }
 
-  return s.replace(/\s+/g, ' ').trim();
+  return stripSpokenInstructionLeaks(s.replace(/\s+/g, ' ').trim(), { final });
 }
 
 function envInt(name, fallback) {

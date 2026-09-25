@@ -559,5 +559,10 @@ assert.match(
   /envInt\('VOICE_STREAM_EARLY_CHARS', 0\)/,
   'streamed TTS must default to sentence-only flush so fragments are not articulated'
 );
+assert.match(
+  streamBufSource,
+  /stripSpokenInstructionLeaks/,
+  'streamed TTS must drop ASR_CORRECTION_PROMPT / RETOTI / NP_FALSE before speak'
+);
 
 console.log('Voice runtime wiring checks passed.');

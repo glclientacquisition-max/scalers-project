@@ -210,6 +210,20 @@ test('forced language wins', () => {
   assert.strictEqual(resolveTtsLanguage('Hello', 'en', 'sw'), 'sw');
 });
 
+test('prepareForTts drops ASR_CORRECTION_PROMPT and RETOTI before underscore strip', () => {
+  const prepared = prepareForTts(
+    'ASR_CORRECTION_PROMPT: The user\'s input seems truncated or quiet. Ask for missing details or to repeat gently. RETOTI: Sawa, Alvin.',
+    { callLanguage: 'sw' }
+  );
+  assert.doesNotMatch(prepared.text, /ASR|RETOTI|NPFALSE|truncated or quiet|repeat gently/i);
+  assert.match(prepared.text, /Sawa, Alvin/);
+});
+
+test('prepareForTts drops a bare NP_FALSE token', () => {
+  const prepared = prepareForTts('NP_FALSE', { callLanguage: 'en' });
+  assert.strictEqual(prepared.text, '');
+});
+
 test('prepareForTts full pipeline', () => {
   const prepared = prepareForTts('Call +254712345678 about mpesa in Thika…', {
     callLanguage: 'en',

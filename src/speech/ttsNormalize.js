@@ -7,6 +7,7 @@ const {
 } = require('./pronunciationLexicon');
 const { expandPhones, expandSpokenForms } = require('./spokenForms');
 const { shouldRewriteSheng, rewriteShengForTts } = require('./shengRewrite');
+const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
 
 const SW_UTTERANCE_MARKERS =
   /\b(habari|sawa|asante|karibu|tafadhali|nina|nataka|ningependa|ndiyo|hapana|kwaheri|jina|msaada|kidogo|naweza|unaweza|ninaomba|naomba|pole|samahani|bei|huduma|nitakupigia|nakucheckia|shida|kesho|leo)\b/gi;
@@ -16,7 +17,7 @@ const SW_UTTERANCE_MARKERS =
  * @param {string} text
  */
 function stripMarkup(text) {
-  return String(text || '')
+  return stripSpokenInstructionLeaks(String(text || ''), { final: true })
     .replace(/###(?:ENDCALL|ENDTOOL|TOOL)###/gi, '')
     .replace(/[*_`#]+/g, '')
     .replace(/\bENDCALL\b/gi, '')

@@ -1,3 +1,15 @@
+# Instruction labels spoken aloud — `HD_ff24acf5207d` (2026-09-25)
+
+Staging DID `+254709221536`, SHA `ba5b53f` (`cursor/ticket-done-sms-ping-679d`, not first-forward). After a truncated closer, Gemini spoke control text:
+
+`spoken="NPFALSE"` then `spoken="ASRCORRECTIONPROMPT: The user's input seems truncated or quiet."` / `Ask for missing details or to repeat gently.` / `RETOTI: Sawa, Alvin.`
+
+Desk transcript stored the same block. Later turns copied the format because raw `geminiParts` went back into history.
+
+Fix: `src/speech/spokenInstructionLeak.js` strips those labels before TTS (`spokenStreamBuffer`, `prepareForTts`) and before Gemini history (`geminiVoice` clone). Prompt forbids reciting the tags.
+
+---
+
 # First-forward acceptance buckets (2026-09-25)
 
 Do not treat raw hangup as Shy failed. Kenya flash under 3s with no speech is often airtime protocol, not an AI reject.

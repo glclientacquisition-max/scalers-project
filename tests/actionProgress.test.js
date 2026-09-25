@@ -80,6 +80,12 @@ assert.equal(
   'We are open until 6 PM.'
 );
 assert.equal(
+  polishSpokenReply(
+    'ASR_CORRECTION_PROMPT: The user\'s input seems truncated or quiet. RETOTI: Sawa, Alvin.'
+  ),
+  'Sawa, Alvin.'
+);
+assert.equal(
   looksLikeSpokenServiceDump('We clean carpets. What time works?'),
   false
 );

@@ -75,6 +75,23 @@ describe('buildGeminiContents', () => {
     assert.equal(contents[1].parts[0].thoughtSignature, 'sig-abc');
   });
 
+  it('strips instruction labels from replayed model parts', () => {
+    const contents = buildGeminiContents([
+      { role: 'user', content: 'Uh, not currently' },
+      {
+        role: 'assistant',
+        content: 'Sawa, Alvin.',
+        geminiParts: [
+          {
+            text: 'ASR_CORRECTION_PROMPT: The user\'s input seems truncated or quiet. Ask for missing details or to repeat gently. RETOTI: Sawa, Alvin!',
+          },
+        ],
+      },
+    ]);
+    assert.equal(contents[1].parts[0].text, 'Sawa, Alvin!');
+    assert.doesNotMatch(contents[1].parts[0].text, /ASR_CORRECTION_PROMPT|RETOTI/);
+  });
+
   it('replays stored model parts without merging a signed part into text', () => {
     const contents = buildGeminiContents([
       { role: 'user', content: 'book tomorrow' },
