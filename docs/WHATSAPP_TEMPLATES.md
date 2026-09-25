@@ -46,6 +46,8 @@ Kind env wins. If a kind name is unset, that event uses `SAUTIKIT_WHATSAPP_TEMPL
 
 Desk: `NEXT_PUBLIC_NOTIFY_WHATSAPP_AVAILABLE=true` (default on).
 
+A SautiKit `202` is not delivery. Meta error `131042` means the WhatsApp Business account has no currency. Session text inside an open 24h window can still arrive. Template pings do not, until WhatsApp Manager billing has a country and currency. The desk then shows "WhatsApp billing is not set."
+
 ## Bodies to paste
 
 ### 1. `scalers_staff_alert`

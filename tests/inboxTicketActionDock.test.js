@@ -49,6 +49,9 @@ describe("ticket action dock", () => {
     const delivery = read("dashboard/src/lib/escalationDelivery.ts");
     assert.match(delivery, /instance_already_sent/);
     assert.match(delivery, /Already pinged this ticket/);
+    assert.match(delivery, /WhatsApp billing is not set/);
+    assert.match(read("server.js"), /whatsapp_billing/);
+    assert.match(read("src/notifications/whatsapp.js"), /131042/);
     assert.match(escalate, /revalidatePath\(`\/calls\/\$\{callId\}`\)/);
     assert.doesNotMatch(escalate, /revalidatePath\("\/home"\)/);
     assert.doesNotMatch(escalate, /revalidatePath\("\/calls"\)/);

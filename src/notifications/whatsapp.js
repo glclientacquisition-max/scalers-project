@@ -145,6 +145,9 @@ function mapWhatsAppSendError(status, json, text) {
     reason = 'template_not_found';
   } else if (code === 132000 || /parameter/i.test(message)) reason = 'template_param_mismatch';
   else if (code === 131026 || /not a whatsapp/i.test(message)) reason = 'not_whatsapp_user';
+  else if (code === 131042 || /currency is not configured|payment issue/i.test(message)) {
+    reason = 'whatsapp_billing';
+  }
   return { status, code, reason, message };
 }
 
