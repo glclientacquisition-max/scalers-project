@@ -58,7 +58,7 @@ describe("inbox overflow persistence", () => {
     assert.doesNotMatch(actions, /export async function inboxToggleRead/);
     assert.doesNotMatch(actions, /export async function inboxSnooze/);
     assert.match(actions, /return inboxArchive\(item\)/);
-    assert.match(overflow, /inboxTogglePin\(item\)/);
+    assert.match(overflow, /inboxTogglePin\(view\)/);
     assert.doesNotMatch(overflow, /inboxSnooze\(item\)/);
     assert.match(overflow, /inboxUnarchive\(item\)/);
     assert.doesNotMatch(overflow, /inboxToggleMute/);

@@ -21,8 +21,8 @@ Owner opens `/contacts/[id]`, sees History built from that contact's real ticket
 2. **KPI strip.** Show each card only when its source exists; omit/hide if unknown or empty. Locked derivations:
    - **Interactions** = count of real assembled call/ticket rows for that contact. Hide when 0.
    - **Visits done** = jobs with status `done` (confirmed completed visits) for that contact. Hide when 0.
-   - **Customer since** = earliest stored first-seen / first call / contact `created_at`. Show relative months from that stamp (`N mo`). Hide when no stamp.
-3. **Contacts list nouns** stay **All · Saved · Unsaved** from #386. Chrome for those piles is the Inbox purpose pill-chip (`InboxFilterPills`) per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** put Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) on Contacts.
+   - **Customer since** = earliest stored first-seen / first call / contact `created_at`. Show relative months from that stamp (`N mo`). Hide when no stamp or the month count is 0.
+3. **Contacts list nouns** stay **All · Recents · Favourites · Saved · Unsaved** on one `InboxFilterPills` row per `CONTACTS_CHROME_PILL_ACCEPT.md`. Do **not** put Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) on Contacts.
 4. **Call / WhatsApp** actions: opened-only honesty (`tel:` / `wa.me`). Top icons only on the person file. No labeled Call / WhatsApp pills.
 5. Phone-first density at ~390 plus desktop. Match existing desk chrome / FRONTEND_CONSTITUTION / design system. No glass, no KPI wallpaper, no fake Online.
 
@@ -32,7 +32,7 @@ Owner opens `/contacts/[id]`, sees History built from that contact's real ticket
 - Notes editable
 - Name this caller / Name + Save
 - Inbox threads link-back
-- All · Saved · Unsaved nouns + sort Last call · Name
+- All · Recents · Favourites · Saved · Unsaved nouns + sort Last call · Name
 - Call / WA opened-only on list + person-file top icons
 
 ## DEFER (do not ship)
@@ -59,4 +59,4 @@ Desk UX chrome only. Do not change `lead_status` / notify / wallet semantics. Bu
 
 ## Verify (TEST)
 
-lint + build green for dashboard. History shows real rows only; tap opens a real ticket/call. KPI cards present only when derived; formulas match lock. List still All · Saved · Unsaved. Call / WA unchanged honesty. Smoke 390 + desktop.
+lint + build green for dashboard. History shows real rows only; tap opens a real ticket/call. KPI cards present only when derived; formulas match lock. List still All · Recents · Favourites · Saved · Unsaved. Call / WA unchanged honesty. Smoke 390 + desktop.

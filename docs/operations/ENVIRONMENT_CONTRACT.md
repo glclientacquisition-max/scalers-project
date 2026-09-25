@@ -84,7 +84,7 @@
 | --- | --- | --- | --- |
 | Command | `cd dashboard && npm run dev` | Vercel preview or staging project | Vercel production |
 | Root | `dashboard/` | Same | Same |
-| URL | `http://localhost:3000` | `https://scalers-staging.vercel.app` | **INFERENCE:** `https://scalers-project.vercel.app` |
+| URL | `http://localhost:3000` | `https://scalers-staging.vercel.app` (pin: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md)) | **INFERENCE:** `https://scalers-project.vercel.app` |
 | Auth | Supabase Auth | Staging Supabase project | Production Supabase project |
 | Dev bypass | `DASHBOARD_OPEN=true` allowed | **Disable** | **Disable** |
 

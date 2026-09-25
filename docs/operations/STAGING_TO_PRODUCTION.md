@@ -72,6 +72,8 @@ Use when the change is application code only (UI, voice logic, prompts in repo).
 
 Desk preview URLs are not Voice. Railway staging does not auto-build PR branches. `main` is the promotion vehicle, not the test vehicle.
 
+**Staging desk URL:** Voice DID work still lands on `cursor/staging-voice-468b`. Do not promote a random feature SHA onto `scalers-staging.vercel.app`. See [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md).
+
 ### Merge
 
 1. Open a PR from **`cursor/staging-voice-468b` → `main`**. Wait for **CI** green.

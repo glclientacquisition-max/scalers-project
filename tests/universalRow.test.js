@@ -19,10 +19,12 @@ describe("universal row anatomy", () => {
   it("ships the shared primitives", () => {
     assert.match(row, /export function RowIdentity/);
     assert.match(row, /export function RowStateDot/);
+    assert.match(row, /export function InboxPinMark/);
     assert.match(row, /export function deskRowInitials/);
     assert.match(row, /export function deskRowWeightClass/);
     assert.match(master, /RowIdentity/);
     assert.match(master, /RowStateDot/);
+    assert.match(master, /InboxPinMark/);
   });
 
   it("keeps the identity circle neutral and state-free", () => {

@@ -95,6 +95,28 @@ export const tableHeadCellClass = "px-4 py-3 font-medium";
 
 export const tableCellClass = "px-4 py-3.5";
 
+/** Inbox / Contacts / Settings exclusive chips. Filled active. Not underline tabs. */
+export function deskRateCardClass(active: boolean) {
+  return [
+    "inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium",
+    deskShiftClass,
+    "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
+    active
+      ? "bg-[#005CCC] text-white"
+      : "bg-surface-muted text-ink hover:bg-[#0096FF]/10",
+  ].join(" ");
+}
+
+export function deskRateCardCountClass(active: boolean) {
+  return [
+    "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-xs tabular-nums",
+    active ? "bg-white/20 text-white" : "bg-surface text-ink-soft",
+  ].join(" ");
+}
+
+export const deskRateCardRowClass =
+  "-mx-1 flex flex-nowrap snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
 export function filterTabClass(active: boolean) {
   return [
     "group inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium",

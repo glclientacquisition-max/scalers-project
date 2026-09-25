@@ -287,6 +287,18 @@ async function processWhatsAppReceived(opts = {}) {
       duplicates += 1;
       continue;
     }
+    const errors = Array.isArray(st.raw?.errors) ? st.raw.errors : [];
+    const first = errors[0] || {};
+    console.warn(
+      '[whatsapp] delivery',
+      JSON.stringify({
+        status: st.status || null,
+        recipient: st.recipientId || null,
+        code: first.code || null,
+        title: first.title || null,
+        detail: first.error_data?.details || first.message || null,
+      })
+    );
     if (typeof persistStatus === 'function') {
       await persistStatus(st);
     }

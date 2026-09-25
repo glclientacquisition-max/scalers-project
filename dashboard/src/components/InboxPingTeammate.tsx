@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { pingTeammateAction } from "@/app/(desk)/calls/escalateActions";
@@ -62,7 +62,7 @@ export function InboxPingTeammate({
 }) {
   const router = useRouter();
   const labelId = useId();
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [line, setLine] = useState<string | null>(null);
   const [picked, setPicked] = useState(people[0]?.name || "");
@@ -76,15 +76,18 @@ export function InboxPingTeammate({
   const hidden = archived || people.length === 0;
 
   function run(name: string) {
+    if (pending) return;
     setError(null);
     setOpen(false);
-    startTransition(async () => {
+    setPending(true);
+    void (async () => {
       const res = await pingTeammateAction({ callId, teammateName: name });
+      setPending(false);
       if (res.line) setLine(res.line);
       if (res.error && res.error !== res.line) setError(res.error);
       else if (!res.ok && !res.failed) setError(res.error || "Could not ping.");
       router.refresh();
-    });
+    })();
   }
 
   function placeFromButton() {
@@ -195,6 +198,7 @@ export function InboxPingTeammate({
             ref={btnRef}
             type="button"
             disabled={pending}
+            aria-busy={pending}
             aria-label={pending ? "Pinging" : hint}
             aria-haspopup={one ? undefined : "menu"}
             aria-expanded={one ? undefined : open}

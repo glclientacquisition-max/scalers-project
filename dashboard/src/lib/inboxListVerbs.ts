@@ -107,6 +107,15 @@ export function inboxTicketOverflowActions(opts: {
   return [{ id: "archive", label: "Archive" }];
 }
 
+/** Overlay owner Pin from the row session so the glyph and Unpin stay in sync before refresh. */
+export function inboxItemWithLocal(
+  item: InboxItem,
+  local: { pinnedAt?: string | null }
+): InboxItem {
+  if (local.pinnedAt === undefined) return item;
+  return { ...item, pinnedAt: local.pinnedAt };
+}
+
 /** md+ overflow: Pin, Mark done when eligible, Archive or Unarchive. No Select. */
 export function inboxOverflowActions(item: InboxItem): InboxListAction[] {
   const stay: InboxListAction[] = [

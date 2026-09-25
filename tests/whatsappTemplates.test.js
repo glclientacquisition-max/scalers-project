@@ -252,7 +252,7 @@ describe('staff WhatsApp templates', () => {
     assert.equal(payload.to, '254740442943');
     assert.equal(payload.type, 'template');
     assert.equal(payload.template.name, APPROVED_FIRST_TEMPLATE);
-    assert.equal(payload.template.language_code, 'en');
+    assert.equal(payload.template.language_code, APPROVED_FIRST_TEMPLATE_LANG);
     assert.equal(payload.template.components[0].parameters.length, 3);
     assert.equal(buildLeadText({ businessName: 'Shop', name: 'Jane' }).includes('—'), false);
   });
@@ -360,6 +360,65 @@ describe('staff WhatsApp templates', () => {
       payload.template.components[0].parameters.map((p) => p.text),
       ['Line one', 'Line two', 'Line three']
     );
+  });
+
+  it('retries a SautiKit 502 before giving up', async () => {
+    process.env.SAUTIKIT_API_KEY = 'k';
+    process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
+    let hits = 0;
+    mock.method(global, 'fetch', async () => {
+      hits += 1;
+      if (hits < 3) {
+        return { ok: false, status: 502, text: async () => '<!DOCTYPE html> bad gateway' };
+      }
+      return {
+        ok: true,
+        status: 202,
+        text: async () => JSON.stringify({ messages: [{ id: 'wamid.RETRY' }] }),
+      };
+    });
+    const json = await sendOwnerWhatsApp({
+      to: '254711000000',
+      kind: 'escalation',
+      windowOpen: false,
+      body: 'Escalation for Wanjiku. Shop\nCaller: Jane',
+      lead: { businessName: 'Shop', name: 'Jane', callerNumber: '254711', reason: 'Ask' },
+    });
+    assert.equal(hits, 3);
+    assert.equal(json.messageId, 'wamid.RETRY');
+  });
+
+  it('retries the approved first template when the kind name is missing', async () => {
+    process.env.SAUTIKIT_API_KEY = 'k';
+    process.env.SAUTIKIT_WHATSAPP_NUMBER_ID = 'num-1';
+    process.env.SAUTIKIT_WHATSAPP_TEMPLATE_ESCALATION = 'scalers_escalation';
+    const urls = [];
+    mock.method(global, 'fetch', async (_url, init) => {
+      const posted = JSON.parse(init.body);
+      urls.push(posted.template.name + ':' + posted.template.language_code);
+      if (posted.template.name === 'scalers_escalation') {
+        return {
+          ok: false,
+          status: 404,
+          text: async () => JSON.stringify({ error: { code: 132001, message: 'template name does not exist' } }),
+        };
+      }
+      return {
+        ok: true,
+        status: 202,
+        text: async () => JSON.stringify({ messages: [{ id: 'wamid.FALLBACK' }] }),
+      };
+    });
+    const json = await sendOwnerWhatsApp({
+      to: '254711000000',
+      kind: 'escalation',
+      windowOpen: false,
+      body: 'Escalation for Wanjiku. Shop\nCaller: Jane',
+      lead: { businessName: 'Shop', name: 'Jane', callerNumber: '254711', reason: 'Ask' },
+    });
+    assert.equal(urls[0], 'scalers_escalation:en_US');
+    assert.ok(urls.includes('scalers_staff_alert:en_US'));
+    assert.equal(json.messageId, 'wamid.FALLBACK');
   });
 
   it('maps 24h-window and template errors', () => {

@@ -63,6 +63,7 @@ export type TenantUsageSummary = {
   billingEnforcement: string;
   isBeta: boolean;
   recentLedger: WalletLedgerRow[];
+  ledgerTotal: number;
   softSpendLimit: SoftSpendLimitStatus;
 };
 
@@ -255,6 +256,8 @@ export async function getTenantUsageSummary(
     billingEnforcement?: string | null;
     softSpendLimitEnabled?: boolean | null;
     softSpendLimitKes?: number | null;
+    ledgerPage?: number;
+    ledgerPageSize?: number;
   }
 ): Promise<TenantUsageSummary> {
   let walletBalanceKes = resolveWalletBalanceKes(wallets);
@@ -272,6 +275,9 @@ export async function getTenantUsageSummary(
   }
 
   const since = startOfMonthUtcIso();
+  const ledgerSize = Math.max(1, Math.floor(wallets.ledgerPageSize || 25));
+  const ledgerPage = Math.max(1, Math.floor(wallets.ledgerPage || 1));
+  const ledgerFrom = (ledgerPage - 1) * ledgerSize;
   const [callsRes, ledgerRes, chargesRes] = await Promise.all([
     client
       .from("calls")
@@ -280,10 +286,13 @@ export async function getTenantUsageSummary(
       .gte("created_at", since),
     client
       .from("wallet_ledger")
-      .select("id, created_at, kind, amount_kes, balance_after_kes, note, reference_type, reference_id")
+      .select(
+        "id, created_at, kind, amount_kes, balance_after_kes, note, reference_type, reference_id",
+        { count: "exact" }
+      )
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
-      .limit(12),
+      .range(ledgerFrom, ledgerFrom + ledgerSize - 1),
     client
       .from("wallet_ledger")
       .select("amount_kes, kind")
@@ -316,6 +325,7 @@ export async function getTenantUsageSummary(
     balanceKes: walletBalanceKes,
   });
 
+  const ledgerTotal = !ledgerRes.error ? ledgerRes.count ?? (ledgerRes.data || []).length : 0;
   const recentLedger: WalletLedgerRow[] = !ledgerRes.error
     ? (ledgerRes.data || []).map((row) => ({
         id: row.id,
@@ -350,6 +360,7 @@ export async function getTenantUsageSummary(
     billingEnforcement,
     isBeta,
     recentLedger,
+    ledgerTotal,
     softSpendLimit,
   };
 }

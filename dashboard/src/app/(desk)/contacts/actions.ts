@@ -14,6 +14,7 @@ import { mergeContactIdentity } from "@/lib/contactIdentity";
 import { storedPhoneCandidates } from "@/lib/handoffMode";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerFacingError } from "@/lib/ownerFacingError";
+import { withContactFavourite } from "@/lib/contactFavourite";
 
 export type ContactNotesResult = {
   ok?: boolean;
@@ -320,6 +321,45 @@ export async function updateContactName(
     .update({
       name: identity.name,
       metadata: identity.metadata,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("tenant_id", ctx.tenant.id);
+
+  if (error) return { error: contactsWriteError(error.message) };
+
+  revalidatePath("/contacts");
+  revalidatePath(`/contacts/${id}`);
+  return { ok: true };
+}
+
+export async function updateContactFavourite(
+  contactId: string,
+  favourite: boolean
+): Promise<ContactNotesResult> {
+  const ctx = await loadWorkspace();
+  if (!ctx) return { error: "Not signed in." };
+
+  const id = String(contactId || "").trim();
+  if (!id) return { error: "Missing contact." };
+
+  const { data: existing, error: loadError } = await ctx.workspace.client
+    .from("contacts")
+    .select("id, metadata")
+    .eq("id", id)
+    .eq("tenant_id", ctx.tenant.id)
+    .maybeSingle();
+
+  if (loadError) return { error: contactsWriteError(loadError.message) };
+  if (!existing) return { error: "Missing contact." };
+
+  const { error } = await ctx.workspace.client
+    .from("contacts")
+    .update({
+      metadata: withContactFavourite(
+        contactMetadata(existing.metadata),
+        Boolean(favourite)
+      ),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

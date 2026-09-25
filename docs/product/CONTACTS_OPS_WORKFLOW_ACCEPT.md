@@ -27,7 +27,7 @@ Owner adds contacts from one Add control, can rename a saved contact, jumps from
 - Phone locked
 - Notes editable
 - Call / WA opened-only (`tel:` / `wa.me`) on list + profile dock + strip
-- All · Saved · Unsaved pill chips + sort Last call · Name + search + segment-preserving back (`contactProfileHref` / `contactsReturnHref`)
+- All · Recents · Favourites · Saved · Unsaved pill chips + sort Last call · Name + search + segment-preserving back (`contactProfileHref` / `contactsReturnHref`)
 
 ## DEFER (do not ship)
 

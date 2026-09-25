@@ -31,6 +31,8 @@ describe("desk control craft", () => {
     assert.match(chrome, /pendingSpinnerClass/);
     assert.match(chrome, /deskFieldClass/);
     assert.match(chrome, /filterTabClass/);
+    assert.match(chrome, /deskRateCardClass/);
+    assert.match(chrome, /deskRateCardRowClass/);
     assert.match(chrome, /deskShiftClass/);
     assert.match(chrome, /export const deskPreviewClass/);
     assert.match(chrome, /export const deskPreviewCellClass/);
@@ -43,9 +45,9 @@ describe("desk control craft", () => {
     assert.match(settings, /export const settingsPrimaryButtonClass = btnPrimary/);
   });
 
-  it("uses FilterTabs on Inbox sort and Contacts sort", () => {
+  it("uses FilterTabs on Inbox sort and a Sort select on Contacts", () => {
     assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /<FilterTabs/);
-    assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /<FilterTabs/);
+    assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /<ContactSortSelect/);
     assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /<InboxFilterPills/);
     assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /filterTabClass/);
   });
