@@ -40,9 +40,9 @@ describe("inbox pagination page jump", () => {
     assert.deepEqual(api.listPageSpan(9, 25, 40), { page: 2, from: 26, to: 40, pages: 2 });
     assert.match(read("dashboard/src/components/InboxPileNav.tsx"), /clampListPage/);
     assert.match(read("dashboard/src/app/(desk)/contacts/page.tsx"), /clampListPage/);
-    assert.match(read("dashboard/src/components/ui/ListPager.tsx"), /min-h-11/);
-    assert.match(read("dashboard/src/components/PronunciationCoach.tsx"), /<ListPager/);
-    assert.match(read("dashboard/src/components/TenantForm.tsx"), /<ListPager/);
+    assert.match(read("dashboard/src/components/ui/Pagination.tsx"), /onPage\?:/);
+    assert.match(read("dashboard/src/components/PronunciationCoach.tsx"), /<Pagination/);
+    assert.match(read("dashboard/src/components/TenantForm.tsx"), /<Pagination/);
   });
 
   it("does not replace Prev/Next with the jump control", () => {

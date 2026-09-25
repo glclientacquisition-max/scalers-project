@@ -75,7 +75,7 @@ import {
   teamHasDialablePhone,
   type HandoffMode,
 } from "@/lib/handoffMode";
-import { handoffComingSoonLine } from "@/lib/deskLiveTransfer";
+import { handoffMessageLine } from "@/lib/deskLiveTransfer";
 import {
   displaySonioxVoiceLabel,
   getDefaultSonioxVoiceIdSync,
@@ -96,7 +96,7 @@ import {
 } from "@/lib/businessPolicies";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
-import { ListPager } from "@/components/ui/ListPager";
+import { Pagination } from "@/components/ui/Pagination";
 import {
   ExpandTextarea,
   SettingsGroup,
@@ -251,7 +251,7 @@ function CatalogPager({
   onPage: (page: number) => void;
 }) {
   return (
-    <ListPager
+    <Pagination
       page={page + 1}
       pageSize={pageSize}
       total={total}
@@ -1947,16 +1947,16 @@ export function TenantForm({
               {liveTransferExecutor
                 ? liveDest
                   ? `Rings ${liveDest.name} during open hours.`
-                  : "Add a team phone. Until then, Scalers messages the team."
+                  : "Add a team phone."
                 : liveDest
-                  ? handoffComingSoonLine(liveDest.name)
-                  : "Coming soon. Today we message a teammate."}
+                  ? handoffMessageLine(liveDest.name)
+                  : "Messages a teammate."}
             </p>
           ) : (
             <p className="px-1 text-xs text-[var(--ink-soft)]">
               {canMessageTeam
-                ? "SMS, WhatsApp, or email. The AI stays on the line."
-                : "Add a team phone or alert email for messages to land."}
+                ? "SMS, WhatsApp, or email."
+                : "Add a team phone or email."}
             </p>
           )}
         </div>

@@ -61,12 +61,14 @@ describe("P0 #3 Connect live call honesty", () => {
   const server = read("server.js");
 
   it("never promises Rings when the executor is off", () => {
-    assert.match(handoff, /Coming soon\. Today we message a teammate\./);
+    assert.match(handoff, /Messages a teammate\./);
     assert.doesNotMatch(handoff, /Rings a team phone during open hours/);
-    assert.match(form, /handoffComingSoonLine\(liveDest\.name\)/);
+    assert.doesNotMatch(handoff, /Coming soon/);
+    assert.match(form, /handoffMessageLine\(liveDest\.name\)/);
     assert.match(form, /liveTransferExecutor/);
     assert.match(form, /liveTransferExecutor\s*\?\s*liveDest/);
-    assert.match(form, /Coming soon\. Today we message a teammate\./);
+    assert.match(form, /Messages a teammate\./);
+    assert.doesNotMatch(form, /Coming soon/);
   });
 
   it("stamps notify-only when live_transfer did not run", () => {
