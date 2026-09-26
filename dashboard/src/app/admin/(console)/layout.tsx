@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { AdminNav } from "@/components/AdminNav";
-import { getAdminSession, getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
+import { getAdminSession, isLegacyAuthenticated } from "@/lib/auth";
 
 // instant = false: Super Admin cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
@@ -12,7 +12,7 @@ export const instant = false;
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!(await isLegacyAuthenticated())) {
-    redirect((await getAuthUser()) ? "/home" : "/admin/login");
+    redirect("/admin/login");
   }
 
   const adminSession = await getAdminSession();
