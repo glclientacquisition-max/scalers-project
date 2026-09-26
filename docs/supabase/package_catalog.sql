@@ -65,7 +65,7 @@ create table if not exists public.tenant_subscriptions (
   package_id uuid not null references public.billing_packages (id),
   period text not null default 'month',
   started_at timestamptz not null default now(),
-  current_period_start timestamptz not null default date_trunc('month', now() at time zone 'Africa/Nairobi') at time zone 'Africa/Nairobi',
+  current_period_start timestamptz not null default now(),
   current_period_end timestamptz,
   status text not null default 'active',
   updated_at timestamptz not null default now(),
@@ -157,15 +157,17 @@ begin
 end;
 $$;
 
+drop function if exists public.assign_tenant_package(uuid, uuid, text);
+
 create or replace function public.assign_tenant_package(
   p_tenant_id uuid,
   p_package_id uuid,
   p_period text default 'month'
 )
 returns table (
-  tenant_id uuid,
-  package_id uuid,
-  period text
+  assigned_tenant_id uuid,
+  assigned_package_id uuid,
+  assigned_period text
 )
 language plpgsql
 security definer
@@ -189,7 +191,7 @@ begin
     raise exception 'package not found';
   end if;
 
-  v_start := date_trunc('month', now() at time zone 'Africa/Nairobi') at time zone 'Africa/Nairobi';
+  v_start := (date_trunc('month', now() at time zone 'Africa/Nairobi') at time zone 'Africa/Nairobi');
   if v_period = 'year' then
     v_end := v_start + interval '12 months';
   else
@@ -222,9 +224,9 @@ begin
       whatsapp_included_units = v_pack.staff_wa
     where id = p_tenant_id;
 
-  tenant_id := p_tenant_id;
-  package_id := p_package_id;
-  period := v_period;
+  assigned_tenant_id := p_tenant_id;
+  assigned_package_id := p_package_id;
+  assigned_period := v_period;
   return next;
 end;
 $$;
