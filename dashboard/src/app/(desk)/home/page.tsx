@@ -6,7 +6,6 @@ import {
   formatCallWhenRelative,
   nairobiDateLabel,
   nairobiDayStartIso,
-  walletKes,
 } from "@/lib/callsTriage";
 import { inboxRecordHref } from "@/lib/inboxHref";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
@@ -35,11 +34,8 @@ import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { LivePing } from "@/components/ui/deskRow";
-import {
-  getWalletRunwayDays,
-  isBetaBilling,
-  walletRunwayLabel,
-} from "@/lib/wallet";
+import { isBetaBilling } from "@/lib/wallet";
+import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
 
 // instant = false: request-time desk data under the owner auth shell.
 export const instant = false;
@@ -57,9 +53,7 @@ export default async function HomeOverviewPage() {
 
   const client = workspace.client;
   const dayStart = nairobiDayStartIso();
-  const kes = walletKes(tenant);
   const isBeta = isBetaBilling(tenant.billing_enforcement);
-  const lowWallet = !isBeta && kes < 200;
   const business = tenant.business_name?.trim() || "your workspace";
   const today = nairobiDateLabel();
 
@@ -85,21 +79,23 @@ export default async function HomeOverviewPage() {
   const vertical = tenant.vertical;
   const copy = nicheCopy(vertical);
 
-  const [todayRes, inbox, runwayDays] = await Promise.all([
+  const [todayRes, inbox, pack] = await Promise.all([
     client
       .from("calls")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenant.id)
       .gte("created_at", dayStart),
     loadCachedInboxItems(tenant.id, vertical),
-    isBeta
-      ? Promise.resolve(null)
-      : getWalletRunwayDays(client, tenant.id, kes),
+    loadOwnerPackageMeter(tenant.id),
   ]);
   if (inbox.error) {
     return <DeskError>Could not load Overview.</DeskError>;
   }
-  const runway = walletRunwayLabel(runwayDays);
+  const minutesLeft = remainingCount(pack.minutesIncluded, pack.minutesUsed);
+  const packLabel = pack.packageName
+    ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
+    : "No package";
+  const minutesExhausted = pack.minutesIncluded > 0 && minutesLeft <= 0;
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
@@ -374,24 +370,20 @@ export default async function HomeOverviewPage() {
               ) : null}
             </section>
 
-            {!isBeta ? (
-              <section aria-label="Wallet" className="border-t border-line px-4 py-4">
-                <p className="font-mono text-sm font-medium text-ink">
-                  KES {kes.toLocaleString("en-KE")}
-                </p>
-                {runway ? (
-                  <p className="mt-0.5 text-xs text-ink-soft">{runway}</p>
-                ) : null}
-                {lowWallet ? (
-                  <Link
-                    href="/wallet"
-                    className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warn hover:underline ${focusRingVisible}`}
-                  >
-                    Top up
-                  </Link>
-                ) : null}
-              </section>
-            ) : null}
+            <section aria-label="Usage" className="border-t border-line px-4 py-4">
+              <p className="font-mono text-sm font-medium text-ink">
+                {minutesLeft.toLocaleString("en-KE")} min left
+              </p>
+              <p className="mt-0.5 text-xs text-ink-soft">{packLabel}</p>
+              {minutesExhausted && !isBeta ? (
+                <Link
+                  href="/wallet"
+                  className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warn hover:underline ${focusRingVisible}`}
+                >
+                  Usage
+                </Link>
+              ) : null}
+            </section>
 
             {showCta ? (
               <div className="border-t border-line px-4 py-4">

@@ -2,7 +2,7 @@
 
 **Destination:** Owners buy a monthly or annual package with included buckets. Exhausted buckets continue only if on-demand is on, or the owner upgrades. Super Admin owns the catalog at `/admin/packages` after the existing username + access code login.  
 **Lane:** Ops & Billing (numbers, Admin). Platform (SQL/RPC). Desk (Usage). Voice (consume minutes on hangup, later).  
-**Status:** Control plane shipping. Voice consume and prepaid strip are later.  
+**Status:** Control plane shipping. Owner Usage and Home read remaining buckets. Voice consume and prepaid strip are later.  
 **Companion:** [`../../PACKAGES.md`](../../PACKAGES.md), [`../../supabase/package_catalog.sql`](../../supabase/package_catalog.sql)
 
 ## Decisions so far
@@ -63,4 +63,4 @@ Replace `charge_call_to_wallet` as the owner meter with per-second consume. Late
 
 ### task / Usage page reads package remaining
 
-Desk Usage shows package name and remaining buckets. Later PR.
+Desk Usage and Home show package name and remaining buckets. Admin Businesses shows the assigned package. Done in the Usage meter PR.

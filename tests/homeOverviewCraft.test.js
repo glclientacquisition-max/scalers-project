@@ -100,12 +100,14 @@ describe("home overview craft", () => {
     assert.match(page, /lg:col-span-5/);
   });
 
-  it("splits the aside into Today, Line, and Wallet sections", () => {
+  it("splits the aside into Today, Line, and Usage sections", () => {
     assert.match(page, /aria-label="Today"/);
     assert.match(page, /aria-label="Line"/);
-    assert.match(page, /aria-label="Wallet"/);
-    assert.match(page, /Top up/);
-    assert.match(page, /KES \{kes\.toLocaleString/);
+    assert.match(page, /aria-label="Usage"/);
+    assert.match(page, /min left/);
+    assert.match(page, /loadOwnerPackageMeter/);
+    assert.doesNotMatch(page, /Top up/);
+    assert.doesNotMatch(page, /KES \{kes\.toLocaleString/);
   });
 
   it("posts Updates with the Settings bulletin panel", () => {
