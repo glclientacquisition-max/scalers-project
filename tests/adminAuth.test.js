@@ -15,6 +15,7 @@ describe("Super Admin Better Auth", () => {
   const handler = read("dashboard/src/app/api/auth/[...all]/route.ts");
   const session = read("dashboard/src/app/api/admin/session/route.ts");
   const login = read("dashboard/src/app/admin/login/page.tsx");
+  const adminLayout = read("dashboard/src/app/admin/(console)/layout.tsx");
   const ownerLogin = read("dashboard/src/app/api/login/route.ts");
   const proxy = read("dashboard/src/proxy.ts");
   const gate = read("dashboard/src/lib/auth.ts");
@@ -55,6 +56,11 @@ describe("Super Admin Better Auth", () => {
     assert.match(proxy, /configuredAdminHost/);
     assert.match(proxy, /\/admin\/login/);
     assert.match(proxy, /export function proxy/);
+  });
+
+  it("keeps Super Admin on /admin/login when an owner session is present", () => {
+    assert.match(adminLayout, /redirect\("\/admin\/login"\)/);
+    assert.doesNotMatch(adminLayout, /getAuthUser\(\) \? "\/home"/);
   });
 
   it("reads Better Auth session before the leftover HMAC cookie", () => {
