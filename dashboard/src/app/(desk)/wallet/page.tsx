@@ -67,7 +67,6 @@ export default async function WalletPage({
   const smsLeft = remainingCount(pack.smsIncluded, pack.smsUsed);
   const emailLeft = remainingCount(pack.emailIncluded, pack.emailUsed);
   const waLeft = remainingCount(pack.waIncluded, pack.waUsed);
-  const seatsLeft = remainingCount(pack.seatsIncluded, pack.seatsUsed);
   const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
   const outboundMin = outboundKesPerMinute(pack.rates.outboundKesPerSecond);
   const exhausted =
