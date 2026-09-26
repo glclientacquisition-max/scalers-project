@@ -28,8 +28,11 @@ Requirements:
 
 ```
 /admin                 Overview (platform health)
+/admin/packages        Rate card, SKUs, annual discount, assign
+/admin/wallets         Wallet credit + plan
 /admin/businesses      All businesses + actions
 /admin/numbers         Number pool (add / assign / release)
+/admin/voices          Voice catalog
 ```
 
 Nav label for ops: **Admin** (not “DID pool”).
@@ -43,7 +46,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 ### 1. Overview (`/admin`)
 - KPI cards: total businesses, active businesses, businesses waiting for a number, available DIDs, assigned DIDs, calls (last 7 days).
 - Short “Needs attention” list: businesses with `pending:` DID or inactive flag.
-- Primary CTAs: Add number · View businesses.
+- Primary CTAs: Add number · Packages · View businesses.
 
 ### 2. Businesses (`/admin/businesses`)
 - Table: Business name · Phone DID · Notify number · Status (Active / Waiting for number / Archived) · Created · Actions.
@@ -61,7 +64,13 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Prevent double-assign (DB uniqueness + status gates — already in Phase C SQL).
 - Copy must say **business**, not tenant.
 
-### 4. Platform teardown / demo reset (one-time ops)
+### 4. Packages (`/admin/packages`)
+- Same username + access code as the rest of Super Admin. No second door.
+- Edit on-demand rates (inbound/outbound as KES per minute, stored per second), WhatsApp, SMS, email, and annual discount %.
+- Edit Starter / Growth / Scale included buckets and monthly KES. Annual price is monthly x 12 x (1 - discount %).
+- Assign a package and period to a business. Does not leave beta. Wallets Plan still does that.
+
+### 5. Platform teardown / demo reset (one-time ops)
 - Ability to **remove Jirani Home Services** completely and leave `+254709221536` as **Available** in the pool for the next business.
 - Documented SQL + in-UI action with typed confirmation (`REMOVE`).
 

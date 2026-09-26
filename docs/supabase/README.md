@@ -122,7 +122,8 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24b | [`realtime_inbox_replica_identity.sql`](./realtime_inbox_replica_identity.sql) | `realtime_inbox.sql` | `REPLICA IDENTITY FULL` on those three tables so `tenant_id` filters match hangup UPDATEs. Idempotent; no publication, grant, or policy change. |
 | 24c | [`notify_send_ledger.sql`](./notify_send_ledger.sql) | `contacts_and_requests.sql` (tenants, calls, `current_user_tenant_ids`) | Append-only `notify_sends`. Staff + caller SMS = tenant. Wallet/outage = platform. Meter only, no charge. |
 | 24d | [`sms_allowance.sql`](./sms_allowance.sql) | `notify_send_ledger.sql`, `line_rental_grace.sql` | Included SMS (default 200). Same `on_demand_usage_enabled` as minutes. Beta never blocks. |
-| 24e | [`package_entitlements.sql`](./package_entitlements.sql) | `sms_allowance.sql` | Reserved email + seat included columns. **`tenants_protect_wallet_columns()` final.** No email/invite gate. |
+| 24e | [`package_entitlements.sql`](./package_entitlements.sql) | `sms_allowance.sql` | Reserved email + seat included columns. No email/invite gate. |
+| 24g | [`package_catalog.sql`](./package_catalog.sql) | `package_entitlements.sql` | SKUs, rate card, `tenant_subscriptions`, minutes/WA included columns, `assign_tenant_package`. **`tenants_protect_wallet_columns()` latest.** |
 | 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |
 
 ---

@@ -96,7 +96,7 @@ describe("admin console polish", () => {
       if (/bg-\[var\(--accent\)\]/.test(source)) offenders.push(rel);
     }
     assert.deepEqual(offenders, []);
-    assert.match(read("dashboard/src/app/admin/page.tsx"), /btnPrimary/);
+    assert.match(read("dashboard/src/app/admin/(console)/page.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/DidPoolManager.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminWalletsPanel.tsx"), /btnPrimary/);
@@ -108,7 +108,7 @@ describe("admin console polish", () => {
   });
 
   it("renders overview attention as a dense table with row tap", () => {
-    const page = read("dashboard/src/app/admin/page.tsx");
+    const page = read("dashboard/src/app/admin/(console)/page.tsx");
     assert.match(page, /lg:grid-cols-4/);
     assert.match(page, /Needs attention/);
     assert.match(page, /<table/);
@@ -135,10 +135,11 @@ describe("admin console polish", () => {
 
   it("standardizes admin page titles on text-2xl", () => {
     for (const rel of [
-      "dashboard/src/app/admin/wallets/page.tsx",
-      "dashboard/src/app/admin/voices/page.tsx",
-      "dashboard/src/app/admin/businesses/page.tsx",
-      "dashboard/src/app/admin/numbers/page.tsx",
+      "dashboard/src/app/admin/(console)/wallets/page.tsx",
+      "dashboard/src/app/admin/(console)/packages/page.tsx",
+      "dashboard/src/app/admin/(console)/voices/page.tsx",
+      "dashboard/src/app/admin/(console)/businesses/page.tsx",
+      "dashboard/src/app/admin/(console)/numbers/page.tsx",
     ]) {
       const src = read(rel);
       assert.match(src, /font-display text-2xl tracking-tight/);

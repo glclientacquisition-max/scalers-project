@@ -1,7 +1,7 @@
 # Package entitlements
 
-**Status:** Contract. No shop UI. No SKU catalog yet.  
-**Lanes:** Ops & Billing (numbers), Platform (columns/RPCs)
+**Status:** Super Admin catalog at `/admin/packages` (username + access code). Voice consume and owner checkout later.  
+**Lanes:** Ops & Billing (numbers, Admin). Platform (columns/RPCs).
 
 A package is a set of **included counters** written onto the tenant. Enforcement is one consume RPC per bucket. Assigning "Starter = 500 SMS + 100 emails + 5 seats" is a write of those numbers, not a new send path.
 
@@ -12,9 +12,9 @@ A package is a set of **included counters** written onto the tenant. Enforcement
 | Tenant SMS | `sms_included_units` (default 200) | `sms_used_units` via `consume_sms_units` | Wallet on-demand | **Enforced** (`sms_allowance.sql`) |
 | Tenant email | `email_included_units` (default 100) | `email_used_units` | Same on-demand when gated | **Reserved.** Meter on `notify_sends`. Do not block yet. |
 | Team seats | `seat_included` (default 5) | Count of `tenant_members` | **No.** Hard cap. | **Reserved.** Do not block invites yet. |
-| Inbound minutes | Prepaid KES wallet today | `charge_call_to_wallet` | Same on-demand | Live as money, not an included-minute pack |
+| Inbound minutes | `minutes_included` | `seconds_used` | KES 0.05/sec (KES 3/min) | Catalog. Voice consume later. Prepaid wallet still live. |
 | Line / DID | `line_paid_through` | Monthly `apply_line_rental` | Grace, then suspend | Live |
-| WhatsApp | Not a tenant pack unit | Ledger 1/send | n/a | Channel fallback only |
+| Staff WhatsApp | `whatsapp_included_units` | `whatsapp_used_units` | KES 2 / send | Catalog. Consume later. Meta bills Scalers. |
 
 Platform wallet and outage messages never consume tenant SMS or email.
 
@@ -22,7 +22,7 @@ Seats are login accounts (`tenant_members`), not People directory rows (`team_di
 
 ## Rules
 
-1. Package assign (future RPC) sets included columns. Owners cannot PATCH them. Protect trigger is RPC-only.
+1. Package assign (`assign_tenant_package`) sets included columns. Owners cannot PATCH them. Protect trigger is RPC-only.
 2. Period reset (future) zeroes `*_used_units`. Seats are a live count, not a used column.
 3. Per-bucket top-up (future) increments included. Same stop rule.
 4. Beta (`billing_enforcement = off`) meters and never blocks.
@@ -31,8 +31,8 @@ Seats are login accounts (`tenant_members`), not People directory rows (`team_di
 
 ## Not this slice
 
-- SKU table / Super Admin plan picker / M-Pesa pack checkout
+- Owner M-Pesa pack checkout
 - `consume_email_units` or invite-time seat check
 - Email or seat rows on the Wallet page
 
-SQL placeholders: [`docs/supabase/package_entitlements.sql`](./supabase/package_entitlements.sql). SMS enforcement: [`sms_allowance.sql`](./supabase/sms_allowance.sql).
+SQL: [`docs/supabase/package_entitlements.sql`](./supabase/package_entitlements.sql), [`package_catalog.sql`](./supabase/package_catalog.sql). SMS enforcement: [`sms_allowance.sql`](./supabase/sms_allowance.sql). Super Admin: `/admin/packages` after the existing username + access code.
