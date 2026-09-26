@@ -1,7 +1,7 @@
 # Super Admin
 
 **Route:** `/admin`  
-**Job:** Ops console for wallets, businesses, numbers, and voices.
+**Job:** Ops console for wallets, packages, businesses, numbers, and voices.
 
 **Chrome:** Owner desk uses a compact icon rail (`DESK_LINKS`) on `md+`. Super Admin keeps a fixed navy labeled sidebar on `lg+` (horizontal nav below `lg`). Do not copy the ops shell onto `(desk)`.
 
