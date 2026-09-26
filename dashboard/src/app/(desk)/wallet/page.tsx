@@ -1,22 +1,19 @@
 import { redirect } from "next/navigation";
 import { getCurrentTenant, createWorkspaceDataClient } from "@/lib/tenant";
+import { getTenantUsageSummary } from "@/lib/wallet";
 import {
-  WALLET_LINE_FEE_KES_PER_MONTH,
-  WALLET_LOW_BALANCE_KES,
-  WALLET_RATE_KES_PER_MINUTE,
-  WALLET_TRANSFER_RATE_KES_PER_MINUTE,
-  getTenantUsageSummary,
-} from "@/lib/wallet";
+  inboundKesPerMinute,
+  loadOwnerPackageMeter,
+  outboundKesPerMinute,
+  remainingCount,
+} from "@/lib/packageCatalog";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
-import { WalletTopUpButton } from "@/components/WalletTopUpButton";
-import { getWalletTopUpConfig } from "@/lib/walletTopUp";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { Pagination } from "@/components/ui/Pagination";
 import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 
-// instant = false: request-time desk data under the owner auth shell.
 export const instant = false;
 
 function kindLabel(kind: string): string {
@@ -26,6 +23,10 @@ function kindLabel(kind: string): string {
   if (kind === "topup") return "Top-up";
   if (kind === "trial_credit") return "Trial credit";
   return kind;
+}
+
+function bucketLabel(used: number, included: number): string {
+  return `${used.toLocaleString("en-KE")} / ${included.toLocaleString("en-KE")}`;
 }
 
 export default async function WalletPage({
@@ -61,142 +62,106 @@ export default async function WalletPage({
     return <DeskError>Could not load Usage.</DeskError>;
   }
 
+  const pack = await loadOwnerPackageMeter(tenant.id);
+  const minutesLeft = remainingCount(pack.minutesIncluded, pack.minutesUsed);
+  const smsLeft = remainingCount(pack.smsIncluded, pack.smsUsed);
+  const emailLeft = remainingCount(pack.emailIncluded, pack.emailUsed);
+  const waLeft = remainingCount(pack.waIncluded, pack.waUsed);
+  const seatsLeft = remainingCount(pack.seatsIncluded, pack.seatsUsed);
+  const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
+  const outboundMin = outboundKesPerMinute(pack.rates.outboundKesPerSecond);
+  const exhausted =
+    (pack.minutesIncluded > 0 && minutesLeft <= 0) ||
+    (pack.smsIncluded > 0 && smsLeft <= 0) ||
+    (pack.emailIncluded > 0 && emailLeft <= 0) ||
+    (pack.waIncluded > 0 && waLeft <= 0);
+
   const safePage = clampListPage(page, usage.ledgerTotal, DEFAULT_PAGE_SIZE);
   if (safePage !== page) {
     redirect(safePage > 1 ? `/wallet?page=${safePage}` : "/wallet");
   }
 
-  const billedThisMonth = usage.callChargesKes + usage.lineFeeKes;
-  const lowThreshold = Number(tenant.wallet_low_balance_kes ?? WALLET_LOW_BALANCE_KES);
-  const prepaidEmpty = !usage.isBeta && usage.walletBalanceKes <= 0;
-  const prepaidLow =
-    !usage.isBeta && usage.walletBalanceKes > 0 && usage.walletBalanceKes < lowThreshold;
-  const topUpConfig = getWalletTopUpConfig();
-  const smsIncluded = Number(tenant.sms_included_units);
-  const smsUsed = Math.max(0, Number(tenant.sms_used_units ?? 0));
-  const hasSmsMeter = Number.isFinite(smsIncluded);
-  const smsExhausted =
-    !usage.isBeta &&
-    hasSmsMeter &&
-    smsUsed >= smsIncluded &&
-    !tenant.on_demand_usage_enabled;
+  const packLabel = pack.packageName
+    ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
+    : "No package";
 
   return (
     <div className="max-w-3xl">
-      <header className="space-y-3">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <h1 className={deskListTitleClass}>Usage</h1>
-        <div className="flex flex-wrap items-start justify-end gap-4">
-          {usage.isBeta ? (
-            <span className="inline-flex min-h-[3.25rem] items-center rounded-xl border border-accent/30 bg-accent/5 px-6 py-3 text-sm font-medium text-accent-deep">
-              Free beta
-            </span>
-          ) : (
-            <WalletTopUpButton
-              tenantId={tenant.id}
-              topUpEnabled={topUpConfig.enabled}
-              presets={topUpConfig.presets}
-            />
-          )}
-        </div>
+        {usage.isBeta ? (
+          <span className="inline-flex min-h-12 items-center rounded-xl border border-accent/30 bg-accent/5 px-6 py-3 text-sm font-medium text-accent-deep">
+            Free beta
+          </span>
+        ) : null}
       </header>
 
-      {(prepaidEmpty || prepaidLow || smsExhausted) && !usage.isBeta ? (
-        <div className="mt-4 space-y-3">
-          {prepaidEmpty || prepaidLow ? (
-            <p className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
-              {prepaidEmpty
-                ? tenant.on_demand_usage_enabled
-                  ? "Prepaid empty. On-demand is on."
-                  : "Prepaid empty. Top up or enable on-demand below."
-                : `Prepaid under KES ${lowThreshold.toLocaleString("en-KE")}.`}
-            </p>
-          ) : null}
-          {smsExhausted ? (
-            <p className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
-              Included SMS used. Enable on-demand or wait for the next pack.
-            </p>
-          ) : null}
-        </div>
+      {exhausted && !tenant.on_demand_usage_enabled && !usage.isBeta ? (
+        <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
+          Included units used. Enable on-demand or switch package.
+        </p>
       ) : null}
 
       <section className="mt-8 rounded-2xl border border-line bg-surface p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-              Prepaid balance
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Minutes left</p>
+            <p className="mt-2 font-display text-3xl tracking-tight text-ink sm:text-4xl">
+              {minutesLeft.toLocaleString("en-KE")}
             </p>
-            <p
-              className={[
-                "mt-2 font-display text-3xl tracking-tight sm:text-4xl",
-                !usage.isBeta && usage.lowBalance ? "text-warn" : "text-ink",
-              ].join(" ")}
-            >
-              KES {usage.walletBalanceKes.toLocaleString("en-KE")}
-            </p>
-            <p className="mt-2 text-sm text-ink-soft">
-              {usage.isBeta ? "Metered. No charges during beta." : "Line fee and call minutes"}
-            </p>
+            <p className="mt-2 text-sm text-ink-soft">{packLabel}</p>
           </div>
           <dl className="grid min-w-[12rem] gap-4 sm:grid-cols-2">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">
-                {usage.isBeta ? "Est. month" : "Billed month"}
-              </dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
-                KES{" "}
-                {(usage.isBeta ? usage.estimatedCostKes : billedThisMonth).toLocaleString(
-                  "en-KE"
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">Calls</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">{usage.callsThisMonth}</dd>
-            </div>
-            <div>
               <dt className="text-xs uppercase tracking-wide text-ink-soft">Minutes</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">{usage.minutesThisMonth}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">Line fee</dt>
               <dd className="mt-1 text-lg font-semibold text-ink">
-                KES {usage.lineFeeKes.toLocaleString("en-KE")}
+                {bucketLabel(pack.minutesUsed, pack.minutesIncluded)}
               </dd>
             </div>
-            {hasSmsMeter ? (
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-ink-soft">SMS</dt>
-                <dd className="mt-1 text-lg font-semibold text-ink">
-                  {smsUsed.toLocaleString("en-KE")} / {smsIncluded.toLocaleString("en-KE")}
-                </dd>
-              </div>
-            ) : null}
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">SMS</dt>
+              <dd className="mt-1 text-lg font-semibold text-ink">
+                {bucketLabel(pack.smsUsed, pack.smsIncluded)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">Email</dt>
+              <dd className="mt-1 text-lg font-semibold text-ink">
+                {bucketLabel(pack.emailUsed, pack.emailIncluded)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">WhatsApp</dt>
+              <dd className="mt-1 text-lg font-semibold text-ink">
+                {bucketLabel(pack.waUsed, pack.waIncluded)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-soft">Seats</dt>
+              <dd className="mt-1 text-lg font-semibold text-ink">
+                {bucketLabel(pack.seatsUsed, pack.seatsIncluded)}
+              </dd>
+            </div>
           </dl>
         </div>
 
-        <dl className="mt-8 grid gap-3 border-t border-line pt-6 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+        <dl className="mt-8 grid gap-3 border-t border-line pt-6 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="text-ink-soft">Inbound</dt>
-            <dd className="mt-1 font-medium text-ink">
-              KES {WALLET_RATE_KES_PER_MINUTE}/min
-            </dd>
+            <dd className="mt-1 font-medium text-ink">KES {inboundMin}/min</dd>
           </div>
           <div>
-            <dt className="text-ink-soft">Live transfer</dt>
-            <dd className="mt-1 font-medium text-ink">
-              KES {WALLET_TRANSFER_RATE_KES_PER_MINUTE}/min
-            </dd>
+            <dt className="text-ink-soft">Outbound</dt>
+            <dd className="mt-1 font-medium text-ink">KES {outboundMin}/min</dd>
           </div>
           <div>
-            <dt className="text-ink-soft">Line rental</dt>
-            <dd className="mt-1 font-medium text-ink">
-              KES {WALLET_LINE_FEE_KES_PER_MONTH.toLocaleString("en-KE")}/mo
-            </dd>
+            <dt className="text-ink-soft">WhatsApp</dt>
+            <dd className="mt-1 font-medium text-ink">KES {pack.rates.whatsappKes}</dd>
           </div>
           <div>
-            <dt className="text-ink-soft">Call charges</dt>
+            <dt className="text-ink-soft">SMS / email</dt>
             <dd className="mt-1 font-medium text-ink">
-              KES {usage.callChargesKes.toLocaleString("en-KE")}
+              KES {pack.rates.smsKes} / {pack.rates.emailKes}
             </dd>
           </div>
         </dl>
@@ -206,9 +171,6 @@ export default async function WalletPage({
         <OnDemandUsagePanel
           tenantId={tenant.id}
           enabled={Boolean(tenant.on_demand_usage_enabled)}
-          isBeta={usage.isBeta}
-          walletBalanceKes={usage.walletBalanceKes}
-          lowThresholdKes={lowThreshold}
         />
       </div>
 

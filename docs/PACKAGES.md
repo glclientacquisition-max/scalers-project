@@ -1,7 +1,7 @@
 # Package entitlements
 
-**Status:** Super Admin catalog at `/admin/packages` (username + access code). Voice consume and owner checkout later.  
-**Lanes:** Ops & Billing (numbers, Admin). Platform (columns/RPCs).
+**Status:** Super Admin catalog at `/admin/packages` (username + access code). Owner Usage and Home read remaining buckets. Voice consume and owner checkout later.  
+**Lanes:** Ops & Billing (numbers, Admin). Platform (columns/RPCs). Desk (Usage, Home).
 
 A package is a set of **included counters** written onto the tenant. Enforcement is one consume RPC per bucket. Assigning "Starter = 500 SMS + 100 emails + 5 seats" is a write of those numbers, not a new send path.
 
@@ -33,6 +33,6 @@ Seats are login accounts (`tenant_members`), not People directory rows (`team_di
 
 - Owner M-Pesa pack checkout
 - `consume_email_units` or invite-time seat check
-- Email or seat rows on the Wallet page
+- Prepaid column drop
 
 SQL: [`docs/supabase/package_entitlements.sql`](./supabase/package_entitlements.sql), [`package_catalog.sql`](./supabase/package_catalog.sql). SMS enforcement: [`sms_allowance.sql`](./supabase/sms_allowance.sql). Super Admin: `/admin/packages` after the existing username + access code.

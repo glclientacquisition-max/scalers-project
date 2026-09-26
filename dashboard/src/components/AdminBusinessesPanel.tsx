@@ -41,7 +41,8 @@ export function AdminBusinessesPanel({
       (b) =>
         b.business_name.toLowerCase().includes(q) ||
         b.sautikit_virtual_number.toLowerCase().includes(q) ||
-        b.whatsapp_notification_number.toLowerCase().includes(q)
+        b.whatsapp_notification_number.toLowerCase().includes(q) ||
+        (b.package_name || "").toLowerCase().includes(q)
     );
   }, [businesses, query]);
 
@@ -145,11 +146,12 @@ export function AdminBusinessesPanel({
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
 
       <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
-        <table className="w-full min-w-[860px] text-left text-sm">
+        <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="bg-[var(--bg-deep)]/70 text-ink-soft">
             <tr>
               <th className="px-4 py-3 font-medium">Business</th>
               <th className="px-4 py-3 font-medium">Phone number</th>
+              <th className="px-4 py-3 font-medium">Package</th>
               <th className="px-4 py-3 font-medium">Wallet</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Actions</th>
@@ -158,7 +160,7 @@ export function AdminBusinessesPanel({
           <tbody>
             {pageRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-ink-soft">
+                <td colSpan={6} className="px-4 py-10 text-center text-ink-soft">
                   No businesses match.
                 </td>
               </tr>
@@ -166,6 +168,9 @@ export function AdminBusinessesPanel({
               pageRows.map((b) => {
                 const waiting = b.status === "waiting";
                 const kes = Number(b.wallet_balance_kes ?? b.telecom_wallet_balance_kes ?? 0);
+                const packLabel = b.package_name
+                  ? `${b.package_name}${b.package_period ? ` / ${b.package_period}` : ""}`
+                  : "None";
                 return (
                   <tr key={b.id} className="border-t border-line/70 align-top hover:bg-accent-soft/40">
                     <td className="px-4 py-3">
@@ -181,6 +186,7 @@ export function AdminBusinessesPanel({
                         b.sautikit_virtual_number
                       )}
                     </td>
+                    <td className="px-4 py-3">{packLabel}</td>
                     <td className="px-4 py-3 text-xs leading-relaxed">
                       <p>KES {kes.toLocaleString("en-KE")}</p>
                     </td>
