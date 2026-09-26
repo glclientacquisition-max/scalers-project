@@ -85,6 +85,48 @@ export function parseCount(raw: unknown): number | null {
   return n;
 }
 
+export function minutesUsedFromSeconds(seconds: number): number {
+  return Math.ceil(Math.max(0, Number(seconds) || 0) / 60);
+}
+
+export function remainingCount(included: number, used: number): number {
+  return Math.max(0, Math.floor(Number(included) || 0) - Math.max(0, Number(used) || 0));
+}
+
+export type OwnerPackageMeter = {
+  packageName: string | null;
+  period: "month" | "year" | null;
+  minutesIncluded: number;
+  minutesUsed: number;
+  smsIncluded: number;
+  smsUsed: number;
+  emailIncluded: number;
+  emailUsed: number;
+  waIncluded: number;
+  waUsed: number;
+  seatsIncluded: number;
+  seatsUsed: number;
+  rates: BillingRateCard;
+};
+
+export function emptyOwnerPackageMeter(): OwnerPackageMeter {
+  return {
+    packageName: null,
+    period: null,
+    minutesIncluded: 0,
+    minutesUsed: 0,
+    smsIncluded: 0,
+    smsUsed: 0,
+    emailIncluded: 0,
+    emailUsed: 0,
+    waIncluded: 0,
+    waUsed: 0,
+    seatsIncluded: 0,
+    seatsUsed: 0,
+    rates: { ...DEFAULT_RATES },
+  };
+}
+
 export function inboundKesForSeconds(seconds: number, kesPerSecond = 0.05): number {
   const secs = Math.max(0, Math.ceil(Number(seconds) || 0));
   return Math.round(secs * Number(kesPerSecond) * 100) / 100;
@@ -143,15 +185,7 @@ export async function loadPackageCatalog(): Promise<PackageCatalog> {
   if (subsRes.error) throw subsRes.error;
   if (tenantsRes.error) throw tenantsRes.error;
 
-  const rateRow = ratesRes.data || {};
-  const rates: BillingRateCard = {
-    inboundKesPerSecond: num(rateRow.inbound_kes_per_second, DEFAULT_RATES.inboundKesPerSecond),
-    outboundKesPerSecond: num(rateRow.outbound_kes_per_second, DEFAULT_RATES.outboundKesPerSecond),
-    whatsappKes: num(rateRow.whatsapp_kes, DEFAULT_RATES.whatsappKes),
-    smsKes: num(rateRow.sms_kes, DEFAULT_RATES.smsKes),
-    emailKes: num(rateRow.email_kes, DEFAULT_RATES.emailKes),
-    annualDiscountPercent: num(rateRow.annual_discount_percent, DEFAULT_RATES.annualDiscountPercent),
-  };
+  const rates = mapRates(ratesRes.data || {});
 
   const packages = (packsRes.data || []).map((row) => mapPackage(row as Record<string, unknown>));
   const subByTenant = new Map(
@@ -210,6 +244,103 @@ export async function saveBillingPackage(pack: BillingPackage): Promise<void> {
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+}
+
+function mapRates(rateRow: Record<string, unknown>): BillingRateCard {
+  return {
+    inboundKesPerSecond: num(rateRow.inbound_kes_per_second, DEFAULT_RATES.inboundKesPerSecond),
+    outboundKesPerSecond: num(rateRow.outbound_kes_per_second, DEFAULT_RATES.outboundKesPerSecond),
+    whatsappKes: num(rateRow.whatsapp_kes, DEFAULT_RATES.whatsappKes),
+    smsKes: num(rateRow.sms_kes, DEFAULT_RATES.smsKes),
+    emailKes: num(rateRow.email_kes, DEFAULT_RATES.emailKes),
+    annualDiscountPercent: num(rateRow.annual_discount_percent, DEFAULT_RATES.annualDiscountPercent),
+  };
+}
+
+export async function loadBusinessPackageNames(): Promise<
+  Map<string, { packageName: string; period: "month" | "year" }>
+> {
+  const admin = getSupabaseAdmin();
+  const [subsRes, packsRes] = await Promise.all([
+    admin.from("tenant_subscriptions").select("tenant_id, package_id, period"),
+    admin.from("billing_packages").select("id, name"),
+  ]);
+  if (subsRes.error && isMissingCatalog(subsRes.error.message)) return new Map();
+  if (packsRes.error && isMissingCatalog(packsRes.error.message)) return new Map();
+  if (subsRes.error) throw subsRes.error;
+  if (packsRes.error) throw packsRes.error;
+  const names = new Map((packsRes.data || []).map((row) => [String(row.id), String(row.name || "")]));
+  const out = new Map<string, { packageName: string; period: "month" | "year" }>();
+  for (const row of subsRes.data || []) {
+    const period = row.period === "year" ? "year" : row.period === "month" ? "month" : null;
+    const packageName = names.get(String(row.package_id)) || null;
+    if (!period || !packageName) continue;
+    out.set(String(row.tenant_id), { packageName, period });
+  }
+  return out;
+}
+
+export async function loadOwnerPackageMeter(tenantId: string): Promise<OwnerPackageMeter> {
+  const empty = emptyOwnerPackageMeter();
+  if (!tenantId) return empty;
+  try {
+    const admin = getSupabaseAdmin();
+    const [tenantRes, subRes, ratesRes, seatsRes] = await Promise.all([
+      admin
+        .from("tenants")
+        .select(
+          "minutes_included, seconds_used, sms_included_units, sms_used_units, email_included_units, email_used_units, whatsapp_included_units, whatsapp_used_units, seat_included"
+        )
+        .eq("id", tenantId)
+        .maybeSingle(),
+      admin.from("tenant_subscriptions").select("package_id, period").eq("tenant_id", tenantId).maybeSingle(),
+      admin.from("billing_rate_card").select("*").eq("id", 1).maybeSingle(),
+      admin.from("tenant_members").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    ]);
+
+    if (tenantRes.error && /minutes_included|seconds_used|whatsapp_|email_|seat_included/i.test(tenantRes.error.message)) {
+      return empty;
+    }
+    if (tenantRes.error) throw tenantRes.error;
+
+    const tenant = (tenantRes.data || {}) as Record<string, unknown>;
+    let packageName: string | null = null;
+    let period: "month" | "year" | null = null;
+    if (!subRes.error && subRes.data?.package_id) {
+      period = subRes.data.period === "year" ? "year" : subRes.data.period === "month" ? "month" : null;
+      const packRes = await admin
+        .from("billing_packages")
+        .select("name")
+        .eq("id", subRes.data.package_id)
+        .maybeSingle();
+      if (!packRes.error) packageName = packRes.data?.name ? String(packRes.data.name) : null;
+    }
+
+    const rates =
+      ratesRes.error && isMissingCatalog(ratesRes.error.message)
+        ? { ...DEFAULT_RATES }
+        : ratesRes.error
+          ? { ...DEFAULT_RATES }
+          : mapRates((ratesRes.data || {}) as Record<string, unknown>);
+
+    return {
+      packageName,
+      period,
+      minutesIncluded: num(tenant.minutes_included),
+      minutesUsed: minutesUsedFromSeconds(num(tenant.seconds_used)),
+      smsIncluded: num(tenant.sms_included_units),
+      smsUsed: num(tenant.sms_used_units),
+      emailIncluded: num(tenant.email_included_units),
+      emailUsed: num(tenant.email_used_units),
+      waIncluded: num(tenant.whatsapp_included_units),
+      waUsed: num(tenant.whatsapp_used_units),
+      seatsIncluded: num(tenant.seat_included),
+      seatsUsed: seatsRes.count ?? 0,
+      rates,
+    };
+  } catch {
+    return empty;
+  }
 }
 
 export async function assignBusinessPackage(opts: {

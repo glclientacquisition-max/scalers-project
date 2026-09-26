@@ -16,9 +16,6 @@ export function OnDemandUsagePanel({
 }: {
   tenantId: string;
   enabled: boolean;
-  isBeta: boolean;
-  walletBalanceKes: number;
-  lowThresholdKes: number;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveOnDemandUsage, initial);
@@ -53,7 +50,7 @@ export function OnDemandUsagePanel({
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span className="text-ink">
-            Continue after prepaid minutes or included SMS hit zero
+            Continue after included minutes, SMS, email, or WhatsApp hit zero
           </span>
         </label>
 

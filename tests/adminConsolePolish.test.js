@@ -123,6 +123,8 @@ describe("admin console polish", () => {
     assert.doesNotMatch(panel, /lg:hidden/);
     assert.match(panel, /Assign next number/);
     assert.match(panel, /Adjust wallet/);
+    assert.match(panel, />Package</);
+    assert.match(panel, /b\.package_name/);
   });
 
   it("lists DID pool rows in one dense table", () => {

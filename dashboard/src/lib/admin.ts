@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { listDidPool, listPendingTenants, type DidPoolRow, type PendingTenant } from "@/lib/didPool";
+import { loadBusinessPackageNames } from "@/lib/packageCatalog";
 import { resolveWalletBalanceKes } from "@/lib/wallet";
 
 export type AdminBusiness = {
@@ -15,6 +16,8 @@ export type AdminBusiness = {
   telecom_wallet_balance_kes: number | null;
   /** @deprecated */
   ai_wallet_balance_usd: number | null;
+  package_name: string | null;
+  package_period: "month" | "year" | null;
   status: "active" | "waiting" | "archived";
 };
 
@@ -80,17 +83,21 @@ export async function listBusinesses(): Promise<AdminBusiness[]> {
   }
 
   if (error) throw error;
+  const packages = await loadBusinessPackageNames();
   return (data || []).map((row) => {
     const wallet = resolveWalletBalanceKes({
       walletKes: row.wallet_balance_kes,
       telecomKes: row.telecom_wallet_balance_kes,
       aiUsd: row.ai_wallet_balance_usd,
     });
+    const pack = packages.get(String(row.id));
     return {
       ...row,
       wallet_balance_kes: wallet,
       telecom_wallet_balance_kes: wallet,
       ai_wallet_balance_usd: 0,
+      package_name: pack?.packageName || null,
+      package_period: pack?.period || null,
       status: businessStatus(row),
     } as AdminBusiness;
   });

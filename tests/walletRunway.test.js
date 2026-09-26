@@ -37,16 +37,18 @@ describe("wallet runway", () => {
     assert.match(wallet, /const isBeta = isBetaBilling\(billingEnforcement\)/);
   });
 
-  it("hides the Wallet section and Top up for beta workspaces", () => {
+  it("keeps prepaid runway math on the wallet helper only", () => {
     assert.match(home, /isBetaBilling\(tenant\.billing_enforcement\)/);
-    assert.match(home, /const lowWallet = !isBeta && kes < 200/);
-    assert.match(home, /\{!isBeta \? \(/);
+    assert.doesNotMatch(home, /getWalletRunwayDays/);
+    assert.doesNotMatch(home, /walletRunwayLabel/);
+    assert.doesNotMatch(home, /lowWallet/);
   });
 
-  it("renders the pace caption under the balance", () => {
-    assert.match(home, /getWalletRunwayDays\(client, tenant\.id, kes\)/);
-    assert.match(home, /const runway = walletRunwayLabel\(runwayDays\)/);
-    assert.match(home, /\{runway \? \(/);
+  it("renders remaining minutes on Home from the package meter", () => {
+    assert.match(home, /loadOwnerPackageMeter\(tenant\.id\)/);
+    assert.match(home, /remainingCount\(pack\.minutesIncluded, pack\.minutesUsed\)/);
+    assert.match(home, /min left/);
+    assert.match(home, /aria-label="Usage"/);
   });
 
   it("renders the owner ledger as a dense table", () => {
