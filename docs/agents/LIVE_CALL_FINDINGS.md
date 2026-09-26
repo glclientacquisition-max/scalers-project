@@ -1,3 +1,35 @@
+# Staging DID review — `HD_0ef68f8e7930` (2026-09-25 17:57Z)
+
+SHA `df462cb` (`#426` on Railway staging Voice). 144s. Caller `+254790381872` → `+254709221536`. Recording URL empty. Score from desk transcript + `spoken=` + `[voice-timing]`.
+
+Greeting: `caller speed scale=1`, `speed=1`, `connect_to_greeting_pcm_ms=674`, `cached=0`. Instant closed-hours opener. No leak labels. No `Al-vin`. Every later `begin` stayed `speed=1`. Filler warmup logged `Mm-hmm` / `Sawa` / `Poa` with `silent: true` (not on the wire).
+
+| ID | Result | Evidence |
+| --- | --- | --- |
+| V1 | pass | Sentence flushes. No fragment restart. |
+| V2 | pass | Tiny acks were warmup, not their own caller-facing turn. |
+| V3 | pass | `spoken="Nice to speak with you, Alvin."` |
+| V4 | pass | `8 A M` is the AM spoken form. |
+| V5 | pass | `How are you doing, Shy?` → `outcome=phatic`, no thinking-ack. First turn STT was `Uh, woke up, Shy.` so the matcher never saw how-are-you. |
+| V6 | pass | `idle_nudge` after the caller had spoken; line was `How can I help?` |
+| V7 | pass | `filler=1` on one turn only. |
+| V8 | pass | Scale 1 for the whole call. Caller did not ask faster. |
+| V9 | pass | Barge cancelled the in-flight line. |
+| B2 | note | `Alvin is the name.` then `Okay. May I have your name?` Brain. |
+| B3 | note | `Takeyour time, Alvin.` Brain holding line. |
+
+**Voice fail on this SID:** Gemini stream dropped the space after the first word. Wire spoke `Ican` / `Youhave` / `Itis` / `Understood,Alvin` / `Takeyour` / `Iam`. Fix: `joinSpokenPieces` in the stream buffer plus `polishPunctuation` repair.
+
+## Confirm — `HD_bc9f610692de` (2026-09-25 18:14Z)
+
+SHA `ea0350b` on staging Voice. 72s. Same caller and DID. Owner confirmed on the phone. Recording URL empty.
+
+`caller speed scale=1`. Every `begin` is `speed=1`. `connect_to_greeting_pcm_ms=804`. `How are you doing, Shy?` → `outcome=phatic`. Wire has spaces: `I am doing well`, `I can still help you`, `Thank you, Alvin`. No `Ican` / `Youhave` / `Al-vin` / leak labels.
+
+Brain leftover: `What are my bookings?` hit speech-guarantee `Okay. May I have your name?` after the name was already in. Not a Voice retune.
+
+---
+
 # Instruction labels spoken aloud — `HD_ff24acf5207d` (2026-09-25)
 
 Staging DID `+254709221536`, SHA `ba5b53f` (`cursor/ticket-done-sms-ping-679d`, not first-forward). After a truncated closer, Gemini spoke control text:
@@ -6,7 +38,7 @@ Staging DID `+254709221536`, SHA `ba5b53f` (`cursor/ticket-done-sms-ping-679d`, 
 
 Desk transcript stored the same block. Later turns copied the format because raw `geminiParts` went back into history.
 
-Fix: `src/speech/spokenInstructionLeak.js` strips those labels before TTS (`spokenStreamBuffer`, `prepareForTts`) and before Gemini history (`geminiVoice` clone). Prompt forbids reciting the tags.
+Fix: `src/speech/spokenInstructionLeak.js` strips those labels before TTS (`spokenStreamBuffer`, `prepareForTts`) and before Gemini history (`geminiVoice` clone). Prompt forbids reciting the tags. Follow-up: also strip `Speak this spelling once`, `VISIT COMMIT`, and `Name said` / `the caller said` narration. `You said` / `I said` stay.
 
 ---
 
@@ -146,7 +178,7 @@ Follow-up from the owner: on the `a2c0c86c` call the caller asked "slower" / "po
 
 Default-speed guarantees (owner ask: normal speed stays the default, consistently):
 
-- Every call starts at scale 1 — the scale is per-connection state in the media handler, so a slowed pace never leaks into the next call.
+- Every call starts at scale 1. Greeting forces `ttsSpeedScale = 1` again so a faster ask cannot ride the next answer. "Increase the speed" / "go faster" step the same as "faster".
 - Scale 1 is exactly the profile speed (`speedEn`/`speedSw`, both 1.0 on balanced); the wire sends the identical value as before this feature.
 - The scale only moves on an explicit caller request and holds steady between them; one stream keeps one speed, so a sentence never changes pace mid-utterance.
 - "slower" then "faster" returns to exactly 1; "normal speed" / "kama kawaida" resets to 1 from any step.

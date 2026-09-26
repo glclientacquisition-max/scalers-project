@@ -16,7 +16,7 @@
 
 **Next to return.** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one truncated reason (`deskPreviewClass`). Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link. On phone (`lg:hidden`) it is a compact row under Work. At `lg` it is the left-column card (`hidden lg:block`).
 
-**Updates.** Same `DailyBulletinPanel` as Profile `?tab=updates`. Callers hear, duration, Post update, Clear. Writes `daily_bulletin` through `bulletinActions`. Always on Home after Work (and Next to return when that row exists). Not a second persist path. Post update stays filled and docked to the field.
+**Updates.** Same `DailyBulletinPanel` as Profile `?tab=updates`. Callers hear, Until chips (Tonight · Tomorrow night · I clear it · Pick), Post update, Clear. Pick uses From Now / Later plus date and time fields (not `datetime-local`). One preview line states the window. Writes `daily_bulletin` `starts_at` / `ends_at` through `bulletinActions`. Callers hear a row only after start and before end (`isBulletinLive`). Scheduled rows stay on the desk list. Always on Home after Work (and Next to return when that row exists). Not a second persist path. Post update stays filled and docked to the field.
 
 **One blue action per screen.** The aside CTA is the work primary. Next to return uses a ghost WhatsApp button (green glyph). Post update is the Updates primary, docked to Callers hear.
 

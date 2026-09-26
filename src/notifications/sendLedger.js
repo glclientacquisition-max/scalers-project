@@ -270,7 +270,7 @@ async function beginInstanceSend(ledger, to) {
     releaseInstanceFlight(flight.key);
     return { ok: false, reason: 'table_missing', key: null };
   }
-  if (prior.delivered) {
+  if (prior.delivered && !ledger.force) {
     releaseInstanceFlight(flight.key);
     return { ok: false, reason: 'instance_already_sent', key: null };
   }

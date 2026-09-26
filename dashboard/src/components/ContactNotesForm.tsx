@@ -7,6 +7,7 @@ import {
   settingsFieldClass,
   settingsPrimaryButtonClass,
 } from "@/components/settingsUi";
+import { deskShiftClass, focusRingVisible } from "@/components/ui/deskChrome";
 
 export function ContactNotesForm({
   contactId,
@@ -16,6 +17,7 @@ export function ContactNotesForm({
   initial: string;
 }) {
   const [notes, setNotes] = useState(initial);
+  const [open, setOpen] = useState(Boolean(String(initial || "").trim()));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -28,29 +30,42 @@ export function ContactNotesForm({
   }
 
   return (
-    <form
-      className="space-y-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        save();
-      }}
-    >
-      <label htmlFor="contact-notes" className="text-xs font-medium uppercase tracking-wide text-ink-soft">
-        Notes
-      </label>
-      <textarea
-        id="contact-notes"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={2}
-        maxLength={2000}
-        className={`${settingsFieldClass} leading-relaxed`}
-        {...compactTextareaExpandHandlers}
-      />
-      <button type="submit" disabled={pending} className={settingsPrimaryButtonClass}>
-        Save
+    <section data-contact-notes="">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className={`flex min-h-11 w-full items-center justify-between text-left text-xs font-medium uppercase tracking-wide text-ink-soft ${deskShiftClass} ${focusRingVisible} rounded-xl`}
+      >
+        <span>Notes</span>
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
       </button>
-      {error ? <p className="text-sm text-warn">{error}</p> : null}
-    </form>
+      {open ? (
+        <form
+          className="mt-3 space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save();
+          }}
+        >
+          <label htmlFor="contact-notes" className="sr-only">
+            Notes
+          </label>
+          <textarea
+            id="contact-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            maxLength={2000}
+            className={`${settingsFieldClass} leading-relaxed`}
+            {...compactTextareaExpandHandlers}
+          />
+          <button type="submit" disabled={pending} className={settingsPrimaryButtonClass}>
+            Save
+          </button>
+          {error ? <p className="text-sm text-warn">{error}</p> : null}
+        </form>
+      ) : null}
+    </section>
   );
 }

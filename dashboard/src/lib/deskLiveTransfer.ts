@@ -6,11 +6,9 @@ export function deskLiveTransferExecutorEnabled(
   return /^(1|true|on|yes)$/i.test(String(raw || "").trim());
 }
 
-export function handoffComingSoonLine(name?: string | null): string {
+export function handoffMessageLine(name?: string | null): string {
   const who = String(name || "").trim();
-  return who
-    ? `Coming soon. Today we message ${who}.`
-    : "Coming soon. Today we message a teammate.";
+  return who ? `Messages ${who}.` : "Messages a teammate.";
 }
 
 export function liveConnectReasonLabel(reason: string): string {

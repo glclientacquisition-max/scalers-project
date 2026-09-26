@@ -3,6 +3,7 @@
 
 const assert = require('assert');
 const {
+  joinSpokenPieces,
   stripMarkersForSpeech,
   splitSpeakableChunks,
   createSpokenStreamBuffer,
@@ -20,6 +21,26 @@ function test(name, fn) {
     process.exitCode = 1;
   }
 }
+
+console.log('joinSpokenPieces');
+test('inserts a space when Gemini drops it between words', () => {
+  assert.strictEqual(joinSpokenPieces('I', 'can help with that, Alvin.'), 'I can help with that, Alvin.');
+  assert.strictEqual(joinSpokenPieces('You', 'have a carpet cleaning visit.'), 'You have a carpet cleaning visit.');
+  assert.strictEqual(joinSpokenPieces('Understood,', 'Alvin.'), 'Understood, Alvin.');
+  assert.strictEqual(joinSpokenPieces('I ', 'can help'), 'I can help');
+  assert.strictEqual(joinSpokenPieces('Hello.', ' How are you?'), 'Hello. How are you?');
+  assert.strictEqual(joinSpokenPieces('Carpet cle', 'aning ranges'), 'Carpet cleaning ranges');
+});
+
+test('HD_0ef68f8e7930 stream deltas speak with spaces', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [
+    ...buf.push('I'),
+    ...buf.push('can help with that, Alvin.'),
+    ...buf.finish(),
+  ];
+  assert.deepStrictEqual(emitted, ['I can help with that, Alvin.']);
+});
 
 console.log('stripMarkersForSpeech');
 test('removes complete tool blocks', () => {
@@ -159,6 +180,39 @@ test('does not speak ASR_CORRECTION_PROMPT / RETOTI / NP_FALSE from HD_ff24acf52
   assert.doesNotMatch(joined, /ASR_CORRECTION_PROMPT|RETOTI|NP_FALSE|truncated or quiet|repeat gently/i);
   assert.match(joined, /Sawa, Alvin/);
   assert.match(joined, /Tunashukuru sana/);
+});
+
+test('does not speak Speak this spelling / VISIT COMMIT / Alvin said', () => {
+  const buf = createSpokenStreamBuffer();
+  const leaked =
+    'Speak this spelling once in the next line. VISIT COMMIT (think this; never say it as a script): Alvin said they want carpet cleaning.';
+  const emitted = [...buf.push(leaked), ...buf.finish()];
+  const joined = emitted.join(' ');
+  assert.doesNotMatch(
+    joined,
+    /Speak this spelling|VISIT COMMIT|think this|never say it as a script|Alvin said/i
+  );
+  assert.match(joined, /they want carpet cleaning/i);
+});
+
+test('keeps You said and I said confirmations', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [
+    ...buf.push('You said Thursday. I said ten.'),
+    ...buf.finish(),
+  ];
+  const joined = emitted.join(' ');
+  assert.match(joined, /You said Thursday/);
+  assert.match(joined, /I said ten/);
+});
+
+test('holds an incomplete Speak this suffix while streaming', () => {
+  const buf = createSpokenStreamBuffer();
+  assert.deepStrictEqual(buf.push('Sawa. Speak this spell'), []);
+  const emitted = [...buf.push('ing once. Thursday works.'), ...buf.finish()];
+  const joined = emitted.join(' ');
+  assert.doesNotMatch(joined, /Speak this spelling/i);
+  assert.match(joined, /Thursday works/);
 });
 
 test('holds an incomplete ASR_ label until the token finishes', () => {

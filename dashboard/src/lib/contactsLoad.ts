@@ -14,6 +14,10 @@ import {
   type ContactTimelineEntry,
 } from "@/lib/contactPersonFile";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
+import {
+  contactFavouriteAt,
+  isContactFavourite,
+} from "@/lib/contactFavourite";
 
 export type { ContactTimelineEntry } from "@/lib/contactPersonFile";
 
@@ -52,14 +56,21 @@ export function pickLastContactAt(
   return maxIso(byPhone || null, byContactId || null) || updatedAt || null;
 }
 
-export type ContactSavedFilter = "all" | "saved" | "unsaved" | "recent";
+export type ContactSavedFilter =
+  | "all"
+  | "saved"
+  | "unsaved"
+  | "recent"
+  | "favourite";
 export type ContactSort = "recent" | "name";
 
 export function resolveContactSavedFilter(
   raw?: string | null
 ): ContactSavedFilter {
   const value = String(raw || "all").toLowerCase();
-  if (value === "saved" || value === "unsaved" || value === "recent") return value;
+  if (value === "saved" || value === "unsaved" || value === "recent" || value === "favourite") {
+    return value;
+  }
   return "all";
 }
 
@@ -81,6 +92,66 @@ export function contactsHref(opts: {
   if (opts.page && opts.page > 1) q.set("page", String(opts.page));
   const qs = q.toString();
   return qs ? `/contacts?${qs}` : "/contacts";
+}
+
+/** Recents filter. Same chip row as All. */
+export function contactsRecentsHref(opts: {
+  sort?: ContactSort;
+  q?: string;
+  page?: number;
+}): string {
+  return contactsHref({ ...opts, saved: "recent" });
+}
+
+/** Favourites filter. Same chip row as All. */
+export function contactsFavouritesHref(opts: {
+  sort?: ContactSort;
+  q?: string;
+  page?: number;
+}): string {
+  return contactsHref({ ...opts, saved: "favourite" });
+}
+
+/** One Contacts filter row. Recents and Favourites live here. Unsaved once. */
+export function contactFilterPills(opts: {
+  sort?: ContactSort;
+  q?: string;
+  recents?: number;
+  favourites?: number;
+  unsaved?: number;
+}): Array<{
+  id: ContactSavedFilter;
+  label: string;
+  href: string;
+  count?: number;
+}> {
+  const query = { sort: opts.sort, q: opts.q };
+  return [
+    { id: "all", label: "All", href: contactsHref(query) },
+    {
+      id: "recent",
+      label: "Recents",
+      href: contactsRecentsHref(query),
+      count: opts.recents,
+    },
+    {
+      id: "favourite",
+      label: "Favourites",
+      href: contactsFavouritesHref(query),
+      count: opts.favourites,
+    },
+    {
+      id: "saved",
+      label: "Saved",
+      href: contactsHref({ ...query, saved: "saved" }),
+    },
+    {
+      id: "unsaved",
+      label: "Unsaved",
+      href: contactsHref({ ...query, saved: "unsaved" }),
+      count: opts.unsaved,
+    },
+  ];
 }
 
 export type ContactsListReturn = {
@@ -127,13 +198,22 @@ export function isUnsavedContactName(name?: string | null): boolean {
   return !String(name || "").trim();
 }
 
-/** List subline: Unsaved, phone, or last call. Never hangup copy or presence. */
+/** Primary list text: saved name, or the phone when unnamed. */
+export function contactListTitle(row: {
+  name?: string | null;
+  phone?: string | null;
+}): string {
+  if (!isUnsavedContactName(row.name)) return String(row.name || "").trim();
+  return String(row.phone || "").trim() || "No phone";
+}
+
+/** List subline: Unknown caller, phone, or last call. Never hangup copy or presence. */
 export function contactListSubline(row: {
   name?: string | null;
   phone?: string | null;
   lastContactAt?: string | null;
 }): string {
-  if (isUnsavedContactName(row.name)) return "Unsaved";
+  if (isUnsavedContactName(row.name)) return "Unknown caller";
   const phone = String(row.phone || "").trim();
   if (phone) return phone;
   if (row.lastContactAt) return formatCallWhenRelative(row.lastContactAt);
@@ -340,6 +420,8 @@ export async function loadContactsPage(
     listedQuery = listedQuery.not("name", "is", null).neq("name", "");
   } else if (saved === "unsaved") {
     listedQuery = listedQuery.or("name.is.null,name.eq.");
+  } else if (saved === "favourite") {
+    listedQuery = listedQuery.not("metadata->>favourite_at", "is", null);
   }
   if (searchOr) listedQuery = listedQuery.or(searchOr);
   listedQuery =
@@ -363,11 +445,49 @@ export async function loadContactsPage(
   }
 
   const extras = await loadLastContactMap(client, tenantId, contacts);
-  const rows = decorateContactRows(contacts, extras);
-  if (sort === "recent") {
+  const rows = decorateContactRows(contacts, extras).filter((row) =>
+    saved !== "favourite" ? true : isContactFavourite(row.metadata)
+  );
+  if (saved === "favourite" && sort === "recent") {
+    rows.sort((a, b) => {
+      const at = contactFavouriteAt(a.metadata) || "";
+      const bt = contactFavouriteAt(b.metadata) || "";
+      if (at !== bt) return at < bt ? 1 : -1;
+      return compareContactRows(a, b, "recent");
+    });
+  } else if (sort === "recent") {
     rows.sort((a, b) => compareContactRows(a, b, "recent"));
   }
   return { rows, total, error: null };
+}
+
+export async function loadContactPileCounts(
+  client: SupabaseClient,
+  tenantId: string
+): Promise<{ recents: number; favourites: number; unsaved: number }> {
+  const [recent, favourites, unsaved] = await Promise.all([
+    client
+      .from("calls")
+      .select("caller_number")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    client
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .not("metadata->>favourite_at", "is", null),
+    client
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .or("name.is.null,name.eq."),
+  ]);
+  return {
+    recents: uniqueRecentCallerPhones(recent.data || []).length,
+    favourites: favourites.count ?? 0,
+    unsaved: unsaved.count ?? 0,
+  };
 }
 
 async function loadLastContactMap(

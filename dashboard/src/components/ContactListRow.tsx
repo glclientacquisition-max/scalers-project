@@ -1,5 +1,6 @@
 import { CallLink } from "@/components/CallLink";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { ContactNameForm } from "@/components/ContactNameForm";
 import { DeskLandSurface } from "@/components/ui/DeskLand";
 import { RowIdentity } from "@/components/ui/deskRow";
 import {
@@ -15,6 +16,8 @@ import {
 import { formatCallWhenRelative } from "@/lib/callsTriage";
 import {
   contactListSubline,
+  contactListTitle,
+  isUnsavedContactName,
   type ContactListRow as ContactListRowData,
 } from "@/lib/contactsLoad";
 
@@ -29,10 +32,6 @@ function ContactListDock({ phone }: { phone: string | null }) {
   );
 }
 
-function contactTitle(row: ContactListRowData): string {
-  return row.name?.trim() || "Unknown";
-}
-
 function lastCallStamp(row: ContactListRowData): string | null {
   return row.lastContactAt ? formatCallWhenRelative(row.lastContactAt) : null;
 }
@@ -44,9 +43,10 @@ export function ContactPhoneRow({
   row: ContactListRowData;
   href: string;
 }) {
-  const title = contactTitle(row);
+  const title = contactListTitle(row);
   const subline = contactListSubline(row);
   const lastCall = lastCallStamp(row);
+  const unsaved = isUnsavedContactName(row.name);
   return (
     <DeskLandSurface
       as="li"
@@ -69,6 +69,11 @@ export function ContactPhoneRow({
           ) : null}
         </div>
         <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>{subline}</p>
+        {unsaved ? (
+          <div className={`${deskRowActionClass} mt-1`}>
+            <ContactNameForm contactId={row.id} initialName={row.name} variant="row" />
+          </div>
+        ) : null}
       </div>
       <ContactListDock phone={row.phone} />
     </DeskLandSurface>
@@ -82,9 +87,10 @@ export function ContactTableRow({
   row: ContactListRowData;
   href: string;
 }) {
-  const title = contactTitle(row);
+  const title = contactListTitle(row);
   const subline = contactListSubline(row);
   const lastCall = lastCallStamp(row);
+  const unsaved = isUnsavedContactName(row.name);
   return (
     <DeskLandSurface
       as="tr"
@@ -99,9 +105,18 @@ export function ContactTableRow({
             <p className={`text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
               {title}
             </p>
-            <p className={`mt-0.5 text-sm text-ink-soft lg:hidden ${deskPreviewClass}`}>
+            <p
+              className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass} ${
+                unsaved ? "" : "lg:hidden"
+              }`}
+            >
               {subline}
             </p>
+            {unsaved ? (
+              <div className={`${deskRowActionClass} mt-1 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100`}>
+                <ContactNameForm contactId={row.id} initialName={row.name} variant="row" />
+              </div>
+            ) : null}
           </div>
         </div>
       </td>

@@ -19,7 +19,7 @@ This device    Appearance · Sign out
 
 Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Updates and Test stay under Assistant. Team stays under Alerts. Import stays under Knowledge.
 
-Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Profile hub keeps tabs. `DeskBack` icon, aria-label Profile (`md:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` strips are `inline-flex`, `gap-1`, content-width; they do not `justify-between` or `flex-1` across the pane. No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
+Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Profile hub keeps tabs. `DeskBack` icon, aria-label Profile (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
 Sticky Save on Catalog and Train panels, top-right of the panel header. Updates, Alerts, Import, Test, and Appearance use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
 
@@ -27,11 +27,11 @@ Bare `/settings` is the hub. lg+ hub shows Appearance in the panel. `?tab=update
 
 ## Chrome
 
-Short in-page title Profile plus compact workspace name and Line live / Number pending. Do not use `deskListTitleClass` on the hub. Muted Sign out on the hub header and in This device (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` plus a short title (Hours, Pronunciation). Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`.
+Short in-page title Profile plus compact workspace name and Line live / Number pending. Do not use `deskListTitleClass` on the hub. Muted Sign out on the hub header and in This device (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`.
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` underline tabs. Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
@@ -55,7 +55,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
 | Test | Generate preview filled plus large tel control | One filled control: Call when live, else Generate preview. The other is ghost |
-| Appearance | Three filled segment pills | System / Light / Dark underline tabs. Label **This device**. `localStorage["scalers-desk-theme"]` |
+| Appearance | Three filled segment pills | System / Light / Dark rate cards. Label **This device**. `localStorage["scalers-desk-theme"]` |
 | Sign out | Ghost, instant POST | Ghost until confirm. **Sign out?** then filled **Sign out** / ghost **Stay**. POST `/api/logout` only after confirm |
 
 Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
@@ -64,7 +64,7 @@ Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notif
 
 Scope: **this device** (browser only), **whole business** (tenant row, every owner), **assistant on calls** (after Save and train, or a live panel write that the compiler already reads).
 
-One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclusive options are `SettingsSegmented`. Four-plus exclusive are `SettingsSelect`. Destructive and session actions stay ghost until confirm.
+One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclusive options are `SettingsSegmented` rate cards. Four-plus exclusive are `SettingsSelect`. Destructive and session actions stay ghost until confirm.
 
 ### Identity (`?tab=train&panel=identity`)
 
@@ -135,8 +135,10 @@ Same `DailyBulletinPanel` as Home. One persist path (`bulletinActions` → `dail
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
 | Callers hear | input | `daily_bulletin` text | Assistant on calls |
-| Update duration | segmented (3) | bulletin `expiry` | Assistant on calls |
-| Post update | filled, docked | insert live bulletin | Assistant on calls |
+| Until | rate cards (4) | bulletin `expiry` | Assistant on calls |
+| From / Until | Now or Later, then date + time when Pick | `starts_at` / `ends_at` (EAT) | Assistant on calls after start |
+| Window preview | one line | compose only | This device |
+| Post update | filled, docked | insert bulletin | Assistant on calls |
 | Clear | ghost | expire that item | Assistant on calls |
 
 ### Test (`?tab=test`)

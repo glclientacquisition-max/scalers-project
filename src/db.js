@@ -1867,6 +1867,26 @@ async function insertNotifySend(row = {}) {
   return { ok: true, id: data?.id || null };
 }
 
+async function findNotifySendByProviderMessageId(providerMessageId) {
+  const id = String(providerMessageId || '').trim();
+  if (!id) return null;
+  const { data, error } = await supabase
+    .from('notify_sends')
+    .select('id, call_sid, kind, channel')
+    .eq('provider_message_id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (/notify_sends|does not exist|schema cache|relation/i.test(error.message || '')) {
+      return null;
+    }
+    console.warn('[db] findNotifySendByProviderMessageId:', error.message);
+    return null;
+  }
+  return data || null;
+}
+
 async function findNotifySend({ tenantId, idempotencyKey } = {}) {
   if (!tenantId || !idempotencyKey) return null;
   const { data, error } = await supabase
@@ -1947,6 +1967,7 @@ module.exports = {
   mergeCallSummaryMeta,
   insertNotifySend,
   findNotifySend,
+  findNotifySendByProviderMessageId,
   persistPlatformWhatsAppInbound,
   persistPlatformWhatsAppOutbound,
   persistWhatsAppStatus,

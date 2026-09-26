@@ -13,18 +13,18 @@ Contacts list segments still use underline `FilterTabs`. Inbox purpose already u
 
 ## Operator outcome
 
-Owner switches All / Saved / Unsaved on Contacts with the same filled-pill chrome as Inbox purpose. Opening a person file shows Call and WhatsApp once, as top icons. Honesty is unchanged.
+Owner switches All / Recents / Favourites / Saved / Unsaved on Contacts with the same filled-pill chrome as Inbox purpose. Opening a person file shows Call and WhatsApp once, as top icons. Honesty is unchanged.
 
 ## Acceptance (must ship)
 
-1. **Contacts list filters.** Replace the underline FilterTabs look on All · Saved · Unsaved with the same pill-chip DESIGN as the Inbox purpose row (`InboxFilterPills`: filled active pill, muted idle, `min-h-11`, snap scroll, trailing fade). Count badge only when a real count is already on the page load. Nouns MUST stay **All · Saved · Unsaved**. Do not copy Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) onto Contacts.
+1. **Contacts list filters.** One `InboxFilterPills` row. Nouns: **All · Recents · Favourites · Saved · Unsaved**. Recents and Favourites live on that row. Unsaved once. Same pill DESIGN as Inbox purpose. Count badge only when a real count is already on the page load. Do not copy Inbox purpose nouns (Needs you / Visits / Holds / Human / Answered) onto Contacts. Do not add a second chip strip.
 2. **Sort stays underline.** Last call · Name remains the second `FilterTabs` row (`aria-label` Sort contacts). Same family as Inbox List / Work.
 3. **Person file header.** Keep top Call and WhatsApp icons (`CallLink` `tel:` + `WhatsAppLink` `wa.me`, `deskHitClass`). Remove the large labeled Call / WhatsApp pills. One reach row. Opened only. No write-back claims change.
 4. **#389 honesty stays.** History stamps, tap-through, and sourced KPI cards are unchanged. Layout may shift only to dock the icons in the header.
 
 ## KEEP
 
-- All · Saved · Unsaved nouns
+- All · Recents · Favourites · Saved · Unsaved nouns on one row
 - Sort Last call · Name as FilterTabs
 - Phone locked
 - Notes editable
@@ -47,7 +47,8 @@ Owner switches All / Saved / Unsaved on Contacts with the same filled-pill chrom
 
 - Dual Call / WhatsApp on the person file (icons plus labeled pills)
 - A second Contacts filter skin
-- Underline FilterTabs for All · Saved · Unsaved
+- Underline FilterTabs for Contacts segments
+- A second Recents / Favourites / Unsaved strip above the filters
 
 ## Seat / walls
 
@@ -55,4 +56,4 @@ Desk UX chrome only. Do not change `lead_status` / notify / wallet semantics. Re
 
 ## Verify (TEST)
 
-lint + build green for dashboard. List chips: All · Saved · Unsaved filled-pill chrome, no Needs you / Visits / Holds. Sort still Last call · Name underline. Person file: top Call / WA icons only; large pills gone. History and KPI formulas untouched. Call / WA still `tel:` / `wa.me`. Smoke 390 + desktop.
+lint + build green for dashboard. List chips: All · Recents · Favourites · Saved · Unsaved on one filled-pill row, no Needs you / Visits / Holds. Sort still Last call · Name. Person file: top Call / WA icons only; large pills gone. History and KPI formulas untouched. Call / WA still `tel:` / `wa.me`. Smoke 390 + desktop.

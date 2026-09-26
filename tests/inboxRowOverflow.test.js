@@ -45,13 +45,18 @@ describe("inbox row overflow menu", () => {
   const row = read("dashboard/src/components/InboxItemRow.tsx");
   const place = read("dashboard/src/lib/inboxOverflowPlace.ts");
 
+  function inboxItemWithLocal(item, local) {
+    if (local.pinnedAt === undefined) return item;
+    return { ...item, pinnedAt: local.pinnedAt };
+  }
+
   it("reuses the ticket Archive handler plus Pin and Mark done", () => {
     assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
     assert.match(lead, /updateLeadStatus\(callId, action\)/);
     assert.match(overflow, /inboxArchive/);
     assert.match(overflow, /inboxUnarchive/);
     assert.match(overflow, /inboxMarkDone/);
-    assert.match(overflow, /inboxTogglePin\(item\)/);
+    assert.match(overflow, /inboxTogglePin\(view\)/);
   });
 
   it("opens a custom menu on md+ and selects on long-press, with no phone sheet", () => {
@@ -80,7 +85,7 @@ describe("inbox row overflow menu", () => {
     assert.match(verbs, /label: "Unpin"/);
     assert.match(verbs, /Mark done/);
     assert.doesNotMatch(verbs, /label: "Select"/);
-    assert.match(overflow, /inboxOverflowActions\(item\)/);
+    assert.match(overflow, /inboxOverflowActions\(inboxItemWithLocal\(item, local\)\)/);
     assert.doesNotMatch(overflow, /id: "unread"/);
     assert.doesNotMatch(overflow, /id: "snooze"/);
     assert.doesNotMatch(overflow, /Mark unread/);
@@ -95,9 +100,34 @@ describe("inbox row overflow menu", () => {
     assert.doesNotMatch(overflow, /id === "mark_done"[\s\S]{0,400}patch\(\{ hidden/);
   });
 
-  it("does not render Pin UI on the list", () => {
-    assert.doesNotMatch(row, /InboxPinMark/);
+  it("closes after a successful run and keeps the menu on desk tokens", () => {
+    assert.match(overflow, /busyRef\.current = true/);
+    assert.match(overflow, /setOpen\(false\)/);
+    assert.match(overflow, /createPortal\(<div className="desk-theme">\{menu\}<\/div>, document.body\)/);
+    assert.match(overflow, /pendingId === action.id \? "Saving"/);
+    assert.doesNotMatch(overflow, /\{busy \? "Saving" : action.label\}/);
+    assert.doesNotMatch(overflow, /close\(\);\n    router.refresh/);
+  });
+
+  it("marks pinned rows next to time, not as Favourites", () => {
+    const mark = read("dashboard/src/components/ui/deskRow.tsx");
+    const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
+    assert.match(row, /InboxPinMark show=\{Boolean\(pinnedAt\)\}/);
+    assert.match(row, /useInboxRowLocal\(item\.id\)/);
+    assert.match(verbs, /export function inboxItemWithLocal/);
+    assert.match(overflow, /if \(id === "pin"\) patch\(\{ pinnedAt:/);
+    assert.match(overflow, /if \(id === "unpin"\) patch\(\{ pinnedAt: null \}\)/);
+    assert.match(overflow, /inboxTogglePin\(view\)/);
+    assert.match(mark, /export function InboxPinMark/);
+    assert.match(mark, /data-inbox-pin/);
+    assert.match(mark, /aria-label="Pinned"/);
     assert.doesNotMatch(row, /Favorites/);
+    assert.doesNotMatch(row, /favourite_at/);
+    assert.match(actions, /pathname.startsWith\("\/dev\/"\)/);
+    const loose = { id: "human", pinnedAt: null };
+    assert.equal(inboxItemWithLocal(loose, {}).pinnedAt, null);
+    assert.ok(inboxItemWithLocal(loose, { pinnedAt: "2026-09-24T10:00:00.000Z" }).pinnedAt);
+    assert.equal(inboxItemWithLocal({ ...loose, pinnedAt: "x" }, { pinnedAt: null }).pinnedAt, null);
   });
 
   it("right-aligns More to the trigger instead of covering Call and WhatsApp", () => {

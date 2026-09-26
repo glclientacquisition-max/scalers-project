@@ -59,7 +59,7 @@ function contactPersonFileKpiCards(opts) {
     });
   }
   const months = customerSinceMonths(opts.firstSeenAt, opts.now);
-  if (months != null) {
+  if (months != null && months > 0) {
     cards.push({
       id: "customerSince",
       label: "Customer since",
@@ -94,6 +94,15 @@ describe("contacts person-file KPI lock", () => {
     );
     assert.deepEqual(
       contactPersonFileKpiCards({
+        interactionCount: 9,
+        visitsDoneCount: 0,
+        firstSeenAt: "2026-09-21T07:00:00+03:00",
+        now,
+      }),
+      [{ id: "interactions", label: "Interactions", value: "9" }]
+    );
+    assert.deepEqual(
+      contactPersonFileKpiCards({
         interactionCount: 0,
         visitsDoneCount: 0,
         firstSeenAt: null,
@@ -109,6 +118,7 @@ describe("contacts person-file KPI lock", () => {
     assert.match(src, /label: "Visits done"/);
     assert.match(src, /interactionCount > 0/);
     assert.match(src, /visitsDoneCount > 0/);
+    assert.match(src, /months != null && months > 0/);
     assert.doesNotMatch(src, /\bOnline\b/);
     assert.doesNotMatch(src, /last seen/);
     assert.doesNotMatch(src, /\bVIP\b/);
@@ -155,7 +165,7 @@ describe("contacts person-file chrome", () => {
     assert.match(accept, /Interactions/);
     assert.match(accept, /Visits done/);
     assert.match(accept, /Customer since/);
-    assert.match(accept, /All · Saved · Unsaved/);
+    assert.match(accept, /All · Recents · Favourites · Saved · Unsaved/);
     assert.match(accept, /opened-only/);
     assert.match(accept, /inboxRecordHref/);
     assert.match(accept, /Hide when 0/);
@@ -169,8 +179,8 @@ describe("contacts person-file chrome", () => {
   });
 
   it("renders History from assembled tickets and taps through to a real call", () => {
-    assert.match(profile, />History</);
-    assert.match(profile, /<ContactTimeline entries=\{timeline\} \/>/);
+    assert.match(profile, /<ContactHistory/);
+    assert.match(profile, /groupContactTimeline/);
     assert.match(timeline, /entry\.stamp/);
     assert.match(timeline, /entry\.href/);
     assert.doesNotMatch(timeline, /kindLabel|return "Request"|return "Call"/);
@@ -184,7 +194,7 @@ describe("contacts person-file chrome", () => {
   });
 
   it("shows sourced KPI cards only and hides unknown ones", () => {
-    assert.match(profile, /<ContactKpiStrip cards=\{kpiCards\} \/>/);
+    assert.match(profile, /<ContactKpiStrip cards=\{kpiCards\}/);
     assert.match(profile, /contactPersonFileKpiCards/);
     assert.match(strip, /data-contact-kpi-strip/);
     assert.match(strip, /data-contact-kpi=\{card\.id\}/);
@@ -198,11 +208,8 @@ describe("contacts person-file chrome", () => {
   it("keeps Contacts list nouns as All Saved Unsaved, not Inbox purpose nouns", () => {
     assert.match(page, /<InboxFilterPills/);
     assert.match(page, /label="Filter contacts"/);
-    assert.match(page, /label: "All"/);
-    assert.match(page, /label: "Saved"/);
-    assert.match(page, /label: "Unsaved"/);
-    assert.match(page, /<FilterTabs/);
-    assert.match(page, /label="Sort contacts"/);
+    assert.match(page, /contactFilterPills/);
+    assert.match(page, /<ContactSortSelect/);
     assert.doesNotMatch(page, /Needs you/);
     assert.doesNotMatch(page, /label: "Human"/);
     assert.doesNotMatch(page, /label: "Answered"/);

@@ -224,6 +224,18 @@ test('prepareForTts drops a bare NP_FALSE token', () => {
   assert.strictEqual(prepared.text, '');
 });
 
+test('prepareForTts drops Speak this spelling, VISIT COMMIT, and Alvin said', () => {
+  const prepared = prepareForTts(
+    'Speak this spelling once in the next line. VISIT COMMIT (think this; never say it as a script): Alvin said they want carpet cleaning.',
+    { callLanguage: 'en' }
+  );
+  assert.doesNotMatch(
+    prepared.text,
+    /Speak this spelling|VISIT COMMIT|think this|never say it as a script|Alvin said/i
+  );
+  assert.match(prepared.text, /they want carpet cleaning/i);
+});
+
 test('prepareForTts full pipeline', () => {
   const prepared = prepareForTts('Call +254712345678 about mpesa in Thika…', {
     callLanguage: 'en',
@@ -323,6 +335,31 @@ test('thousands and decimals are not list markers', () => {
   assert.strictEqual(
     prepareForTts('It is 15,000. Thank you.', { callLanguage: 'en' }).text,
     'It is 15,000. Thank you.'
+  );
+});
+
+test('HD_0ef68f8e7930 glued openers get a space before TTS', () => {
+  assert.strictEqual(
+    prepareForTts('Ican help with that, Alvin.', { callLanguage: 'en' }).text,
+    'I can help with that, Alvin.'
+  );
+  assert.strictEqual(
+    prepareForTts('Youhave a carpet cleaning visit requested for tomorrow at 8 AM.', {
+      callLanguage: 'en',
+    }).text,
+    'You have a carpet cleaning visit requested for tomorrow at 8 A M.'
+  );
+  assert.strictEqual(
+    prepareForTts('Understood,Alvin.', { callLanguage: 'en' }).text,
+    'Understood, Alvin.'
+  );
+  assert.strictEqual(
+    prepareForTts('Takeyour time, Alvin.', { callLanguage: 'en' }).text,
+    'Take your time, Alvin.'
+  );
+  assert.strictEqual(
+    prepareForTts('Iam doing well, Alvin, thank you for asking.', { callLanguage: 'en' }).text,
+    'I am doing well, Alvin, thank you for asking.'
   );
 });
 

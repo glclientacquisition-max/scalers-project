@@ -117,7 +117,7 @@ Hard delete, ledger writes, DID assignment, and prompt compile semantics stay Pl
 1. Apply `docs/supabase/did_number_pool.sql` in Supabase.
 2. Point spare SautiKit DIDs’ webhooks at Railway.
 3. Apply `docs/supabase/super_admin_ops.sql` (release/remove business helpers + optional Jirani teardown).
-4. Login as ops (`admin@scalers.local` + `DASHBOARD_PASSWORD`) → **Admin**.
+4. Open `/admin/login` (or `admin.scalers.co.ke` when `ADMIN_HOST` is set). Username + access code from `ADMIN_OPERATORS` or `ADMIN_ACCESS_CODE` + `ADMIN_USERNAMES`.
 5. Use **Numbers** to seed DIDs; **Businesses** to assign / release / remove.
 
 See `docs/PRODUCTION_DID_POOL.md` and `docs/SUPER_ADMIN_REQUIREMENTS.md`.
@@ -149,7 +149,11 @@ Open http://localhost:3000 (or the port Next prints).
 | `VOICE_PUBLIC_BASE_URL` | Railway voice base (`https://…`, required for phone preview + webhook routing after buy) |
 | `VOICE_INTERNAL_SECRET` | Same secret as Railway — auth for desk → `/api/tts/preview` |
 | `SAUTIKIT_API_BASE` | Optional: defaults to `https://api.sautikit.com` |
-| `DASHBOARD_PASSWORD` | Optional legacy shared-password desk |
+| `ADMIN_HOST` | Optional Super Admin host (`admin.scalers.co.ke`) |
+| `ADMIN_ACCESS_CODE` / `ADMIN_USERNAMES` | Shared access code + usernames |
+| `ADMIN_OPERATORS` | Per-user `name:code` list |
+| `BETTER_AUTH_SECRET` | Super Admin session signing |
+| `DASHBOARD_PASSWORD` | Optional leftover HMAC cookie |
 | `DASHBOARD_OPEN=true` | Dev only: skip login if no password |
 
 ## Deploy (Vercel)

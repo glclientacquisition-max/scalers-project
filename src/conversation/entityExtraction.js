@@ -93,6 +93,22 @@ function extractName(text, opts = {}) {
     );
   if (explicit) return cleanNameCapture(explicit[1], opts);
 
+  // Live miss HD_0ef68f8e7930 / HD_bc9f610692de: "Alvin is the name." / "Alvin is calling."
+  const invertedName =
+    /\b([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})\s+is(?:\s+(?:the|my))?\s+name\b/iu.exec(
+      raw
+    );
+  if (invertedName) {
+    const captured = cleanNameCapture(invertedName[1], opts);
+    if (captured) return captured;
+  }
+  const isCalling =
+    /\b([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})\s+is calling\b/iu.exec(raw);
+  if (isCalling) {
+    const captured = cleanNameCapture(isCalling[1], opts);
+    if (captured) return captured;
+  }
+
   const im =
     /\b(?:i'?m|i am)\s+([\p{L}'’-]+)(?:\s+([\p{L}'’-]+))?(?:\s+([\p{L}'’-]+))?/iu.exec(
       raw
@@ -388,6 +404,9 @@ const NAME_BLOCKLIST = new Set([
   'angry',
   'wrong',
   'the',
+  'this',
+  'that',
+  'it',
   'and',
   'for',
   'from',

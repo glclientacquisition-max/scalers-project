@@ -28,6 +28,7 @@ import {
 } from "@/lib/inboxLeadActions";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
 import {
+  inboxItemWithLocal,
   inboxOverflowActions,
   type InboxListAction,
   type InboxListActionId,
@@ -102,12 +103,14 @@ export function InboxRowShell({
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<InboxOverflowAnchor>({ x: 0, y: 0, align: "point" });
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [pendingId, setPendingId] = useState<ActionId | null>(null);
+  const busyRef = useRef(false);
+  const busy = pendingId !== null;
 
   const close = useCallback(() => {
-    if (busy) return;
+    if (busyRef.current) return;
     setOpen(false);
-  }, [busy]);
+  }, []);
 
   const openAt = useCallback((next: InboxOverflowAnchor) => {
     setError(null);
@@ -129,14 +132,17 @@ export function InboxRowShell({
       setError("Missing call.");
       return;
     }
-    setBusy(true);
+    busyRef.current = true;
+    setPendingId(id);
     setError(null);
+    const view = inboxItemWithLocal(item, local);
     let res: { error?: string; ok?: boolean } = { ok: true };
-    if (id === "pin" || id === "unpin") res = await inboxTogglePin(item);
+    if (id === "pin" || id === "unpin") res = await inboxTogglePin(view);
     if (id === "mark_done") res = await inboxMarkDone(item);
     if (id === "archive") res = await inboxArchive(item);
     if (id === "unarchive") res = await inboxUnarchive(item);
-    setBusy(false);
+    busyRef.current = false;
+    setPendingId(null);
     if (res.error) {
       setError(res.error);
       return;
@@ -147,11 +153,13 @@ export function InboxRowShell({
     if (id === "archive" || id === "unarchive") {
       patch({ hidden: true });
     }
-    close();
+    if (id === "pin") patch({ pinnedAt: new Date().toISOString() });
+    if (id === "unpin") patch({ pinnedAt: null });
+    setOpen(false);
     router.refresh();
   };
 
-  const actions: OverflowAction[] = inboxOverflowActions(item);
+  const actions: OverflowAction[] = inboxOverflowActions(inboxItemWithLocal(item, local));
 
   if (local.hidden) return null;
 
@@ -217,6 +225,7 @@ export function InboxRowShell({
             anchor={anchor}
             actions={actions}
             busy={busy}
+            pendingId={pendingId}
             error={error}
             onRun={run}
             onClose={close}
@@ -230,8 +239,9 @@ export function InboxRowShell({
 export function InboxRowMore({ item }: { item: InboxItem }) {
   const menu = useInboxRowMenu();
   const ui = useInboxRowUi();
+  const [local] = useInboxRowLocal(item.id);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const actions = inboxOverflowActions(item);
+  const actions = inboxOverflowActions(inboxItemWithLocal(item, local));
   if (!menu || ui?.selecting || actions.length === 0) return null;
   return (
     <DeskHint label="More" side="top">
@@ -271,6 +281,7 @@ function InboxOverflowSurface({
   anchor,
   actions,
   busy,
+  pendingId,
   error,
   onRun,
   onClose,
@@ -279,6 +290,7 @@ function InboxOverflowSurface({
   anchor: InboxOverflowAnchor;
   actions: OverflowAction[];
   busy: boolean;
+  pendingId: ActionId | null;
   error: string | null;
   onRun: (id: ActionId) => void;
   onClose: () => void;
@@ -386,7 +398,7 @@ function InboxOverflowSurface({
               "hover:bg-surface-muted disabled:opacity-50",
             ].join(" ")}
           >
-            {busy ? "Saving" : action.label}
+            {pendingId === action.id ? "Saving" : action.label}
           </button>
         </Fragment>
       ))}
@@ -400,5 +412,5 @@ function InboxOverflowSurface({
 
   if (typeof document === "undefined") return null;
 
-  return createPortal(menu, document.body);
+  return createPortal(<div className="desk-theme">{menu}</div>, document.body);
 }

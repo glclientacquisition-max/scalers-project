@@ -38,7 +38,7 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Voice outbound PSTN | SautiKit `POST /v1/calls` for live transfer | `src/billing/liveTransferLegs.js` (gate only); no live originate in media path | **blocked** | See §2. Desk must not say Rings / transferred. |
 | Live transfer executor | Cold Dial after Stream; conference REST is next | `src/sautikit/pendingLiveTransfer.js`; `server.js` `/voice/transfer`; `src/conversation/liveTransferReady.js` | **blocked** | Staging 2026-09-06: StreamStopped never re-POSTs Dial. Default `VOICE_LIVE_TRANSFER=off`. |
 | Voice brain (live call) | Gemini turn + tools + playbooks | `src/prompts.js`, `src/conversation/*`, `server.js` `runGeminiTurn*` | **live** | Brain may say “texted the team” only after notify OK. Transfer copy only if `liveTransfer: true`. |
-| Returning-caller card | Compact phone file at call setup | `src/db.js` `getCallerMemory`; `src/conversation/callerMemory.js`; ADR-0005 | **live** | Shared line must not greet the primary name. |
+| Returning-caller card | Compact phone file at call setup | `src/db.js` `getCallerMemory`; `src/conversation/callerMemory.js`; ADR-0005 | **live** | Candidate by phone. Bind the speaker before using the name or visit. |
 | Post-call review | Hangup Gemini JSON → `owner_review` | `src/conversation/callTranscriptReview.js` | **live** (kill: `POST_CALL_GEMINI_REVIEW=off`) | Lands 1–2 min after mid-call SMS. Do not SMS the four-block card. |
 | Compile / live ground truth | Desk fields → `llm_system_prompt` + per-turn facts | `dashboard/src/lib/promptCompiler.ts`; `src/conversation/liveKnowledge.js` | **live** | Stale compile vs live facts: live ground truth wins. |
 | Thin CRM | Contacts, holds/orders, visits | `contacts`, `service_requests`, `appointments`; `src/db.js` upsert/create helpers | **live** | Confirm / Done only when those rows exist (#364). |
@@ -53,7 +53,7 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Packages / SKUs | Reserved email + seat columns | `docs/supabase/package_entitlements.sql`; [`../PACKAGES.md`](../PACKAGES.md) | **docs-only** | No shop UI. Do not gate email or invites. |
 | DID pool | Assign / release Kenya numbers | `sautikit_did_pool`; admin APIs; [`../PRODUCTION_DID_POOL.md`](../PRODUCTION_DID_POOL.md) | **live** | `+254709221536` must never be `available`. |
 | Auth (owner) | Supabase Auth JWT + RLS | `dashboard/src/lib/auth.ts`; `docs/supabase/owner_rls.sql` | **live** | Service role never in `NEXT_PUBLIC_*`. |
-| Auth (Super Admin) | Shared-password cookie | `isLegacyAuthenticated()`; `/admin` | **legacy** | Not owner auth. Do not market as SSO. |
+| Auth (Super Admin) | Better Auth username + access code | `admin-auth.ts`; `/admin/login`; `ADMIN_HOST` | **live** | Not owner auth. HMAC leftover only. |
 | Deploy | Voice Railway, desk Vercel, DB Supabase | `Dockerfile`, `railway.toml`, `dashboard/vercel.json` | **live** | Stay on Vercel through the wedge. Cloudflare = later spike only. |
 | Module split | `src/telephony/`, `LLM_PROVIDER` | [`../TARGET_MODULE_LAYOUT.md`](../TARGET_MODULE_LAYOUT.md) | **docs-only** | `server.js` is still the orchestrator. Do not rewrite it in this ladder step. |
 | RAG / embeddings | `knowledge_chunks` | Blueprint + BI roadmap | **docs-only** | Not in `src/`. Do not plan mid-call retrieve. |
@@ -134,7 +134,7 @@ Tools that write the business: `save_caller_info`, `create_service_request`, `cr
 
 Code for cold Dial is real: `queuePendingLiveTransfer`, `/voice/transfer`, `saveTransferAttempt`, billing helpers. ADR-0004 executor is **superseded**: StreamStopped rides `events_url` (cannot return Dial); Redirect after `<Stream connect="true"/>` did not run on staging (`HD_ae71b5349f5e`, `HD_4f14d4d55244`). Next lab is **conference + REST outbound**, not another WS-close.
 
-Desk Train copy today (`TenantForm.tsx`): if the executor env is **off**, live_transfer shows “Coming soon. Today we message {name}.” If someone turns `VOICE_LIVE_TRANSFER=on` on the **desk** host without a working conference, the same panel will say **“Rings {name} during open hours.”** That is the remaining lie. Voice host and Vercel env must stay **off** until a human actually rings.
+Desk Train copy today (`TenantForm.tsx`): if the executor env is **off**, live_transfer shows “Messages {name}.” If someone turns `VOICE_LIVE_TRANSFER=on` on the **desk** host without a working conference, the same panel will say **“Rings {name} during open hours.”** That is the remaining lie. Voice host and Vercel env must stay **off** until a human actually rings.
 
 Call detail already stamps `live_connect` when escalate runs and transfer did not (`Notify only (live connect unavailable)`). Keep that.
 

@@ -16,7 +16,7 @@ New Scalers signups get a real `+254…` DID from a pre-bought pool instead of s
    - Same Stream / media settings as the smoke DID
 
 3. **Seed the pool** (pick one):
-   - Desk: login as `admin@scalers.local` + `DASHBOARD_PASSWORD` → **Admin → Numbers**  
+   - Desk: `/admin/login` with username + access code → **Admin → Numbers**  
    - Or SQL:
 
 ```sql

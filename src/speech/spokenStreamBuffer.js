@@ -4,6 +4,29 @@
 const { stripSpokenInstructionLeaks } = require('./spokenInstructionLeak');
 
 /**
+ * Gemini stream parts often omit the leading space on the next word.
+ * Live HD_0ef68f8e7930 spoke "Ican" / "Youhave" / "Understood,Alvin".
+ * @param {string} left
+ * @param {string} right
+ */
+function joinSpokenPieces(left, right) {
+  const a = String(left || '');
+  const b = String(right || '');
+  if (!b) return a;
+  if (!a) return b;
+  if (/\s$/.test(a) || /^\s/.test(b)) return a + b;
+  if (/[,:;]$/.test(a) && /^[A-Za-z]/.test(b)) return `${a} ${b}`;
+  // Only known openers. Mid-word stream slices ("cle" + "aning") stay glued.
+  if (
+    /(?:^|[\s.!?])(?:I|You|It|We|He|She|They|Take|Thank)$/.test(a) &&
+    /^[A-Za-z]/.test(b)
+  ) {
+    return `${a} ${b}`;
+  }
+  return a + b;
+}
+
+/**
  * Strip complete tool blocks and end-call markers for speech.
  * When final=false, also truncates incomplete marker prefixes.
  * @param {string} raw
@@ -191,7 +214,7 @@ function createSpokenStreamBuffer(opts = {}) {
    * @returns {string[]} newly flushable spoken chunks
    */
   function push(delta, pushOpts = {}) {
-    if (delta) raw += delta;
+    if (delta) raw = joinSpokenPieces(raw, delta);
     const final = Boolean(pushOpts.final);
     const speakable = stripMarkersForSpeech(raw, { final });
 
@@ -250,6 +273,7 @@ function createSpokenStreamBuffer(opts = {}) {
 }
 
 module.exports = {
+  joinSpokenPieces,
   stripMarkersForSpeech,
   splitSpeakableChunks,
   createSpokenStreamBuffer,

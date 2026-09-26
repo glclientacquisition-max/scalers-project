@@ -12,11 +12,13 @@ Replace the narrow “DID pool” ops page with a **Super Admin** control center
 
 | Role | Who | Access |
 | --- | --- | --- |
-| Super Admin (ops) | Legacy login `admin@scalers.local` + `DASHBOARD_PASSWORD` | `/admin/*` |
+| Super Admin (ops) | Username + access code (Better Auth). Host `admin.scalers.co.ke` when `ADMIN_HOST` is set. | `/admin/*` |
 | Business owner | Supabase Auth signup/login | Own `/calls` + `/settings` only |
 
 Requirements:
-- Super Admin routes must reject business-owner sessions (redirect to `/calls`).
+- Super Admin routes must reject business-owner sessions (redirect to `/home`).
+- Ops sign in at `/admin/login` with a username and access code. Not email. Env: `ADMIN_OPERATORS` or `ADMIN_ACCESS_CODE` + `ADMIN_USERNAMES`.
+- When `ADMIN_HOST=admin.scalers.co.ke`, the app host redirects `/admin` there. Add that hostname on the same Vercel project.
 - All admin mutations use the service-role server client (never expose service key to the browser).
 - Destructive actions require an explicit confirmation step.
 
@@ -26,8 +28,11 @@ Requirements:
 
 ```
 /admin                 Overview (platform health)
+/admin/packages        Rate card, SKUs, annual discount, assign
+/admin/wallets         Wallet credit + plan
 /admin/businesses      All businesses + actions
 /admin/numbers         Number pool (add / assign / release)
+/admin/voices          Voice catalog
 ```
 
 Nav label for ops: **Admin** (not “DID pool”).
@@ -41,7 +46,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 ### 1. Overview (`/admin`)
 - KPI cards: total businesses, active businesses, businesses waiting for a number, available DIDs, assigned DIDs, calls (last 7 days).
 - Short “Needs attention” list: businesses with `pending:` DID or inactive flag.
-- Primary CTAs: Add number · View businesses.
+- Primary CTAs: Add number · Packages · View businesses.
 
 ### 2. Businesses (`/admin/businesses`)
 - Table: Business name · Phone DID · Notify number · Status (Active / Waiting for number / Archived) · Created · Actions.
@@ -59,7 +64,13 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Prevent double-assign (DB uniqueness + status gates — already in Phase C SQL).
 - Copy must say **business**, not tenant.
 
-### 4. Platform teardown / demo reset (one-time ops)
+### 4. Packages (`/admin/packages`)
+- Same username + access code as the rest of Super Admin. No second door.
+- Edit on-demand rates (inbound/outbound as KES per minute, stored per second), WhatsApp, SMS, email, and annual discount %.
+- Edit Starter / Growth / Scale included buckets and monthly KES. Annual price is monthly x 12 x (1 - discount %).
+- Assign a package and period to a business. Does not leave beta. Wallets Plan still does that.
+
+### 5. Platform teardown / demo reset (one-time ops)
 - Ability to **remove Jirani Home Services** completely and leave `+254709221536` as **Available** in the pool for the next business.
 - Documented SQL + in-UI action with typed confirmation (`REMOVE`).
 
@@ -93,7 +104,7 @@ Business-owner nav stays: Calls · Business · Sign out.
 - Prompt wizard / onboarding questionnaire.
 - Dynamic SautiKit DID purchase API.
 - Multi-user roles inside a business (admin/member invites).
-- Google OAuth for Super Admin (keep shared ops password until SSO).
+- Google OAuth for Super Admin.
 
 ---
 

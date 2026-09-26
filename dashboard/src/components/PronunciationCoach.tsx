@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Pagination } from "@/components/ui/Pagination";
 import {
   useActionState,
   useEffect,
@@ -219,7 +220,6 @@ export function PronunciationCoach({
     const fd = new FormData();
     fd.set("id", tenantId);
     loadQueueAction(fd);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   useEffect(() => {
@@ -769,7 +769,7 @@ export function PronunciationCoach({
           ) : (
             <>
               {active ? (
-                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gradient-to-br from-surface via-accent-soft/35 to-surface px-4 py-4 sm:px-5">
+                <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-surface px-4 py-4 sm:px-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]">
                       {active.label}
@@ -1048,38 +1048,13 @@ export function PronunciationCoach({
                   );
                 })}
               </ul>
-              {lexicon.length > LEXICON_PAGE_SIZE ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-[var(--ink-soft)]">
-                    {safeLexiconPage * LEXICON_PAGE_SIZE + 1}-
-                    {Math.min(lexicon.length, (safeLexiconPage + 1) * LEXICON_PAGE_SIZE)}{" "}
-                    of {lexicon.length}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={safeLexiconPage <= 0}
-                      onClick={() => setLexiconPage((p) => Math.max(0, p - 1))}
-                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-xs text-[var(--ink-soft)]">
-                      {safeLexiconPage + 1} / {lexiconPageCount}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={safeLexiconPage >= lexiconPageCount - 1}
-                      onClick={() =>
-                        setLexiconPage((p) => Math.min(lexiconPageCount - 1, p + 1))
-                      }
-                      className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              <Pagination
+                page={safeLexiconPage + 1}
+                pageSize={LEXICON_PAGE_SIZE}
+                total={lexicon.length}
+                noun="line"
+                onPage={(next) => setLexiconPage(next - 1)}
+              />
             </>
           )}
           {persistState.error ? (
@@ -1100,7 +1075,6 @@ export function PronunciationCoach({
 
       {mode === "fix" ? (
         <div className="space-y-8">
-          {/* 1) Needs review — decisions first */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>

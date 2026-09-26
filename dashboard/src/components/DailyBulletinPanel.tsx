@@ -1,11 +1,16 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import {
-  formatBulletinEndLabel,
-  liveBulletinItems,
+  deskBulletinItems,
+  eatDateLocal,
+  eatTimeLocal,
+  endOfEatDay,
+  formatBulletinComposePreview,
+  formatBulletinWindowLabel,
+  joinEatDateTime,
   type BulletinExpiry,
   type BulletinItem,
 } from "@/lib/dailyBulletin";
@@ -26,16 +31,35 @@ const EXPIRY_OPTIONS: { id: BulletinExpiry; label: string }[] = [
   { id: "today", label: "Until tonight" },
   { id: "tomorrow", label: "Until tomorrow night" },
   { id: "manual", label: "Until I clear it" },
+  { id: "schedule", label: "Pick" },
 ];
+
+const START_OPTIONS = [
+  { id: "now", label: "Now" },
+  { id: "later", label: "Later" },
+] as const;
 
 const initial: BulletinActionState = {};
 
+function tonightParts() {
+  const end = new Date(endOfEatDay());
+  return { date: eatDateLocal(end), time: eatTimeLocal(end) };
+}
+
 export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
+  const tonight = tonightParts();
   const [text, setText] = useState("");
   const [expiry, setExpiry] = useState<BulletinExpiry>("today");
+  const [startWhen, setStartWhen] = useState<(typeof START_OPTIONS)[number]["id"]>(
+    "now"
+  );
+  const [startDate, setStartDate] = useState(eatDateLocal);
+  const [startTime, setStartTime] = useState(eatTimeLocal);
+  const [endDate, setEndDate] = useState(tonight.date);
+  const [endTime, setEndTime] = useState(tonight.time);
   const [items, setItems] = useState<BulletinItem[]>(() =>
-    liveBulletinItems(tenant.daily_bulletin)
+    deskBulletinItems(tenant.daily_bulletin)
   );
   const [postState, postAction, postPending] = useActionState(
     postBulletinAction,
@@ -46,8 +70,25 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
     initial
   );
 
+  const startsLocal =
+    expiry === "schedule" && startWhen === "later"
+      ? joinEatDateTime(startDate, startTime)
+      : "";
+  const endsLocal =
+    expiry === "schedule" ? joinEatDateTime(endDate, endTime) : "";
+
+  const preview = useMemo(
+    () =>
+      formatBulletinComposePreview({
+        expiry,
+        startsLocal,
+        endsLocal,
+      }),
+    [expiry, startsLocal, endsLocal]
+  );
+
   useEffect(() => {
-    setItems(liveBulletinItems(tenant.daily_bulletin));
+    setItems(deskBulletinItems(tenant.daily_bulletin));
   }, [tenant.daily_bulletin]);
 
   useEffect(() => {
@@ -67,10 +108,12 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const flashIsError = Boolean(postState.error || clearState.error);
 
   return (
-    <section className="min-w-0 w-full space-y-6">
+    <section className="min-w-0 w-full space-y-3">
       <form action={postAction} className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
+        <input type="hidden" name="starts_at" value={startsLocal} />
+        <input type="hidden" name="ends_at" value={endsLocal} />
         <SettingsGroup title="Callers hear">
           <div className="flex min-w-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
@@ -98,11 +141,76 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
         </SettingsGroup>
 
         <SettingsSegmented
-          label="Update duration"
+          label="Until"
           value={expiry}
           options={EXPIRY_OPTIONS}
           onChange={setExpiry}
         />
+
+        {expiry === "schedule" ? (
+          <div className="min-w-0 space-y-3">
+            <div className="min-w-0 space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                From
+              </p>
+              <SettingsSegmented
+                label="From"
+                value={startWhen}
+                options={START_OPTIONS}
+                onChange={setStartWhen}
+              />
+              {startWhen === "later" ? (
+                <div className="grid min-w-0 grid-cols-2 gap-2">
+                  <label className="min-w-0">
+                    <span className="sr-only">Start date</span>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className={`${settingsFieldClass} mt-0 min-w-0`}
+                    />
+                  </label>
+                  <label className="min-w-0">
+                    <span className="sr-only">Start time</span>
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className={`${settingsFieldClass} mt-0 min-w-0`}
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+            <div className="min-w-0 space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+                Until
+              </p>
+              <div className="grid min-w-0 grid-cols-2 gap-2">
+                <label className="min-w-0">
+                  <span className="sr-only">End date</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className={`${settingsFieldClass} mt-0 min-w-0`}
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="sr-only">End time</span>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className={`${settingsFieldClass} mt-0 min-w-0`}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <p className="px-1 text-sm text-ink-soft">{preview}</p>
       </form>
 
       {items.length === 0 ? (
@@ -110,7 +218,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
           No live updates.
         </p>
       ) : (
-        <SettingsGroup title="Live">
+        <SettingsGroup title="Posted">
           {items.map((item) => (
             <div
               key={item.id}
@@ -121,7 +229,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                   {item.text}
                 </p>
                 <p className="mt-1 text-xs text-ink-soft">
-                  {formatBulletinEndLabel(item.ends_at)}
+                  {formatBulletinWindowLabel(item)}
                 </p>
               </div>
               <form action={clearAction} className="shrink-0">

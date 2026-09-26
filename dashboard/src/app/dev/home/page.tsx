@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
-import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { ThemePicker } from "@/components/ThemePicker";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { LivePing } from "@/components/ui/deskRow";
@@ -15,7 +15,7 @@ export default function DevHomePage() {
   }
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+    <div className={deskShellClass}>
       <DeskRail needsCount={3} homeHref="/dev/home" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>

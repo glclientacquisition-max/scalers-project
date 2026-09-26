@@ -51,4 +51,4 @@ Re-open **contact strip** as next desk polish candidate (still behind Funnel maj
 
 ## Segment chrome (2026-09-21)
 
-List segment chrome and click-through Back are locked in [`CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md`](./CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md) and [`CONTACTS_CHROME_PILL_ACCEPT.md`](./CONTACTS_CHROME_PILL_ACCEPT.md). All · Saved · Unsaved are pill-chip items. Not Inbox purpose nouns.
+List segment chrome and click-through Back are locked in [`CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md`](./CONTACTS_SEGMENT_WORKFLOW_ACCEPT.md) and [`CONTACTS_CHROME_PILL_ACCEPT.md`](./CONTACTS_CHROME_PILL_ACCEPT.md). All · Recents · Favourites · Saved · Unsaved are pill-chip items on one row. Not Inbox purpose nouns.

@@ -57,6 +57,14 @@ function polishPunctuation(text) {
   t = t.replace(/,\s*,+/g, ',');
   t = t.replace(/^\s*,\s*/, '');
   t = t.replace(/\s+,/g, ',');
+  t = t.replace(/,([A-Za-z])/g, ', $1');
+  // Stream leftover: first word glued to the next ("Ican", "Takeyour").
+  t = t.replace(
+    /\b(I|You|It|We|He|She|They)(can|have|is|am|are|will|would|do)\b/g,
+    '$1 $2'
+  );
+  t = t.replace(/\b(Take)(your)\b/g, '$1 $2');
+  t = t.replace(/\b(Thank)(you)\b/g, '$1 $2');
   t = t.replace(/([!?.,])\1+/g, '$1');
   // Exclamation makes Soniox punch / strain on the phone. Period keeps pace even.
   t = t.replace(/!+/g, '.');

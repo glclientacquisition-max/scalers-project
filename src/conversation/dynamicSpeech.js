@@ -9,6 +9,7 @@ const {
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
+const { looksLikeFileVisitTalk } = require('./visitTalk');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -265,7 +266,7 @@ function pickPhaticReply(opts = {}) {
   const lang = confirmationLanguage(opts.language);
   const card = opts.callerMemory;
   if (card && typeof card === 'object') {
-    if (card.sharedLine && !speakerKnownOnFile(card)) {
+    if (!speakerKnownOnFile(card)) {
       return lang === 'en'
         ? "I'm well. Who is calling?"
         : 'Nzuri. Ni nani anayepiga?';
@@ -456,7 +457,12 @@ function pickSpeechGuaranteeLine({
   userText = '',
 } = {}) {
   const nameKnown = callerNameAlreadyKnown({ brainState, userText });
-  const slot = nextGuaranteeSlot({ nextBestAction, brainState, nameKnown });
+  let slot = nextGuaranteeSlot({ nextBestAction, brainState, nameKnown });
+  // Live leftover HD_bc9f610692de: a bookings/visit ask after the name is in
+  // must not speech-guarantee another name ask.
+  if (looksLikeFileVisitTalk(userText) && slot === 'name') {
+    slot = '';
+  }
   const handoff =
     !nameKnown &&
     (String(brainState?.intent || '').toLowerCase() === 'human' ||

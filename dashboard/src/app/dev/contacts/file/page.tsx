@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import { ContactActionDock } from "@/components/ContactActionDock";
+import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
+import { ContactNameForm } from "@/components/ContactNameForm";
 import { ContactKpiStrip } from "@/components/ContactKpiStrip";
-import { DeskRail, DeskTabBar, deskMainClass } from "@/components/DeskNav";
-import { DeskBack } from "@/components/ui/DeskBack";
+import { RowIdentity } from "@/components/ui/deskRow";
+import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
+import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import {
   contactPersonFileKpiCards,
   pickFirstSeenAt,
@@ -25,22 +28,29 @@ export default function DevContactFilePage() {
   });
 
   return (
-    <div className="desk-theme flex min-h-dvh min-w-0 overflow-x-clip md:h-dvh">
+    <div className={deskShellClass}>
       <DeskRail needsCount={0} homeHref="/dev/contacts" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <main className={deskMainClass}>
           <div className="max-w-6xl min-w-0 overflow-x-clip" data-desk-nested="">
-            <DeskBack href="/dev/contacts">Contacts</DeskBack>
-            <div className="mt-6 space-y-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-                    Amina
-                  </h1>
-                  <p className="mt-2 font-mono text-sm text-ink">+254700000002</p>
+            <div className="space-y-4">
+              <DeskRecordLead
+                back={<DeskBack href="/dev/contacts">Contacts</DeskBack>}
+                trail={<ContactActionDock number="+254700000002" />}
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <RowIdentity name="Amina" size="lg" />
+                  <div className="min-w-0 flex-1">
+                    <ContactNameForm
+                      contactId="ct-saved"
+                      initialName="Amina"
+                      title="Amina"
+                    />
+                    <p className="mt-2 font-mono text-sm text-ink">+254700000002</p>
+                  </div>
                 </div>
-                <ContactActionDock number="+254700000002" />
-              </div>
+              </DeskRecordLead>
+              <ContactFavouriteButton contactId="ct-saved" favourite={false} />
               <ContactKpiStrip cards={cards} />
             </div>
           </div>

@@ -46,9 +46,10 @@ describe("business settings depth", () => {
     assert.ok(policies.indexOf('id: "deposit"') < policies.indexOf('id: "returns"'));
     assert.match(handoff, /label: "Message teammate"/);
     assert.match(handoff, /label: "Connect live call"/);
-    assert.match(handoff, /Coming soon\. Today we message a teammate\./);
+    assert.match(handoff, /Messages a teammate\./);
+    assert.doesNotMatch(handoff, /Coming soon/);
     assert.doesNotMatch(handoff, /WhatsApp \/ email callback/);
-    assert.match(form, /handoffComingSoonLine\(liveDest\.name\)/);
+    assert.match(form, /handoffMessageLine\(liveDest\.name\)/);
     assert.doesNotMatch(form, /Unknown fallback|Add 1|Front desk voice|Jane Doe/);
   });
 
@@ -57,6 +58,11 @@ describe("business settings depth", () => {
     assert.match(ingest, /label: "Website"/);
     assert.match(bulletin, /Callers hear/);
     assert.match(bulletin, /Out of chicken today/);
+    assert.match(bulletin, /SettingsSegmented/);
+    assert.match(bulletin, /Until tonight/);
+    assert.match(bulletin, /Pick/);
+    assert.match(bulletin, /type="date"/);
+    assert.match(bulletin, /type="time"/);
     assert.match(faqs, /Westlands, opposite Naivas/);
     assert.doesNotMatch(ingest, /Paste your menu/);
     assert.doesNotMatch(form, /Super Admin can add them/);

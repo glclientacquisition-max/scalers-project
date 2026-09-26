@@ -215,7 +215,10 @@ const {
   classifyFinalDuringAgentSpeech,
   agentAwaitingReply,
 } = require('./src/speech/turnTaking');
-const { createSpokenStreamBuffer } = require('./src/speech/spokenStreamBuffer');
+const {
+  createSpokenStreamBuffer,
+  joinSpokenPieces,
+} = require('./src/speech/spokenStreamBuffer');
 const {
   createOverlapHold,
   createAgentReplayMemory,
@@ -1191,6 +1194,37 @@ async function handleVoiceIncoming(req, res) {
   }
 }
 
+async function noteWhatsAppDeliveryFailed(row = {}) {
+  const status = String(row.status || '');
+  if (status !== 'failed' && status !== 'undelivered') return;
+  const wamid = String(row.wamid || '').trim();
+  if (!wamid) return;
+  const errors = Array.isArray(row.raw?.errors) ? row.raw.errors : [];
+  const code = Number(errors[0]?.code);
+  const reason = code === 131042 ? 'whatsapp_billing' : 'whatsapp_delivery_failed';
+  try {
+    const sent = await db.findNotifySendByProviderMessageId(wamid);
+    if (!sent?.call_sid) return;
+    await db.mergeCallSummaryMeta({
+      callSid: sent.call_sid,
+      patch: {
+        escalation_sent: false,
+        whatsapp_sent: false,
+        escalation_notify: {
+          ok: false,
+          soft: false,
+          stage: 'failed',
+          channels: [],
+          reason,
+          at: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (err) {
+    console.warn('[whatsapp] delivery note failed:', err?.message || err);
+  }
+}
+
 async function handleWhatsAppWebhook(req, res) {
   res.sendStatus(200);
   try {
@@ -1219,7 +1253,10 @@ async function handleWhatsAppWebhook(req, res) {
       body,
       headers: req.headers,
       persistInbound: (row) => db.persistPlatformWhatsAppInbound(row),
-      persistStatus: (row) => db.persistWhatsAppStatus(row),
+      persistStatus: async (row) => {
+        await db.persistWhatsAppStatus(row);
+        await noteWhatsAppDeliveryFailed(row);
+      },
       markRead: (wamid) => markWhatsAppRead(wamid),
       sendText: async ({ to, body }) => {
         const json = await sendOwnerWhatsApp({ to, body, windowOpen: true });
@@ -3066,6 +3103,10 @@ mediaWss.on('connection', (ws, req) => {
     try {
       await ensureTenantPrompt();
       if (speechOutageStarted) return;
+      // Every answered call starts at profile pace. A faster ask on the last
+      // call must not ride this greeting or the rest of this session.
+      ttsSpeedScale = 1;
+      console.log(`[ws/media][${sidLabel()}] caller speed scale=1`);
       if (isDefaultShopName(businessName)) {
         console.warn(
           `[ws/media][${sidLabel()}] greeting skipped — default shop name`
@@ -3205,17 +3246,32 @@ mediaWss.on('connection', (ws, req) => {
             }
 
             const meta = parsed.metadata || parsed;
-            const maybeSid =
+            const incomingCallSid =
               meta.callSid ||
-              meta.sessionId ||
               meta.call_sid ||
               meta.call_id ||
+              parsed.callSid ||
+              null;
+            const maybeSid =
+              incomingCallSid ||
+              meta.sessionId ||
               meta.streamSid ||
               parsed.sessionId ||
               parsed.streamSid ||
               null;
+            if (
+              incomingCallSid &&
+              sessionCallSid &&
+              String(incomingCallSid) !== String(sessionCallSid)
+            ) {
+              ttsSpeedScale = 1;
+              console.log(
+                `[ws/media][${sessionCallSid}] caller speed scale=1 (new callSid=${incomingCallSid})`
+              );
+            }
             if (maybeSid && !sessionCallSid) {
               sessionCallSid = String(maybeSid);
+              ttsSpeedScale = 1;
               console.log(`[ws/media] bound session callSid=${sessionCallSid}`);
               ensureTenantPrompt().catch(() => {});
             }
@@ -3438,6 +3494,7 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
         callId: call.id || null,
         callSid,
         kind: 'escalation',
+        force,
       },
     });
 
@@ -4354,7 +4411,7 @@ async function runGeminiTurnStreaming(
           thoughtSignature = extractThoughtSignature(chunk) || thoughtSignature;
           const delta = extractGeminiText(chunk);
           if (!delta) continue;
-          fullText += delta;
+          fullText = joinSpokenPieces(fullText, delta);
           const pieces = buffer.push(delta);
           for (const piece of pieces) {
             if (shouldAbort?.()) break;

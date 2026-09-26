@@ -50,6 +50,18 @@ assert.equal(
     language: 'en',
     callerMemory: { nextAppointment: 'carpet, Tuesday', greetByName: true },
   }),
+  "I'm well. Who is calling?"
+);
+assert.equal(
+  pickPhaticReply({
+    language: 'en',
+    callerMemory: {
+      nextAppointment: 'carpet, Tuesday',
+      greetByName: true,
+      identityBound: true,
+      fileRole: 'primary',
+    },
+  }),
   "I'm well. I have your visit on file. Is that why you called?"
 );
 assert.equal(
@@ -220,6 +232,22 @@ assert.match(
     userText: 'Are you open?',
   }),
   /^Okay\.?$/i
+);
+
+// Live leftover HD_bc9f610692de: bookings ask after the name was already in
+// must not speech-guarantee another name ask.
+assert.doesNotMatch(
+  pickSpeechGuaranteeLine({
+    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    brainState: {
+      intent: 'booking',
+      caller: { name: 'Alvin', nameConfirmed: true },
+      goal: { missingSlots: ['name'] },
+    },
+    language: 'en',
+    userText: 'What are my bookings?',
+  }),
+  /May I have your name/i
 );
 
 console.log('actionProgress tests passed.');

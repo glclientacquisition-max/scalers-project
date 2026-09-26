@@ -23,9 +23,13 @@ export const DESK_LINKS = [
   { href: "/settings", label: "Profile" },
 ] as const;
 
+/** Viewport desk chrome. Scroll stays inside main so the light body never shows under the shell. */
+export const deskShellClass =
+  "desk-theme flex h-dvh min-h-dvh min-w-0 overflow-hidden";
+
 /** Page frame next to the rail. Ticket pages opt into bleed with `data-desk-bleed`. */
 export const deskMainClass =
-  "mx-auto w-full min-w-0 max-w-desk flex-1 px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6 md:overflow-y-auto md:p-6 md:has-[[data-desk-bleed]]:h-full md:has-[[data-desk-bleed]]:max-w-none md:has-[[data-desk-bleed]]:overflow-hidden md:has-[[data-desk-bleed]]:p-0 md:has-[[data-settings-console]]:max-w-none";
+  "mx-auto w-full min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6 md:p-6 md:has-[[data-desk-bleed]]:h-full md:has-[[data-desk-bleed]]:max-w-none md:has-[[data-desk-bleed]]:overflow-hidden md:has-[[data-desk-bleed]]:p-0 md:has-[[data-settings-console]]:max-w-none";
 
 function pathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -142,34 +146,36 @@ export function DeskRail({
   return (
     <div
       data-desk-rail=""
-      className="hidden h-dvh w-[4.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
+      className="hidden h-dvh w-[5.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">
           <BrandLockup href={homeHref} name="Scalers" size="sm" markOnly priority />
         </DeskHint>
       </div>
-      <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1.5 pt-1">
+      <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1 pt-1">
         {DESK_LINKS.map((item) => {
           const active = pathActive(pathname, item.href);
           return (
-            <DeskHint key={item.href} label={item.label}>
-              <Link
-                href={item.href}
-                aria-label={inboxLinkAria(item.label, needsCount) || item.label}
-                aria-current={active ? "page" : undefined}
-                className={[
-                  "inline-flex h-12 w-12 items-center justify-center rounded-xl",
-                  deskShiftClass,
-                  focusRingVisible,
-                  active
-                    ? "bg-accent/10 text-accent-deep"
-                    : "text-ink-soft hover:bg-surface-muted hover:text-ink",
-                ].join(" ")}
-              >
-                <TabIconWithBadge name={item.label} count={needsCount} />
-              </Link>
-            </DeskHint>
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-label={inboxLinkAria(item.label, needsCount) || item.label}
+              aria-current={active ? "page" : undefined}
+              className={[
+                "flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5",
+                deskShiftClass,
+                focusRingVisible,
+                active
+                  ? "bg-accent/10 text-accent-deep"
+                  : "text-ink-soft hover:bg-surface-muted hover:text-ink",
+              ].join(" ")}
+            >
+              <TabIconWithBadge name={item.label} count={needsCount} />
+              <span className="max-w-full truncate text-[10px] font-medium leading-none">
+                {item.label}
+              </span>
+            </Link>
           );
         })}
       </nav>
