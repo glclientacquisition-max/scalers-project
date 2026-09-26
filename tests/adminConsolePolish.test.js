@@ -151,9 +151,9 @@ describe("admin console polish", () => {
   it("documents the admin left-rail exception", () => {
     const master = read("docs/frontend/design-system/MASTER.md");
     assert.match(master, /## Super Admin/);
-    assert.match(master, /exception to the owner-desk ban on a left rail/);
+    assert.match(master, /labeled navy sidebar on `lg\+`/);
+    assert.match(master, /Do not copy the ops sidebar onto `\(desk\)`/);
     const page = read("docs/frontend/design-system/pages/admin.md");
-    assert.match(page, /Owner desk bans a left rail/);
-    assert.match(page, /fixed navy sidebar on `lg\+`/);
+    assert.match(page, /fixed navy labeled sidebar on `lg\+`/);
   });
 });
