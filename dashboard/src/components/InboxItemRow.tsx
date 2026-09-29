@@ -329,16 +329,16 @@ export function InboxPhoneRow({
   const work = item.headline;
   const meta = showHold ? needed : showJob ? visit : when;
   const body = (
-    <div className="min-w-0 flex-1">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)}`}>
+    <div className="min-w-0 flex-1 overflow-hidden">
+      <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+        <p className={`min-w-0 sm:flex-1 text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)}`}>
           {who}
         </p>
         <InboxWhenMeta
           item={item}
           text={meta}
-          className="flex min-w-[5.5rem] shrink-0 items-center justify-end gap-1.5 text-xs text-ink-soft"
-          textClassName="max-w-[7.5rem] truncate"
+          className="flex min-w-0 items-center gap-1.5 text-xs text-ink-soft sm:max-w-[45%] sm:shrink-0 sm:justify-end"
+          textClassName="min-w-0 truncate"
         />
       </div>
       <p className={`mt-0.5 text-sm ${deskPreviewClass} ${item.needsYou ? "text-ink" : "text-ink-soft"}`}>
@@ -353,7 +353,7 @@ export function InboxPhoneRow({
       item={item}
       as="li"
       className={[
-        "relative flex min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
+        "relative flex min-w-0 items-center gap-3 overflow-hidden border-t border-line/70 px-4 py-3 first:border-t-0",
         item.urgent ? "bg-warn-soft/50" : "",
       ].join(" ")}
     >
