@@ -1178,6 +1178,12 @@ async function handleVoiceIncoming(req, res) {
         }, 3000);
       }
     } catch (dbErr) {
+      if (dbErr?.code === 'unassigned_did') {
+        console.warn(`[${callSid}] unassigned number — reject`);
+        return res
+          .type('text/xml')
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+      }
       // Do not fail the webhook / Stream setup if DB is briefly unavailable.
       console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
     }
