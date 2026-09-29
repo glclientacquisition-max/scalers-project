@@ -307,6 +307,66 @@ function decideVisitPlace(
   };
 }
 
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function mentionsPlaceToken(text, place) {
+  const token = placeWords(place).find((word) => word.length >= 4);
+  if (!token) return false;
+  return new RegExp(`\\b${escapeRegExp(token)}\\b`, 'i').test(String(text || ''));
+}
+
+/**
+ * A later "in Nairobi" must not replace a gate or building already heard.
+ * An explicit correction ("not Runda, Karen gate") still replaces it.
+ */
+function preferVisitPlace(previous, incoming, text = '') {
+  const prev = cleanPlace(previous, 240);
+  const next = cleanPlace(incoming, 240);
+  if (!next) return prev;
+  if (!prev) return next;
+  if (prev.toLowerCase() === next.toLowerCase()) return prev;
+  if (
+    /\b(?:not|instead|rather|badala|hapana|siyo|location is|landmark is|address is)\b/i.test(
+      text
+    )
+  ) {
+    return next;
+  }
+  const prevQuality = classifyVisitLocation(prev);
+  const nextQuality = classifyVisitLocation(next);
+  const specific =
+    prevQuality === 'findable' || prevQuality === 'pin_promised';
+  if (!specific || nextQuality !== 'area_only' || placeWords(next).length > 1) {
+    return next;
+  }
+  const parentOfNext = new RegExp(
+    `\\b(?:in|at|kwa)\\s+${escapeRegExp(next)}\\b`,
+    'i'
+  ).test(text);
+  if (parentOfNext && mentionsPlaceToken(text, prev)) return prev;
+  if (mentionsPlaceToken(prev, next)) return prev;
+  return next;
+}
+
+function visitBlockSpeech(blocked, language = 'en') {
+  const lang = String(language || 'en').toLowerCase();
+  const sw = lang === 'sw' || lang.startsWith('swahili');
+  const sheng = lang === 'sheng';
+  if (blocked === 'outside') {
+    if (sw) return 'Eneo hilo liko nje. Ninaweza kuandika callback.';
+    if (sheng) return 'Hiyo area iko nje. Naweza andika callback.';
+    return 'That area is outside our coverage. I can note a callback.';
+  }
+  if (blocked === 'unknown_coverage') {
+    if (sw) return 'Sina orodha ya maeneo. Ninaweza kuandika hii kwa timu.';
+    if (sheng) return 'Sina list ya area. Naweza andika hii kwa team.';
+    return "I don't have our coverage list on file. I can note this for the team.";
+  }
+  return '';
+}
+
 function appendVisitNotes(notes, decision = {}) {
   let next = cleanPlace(notes, 400);
   if (decision.confirmAccess && !/confirm access/i.test(next)) {
@@ -327,5 +387,7 @@ module.exports = {
   classifyVisitLocation,
   assessCoverage,
   decideVisitPlace,
+  preferVisitPlace,
+  visitBlockSpeech,
   appendVisitNotes,
 };

@@ -206,6 +206,7 @@ const {
   pickPhaticReply,
   polishSpokenReply,
 } = require('./src/conversation/dynamicSpeech');
+const { visitBlockSpeech } = require('./src/conversation/visitLocation');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -2388,6 +2389,24 @@ mediaWss.on('connection', (ws, req) => {
         await speakText(identityLine);
         spokeThisTurn = true;
         logTurnTiming(turnTiming, { outcome: 'identity' });
+        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+        return;
+      }
+
+      const placeBlockLine = visitBlockSpeech(
+        brainState.visitPlace?.blocked,
+        callLanguage
+      );
+      if (placeBlockLine && !/^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i.test(clean)) {
+        console.log(
+          `[ws/media][${callKey}] visit block local reply lang=${callLanguage}: ${placeBlockLine}`
+        );
+        callTranscript.pushAgent(placeBlockLine);
+        messages.push({ role: 'assistant', content: placeBlockLine, local: true });
+        turnTiming.markFirstSpokenChunk();
+        await speakText(placeBlockLine);
+        spokeThisTurn = true;
+        logTurnTiming(turnTiming, { outcome: 'visit_block' });
         if (activeTurnTiming === turnTiming) activeTurnTiming = null;
         return;
       }

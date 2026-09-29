@@ -10,6 +10,8 @@ const {
   classifyVisitLocation,
   assessCoverage,
   decideVisitPlace,
+  preferVisitPlace,
+  visitBlockSpeech,
 } = require('../src/conversation/visitLocation');
 const { formatPlaybookForPrompt } = require('../src/conversation/playbooks');
 
@@ -45,6 +47,25 @@ describe('visit location ladder', () => {
       'outside'
     );
     assert.equal(assessCoverage('Runda', { businessPolicies: {} }), 'unknown');
+  });
+
+  it('keeps a gate when the caller only adds the city', () => {
+    const prior = 'Runda Green Park gate 4';
+    assert.equal(
+      preferVisitPlace(prior, 'Nairobi', 'Runda is in Nairobi'),
+      prior
+    );
+    assert.equal(preferVisitPlace(prior, 'Karen', "I'm in Karen"), 'Karen');
+    assert.match(
+      preferVisitPlace(prior, 'Karen gate 2', 'not Runda, Karen gate 2'),
+      /Karen gate 2/
+    );
+  });
+
+  it('speaks the fixed outside line', () => {
+    assert.match(visitBlockSpeech('outside', 'en'), /outside our coverage/i);
+    assert.match(visitBlockSpeech('outside', 'sw'), /nje/i);
+    assert.equal(visitBlockSpeech('refused', 'en'), '');
   });
 
   it('soft-saves area-only only after one follow-up when coverage matches', () => {

@@ -22,7 +22,11 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
-const { decideVisitPlace, isLocationRefusal } = require('./visitLocation');
+const {
+  decideVisitPlace,
+  isLocationRefusal,
+  preferVisitPlace,
+} = require('./visitLocation');
 const {
   isRepairSignal,
   applyRepairObservation,
@@ -422,21 +426,42 @@ function observeCallerTurn(state, input = {}) {
     next = markRepairProgress(next);
   }
 
-  const homeVisit =
+  const homeVertical =
     String(input.profile?.vertical || next.vertical || '').toLowerCase() ===
-      'home_services' && next.intent === 'booking';
+    'home_services';
+  const homeVisit = homeVertical && next.intent === 'booking';
   if (homeVisit && isLocationRefusal(text)) {
     next.conversation.locationRefusals =
       Number(next.conversation.locationRefusals || 0) + 1;
   }
-  if (homeVisit) {
-    const place =
+  if (homeVertical) {
+    const incoming =
       entityValue(next.entities?.location) || entityValue(next.entities?.landmark);
-    next.visitPlace = decideVisitPlace(place, {
-      profile: input.profile || {},
-      detailAsked: Boolean(next.conversation.locationDetailAsked),
-      refusals: Number(next.conversation.locationRefusals || 0),
-    });
+    const previous =
+      entityValue(state?.entities?.location) || entityValue(state?.entities?.landmark);
+    const place = preferVisitPlace(previous, incoming, text);
+    const keptSpecific = Boolean(place && incoming && place !== incoming);
+    if (keptSpecific) {
+      next.entities.location = {
+        value: place,
+        source: 'caller_explicit',
+        confidence: 0.9,
+        confirmed: false,
+      };
+      if (state?.intent === 'booking') {
+        next.intent = 'booking';
+        next.goal.primary = 'make_booking_request';
+      }
+    }
+    if (next.intent === 'booking' || keptSpecific) {
+      next.visitPlace = decideVisitPlace(place, {
+        profile: input.profile || {},
+        detailAsked: Boolean(next.conversation.locationDetailAsked),
+        refusals: Number(next.conversation.locationRefusals || 0),
+      });
+    } else {
+      next.visitPlace = null;
+    }
   } else {
     next.visitPlace = null;
   }

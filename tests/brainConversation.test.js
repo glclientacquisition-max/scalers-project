@@ -350,6 +350,37 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(turn.decision.action, 'CREATE_REQUEST');
   });
 
+  it('keeps the gate when the caller says the estate is in the city', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      businessPolicies: { delivery: 'Nairobi' },
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Book carpet cleaning tomorrow at 10 AM. My name is Alex.',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    turn = runTurn(
+      turn.state,
+      turn.languageState,
+      'Runda Green Park gate 4',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.match(entityValue(turn.state.entities.location), /Green Park gate 4/i);
+    turn = runTurn(turn.state, turn.languageState, 'Runda is in Nairobi', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.match(entityValue(turn.state.entities.location), /Green Park gate 4/i);
+    assert.doesNotMatch(entityValue(turn.state.entities.location), /^Nairobi$/i);
+  });
+
   it('saves an in-coverage area after one follow-up and flags confirm access', () => {
     const homeProfile = {
       vertical: 'home_services',
