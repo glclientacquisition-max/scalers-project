@@ -54,9 +54,14 @@ function compareContactRows(a, b, sort) {
   return at < bt ? 1 : -1;
 }
 
-function contactListSubline(row) {
+function contactListTitle(row) {
   if (!String(row.name || "").trim()) return "Unknown caller";
+  return String(row.name || "").trim();
+}
+
+function contactListSubline(row) {
   const phone = String(row.phone || "").trim();
+  if (!String(row.name || "").trim()) return phone || "No phone";
   if (phone) return phone;
   return "";
 }
@@ -92,9 +97,11 @@ describe("contacts list Phase 1 helpers", () => {
         .map((row) => row.name),
       ["Amina", "Brian", "Otieno", ""]
     );
-    assert.equal(contactListSubline({ name: null, phone: "+254700000001" }), "Unknown caller");
+    assert.equal(contactListTitle({ name: null, phone: "+254700000001" }), "Unknown caller");
+    assert.equal(contactListSubline({ name: null, phone: "+254700000001" }), "+254700000001");
     assert.equal(contactListSubline({ name: "Amina", phone: "+254700000002" }), "+254700000002");
     const src = read("dashboard/src/lib/contactsLoad.ts");
+    assert.match(src, /export function contactListTitle/);
     assert.match(src, /export function contactListSubline/);
     assert.match(src, /return "Unknown caller"/);
     assert.match(src, /formatCallWhenRelative\(row\.lastContactAt\)/);

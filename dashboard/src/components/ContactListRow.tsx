@@ -68,7 +68,13 @@ export function ContactPhoneRow({
             </p>
           ) : null}
         </div>
-        <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>{subline}</p>
+        <p
+          className={`mt-0.5 text-sm text-ink-soft ${
+            unsaved ? "whitespace-normal break-words" : deskPreviewClass
+          }`}
+        >
+          {subline}
+        </p>
         {unsaved ? (
           <div className={`${deskRowActionClass} mt-1`}>
             <ContactNameForm contactId={row.id} initialName={row.name} variant="row" />
@@ -97,7 +103,7 @@ export function ContactTableRow({
       id={row.id}
       className={`group relative cursor-pointer border-t border-line/70 ${deskShiftClass} hover:bg-accent/[0.04]`}
     >
-      <td className="px-3 py-3.5 align-top lg:px-5 lg:py-5">
+      <td className="px-3 py-3.5 align-top lg:px-3 lg:py-2">
         <DeskRowHit href={href} label={title} />
         <div className={`${deskRowMutedClass} flex min-w-0 items-center gap-3`}>
           <RowIdentity name={row.name} />
@@ -105,11 +111,7 @@ export function ContactTableRow({
             <p className={`text-base font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
               {title}
             </p>
-            <p
-              className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass} ${
-                unsaved ? "" : "lg:hidden"
-              }`}
-            >
+            <p className={`mt-0.5 text-sm text-ink-soft ${deskPreviewClass} lg:hidden`}>
               {subline}
             </p>
             {unsaved ? (
@@ -121,14 +123,14 @@ export function ContactTableRow({
         </div>
       </td>
       <td
-        className={`${deskRowMutedClass} hidden px-3 py-3.5 align-top font-mono text-sm text-ink lg:table-cell lg:px-5 lg:py-5`}
+        className={`${deskRowMutedClass} hidden whitespace-nowrap px-3 py-3.5 align-top font-mono text-sm text-ink lg:table-cell lg:px-3 lg:py-2`}
       >
         {row.phone || "No phone"}
       </td>
-      <td className={`${deskRowMutedClass} ${deskPreviewCellClass} px-3 py-3.5 align-top text-sm text-ink-soft lg:px-5 lg:py-5`}>
+      <td className={`${deskRowMutedClass} ${deskPreviewCellClass} px-3 py-3.5 align-top text-sm text-ink-soft lg:px-3 lg:py-2`}>
         <p className={`tabular-nums ${deskPreviewClass}`}>{lastCall || "None"}</p>
       </td>
-      <td className="w-px px-3 py-3.5 align-middle lg:px-5 lg:py-5">
+      <td className="w-px px-3 py-3.5 align-middle lg:px-3 lg:py-2">
         <ContactListDock phone={row.phone} />
       </td>
     </DeskLandSurface>

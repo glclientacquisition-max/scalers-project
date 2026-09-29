@@ -22,7 +22,7 @@ export default async function ContactImportPage() {
     <div className="max-w-3xl" data-desk-nested="">
       <DeskRecordLead back={<DeskBack href="/contacts">Contacts</DeskBack>}>
         <h1 className="font-display text-[clamp(1.5rem,2.4vw,2rem)] font-semibold leading-tight tracking-tight text-ink">
-          Import
+          Import Contacts
         </h1>
         <p className="mt-2 text-sm text-ink-soft">CSV. Max 500 rows.</p>
       </DeskRecordLead>

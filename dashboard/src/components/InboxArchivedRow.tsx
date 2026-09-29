@@ -71,7 +71,7 @@ export function InboxArchivedTableRow({
         "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
       ].join(" ")}
     >
-      <td colSpan={4} className="relative min-h-12 px-5 py-4">
+      <td colSpan={4} className="relative min-h-12 px-3 py-2">
         <DeskRowHit href={inboxArchivedHref(ret)} label="Archived" />
         <div className="flex items-center gap-3">
           <div className={deskRowMutedClass}>

@@ -28,13 +28,9 @@ export const ALERTS_SETTINGS_FORM_ID = "alerts-settings-form";
 export function AlertsPanel({
   tenant,
   businessName,
-  lineLive,
-  lineDetail,
 }: {
   tenant: TenantRow;
   businessName: string;
-  lineLive: boolean;
-  lineDetail: string;
 }) {
   const router = useRouter();
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(
@@ -67,8 +63,7 @@ export function AlertsPanel({
     <section className="min-w-0 w-full space-y-6">
       <SettingsPageHeader
         businessName={businessName}
-        lineLive={lineLive}
-        lineDetail={lineDetail}
+        lineLive={false}
         showBack
         title="Alerts"
         action={

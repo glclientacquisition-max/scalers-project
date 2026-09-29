@@ -117,7 +117,8 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(home, />Overview</);
     assert.match(home, /HomeOverviewHeader/);
     assert.doesNotMatch(homeHeader, /deskListTitleClass/);
-    assert.match(homeHeader, /<h1[\s\S]*text-lg font-semibold[\s\S]*\{business\}/);
+    assert.doesNotMatch(homeHeader, /<h1/);
+    assert.doesNotMatch(homeHeader, /\{business\}/);
     assert.doesNotMatch(home, /pageTitleClass/);
     assert.match(settingsShell, /<SettingsPageHeader[\s\S]*?index/);
     assert.doesNotMatch(
@@ -132,7 +133,10 @@ describe("desk shell chrome", () => {
 
     const ticket = read("dashboard/src/components/InboxTicketView.tsx");
     const ticketHeader = ticket.slice(ticket.indexOf("<header"), ticket.indexOf("</header>"));
-    assert.match(ticketHeader, /<DeskBack href=\{backHref\}>Inbox<\/DeskBack>/);
+    assert.match(
+      ticketHeader,
+      /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/
+    );
     assert.doesNotMatch(ticketHeader, /deskListTitleClass/);
     assert.doesNotMatch(ticketHeader, /<h1[\s\S]{0,120}>Inbox<\/h1>/);
     assert.doesNotMatch(ticketHeader, /BrandLockup|BrandWordmark/);
@@ -167,7 +171,9 @@ describe("desk shell chrome", () => {
     assert.match(signOut, /if \(!confirming\)/);
     assert.doesNotMatch(settingsUi, /SignOutButton/);
     assert.match(settingsUi, />Profile</);
-    assert.match(settingsShell, /<SignOutButton/);
+    assert.doesNotMatch(settingsShell, /SignOutButton/);
+    assert.doesNotMatch(settingsShell, /SettingsSignOutRow/);
+    assert.match(read("dashboard/src/components/DeskAccountBar.tsx"), /<SignOutButton/);
     assert.match(settingsUi, /uppercase tracking-wide text-gray-500/);
     assert.match(settingsShell, /settingsGroupTitleClass/);
     assert.match(settingsShell, /data-settings-menu/);
@@ -185,7 +191,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(homeHeader, /size="xs"/);
     assert.doesNotMatch(homeHeader, /size="lg"/);
     assert.doesNotMatch(homeHeader, /deskListTitleClass/);
-    assert.match(homeHeader, /text-lg font-semibold/);
+    assert.doesNotMatch(homeHeader, /text-lg font-semibold/);
     assert.doesNotMatch(home, /BrandLockup/);
     assert.doesNotMatch(home, /nairobiGreeting/);
     assert.doesNotMatch(home, /pageTitleClass/);

@@ -52,14 +52,14 @@ function SingleTable({ entry }: { entry: ContactTimelineEntry }) {
         entry.href ? "cursor-pointer hover:bg-accent/[0.04]" : "",
       ].join(" ")}
     >
-      <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 text-ink-soft`}>
+      <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 text-ink-soft`}>
         <TimelineRowHit entry={entry} />
         {formatCallWhen(entry.createdAt)}
       </td>
-      <td className={`${deskRowMutedClass} px-5 py-4`}>
+      <td className={`${deskRowMutedClass} px-3 py-2`}>
         <InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />
       </td>
-      <td className={`${deskPreviewCellClass} px-5 py-4`}>
+      <td className={`${deskPreviewCellClass} px-3 py-2`}>
         <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
       </td>
     </tr>
@@ -161,19 +161,19 @@ export function ContactHistory({
                 <tr>
                   <th
                     scope="col"
-                    className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
                   >
                     When
                   </th>
                   <th
                     scope="col"
-                    className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
                   >
                     Type
                   </th>
                   <th
                     scope="col"
-                    className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
                   >
                     What
                   </th>
@@ -267,7 +267,7 @@ function GroupTable({
             type="button"
             aria-expanded={open}
             onClick={onToggle}
-            className={`flex min-h-11 w-full items-center justify-between gap-3 px-5 py-4 text-left ${deskShiftClass}`}
+            className={`flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left ${deskShiftClass}`}
           >
             <span className="min-w-0 text-sm text-ink">{copy}</span>
             <InboxPurposeChip purpose={row.group.purpose} label={row.group.stamp} />

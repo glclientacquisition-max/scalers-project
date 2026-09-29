@@ -82,7 +82,6 @@ function inboxNeedsYouNextStep(row, vertical) {
   const recipe = inboxListDockRecipe(row);
   if (recipe === "confirm") return nicheConfirmStamp(vertical);
   if (recipe === "hold_done") return "Hold Done";
-  if (recipe === "call_wa") return "Call or WhatsApp";
   return null;
 }
 
@@ -120,13 +119,11 @@ describe("Needs you whose-turn next-step", () => {
     assert.equal(inboxNeedsYouNextStep(visit), "Confirm visit");
     assert.equal(inboxNeedsYouNextStep(visit, "hospitality"), "Confirm visit");
     assert.equal(inboxNeedsYouNextStep(hold), "Hold Done");
-    assert.equal(inboxNeedsYouNextStep(human), "Call or WhatsApp");
-    assert.equal(inboxNeedsYouNextStep(missed), "Call or WhatsApp");
-    assert.equal(inboxNeedsYouNextStep(visitIntent), "Call or WhatsApp");
-    assert.equal(inboxNeedsYouNextStep(holdIntent), "Call or WhatsApp");
+    assert.equal(inboxNeedsYouNextStep(human), null);
+    assert.equal(inboxNeedsYouNextStep(missed), null);
+    assert.equal(inboxNeedsYouNextStep(visitIntent), null);
+    assert.equal(inboxNeedsYouNextStep(holdIntent), null);
     assert.equal(inboxNeedsYouNextStep(visitIntentSilent), null);
-    assert.doesNotMatch(inboxNeedsYouNextStep(visitIntent), /Confirm|Done/);
-    assert.doesNotMatch(inboxNeedsYouNextStep(holdIntent), /Confirm|Done/);
   });
 
   it("omits the line on live, archived, confirmed, and leftover rows", () => {
@@ -168,7 +165,7 @@ describe("Needs you whose-turn next-step", () => {
     assert.match(verbs, /inboxListDockRecipe\(item\)/);
     assert.match(verbs, /recipe === "confirm"[\s\S]*confirmStamp/);
     assert.match(verbs, /recipe === "hold_done"[\s\S]*"Hold Done"/);
-    assert.match(verbs, /recipe === "call_wa"[\s\S]*"Call or WhatsApp"/);
+    assert.doesNotMatch(verbs, /Call or WhatsApp/);
     assert.doesNotMatch(verbs, /Your turn|Waiting on caller|Awaiting confirm/);
     assert.doesNotMatch(verbs, /lead_status:\s*"resolved"/);
     assert.doesNotMatch(verbs, /notifyChannels/);

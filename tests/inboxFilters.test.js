@@ -20,7 +20,8 @@ describe("inbox filters and empty states", () => {
   it("uses existing purpose piles, not Unread or Assigned", () => {
     assert.match(niche, /label: "Needs you"/);
     assert.match(niche, /label: "All"/);
-    assert.match(niche, /label: "Human"/);
+    assert.match(niche, /label: copy\.returnCtaMany/);
+    assert.doesNotMatch(niche, /label: "Human"/);
     assert.doesNotMatch(niche, /label: "Archived"/);
     assert.match(purpose, /export function itemIsArchived/);
     assert.doesNotMatch(purpose, /if \(lead\.leadStatus === "archived"\) continue/);

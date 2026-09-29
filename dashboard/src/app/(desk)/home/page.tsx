@@ -175,11 +175,13 @@ export default async function HomeOverviewPage() {
     ctaLabel = "Train";
   }
 
-  const showCta = !(line === "pending" && waitingCount === 0);
+  const returnSidebar =
+    ctaLabel === copy.returnCtaOne || ctaLabel === copy.returnCtaMany;
+  const showCta = !(line === "pending" && waitingCount === 0) && !returnSidebar;
 
   return (
     <div className="w-full min-w-0">
-      <HomeOverviewHeader business={business} today={today} />
+      <HomeOverviewHeader today={today} />
 
       {inbox.partialError ? (
         <div className="mt-6">

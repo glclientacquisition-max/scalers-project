@@ -163,12 +163,21 @@ export function settingsNavItems(): SettingsNavItem[] {
 
 export function settingsPanelHeading(
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel
+  trainPanel: SettingsPanel,
+  vertical?: string | null
 ): string | null {
   if (tab === "menu") return null;
   if (tab === "catalog") return "Catalog";
   if (tab === "alerts") return "Alerts";
-  if (tab === "import") return "Import";
+  if (tab === "import") {
+    const v = String(vertical || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
+    return v === "retail" || v === "shop" || v === "shops"
+      ? "Import Catalog"
+      : "Import Knowledge";
+  }
   if (tab === "test") return "Test";
   if (tab === "appearance") return "Appearance";
   if (tab !== "train") return null;

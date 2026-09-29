@@ -30,7 +30,6 @@ import {
   settingsRailWrapClass,
 } from "@/components/settingsUi";
 import { ThemePicker } from "@/components/ThemePicker";
-import { SignOutButton } from "@/components/ui/SignOutButton";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 
 function SettingsChevron() {
@@ -71,16 +70,6 @@ function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
         </div>
       </SettingsGroup>
     </section>
-  );
-}
-
-function SettingsSignOutRow() {
-  return (
-    <li className="border-t border-line">
-      <div className="flex min-h-12 items-center px-2">
-        <SignOutButton />
-      </div>
-    </li>
   );
 }
 
@@ -130,11 +119,6 @@ function SettingsMenu({
                   </li>
                 );
               })}
-              {section.id === "device" ? (
-                <li className="px-1 pt-1">
-                  <SignOutButton />
-                </li>
-              ) : null}
             </ul>
           ) : (
             <ul className="w-full overflow-hidden rounded-xl border border-line bg-surface">
@@ -165,7 +149,6 @@ function SettingsMenu({
                   </li>
                 );
               })}
-              {section.id === "device" ? <SettingsSignOutRow /> : null}
             </ul>
           )}
         </section>
@@ -225,7 +208,7 @@ export function BusinessSettingsShell({
     tab === "catalog" ? "catalog" : tab === "train" ? trainPanel : "identity";
   const showForm = tab === "catalog" || tab === "train";
   const isMenu = tab === "menu";
-  const heading = settingsPanelHeading(tab, trainPanel);
+  const heading = settingsPanelHeading(tab, trainPanel, tenant.vertical);
   const { lineLive, lineDetail } = settingsLineState(tenant.sautikit_virtual_number);
   const businessName = tenant.business_name?.trim() || "Business";
 
@@ -268,7 +251,6 @@ export function BusinessSettingsShell({
             panel="identity"
             curatedVoices={curatedVoices}
             heading="Identity"
-            lineNumber={lineLive ? lineDetail : "Number pending"}
             sidebar={rail}
             liveTransferExecutor={liveTransferExecutor}
             showBack={false}
@@ -287,7 +269,6 @@ export function BusinessSettingsShell({
           panel={formPanel}
           curatedVoices={curatedVoices}
           heading={heading}
-          lineNumber={lineLive ? lineDetail : "Number pending"}
           sidebar={rail}
           liveTransferExecutor={liveTransferExecutor}
         />
@@ -296,18 +277,14 @@ export function BusinessSettingsShell({
           {rail}
           <div className={settingsPanelClass}>
             {tab === "alerts" ? (
-              <AlertsPanel
-                tenant={tenant}
-                businessName={businessName}
-                lineLive={lineLive}
-                lineDetail={lineDetail}
-              />
+              <AlertsPanel tenant={tenant} businessName={businessName} />
             ) : (
               <>
                 <SettingsPageHeader
                   businessName={businessName}
                   lineLive={lineLive}
                   lineDetail={lineDetail}
+                  showLine={tab === "test"}
                   showBack
                   title={heading}
                 />

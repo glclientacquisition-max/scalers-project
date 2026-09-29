@@ -55,8 +55,8 @@ export function inboxListDockRecipe(item: InboxItem): InboxListDockRecipe {
 }
 
 /**
- * Needs you next-step line. Restates the list dock in words.
- * Not a new lead_status. Live and empty docks omit the line.
+ * Needs you next-step line. Restates Confirm and Hold Done only.
+ * Call and WhatsApp stay on the dock. Not a new lead_status.
  */
 export function inboxNeedsYouNextStep(
   item: InboxItem,
@@ -67,7 +67,6 @@ export function inboxNeedsYouNextStep(
   const recipe = inboxListDockRecipe(item);
   if (recipe === "confirm") return nicheCopy(vertical).confirmStamp;
   if (recipe === "hold_done") return "Hold Done";
-  if (recipe === "call_wa") return "Call or WhatsApp";
   return null;
 }
 

@@ -7,14 +7,14 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 
 ## IA
 
-`/settings` is the Profile tab. Bare `/settings` is the account hub: destination index plus muted Sign out. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance`. No new field screens.
+`/settings` is the Profile tab. Bare `/settings` is the account hub: destination index. Sign out stays on the account bar. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance`. No new field screens.
 
 ```text
 Business       Identity · Hours · Locations · Policies
 Assistant      Voice · Pronunciation · Test
 Knowledge      FAQs · Catalog · Import
 Alerts         Alerts · Team
-This device    Appearance · Sign out
+This device    Appearance
 ```
 
 Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Test stays under Assistant. Team stays under Alerts. Import stays under Knowledge. Updates stay on Home.
@@ -27,7 +27,7 @@ Bare `/settings` is the hub. lg+ hub shows Identity in the panel. `?tab=updates`
 
 ## Chrome
 
-Short in-page title Profile plus compact workspace name and Line live / Number pending. Do not use `deskListTitleClass` on the hub. Muted Sign out on the hub header and in This device (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`.
+Short in-page title Profile plus compact workspace name. Line live / Number pending stays on Test. Appearance, Import, Catalog, and the other panels do not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the account bar (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
@@ -200,7 +200,7 @@ Home only. `DailyBulletinPanel` is not a Profile destination. Old `?tab=updates`
 
 Pre-paint script in `app/layout.tsx` reads the same key so the choice survives reload on that browser.
 
-### Sign out (hub header, This device index, lg+ rail)
+### Sign out (account bar)
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |

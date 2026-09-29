@@ -272,7 +272,6 @@ export function TenantForm({
   panel = "identity",
   curatedVoices,
   heading = null,
-  lineNumber = "",
   sidebar = null,
   liveTransferExecutor = false,
   showBack = true,
@@ -281,7 +280,6 @@ export function TenantForm({
   panel?: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
   heading?: string | null;
-  lineNumber?: string;
   sidebar?: ReactNode;
   liveTransferExecutor?: boolean;
   showBack?: boolean;
@@ -728,10 +726,7 @@ export function TenantForm({
         <div className={`${settingsPanelClass} space-y-4`}>
           <SettingsPageHeader
             businessName={tenant.business_name?.trim() || "Business"}
-            lineLive={Boolean(lineNumber) && lineNumber !== "Number pending"}
-            lineDetail={
-              Boolean(lineNumber) && lineNumber !== "Number pending" ? lineNumber : ""
-            }
+            lineLive={false}
             showBack={showBack}
             title={heading}
             action={
@@ -1294,6 +1289,7 @@ export function TenantForm({
           </div>
         </div>
 
+        {vertical === "home_services" ? null : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <p className={settingsBlockTitleClass}>Products</p>
@@ -1504,6 +1500,7 @@ export function TenantForm({
             </>
           )}
         </div>
+        )}
       </section>
 
       <section className={panel === "hours" ? "space-y-6" : "hidden"}>

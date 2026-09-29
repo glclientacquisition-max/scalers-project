@@ -130,7 +130,7 @@ function InboxRowWho({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       <InboxRowCheck item={item} />
       <RowStateDot show={item.unread} live={item.purpose === "live"} />
       <div className={deskRowActionClass}>
@@ -235,7 +235,7 @@ export function InboxTableRow({
     >
       {kind === "hold" ? (
         <>
-          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
+          <td className={`px-3 py-2 align-top ${deskPreviewCellClass}`}>
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
@@ -246,10 +246,10 @@ export function InboxTableRow({
               <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
-          <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
+          <td className={`${deskRowMutedClass} max-w-[10rem] px-3 py-2 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
-          <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
+          <td className={`${deskRowMutedClass} px-3 py-2 align-top text-sm text-ink-soft`}>
             <InboxWhenMeta item={item} text={showHold ? needed : when} />
           </td>
         </>
@@ -257,7 +257,7 @@ export function InboxTableRow({
 
       {kind === "job" ? (
         <>
-          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
+          <td className={`px-3 py-2 align-top ${deskPreviewCellClass}`}>
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
@@ -268,10 +268,10 @@ export function InboxTableRow({
               <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
-          <td className={`${deskRowMutedClass} max-w-[10rem] px-5 py-4 align-top font-medium text-ink`}>
+          <td className={`${deskRowMutedClass} max-w-[10rem] px-3 py-2 align-top font-medium text-ink`}>
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
-          <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
+          <td className={`${deskRowMutedClass} px-3 py-2 align-top text-sm text-ink-soft`}>
             <InboxWhenMeta item={item} text={hasJob ? place : ""} />
           </td>
         </>
@@ -279,7 +279,7 @@ export function InboxTableRow({
 
       {kind === "mixed" ? (
         <>
-          <td className={`px-5 py-4 align-top ${deskPreviewCellClass}`}>
+          <td className={`px-3 py-2 align-top ${deskPreviewCellClass}`}>
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
               <p
@@ -291,16 +291,16 @@ export function InboxTableRow({
               <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
-          <td className={`${deskRowMutedClass} min-w-[7rem] px-5 py-4 align-top`}>
+          <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 align-top`}>
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
           </td>
-          <td className={`${deskRowMutedClass} min-w-[6.5rem] whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
+          <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 align-top text-sm text-ink-soft`}>
             <InboxWhenMeta item={item} text={when} />
           </td>
         </>
       ) : null}
 
-      <td className={`${deskRowActionClass} whitespace-nowrap px-5 py-4 align-middle`}>
+      <td className={`${deskRowActionClass} whitespace-nowrap px-3 py-2 align-middle`}>
         <div className="flex items-center justify-end gap-1">
           <InboxRowMore item={item} />
           <InboxTrailingAction item={item} message={message} />
