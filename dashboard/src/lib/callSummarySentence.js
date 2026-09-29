@@ -20,6 +20,29 @@ function trimText(raw) {
   return typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
 }
 
+const MOOD_LABEL = {
+  calm: "Calm",
+  rushed: "Rushed",
+  confused: "Confused",
+  upset: "Upset",
+  angry: "Angry",
+  urgent: "Urgent",
+};
+
+/** Empty, "None", and "None." are not an owner action. */
+function usefulOwnerFact(raw) {
+  const text = trimText(raw);
+  if (!text || /^none\.?$/i.test(text)) return "";
+  return text;
+}
+
+/** Known mood only. Unknown and blank stay off the desk. */
+function usefulMoodLabel(raw) {
+  const key = trimText(raw).toLowerCase();
+  if (!key || key === "unknown") return "";
+  return MOOD_LABEL[key] || "";
+}
+
 /**
  * Inbox one-liner. Hangup `reason` first, then Want, then live reason.
  *
@@ -132,4 +155,6 @@ module.exports = {
   pickCallOwnerCard,
   buildSummarySentence,
   displayContactLastReason,
+  usefulOwnerFact,
+  usefulMoodLabel,
 };

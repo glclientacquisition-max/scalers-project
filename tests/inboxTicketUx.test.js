@@ -156,6 +156,11 @@ describe("inbox ticket action chrome", () => {
     const structured = summary.slice(summary.indexOf("return ("));
     assert.ok(structured.indexOf('label="Want"') < structured.indexOf('label="Do next"'));
     assert.ok(structured.indexOf('label="Do next"') < structured.indexOf('label="Mood"'));
+    assert.match(summary, /const structured = Boolean\(nextText \|\| doneText \|\| moodLabel\)/);
+    assert.match(summary, /\{nextText \? <Field label="Do next"/);
+    assert.match(summary, /\{moodLabel \? <Field label="Mood"/);
+    assert.match(summary, /\{doneText \? <Field label="Done"/);
+    assert.doesNotMatch(summary, /"None"|Unknown/);
   });
 });
 

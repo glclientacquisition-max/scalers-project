@@ -28,3 +28,7 @@ export function displayContactLastReason(opts: {
   lastReason: string | null;
   latestCallReason: string | null;
 }): string | null;
+
+export function usefulOwnerFact(raw: string | null | undefined): string;
+
+export function usefulMoodLabel(raw: string | null | undefined): string;

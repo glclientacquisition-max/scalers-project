@@ -25,7 +25,11 @@ import {
   contactPersonFileKpiCards,
   pickFirstSeenAt,
 } from "@/lib/contactPersonFile";
-import { displayContactLastReason } from "@/lib/callSummarySentence";
+import {
+  displayContactLastReason,
+  usefulMoodLabel,
+  usefulOwnerFact,
+} from "@/lib/callSummarySentence";
 import { CallSummaryCard } from "@/components/CallSummaryCard";
 import { ContactKpiStrip } from "@/components/ContactKpiStrip";
 import { ContactHistory } from "@/components/ContactHistory";
@@ -41,12 +45,6 @@ import {
   type ContactHistoryFilter,
 } from "@/lib/contactHistoryView";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
-
-function actionableOwnerFact(raw: string | null | undefined): string | null {
-  const text = String(raw || "").replace(/\s+/g, " ").trim();
-  if (!text || /^none$/i.test(text)) return null;
-  return text;
-}
 
 function fileHref(
   id: string,
@@ -137,8 +135,11 @@ export default async function ContactDetailPage({
     lastReason: contact.last_reason,
     latestCallReason: latestCall?.ownerReason || latestCall?.ownerWant || null,
   });
+  const ownerDone = usefulOwnerFact(latestCall?.ownerCard?.done);
+  const ownerNext = usefulOwnerFact(latestCall?.ownerCard?.next);
+  const ownerMood = usefulMoodLabel(latestCall?.ownerCard?.mood);
   const showLastReason =
-    Boolean(latestCall?.ownerCard?.done || latestCall?.ownerCard?.mood || latestCall?.ownerCard?.next) ||
+    Boolean(ownerDone || ownerNext || ownerMood) ||
     !lastReasonIsHistoryDuplicate(lastReason, latestCall);
   const threadsHref = inboxThreadsFromContactHref(contact.phone);
   const kpiCards = contactPersonFileKpiCards({
@@ -216,8 +217,9 @@ export default async function ContactDetailPage({
                   latestCall?.ownerWant ||
                   contact.last_reason
                 }
-                done={actionableOwnerFact(latestCall?.ownerCard?.done)}
-                next={actionableOwnerFact(latestCall?.ownerCard?.next)}
+                done={ownerDone || null}
+                mood={ownerMood || null}
+                next={ownerNext || null}
               />
             </section>
           ) : null}

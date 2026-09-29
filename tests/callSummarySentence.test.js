@@ -1,11 +1,15 @@
 // Run: node --test tests/callSummarySentence.test.js
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const {
   displayContactLastReason,
   pickCallOwnerCard,
   pickCallOwnerReason,
   pickCallOwnerWant,
+  usefulMoodLabel,
+  usefulOwnerFact,
 } = require('../dashboard/src/lib/callSummarySentence');
 
 describe('contact last reason matches call summary', () => {
@@ -78,5 +82,36 @@ describe('contact last reason matches call summary', () => {
     assert.match(shown, /confused about his booking/);
     assert.doesNotMatch(shown, /aje asked/);
     assert.doesNotMatch(shown, /so Shy handled/);
+  });
+
+  it('treats None and Unknown as unset so next does not unlock empty rows', () => {
+    assert.equal(usefulOwnerFact('None'), '');
+    assert.equal(usefulOwnerFact('None.'), '');
+    assert.equal(usefulOwnerFact('Call them back'), 'Call them back');
+    assert.equal(usefulMoodLabel('unknown'), '');
+    assert.equal(usefulMoodLabel('Unknown'), '');
+    assert.equal(usefulMoodLabel(''), '');
+    assert.equal(usefulMoodLabel('upset'), 'Upset');
+    const page = fs.readFileSync(
+      path.join(__dirname, '../dashboard/src/app/(desk)/contacts/[id]/page.tsx'),
+      'utf8'
+    );
+    const history = fs.readFileSync(
+      path.join(__dirname, '../dashboard/src/lib/contactHistoryView.ts'),
+      'utf8'
+    );
+    assert.match(page, /usefulOwnerFact\(latestCall\?\.ownerCard\?\.done\)/);
+    assert.match(page, /usefulMoodLabel\(latestCall\?\.ownerCard\?\.mood\)/);
+    assert.match(page, /mood=\{ownerMood \|\| null\}/);
+    assert.doesNotMatch(page, /ownerCard\?\.mood \|\|/);
+    assert.match(history, /usefulOwnerFact\(card\.done\)/);
+    assert.match(history, /usefulMoodLabel\(card\.mood\)/);
+    const callPage = fs.readFileSync(
+      path.join(__dirname, '../dashboard/src/app/(desk)/calls/[id]/page.tsx'),
+      'utf8'
+    );
+    assert.match(callPage, /usefulOwnerFact\(summaryCard\?\.done\)/);
+    assert.match(callPage, /usefulMoodLabel\(summaryCard\?\.mood\)/);
+    assert.doesNotMatch(callPage, /moodKey !== "unknown"/);
   });
 });

@@ -1,4 +1,5 @@
 import { formatCallWhen } from "@/lib/callsTriage";
+import { usefulMoodLabel, usefulOwnerFact } from "@/lib/callSummarySentence";
 import type { InboxPurpose } from "@/lib/inboxPurpose";
 import { purposeLabel } from "@/lib/inboxPurpose";
 import type { ContactTimelineEntry } from "@/lib/contactPersonFile";
@@ -236,7 +237,12 @@ export function lastReasonIsHistoryDuplicate(
   const reason = String(lastReason || "").trim().toLowerCase();
   if (!reason || !latest) return false;
   const card = latest.ownerCard;
-  if (card && (card.done || card.mood || card.next)) return false;
+  if (
+    card &&
+    (usefulOwnerFact(card.done) || usefulMoodLabel(card.mood) || usefulOwnerFact(card.next))
+  ) {
+    return false;
+  }
   const headline = String(latest.headline || "").trim().toLowerCase();
   const want = String(latest.ownerWant || latest.ownerReason || "").trim().toLowerCase();
   return reason === headline || reason === want;
