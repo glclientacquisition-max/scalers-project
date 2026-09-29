@@ -7,6 +7,7 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
+const { looksLikePaceOnlyTurn } = require('./dynamicSpeech');
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -24,6 +25,18 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   const missingSlots = Array.isArray(state?.goal?.missingSlots)
     ? state.goal.missingSlots
     : [];
+
+  const latestUtterance = String(
+    (state?.conversation?.answersReceived || []).slice(-1)[0] ||
+      state?.goal?.description ||
+      ''
+  );
+  if (looksLikePaceOnlyTurn(latestUtterance)) {
+    return {
+      action: ACTIONS.ANSWER,
+      reason: 'Pace request only. Keep the current job. Do not restart the SOP.',
+    };
+  }
 
   if (state?.resolution?.status === 'resolved' || state?.goal?.status === 'completed') {
     return {

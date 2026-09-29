@@ -82,7 +82,7 @@ Staging is defined. See [`ENVIRONMENT_CONTRACT.md`](./ENVIRONMENT_CONTRACT.md) f
 | Supabase | `sgcdncjxauhsbunobmob` (no production data) |
 | Voice | `https://scalers-staging-staging.up.railway.app` (Railway env `staging`, branch `cursor/staging-voice-468b`) |
 | Desk | `https://scalers-staging.vercel.app` (Vercel project `scalers-staging`, same branch). Production builds from any other branch are ignored. Why the URL used to flip: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md). |
-| Git branch | **`cursor/staging-voice-468b`**. Promote is squash-merge to `main`. Approved desk work that never reached `main` ships in the desk-stack PR onto `main` so it cannot vanish again. |
+| Git branch | **`cursor/staging-voice-468b`**. A pull request into `main` is merged onto this branch for testing. Promote by squash-merging that tested pull request into `main`. |
 | SautiKit | Test DID `+254709221536` pointing at staging voice URL |
 
 Validate database changes on staging before production. Never use production credentials for staging tests.

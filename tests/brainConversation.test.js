@@ -526,6 +526,89 @@ describe('multi-turn Brain outcomes', () => {
     assert.equal(turn.decision.action, 'CREATE_REQUEST');
   });
 
+  it('Amina incomplete sofa ask collects the next slot only, not a job list', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [
+        { name: 'Couch cleaning' },
+        { name: 'Carpet cleaning' },
+        { name: 'Mattress cleaning' },
+      ],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    const turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Can you come clean my sofa?',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.equal(turn.state.intent, 'booking');
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+    assert.ok(['name', 'when', 'landmark', 'service'].includes(turn.decision.slot));
+    assert.notEqual(turn.decision.slot, 'subject');
+    const prompt = formatBrainStateForPrompt(turn.state);
+    assert.match(prompt, /Visit SOP:/);
+    assert.match(prompt, /Ask only for/);
+    assert.doesNotMatch(prompt, /Speak this spelling once/i);
+    assert.doesNotMatch(prompt, /is that right/i);
+  });
+
+  it('does not restart who-is-speaking on a pace-only turn after a price ask', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      callerMemory: {
+        name: 'Mama',
+        sharedLine: true,
+        alternateNames: ['Brian'],
+        nextAppointment: 'carpet, Thursday 10 AM',
+      },
+      servicesCatalog: [{ name: 'Couch cleaning', price_range: 'Ksh 600 per seat' }],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'How much for couch cleaning?',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.equal(turn.state.intent, 'price');
+    assert.equal(turn.decision.action, 'ANSWER');
+
+    turn = runTurn(turn.state, turn.languageState, 'slower', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.intent, 'price');
+    assert.equal(turn.decision.action, 'ANSWER');
+    assert.notEqual(turn.decision.slot, 'name');
+    assert.doesNotMatch(String(turn.decision.reason), /Shared line|ask who is speaking/i);
+  });
+
+  it('Nataka cleaning kesho stays a visit and does not re-ask a known name', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'General cleaning' }],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Nataka cleaning kesho. Naitwa Amina.',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.equal(turn.state.intent, 'booking');
+    assert.equal(turn.state.caller.name, 'Amina');
+    assert.equal(turn.state.goal.missingSlots.includes('name'), false);
+    assert.notEqual(turn.decision.slot, 'name');
+    assert.match(formatBrainStateForPrompt(turn.state), /name=Amina/);
+  });
+
   it('classifies transfer and connect requests as human intent', () => {
     const turn1 = runTurn(createBrainState(profile), createLanguageState(), 'Connect me to Alvin');
     assert.equal(turn1.state.intent, 'human');

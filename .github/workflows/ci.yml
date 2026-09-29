@@ -35,6 +35,9 @@ jobs:
       - name: test:mvp
         run: npm run test:mvp
 
+      - name: test:stage-pr
+        run: npm run test:stage-pr
+
       - name: eval:brain
         run: npm run eval:brain
 

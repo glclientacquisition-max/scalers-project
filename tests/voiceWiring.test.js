@@ -96,6 +96,12 @@ assert.match(
 
 assert.match(
   source,
+  /looksLikePaceOnlyTurn\(clean\)/,
+  'pace-only turns must skip Gemini and not restart who-is-speaking'
+);
+
+assert.match(
+  source,
   /polishSpokenReply/,
   'final Gemini speech must strip holding lines and service dumps'
 );

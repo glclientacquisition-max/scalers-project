@@ -205,6 +205,7 @@ const {
   pickIdentityReply,
   pickPhaticReply,
   polishSpokenReply,
+  looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const {
   visitBlockSpeech,
@@ -2299,6 +2300,21 @@ mediaWss.on('connection', (ws, req) => {
           `[ws/media][${callKey}] caller speed request=${speedRequest.action} scale=${ttsSpeedScale}`
         );
       }
+    }
+    // Live miss HD_391a57aae9e9: "slower" must not restart who-is-speaking / visit SOP.
+    if (looksLikePaceOnlyTurn(clean)) {
+      const paceLine =
+        callLanguage === 'sw' || callLanguage === 'sheng' ? 'Sawa.' : 'Okay.';
+      console.log(`[ws/media][${callKey}] pace-only skip gemini lang=${callLanguage}`);
+      callTranscript.pushCaller(clean);
+      messages.push({ role: 'user', content: clean });
+      callTranscript.pushAgent(paceLine);
+      messages.push({ role: 'assistant', content: paceLine, local: true });
+      turnTiming.markFirstSpokenChunk();
+      await speakText(paceLine);
+      logTurnTiming(turnTiming, { outcome: 'pace' });
+      if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+      return;
     }
     const capabilities =
       callBrainCapabilities.get(callKey) ||

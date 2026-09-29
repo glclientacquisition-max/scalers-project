@@ -94,7 +94,7 @@ Runs: TTS normalize → spoken stream buffer → turn-taking → wiring.
 
 For media/webhook local bring-up: `npm start` + `npm run tunnel:cloudflared` (see `docs/WEBHOOK_TUNNEL.md`).
 
-Staging DID tests require the PR commit on Railway staging first. Run `.github/workflows/staging-voice-deploy.yml`, then confirm `GET /healthz` `gitSha`. Do not merge to `main` to get a Voice test.
+Staging DID tests require the pull request on Railway staging first. Opening a pull request into `main` runs `.github/workflows/stage-pull-request.yml`, which rebuilds `cursor/staging-voice-468b` as `main` plus the pull requests still open. Confirm `GET /healthz` `gitSha` is that staging tip. Closing the pull request takes it off the practice line. A one-off deploy can still use `.github/workflows/staging-voice-deploy.yml`. Merge to `main` only after that staging call.
 
 Gemini 3 Flash turns must replay model `parts` (including thought signatures) on the next request. Do not flatten signed parts into one text part, and do not speak a canned booking line to hide a failed Gemini turn. If Gemini is down (403/429 billing), ask for a name and take a callback. Do not invent a booking. Do not retry depleted credits.
 

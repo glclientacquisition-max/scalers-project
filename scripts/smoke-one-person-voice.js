@@ -201,8 +201,8 @@ function smokeEmptyGeminiGuarantee() {
   });
   checkLine('empty Gemini ANSWER after name', line, {
     enMidCall: true,
-    mustInclude: [/day and time|time works/i],
-    mustNotInclude: [/can't finish/i, /name so I can reach them/i],
+    mustInclude: [/^Okay\.?$/i],
+    mustNotInclude: [/can't finish/i, /name so I can reach them/i, /day and time|time works/i],
   });
 }
 

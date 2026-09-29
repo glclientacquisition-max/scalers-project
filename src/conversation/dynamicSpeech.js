@@ -10,6 +10,7 @@ const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
+const { detectSpeedRequest } = require('../speech/speedControl');
 
 /**
  * Instant greeting — brand-first English opener (see businessAssistantIntro.js).
@@ -284,6 +285,17 @@ function pickPhaticReply(opts = {}) {
 const SPOKEN_JOB_NOUNS =
   /\b(carpet|couch|sofa|mattress|airbnb|upholstery|fumigation|plumbing)\b/gi;
 
+const PACE_JOB_OR_ASK =
+  /\b(book|visit|appointment|open|hours|price|how much|connect|transfer|clean|cleaning|carpet|couch|sofa|mattress|tomorrow|today|kesho|nataka)\b/i;
+
+function looksLikePaceOnlyTurn(text) {
+  const raw = String(text || '').trim();
+  if (!raw || !detectSpeedRequest(raw)) return false;
+  if (PACE_JOB_OR_ASK.test(raw)) return false;
+  const words = normalizeCallerAsk(raw).split(' ').filter(Boolean);
+  return words.length > 0 && words.length <= 8;
+}
+
 function looksLikeSpokenServiceDump(text) {
   const raw = String(text || '');
   const nouns = [...raw.matchAll(SPOKEN_JOB_NOUNS)].map((row) =>
@@ -321,9 +333,26 @@ function stripSpokenHedges(text, opts = {}) {
   return raw;
 }
 
+const PREMATURE_OUTCOME =
+  /\b(i('ve| have) booked( you)?|your visit is booked|booking (is )?confirmed|i('ve| have) transferred you|stay on the line)\b/gi;
+
+function stripPrematureOutcomeClaims(text, opts = {}) {
+  let raw = String(text || '').trim();
+  if (!raw) return raw;
+  raw = raw.replace(PREMATURE_OUTCOME, '');
+  raw = raw.replace(/\s+/g, ' ').replace(/^[,.]+\s*/, '').replace(/\s+[,.]+/g, '.').trim();
+  if (!raw) {
+    return confirmationLanguage(opts.language) === 'en' ? 'Okay.' : 'Sawa.';
+  }
+  return raw;
+}
+
 function polishSpokenReply(text, opts = {}) {
   return trimSpokenServiceDump(
-    stripSpokenHedges(stripSpokenInstructionLeaks(text, { final: true }), opts),
+    stripPrematureOutcomeClaims(
+      stripSpokenHedges(stripSpokenInstructionLeaks(text, { final: true }), opts),
+      opts
+    ),
     opts
   );
 }
@@ -412,7 +441,8 @@ function callerNameAlreadyKnown({ brainState = {}, userText = '' } = {}) {
 }
 
 function nextGuaranteeSlot({ nextBestAction = {}, brainState = {}, nameKnown = false } = {}) {
-  const intent = String(brainState?.intent || '').toLowerCase();
+  const action = String(nextBestAction?.action || '').toUpperCase();
+  if (action && action !== 'ASK_CLARIFICATION') return '';
   const missing = Array.isArray(brainState?.goal?.missingSlots)
     ? brainState.goal.missingSlots.map((slot) => String(slot || '').toLowerCase())
     : [];
@@ -423,9 +453,7 @@ function nextGuaranteeSlot({ nextBestAction = {}, brainState = {}, nameKnown = f
     if (slot && !ordered.includes(slot)) ordered.push(slot);
   }
   const remaining = nameKnown ? ordered.filter((slot) => slot !== 'name') : ordered;
-  if (remaining[0]) return remaining[0];
-  if (nameKnown && (intent === 'booking' || intent === 'hold')) return 'when';
-  return '';
+  return remaining[0] || '';
 }
 
 function shouldSpeakHandoffNameAsk({
@@ -459,10 +487,11 @@ function pickSpeechGuaranteeLine({
   const nameKnown = callerNameAlreadyKnown({ brainState, userText });
   let slot = nextGuaranteeSlot({ nextBestAction, brainState, nameKnown });
   // Live leftover HD_bc9f610692de: a bookings/visit ask after the name is in
-  // must not speech-guarantee another name ask.
-  if (looksLikeFileVisitTalk(userText) && slot === 'name') {
+  // must not speech-guarantee another name ask or invent a when.
+  if (looksLikeFileVisitTalk(userText) || looksLikePaceOnlyTurn(userText)) {
     slot = '';
   }
+  if (nameKnown && slot === 'name') slot = '';
   const handoff =
     !nameKnown &&
     (String(brainState?.intent || '').toLowerCase() === 'human' ||
@@ -685,6 +714,7 @@ module.exports = {
   shouldSpeakThinkingAck,
   pickPhaticReply,
   looksLikeSpokenServiceDump,
+  looksLikePaceOnlyTurn,
   trimSpokenServiceDump,
   stripSpokenHedges,
   polishSpokenReply,
