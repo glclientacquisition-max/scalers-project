@@ -2,7 +2,9 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { knowledgePastePlaceholder } from "@/lib/deskPlaceholders";
 import type { TenantRow } from "@/lib/supabase";
+import { parseVertical } from "@/lib/vertical";
 import type { IngestDraft } from "@/lib/ingest/extract";
 import { FAQ_ANSWER_MAX, FAQ_QUESTION_MAX } from "@/lib/faqs";
 import {
@@ -176,9 +178,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   onChange={(e) => setPaste(e.target.value)}
                   rows={2}
                   {...compactTextareaExpandHandlers}
-                  placeholder={
-                    "Westlands Books, Nairobi\nMon-Sat 9am-7pm\nHome cleaning from 2,500 KES\nQ: Do you cover Westlands?\nA: Yes, same day before noon."
-                  }
+                  placeholder={knowledgePastePlaceholder(parseVertical(tenant.vertical))}
                   className={`${fieldClass} mt-0 leading-relaxed`}
                 />
                 <div className="flex justify-end self-end">

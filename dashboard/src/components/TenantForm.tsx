@@ -62,6 +62,7 @@ import {
   FAQ_STARTERS,
   normalizeFaqKey,
 } from "@/lib/faqs";
+import { servicesPastePlaceholder } from "@/lib/deskPlaceholders";
 import {
   parseVertical,
   verticalBlurb,
@@ -1067,9 +1068,7 @@ export function TenantForm({
                 }}
                 rows={2}
                 {...compactTextareaExpandHandlers}
-                placeholder={
-                  "Home cleaning - from 2,500 KES\nPlumbing\nElectrical - quote after visit"
-                }
+                placeholder={servicesPastePlaceholder(vertical)}
                 className={`${denseFieldClass} text-sm leading-relaxed`}
               />
               <details className="text-xs text-ink-soft">

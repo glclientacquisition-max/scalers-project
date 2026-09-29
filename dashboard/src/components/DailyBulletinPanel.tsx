@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
+import { callersHearPlaceholder } from "@/lib/deskPlaceholders";
 import { parseVertical } from "@/lib/vertical";
 import {
   deskBulletinItems,
@@ -127,11 +128,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 maxLength={160}
-                placeholder={
-                  parseVertical(tenant.vertical) === "home_services"
-                    ? "Fully booked today"
-                    : "Out of chicken today"
-                }
+                placeholder={callersHearPlaceholder(parseVertical(tenant.vertical))}
                 className={`${settingsFieldClass} mt-0 min-w-0`}
               />
             </div>
