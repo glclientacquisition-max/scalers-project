@@ -211,13 +211,49 @@ assert.match(
 assert.match(
   source,
   /live transfer Dial blocked/,
-  'must not close /ws/media for transfer until conference REST can ring a human'
+  'cold Dial must not close /ws/media'
+);
+
+assert.doesNotMatch(
+  source,
+  /conference hold bridge/,
+  'answer must not use the connect=false conference bridge that hung up HD_797ab6b46610'
+);
+
+assert.doesNotMatch(
+  source,
+  /buildLiveBridgeXml/,
+  'connect=false Stream XML must not be the answer document'
+);
+
+assert.match(
+  source,
+  /SautiKit requires connect="true"/,
+  'answer Stream must hold the leg with connect=true'
+);
+
+assert.match(
+  source,
+  /live transfer armed — caller stays in conference, media stays up/,
+  'arming a transfer must not close /ws/media'
 );
 
 assert.match(
   source,
   /\/voice\/transfer/,
   'post-Stream Redirect must hit /voice/transfer to issue Dial'
+);
+
+assert.match(
+  source,
+  /\/voice\/transfer-agent/,
+  'outbound transfer leg must join via /voice/transfer-agent'
+);
+
+assert.match(
+  source,
+  /\/voice\/conference-events/,
+  'conference status must hit /voice/conference-events before originate'
 );
 
 assert.match(
