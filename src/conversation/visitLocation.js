@@ -1,9 +1,10 @@
 // Home-visit place quality. Speech says location. Storage stays the landmark field.
-// Coverage is Train text only (POLICIES delivery + LOCATIONS label/address/coverage).
-// No geocoder.
+// Coverage is Train text. A county in Delivery or Coverage notes covers localities
+// in that county. The office address does not. No geocoder.
 
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
+const { countiesMentioned, countiesForPlace } = require('./kenyaPlaces');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
 
@@ -190,11 +191,22 @@ function coverageCorpus(profile = {}) {
   return new Set(blobs.flatMap(coverageTokens));
 }
 
+function settingsCountyText(profile = {}) {
+  const policies = normalizePolicies(profile.businessPolicies);
+  const blobs = [];
+  if (policies.delivery) blobs.push(policies.delivery);
+  for (const loc of normalizeLocations(profile.businessLocations)) {
+    if (loc.coverage_notes) blobs.push(loc.coverage_notes);
+  }
+  return blobs.join(' ');
+}
+
 /**
  * unknown: no Train coverage text, or the place has no area token.
- * inside: a place token appears in POLICIES/LOCATIONS coverage text.
- * outside: coverage text exists and none of the place tokens match.
- * Shop landmark/directions are not coverage.
+ * inside: a place token is in the coverage text, or its county is named
+ * in Delivery or Coverage notes.
+ * outside: coverage text exists and neither the place nor its county matches.
+ * The office address can match a written name. It does not expand a county.
  */
 function assessCoverage(text, profile = {}) {
   const covered = coverageCorpus(profile);
@@ -202,6 +214,9 @@ function assessCoverage(text, profile = {}) {
   const mentioned = coverageTokens(text);
   if (!mentioned.length) return 'unknown';
   if (mentioned.some((token) => covered.has(token))) return 'inside';
+  const allowed = countiesMentioned(settingsCountyText(profile));
+  const placeCounties = countiesForPlace(text);
+  if (placeCounties.some((county) => allowed.has(county))) return 'inside';
   return 'outside';
 }
 

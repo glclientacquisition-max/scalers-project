@@ -50,6 +50,44 @@ describe('visit location ladder', () => {
     assert.equal(assessCoverage('Runda', { businessPolicies: {} }), 'unknown');
   });
 
+  it('treats a county in Delivery as its localities, not the office address', () => {
+    const nairobi = { businessPolicies: { delivery: 'Nairobi' } };
+    assert.equal(assessCoverage('Runda Green Park gate 4', nairobi), 'inside');
+    assert.equal(assessCoverage('Westlands', nairobi), 'inside');
+    assert.equal(assessCoverage('Ruaka', nairobi), 'outside');
+    assert.equal(assessCoverage('Rongai', nairobi), 'outside');
+    assert.equal(assessCoverage('Kitengela', nairobi), 'outside');
+    assert.equal(assessCoverage('Mombasa', nairobi), 'outside');
+    assert.equal(assessCoverage('Syokimau', nairobi), 'outside');
+    assert.equal(assessCoverage('Mombasa Road', nairobi), 'inside');
+    assert.equal(assessCoverage('rwaka', nairobi), 'outside');
+    assert.equal(assessCoverage('kitengele', nairobi), 'outside');
+    assert.equal(assessCoverage('rongae', nairobi), 'outside');
+    assert.equal(assessCoverage('near the stage', nairobi), 'outside');
+    const part = { businessPolicies: { delivery: 'Westlands and Kilimani' } };
+    assert.equal(assessCoverage('Westlands', part), 'inside');
+    assert.equal(assessCoverage('Runda', part), 'outside');
+    const office = {
+      businessPolicies: { delivery: '' },
+      businessLocations: [{ label: 'Depot', address: 'Nairobi', coverage_notes: '' }],
+    };
+    assert.equal(assessCoverage('Runda', office), 'outside');
+    assert.equal(assessCoverage('Nairobi', office), 'inside');
+    const kiambu = {
+      businessPolicies: { delivery: '' },
+      businessLocations: [{ coverage_notes: 'Kiambu' }],
+    };
+    assert.equal(assessCoverage('Ruaka', kiambu), 'inside');
+    assert.equal(assessCoverage('Runda', kiambu), 'outside');
+    assert.equal(
+      assessCoverage('Rongai', { businessPolicies: { delivery: 'Kajiado' } }),
+      'inside'
+    );
+    const booked = decideVisitPlace('Runda', { profile: nairobi, detailAsked: true });
+    assert.equal(booked.bookable, true);
+    assert.equal(booked.coverage, 'inside');
+  });
+
   it('keeps a gate when the caller only adds the city', () => {
     const prior = 'Runda Green Park gate 4';
     assert.equal(
@@ -75,6 +113,18 @@ describe('visit location ladder', () => {
     assert.match(
       coverageAskSpeech('What about Westlands?', profile, 'en'),
       /Yes, we cover Westlands/i
+    );
+    assert.match(
+      coverageAskSpeech('What about Runda?', profile, 'en'),
+      /Yes, we cover Runda/i
+    );
+    assert.match(
+      coverageAskSpeech('What about Ruaka?', profile, 'en'),
+      /outside our coverage/i
+    );
+    assert.match(
+      coverageAskSpeech('Do you do kitengele?', profile, 'en'),
+      /outside our coverage/i
     );
     assert.equal(coverageAskSpeech('Do you do carpet cleaning?', profile, 'en'), '');
     assert.equal(coverageAskSpeech('Which team?', profile, 'en'), '');
