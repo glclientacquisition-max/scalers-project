@@ -255,8 +255,6 @@ const {
 } = require('./src/sautikit/pendingLiveTransfer');
 const {
   armConferenceTransfer,
-  seedConferenceHold,
-  buildLiveBridgeXml,
   buildHoldConferenceDocument,
   conferenceRoomName,
   conferenceKeepsCallOpen,
@@ -1237,13 +1235,10 @@ async function handleVoiceIncoming(req, res) {
       console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
     }
 
-    const bridgeXml = await maybeAnswerConferenceBridge(req, callSid, fromNumber, toNumber);
-    if (bridgeXml) {
-      return res.type('text/xml').send(bridgeXml);
-    }
-
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
     // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s.
+    // connect=false plus Redirect into Conference still dropped the PSTN
+    // (HD_797ab6b46610, HD_8ae5a010c998). Do not answer with it.
     // Pass callSid on the WS URL so /ws/media can bind the session without
     // waiting for the first metadata frame. Redirect after Stream runs when
     // the media socket closes (StreamStopped does not re-hit this URL).
@@ -1429,40 +1424,6 @@ async function handleVoiceTransferContinue(req, res) {
 }
 
 app.post('/voice/transfer', sautikitWebhookGuard, handleVoiceTransferContinue);
-
-async function maybeAnswerConferenceBridge(req, callSid, fromNumber, toNumber) {
-  if (!envLiveTransferExecutorEnabled()) return null;
-  let profile = null;
-  try {
-    profile = await db.getTenantProfile({ toNumber });
-  } catch (err) {
-    console.warn('[voice/incoming] conference bridge profile failed:', err?.message || err);
-    return null;
-  }
-  if (profile?.handoffMode !== 'live_transfer') return null;
-  const base = voiceHttpBaseFor(callSid);
-  if (!base) return null;
-  const sid = encodeURIComponent(String(callSid || '').trim());
-  const room = conferenceRoomName(callSid);
-  const seeded = seedConferenceHold({
-    callSid,
-    callerId: normalizeKenyaE164(profile.did) || null,
-    callerNumber: normalizeKenyaE164(fromNumber) || fromNumber,
-    eventsUrl: `${base}/voice/conference-events?callSid=${sid}`,
-    agentUrl: `${base}/voice/transfer-agent?callSid=${sid}&room=${encodeURIComponent(room)}`,
-    fallbackUrl: `${base}/voice/transfer-fallback?callSid=${sid}`,
-    billingEnforcement: profile.billingEnforcement,
-    walletBalanceKes: profile.walletBalanceKes,
-  });
-  if (!seeded) return null;
-  seeded.tenantId = profile.id || null;
-  const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${sid}`;
-  console.log(`[${callSid}] conference hold bridge room=${seeded.room}`);
-  return buildLiveBridgeXml({
-    streamUrl,
-    continueUrl: `${base}/voice/conference-hold?callSid=${sid}`,
-  });
-}
 
 function handleVoiceConferenceHold(req, res) {
   const callSid = String(req.query?.callSid || '').trim();

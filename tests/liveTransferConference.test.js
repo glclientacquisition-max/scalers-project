@@ -4,7 +4,6 @@ const {
   conferenceRoomName,
   clientRequestIdFor,
   buildOriginateBody,
-  buildLiveBridgeXml,
   buildHoldConferenceDocument,
   seedConferenceHold,
   armConferenceTransfer,
@@ -72,15 +71,7 @@ describe('live transfer conference', () => {
     assert.equal(late.kind, 'terminal_drop');
   });
 
-  it('puts the caller in the room at answer and dials only after arm', () => {
-    const xml = buildLiveBridgeXml({
-      streamUrl: 'wss://voice.test/ws/media?callSid=HD_abc123',
-      continueUrl: 'https://voice.test/voice/conference-hold?callSid=HD_abc123',
-    });
-    assert.match(xml, /connect="false"/);
-    assert.doesNotMatch(xml, /connect="true"/);
-    assert.match(xml, /voice\/conference-hold\?callSid=HD_abc123/);
-
+  it('does not originate on a listening join until the transfer is armed', () => {
     const seeded = seedConferenceHold({
       callSid: 'HD_abc123',
       callerId: '+254709221536',

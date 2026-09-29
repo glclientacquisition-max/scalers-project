@@ -36,14 +36,6 @@ function clientRequestIdFor(callSid) {
   return id;
 }
 
-function escapeXml(raw) {
-  return String(raw || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function buildCallerConferenceDocument(state) {
   return {
     actions: [
@@ -81,23 +73,6 @@ function buildHoldConferenceDocument(state) {
       },
     ],
   };
-}
-
-/**
- * Answer document when the tenant can live-transfer.
- * connect=false does not hold the leg, so Redirect runs at once and returns Conference.
- * The fork is fire-and-forget. Closing the socket is not how the caller enters the room.
- */
-function buildLiveBridgeXml({ streamUrl, continueUrl } = {}) {
-  const url = escapeXml(streamUrl);
-  const next = escapeXml(continueUrl);
-  return (
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<Response>\n` +
-    `    <Stream url="${url}" name="ai-receptionist" track="inbound_track" connect="false" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />\n` +
-    `    <Redirect method="POST">${next}</Redirect>\n` +
-    `</Response>`
-  );
 }
 
 function buildAgentConferenceDocument(state) {
@@ -584,7 +559,6 @@ module.exports = {
   clientRequestIdFor,
   buildCallerConferenceDocument,
   buildHoldConferenceDocument,
-  buildLiveBridgeXml,
   seedConferenceHold,
   buildAgentConferenceDocument,
   buildFallbackDocument,

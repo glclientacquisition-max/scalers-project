@@ -214,16 +214,22 @@ assert.match(
   'cold Dial must not close /ws/media'
 );
 
-assert.match(
+assert.doesNotMatch(
   source,
   /conference hold bridge/,
-  'a live-transfer tenant must enter the conference at answer'
+  'answer must not use the connect=false conference bridge that hung up HD_797ab6b46610'
+);
+
+assert.doesNotMatch(
+  source,
+  /buildLiveBridgeXml/,
+  'connect=false Stream XML must not be the answer document'
 );
 
 assert.match(
   source,
-  /\/voice\/conference-hold/,
-  'the non-holding stream must redirect into the conference'
+  /SautiKit requires connect="true"/,
+  'answer Stream must hold the leg with connect=true'
 );
 
 assert.match(

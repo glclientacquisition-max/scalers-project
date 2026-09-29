@@ -362,7 +362,7 @@ Staging Voice is on `cursor/live-transfer-spec-3c65`. `/healthz` shows `liveTran
 
 **Do not repeat the WS-close spike.** Staging `VOICE_LIVE_TRANSFER` is **off** again so callers get SMS + AI on the line, not dead air.
 
-**2026-09-29:** `HD_cbb6a3a6b583` armed a conference and left `/ws/media` open. No second voice document, no outbound call. `HD_9f2165f372f4` closed the socket on purpose (`reason=live_transfer`). SautiKit still did not POST the voice URL. No conference, no ring. Closing the fork is not StreamStopped. The caller has to enter the conference at answer (`connect=false` plus Redirect to `/voice/conference-hold`). `Completed` still does not admit or originate.
+**2026-09-29:** `HD_cbb6a3a6b583` armed a conference and left `/ws/media` open. No second voice document, no outbound call. `HD_9f2165f372f4` closed the socket on purpose (`reason=live_transfer`). SautiKit still did not POST the voice URL. No conference, no ring. Closing the fork is not StreamStopped. `HD_797ab6b46610` and `HD_8ae5a010c998` answered with Stream `connect=false` plus Redirect. `/voice/conference-hold` returned 200 and Conference JSON. The media socket opened and closed in about half a second with zero frames (code 1000, empty reason), then `Completed`. Transfer failed `caller_gone`. Duration 0s and 1s. `connect=false` hangs the leg up even when the next verb runs. Do not answer with it. `Completed` still does not admit or originate. Staging `VOICE_LIVE_TRANSFER` is off again. Handoff for that tenant is callback.
 
 ---
 
