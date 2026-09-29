@@ -106,5 +106,12 @@ describe('contact last reason matches call summary', () => {
     assert.doesNotMatch(page, /ownerCard\?\.mood \|\|/);
     assert.match(history, /usefulOwnerFact\(card\.done\)/);
     assert.match(history, /usefulMoodLabel\(card\.mood\)/);
+    const callPage = fs.readFileSync(
+      path.join(__dirname, '../dashboard/src/app/(desk)/calls/[id]/page.tsx'),
+      'utf8'
+    );
+    assert.match(callPage, /usefulOwnerFact\(summaryCard\?\.done\)/);
+    assert.match(callPage, /usefulMoodLabel\(summaryCard\?\.mood\)/);
+    assert.doesNotMatch(callPage, /moodKey !== "unknown"/);
   });
 });

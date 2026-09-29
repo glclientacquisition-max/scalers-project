@@ -7,7 +7,13 @@ import {
   type CallRow,
   type TranscriptRow,
 } from "@/lib/supabase";
-import { pickCallOwnerCard, pickCallOwnerReason, pickCallOwnerWant } from "@/lib/callSummarySentence";
+import {
+  pickCallOwnerCard,
+  pickCallOwnerReason,
+  pickCallOwnerWant,
+  usefulMoodLabel,
+  usefulOwnerFact,
+} from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { DeskError } from "@/components/ui/DeskError";
@@ -196,16 +202,8 @@ export default async function CallDetailPage({
   const wantText = String(summaryCard?.want || want || "")
     .replace(/\s+/g, " ")
     .trim();
-  const doneText = String(summaryCard?.done || "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const moodKey = String(summaryCard?.mood || "")
-    .toLowerCase()
-    .trim();
-  const moodLabel =
-    moodKey && moodKey !== "unknown"
-      ? moodKey.charAt(0).toUpperCase() + moodKey.slice(1)
-      : null;
+  const doneText = usefulOwnerFact(summaryCard?.done);
+  const moodLabel = usefulMoodLabel(summaryCard?.mood);
   const stamp = signalLabel({
     purpose,
     hold,
@@ -252,7 +250,7 @@ export default async function CallDetailPage({
         }
         want={wantText || null}
         done={doneText || null}
-        mood={moodLabel}
+        mood={moodLabel || null}
         job={job}
         hold={hold}
         turns={turns}
