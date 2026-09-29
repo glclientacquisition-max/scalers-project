@@ -128,7 +128,7 @@ const HOME_INTENTS = [
     requiredSlots: ['name', 'reason'],
     optionalSlots: [],
     completion:
-      'Follow HANDOFF MODE. Capture name + reason. If escalate enabled, escalate. Never claim a live transfer unless it actually happens.',
+      'Follow HANDOFF MODE. Capture name + reason. If escalate enabled, escalate. Never say stay on the line. Never claim a live transfer.',
     tool: 'escalate',
     patterns: [
       /\b(human|person|someone|owner|manager|boss|agent|speak to|talk to|nipe|nataka kuongea na)\b/i,

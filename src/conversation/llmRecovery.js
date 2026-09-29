@@ -11,7 +11,8 @@ const {
  * @returns {{ spoken: string, name: string, saved: boolean }}
  */
 function planLlmRecovery(opts = {}) {
-  const name = callerNameFromUtterance(opts.userText);
+  const namedOnFile = String(opts.brainState?.caller?.name || '').trim();
+  const name = callerNameFromUtterance(opts.userText) || namedOnFile;
   if (name) {
     return {
       spoken: pickLlmRecoverySaved({ language: opts.language }),

@@ -26,6 +26,16 @@ describe('reasoning-down name capture', () => {
     assert.match(first.spoken, /I have your name/i);
     assert.doesNotMatch(first.spoken, /can't finish/i);
 
+    const named = planLlmRecovery({
+      userText: 'I need carpet cleaning tomorrow',
+      alreadyOffered: false,
+      language: 'en',
+      brainState: { caller: { name: 'Alvin' } },
+    });
+    assert.equal(named.saved, true);
+    assert.equal(named.name, 'Alvin');
+    assert.match(named.spoken, /I have your name/i);
+
     const ask = planLlmRecovery({
       userText: 'I need carpet cleaning tomorrow',
       alreadyOffered: false,
