@@ -1,59 +1,46 @@
-# Staging desk alias pin
+# Staging desk alias
 
-**Status:** Canonical (2026-09-25)  
+**Status:** Main tracks the alias (2026-09-29). The 2026-09-25 pin is lifted.  
 **Project:** Vercel `scalers-staging` (`prj_koYxAaXjOZ9QYA7hVB2SUOEAmyoB`)  
 **URL:** `https://scalers-staging.vercel.app`
 
-## The issue
+## Current rule
 
-`scalers-staging.vercel.app` is the project production alias. A push to `main` is a git production deploy. That deploy takes the alias.
+`scalers-staging.vercel.app` is the project production alias. A push or merge to `main` is a git production deploy of `scalers-staging`. That deploy takes the alias.
 
-Desk work still lives on stacked `cursor/*` branches. Those commits are not on `main`. Agents then promote a feature SHA onto the alias. The next merge to `main` (skills install, voice opener, anything) puts `main` back on the URL. The desk changes are still in git. The URL is not serving them.
+Production desk is a different project (`scalers-project`, `scalers.co.ke`). Production voice is Railway. Do not change those from a staging desk fix.
 
-This is not a UI revert. It is alias theft.
+## Why main builds were canceled
 
-Evidence on 2026-09-25:
+On 2026-09-25 the project was pinned so a desk stack off `main` could hold the URL:
 
-| Time (UTC) | What served `scalers-staging.vercel.app` | Source |
-| --- | --- | --- |
-| 09:27 | `56f38a2` Updates Pick / From Now / Later | Manual production deploy of `cursor/updates-when-679d` |
-| 10:02 | `8bf0725` First-forward opener (#418) | Git production deploy of `main` |
-| 10:04 | `861924f` Agent skills (#419) | Git production deploy of `main` |
+1. Ignored Build Step exited 0 when `VERCEL_GIT_COMMIT_REF` was `main`. Vercel canceled those production deploys as ignored-build (`errorLink` points at the ignored-build-step docs).
+2. `autoAssignCustomDomains` was off, so a new production deploy did not assign `scalers-staging.vercel.app`.
 
-`56f38a2` is not an ancestor of `main`. Twenty-two desk commits sit on the stack and vanish from the URL whenever `main` moves.
+Git pushes of `main` (including `f4b8ea70`, #443) created `CANCELED` deploys. The alias stayed on `cursor/staging-voice-468b` (`f3fb0e8`).
 
-Production desk is a different project (`scalers-project`). Production voice is Railway. Do not change those from this pin.
+That pin is lifted. #443 is on `main` and on production desk. Staging serves the same SHA.
 
-## The durable fix
+## Settings (`scalers-staging` only)
 
-Ship the approved desk stack to `main`. The URL tracks `main`. Sideways merges of Contacts, Updates, Inbox, and Ping never reach this alias until they are on `main`.
+1. Ignored Build Step is cleared. Builds from `main` run.
+2. `autoAssignCustomDomains` is on. A production deploy of `main` assigns `scalers-staging.vercel.app`.
+3. Do not put an `ignoreCommand` in `dashboard/vercel.json`. That file is shared with production `scalers-project`.
 
-## The pin (only while a stack is still off main)
-
-Day-to-day staging Voice and Desk land on `cursor/staging-voice-468b` (#424). This pin does not replace that branch.
-
-Vercel project `scalers-staging` now:
-
-1. **Ignores git builds from `main`.** Ignored Build Step exits 0 when `VERCEL_GIT_COMMIT_REF` is `main`.
-2. **Does not auto-assign the production alias.** `autoAssignCustomDomains` is off. A new production deploy does not steal `scalers-staging.vercel.app`.
-3. **Serves an explicit assigned SHA** while approved desk work is off `main`. Do not point the alias at a random feature SHA.
-
-`cursor/staging-live-679d` is an optional pointer. Fast-forward or reset it to the stack tip you want owners to see. Then assign `scalers-staging.vercel.app` to that deployment.
-
-Do not put an `ignoreCommand` in `dashboard/vercel.json`. That file is shared with production `scalers-project`.
+Do not restore the main ignore. Do not turn auto-assign off to park a feature SHA on this URL.
 
 ## Agent rules
 
 - Test a single PR on its Vercel preview URL.
-- To put a stack on the live staging URL: update `cursor/staging-live-679d`, deploy that branch, assign the alias.
-- Do not `create_deployment` `target: production` of an arbitrary feature branch onto `scalers-staging`.
-- Do not merge the desk stack to `main` just to refresh this URL. `main` still deploys production desk (`scalers-project`).
-- Do not change production Railway voice from a staging desk pin.
+- Do not `create_deployment` with `target: production` of a feature branch onto `scalers-staging`.
+- Do not assign `scalers-staging.vercel.app` to `cursor/staging-voice-468b` or `cursor/staging-live-679d`.
+- Do not change production Railway voice or `scalers-project` from this note.
 
-## Restore
+## Green check (2026-09-29)
 
-If the URL is on `main` again:
-
-1. Confirm `get_deployment` for `scalers-staging.vercel.app` (`githubCommitRef`).
-2. Assign the alias to the latest READY deploy of `cursor/staging-live-679d`.
-3. Confirm the Ignored Build Step and `autoAssignCustomDomains` are still set on `scalers-staging` only.
+| | SHA |
+| --- | --- |
+| `origin/main` | `f4b8ea70df6db7c85548408db3973dfee272d528` |
+| Alias `scalers-staging.vercel.app` | `f4b8ea70df6db7c85548408db3973dfee272d528` |
+| Deployment | `dpl_4sqb5imqxPftuKU1rzQGqXB4U1c6` (`READY`, production) |
+| Production desk `scalers.co.ke` | same SHA, project `scalers-project`, unchanged by this fix |
