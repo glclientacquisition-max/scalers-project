@@ -59,7 +59,7 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "Policies"/);
     assert.match(nav, /label: "Voice"/);
     assert.match(nav, /label: "Pronunciation"/);
-    assert.match(nav, /label: "Updates"/);
+    assert.doesNotMatch(nav, /label: "Updates"/);
     assert.match(nav, /label: "Test"/);
     assert.match(nav, /label: "FAQs"/);
     assert.match(nav, /label: "Catalog"/);
@@ -75,7 +75,7 @@ describe("business settings craft", () => {
     assert.match(nav, /panel: "pronunciation"/);
     assert.match(nav, /panel: "faqs"/);
     assert.match(nav, /panel: "team"/);
-    assert.match(nav, /tab: "updates"/);
+    assert.doesNotMatch(nav, /tab: "updates"/);
     assert.match(nav, /tab: "test"/);
     assert.match(nav, /tab: "catalog"/);
     assert.match(nav, /tab: "import"/);
@@ -87,7 +87,7 @@ describe("business settings craft", () => {
     assert.match(shell, /tab === "appearance"/);
     assert.match(shell, /AlertsPanel/);
     assert.match(shell, /AppearancePanel/);
-    assert.match(shell, /DailyBulletinPanel/);
+    assert.doesNotMatch(shell, /DailyBulletinPanel/);
     assert.match(shell, /KnowledgeIngestPanel/);
     assert.match(shell, /CatalogImportPanel/);
     assert.match(shell, /TestLinePanel/);
@@ -330,17 +330,17 @@ describe("business settings craft", () => {
     assert.doesNotMatch(save, /w-full/);
   });
 
-  it("truncates dense settings tables and uses icon-only team notify", () => {
+  it("truncates dense settings tables and labels team notify", () => {
     assert.match(form, /min-w-0 truncate/);
     assert.match(form, /table-fixed/);
     assert.doesNotMatch(form, /min-w-\[720px\]/);
     assert.doesNotMatch(form, /min-w-\[640px\]/);
     assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
-    assert.match(form, /title=\{flag\.label\}/);
-    assert.doesNotMatch(
-      form,
-      /<span className="text-xs font-medium text-ink">\{flag\.label\}<\/span>/
-    );
+    assert.match(form, /\{flag\.label\}/);
+    assert.match(form, /label: "SMS"/);
+    assert.match(form, /label: "WhatsApp"/);
+    assert.match(form, /label: "Email"/);
+    assert.doesNotMatch(form, /title=\{flag\.label\}/);
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {
@@ -349,10 +349,9 @@ describe("business settings craft", () => {
       ui.indexOf("export function SettingsSelect")
     );
     assert.match(segmented, /data-settings-strip=/);
-    assert.match(segmented, /inline-flex max-w-full min-w-0/);
-    assert.match(segmented, /flex max-w-full justify-start gap-1/);
-    assert.match(segmented, /className="shrink-0"/);
-    assert.match(segmented, /overflow-x-auto/);
+    assert.match(segmented, /deskRateCardRowClass/);
+    assert.match(segmented, /deskRateCardClass/);
+    assert.match(segmented, /snap-start shrink-0/);
     assert.doesNotMatch(segmented, /justify-between/);
     assert.doesNotMatch(segmented, /flex-1/);
     assert.doesNotMatch(segmented, /w-full min-w-0 border-b/);

@@ -186,13 +186,14 @@ const emptyMember = (): TeamDirectoryEntry => ({
   ...EMPTY_TEAM_NOTIFY_FLAGS,
 });
 
+/** Channel names on the three saved notify flags. Keys stay escalation, inbox, ops. */
 const TEAM_NOTIFY_FLAGS: Array<{
   key: "receives_escalation" | "receives_inbox" | "receives_ops";
   label: string;
 }> = [
-  { key: "receives_escalation", label: "Escalate" },
-  { key: "receives_inbox", label: "Inbox" },
-  { key: "receives_ops", label: "Ops" },
+  { key: "receives_escalation", label: "SMS" },
+  { key: "receives_inbox", label: "WhatsApp" },
+  { key: "receives_ops", label: "Email" },
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
@@ -2027,7 +2028,11 @@ export function TenantForm({
             <span>Handles</span>
             <span>Phone</span>
             <span>Email</span>
-            <span>Notify</span>
+            <span className="grid w-[13rem] grid-cols-3 gap-1 text-center text-[11px] font-medium normal-case leading-tight tracking-normal">
+              <span>SMS</span>
+              <span>WhatsApp</span>
+              <span>Email</span>
+            </span>
             <span className="sr-only">Remove</span>
           </div>
           {team.map((member, index) => (
@@ -2084,11 +2089,12 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
                 />
               </div>
-              <div className="flex min-w-0 items-center justify-start gap-0.5" role="group" aria-label={`Messages for ${member.name || `teammate ${index + 1}`}`}>
+              <div className="grid w-[13rem] grid-cols-3 gap-1" role="group" aria-label={`Notify for ${member.name || `teammate ${index + 1}`}`}>
                 {TEAM_NOTIFY_FLAGS.map((flag) => {
                   const selected = member[flag.key] === true;
                   return (
-                    <div key={flag.key} title={flag.label} className="flex min-h-11 min-w-11 items-center justify-center">
+                    <div key={flag.key} className="flex min-h-11 flex-col items-center justify-center">
+                      <span className="text-xs font-medium text-ink-soft lg:sr-only">{flag.label}</span>
                       <ToolSwitch
                         checked={selected}
                         label={`${flag.label} for ${member.name || `teammate ${index + 1}`}`}

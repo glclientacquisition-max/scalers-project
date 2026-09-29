@@ -11,19 +11,19 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 
 ```text
 Business       Identity · Hours · Locations · Policies
-Assistant      Voice · Pronunciation · Updates · Test
+Assistant      Voice · Pronunciation · Test
 Knowledge      FAQs · Catalog · Import
 Alerts         Alerts · Team
 This device    Appearance · Sign out
 ```
 
-Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Updates and Test stay under Assistant. Team stays under Alerts. Import stays under Knowledge.
+Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Test stays under Assistant. Team stays under Alerts. Import stays under Knowledge. Updates stay on Home.
 
 Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Profile hub keeps tabs. `DeskBack` icon, aria-label Profile (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
-Sticky Save on Catalog and Train panels, top-right of the panel header. Updates, Alerts, Import, Test, and Appearance use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
+Sticky Save on Catalog and Train panels, top-right of the panel header. Alerts, Import, Test, and Appearance use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
 
-Bare `/settings` is the hub. lg+ hub shows Appearance in the panel. `?tab=updates` is Updates. `?tab=alerts` is Alerts. `?tab=appearance` is Appearance. Hash `#train` is not routed. `Train` is the verb on Save.
+Bare `/settings` is the hub. lg+ hub shows Identity in the panel. `?tab=updates` and `?tab=today` open the hub. Updates stay on Home. `?tab=alerts` is Alerts. `?tab=appearance` is Appearance. Hash `#train` is not routed. `Train` is the verb on Save.
 
 ## Chrome
 
@@ -128,18 +128,9 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | AI listen | ghost, then filled confirm | Gemini review queue | This device until Save |
 | Save and train | filled sticky | `tts_lexicon` compile | Assistant on calls |
 
-### Updates (`?tab=updates`)
+### Updates
 
-Same `DailyBulletinPanel` as Home. One persist path (`bulletinActions` → `daily_bulletin`).
-
-| Control | Type | Writes | Affects |
-| --- | --- | --- | --- |
-| Callers hear | input | `daily_bulletin` text | Assistant on calls |
-| Until | rate cards (4) | bulletin `expiry` | Assistant on calls |
-| From / Until | Now or Later, then date + time when Pick | `starts_at` / `ends_at` (EAT) | Assistant on calls after start |
-| Window preview | one line | compose only | This device |
-| Post update | filled, docked | insert bulletin | Assistant on calls |
-| Clear | ghost | expire that item | Assistant on calls |
+Home only. `DailyBulletinPanel` is not a Profile destination. Old `?tab=updates` links open the hub.
 
 ### Test (`?tab=test`)
 

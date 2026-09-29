@@ -82,12 +82,12 @@ export function formatEscalationDelivery(
       stage === "desk_only" ||
       hasEscalationTarget(meta)
     ) {
-      return { state: "failed", line: "Needs human. Notify failed." };
+      return { state: "failed", line: "Notification retry pending" };
     }
   }
 
   if (hasEscalationTarget(meta)) {
-    return { state: "failed", line: "Needs human. Notify failed." };
+    return { state: "failed", line: "Notification retry pending" };
   }
   return { state: "none", line: null };
 }

@@ -90,7 +90,8 @@ describe("P0 #4 escalation delivery truth", () => {
       server,
       /No live SMS\/WA\/email channel[\s\S]{0,400}markEscalationSent/
     );
-    assert.match(delivery, /Needs human\. Notify failed\./);
+    assert.match(delivery, /Notification retry pending/);
+    assert.doesNotMatch(delivery, /Needs human\. Notify failed\./);
     assert.match(ticket, /escalationDelivery/);
   });
 

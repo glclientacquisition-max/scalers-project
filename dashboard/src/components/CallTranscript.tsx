@@ -8,7 +8,7 @@ import {
   type TranscriptSpeechItem,
   type TranscriptStreamItem,
 } from "@/lib/callTranscriptStream";
-import { plainOwnerCopy } from "@/lib/deskTicketChat";
+import { ownerDeskLine, plainOwnerCopy } from "@/lib/deskTicketChat";
 import type { TranscriptRow } from "@/lib/supabase";
 
 const PREVIEW_TURNS = 3;
@@ -65,7 +65,7 @@ function FactLine({ item, lead }: { item: TranscriptFactItem; lead: boolean }) {
         lead ? "" : "mt-3",
       ].join(" ")}
     >
-      {plainOwnerCopy(item.text)}
+      {ownerDeskLine(item.text)}
     </p>
   );
 }

@@ -11,7 +11,6 @@ export type SettingsPanel =
 
 export type BusinessSettingsTab =
   | "menu"
-  | "updates"
   | "catalog"
   | "train"
   | "import"
@@ -49,11 +48,7 @@ export function parseBusinessSettingsTab(
   ) {
     return raw;
   }
-  // "today" kept as a legacy alias for bookmarked /settings?tab=today links.
-  if (raw === "updates" || raw === "today") {
-    return "updates";
-  }
-  if (raw === "menu") return "menu";
+  // Updates live on Home. Old ?tab=updates and ?tab=today bookmarks open the hub.
   return "menu";
 }
 
@@ -112,7 +107,6 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     items: [
       { label: "Voice", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", target: { tab: "train", panel: "pronunciation" } },
-      { label: "Updates", target: { tab: "updates" } },
       { label: "Test", target: { tab: "test" } },
     ],
   },
@@ -173,7 +167,6 @@ export function settingsPanelHeading(
 ): string | null {
   if (tab === "menu") return null;
   if (tab === "catalog") return "Catalog";
-  if (tab === "updates") return "Updates";
   if (tab === "alerts") return "Alerts";
   if (tab === "import") return "Import";
   if (tab === "test") return "Test";

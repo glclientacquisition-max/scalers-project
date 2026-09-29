@@ -30,14 +30,21 @@ const fieldClass = settingsFieldClass;
 const extractInitial: IngestExtractState = {};
 const applyInitial: IngestApplyState = {};
 
-type SourceMode = "paste" | "url";
+type SourceMode = "text" | "url" | "csv";
+
+function serviceCsvPlaceholder(vertical: string | null | undefined): string {
+  if (parseVertical(vertical) === "retail") {
+    return "name,price\nA4 paper,500 KES\nBinding,300 KES";
+  }
+  return "name,price\nHome cleaning,2500 KES\nSofa cleaning,1500 KES";
+}
 
 export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
   const knowledgePasteExample = useMountedPoolPick(
     placeholderPool(KNOWLEDGE_PASTE_POOLS, parseVertical(tenant.vertical))
   );
-  const [mode, setMode] = useState<SourceMode>("paste");
+  const [mode, setMode] = useState<SourceMode>("text");
   const [paste, setPaste] = useState("");
   const [url, setUrl] = useState("");
   const [draft, setDraft] = useState<IngestDraft | null>(null);
@@ -159,8 +166,9 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             value={mode}
             options={
               [
-                { id: "paste" as const, label: "Paste" },
-                { id: "url" as const, label: "Website" },
+                { id: "text" as const, label: "Text" },
+                { id: "url" as const, label: "URL" },
+                { id: "csv" as const, label: "CSV" },
               ] as const
             }
             onChange={setMode}
@@ -168,12 +176,12 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
 
           <form action={extractAction} className="space-y-3">
             <input type="hidden" name="tenant_id" value={tenant.id} />
-            <input type="hidden" name="source_mode" value={mode} />
+            <input type="hidden" name="source_mode" value={mode === "url" ? "url" : "paste"} />
 
-            {mode === "paste" ? (
+            {mode === "text" || mode === "csv" ? (
               <div className="flex flex-col gap-1.5">
                 <label className="block text-xs font-medium text-ink-soft" htmlFor="ingest_paste">
-                  Text
+                  {mode === "csv" ? "CSV" : "Text"}
                 </label>
                 <textarea
                   id="ingest_paste"
@@ -182,7 +190,11 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   onChange={(e) => setPaste(e.target.value)}
                   rows={2}
                   {...compactTextareaExpandHandlers}
-                  placeholder={knowledgePasteExample}
+                  placeholder={
+                    mode === "csv"
+                      ? serviceCsvPlaceholder(tenant.vertical)
+                      : knowledgePasteExample
+                  }
                   className={`${fieldClass} mt-0 leading-relaxed`}
                 />
                 <div className="flex justify-end self-end">
