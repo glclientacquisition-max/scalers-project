@@ -255,10 +255,13 @@ const {
 } = require('./src/sautikit/pendingLiveTransfer');
 const {
   isAiLegDestination,
-  shouldDialAiLeg,
   parentDidForTenant,
+  decideShopBridge,
+  rememberShopBridge,
+  buildStillHereXml,
   buildShopBridgeXml,
   aiLegDid,
+  aiLegDropMs,
   aiLegHealth,
 } = require('./src/sautikit/aiLegBridge');
 const {
@@ -1256,20 +1259,42 @@ async function handleVoiceIncoming(req, res) {
       console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
     }
 
-    if (!inboundAiLeg && shouldDialAiLeg(toNumber)) {
-      const host = requestHost(req);
-      const doneUrl = host
-        ? `${requestHttpProto(req)}://${host}/voice/ai-leg-done?callSid=${encodeURIComponent(callSid)}`
-        : '';
-      console.log(`[${callSid}] ai leg bridge`);
-      return res.type('text/xml').send(buildShopBridgeXml({
-        aiLeg: aiLegDid(),
-        callerId: parentDidForTenant(),
-        doneUrl,
-      }));
+    if (!inboundAiLeg) {
+      const bridgeDecision = decideShopBridge({ callSid, callSessionState, toNumber });
+      if (bridgeDecision === 'dial_finished') {
+        console.log(`[${callSid}] ai leg dial finished`);
+        return res.type('text/xml').send(buildStillHereXml());
+      }
+      if (bridgeDecision === 'already') {
+        console.log(`[${callSid}] ai leg bridge already sent`);
+        return res.type('text/xml').send(emptyVoiceXml());
+      }
+      if (bridgeDecision === 'dial') {
+        rememberShopBridge(callSid);
+        const host = requestHost(req);
+        const doneUrl = host
+          ? `${requestHttpProto(req)}://${host}/voice/ai-leg-done?callSid=${encodeURIComponent(callSid)}`
+          : '';
+        console.log(`[${callSid}] ai leg bridge`);
+        return res.type('text/xml').send(buildShopBridgeXml({
+          aiLeg: aiLegDid(),
+          callerId: parentDidForTenant(),
+          doneUrl,
+        }));
+      }
     }
     if (inboundAiLeg) {
       console.log(`[${callSid}] ai leg stream`);
+      const dropMs = aiLegDropMs();
+      if (dropMs) {
+        const dropSid = callSid;
+        setTimeout(() => {
+          hangupOutboundLeg({ outboundCallSid: dropSid })
+            .then((result) => console.log(`[${dropSid}] ai leg drop`, result))
+            .catch((err) => console.warn(`[${dropSid}] ai leg drop failed`, err?.message || err));
+        }, dropMs);
+        console.log(`[${callSid}] ai leg drop scheduled ms=${dropMs}`);
+      }
     }
 
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;

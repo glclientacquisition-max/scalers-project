@@ -49,6 +49,48 @@ function shouldDialAiLeg(toNumber) {
   return aiLegBridgeEnabled() && phonesMatch(toNumber, parentDidForTenant());
 }
 
+const bridgedShopCalls = new Set();
+
+function rememberShopBridge(callSid) {
+  const sid = String(callSid || '').trim();
+  if (sid) bridgedShopCalls.add(sid);
+}
+
+function shopBridgeAlready(callSid) {
+  return bridgedShopCalls.has(String(callSid || '').trim());
+}
+
+function resetAiLegBridgeForTests() {
+  bridgedShopCalls.clear();
+}
+
+function isDialFinishedState(callSessionState) {
+  const state = String(callSessionState || '').toLowerCase();
+  return state.includes('dialcompleted') || state.includes('dial-completed');
+}
+
+function decideShopBridge({ callSid, callSessionState, toNumber } = {}) {
+  if (isDialFinishedState(callSessionState)) return 'dial_finished';
+  if (shopBridgeAlready(callSid)) return 'already';
+  if (shouldDialAiLeg(toNumber)) return 'dial';
+  return 'stream';
+}
+
+function buildStillHereXml() {
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<Response>\n` +
+    `  <Say>Still here.</Say>\n` +
+    `</Response>`
+  );
+}
+
+function aiLegDropMs() {
+  const n = Number(process.env.VOICE_AI_LEG_DROP_MS || 0);
+  if (!Number.isFinite(n) || n < 5000) return 0;
+  return Math.min(120000, Math.floor(n));
+}
+
 function buildShopBridgeXml({ aiLeg, callerId, doneUrl, timeoutS = 600 } = {}) {
   const dest = escapeXml(aiLeg);
   const from = escapeXml(callerId || '');
@@ -69,6 +111,7 @@ function aiLegHealth() {
     bridge: aiLegBridgeEnabled(),
     leg: maskE164(aiLegDid()),
     parent: maskE164(parentDidForTenant()),
+    dropMs: aiLegDropMs(),
   };
 }
 
@@ -78,7 +121,12 @@ module.exports = {
   aiLegBridgeEnabled,
   isAiLegDestination,
   shouldDialAiLeg,
+  rememberShopBridge,
+  decideShopBridge,
+  buildStillHereXml,
   buildShopBridgeXml,
+  aiLegDropMs,
   aiLegHealth,
   phonesMatch,
+  resetAiLegBridgeForTests,
 };

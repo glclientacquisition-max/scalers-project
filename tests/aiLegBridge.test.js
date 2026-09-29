@@ -4,6 +4,10 @@ const {
   isAiLegDestination,
   shouldDialAiLeg,
   buildShopBridgeXml,
+  buildStillHereXml,
+  decideShopBridge,
+  rememberShopBridge,
+  resetAiLegBridgeForTests,
   parentDidForTenant,
   aiLegBridgeEnabled,
 } = require('../src/sautikit/aiLegBridge');
@@ -14,6 +18,7 @@ describe('ai leg bridge', () => {
   const previous = {};
 
   beforeEach(() => {
+    resetAiLegBridgeForTests();
     for (const key of KEYS) previous[key] = process.env[key];
     process.env.VOICE_AI_LEG_DID = '+254709221542';
     process.env.VOICE_AI_LEG_PARENT_DID = '+254709221536';
@@ -53,5 +58,27 @@ describe('ai leg bridge', () => {
     assert.match(xml, /voice\/ai-leg-done\?callSid=HD_abc/);
     assert.doesNotMatch(xml, /connect="false"/);
     assert.doesNotMatch(xml, /<Stream/);
+  });
+
+  it('says the shop leg is still up when Dial finishes and does not dial twice', () => {
+    assert.equal(
+      decideShopBridge({ callSid: 'HD_parent', callSessionState: '', toNumber: '+254709221536' }),
+      'dial'
+    );
+    rememberShopBridge('HD_parent');
+    assert.equal(
+      decideShopBridge({ callSid: 'HD_parent', callSessionState: 'Completed', toNumber: '+254709221536' }),
+      'already'
+    );
+    assert.equal(
+      decideShopBridge({
+        callSid: 'HD_parent',
+        callSessionState: 'DialCompleted',
+        toNumber: '+254709221536',
+      }),
+      'dial_finished'
+    );
+    assert.match(buildStillHereXml(), /<Say>Still here\.<\/Say>/);
+    assert.doesNotMatch(buildStillHereXml(), /<Dial/);
   });
 });

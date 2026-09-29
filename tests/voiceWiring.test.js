@@ -252,6 +252,12 @@ assert.match(
 
 assert.match(
   source,
+  /ai leg dial finished/,
+  'DialCompleted must not dial the AI leg again'
+);
+
+assert.match(
+  source,
   /live transfer armed — caller stays in conference, media stays up/,
   'arming a transfer must not close /ws/media'
 );
