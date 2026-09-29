@@ -1,0 +1,62 @@
+# Merge each same-repo pull request into cursor/staging-voice-468b so staging
+# Desk and Voice can deploy it. Production still follows main.
+# This workflow runs from main (pull_request_target) and only git-merges the
+# pull request ref. It does not install or run code from the pull request.
+
+name: Stage pull request
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: stage-pull-request
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    name: Merge onto staging branch
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref != 'cursor/staging-voice-468b'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Merge this pull request onto staging
+        id: stage
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+          STAGE_RESULT_PATH: ${{ runner.temp }}/stage-result.json
+        run: node scripts/stage-pull-request.js
+        continue-on-error: true
+
+      - name: Record the result on the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          STAGE_RESULT_PATH: ${{ runner.temp }}/stage-result.json
+        run: node scripts/stage-pull-request-note.js
+
+      - name: Fail when the pull request did not land on staging
+        if: steps.stage.outcome == 'failure'
+        run: exit 1
