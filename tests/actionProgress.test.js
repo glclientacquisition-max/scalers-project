@@ -16,6 +16,7 @@ const {
   trimSpokenServiceDump,
   stripSpokenHedges,
   polishSpokenReply,
+  looksLikePaceOnlyTurn,
 } = require('../src/conversation/dynamicSpeech');
 
 assert.strictEqual(pickActionProgress('CREATE_REQUEST', 'en'), 'Okay.');
@@ -201,7 +202,7 @@ const emptyAnswerAfterName = pickSpeechGuaranteeLine({
 });
 assert.doesNotMatch(emptyAnswerAfterName, /can't finish/i);
 assert.doesNotMatch(emptyAnswerAfterName, /name so I can reach them/i);
-assert.match(emptyAnswerAfterName, /day and time|time works/i);
+assert.match(emptyAnswerAfterName, /^Okay\.?$/i);
 
 const nextWhenSlot = pickSpeechGuaranteeLine({
   nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'when' },
@@ -235,19 +236,46 @@ assert.match(
 );
 
 // Live leftover HD_bc9f610692de: bookings ask after the name was already in
-// must not speech-guarantee another name ask.
-assert.doesNotMatch(
+// must not speech-guarantee another name ask, and must not invent a when slot.
+const bookingsGuarantee = pickSpeechGuaranteeLine({
+  nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+  brainState: {
+    intent: 'booking',
+    caller: { name: 'Alvin', nameConfirmed: true },
+    goal: { missingSlots: ['name'] },
+  },
+  language: 'en',
+  userText: 'What are my bookings?',
+});
+assert.doesNotMatch(bookingsGuarantee, /May I have your name/i);
+assert.doesNotMatch(bookingsGuarantee, /day and time|time works/i);
+assert.match(bookingsGuarantee, /^Okay\.?$/i);
+
+assert.match(
   pickSpeechGuaranteeLine({
-    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    nextBestAction: { action: 'ANSWER' },
     brainState: {
       intent: 'booking',
-      caller: { name: 'Alvin', nameConfirmed: true },
+      caller: { name: 'Alvin' },
       goal: { missingSlots: ['name'] },
     },
     language: 'en',
-    userText: 'What are my bookings?',
+    userText: "Yeah, I'm Alvin.",
   }),
-  /May I have your name/i
+  /^Okay\.?$/i
 );
+
+assert.doesNotMatch(
+  polishSpokenReply("Okay, I've booked you for Thursday. Stay on the line."),
+  /booked|stay on the line/i
+);
+assert.doesNotMatch(
+  polishSpokenReply("Okay, I've transferred you to Alvin."),
+  /transferred you/i
+);
+
+assert.equal(looksLikePaceOnlyTurn('slower'), true);
+assert.equal(looksLikePaceOnlyTurn('polepole'), true);
+assert.equal(looksLikePaceOnlyTurn('come clean my sofa tomorrow'), false);
 
 console.log('actionProgress tests passed.');

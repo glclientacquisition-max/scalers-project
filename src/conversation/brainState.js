@@ -8,7 +8,7 @@ const {
   applyCallerNameConfirmation,
 } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
-const { looksLikePhaticCallerTurn } = require('./dynamicSpeech');
+const { looksLikePhaticCallerTurn, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
 const { mergeWorkResults } = require('./callResolution');
 const {
   applyLiveCallerFile,
@@ -82,9 +82,24 @@ function looksLikeHomeVisitAsk(value) {
   ) {
     return true;
   }
+  // Live pack #13: Nataka cleaning kesho. Job nouns may stay English.
+  if (
+    /\b(nataka|ninataka|naomba)\b/.test(value) &&
+    /\b(clean|cleaning|carpet|couch|sofa|mattress|airbnb|upholstery|visit|ziara|huduma)\b/.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\bkesho\b/.test(value) &&
+    /\b(clean|cleaning|carpet|couch|sofa|mattress|airbnb|ziara)\b/.test(value)
+  ) {
+    return true;
+  }
   return (
-    /\b(come (over|by|tomorrow|today)|fix|repair|plumb|install)\b/.test(value) &&
-    /\b(tomorrow|today|tonight|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d+\s*(am|pm)|o'?clock|saa)\b/.test(
+    /\b(come (over|by|tomorrow|today|kesho)|fix|repair|plumb|install)\b/.test(value) &&
+    /\b(tomorrow|today|tonight|kesho|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d+\s*(am|pm)|o'?clock|saa)\b/.test(
       value
     )
   );
@@ -294,11 +309,13 @@ function observeCallerTurn(state, input = {}) {
     inferredIntent === 'location' &&
     Array.isArray(next.goal.missingSlots) &&
     next.goal.missingSlots.includes('landmark');
+  const paceOnly = looksLikePaceOnlyTurn(text);
   const preserveActiveIntent =
     previousWasMeaningful &&
     next.intent !== 'unknown' &&
     (next.goal.status === 'active' || next.handoff?.requested) &&
     (fillingBookingLandmark ||
+      paceOnly ||
       (inferredIntent === 'general_enquiry' &&
         (next.goal.missingSlots.length > 0 ||
           next.handoff?.requested ||
@@ -568,7 +585,7 @@ function formatNameConfirmForPrompt(state) {
   }
   if (!name) return '';
   if (state?.caller?.nameConfirmed) {
-    return `- Caller name: ${name} (confirmed). Speak this spelling once in the next line. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.`;
+    return `- Caller name: ${name} (confirmed). Use this spelling. Do not ask for the name again. Do not ask if the name is right. You may append save_caller_info with this confirmed name.`;
   }
   return `- Caller name is known (${name}). Do not ask for the name again. Do not ask "is that right?". Continue the next missing slot. Do not append save_caller_info until they confirm, correct, or continue.`;
 }
