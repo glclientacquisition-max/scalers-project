@@ -7,11 +7,13 @@ const path = require("node:path");
 const {
   STAGING_BRANCH,
   decideStage,
-  stagePullRequest,
+  rebuildStaging,
   noteBody,
   noteRequest,
   statusFor,
+  statusForPull,
 } = require("../scripts/stage-pull-request");
+const { noteTargets } = require("../scripts/stage-pull-request-note");
 
 const tempDirs = [];
 
@@ -35,18 +37,21 @@ function setupRepo() {
   git(work, ["config", "user.email", "test@example.com"]);
   git(work, ["config", "user.name", "test"]);
   writeCommit(work, "README", "main\n", "init");
-  git(work, ["init", "--bare", remote]);
+  git(work, ["init", "--bare", "-b", "main", remote]);
   git(work, ["remote", "add", "origin", remote]);
   git(work, ["checkout", "-b", STAGING_BRANCH]);
   writeCommit(work, "staging-only.txt", "keep\n", "staging only");
+  git(work, ["push", "origin", "main", STAGING_BRANCH]);
   git(work, ["checkout", "main"]);
-  git(work, ["checkout", "-b", "feature"]);
-  writeCommit(work, "feature.txt", "hello\n", "feature");
-  const featureSha = git(work, ["rev-parse", "HEAD"]).trim();
-  git(work, ["push", "origin", "main", STAGING_BRANCH, "feature"]);
-  git(work, ["push", "origin", "feature:refs/pull/7/head"]);
+  return { work, remote };
+}
+
+function addPull(work, number, file, contents) {
   git(work, ["checkout", "main"]);
-  return { work, remote, featureSha };
+  git(work, ["checkout", "-B", `feature-${number}`]);
+  writeCommit(work, file, contents, `pr ${number}`);
+  git(work, ["push", "origin", `feature-${number}:refs/pull/${number}/head`]);
+  git(work, ["checkout", "main"]);
 }
 
 function remoteFile(remote, branch, file) {
@@ -88,52 +93,76 @@ describe("decideStage", () => {
   });
 });
 
-describe("stagePullRequest", () => {
-  it("merges the pull request onto staging and keeps staging-only commits", () => {
+describe("rebuildStaging", () => {
+  it("rebuilds staging as main plus open pull requests", () => {
     const { work, remote } = setupRepo();
-    const first = stagePullRequest({ cwd: work, prNumber: 7 });
-    assert.equal(first.status, "merged");
-    assert.match(remoteFile(remote, STAGING_BRANCH, "feature.txt"), /hello/);
-    assert.match(remoteFile(remote, STAGING_BRANCH, "staging-only.txt"), /keep/);
+    addPull(work, 7, "feature.txt", "hello\n");
 
-    const second = stagePullRequest({ cwd: work, prNumber: 7 });
+    const first = rebuildStaging({ cwd: work, prNumbers: [7] });
+    assert.equal(first.status, "rebuilt");
+    assert.deepEqual(first.included, [7]);
+    assert.match(remoteFile(remote, STAGING_BRANCH, "feature.txt"), /hello/);
+    assert.throws(() => remoteFile(remote, STAGING_BRANCH, "staging-only.txt"));
+
+    const second = rebuildStaging({ cwd: work, prNumbers: [7] });
     assert.equal(second.status, "current");
     assert.equal(second.stagingSha, first.stagingSha);
   });
 
-  it("leaves staging unchanged when the merge conflicts", () => {
+  it("drops a pull request that is no longer open", () => {
     const { work, remote } = setupRepo();
-    git(work, ["checkout", STAGING_BRANCH]);
-    writeCommit(work, "README", "staging\n", "staging readme");
-    git(work, ["push", "origin", STAGING_BRANCH]);
-    git(work, ["checkout", "feature"]);
-    writeCommit(work, "README", "feature\n", "feature readme");
-    git(work, ["push", "origin", "feature:refs/pull/7/head"]);
-    git(work, ["checkout", "main"]);
+    addPull(work, 7, "feature.txt", "hello\n");
+    rebuildStaging({ cwd: work, prNumbers: [7] });
 
-    const result = stagePullRequest({ cwd: work, prNumber: 7 });
-    assert.equal(result.status, "conflict");
-    assert.match(remoteFile(remote, STAGING_BRANCH, "README"), /staging/);
+    const cleared = rebuildStaging({ cwd: work, prNumbers: [] });
+    assert.equal(cleared.status, "rebuilt");
+    assert.deepEqual(cleared.included, []);
     assert.throws(() => remoteFile(remote, STAGING_BRANCH, "feature.txt"));
+    assert.match(remoteFile(remote, STAGING_BRANCH, "README"), /main/);
+  });
+
+  it("keeps the newer pull request when an older one conflicts", () => {
+    const { work, remote } = setupRepo();
+    addPull(work, 7, "README", "older\n");
+    addPull(work, 8, "README", "newer\n");
+
+    const result = rebuildStaging({ cwd: work, prNumbers: [7, 8] });
+    assert.deepEqual(result.included, [8]);
+    assert.equal(result.conflicts[0].number, 7);
+    assert.match(remoteFile(remote, STAGING_BRANCH, "README"), /newer/);
   });
 });
 
 describe("pull request note", () => {
   it("posts once, then updates the same comment", () => {
-    const body = noteBody("merged", "abc123");
+    const body = noteBody("on-staging", "abc123");
     assert.match(body, /scalers-staging\.vercel\.app/);
+    assert.match(body, /Closing it takes it off/);
     assert.match(body, /abc123/);
     const created = noteRequest([], body);
     assert.equal(created.method, "POST");
-    const updated = noteRequest([{ id: 9, body }], noteBody("current", "abc123"));
+    const updated = noteRequest([{ id: 9, body }], noteBody("removed", "abc123"));
     assert.equal(updated.method, "PATCH");
     assert.equal(updated.id, 9);
+    assert.match(updated.body, /off the staging branch/);
   });
 
-  it("marks a conflict as a failed status", () => {
+  it("marks a conflict as a failed status and a closed pull request as removed", () => {
+    const result = { included: [8], conflicts: [{ number: 7 }] };
+    assert.equal(statusForPull(result, 8), "on-staging");
+    assert.equal(statusForPull(result, 7), "conflict");
+    assert.equal(statusForPull(result, 7, { merged: true }), "on-main");
+    assert.equal(statusForPull(result, 3), "removed");
     assert.equal(statusFor({ status: "conflict" }).state, "failure");
-    assert.equal(statusFor({ status: "merged" }).state, "success");
+    assert.equal(statusFor({ status: "removed" }).state, "success");
     assert.match(noteBody("conflict"), /conflicted/);
+  });
+
+  it("notes the triggering pull request and every included or conflicting one", () => {
+    assert.deepEqual(
+      noteTargets({ included: [8, 9], conflicts: [{ number: 7 }] }, 9),
+      [9, 8, 7]
+    );
   });
 });
 

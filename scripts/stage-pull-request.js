@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Merge a pull request onto the staging branch so Desk and Voice can deploy it
- * before that pull request merges to main.
+ * Rebuild the staging branch as main plus the open pull requests into main.
+ * Closing a pull request runs this again, so that change leaves staging.
  *
- * The workflow checks out main and runs this file. It fetches the pull request
- * ref and merges that ref. It does not execute files from the pull request.
+ * The workflow checks out main and runs this file. It fetches pull request
+ * refs and merges those refs. It does not execute files from the pull requests.
  */
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
@@ -43,69 +43,140 @@ function runGit(cwd, args, { allowFail = false } = {}) {
   }
 }
 
-function stagePullRequest({
+function listOpenPullNumbers({ repo, stagingBranch = STAGING_BRANCH } = {}) {
+  if (!repo) throw new Error("GITHUB_REPOSITORY is required to list open pull requests");
+  const raw = execFileSync(
+    "gh",
+    [
+      "pr",
+      "list",
+      "--repo",
+      repo,
+      "--base",
+      "main",
+      "--state",
+      "open",
+      "--limit",
+      "200",
+      "--json",
+      "number,headRefName",
+    ],
+    { encoding: "utf8" }
+  );
+  const rows = JSON.parse(raw);
+  return rows
+    .filter((row) => row.headRefName !== stagingBranch)
+    .map((row) => Number(row.number))
+    .sort((a, b) => b - a);
+}
+
+function rebuildStaging({
   cwd,
-  prNumber,
+  prNumbers,
   stagingBranch = STAGING_BRANCH,
   remote = "origin",
 }) {
-  if (!prNumber) throw new Error("PR_NUMBER is required");
+  if (!Array.isArray(prNumbers)) throw new Error("prNumbers is required");
 
-  runGit(cwd, ["fetch", remote, stagingBranch]);
-  runGit(cwd, ["fetch", remote, `+pull/${prNumber}/head:pr-head`]);
-  runGit(cwd, ["checkout", "-B", "staging-work", `${remote}/${stagingBranch}`]);
+  runGit(cwd, ["fetch", remote, "main", stagingBranch]);
+  const expected = runGit(cwd, ["rev-parse", `${remote}/${stagingBranch}`]).stdout.trim();
+  runGit(cwd, ["checkout", "-B", "staging-work", `${remote}/main`]);
   runGit(cwd, ["config", "user.email", "github-actions[bot]@users.noreply.github.com"]);
   runGit(cwd, ["config", "user.name", "github-actions[bot]"]);
 
-  const ancestor = runGit(cwd, ["merge-base", "--is-ancestor", "pr-head", "HEAD"], {
-    allowFail: true,
-  });
-  if (ancestor.code === 0) {
-    const stagingSha = runGit(cwd, ["rev-parse", "HEAD"]).stdout.trim();
-    return { status: "current", stagingSha };
-  }
+  const included = [];
+  const conflicts = [];
+  const newestFirst = [...prNumbers].map(Number).sort((a, b) => b - a);
 
-  const merged = runGit(
-    cwd,
-    ["merge", "--no-ff", "--no-edit", "pr-head", "-m", `chore: stage PR #${prNumber} for testing`],
-    { allowFail: true }
-  );
-  if (merged.code !== 0) {
-    const detail = `${merged.stdout}\n${merged.stderr}`.trim();
-    runGit(cwd, ["merge", "--abort"], { allowFail: true });
-    if (/CONFLICT|could not apply|Automatic merge failed|fix conflicts/i.test(detail)) {
-      return { status: "conflict", detail };
+  for (const number of newestFirst) {
+    const ref = `pr-${number}`;
+    runGit(cwd, ["fetch", remote, `+pull/${number}/head:${ref}`]);
+    const merged = runGit(
+      cwd,
+      ["merge", "--no-ff", "--no-edit", ref, "-m", `chore: stage PR #${number} for testing`],
+      { allowFail: true }
+    );
+    if (merged.code !== 0) {
+      const detail = `${merged.stdout}\n${merged.stderr}`.trim();
+      runGit(cwd, ["merge", "--abort"], { allowFail: true });
+      if (/CONFLICT|could not apply|Automatic merge failed|fix conflicts/i.test(detail)) {
+        conflicts.push({ number, detail });
+        continue;
+      }
+      throw new Error(detail);
     }
-    throw new Error(detail);
+    included.push(number);
   }
 
-  runGit(cwd, ["push", remote, `HEAD:${stagingBranch}`]);
+  const newTree = runGit(cwd, ["rev-parse", "HEAD^{tree}"]).stdout.trim();
+  const oldTree = runGit(cwd, ["rev-parse", `${expected}^{tree}`]).stdout.trim();
+  if (newTree === oldTree) {
+    return { status: "current", stagingSha: expected, included, conflicts };
+  }
+
+  runGit(cwd, [
+    "push",
+    `--force-with-lease=refs/heads/${stagingBranch}:${expected}`,
+    remote,
+    `HEAD:refs/heads/${stagingBranch}`,
+  ]);
   const stagingSha = runGit(cwd, ["rev-parse", "HEAD"]).stdout.trim();
-  return { status: "merged", stagingSha };
+  return { status: "rebuilt", stagingSha, included, conflicts };
+}
+
+function statusForPull(result, number, { merged = false } = {}) {
+  const n = Number(number);
+  if (merged) return "on-main";
+  if ((result.conflicts || []).some((conflict) => Number(conflict.number) === n)) return "conflict";
+  if ((result.included || []).map(Number).includes(n)) return "on-staging";
+  return "removed";
 }
 
 function noteBody(status, stagingSha) {
+  const tip = stagingSha ? ["", `Staging branch tip: \`${stagingSha}\`.`] : [];
   if (status === "conflict") {
     return [
       NOTE_MARKER,
-      "This pull request did not land on staging. The merge into `cursor/staging-voice-468b` conflicted.",
+      "This pull request is off staging. It conflicted with main or another open pull request.",
       "",
-      "Update the branch so it merges cleanly, push, and this check will try again.",
+      "Update the branch and push. This check will try again.",
       "",
       `Staging desk: ${STAGING_DESK_URL}`,
+      ...tip,
     ].join("\n");
   }
-  const lines = [
+  if (status === "removed") {
+    return [
+      NOTE_MARKER,
+      "This pull request is off the staging branch.",
+      "",
+      "Staging is main plus the pull requests still open.",
+      "",
+      `Staging desk: ${STAGING_DESK_URL}`,
+      ...tip,
+    ].join("\n");
+  }
+  if (status === "on-main") {
+    return [
+      NOTE_MARKER,
+      "This pull request is in main. Staging includes it from main.",
+      "",
+      "Production follows main.",
+      "",
+      `Staging desk: ${STAGING_DESK_URL}`,
+      ...tip,
+    ].join("\n");
+  }
+  return [
     NOTE_MARKER,
-    "This pull request is on the staging branch `cursor/staging-voice-468b`.",
+    "This pull request is on the staging branch.",
+    "",
+    "Closing it takes it off. Production updates when it merges into main.",
     "",
     `Staging desk: ${STAGING_DESK_URL}`,
     `Staging voice: ${STAGING_VOICE_HEALTH_URL}`,
-    "",
-    "Production updates when this pull request merges into `main`.",
-  ];
-  if (stagingSha) lines.push("", `Staging branch tip: \`${stagingSha}\`.`);
-  return lines.join("\n");
+    ...tip,
+  ].join("\n");
 }
 
 function noteRequest(comments, body) {
@@ -118,15 +189,12 @@ function noteRequest(comments, body) {
 
 function statusFor(result) {
   if (result.status === "conflict") {
-    return {
-      state: "failure",
-      description: "Merge into staging conflicted",
-    };
+    return { state: "failure", description: "Staging merge conflicted" };
   }
-  return {
-    state: "success",
-    description: "On the staging branch",
-  };
+  if (result.status === "removed") {
+    return { state: "success", description: "Off the staging branch" };
+  }
+  return { state: "success", description: "On the staging branch" };
 }
 
 function readResult(resultPath) {
@@ -144,16 +212,23 @@ function main() {
     baseRepo: process.env.BASE_REPO || process.env.GITHUB_REPOSITORY,
     headRef: process.env.HEAD_REF,
   });
-  if (decision.action === "skip") {
-    writeResult(resultPath, { status: "skipped", reason: decision.reason });
+  if (process.env.PR_EVENT && decision.action === "skip") {
+    writeResult(resultPath, { status: "skipped", reason: decision.reason, included: [], conflicts: [] });
     return;
   }
-  const result = stagePullRequest({
-    cwd: process.cwd(),
-    prNumber: process.env.PR_NUMBER,
-  });
-  writeResult(resultPath, result);
-  if (result.status === "conflict") process.exitCode = 2;
+
+  const prNumbers = process.env.PR_NUMBERS
+    ? process.env.PR_NUMBERS.split(",").filter(Boolean).map(Number)
+    : listOpenPullNumbers({ repo: process.env.GITHUB_REPOSITORY });
+
+  const rebuilt = rebuildStaging({ cwd: process.cwd(), prNumbers });
+  const trigger = process.env.PR_NUMBER ? Number(process.env.PR_NUMBER) : null;
+  const merged = process.env.PR_MERGED === "true";
+  const status = trigger
+    ? statusForPull(rebuilt, trigger, { merged })
+    : rebuilt.status;
+  writeResult(resultPath, { ...rebuilt, status });
+  if (status === "conflict") process.exitCode = 2;
 }
 
 if (require.main === module) main();
@@ -163,7 +238,9 @@ module.exports = {
   STAGING_DESK_URL,
   NOTE_MARKER,
   decideStage,
-  stagePullRequest,
+  listOpenPullNumbers,
+  rebuildStaging,
+  statusForPull,
   noteBody,
   noteRequest,
   statusFor,

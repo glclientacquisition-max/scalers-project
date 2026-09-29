@@ -20,7 +20,7 @@ TEST          — lane test gates (see below)
   ↓
 REVIEW        — PR with clear description; no unrelated changes
   ↓
-STAGING       — opening a PR into `main` merges it onto `cursor/staging-voice-468b`
+STAGING       — rebuild `cursor/staging-voice-468b` as `main` plus open PRs
   ↓
 BETA          — beta tenants; billing_enforcement=off default
   ↓
@@ -80,13 +80,13 @@ One integration branch: **`cursor/staging-voice-468b`**. Not a second git repo.
 Day to day:
 
 1. Feature branch (one lane). Open a pull request into `main`.
-2. `.github/workflows/stage-pull-request.yml` merges that pull request onto `cursor/staging-voice-468b` and pushes. This starts after the workflow file is on `main`.
+2. `.github/workflows/stage-pull-request.yml` rebuilds `cursor/staging-voice-468b` as `main` plus every open pull request into `main`. This starts after the workflow file is on `main`.
 3. Staging Desk and staging Voice deploy from that branch. Open `scalers-staging.vercel.app`. For voice, confirm `/healthz.gitSha` is the staging branch tip from the pull request note, then call `+254709221536`.
 4. If the test is good, mark that feature pull request ready and squash-merge it into `main`. Production Desk and production Voice follow `main`.
-5. Leave `cursor/staging-voice-468b` as the test branch. It keeps other pull requests that were opened for testing, plus any commits already on it. Squash-merging that branch into `main` would ship that mix.
+5. If the test is not good, close the pull request. The workflow rebuilds staging without it. The practice desk and practice phone go back to `main` plus the pull requests still open.
 6. A preview URL on the feature pull request is a glance. The shared staging URL is `https://scalers-staging.vercel.app`.
 
-Closing a pull request leaves its commits on the staging branch. Production still changes only when that pull request merges into `main`.
+Promote by squash-merging the tested pull request into `main`. The staging branch is only the practice copy.
 
 ---
 

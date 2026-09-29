@@ -1,13 +1,16 @@
-# Merge each same-repo pull request into cursor/staging-voice-468b so staging
-# Desk and Voice can deploy it. Production still follows main.
-# This workflow runs from main (pull_request_target) and only git-merges the
-# pull request ref. It does not install or run code from the pull request.
+# Rebuild cursor/staging-voice-468b as main plus open pull requests into main.
+# Closing a pull request rebuilds staging without it.
+# Production still follows main.
+# This workflow runs from main (pull_request_target) and only git-merges pull
+# request refs. It does not install or run code from those pull requests.
 
 name: Stage pull request
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+  push:
     branches: [main]
 
 permissions:
@@ -21,10 +24,11 @@ concurrency:
 
 jobs:
   stage:
-    name: Merge onto staging branch
+    name: Rebuild staging branch
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref != 'cursor/staging-voice-468b'
+      github.event_name == 'push' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.head.ref != 'cursor/staging-voice-468b')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,10 +40,14 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Merge this pull request onto staging
+      - name: Rebuild staging from main and open pull requests
         id: stage
         env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_EVENT: ${{ github.event.action }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
@@ -52,11 +60,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           STAGE_RESULT_PATH: ${{ runner.temp }}/stage-result.json
         run: node scripts/stage-pull-request-note.js
 
-      - name: Fail when the pull request did not land on staging
+      - name: Fail when this pull request conflicted
         if: steps.stage.outcome == 'failure'
         run: exit 1
