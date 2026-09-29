@@ -19,13 +19,14 @@ export function CoverageAreaField({
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(-1);
   const results = useMemo(
     () => searchCoverageAreas(query, value),
     [query, value]
   );
   const listId = `${id}-list`;
-  const activeIndex = results.length ? Math.min(active, results.length - 1) : 0;
+  const activeIndex =
+    results.length && active >= 0 ? Math.min(active, results.length - 1) : -1;
 
   function addArea(areaId: string) {
     if (value.includes(areaId) || value.length >= COVERAGE_AREA_MAX) return;
@@ -73,12 +74,13 @@ export function CoverageAreaField({
           open && results[activeIndex] ? `${id}-opt-${activeIndex}` : undefined
         }
         value={query}
-        placeholder="Nairobi"
+        placeholder="Search estates"
         autoComplete="off"
         className={settingsDenseFieldClass}
         onChange={(event) => {
-          setQuery(event.target.value);
-          setActive(0);
+          const next = event.target.value;
+          setQuery(next);
+          setActive(next.trim() ? 0 : -1);
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
@@ -87,11 +89,14 @@ export function CoverageAreaField({
           if (event.key === "ArrowDown") {
             event.preventDefault();
             setOpen(true);
-            setActive((prev) => Math.min(prev + 1, Math.max(results.length - 1, 0)));
+            setActive((prev) => {
+              if (prev < 0) return results.length ? 0 : -1;
+              return Math.min(prev + 1, Math.max(results.length - 1, 0));
+            });
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
-            setActive((prev) => Math.max(prev - 1, 0));
-          } else if (event.key === "Enter" && open && results[activeIndex]) {
+            setActive((prev) => (prev <= 0 ? -1 : prev - 1));
+          } else if (event.key === "Enter" && open && activeIndex >= 0 && results[activeIndex]) {
             event.preventDefault();
             addArea(results[activeIndex].id);
           } else if (event.key === "Escape") {
@@ -106,6 +111,13 @@ export function CoverageAreaField({
           aria-label="Coverage"
           className="max-h-60 overflow-y-auto rounded-lg border border-line bg-surface"
         >
+          {!query.trim() ? (
+            <li>
+              <p className="px-3 pt-2 text-xs font-medium text-ink-soft">
+                Type an estate name
+              </p>
+            </li>
+          ) : null}
           {results.map((area, index) => {
             const showCounty =
               area.kind === "county" &&

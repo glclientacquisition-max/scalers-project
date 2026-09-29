@@ -26,6 +26,7 @@ const LEGACY_STATUS = new Set(["new", "contacted", "resolved", "archived"]);
 
 function pile(ret: InboxReturn): string | undefined {
   const raw = String(ret.purpose || ret.from || ret.status || "").trim();
+  if (raw === "home") return "home";
   return PILES.has(raw) ? raw : undefined;
 }
 
@@ -52,6 +53,10 @@ function applyViewQuery(q: URLSearchParams, ret: InboxReturn, id?: string) {
 
 function applyInboxQuery(q: URLSearchParams, ret: InboxReturn, list: boolean) {
   const id = pile(ret);
+  if (id === "home") {
+    if (!list) q.set("from", "home");
+    return;
+  }
   if (id) {
     if (!list) q.set("from", id);
     else if (LEGACY_STATUS.has(id)) q.set("status", id);
@@ -72,6 +77,7 @@ export function inboxRecordHref(callId: string, ret: InboxReturn = {}): string {
 }
 
 export function inboxReturnHref(ret: InboxReturn = {}): string {
+  if (pile(ret) === "home") return "/home";
   const q = new URLSearchParams();
   applyInboxQuery(q, ret, true);
   const qs = q.toString();

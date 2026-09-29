@@ -272,6 +272,7 @@ export function TenantForm({
   lineNumber = "",
   sidebar = null,
   liveTransferExecutor = false,
+  showBack = true,
 }: {
   tenant: TenantRow;
   panel?: SettingsPanel;
@@ -280,6 +281,7 @@ export function TenantForm({
   lineNumber?: string;
   sidebar?: ReactNode;
   liveTransferExecutor?: boolean;
+  showBack?: boolean;
 }) {
   const voiceOptions =
     curatedVoices && curatedVoices.length
@@ -724,7 +726,7 @@ export function TenantForm({
             lineDetail={
               Boolean(lineNumber) && lineNumber !== "Number pending" ? lineNumber : ""
             }
-            showBack
+            showBack={showBack}
             title={heading}
             action={
               panel === "pronunciation" ? undefined : (
@@ -1185,20 +1187,21 @@ export function TenantForm({
                     const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
                     return (
                       <tr key={`service-${index}`} className="align-middle">
-                        <td className="min-w-0 truncate px-3 py-2">
+                        <td className="min-w-0 px-3 py-2">
                           <label className="sr-only" htmlFor={`svc-name-${index}`}>
                             Service name
                           </label>
                           <input
                             id={`svc-name-${index}`}
                             value={service.name}
+                            title={service.name || undefined}
                             onChange={(e) => updateService(index, "name", e.target.value)}
                             placeholder={
                               vertical === "retail"
                                 ? "Book sourcing / special orders"
                                 : "Home cleaning"
                             }
-                            className={`${tableFieldClass} truncate`}
+                            className={tableFieldClass}
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -1415,16 +1418,17 @@ export function TenantForm({
                       const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                       return (
                         <tr key={`product-${index}`} className="align-middle">
-                          <td className="min-w-0 truncate px-3 py-2">
+                          <td className="min-w-0 px-3 py-2">
                             <label className="sr-only" htmlFor={`prod-name-${index}`}>
                               Product name
                             </label>
                             <input
                               id={`prod-name-${index}`}
                               value={product.name}
+                              title={product.name || undefined}
                               onChange={(e) => updateProduct(index, "name", e.target.value)}
                               placeholder="Atomic Habits"
-                              className={`${tableFieldClass} truncate`}
+                              className={tableFieldClass}
                             />
                           </td>
                           <td className="px-3 py-2">

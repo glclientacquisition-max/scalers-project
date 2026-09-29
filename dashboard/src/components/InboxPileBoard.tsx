@@ -215,7 +215,7 @@ export function InboxPileBoard({
               ids={pageRows.map((item) => item.id)}
               scopeKey={`${purpose}:${page}:${q}`}
             >
-              <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
+              <ul className="mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
                 {showArchivedEntry ? (
                   <InboxArchivedPhoneRow count={counts.archived} ret={ret} />
                 ) : null}

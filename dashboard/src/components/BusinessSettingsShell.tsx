@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { AlertsPanel } from "@/components/AlertsPanel";
@@ -50,6 +52,15 @@ function SettingsChevron() {
   );
 }
 
+function SettingsIdentityRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    if (!window.matchMedia("(min-width: 768px)").matches) return;
+    router.replace("/settings?tab=train&panel=identity");
+  }, [router]);
+  return null;
+}
+
 function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
   return (
     <section className="min-w-0 w-full space-y-6">
@@ -96,7 +107,7 @@ function SettingsMenu({
             <ul className="w-max max-w-full space-y-0.5">
               {section.items.map((item) => {
                 const active = settingsNavItemActive(item.target, tab, trainPanel, {
-                  selectHubAppearance: true,
+                  selectHubIdentity: isRail,
                 });
                 const key =
                   item.target.tab === "train"
@@ -239,25 +250,33 @@ export function BusinessSettingsShell({
 
   if (isMenu) {
     return (
-      <div className="w-full min-w-0" data-settings-console="">
-        <SettingsPageHeader
-          businessName={businessName}
-          lineLive={lineLive}
-          lineDetail={lineDetail}
-          index
-        />
-        <div className={settingsConsoleClass}>
-          {rail}
-          <div className={settingsPanelClass}>
-            <div className="md:hidden">
-              <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
-            </div>
-            <div className="hidden md:block">
-              <AppearancePanel />
-            </div>
+      <>
+        <div className="w-full min-w-0 md:hidden" data-settings-console="">
+          <SettingsPageHeader
+            businessName={businessName}
+            lineLive={lineLive}
+            lineDetail={lineDetail}
+            index
+          />
+          <div className="mt-4">
+            <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
           </div>
         </div>
-      </div>
+        <div className="hidden w-full min-w-0 md:block">
+          <SettingsIdentityRedirect />
+          <TenantForm
+            key={tenantFormKey}
+            tenant={tenant}
+            panel="identity"
+            curatedVoices={curatedVoices}
+            heading="Identity"
+            lineNumber={lineLive ? lineDetail : "Number pending"}
+            sidebar={rail}
+            liveTransferExecutor={liveTransferExecutor}
+            showBack={false}
+          />
+        </div>
+      </>
     );
   }
 

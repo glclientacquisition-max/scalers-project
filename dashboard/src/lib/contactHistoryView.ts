@@ -142,6 +142,29 @@ export function groupContactTimeline(
   return rows;
 }
 
+const nairobiGroupStamp = new Intl.DateTimeFormat("en-KE", {
+  timeZone: "Africa/Nairobi",
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+const nairobiGroupClock = new Intl.DateTimeFormat("en-KE", {
+  timeZone: "Africa/Nairobi",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+function eatClock(iso: string, withDay: boolean): string | null {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  const formatted = (withDay ? nairobiGroupStamp : nairobiGroupClock).format(at);
+  return formatted.replace(/\s?(am|pm)$/i, (_, mer: string) => ` ${mer.toUpperCase()}`);
+}
+
 export function contactHistoryGroupCopy(group: ContactHistoryGroup): string {
   const minutes = Math.max(1, Math.round(minutesBetween(group.startAt, group.endAt)));
   const noun =
@@ -154,7 +177,14 @@ export function contactHistoryGroupCopy(group: ContactHistoryGroup): string {
           : group.purpose === "answered"
             ? "answered calls"
             : "rows";
-  return `${group.entries.length} ${noun} in a ${minutes}-minute window`;
+  const base = `${group.entries.length} ${noun} in a ${minutes}-minute window`;
+  if (group.purpose !== "missed") return base;
+  const start = eatClock(group.startAt, true);
+  if (!start) return base;
+  const sameDay = nairobiDayKey(group.startAt) === nairobiDayKey(group.endAt);
+  const end = eatClock(group.endAt, !sameDay);
+  if (!end || start === end) return `${base}, ${start}`;
+  return `${base}, ${start} to ${end}`;
 }
 
 function nairobiDayKey(iso: string): string | null {

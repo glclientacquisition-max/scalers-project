@@ -470,6 +470,11 @@ export function inboxNeedsYou(opts: {
   return false;
 }
 
+/** List preview must not keep a pasted bullet as the unread mark. */
+function ownerLine(raw: string): string {
+  return raw.replace(/^(?:[•●▪◦]\s*)+/, "").replace(/^\*\s+/, "").trim();
+}
+
 export function holdHeadline(hold: InboxHold, vertical?: string | null): string {
   const item = hold.item?.trim();
   if (item) {
@@ -518,13 +523,13 @@ export function buildInboxItem(opts: {
   const callerPhone =
     job?.caller_phone || hold?.caller_phone || lead?.call.caller_number || null;
 
-  let headline = lead?.reason || purposeLabel(purpose, vertical);
+  let headline = ownerLine(lead?.reason || purposeLabel(purpose, vertical));
   let detail: string | null = lead?.primaryIntent || null;
   if (job) {
-    headline = jobHeadline(job, vertical);
+    headline = ownerLine(jobHeadline(job, vertical));
     detail = jobDetail(job);
   } else if (hold) {
-    headline = holdHeadline(hold, vertical);
+    headline = ownerLine(holdHeadline(hold, vertical));
     const when = hold.when_text?.trim();
     detail = when || hold.notes;
   }

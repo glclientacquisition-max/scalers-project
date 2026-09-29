@@ -42,6 +42,12 @@ import {
 } from "@/lib/contactHistoryView";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
 
+function actionableOwnerFact(raw: string | null | undefined): string | null {
+  const text = String(raw || "").replace(/\s+/g, " ").trim();
+  if (!text || /^none$/i.test(text)) return null;
+  return text;
+}
+
 function fileHref(
   id: string,
   sp: Record<string, string | undefined>,
@@ -210,9 +216,8 @@ export default async function ContactDetailPage({
                   latestCall?.ownerWant ||
                   contact.last_reason
                 }
-                done={latestCall?.ownerCard?.done}
-                mood={latestCall?.ownerCard?.mood}
-                next={latestCall?.ownerCard?.next}
+                done={actionableOwnerFact(latestCall?.ownerCard?.done)}
+                next={actionableOwnerFact(latestCall?.ownerCard?.next)}
               />
             </section>
           ) : null}

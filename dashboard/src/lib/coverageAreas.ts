@@ -1,4 +1,5 @@
-import INDEX from "@/lib/data/kenyaPlaceCounties.json";
+import INDEX from "./data/kenyaPlaceCounties.json";
+import { rankCoverageAreas } from "./coverageRank";
 
 export const COVERAGE_AREA_MAX = 40;
 
@@ -18,15 +19,6 @@ function titleName(name: string): string {
   return name.replace(/\b[a-z]+/g, (word) =>
     word === "cbd" ? "CBD" : word.charAt(0).toUpperCase() + word.slice(1)
   );
-}
-
-function normalizeText(value: string): string {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/['’]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 const DIRECTORY: CoverageAreaOption[] = (() => {
@@ -86,25 +78,11 @@ export function formatCoverageList(areas: readonly string[]): string {
 
 export { areasFromPlainText } from "./coverageSeed";
 
+/** Type an estate. Empty query stays on counties. */
 export function searchCoverageAreas(
   query: string,
   selected: readonly string[],
   limit = 20
 ): CoverageAreaOption[] {
-  const chosen = new Set(selected);
-  const q = normalizeText(query);
-  const pool = DIRECTORY.filter((area) => !chosen.has(area.id));
-  if (!q) return pool.filter((area) => area.kind === "county");
-  const starts: CoverageAreaOption[] = [];
-  const contains: CoverageAreaOption[] = [];
-  for (const area of pool) {
-    const hay = `${area.search} ${area.label.toLowerCase()}`;
-    if (area.search.startsWith(q) || area.label.toLowerCase().startsWith(q)) {
-      starts.push(area);
-    } else if (hay.includes(q)) {
-      contains.push(area);
-    }
-    if (starts.length >= limit) break;
-  }
-  return [...starts, ...contains].slice(0, limit);
+  return rankCoverageAreas(DIRECTORY, query, selected, limit);
 }

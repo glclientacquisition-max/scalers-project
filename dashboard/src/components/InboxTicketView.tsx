@@ -90,13 +90,13 @@ function TicketSummaryFacts({
       ) : null}
       {mood ? (
         <div>
-          <dt className={metaLabelClass}>Mood</dt>
+          <dt className="text-xs font-medium text-ink-soft">Mood</dt>
           <dd className="mt-1 text-sm text-ink">{plainOwnerCopy(mood)}</dd>
         </div>
       ) : null}
       {done ? (
         <div>
-          <dt className={metaLabelClass}>Done</dt>
+          <dt className="text-xs font-medium text-ink-soft">Done</dt>
           <dd className="mt-1 text-sm text-ink [overflow-wrap:anywhere]">{plainOwnerCopy(done)}</dd>
         </div>
       ) : null}
@@ -309,6 +309,7 @@ export function InboxTicketView({
   waMessage,
   needsYou,
   urgency,
+  bannerWhen = null,
   want,
   done,
   mood,
@@ -338,6 +339,8 @@ export function InboxTicketView({
   waMessage: string;
   needsYou: boolean;
   urgency: string | null;
+  /** Missed-call banner clock. Other banners stay a next step only. */
+  bannerWhen?: string | null;
   want: string | null;
   done: string | null;
   mood: string | null;
@@ -362,6 +365,7 @@ export function InboxTicketView({
   const [away, setAway] = useState(false);
   const [summaryW, setSummaryW] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [gripHot, setGripHot] = useState(false);
   const summaryWRef = useRef<number | null>(null);
   const canConfirm = !archived && String(job?.status || "").toLowerCase() === "requested";
   const canHoldDone = !archived && String(hold?.status || "").toLowerCase() === "open";
@@ -508,7 +512,9 @@ export function InboxTicketView({
       <header className="shrink-0 border-b border-line bg-surface px-2 py-2 sm:px-4">
         <DeskRecordLead
           align="center"
-          back={<DeskBack href={backHref}>Inbox</DeskBack>}
+          back={
+            <DeskBack href={backHref}>{backHref === "/home" ? "Home" : "Inbox"}</DeskBack>
+          }
           trail={
             <InboxTicketMore
               callId={callId}
@@ -529,6 +535,9 @@ export function InboxTicketView({
       {needsYou && urgency ? (
         <p className="shrink-0 border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm font-medium text-warn sm:px-6">
           {plainOwnerCopy(urgency)}
+          {bannerWhen ? (
+            <span className="font-normal"> · {plainOwnerCopy(bannerWhen)}</span>
+          ) : null}
         </p>
       ) : null}
 
@@ -591,6 +600,7 @@ export function InboxTicketView({
           </aside>
           <DeskHint
             label="Summary width"
+            open={dragging || gripHot}
             className="relative z-10 hidden h-full w-px shrink-0 lg:flex"
           >
             <div
@@ -627,9 +637,11 @@ export function InboxTicketView({
             >
               <span
                 aria-hidden="true"
+                onPointerEnter={() => setGripHot(true)}
+                onPointerLeave={() => setGripHot(false)}
                 className={[
-                  "absolute inset-y-0 left-1/2 z-10 w-6 -translate-x-1/2",
-                  dragging ? "bg-accent/15" : "hover:bg-accent/10",
+                  "absolute top-1/2 left-1/2 z-10 h-11 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full",
+                  dragging ? "bg-accent/25" : "hover:bg-accent/15",
                 ].join(" ")}
               />
               <span

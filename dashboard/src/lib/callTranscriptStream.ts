@@ -83,6 +83,25 @@ export function isHonestTranscriptFact(text: string): boolean {
   return false;
 }
 
+function normUtterance(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Caller STT often repeats the receptionist greeting. Drop that second copy. */
+function isGreetingEcho(prev: string, next: string): boolean {
+  const a = normUtterance(prev);
+  const b = normUtterance(next);
+  if (a.length < 12 || b.length < 12) return false;
+  if (a === b) return true;
+  const short = a.length <= b.length ? a : b;
+  const long = a.length <= b.length ? b : a;
+  return long.includes(short);
+}
+
 function keepSystemLine(text: string): boolean {
   const line = text.replace(/\s+/g, " ").trim();
   if (!line) return false;
@@ -100,6 +119,7 @@ export function buildCallTranscriptStream(
 ): TranscriptStreamItem[] {
   const kept: TranscriptStreamItem[] = [];
   let lastSpeech: TranscriptSpeechSpeaker | null = null;
+  let lastSpeechText: string | null = null;
   let lastMinute: string | null = null;
 
   for (const turn of turns) {
@@ -110,8 +130,10 @@ export function buildCallTranscriptStream(
       if (!keepSystemLine(text)) continue;
       kept.push({ kind: "fact", id: turn.id, text });
       lastSpeech = null;
+      lastSpeechText = null;
       continue;
     }
+    if (lastSpeechText && isGreetingEcho(lastSpeechText, text)) continue;
     const minute = nairobiMinuteKey(turn.created_at);
     const clustered = lastSpeech === speaker;
     const stamp =
@@ -131,7 +153,30 @@ export function buildCallTranscriptStream(
       tail: true,
     });
     lastSpeech = speaker;
+    lastSpeechText = text;
   }
 
-  return kept;
+  return dropTrailingOpening(kept);
+}
+
+/** Closed calls sometimes append the opening agent line again. Drop that copy. */
+function dropTrailingOpening(items: TranscriptStreamItem[]): TranscriptStreamItem[] {
+  const speech = items.filter(
+    (item): item is TranscriptSpeechItem => item.kind === "speech"
+  );
+  if (speech.length < 3) return items;
+  const opening = speech.find((item) => item.speaker === "agent");
+  const last = speech[speech.length - 1];
+  if (!opening || opening.id === last.id || last.speaker !== "agent") return items;
+  const openingText = normUtterance(opening.text);
+  const lastText = normUtterance(last.text);
+  if (openingText.length < 12 || openingText !== lastText) return items;
+  const next = items.filter((item) => item.id !== last.id);
+  for (let i = next.length - 1; i >= 0; i -= 1) {
+    const row = next[i];
+    if (row.kind !== "speech") continue;
+    row.tail = true;
+    break;
+  }
+  return next;
 }

@@ -13,6 +13,7 @@ import { InboxTicketView } from "@/components/InboxTicketView";
 import { DeskError } from "@/components/ui/DeskError";
 import {
   followUpWhatsAppMessage,
+  formatCallWhenRelative,
 } from "@/lib/callsTriage";
 import {
   contactFromCallHref,
@@ -246,6 +247,9 @@ export default async function CallDetailPage({
         waMessage={waMessage}
         needsYou={needsYou}
         urgency={urgency}
+        bannerWhen={
+          purpose === "missed" ? formatCallWhenRelative(row.created_at) : null
+        }
         want={wantText || null}
         done={doneText || null}
         mood={moodLabel}

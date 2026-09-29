@@ -150,7 +150,10 @@ export default async function HomeOverviewPage() {
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
-  if (work.requested > 0) {
+  if (work.toReturn > work.requested && work.toReturn > work.toFulfill) {
+    ctaHref = callsHref({ purpose: "human" });
+    ctaLabel = work.toReturn === 1 ? copy.returnCtaOne : copy.returnCtaMany;
+  } else if (work.requested > 0) {
     ctaHref = callsHref({ purpose: "job" });
     ctaLabel = work.requested === 1 ? copy.jobCtaOne : copy.jobCtaMany;
   } else if (work.toFulfill > 0) {
@@ -246,7 +249,7 @@ export default async function HomeOverviewPage() {
               className="relative mt-3 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden"
             >
               <DeskRowHit
-                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { purpose: "needs" }) : null}
+                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
                 label="Conversation"
               />
               <div className="flex min-h-12 items-center gap-3 px-4 py-2">
@@ -272,7 +275,7 @@ export default async function HomeOverviewPage() {
                 <div className={`${deskRowActionClass} flex shrink-0 items-center gap-2`}>
                   {nextReturn.callId ? (
                     <Link
-                      href={inboxRecordHref(nextReturn.callId, { purpose: "needs" })}
+                      href={inboxRecordHref(nextReturn.callId, { from: "home" })}
                       className={[
                         "inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC]",
                         focusRingVisible,
@@ -301,7 +304,7 @@ export default async function HomeOverviewPage() {
               className="relative mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
             >
               <DeskRowHit
-                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { purpose: "needs" }) : null}
+                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
                 label="Conversation"
               />
               <h2
@@ -324,7 +327,7 @@ export default async function HomeOverviewPage() {
               <div className={`${deskRowActionClass} mt-3 flex flex-wrap items-center gap-2`}>
                 {nextReturn.callId ? (
                   <Link
-                    href={inboxRecordHref(nextReturn.callId, { purpose: "needs" })}
+                    href={inboxRecordHref(nextReturn.callId, { from: "home" })}
                     className={[
                       "inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC]",
                       focusRingVisible,

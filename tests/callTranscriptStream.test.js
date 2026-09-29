@@ -87,6 +87,47 @@ describe("call transcript stream", () => {
     assert.ok(!out.texts.includes("Escalation sent"));
     assert.ok(!out.texts.includes("[escalate]"));
   });
+
+  it("drops a caller echo of the receptionist greeting", () => {
+    const script = `
+      import { buildCallTranscriptStream } from ${JSON.stringify(helperPath)};
+      const stream = buildCallTranscriptStream([
+        { id: "g1", created_at: "2026-09-12T05:10:01.000Z", speaker: "agent", text_content: "Hello, Done and Dusted Cleaning Services. How can I help?" },
+        { id: "g2", created_at: "2026-09-12T05:10:04.000Z", speaker: "caller", text_content: "Hello, Done and Dusted Cleaning Services. How can I help?" },
+        { id: "g3", created_at: "2026-09-12T05:10:08.000Z", speaker: "caller", text_content: "I need a house clean tomorrow." },
+      ]);
+      console.log(JSON.stringify(stream.map((row) => row.id)));
+    `;
+    const ran = spawnSync(
+      process.execPath,
+      ["--experimental-strip-types", "--input-type=module", "-e", script],
+      { encoding: "utf8" }
+    );
+    assert.equal(ran.status, 0, ran.stderr || ran.stdout);
+    const ids = JSON.parse(ran.stdout.trim().split("\n").at(-1));
+    assert.deepEqual(ids, ["g1", "g3"]);
+  });
+
+  it("drops an opening greeting repeated as the last line", () => {
+    const script = `
+      import { buildCallTranscriptStream } from ${JSON.stringify(helperPath)};
+      const stream = buildCallTranscriptStream([
+        { id: "o1", created_at: "2026-09-12T05:10:01.000Z", speaker: "agent", text_content: "I'm well. Who is calling?" },
+        { id: "o2", created_at: "2026-09-12T05:10:08.000Z", speaker: "caller", text_content: "Alvin. Carpet add-on please." },
+        { id: "o3", created_at: "2026-09-12T05:10:20.000Z", speaker: "agent", text_content: "Saved. We will confirm the visit." },
+        { id: "o4", created_at: "2026-09-12T05:10:40.000Z", speaker: "agent", text_content: "I'm well. Who is calling?" },
+      ]);
+      console.log(JSON.stringify(stream.map((row) => row.id)));
+    `;
+    const ran = spawnSync(
+      process.execPath,
+      ["--experimental-strip-types", "--input-type=module", "-e", script],
+      { encoding: "utf8" }
+    );
+    assert.equal(ran.status, 0, ran.stderr || ran.stdout);
+    const ids = JSON.parse(ran.stdout.trim().split("\n").at(-1));
+    assert.deepEqual(ids, ["o1", "o2", "o3"]);
+  });
 });
 
 describe("ticket chat display chrome", () => {

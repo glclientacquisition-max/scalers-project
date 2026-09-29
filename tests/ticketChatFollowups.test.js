@@ -79,7 +79,10 @@ describe("ticket chat follow-ups", () => {
 
   it("hides the phone tab bar on ticket chat and keeps DeskBack", () => {
     assert.match(ticket, /data-ticket-chat/);
-    assert.match(ticket, /<DeskBack href=\{backHref\}>Inbox<\/DeskBack>/);
+    assert.match(
+      ticket,
+      /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/
+    );
     assert.match(css, /desk-theme:has\(\[data-ticket-chat\]\)[\s\S]{0,160}--desk-tabbar-h:\s*0px/);
     assert.match(css, /\[data-desk-tabbar\]/);
     assert.match(nav, /export function DeskRail/);
