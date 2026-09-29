@@ -9,6 +9,13 @@ const {
 const { canonicalizeCallerName } = require('./callerNameMatch');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { confirmationLanguage } = require('./language');
+const {
+  readVisitPlace,
+  classifyVisitLocation,
+  assessCoverage,
+  appendVisitNotes,
+  mentionsPin,
+} = require('./visitLocation');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
 
@@ -365,22 +372,53 @@ function visitTimeGate(whenText, { hoursSchedule = null, now = new Date() } = {}
   return { ok: true, hours };
 }
 
+function visitCoverageProfile(opts = {}) {
+  return {
+    businessPolicies: opts.businessPolicies || null,
+    businessLocations: opts.businessLocations || null,
+  };
+}
+
+function applyVisitPlaceNotes(value, profile) {
+  const quality = classifyVisitLocation(value.landmark);
+  const coverage = assessCoverage(value.landmark, profile);
+  return {
+    ...value,
+    notes: appendVisitNotes(value.notes, {
+      confirmAccess: quality === 'area_only' && coverage === 'inside',
+      pinNote: mentionsPin(value.landmark),
+    }),
+  };
+}
+
+function outsideVisitPlace(place, profile) {
+  if (!place) return false;
+  const quality = classifyVisitLocation(place);
+  if (quality === 'empty' || quality === 'refused') return false;
+  return assessCoverage(place, profile) === 'outside';
+}
+
 function validateCreateAppointment(
   raw,
-  { hoursSchedule = null, now = new Date(), openAppointments = [], knownNames = [] } = {}
+  {
+    hoursSchedule = null,
+    now = new Date(),
+    openAppointments = [],
+    knownNames = [],
+    businessPolicies = null,
+    businessLocations = null,
+  } = {}
 ) {
   if (!raw || typeof raw !== 'object') {
     return { valid: false, reason: 'Missing appointment payload.' };
   }
+  const place = readVisitPlace(raw);
   const value = {
     serviceName: clean(raw.serviceName || raw.service_name || raw.service, 200),
     name: canonicalCallerName(raw.name, knownNames),
     phone: clean(raw.phone, 40),
     whenText: clean(raw.whenText || raw.when_text || raw.when, 160),
-    landmark: clean(
-      raw.landmark || raw.address_landmark || raw.address,
-      240
-    ),
+    landmark: place,
     notes: clean(raw.notes, 400),
     windowStart: clean(raw.windowStart || raw.window_start, 64),
     windowEnd: clean(raw.windowEnd || raw.window_end, 64),
@@ -392,7 +430,10 @@ function validateCreateAppointment(
     missing.push('name');
   }
   if (!value.whenText) missing.push('when_text');
-  if (!value.landmark) missing.push('landmark');
+  const placeQuality = classifyVisitLocation(place);
+  if (!place || placeQuality === 'empty' || placeQuality === 'refused') {
+    missing.push('location');
+  }
   if (missing.length) {
     return {
       valid: false,
@@ -415,7 +456,24 @@ function validateCreateAppointment(
       value,
     };
   }
-  return { valid: true, value: stampVisitWindow(value, hours.hours), hours: hours.hours };
+  const coverageProfile = visitCoverageProfile({
+    businessPolicies,
+    businessLocations,
+  });
+  if (outsideVisitPlace(place, coverageProfile)) {
+    return {
+      valid: false,
+      reason: 'Outside coverage.',
+      code: 'outside_coverage',
+      missingSlots: [],
+      value,
+    };
+  }
+  return {
+    valid: true,
+    value: stampVisitWindow(applyVisitPlaceNotes(value, coverageProfile), hours.hours),
+    hours: hours.hours,
+  };
 }
 
 const APPOINTMENT_UPDATE_STATUSES = new Set([
@@ -438,14 +496,12 @@ function validateUpdateAppointment(
     return { valid: false, reason: 'Missing appointment update payload.' };
   }
   const statusRaw = clean(raw.status, 40).toLowerCase();
+  const place = readVisitPlace(raw);
   const value = {
     appointmentId: clean(raw.appointmentId || raw.id || raw.appointment_id, 80),
     status: APPOINTMENT_UPDATE_STATUSES.has(statusRaw) ? statusRaw : '',
     whenText: clean(raw.whenText || raw.when_text || raw.when, 160),
-    landmark: clean(
-      raw.landmark || raw.address_landmark || raw.address,
-      240
-    ),
+    landmark: place,
     notes: clean(raw.notes, 400),
     serviceName: clean(raw.serviceName || raw.service_name || raw.service, 200),
     phone: clean(raw.phone, 40),
@@ -495,6 +551,8 @@ async function executeBrainTools({
   openAppointments = [],
   callerPhone = '',
   knownNames = [],
+  businessPolicies = null,
+  businessLocations = null,
 } = {}) {
   const completed = new Set(completedFingerprints);
   const results = [];
@@ -641,6 +699,8 @@ async function executeBrainTools({
       now,
       openAppointments,
       knownNames,
+      businessPolicies,
+      businessLocations,
     });
     const fingerprint = validation.valid
       ? stableFingerprint('create_appointment', validation.value)
@@ -977,19 +1037,31 @@ function formatToolConfirmation(results = [], language = 'en') {
     if (meaningful.status === 'invalid') {
       const code = String(meaningful.code || '');
       const hours = meaningful.hours || {};
+      if (code === 'outside_coverage') {
+        if (sw) return 'Eneo hilo liko nje. Ninaweza kuandika callback.';
+        if (sheng) return 'Hiyo area iko nje. Naweza andika callback.';
+        return 'That area is outside our coverage. I can note a callback.';
+      }
       const timeProblem = formatVisitTimeProblem(code, hours, lang);
       if (timeProblem) return timeProblem;
       const missing = Array.isArray(meaningful.missingSlots)
         ? meaningful.missingSlots
         : [];
-      if (missing.includes('landmark') || missing.includes('when_text')) {
+      const needsPlace =
+        missing.includes('location') || missing.includes('landmark');
+      if (needsPlace && missing.length === 1) {
+        if (sw) return 'Niambie location tuje wapi.';
+        if (sheng) return 'Niambie location, tuje wapi.';
+        return 'Tell me the location where we should come.';
+      }
+      if (needsPlace || missing.includes('when_text')) {
         if (sw) {
-          return 'Niambie jina, huduma, wakati, na landmark ndio nihifadhi ziara.';
+          return 'Niambie jina, huduma, wakati, na location ndio nihifadhi ziara.';
         }
         if (sheng) {
-          return 'Niambie jina, service, when, na landmark ndio ni-save visit.';
+          return 'Niambie jina, service, when, na location ndio ni-save visit.';
         }
-        return 'Tell me your name, the service, when, and a landmark so I can save the visit request.';
+        return 'Tell me your name, the service, when, and the location so I can save the visit request.';
       }
       if (missing.includes('name') || missing.includes('service')) {
         if (sw) return 'Niambie jina lako na huduma unayohitaji.';

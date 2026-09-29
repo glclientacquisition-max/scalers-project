@@ -190,7 +190,7 @@ describe('deriveCallResolution', () => {
     const state = createBrainState();
     state.intent = 'booking';
     state.conversation.turnCount = 3;
-    state.goal.missingSlots = ['landmark'];
+    state.goal.missingSlots = ['location'];
     const out = deriveCallResolution({ brainState: state });
     assert.equal(out.primaryIntent, 'book_visit');
     assert.notEqual(out.resolution, 'resolved');

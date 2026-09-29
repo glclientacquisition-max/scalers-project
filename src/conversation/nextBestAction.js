@@ -126,6 +126,36 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
     };
   }
 
+  const placeGate = String(state?.visitPlace?.blocked || '');
+  if (placeGate === 'outside') {
+    return {
+      action: ACTIONS.ANSWER,
+      reason:
+        'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Decline or offer to note a callback. Never say landmark.',
+    };
+  }
+  if (placeGate === 'unknown_coverage') {
+    return {
+      action: ACTIONS.ANSWER,
+      reason:
+        'Coverage is not on file and the location is only an area. Do not invent coverage. Do not create_appointment. Offer to note it for the owner. Never say landmark.',
+    };
+  }
+  if (placeGate === 'refused') {
+    const escalation = authorizeAction(ACTIONS.ESCALATE, capabilities);
+    return escalation.allowed
+      ? {
+          action: ACTIONS.ESCALATE,
+          reason:
+            'The caller refused a location twice. Escalate. Do not save a visit. Never say landmark.',
+        }
+      : {
+          action: ACTIONS.CAPTURE,
+          reason:
+            'The caller refused a location twice. Log an enquiry. Do not save a visit. Never say landmark.',
+        };
+  }
+
   if (missingSlots.length) {
     return {
       action: ACTIONS.ASK_CLARIFICATION,
