@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
-import { callersHearPlaceholder } from "@/lib/deskPlaceholders";
+import { CALLERS_HEAR_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
+import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import { parseVertical } from "@/lib/vertical";
 import {
   deskBulletinItems,
@@ -50,6 +51,9 @@ function tonightParts() {
 
 export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
+  const callersHearExample = useMountedPoolPick(
+    placeholderPool(CALLERS_HEAR_POOLS, parseVertical(tenant.vertical))
+  );
   const tonight = tonightParts();
   const [text, setText] = useState("");
   const [expiry, setExpiry] = useState<BulletinExpiry>("today");
@@ -128,7 +132,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 maxLength={160}
-                placeholder={callersHearPlaceholder(parseVertical(tenant.vertical))}
+                placeholder={callersHearExample}
                 className={`${settingsFieldClass} mt-0 min-w-0`}
               />
             </div>

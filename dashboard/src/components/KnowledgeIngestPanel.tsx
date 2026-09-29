@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { knowledgePastePlaceholder } from "@/lib/deskPlaceholders";
+import { KNOWLEDGE_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
+import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import type { TenantRow } from "@/lib/supabase";
 import { parseVertical } from "@/lib/vertical";
 import type { IngestDraft } from "@/lib/ingest/extract";
@@ -33,6 +34,9 @@ type SourceMode = "paste" | "url";
 
 export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
+  const knowledgePasteExample = useMountedPoolPick(
+    placeholderPool(KNOWLEDGE_PASTE_POOLS, parseVertical(tenant.vertical))
+  );
   const [mode, setMode] = useState<SourceMode>("paste");
   const [paste, setPaste] = useState("");
   const [url, setUrl] = useState("");
@@ -178,7 +182,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   onChange={(e) => setPaste(e.target.value)}
                   rows={2}
                   {...compactTextareaExpandHandlers}
-                  placeholder={knowledgePastePlaceholder(parseVertical(tenant.vertical))}
+                  placeholder={knowledgePasteExample}
                   className={`${fieldClass} mt-0 leading-relaxed`}
                 />
                 <div className="flex justify-end self-end">

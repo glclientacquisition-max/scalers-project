@@ -57,15 +57,18 @@ describe("business settings depth", () => {
   it("keeps import and updates example-first", () => {
     assert.match(ingest, /label: "Paste"/);
     assert.match(ingest, /label: "Website"/);
-    assert.match(ingest, /knowledgePastePlaceholder/);
+    assert.match(ingest, /useMountedPoolPick/);
+    assert.match(ingest, /KNOWLEDGE_PASTE_POOLS/);
     assert.match(bulletin, /Callers hear/);
-    assert.match(bulletin, /callersHearPlaceholder/);
+    assert.match(bulletin, /useMountedPoolPick/);
+    assert.match(bulletin, /CALLERS_HEAR_POOLS/);
     assert.match(bulletin, /SettingsSegmented/);
     assert.match(bulletin, /Until tonight/);
     assert.match(bulletin, /Pick/);
     assert.match(bulletin, /type="date"/);
     assert.match(bulletin, /type="time"/);
-    assert.match(form, /servicesPastePlaceholder\(vertical\)/);
+    assert.match(form, /useMountedPoolPick/);
+    assert.match(form, /SERVICES_PASTE_POOLS/);
     assert.match(faqs, /Westlands, opposite Naivas/);
     assert.doesNotMatch(bulletin, /Out of chicken today/);
     assert.doesNotMatch(form, /Plumbing\\nElectrical/);
@@ -74,25 +77,33 @@ describe("business settings depth", () => {
     assert.doesNotMatch(form, /Super Admin can add them/);
   });
 
-  it("uses a fixed example per vertical and never chicken for Shop", () => {
+  it("rotates a small example pool per vertical and never chicken for Shop", () => {
     const helperPath = path.join(
       __dirname,
       "../dashboard/src/lib/deskPlaceholders.ts"
     );
     const script = `
       import {
-        callersHearPlaceholder,
-        servicesPastePlaceholder,
-        knowledgePastePlaceholder,
+        CALLERS_HEAR_POOLS,
+        SERVICES_PASTE_POOLS,
+        KNOWLEDGE_PASTE_POOLS,
+        placeholderPool,
+        pickFromPool,
       } from ${JSON.stringify(helperPath)};
-      const verticals = ["retail", "home_services", "hospitality", "general"];
+      const verticals = ["retail", "home_services", "hospitality", "general", "other"];
+      const tables = {
+        hear: CALLERS_HEAR_POOLS,
+        paste: SERVICES_PASTE_POOLS,
+        ingest: KNOWLEDGE_PASTE_POOLS,
+      };
       const out = {};
       for (const vertical of verticals) {
-        out[vertical] = {
-          hear: callersHearPlaceholder(vertical),
-          paste: servicesPastePlaceholder(vertical),
-          ingest: knowledgePastePlaceholder(vertical),
-        };
+        out[vertical] = {};
+        for (const [key, table] of Object.entries(tables)) {
+          const pool = placeholderPool(table, vertical);
+          const picks = Array.from({ length: 24 }, () => pickFromPool(pool));
+          out[vertical][key] = { pool, picks };
+        }
       }
       console.log(JSON.stringify(out));
     `;
@@ -103,25 +114,49 @@ describe("business settings depth", () => {
     );
     assert.equal(ran.status, 0, ran.stderr || ran.stdout);
     const got = JSON.parse(ran.stdout.trim().split("\n").at(-1));
-    assert.equal(got.home_services.hear, "Fully booked today");
-    assert.equal(got.retail.hear, "Pickup only today");
-    assert.equal(got.hospitality.hear, "Fully booked tonight");
-    assert.equal(got.general.hear, "Closed today");
-    assert.match(got.home_services.paste, /Plumbing/);
-    assert.match(got.retail.paste, /Printing - from 500 KES/);
-    assert.doesNotMatch(got.retail.paste, /Plumbing|Electrical|Home cleaning/);
-    assert.doesNotMatch(got.hospitality.paste, /Plumbing|Home cleaning/);
-    assert.doesNotMatch(got.general.paste, /Plumbing|Home cleaning/);
-    assert.match(got.retail.ingest, /Westlands Books/);
-    assert.doesNotMatch(got.retail.ingest, /Home cleaning/);
-    assert.match(got.home_services.ingest, /Home cleaning from 2,500 KES/);
-    assert.doesNotMatch(got.home_services.ingest, /Westlands Books/);
-    for (const vertical of Object.values(got)) {
-      assert.doesNotMatch(vertical.hear, /chicken/i);
-      assert.doesNotMatch(vertical.paste, /chicken/i);
-      assert.doesNotMatch(vertical.ingest, /chicken/i);
+    const shopTrade = /Plumbing|Electrical|Home cleaning|chicken/i;
+    const shopHear = /pickup|delivery|print|paper|binding|A4/i;
+    const shopPaste = /print|binding|card|flyer|stamp|photocopy|letterhead|envelope|pickup|delivery|lamination/i;
+    const shopIngest = /book|print|stationer|paper|deliver|pick up/i;
+    const hsHear = /booked|cleaning|plumb|visit|sofa/i;
+    const hsPaste = /clean|plumb|electr|sofa|carpet|mattress|upholster|window/i;
+    const night = /tonight|booked|table|kitchen|seating|room|walk-in|breakfast|lodge|restaurant|hotel|checkout|airport|dinner|bed/i;
+
+    for (const vertical of ["retail", "home_services", "hospitality", "general"]) {
+      for (const key of ["hear", "paste", "ingest"]) {
+        const { pool, picks } = got[vertical][key];
+        assert.ok(pool.length >= 3 && pool.length <= 5, `${vertical} ${key} pool size`);
+        assert.ok(new Set(picks).size >= 2, `${vertical} ${key} rotates`);
+        for (const pick of picks) {
+          assert.ok(pool.includes(pick), `${vertical} ${key} pick stays in pool`);
+          assert.doesNotMatch(pick, /[—–]|chicken/i);
+        }
+      }
     }
-    assert.doesNotMatch(read("dashboard/src/lib/deskPlaceholders.ts"), /Math\.random|chicken/i);
+
+    for (const line of got.retail.hear.pool) assert.match(line, shopHear);
+    for (const line of got.retail.paste.pool) {
+      assert.match(line, shopPaste);
+      assert.doesNotMatch(line, shopTrade);
+    }
+    for (const line of got.retail.ingest.pool) {
+      assert.match(line, shopIngest);
+      assert.doesNotMatch(line, shopTrade);
+    }
+    for (const line of got.home_services.hear.pool) assert.match(line, hsHear);
+    for (const line of got.home_services.paste.pool) assert.match(line, hsPaste);
+    assert.match(got.home_services.ingest.pool.join("\n"), /Home cleaning from 2,500 KES/);
+    assert.doesNotMatch(got.home_services.ingest.pool.join("\n"), /Westlands Books/);
+    for (const line of got.hospitality.hear.pool) assert.match(line, /tonight|booked|table|kitchen|seating|room/i);
+    for (const line of got.hospitality.paste.pool) {
+      assert.match(line, night);
+      assert.doesNotMatch(line, /Plumbing|Home cleaning/);
+    }
+    assert.doesNotMatch(got.general.paste.pool.join("\n"), /Plumbing|Home cleaning/);
+    assert.deepEqual(got.other.hear.pool, got.general.hear.pool);
+    assert.match(read("dashboard/src/lib/deskPlaceholders.ts"), /Math\.random/);
+    assert.doesNotMatch(read("dashboard/src/lib/deskPlaceholders.ts"), /chicken/i);
+    assert.match(read("dashboard/src/lib/useMountedPoolPick.ts"), /pickFromPool/);
   });
 
   it("saves alerts on their own panel to the same tenant columns", () => {
