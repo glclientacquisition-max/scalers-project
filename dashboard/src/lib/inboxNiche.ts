@@ -149,6 +149,11 @@ export function nicheCopy(vertical?: string | null): InboxNicheCopy {
   return { ...copy, ...HOSPITALITY_RESERVATION_AFFORDANCES };
 }
 
+/** Shop has holds and returns. Visits stay on home services. */
+export function showsVisitQueue(vertical?: string | null): boolean {
+  return parseVertical(vertical) !== "retail";
+}
+
 /** Act, tape, book, closed. 08:00 owner, live watcher, visit confirmer. */
 export function purposeFilters(vertical?: string | null): {
   id: InboxPurposeFilterId;
@@ -156,12 +161,17 @@ export function purposeFilters(vertical?: string | null): {
   divide?: boolean;
 }[] {
   const copy = nicheCopy(vertical);
-  return [
+  const rows: { id: InboxPurposeFilterId; label: string; divide?: boolean }[] = [
     { id: "needs", label: "Needs you" },
     { id: "all", label: "All" },
-    { id: "job", label: copy.jobFilter, divide: true },
-    { id: "hold", label: copy.holdFilter },
-    { id: "human", label: "Human", divide: true },
-    { id: "answered", label: "Answered" },
   ];
+  if (showsVisitQueue(vertical)) {
+    rows.push({ id: "job", label: copy.jobFilter, divide: true });
+  }
+  rows.push(
+    { id: "hold", label: copy.holdFilter, divide: !showsVisitQueue(vertical) },
+    { id: "human", label: "Human", divide: true },
+    { id: "answered", label: "Answered" }
+  );
+  return rows;
 }

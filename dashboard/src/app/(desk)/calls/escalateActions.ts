@@ -124,8 +124,8 @@ export async function pingTeammateAction(opts: {
       });
       return {
         failed: true,
-        line: delivery.line || "Needs human. Notify failed.",
-        error: json?.reason || "Needs human. Notify failed.",
+        line: delivery.line || "Notification retry pending",
+        error: "Notification retry pending",
       };
     }
 
@@ -161,5 +161,5 @@ async function persistNotifyFailed(
     return ownerSaveFailed("ping-teammate", error.message, note);
   }
   revalidatePath(`/calls/${callId}`);
-  return { failed: true, line: note, error: note };
+  return { failed: true, line: "Notification retry pending", error: "Notification retry pending" };
 }

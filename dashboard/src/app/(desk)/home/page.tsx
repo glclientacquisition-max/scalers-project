@@ -25,7 +25,7 @@ import {
   summarizeInboxWork,
 } from "@/lib/inboxPurpose";
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
-import { nicheCopy } from "@/lib/inboxNiche";
+import { nicheCopy, showsVisitQueue } from "@/lib/inboxNiche";
 import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
@@ -104,11 +104,12 @@ export default async function HomeOverviewPage() {
   const work = summarizeInboxWork(inbox.items);
   const todayWork = visitBoardForDay(inbox.items, eatYmd()).length;
   const waitingCount = work.needs;
+  const visitQueue = showsVisitQueue(vertical);
   const briefing = homeBriefing(
     {
       toReturn: work.toReturn,
       toFulfill: work.toFulfill,
-      toConfirm: work.requested,
+      toConfirm: visitQueue ? work.requested : 0,
     },
     vertical
   );
@@ -136,24 +137,28 @@ export default async function HomeOverviewPage() {
       count: work.toFulfill,
       unit: homeQueueUnit(work.toFulfill, copy.holdUnit, holdSample),
     },
-    {
-      id: "job",
-      label: copy.jobFilter,
-      href: callsHref({ purpose: "job" }),
-      count: work.toConfirm,
-      unit:
-        work.requested > 0 && work.requested === work.toConfirm
-          ? homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample)
-          : "",
-    },
-  ] as const;
+    ...(visitQueue
+      ? [
+          {
+            id: "job",
+            label: copy.jobFilter,
+            href: callsHref({ purpose: "job" }),
+            count: work.toConfirm,
+            unit:
+              work.requested > 0 && work.requested === work.toConfirm
+                ? homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample)
+                : "",
+          },
+        ]
+      : []),
+  ];
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
   if (work.toReturn > work.requested && work.toReturn > work.toFulfill) {
     ctaHref = callsHref({ purpose: "human" });
     ctaLabel = work.toReturn === 1 ? copy.returnCtaOne : copy.returnCtaMany;
-  } else if (work.requested > 0) {
+  } else if (visitQueue && work.requested > 0) {
     ctaHref = callsHref({ purpose: "job" });
     ctaLabel = work.requested === 1 ? copy.jobCtaOne : copy.jobCtaMany;
   } else if (work.toFulfill > 0) {
@@ -162,7 +167,7 @@ export default async function HomeOverviewPage() {
   } else if (work.toReturn > 0) {
     ctaHref = callsHref({ purpose: "human" });
     ctaLabel = work.toReturn === 1 ? copy.returnCtaOne : copy.returnCtaMany;
-  } else if (todayWork > 0) {
+  } else if (visitQueue && todayWork > 0) {
     ctaHref = callsHref({ purpose: "job", view: "today" });
     ctaLabel = "Today";
   } else if (line === "needs_training") {

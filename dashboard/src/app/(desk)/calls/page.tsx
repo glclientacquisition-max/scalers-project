@@ -30,6 +30,7 @@ import {
   shiftDayYmd,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
+import { showsVisitQueue } from "@/lib/inboxNiche";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
@@ -81,7 +82,13 @@ export default async function CallsPage({
     ? assembled.filter((item) => itemMatchesQuery(item, q))
     : assembled;
   const counts = countInboxPurposes(searched);
-  const activeFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
+  const resolvedFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
+  const activeFilter =
+    resolvedFilter === "job" && !showsVisitQueue(vertical)
+      ? counts.needs > 0
+        ? "needs"
+        : "all"
+      : resolvedFilter;
   const rawView = String(sp.view || "");
   const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";

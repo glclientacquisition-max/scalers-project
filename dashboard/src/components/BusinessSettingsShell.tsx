@@ -4,13 +4,13 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
-import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
 import { CatalogImportPanel } from "@/components/CatalogImportPanel";
 import { TenantForm } from "@/components/TenantForm";
 import { TestLinePanel } from "@/components/TestLinePanel";
 import type { CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
+import { parseVertical } from "@/lib/vertical";
 import {
   SETTINGS_NAV,
   settingsNavHref,
@@ -192,13 +192,11 @@ function SettingsPanelBody({
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
 }) {
-  if (tab === "updates") return <DailyBulletinPanel tenant={tenant} />;
   if (tab === "import") {
-    return (
-      <div className="space-y-6">
-        <KnowledgeIngestPanel tenant={tenant} />
-        <CatalogImportPanel tenant={tenant} />
-      </div>
+    return parseVertical(tenant.vertical) === "retail" ? (
+      <CatalogImportPanel tenant={tenant} />
+    ) : (
+      <KnowledgeIngestPanel tenant={tenant} />
     );
   }
   if (tab === "test") {
@@ -313,10 +311,7 @@ export function BusinessSettingsShell({
                   showBack
                   title={heading}
                 />
-                {tab === "updates" ||
-                tab === "import" ||
-                tab === "test" ||
-                tab === "appearance" ? (
+                {tab === "import" || tab === "test" || tab === "appearance" ? (
                   <SettingsPanelBody
                     tab={tab}
                     tenant={tenant}

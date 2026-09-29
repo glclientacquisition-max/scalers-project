@@ -28,7 +28,7 @@ import {
   TICKET_SUMMARY_MIN,
   clampTicketSummaryWidth,
 } from "@/lib/ticketSplit";
-import { plainOwnerCopy } from "@/lib/deskTicketChat";
+import { ownerAssistLabel, ownerDeskLine, plainOwnerCopy } from "@/lib/deskTicketChat";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxPingPerson } from "@/components/InboxPingTeammate";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
@@ -576,18 +576,34 @@ export function InboxTicketView({
             ) : null}
             <div className="space-y-2 text-xs text-ink-soft">
               <p>Duration: {plainOwnerCopy(durationLabel)}</p>
-              {assistLabel ? <p>Assist: {plainOwnerCopy(assistLabel)}</p> : null}
-              {assistNote ? (
-                <p className="[overflow-wrap:anywhere]">{plainOwnerCopy(assistNote)}</p>
-              ) : null}
+              {(() => {
+                const assist = ownerAssistLabel(assistLabel);
+                const note = ownerDeskLine(assistNote);
+                const delivery = ownerDeskLine(escalationDelivery);
+                const noteLine = note && note !== assist ? note : null;
+                const deliveryLine =
+                  delivery && delivery !== assist && delivery !== noteLine ? delivery : null;
+                return (
+                  <>
+                    {assist ? (
+                      <p>
+                        {assist === "Requested owner callback" ? assist : `Assist: ${assist}`}
+                      </p>
+                    ) : null}
+                    {noteLine ? (
+                      <p className="[overflow-wrap:anywhere]">{noteLine}</p>
+                    ) : null}
+                    {deliveryLine ? (
+                      <p data-escalation-delivery="" className="[overflow-wrap:anywhere]">
+                        {deliveryLine}
+                      </p>
+                    ) : null}
+                  </>
+                );
+              })()}
               {escalatedLine ? (
                 <p data-escalation-target="" className="[overflow-wrap:anywhere]">
                   {plainOwnerCopy(escalatedLine)}
-                </p>
-              ) : null}
-              {escalationDelivery ? (
-                <p data-escalation-delivery="" className="[overflow-wrap:anywhere]">
-                  {escalationDelivery}
                 </p>
               ) : null}
               {liveConnectLine ? (

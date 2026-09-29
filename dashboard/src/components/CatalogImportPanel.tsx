@@ -31,7 +31,7 @@ type Mode = "paste" | "csv" | "url";
 
 export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("csv");
+  const [mode, setMode] = useState<Mode>("paste");
   const [paste, setPaste] = useState("");
   const [url, setUrl] = useState("");
   const [products, setProducts] = useState<ProductItem[] | null>(null);
@@ -95,7 +95,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
   const flashIsError = Boolean(applyState.error || previewState.error);
 
   return (
-    <section className="mt-8 space-y-4 border-t border-line pt-8">
+    <section className="space-y-4">
       <p className={settingsBlockTitleClass}>Products</p>
 
       {!products ? (
@@ -105,9 +105,9 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             value={mode}
             options={
               [
+                { id: "paste" as const, label: "Text" },
+                { id: "url" as const, label: "URL" },
                 { id: "csv" as const, label: "CSV" },
-                { id: "paste" as const, label: "Paste" },
-                { id: "url" as const, label: "Website" },
               ] as const
             }
             onChange={setMode}
@@ -143,7 +143,7 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
             ) : (
               <div className="flex flex-col gap-1.5">
                 <label className="block text-sm font-medium" htmlFor="catalog_paste">
-                  {mode === "csv" ? "Paste CSV rows" : "Paste product list"}
+                  {mode === "csv" ? "CSV" : "Text"}
                 </label>
                 <textarea
                   id="catalog_paste"
@@ -154,8 +154,8 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
                   {...compactTextareaExpandHandlers}
                   placeholder={
                     mode === "csv"
-                      ? "name,price,category,in_stock,sku\nAtomic Habits,2500 KES,Self-help,yes,\nRich Dad Poor Dad,1800 KES,Finance,yes,"
-                      : "Atomic Habits - 2,500 KES\nRich Dad Poor Dad - 1,800 KES"
+                      ? "name,price,category,in_stock,sku\nA4 paper,500 KES,Paper,yes,\nBinding,300 KES,Print,yes,"
+                      : "A4 paper - 500 KES\nBinding - 300 KES"
                   }
                   className={`${fieldClass} mt-0 text-sm leading-relaxed`}
                 />

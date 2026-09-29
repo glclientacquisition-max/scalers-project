@@ -55,8 +55,10 @@ describe("business settings depth", () => {
   });
 
   it("keeps import and updates example-first", () => {
-    assert.match(ingest, /label: "Paste"/);
-    assert.match(ingest, /label: "Website"/);
+    assert.match(ingest, /label: "Text"/);
+    assert.match(ingest, /label: "URL"/);
+    assert.match(ingest, /label: "CSV"/);
+    assert.doesNotMatch(ingest, /Atomic Habits/);
     assert.match(ingest, /useMountedPoolPick/);
     assert.match(ingest, /KNOWLEDGE_PASTE_POOLS/);
     assert.match(bulletin, /Callers hear/);

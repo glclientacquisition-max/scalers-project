@@ -1,6 +1,6 @@
 import type { CallResolution, LeadStatus } from "@/lib/supabase";
 import type { Lead } from "@/lib/callsTriage";
-import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
+import { nicheCopy, purposeFilters, showsVisitQueue } from "@/lib/inboxNiche";
 import { storedPhoneCandidates, storedPhoneJoinKey } from "@/lib/handoffMode";
 
 export type InboxPurpose = "job" | "hold" | "human" | "missed" | "answered" | "live";
@@ -353,7 +353,7 @@ export function homeDigestLine(
   ).length;
   const bits: string[] = [];
   if (answered > 0) bits.push(`${answered} answered`);
-  if (booked > 0) {
+  if (booked > 0 && showsVisitQueue(vertical)) {
     const noun = booked === 1 ? copy.visitStamp : copy.jobFilter;
     bits.push(`${booked} ${noun.toLowerCase()}`);
   }

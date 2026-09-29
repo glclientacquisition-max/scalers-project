@@ -88,7 +88,7 @@ describe("inbox bulk select", () => {
     assert.match(select, /inline-flex h-11 w-11/);
     assert.doesNotMatch(select, /hidden md:inline-flex/);
     assert.match(select, /aria-label=\{allOn \? "Clear" : "Select all"\}/);
-    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /aria-label=\{allOn \? "Clear" : "Select all"\}/);
+    assert.doesNotMatch(read("dashboard/src/components/InboxToolbar.tsx"), /Select all/);
     assert.match(read("dashboard/src/components/InboxPileBoard.tsx"), /function InboxHeaderCheck/);
     assert.match(read("dashboard/src/components/InboxPileBoard.tsx"), /aria-label=\{allOn \? "Clear" : "Select all"\}/);
     assert.match(read("dashboard/src/components/InboxRowUi.tsx"), /replace:/);

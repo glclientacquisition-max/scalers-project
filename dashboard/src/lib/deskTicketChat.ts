@@ -16,8 +16,6 @@ function settingsSearchTab(search: string | null | undefined): string {
 
 function isSettingsNestedTab(tab: string): boolean {
   return (
-    tab === "updates" ||
-    tab === "today" ||
     tab === "catalog" ||
     tab === "train" ||
     tab === "import" ||
@@ -50,4 +48,24 @@ export function isDeskNestedPath(
 /** Owner-facing ticket copy: em/en dash becomes a plain hyphen. */
 export function plainOwnerCopy(raw: string | null | undefined): string {
   return String(raw ?? "").replace(/[\u2014\u2013]/g, "-");
+}
+
+const UNSET_ASSIST = /^(unknown|n\/a|none\.?)$/i;
+
+/** Assist outcome. Unknown is unset and stays off the record. */
+export function ownerAssistLabel(raw: string | null | undefined): string | null {
+  const text = plainOwnerCopy(raw).trim();
+  if (!text || UNSET_ASSIST.test(text)) return null;
+  if (/^needs human$/i.test(text)) return "Requested owner callback";
+  return text;
+}
+
+/** Pipeline dumps become owner status. Does not invent a call fact. */
+export function ownerDeskLine(raw: string | null | undefined): string | null {
+  const text = plainOwnerCopy(raw).trim();
+  if (!text) return null;
+  if (/notify failed/i.test(text)) return "Notification retry pending";
+  if (/caller needed a human/i.test(text)) return "Requested owner callback";
+  if (/^needs human\.?$/i.test(text)) return "Requested owner callback";
+  return text;
 }
