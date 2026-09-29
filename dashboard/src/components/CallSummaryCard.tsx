@@ -1,22 +1,9 @@
-import { buildSummarySentence } from "@/lib/callSummarySentence";
+import {
+  buildSummarySentence,
+  usefulMoodLabel,
+  usefulOwnerFact,
+} from "@/lib/callSummarySentence";
 import { metaLabelClass } from "@/components/ui/deskChrome";
-
-const MOOD_LABEL: Record<string, string> = {
-  calm: "Calm",
-  rushed: "Rushed",
-  confused: "Confused",
-  upset: "Upset",
-  angry: "Angry",
-  urgent: "Urgent",
-  unknown: "Unknown",
-};
-
-function displayLine(raw: string | null | undefined, empty: string): string {
-  const text = String(raw || "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text || empty;
-}
 
 function Field({
   label,
@@ -58,11 +45,10 @@ export function CallSummaryCard({
     callerNumber,
     urgent,
   });
-  const moodKey = String(mood || "")
-    .toLowerCase()
-    .trim();
-  const moodKnown = Boolean(moodKey && moodKey !== "unknown");
-  const structured = Boolean(done || next || moodKnown);
+  const nextText = usefulOwnerFact(next);
+  const doneText = usefulOwnerFact(done);
+  const moodLabel = usefulMoodLabel(mood);
+  const structured = Boolean(nextText || doneText || moodLabel);
 
   if (!structured) {
     return <p className="mt-3 text-base leading-relaxed text-ink">{wantText}</p>;
@@ -71,12 +57,9 @@ export function CallSummaryCard({
   return (
     <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
       <Field label="Want" value={wantText} wide />
-      <Field label="Do next" value={displayLine(next, "None")} wide />
-      <Field
-        label="Mood"
-        value={MOOD_LABEL[moodKey] || MOOD_LABEL.unknown}
-      />
-      <Field label="Done" value={displayLine(done, "None")} />
+      {nextText ? <Field label="Do next" value={nextText} wide /> : null}
+      {moodLabel ? <Field label="Mood" value={moodLabel} /> : null}
+      {doneText ? <Field label="Done" value={doneText} /> : null}
     </dl>
   );
 }
