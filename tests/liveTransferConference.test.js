@@ -4,6 +4,9 @@ const {
   conferenceRoomName,
   clientRequestIdFor,
   buildOriginateBody,
+  buildLiveBridgeXml,
+  buildHoldConferenceDocument,
+  seedConferenceHold,
   armConferenceTransfer,
   decideTransferContinue,
   decideAgentJoin,
@@ -67,6 +70,41 @@ describe('live transfer conference', () => {
       source: 'transfer_continue',
     });
     assert.equal(late.kind, 'terminal_drop');
+  });
+
+  it('puts the caller in the room at answer and dials only after arm', () => {
+    const xml = buildLiveBridgeXml({
+      streamUrl: 'wss://voice.test/ws/media?callSid=HD_abc123',
+      continueUrl: 'https://voice.test/voice/conference-hold?callSid=HD_abc123',
+    });
+    assert.match(xml, /connect="false"/);
+    assert.doesNotMatch(xml, /connect="true"/);
+    assert.match(xml, /voice\/conference-hold\?callSid=HD_abc123/);
+
+    const seeded = seedConferenceHold({
+      callSid: 'HD_abc123',
+      callerId: '+254709221536',
+      callerNumber: '+254715715894',
+      eventsUrl: armed.eventsUrl,
+      agentUrl: armed.agentUrl,
+      fallbackUrl: armed.fallbackUrl,
+    });
+    assert.equal(seeded.status, 'listening');
+    assert.equal(seeded.transferArmed, false);
+    const hold = buildHoldConferenceDocument(seeded);
+    assert.equal(hold.actions[0].conference.startOnEnter, true);
+    assert.equal(hold.actions[0].conference.name, 'scalers-HD_abc123');
+
+    const early = decideConferenceEvent({
+      callSid: 'HD_abc123',
+      body: { event: 'join', caller: '+254715715894', participant_id: 'p-caller' },
+    });
+    assert.equal(early.originate, false);
+
+    const updated = armConferenceTransfer(armed);
+    assert.equal(updated.transferArmed, true);
+    assert.equal(updated.callerJoined, true);
+    assert.equal(updated.to, '+254712345678');
   });
 
   it('originates once when the caller joins, then bridges the agent', async () => {

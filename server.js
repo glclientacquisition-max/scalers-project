@@ -255,6 +255,9 @@ const {
 } = require('./src/sautikit/pendingLiveTransfer');
 const {
   armConferenceTransfer,
+  seedConferenceHold,
+  buildLiveBridgeXml,
+  buildHoldConferenceDocument,
   conferenceRoomName,
   conferenceKeepsCallOpen,
   decideTransferContinue,
@@ -1234,6 +1237,11 @@ async function handleVoiceIncoming(req, res) {
       console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
     }
 
+    const bridgeXml = await maybeAnswerConferenceBridge(req, callSid, fromNumber, toNumber);
+    if (bridgeXml) {
+      return res.type('text/xml').send(bridgeXml);
+    }
+
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
     // SautiKit requires connect="true" on Stream or the leg hangs up in ~1s.
     // Pass callSid on the WS URL so /ws/media can bind the session without
@@ -1421,6 +1429,53 @@ async function handleVoiceTransferContinue(req, res) {
 }
 
 app.post('/voice/transfer', sautikitWebhookGuard, handleVoiceTransferContinue);
+
+async function maybeAnswerConferenceBridge(req, callSid, fromNumber, toNumber) {
+  if (!envLiveTransferExecutorEnabled()) return null;
+  let profile = null;
+  try {
+    profile = await db.getTenantProfile({ toNumber });
+  } catch (err) {
+    console.warn('[voice/incoming] conference bridge profile failed:', err?.message || err);
+    return null;
+  }
+  if (profile?.handoffMode !== 'live_transfer') return null;
+  const base = voiceHttpBaseFor(callSid);
+  if (!base) return null;
+  const sid = encodeURIComponent(String(callSid || '').trim());
+  const room = conferenceRoomName(callSid);
+  const seeded = seedConferenceHold({
+    callSid,
+    callerId: normalizeKenyaE164(profile.did) || null,
+    callerNumber: normalizeKenyaE164(fromNumber) || fromNumber,
+    eventsUrl: `${base}/voice/conference-events?callSid=${sid}`,
+    agentUrl: `${base}/voice/transfer-agent?callSid=${sid}&room=${encodeURIComponent(room)}`,
+    fallbackUrl: `${base}/voice/transfer-fallback?callSid=${sid}`,
+    billingEnforcement: profile.billingEnforcement,
+    walletBalanceKes: profile.walletBalanceKes,
+  });
+  if (!seeded) return null;
+  seeded.tenantId = profile.id || null;
+  const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${sid}`;
+  console.log(`[${callSid}] conference hold bridge room=${seeded.room}`);
+  return buildLiveBridgeXml({
+    streamUrl,
+    continueUrl: `${base}/voice/conference-hold?callSid=${sid}`,
+  });
+}
+
+function handleVoiceConferenceHold(req, res) {
+  const callSid = String(req.query?.callSid || '').trim();
+  const row = getConferenceTransfer(callSid);
+  if (!row) {
+    console.log(`[voice/conference-hold] no room callSid=${callSid || 'none'}`);
+    return res.type('text/xml').send(emptyVoiceXml());
+  }
+  console.log(`[voice/conference-hold] room=${row.room} callSid=${callSid}`);
+  return res.json(buildHoldConferenceDocument(row));
+}
+
+app.post('/voice/conference-hold', sautikitWebhookGuard, handleVoiceConferenceHold);
 
 function handleVoiceTransferAgent(req, res) {
   const callSid = String(req.query?.callSid || '').trim();
@@ -2938,21 +2993,13 @@ mediaWss.on('connection', (ws, req) => {
         }, 800);
       } else if (
         !bargeInActive &&
-        getConferenceTransfer(sessionCallSid)?.status === 'armed'
+        getConferenceTransfer(sessionCallSid)?.transferArmed
       ) {
-        // SautiKit returns the next voice document when the stream stops.
-        // Redirect after <Stream connect="true"/> does not run while this socket is open.
-        // Completed must not originate. StreamStopped on the voice URL returns Conference.
+        // Caller is already in the conference from answer. Do not close /ws/media.
+        // Closing the fork leaves dead air and does not produce a new voice document.
         console.log(
-          `[ws/media][${sidLabel()}] live transfer stream stop — closing media for Conference`
+          `[ws/media][${sidLabel()}] live transfer armed — caller stays in conference, media stays up`
         );
-        setTimeout(() => {
-          try {
-            ws.close(1000, 'live_transfer');
-          } catch {
-            /* ignore */
-          }
-        }, 800);
       } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
         console.warn(
           `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
@@ -3972,6 +4019,9 @@ async function maybeQueueLiveTransfer({
   console.log(
     `[${callSid}] live transfer conference armed room=${armed.room} to=${maskE164(dest.phone)}`
   );
+  if (armed.callerJoined && !armed.originated) {
+    await originateConferenceLeg(armed);
+  }
   return true;
 }
 

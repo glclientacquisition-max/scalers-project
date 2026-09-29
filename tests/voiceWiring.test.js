@@ -216,8 +216,20 @@ assert.match(
 
 assert.match(
   source,
-  /live transfer stream stop/,
-  'an armed conference must close the media socket so StreamStopped can return Conference'
+  /conference hold bridge/,
+  'a live-transfer tenant must enter the conference at answer'
+);
+
+assert.match(
+  source,
+  /\/voice\/conference-hold/,
+  'the non-holding stream must redirect into the conference'
+);
+
+assert.match(
+  source,
+  /live transfer armed — caller stays in conference, media stays up/,
+  'arming a transfer must not close /ws/media'
 );
 
 assert.match(

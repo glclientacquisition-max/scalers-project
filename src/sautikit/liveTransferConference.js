@@ -36,6 +36,14 @@ function clientRequestIdFor(callSid) {
   return id;
 }
 
+function escapeXml(raw) {
+  return String(raw || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function buildCallerConferenceDocument(state) {
   return {
     actions: [
@@ -54,6 +62,42 @@ function buildCallerConferenceDocument(state) {
       },
     ],
   };
+}
+
+function buildHoldConferenceDocument(state) {
+  return {
+    actions: [
+      {
+        conference: {
+          name: state.room,
+          startOnEnter: true,
+          endOnExit: false,
+          beep: false,
+          maxParticipants: 2,
+          record: true,
+          statusEventsCallbackUrl: state.eventsUrl,
+          statusEvents: 'start end join leave',
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Answer document when the tenant can live-transfer.
+ * connect=false does not hold the leg, so Redirect runs at once and returns Conference.
+ * The fork is fire-and-forget. Closing the socket is not how the caller enters the room.
+ */
+function buildLiveBridgeXml({ streamUrl, continueUrl } = {}) {
+  const url = escapeXml(streamUrl);
+  const next = escapeXml(continueUrl);
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<Response>\n` +
+    `    <Stream url="${url}" name="ai-receptionist" track="inbound_track" connect="false" outputSamplingRate="16000" bidirectionalSamplingRate="16000" />\n` +
+    `    <Redirect method="POST">${next}</Redirect>\n` +
+    `</Response>`
+  );
 }
 
 function buildAgentConferenceDocument(state) {
@@ -94,6 +138,47 @@ function buildOriginateBody({ from, to, voiceCallbackUrl, clientRequestId }) {
   };
 }
 
+function seedConferenceHold({
+  callSid,
+  callerId,
+  callerNumber,
+  eventsUrl,
+  agentUrl,
+  fallbackUrl,
+  billingEnforcement,
+  walletBalanceKes,
+} = {}) {
+  const sid = String(callSid || '').trim();
+  if (!sid || !eventsUrl || !agentUrl || !fallbackUrl) return null;
+  const existing = byCall.get(sid);
+  if (existing) return existing;
+  const room = conferenceRoomName(sid);
+  const row = {
+    callSid: sid,
+    room,
+    to: null,
+    callerId: String(callerId || '').trim() || null,
+    callerNumber: String(callerNumber || '').trim() || null,
+    timeoutS: Math.min(60, Math.max(10, Number(process.env.VOICE_TRANSFER_TIMEOUT_S) || 30)),
+    eventsUrl: String(eventsUrl),
+    agentUrl: String(agentUrl),
+    fallbackUrl: String(fallbackUrl),
+    billingEnforcement: billingEnforcement || null,
+    walletBalanceKes: walletBalanceKes == null ? null : Number(walletBalanceKes),
+    status: 'listening',
+    transferArmed: false,
+    callerJoined: false,
+    originated: false,
+    outboundCallSid: null,
+    callerParticipant: null,
+    agentParticipant: null,
+    armedAt: null,
+  };
+  byCall.set(sid, row);
+  byRoom.set(room, sid);
+  return row;
+}
+
 function armConferenceTransfer({
   callSid,
   to,
@@ -114,11 +199,31 @@ function armConferenceTransfer({
   const existing = byCall.get(sid);
   if (
     existing &&
-    (existing.status === 'armed' ||
-      existing.status === 'caller_holding' ||
-      existing.status === 'dialing' ||
-      existing.status === 'bridged')
+    (existing.status === 'dialing' ||
+      existing.status === 'bridged' ||
+      existing.status === 'failed' ||
+      existing.status === 'cancelled' ||
+      (existing.transferArmed && existing.to))
   ) {
+    return existing;
+  }
+  if (existing) {
+    existing.to = dest;
+    existing.callerId = from;
+    existing.callerNumber = String(callerNumber || existing.callerNumber || '').trim() || null;
+    existing.timeoutS = Math.min(60, Math.max(10, Number(timeoutS) || existing.timeoutS || 30));
+    existing.eventsUrl = String(eventsUrl);
+    existing.agentUrl = String(agentUrl);
+    existing.fallbackUrl = String(fallbackUrl);
+    existing.billingEnforcement = billingEnforcement || existing.billingEnforcement || null;
+    existing.walletBalanceKes =
+      walletBalanceKes == null ? existing.walletBalanceKes : Number(walletBalanceKes);
+    existing.transferArmed = true;
+    existing.armedAt = Date.now();
+    if (existing.status === 'listening') {
+      existing.status = existing.callerJoined ? 'caller_holding' : 'armed';
+    }
+    byCall.set(sid, existing);
     return existing;
   }
   const room = conferenceRoomName(sid);
@@ -135,6 +240,8 @@ function armConferenceTransfer({
     billingEnforcement: billingEnforcement || null,
     walletBalanceKes: walletBalanceKes == null ? null : Number(walletBalanceKes),
     status: 'armed',
+    transferArmed: true,
+    callerJoined: false,
     originated: false,
     outboundCallSid: null,
     callerParticipant: null,
@@ -164,7 +271,8 @@ function conferenceKeepsCallOpen(callSid) {
   const row = getConferenceTransfer(callSid);
   return Boolean(
     row &&
-      (row.status === 'armed' ||
+      (row.status === 'listening' ||
+        row.status === 'armed' ||
         row.status === 'caller_holding' ||
         row.status === 'dialing' ||
         row.status === 'bridged')
@@ -284,10 +392,17 @@ function decideConferenceEvent({ callSid, room, body } = {}) {
       byCall.set(row.callSid, row);
       return { action: 'bridged', attempt: row };
     }
+    row.callerJoined = true;
     if (parsed.participantId) row.callerParticipant = parsed.participantId;
-    if (row.status === 'armed') row.status = 'caller_holding';
+    if (row.transferArmed && (row.status === 'armed' || row.status === 'listening')) {
+      row.status = 'caller_holding';
+    }
     byCall.set(row.callSid, row);
-    return { action: 'caller_joined', attempt: row, originate: !row.originated };
+    return {
+      action: 'caller_joined',
+      attempt: row,
+      originate: Boolean(row.transferArmed && !row.originated),
+    };
   }
 
   if ((parsed.event === 'leave' || parsed.event === 'end') && row.status !== 'bridged') {
@@ -468,6 +583,9 @@ module.exports = {
   conferenceRoomName,
   clientRequestIdFor,
   buildCallerConferenceDocument,
+  buildHoldConferenceDocument,
+  buildLiveBridgeXml,
+  seedConferenceHold,
   buildAgentConferenceDocument,
   buildFallbackDocument,
   buildHangupDocument,
