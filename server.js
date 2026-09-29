@@ -254,6 +254,14 @@ const {
   emptyVoiceXml,
 } = require('./src/sautikit/pendingLiveTransfer');
 const {
+  isAiLegDestination,
+  shouldDialAiLeg,
+  parentDidForTenant,
+  buildShopBridgeXml,
+  aiLegDid,
+  aiLegHealth,
+} = require('./src/sautikit/aiLegBridge');
+const {
   armConferenceTransfer,
   buildHoldConferenceDocument,
   conferenceRoomName,
@@ -502,6 +510,7 @@ app.get('/healthz', (_req, res) => {
       ignoreHours: envLiveTransferIgnoreHours(),
       mode: 'conference',
     },
+    aiLeg: aiLegHealth(),
     voiceProfile: publicVoiceProfile(),
   });
 });
@@ -1124,23 +1133,34 @@ async function handleVoiceIncoming(req, res) {
     rememberVoiceHttpBase(callSid, req);
 
     // Load tenant DIDs and undo WebRTC/header flips before persisting.
+    // The AI leg is dialed with the shop number as caller ID. Do not swap that
+    // leg back into a shop call, or the shop line would dial it again.
+    const rawToNumber = toNumber;
+    const inboundAiLeg = isAiLegDestination(rawToNumber);
     let tenantDids = [];
-    try {
-      tenantDids = await db.listActiveTenantDids();
-    } catch (err) {
-      console.warn('[voice/incoming] listActiveTenantDids failed:', err?.message || err);
-      tenantDids = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+    let swapped = false;
+    if (inboundAiLeg) {
+      const parent = parentDidForTenant();
+      if (parent) toNumber = parent;
+    } else {
+      try {
+        tenantDids = await db.listActiveTenantDids();
+      } catch (err) {
+        console.warn('[voice/incoming] listActiveTenantDids failed:', err?.message || err);
+        tenantDids = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
+      }
+      const corrected = correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids });
+      if (corrected.swapped) {
+        console.warn('[voice/incoming] caller/callee looked flipped (from matched tenant DID) — swapping', {
+          before: { fromNumber, toNumber },
+          after: { fromNumber: corrected.fromNumber, toNumber: corrected.toNumber },
+          tenantDids,
+        });
+      }
+      swapped = corrected.swapped;
+      fromNumber = corrected.fromNumber;
+      toNumber = corrected.toNumber;
     }
-    const corrected = correctCallerCalleeNumbers({ fromNumber, toNumber, tenantDids });
-    if (corrected.swapped) {
-      console.warn('[voice/incoming] caller/callee looked flipped (from matched tenant DID) — swapping', {
-        before: { fromNumber, toNumber },
-        after: { fromNumber: corrected.fromNumber, toNumber: corrected.toNumber },
-        tenantDids,
-      });
-    }
-    fromNumber = corrected.fromNumber;
-    toNumber = corrected.toNumber;
 
     console.log('[voice/incoming]', {
       path: req.path || req.url,
@@ -1148,7 +1168,8 @@ async function handleVoiceIncoming(req, res) {
       callSidSource: extracted.callSid ? 'payload' : 'fallback',
       fromNumber,
       toNumber,
-      swapped: corrected.swapped,
+      swapped,
+      aiLeg: inboundAiLeg,
       callSessionState: callSessionState || '(initial)',
       host: req.headers.host,
       body: summarizeBody(req.body),
@@ -1233,6 +1254,22 @@ async function handleVoiceIncoming(req, res) {
     } catch (dbErr) {
       // Do not fail the webhook / Stream setup if DB is briefly unavailable.
       console.error('[voice/incoming] DB upsert failed (continuing with Stream):', dbErr?.message || dbErr);
+    }
+
+    if (!inboundAiLeg && shouldDialAiLeg(toNumber)) {
+      const host = requestHost(req);
+      const doneUrl = host
+        ? `${requestHttpProto(req)}://${host}/voice/ai-leg-done?callSid=${encodeURIComponent(callSid)}`
+        : '';
+      console.log(`[${callSid}] ai leg bridge`);
+      return res.type('text/xml').send(buildShopBridgeXml({
+        aiLeg: aiLegDid(),
+        callerId: parentDidForTenant(),
+        doneUrl,
+      }));
+    }
+    if (inboundAiLeg) {
+      console.log(`[${callSid}] ai leg stream`);
     }
 
     const streamUrl = `${buildMediaStreamUrl(req)}?callSid=${encodeURIComponent(callSid)}`;
@@ -1348,6 +1385,17 @@ function handleSautikitRootPost(req, res) {
 app.post('/', sautikitWebhookGuard, handleSautikitRootPost);
 app.post('/voice/incoming', sautikitWebhookGuard, handleVoiceIncoming);
 app.post('/voice', sautikitWebhookGuard, handleVoiceIncoming);
+
+function handleAiLegDone(req, res) {
+  const callSid = String(req.query?.callSid || '').trim();
+  const state = String(
+    req.body?.callSessionState || req.body?.CallSessionState || req.body?.status || ''
+  );
+  console.log(`[voice/ai-leg-done] callSid=${callSid || 'none'} state=${state || 'none'}`);
+  return res.type('text/xml').send(emptyVoiceXml());
+}
+
+app.post('/voice/ai-leg-done', sautikitWebhookGuard, handleAiLegDone);
 // Workspace WhatsApp inbound (whatsapp.event.received). Do not resolveTenantId(DID).
 app.post('/whatsapp/events', sautikitWebhookGuard, handleWhatsAppWebhook);
 

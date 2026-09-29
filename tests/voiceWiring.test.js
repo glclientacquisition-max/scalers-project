@@ -234,6 +234,24 @@ assert.match(
 
 assert.match(
   source,
+  /ai leg bridge/,
+  'shop DID can dial the AI-leg number instead of streaming on the caller leg'
+);
+
+assert.match(
+  source,
+  /\/voice\/ai-leg-done/,
+  'Dial end on the shop leg must have a voice URL'
+);
+
+assert.match(
+  source,
+  /ai leg stream/,
+  'the AI-leg number must answer with the holding stream'
+);
+
+assert.match(
+  source,
   /live transfer armed — caller stays in conference, media stays up/,
   'arming a transfer must not close /ws/media'
 );
