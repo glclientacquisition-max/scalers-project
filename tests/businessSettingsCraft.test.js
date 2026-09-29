@@ -125,14 +125,15 @@ describe("business settings craft", () => {
     assert.match(ui, /md:sticky md:top-4/);
   });
 
-  it("keeps Sign out on Profile and parks Appearance under This device", () => {
+  it("parks Sign out on the account bar and Appearance under This device", () => {
     const header = ui.slice(
       ui.indexOf("export function SettingsPageHeader"),
       ui.indexOf("compactTextareaExpandHandlers")
     );
     assert.doesNotMatch(header, /SignOutButton/);
-    assert.match(shell, /SignOutButton/);
-    assert.match(shell, /SettingsSignOutRow/);
+    assert.doesNotMatch(shell, /SignOutButton/);
+    assert.doesNotMatch(shell, /SettingsSignOutRow/);
+    assert.match(read("dashboard/src/components/DeskAccountBar.tsx"), /<SignOutButton/);
     assert.match(shell, /<ThemePicker \/>/);
     assert.match(shell, /title="This device"/);
     assert.match(nav, /title: "This device"/);

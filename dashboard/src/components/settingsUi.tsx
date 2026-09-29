@@ -346,6 +346,7 @@ export function SettingsPageHeader({
   action,
   showBack = false,
   index = false,
+  showLine = false,
   title,
 }: {
   businessName: string;
@@ -354,9 +355,10 @@ export function SettingsPageHeader({
   action?: ReactNode;
   showBack?: boolean;
   index?: boolean;
+  showLine?: boolean;
   title?: string | null;
 }) {
-  const line = (
+  const line = showLine ? (
     <p className="text-[13px] text-ink-soft [overflow-wrap:anywhere]">
       <span className="font-medium text-ink">
         {lineLive ? "Line live" : "Number pending"}
@@ -367,7 +369,7 @@ export function SettingsPageHeader({
         </span>
       ) : null}
     </p>
-  );
+  ) : null;
 
   if (index) {
     return (

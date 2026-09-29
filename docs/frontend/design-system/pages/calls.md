@@ -17,7 +17,7 @@ Retail: Pickup / Order / Holds. Home services: Confirm visit / Visits. Hospitali
 
 **Preview (one line):** Work is `deskPreviewClass`. One ellipsized line. The hangup paragraph, Want, Done, mood, and next live on `/calls/[id]`. Do not stack a second detail line under Work on mixed filters. Table Work cells use `deskPreviewCellClass`. Phone uses the same one-line clamp, never `line-clamp-2` for the summary. Isolated Holds and Visits table cells are also one line (Item or slot, not a stacked subtype).
 
-**Needs you next step:** Rows still in the Needs you pile may show one muted line under the preview (`inboxNeedsYouNextStep`). It restates `inboxListDockRecipe` in words: Confirm visit, Hold Done, or Call or WhatsApp. Hospitality Confirm booking stays gated until reservations exist. Intent-only never uses Confirm or Done language. Live and empty docks omit the line. Not hangup copy. Not a second button.
+**Needs you next step:** Rows still in the Needs you pile may show one muted line under the preview (`inboxNeedsYouNextStep`). It restates Confirm and Hold Done only. Call and WhatsApp stay on the dock, with no static Call or WhatsApp line. Hospitality Confirm booking stays gated until reservations exist. Intent-only never uses Confirm or Done language. Live and empty docks omit the line. Not hangup copy. Not a second button.
 
 **Action dock (that trailing cell):**
 - Visit or booking with a job row: **Confirm** (then Done). That verb only.

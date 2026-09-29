@@ -44,19 +44,19 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
             <tr>
               <th
                 scope="col"
-                className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
               >
                 When
               </th>
               <th
                 scope="col"
-                className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
               >
                 Type
               </th>
               <th
                 scope="col"
-                className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
               >
                 What
               </th>
@@ -71,14 +71,14 @@ export function ContactTimeline({ entries }: { entries: ContactTimelineEntry[] }
                   entry.href ? "cursor-pointer hover:bg-accent/[0.04]" : "",
                 ].join(" ")}
               >
-                <td className={`${deskRowMutedClass} whitespace-nowrap px-5 py-4 text-ink-soft`}>
+                <td className={`${deskRowMutedClass} whitespace-nowrap px-3 py-2 text-ink-soft`}>
                   <TimelineRowHit entry={entry} />
                   {formatCallWhen(entry.createdAt)}
                 </td>
-                <td className={`${deskRowMutedClass} px-5 py-4`}>
+                <td className={`${deskRowMutedClass} px-3 py-2`}>
                   <InboxPurposeChip purpose={entry.purpose} label={entry.stamp} />
                 </td>
-                <td className={`${deskPreviewCellClass} px-5 py-4`}>
+                <td className={`${deskPreviewCellClass} px-3 py-2`}>
                   <ContactTimelineWhat headline={entry.headline} detail={entry.detail} />
                 </td>
               </tr>

@@ -186,23 +186,23 @@ export default async function ContactsPage({
                   <tr>
                     <th
                       scope="col"
-                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-5 lg:py-4"
+                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-3 lg:py-2"
                     >
                       Name
                     </th>
                     <th
                       scope="col"
-                      className="hidden px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:table-cell lg:px-5 lg:py-4"
+                      className="hidden px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:table-cell lg:px-3 lg:py-2"
                     >
                       Phone
                     </th>
                     <th
                       scope="col"
-                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-5 lg:py-4"
+                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-3 lg:py-2"
                     >
                       Last call
                     </th>
-                    <th scope="col" className="w-px px-3 py-3 lg:px-5 lg:py-4">
+                    <th scope="col" className="w-px px-3 py-3 lg:px-3 lg:py-2">
                       <span className="sr-only">Call and WhatsApp</span>
                     </th>
                   </tr>

@@ -170,7 +170,7 @@ export function purposeFilters(vertical?: string | null): {
   }
   rows.push(
     { id: "hold", label: copy.holdFilter, divide: !showsVisitQueue(vertical) },
-    { id: "human", label: "Human", divide: true },
+    { id: "human", label: copy.returnCtaMany, divide: true },
     { id: "answered", label: "Answered" }
   );
   return rows;

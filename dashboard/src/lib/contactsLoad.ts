@@ -199,23 +199,23 @@ export function isUnsavedContactName(name?: string | null): boolean {
   return !String(name || "").trim();
 }
 
-/** Primary list text: saved name, or the phone when unnamed. */
+/** Primary list text: saved name, or Unknown caller. The number stays in Phone. */
 export function contactListTitle(row: {
   name?: string | null;
   phone?: string | null;
 }): string {
   if (!isUnsavedContactName(row.name)) return String(row.name || "").trim();
-  return String(row.phone || "").trim() || "No phone";
+  return "Unknown caller";
 }
 
-/** List subline: Unknown caller, phone, or last call. Never hangup copy or presence. */
+/** List subline: full number, or last call when the name is saved. Never hangup copy. */
 export function contactListSubline(row: {
   name?: string | null;
   phone?: string | null;
   lastContactAt?: string | null;
 }): string {
-  if (isUnsavedContactName(row.name)) return "Unknown caller";
   const phone = String(row.phone || "").trim();
+  if (isUnsavedContactName(row.name)) return phone || "No phone";
   if (phone) return phone;
   if (row.lastContactAt) return formatCallWhenRelative(row.lastContactAt);
   return "No phone";

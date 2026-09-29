@@ -64,7 +64,7 @@ export function InboxRowCheck({ item }: { item: InboxItem }) {
         type="checkbox"
         checked={on}
         onChange={() => (ui.selecting ? ui.toggle(item.id) : ui.enter(item.id))}
-        className="h-4 w-4 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+        className="h-6 w-6 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF] lg:h-4 lg:w-4"
       />
     </label>
   );

@@ -36,7 +36,7 @@ function InboxHeaderCheck() {
         checked={allOn}
         onChange={() => (allOn ? ui.clear() : ui.replace(ids))}
         aria-label={allOn ? "Clear" : "Select all"}
-        className="h-4 w-4 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+        className="h-6 w-6 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF] lg:h-4 lg:w-4"
       />
     </label>
   );
@@ -236,53 +236,53 @@ export function InboxPileBoard({
                     <tr>
                       {inboxTableKind(purpose) === "hold" ? (
                         <>
-                          <th scope="col" className="px-5 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             <span className="flex items-center gap-3">
                               <InboxHeaderCheck />
                               Item
                             </span>
                           </th>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             Who
                           </th>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             Needed
                           </th>
                         </>
                       ) : null}
                       {inboxTableKind(purpose) === "job" ? (
                         <>
-                          <th scope="col" className="px-5 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             <span className="flex items-center gap-3">
                               <InboxHeaderCheck />
                               {copy.jobColumn}
                             </span>
                           </th>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             Who
                           </th>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             Place
                           </th>
                         </>
                       ) : null}
                       {inboxTableKind(purpose) === "mixed" ? (
                         <>
-                          <th scope="col" className="px-5 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             <span className="flex items-center gap-3">
                               <InboxHeaderCheck />
                               Work
                             </span>
                           </th>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             Needed
                           </th>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
+                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
                             When
                           </th>
                         </>
                       ) : null}
-                      <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">
+                      <th scope="col" className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-[0.14em]">
                         Action
                       </th>
                     </tr>
