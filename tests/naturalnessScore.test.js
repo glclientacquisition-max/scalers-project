@@ -113,8 +113,13 @@ test('clean phatic call passes Voice', () => {
 });
 
 test('V5 flags a closer Okay. that reopened how-are-you', () => {
-  const flags = scoreAgentTurn("I'm well. Who is calling?", { prevCaller: 'Okay.' });
-  assert.ok(flags.some((f) => f.id === 'V5' && f.lane === 'voice'));
+  for (const prevCaller of ['Okay.', 'Ok.', 'Fine.', 'Great.']) {
+    const flags = scoreAgentTurn("I'm well. Who is calling?", { prevCaller });
+    assert.ok(
+      flags.some((f) => f.id === 'V5' && f.lane === 'voice'),
+      prevCaller
+    );
+  }
 });
 
 test('thinking-ack Mm-hmm. in spoken= is not a hyphen name', () => {

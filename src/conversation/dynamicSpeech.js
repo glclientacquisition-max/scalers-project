@@ -163,10 +163,22 @@ function pickContextualAck(userText, lang) {
 }
 
 /**
+ * Bare closer. Not how-are-you.
+ * Live miss HD_d0f042f5d960, HD_391a57aae9e9: "Okay." spoke "I'm well. Who is calling?"
+ * Punctuation variants (Ok. / Fine! / GREAT?) are the same token after normalize.
+ */
+function looksLikeBareCloser(text) {
+  const t = normalizeCallerText(text).replace(/[?'!.,-]+$/g, '').trim();
+  return /^(ok|okay|fine|great)$/.test(t);
+}
+
+/**
  * Greetings / how-are-you. A thinking-ack here sounds like stalling.
  * "how much" / "how do I book" must stay eligible for an ack.
+ * Bare Okay / ok / fine / great never enter this path.
  */
 function looksLikePhaticCallerTurn(text) {
+  if (looksLikeBareCloser(text)) return false;
   const t = normalizeCallerText(text).replace(/[?'!-]+$/g, '').trim();
   if (!t) return false;
   if (/^(hi|hello|hey|yo|niaje|sasa|mambo|vipi|polo|fiti|habari( yako)?)$/.test(t)) {
@@ -191,6 +203,7 @@ function looksLikePhaticCallerTurn(text) {
 }
 
 function shouldSpeakThinkingAck(text) {
+  if (looksLikeBareCloser(text)) return false;
   return !looksLikePhaticCallerTurn(text);
 }
 
@@ -461,6 +474,7 @@ function shouldSpeakHandoffNameAsk({
   brainState = {},
   userText = '',
 } = {}) {
+  if (looksLikeBareCloser(userText)) return false;
   if (callerNameAlreadyKnown({ brainState, userText })) return false;
   const missing = Array.isArray(brainState?.goal?.missingSlots)
     ? brainState.goal.missingSlots
@@ -484,6 +498,10 @@ function pickSpeechGuaranteeLine({
   language,
   userText = '',
 } = {}) {
+  // Closers must not reopen a name ask. ANSWER-with-zero-chars stays a later ticket.
+  if (looksLikeBareCloser(userText)) {
+    return pickClarifyProgress({ language, slot: '' });
+  }
   const nameKnown = callerNameAlreadyKnown({ brainState, userText });
   let slot = nextGuaranteeSlot({ nextBestAction, brainState, nameKnown });
   // Live leftover HD_bc9f610692de: a bookings/visit ask after the name is in
@@ -707,6 +725,7 @@ module.exports = {
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
   pickLlmRecoverySaved,
+  looksLikeBareCloser,
   looksLikePhaticCallerTurn,
   looksLikeIdentityQuestion,
   looksLikeRobotQuestion,

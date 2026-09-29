@@ -63,7 +63,9 @@ Connect-to-greeting is a Voice log: `[voice-timing][sid] connect_to_greeting_pcm
 
 Live miss: freeze N1 `HD_d0f042f5d960` and N3 `HD_391a57aae9e9`. Closer `Okay.` matched `looksLikePhaticCallerTurn` because `okay|ok|fine|great` did not require `I'm`. Media path spoke the shared-line line `I'm well. Who is calling?` at 210–301 ms. NBA was `END` (N1) or `ASK_CLARIFICATION` (N3), not a how-are-you.
 
-Fix: wellbeing answers require `I'm` / `I am`. Bare `Okay.` / `ok` / `fine` / `great` take the normal turn loop. `How are you doing, Shy?` still skips Gemini.
+Fix: wellbeing answers require `I'm` / `I am`. Bare `Okay.` / `ok` / `fine` / `great` (and punctuated variants) take the normal turn loop. `How are you doing, Shy?` still skips Gemini.
+
+Harden: `looksLikeBareCloser` is the only closer matcher. Media path, thinking-ack, handoff name-ask, and empty-Gemini name-ask all consult it. A closer does not get `I'm well. Who is calling?` or a thinking-ack.
 
 Do not crank TTS speed. Speech-guarantee on ANSWER (`I can't finish that just now`) is a later Voice ticket.
 

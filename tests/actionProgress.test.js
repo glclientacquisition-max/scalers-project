@@ -9,6 +9,7 @@ const {
   pickSpeechGuaranteeLine,
   shouldSpeakHandoffNameAsk,
   looksLikeCallerName,
+  looksLikeBareCloser,
   looksLikePhaticCallerTurn,
   shouldSpeakThinkingAck,
   pickPhaticReply,
@@ -35,15 +36,51 @@ assert.equal(looksLikePhaticCallerTurn("I'm okay"), true);
 assert.equal(looksLikePhaticCallerTurn("I'm fine thanks"), true);
 assert.equal(looksLikePhaticCallerTurn('I am good'), true);
 // Live miss HD_d0f042f5d960 / HD_391a57aae9e9: closer Okay. is not how-are-you.
-assert.equal(looksLikePhaticCallerTurn('Okay.'), false);
-assert.equal(looksLikePhaticCallerTurn('ok'), false);
+// Punctuated variants must not take the wellbeing line or a thinking-ack.
+const BARE_CLOSERS = [
+  'Okay.',
+  'Ok.',
+  'ok',
+  'OK',
+  'Fine.',
+  'Great.',
+  'okay!',
+  'fine!',
+  'GREAT',
+  'Okay?',
+  'ok,',
+  'Fine,',
+  '  Okay.  ',
+];
+for (const closer of BARE_CLOSERS) {
+  assert.equal(looksLikeBareCloser(closer), true, closer);
+  assert.equal(looksLikePhaticCallerTurn(closer), false, closer);
+  assert.equal(shouldSpeakThinkingAck(closer), false, closer);
+}
 assert.equal(looksLikePhaticCallerTurn('okay thanks'), false);
-assert.equal(looksLikePhaticCallerTurn('fine'), false);
-assert.equal(looksLikePhaticCallerTurn('great'), false);
+assert.equal(looksLikeBareCloser('okay thanks'), false);
+assert.equal(looksLikeBareCloser("I'm okay"), false);
+assert.equal(looksLikeBareCloser('How are you doing, Shy?'), false);
 assert.equal(shouldSpeakThinkingAck('How are you doing?'), false);
 assert.equal(shouldSpeakThinkingAck('How are you doing, Shy?'), false);
 assert.equal(shouldSpeakThinkingAck('How much for a couch?'), true);
-assert.equal(shouldSpeakThinkingAck('Okay.'), true);
+assert.equal(
+  shouldSpeakHandoffNameAsk({
+    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    brainState: { intent: 'human', goal: { missingSlots: ['name'] } },
+    userText: 'Okay.',
+  }),
+  false
+);
+assert.doesNotMatch(
+  pickSpeechGuaranteeLine({
+    nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'name' },
+    brainState: { intent: 'booking', goal: { missingSlots: ['name'] } },
+    language: 'en',
+    userText: 'Okay.',
+  }),
+  /I'm well|who is calling|May I have your name/i
+);
 assert.equal(pickPhaticReply({ language: 'en' }), "I'm well, thanks. How can I help?");
 assert.equal(pickPhaticReply({ language: 'sw' }), 'Nzuri, asante. Naweza kusaidia?');
 assert.equal(

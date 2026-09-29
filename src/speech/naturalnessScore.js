@@ -2,6 +2,8 @@
 // This is not a MOS guess and not a TTS-speed knob. Listen + transcript +
 // spoken= logs decide. Brain wording is tagged, not "fixed" here.
 
+const { looksLikeBareCloser } = require('../conversation/dynamicSpeech');
+
 const TINY_LEAD_IN =
   /^(sure|great|okay|ok|alright|thanks|thank you|i'?m listening|mm-hmm|mm|sawa|poa|got it)[.!]*$/i;
 
@@ -81,11 +83,8 @@ function scoreAgentTurn(text, opts = {}) {
     });
   }
 
-  // Live miss HD_d0f042f5d960: closer "Okay." matched the how-are-you local line.
-  if (
-    /^(ok|okay)\.?$/i.test(prevCaller) &&
-    /^i'?m well\b/i.test(heard)
-  ) {
+  // Live miss HD_d0f042f5d960 / HD_391a57aae9e9: closer matched the how-are-you local line.
+  if (looksLikeBareCloser(prevCaller) && /^i'?m well\b/i.test(heard)) {
     flags.push({
       id: 'V5',
       lane: 'voice',

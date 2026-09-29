@@ -114,7 +114,7 @@ If N1 fails, still run N2 and N3 on the same SHA. The set is the measurement.
 
 Detail: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md).
 
-**V5 matcher is in code.** Bare `Okay` / `ok` / `fine` / `great` are not how-are-you. Wellbeing answers still need `I'm` / `I am`. Do not crank speed or gain. Speech-guarantee on ANSWER is a later Voice ticket. This implementation PR: greeting/filler PCM matches live gain, greeting key includes speed, remaining Brain prose leaks stripped before TTS.
+**V5 matcher is in code.** `looksLikeBareCloser` rejects bare `Okay` / `ok` / `fine` / `great` and punctuated variants. Those turns are not how-are-you and do not get a thinking-ack or a who-is-calling local line. Named how-are-you (`How are you doing, Shy?`) still does. Wellbeing answers still need `I'm` / `I am`. Do not crank speed or gain. Speech-guarantee on ANSWER is a later Voice ticket.
 
 ## After the three calls
 
