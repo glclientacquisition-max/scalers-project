@@ -54,6 +54,7 @@ describe('live transfer conference', () => {
       body: {},
       source: 'transfer_continue',
     });
+    assert.equal(conferenceKeepsCallOpen('HD_abc123'), true);
     assert.equal(admit.kind, 'caller_conference');
     assert.equal(admit.document.actions[1].conference.startOnEnter, false);
     assert.equal(admit.document.actions[1].conference.endOnExit, false);

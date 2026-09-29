@@ -211,7 +211,13 @@ assert.match(
 assert.match(
   source,
   /live transfer Dial blocked/,
-  'must not close /ws/media for transfer until conference REST can ring a human'
+  'cold Dial must not close /ws/media'
+);
+
+assert.match(
+  source,
+  /live transfer stream stop/,
+  'an armed conference must close the media socket so StreamStopped can return Conference'
 );
 
 assert.match(

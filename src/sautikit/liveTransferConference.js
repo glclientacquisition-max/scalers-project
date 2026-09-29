@@ -163,7 +163,11 @@ function parentCallForOutbound(outboundCallSid) {
 function conferenceKeepsCallOpen(callSid) {
   const row = getConferenceTransfer(callSid);
   return Boolean(
-    row && (row.status === 'caller_holding' || row.status === 'dialing' || row.status === 'bridged')
+    row &&
+      (row.status === 'armed' ||
+        row.status === 'caller_holding' ||
+        row.status === 'dialing' ||
+        row.status === 'bridged')
   );
 }
 

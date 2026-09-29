@@ -2938,13 +2938,22 @@ mediaWss.on('connection', (ws, req) => {
         }, 800);
       } else if (
         !bargeInActive &&
-        (hasPendingLiveTransfer(sessionCallSid) ||
-          getConferenceTransfer(sessionCallSid)?.status === 'armed')
+        getConferenceTransfer(sessionCallSid)?.status === 'armed'
       ) {
-        // Staging spikes proved SautiKit does not continue the voice document
-        // after Stream (no Redirect, no StreamStopped on /voice/incoming).
-        // Closing media leaves dead air. Keep the AI on the line; SMS already sent.
-        // Conference admission is /voice/transfer, not a socket close.
+        // SautiKit returns the next voice document when the stream stops.
+        // Redirect after <Stream connect="true"/> does not run while this socket is open.
+        // Completed must not originate. StreamStopped on the voice URL returns Conference.
+        console.log(
+          `[ws/media][${sidLabel()}] live transfer stream stop — closing media for Conference`
+        );
+        setTimeout(() => {
+          try {
+            ws.close(1000, 'live_transfer');
+          } catch {
+            /* ignore */
+          }
+        }, 800);
+      } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
         console.warn(
           `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
         );

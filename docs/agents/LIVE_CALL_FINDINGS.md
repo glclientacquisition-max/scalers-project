@@ -362,7 +362,7 @@ Staging Voice is on `cursor/live-transfer-spec-3c65`. `/healthz` shows `liveTran
 
 **Do not repeat the WS-close spike.** Staging `VOICE_LIVE_TRANSFER` is **off** again so callers get SMS + AI on the line, not dead air.
 
-**2026-09-29:** Voice arms a conference instead of cold Dial. `/voice/transfer` returns Conference JSON. `POST /v1/calls` waits for caller `join`. Completed does not admit or originate. `/ws/media` is not closed for transfer. Flag stays off until a staging ring.
+**2026-09-29:** `HD_cbb6a3a6b583` armed a conference for Christopher and left `/ws/media` open. SautiKit never asked for a second voice document, so no outbound call was placed. Docs say the voice URL is re-invoked on `StreamStopped` and that response is the next action. The executor now closes the media socket after the transfer is armed. `Completed` still does not admit or originate.
 
 ---
 
