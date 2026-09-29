@@ -106,7 +106,7 @@ describe('required create-request injection', () => {
     const parsed = ensureRequiredCreateRequest(
       { appointment: null },
       homeBookingState({
-        goal: { missingSlots: ['landmark'], description: 'carpet clean' },
+        goal: { missingSlots: ['location'], description: 'carpet clean' },
         entities: {
           service: { value: 'Carpet cleaning' },
           name: { value: 'Amina' },

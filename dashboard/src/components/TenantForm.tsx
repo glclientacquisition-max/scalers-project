@@ -94,6 +94,8 @@ import {
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
+import { areasFromPlainText } from "@/lib/coverageAreas";
+import { CoverageAreaField } from "@/components/CoverageAreaField";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
 import { Pagination } from "@/components/ui/Pagination";
@@ -347,9 +349,17 @@ export function TenantForm({
         ]
       : [emptyLocation()];
   });
-  const [policies, setPolicies] = useState<BusinessPolicies>(() =>
-    normalizeBusinessPolicies(tenant.business_policies)
-  );
+  const [policies, setPolicies] = useState<BusinessPolicies>(() => {
+    const next = normalizeBusinessPolicies(tenant.business_policies);
+    if (parseVertical(tenant.vertical) !== "home_services" || next.coverage_areas) {
+      return next;
+    }
+    const rows = normalizeBusinessLocations(tenant.business_locations);
+    const text = [next.delivery, ...rows.map((row) => row.coverage_notes)]
+      .filter(Boolean)
+      .join(" ");
+    return { ...next, coverage_areas: areasFromPlainText(text) };
+  });
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -799,7 +809,20 @@ export function TenantForm({
               id="business_vertical"
               label="Business type"
               value={vertical}
-              onChange={setVertical}
+              onChange={(next) => {
+                setVertical(next);
+                if (next !== "home_services") return;
+                setPolicies((prev) => {
+                  if (prev.coverage_areas) return prev;
+                  const text = [
+                    prev.delivery,
+                    ...locations.map((row) => row.coverage_notes),
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return { ...prev, coverage_areas: areasFromPlainText(text) };
+                });
+              }}
               options={verticalSettingsOptions(vertical).map((opt) => ({
                 id: opt.id,
                 label: opt.label,
@@ -1610,7 +1633,7 @@ export function TenantForm({
             <span>Area</span>
             <span>Landmark</span>
             <span>Directions</span>
-            <span>Coverage</span>
+            <span>{vertical === "home_services" ? "Notes" : "Coverage"}</span>
             <span className="sr-only">Remove</span>
           </div>
           {locations.map((loc, index) => (
@@ -1720,7 +1743,7 @@ export function TenantForm({
                   className="block text-xs font-medium text-ink-soft lg:sr-only"
                   htmlFor={`loc-coverage-${index}`}
                 >
-                  Coverage
+                  {vertical === "home_services" ? "Notes" : "Coverage"}
                 </label>
                 <ExpandTextarea
                   id={`loc-coverage-${index}`}
@@ -1729,7 +1752,11 @@ export function TenantForm({
                   onChange={(value) =>
                     updateLocation(index, "coverage_notes", value)
                   }
-                  placeholder="Kiambu and Ruiru"
+                  placeholder={
+                    vertical === "home_services"
+                      ? "Call ahead for the gate"
+                      : "Kiambu and Ruiru"
+                  }
                   className="min-w-0 break-words [overflow-wrap:anywhere]"
                 />
               </div>
@@ -1758,6 +1785,17 @@ export function TenantForm({
         className={panel === "policies" ? "space-y-6" : "hidden"}
       >
         <SettingsGroup title="Rules">
+          {vertical === "home_services" ? (
+            <SettingsStack label="Coverage" htmlFor="policy-coverage">
+              <CoverageAreaField
+                id="policy-coverage"
+                value={policies.coverage_areas || []}
+                onChange={(coverage_areas) =>
+                  setPolicies((prev) => ({ ...prev, coverage_areas }))
+                }
+              />
+            </SettingsStack>
+          ) : null}
           {POLICY_FIELDS.map((field) => (
             <SettingsStack
               key={field.id}
@@ -1770,7 +1808,11 @@ export function TenantForm({
                 onChange={(value) =>
                   setPolicies((prev) => ({ ...prev, [field.id]: value }))
                 }
-                placeholder={field.placeholder}
+                placeholder={
+                  field.id === "delivery" && vertical === "home_services"
+                    ? "Same day before 2pm"
+                    : field.placeholder
+                }
               />
             </SettingsStack>
           ))}

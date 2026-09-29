@@ -3,6 +3,7 @@
 const { normalizeLocations } = require('./businessLocations');
 const { entityValue } = require('./entityExtraction');
 const { returningFileUsable } = require('./callerMemory');
+const { decideVisitPlace } = require('./visitLocation');
 
 const GOAL_REQUIREMENTS = Object.freeze({
   price: [{ slot: 'subject', anyOf: ['product', 'service', 'requestedItem'] }],
@@ -52,15 +53,29 @@ function missingGoalSlots(state, profile = {}) {
     }
   }
   const vertical = String(profile.vertical || state?.vertical || '').toLowerCase();
-  if (intent === 'booking' && vertical === 'home_services') {
-    requirements.push({ slot: 'landmark', anyOf: ['landmark'] });
-  }
+  const homeVisit = intent === 'booking' && vertical === 'home_services';
+  const visitDecision = homeVisit ? homeVisitDecision(state, profile) : null;
   if (intent === 'cancellation' && wantsNewWhenForChange(state)) {
     return ['when'].filter((slot) => !slotFilled(state, { slot, anyOf: ['when'] }));
   }
-  return requirements
+  const missing = requirements
     .filter((requirement) => !slotFilled(state, requirement))
     .map((requirement) => requirement.slot);
+  if (visitDecision?.ask && !missing.includes('location')) {
+    missing.push('location');
+  }
+  return missing;
+}
+
+function homeVisitDecision(state, profile = {}) {
+  if (state?.visitPlace) return state.visitPlace;
+  const place =
+    entityValue(state?.entities?.location) || entityValue(state?.entities?.landmark);
+  return decideVisitPlace(place, {
+    profile,
+    detailAsked: Boolean(state?.conversation?.locationDetailAsked),
+    refusals: Number(state?.conversation?.locationRefusals || 0),
+  });
 }
 
 function visitSopSlotValue(state, slot) {
@@ -74,6 +89,11 @@ function visitSopSlotValue(state, slot) {
       entityValue(state?.entities?.requestedItem)
     );
   }
+  if (slot === 'location') {
+    return (
+      entityValue(state?.entities?.location) || entityValue(state?.entities?.landmark)
+    );
+  }
   return entityValue(state?.entities?.[slot]);
 }
 
@@ -82,9 +102,14 @@ function formatVisitSopForPrompt(state) {
   if (vertical !== 'home_services' || String(state?.intent || '') !== 'booking') {
     return '';
   }
-  const order = ['service', 'name', 'when', 'landmark'];
+  const order = ['service', 'name', 'when', 'location'];
+  const decision = state.visitPlace || null;
   const parts = order.map((slot) => {
     const value = visitSopSlotValue(state, slot);
+    if (slot === 'location' && decision?.quality === 'area_only' && value) {
+      return `location=${value} (area only)`;
+    }
+    if (slot === 'location' && decision?.ask && !value) return 'location=missing';
     return value ? `${slot}=${value}` : `${slot}=missing`;
   });
   const pair = Array.isArray(state?.caller?.nameCollision)
@@ -93,13 +118,37 @@ function formatVisitSopForPrompt(state) {
   if (pair.length >= 2 && state?.caller?.nameConfirmed !== true) {
     return `- Visit SOP: ${parts.join(' | ')}. Ask once: ${pair.join(' or ')}? Do not guess the spelling.`;
   }
-  const next = order.find((slot) => !visitSopSlotValue(state, slot));
   const job = visitSopSlotValue(state, 'service');
-  const nextLine = next
-    ? job
-      ? `Name ${job} in one clause, then ask only for ${next}. Never re-ask a filled slot.`
-      : `Ask only for ${next}. Never re-ask a filled slot.`
-    : 'Slots complete. Append create_appointment and speak nothing.';
+  let nextLine = '';
+  if (decision?.blocked === 'outside') {
+    nextLine =
+      'Outside POLICIES/LOCATIONS. Do not create_appointment. Decline or offer a callback note. Never say landmark.';
+  } else if (decision?.blocked === 'unknown_coverage') {
+    nextLine =
+      'Coverage is not on file. Do not invent it. Do not create_appointment. Offer to note it for the owner. Never say landmark.';
+  } else if (decision?.blocked === 'refused') {
+    nextLine =
+      'They refused a location twice. Escalate or log an enquiry. Do not create_appointment. Never say landmark.';
+  } else if (decision?.confirmAccess) {
+    nextLine =
+      'Area is in coverage. Append create_appointment and note confirm access. Speak nothing. Never say landmark.';
+  } else {
+    const next = order.find((slot) => {
+      if (slot === 'location') return !decision?.bookable;
+      return !visitSopSlotValue(state, slot);
+    });
+    if (next === 'location' && decision?.quality === 'area_only') {
+      nextLine =
+        'You have the area. Ask once which building, gate, or junction. Never say landmark.';
+    } else if (next) {
+      nextLine = job
+        ? `Name ${job} in one clause, then ask only for ${next}. Never re-ask a filled slot. Never say landmark.`
+        : `Ask only for ${next}. Never re-ask a filled slot. Never say landmark.`;
+    } else {
+      nextLine =
+        'Slots complete. Append create_appointment and speak nothing. Never say landmark.';
+    }
+  }
   return `- Visit SOP: ${parts.join(' | ')}. ${nextLine}`;
 }
 
@@ -111,7 +160,10 @@ function clarificationForSlot(slot) {
     when: 'Name the job you have, then ask for the day and time.',
     when_or_reference: 'Name the open visit if you have it, then ask for the new time or the visit to cancel.',
     branch: 'Ask which branch or location they mean.',
-    landmark: 'Name the job and time you have, then ask for a nearby landmark.',
+    location:
+      'Name the job and time you have, then ask where we should come: "Where should we come?" If you already have an area, ask once which building, gate, or junction. Never say landmark.',
+    landmark:
+      'Name the job and time you have, then ask where we should come: "Where should we come?" If you already have an area, ask once which building, gate, or junction. Never say landmark.',
   };
   return hints[slot] || `Ask for ${slot}.`;
 }

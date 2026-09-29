@@ -1,5 +1,7 @@
 // Normalize tenant business_policies for live ground truth.
 
+const { formatCoverageList, parseCoverageAreas } = require('./coverageAreas');
+
 const POLICY_LABELS = {
   payment: 'Payment',
   returns: 'Returns / exchanges',
@@ -34,15 +36,20 @@ function normalizePolicies(raw) {
     }
   }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return empty;
-  const out = { ...empty };
+  const out = { ...empty, coverage_areas: null };
   for (const key of Object.keys(empty)) {
     out[key] = String(obj[key] || '').trim();
+  }
+  if (Array.isArray(obj.coverage_areas)) {
+    out.coverage_areas = parseCoverageAreas(obj.coverage_areas);
   }
   return out;
 }
 
 function policiesHaveContent(policies) {
-  return Object.values(normalizePolicies(policies)).some(Boolean);
+  const p = normalizePolicies(policies);
+  if (Array.isArray(p.coverage_areas) && p.coverage_areas.length) return true;
+  return Object.entries(POLICY_LABELS).some(([key]) => Boolean(p[key]));
 }
 
 function formatPoliciesBlock(policies) {
@@ -59,7 +66,15 @@ function formatPoliciesBlock(policies) {
       );
     }
   }
-  if (!anyContent) {
+  if (Array.isArray(p.coverage_areas)) {
+    lines.push(
+      `- Coverage: ${formatCoverageList(p.coverage_areas) || '(none listed)'}`
+    );
+    lines.push(
+      'COVERAGE RULE: The Coverage line is the only service area. Delivery text is timing and other instructions.'
+    );
+  }
+  if (!anyContent && !Array.isArray(p.coverage_areas)) {
     return [
       '(no policy text on file)',
       'POLICY RULE: For any policy ask (returns, refunds, payment, etc.), say you do not have that detail. Offer to save a note ONLY if the caller asks. Never invent policy wording. Never force name/reason capture.',

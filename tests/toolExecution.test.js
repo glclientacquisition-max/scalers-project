@@ -412,8 +412,9 @@ describe('validated tool execution', () => {
     assert.equal(calls, 0);
     assert.equal(execution.results[0].action, 'create_appointment');
     assert.equal(execution.results[0].status, 'invalid');
-    assert.deepEqual(execution.results[0].missingSlots, ['when_text', 'landmark']);
-    assert.match(formatToolConfirmation(execution.results, 'en'), /landmark/i);
+    assert.deepEqual(execution.results[0].missingSlots, ['when_text', 'location']);
+    assert.match(formatToolConfirmation(execution.results, 'en'), /location/i);
+    assert.doesNotMatch(formatToolConfirmation(execution.results, 'en'), /landmark/i);
   });
 
   it('confirms soft escalation when desk note is saved', async () => {

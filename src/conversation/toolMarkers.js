@@ -79,7 +79,7 @@ function parseGeminiResponse(responseText) {
             appt.when_text || appt.when || appt.time_window || ''
           ).trim(),
           landmark: String(
-            appt.landmark || appt.address_landmark || appt.address || ''
+            appt.location || appt.landmark || appt.address_landmark || appt.address || ''
           ).trim(),
           notes: String(appt.notes || appt.reason || '').trim(),
           windowStart: String(appt.window_start || '').trim(),
@@ -107,7 +107,7 @@ function parseGeminiResponse(responseText) {
             appt.when_text || appt.when || appt.time_window || ''
           ).trim(),
           landmark: String(
-            appt.landmark || appt.address_landmark || appt.address || ''
+            appt.location || appt.landmark || appt.address_landmark || appt.address || ''
           ).trim(),
           notes: String(appt.notes || appt.reason || '').trim(),
           serviceName: String(

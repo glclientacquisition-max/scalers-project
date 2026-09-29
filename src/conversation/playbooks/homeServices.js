@@ -53,7 +53,7 @@ const HOME_INTENTS = [
     requiredSlots: [],
     optionalSlots: ['area'],
     completion:
-      'Answer from POLICIES delivery/service-area notes and LOCATIONS coverage. If outside area, say so and offer to note a callback — do not promise a visit.',
+      'If POLICIES has a Coverage line, that list is the service area. Delivery text is timing and other instructions. If there is no Coverage line, use Delivery and LOCATIONS coverage notes. If outside the area, say so and offer to note a callback. Do not promise a visit.',
     tool: null,
     patterns: [
       /\b(service area|coverage|do you (cover|serve|come to)|mnaenda|mnafanya (kwa| Nairobi|kiambu|mombasa)|areas?)\b/i,
@@ -62,10 +62,10 @@ const HOME_INTENTS = [
   {
     id: 'book_visit',
     label: 'Book a visit',
-    requiredSlots: ['service', 'name', 'when', 'landmark'],
+    requiredSlots: ['service', 'name', 'when', 'location'],
     optionalSlots: ['notes'],
     completion:
-      'Once service + caller name + time window + landmark/address are known, append create_appointment. Do not say the time is booked. Speak nothing on that turn. The backend confirms or offers another time. House, carpet, couch, mattress, and Airbnb cleans are book_visit.',
+      'Ask where we should come ("Where should we come?" / "Tuje wapi?"). Never say landmark. Area plus gate, building, or junction is enough. If they give only an area, ask once for a building, gate, or junction, then stop. After that follow-up, if the area is inside POLICIES/LOCATIONS, append create_appointment and note confirm access. If it is outside, do not create_appointment. If coverage is not on file, do not invent it and do not save an area-only visit. If they refuse a place twice, escalate or log an enquiry. Do not say the time is booked. Speak nothing on the tool turn. House, carpet, couch, mattress, and Airbnb cleans are book_visit.',
     tool: 'create_appointment',
     patterns: [
       /\b(book|booking|appointment|schedule|visit|come (over|by|tomorrow|today)|nitakuja|njoo|tandika|install|repair|fix)\b/i,
@@ -186,7 +186,11 @@ function missingHomeSlots(intentId, slots = {}) {
   const intent = INTENT_BY_ID[intentId] || INTENT_BY_ID.other;
   const missing = [];
   for (const key of intent.requiredSlots) {
-    if (!String(slots[key] || '').trim()) missing.push(key);
+    const value =
+      key === 'location'
+        ? slots.location || slots.landmark || slots.address
+        : slots[key];
+    if (!String(value || '').trim()) missing.push(key);
   }
   return missing;
 }
@@ -225,11 +229,12 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     'Completion rules:',
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
     '- CONTROL VOICE: name the job you have, then one question or silence for the tool. No holding lines.',
-    '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots in order (service, name, when, landmark); silently check hours (not a one-visit lock); same-hour visits are allowed; fire the tool and speak nothing; never say booked, moved, or cancelled first.',
-    '- Once a name is in CALL STATE, never ask for the name again. Do not make "is that right?" a visit step. Move to when, then landmark, then create_appointment.',
-    '- Book: create_appointment after service + name + when + landmark.',
-    '- Reschedule: update_appointment with the new when against their latest open visit.',
-    '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking.',
+    '- VISIT SOP (think this; do not read it aloud): hear the ask; collect only missing slots in order (service, name, when, location); silently check hours (not a one-visit lock); same-hour visits are allowed; check POLICIES/LOCATIONS before create_appointment; fire the tool and speak nothing; never say booked, moved, or cancelled first. Never say landmark.',
+    '- Once a name is in CALL STATE, never ask for the name again. Do not make "is that right?" a visit step. Move to when, then location (where we should come), then create_appointment.',
+    '- Book: create_appointment after service + name + when + location. Where we come means an area plus a gate, building, or junction. One follow-up if only an area. In coverage after that follow-up: save the area and note confirm access. Outside coverage: no appointment. Refused twice: enquiry or human, no save.',
+    '- Reschedule: update_appointment with the new when against their latest open visit. Keep the saved location unless they change it.',
+    '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking. Cancel does not need a location.',
+    '- Emergency and human escalate do not wait for a location.',
     '- Never invent prices, coverage, or ETAs.',
     '- Cleaning, repair, install, pest, and similar jobs share this spine. Use SERVICES names; do not invent a niche that is not listed.',
     '- Bare urgent / ASAP / same-day is not emergency. Escalate only for burst, flood, fire, gas, or shock.',

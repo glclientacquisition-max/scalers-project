@@ -1,3 +1,5 @@
+import { formatCoverageList, parseCoverageAreas } from "@/lib/coverageAreas";
+
 export type BusinessPolicies = {
   returns: string;
   delivery: string;
@@ -6,10 +8,12 @@ export type BusinessPolicies = {
   cancellation: string;
   warranty: string;
   other: string;
+  /** null until the owner saves the Coverage directory. */
+  coverage_areas: string[] | null;
 };
 
 export const POLICY_FIELDS: {
-  id: keyof BusinessPolicies;
+  id: Exclude<keyof BusinessPolicies, "coverage_areas">;
   label: string;
   placeholder: string;
 }[] = [
@@ -59,6 +63,7 @@ export function emptyPolicies(): BusinessPolicies {
     cancellation: "",
     warranty: "",
     other: "",
+    coverage_areas: null,
   };
 }
 
@@ -80,9 +85,12 @@ export function normalizeBusinessPolicies(raw: unknown): BusinessPolicies {
   } else {
     return base;
   }
-  for (const key of Object.keys(base) as (keyof BusinessPolicies)[]) {
-    base[key] = String(obj[key] ?? "").trim().slice(0, 500);
+  for (const field of POLICY_FIELDS) {
+    base[field.id] = String(obj[field.id] ?? "").trim().slice(0, 500);
   }
+  base.coverage_areas = Array.isArray(obj.coverage_areas)
+    ? parseCoverageAreas(obj.coverage_areas)
+    : null;
   return base;
 }
 
@@ -93,7 +101,8 @@ export function parseBusinessPoliciesField(
 }
 
 export function policiesHaveContent(policies: BusinessPolicies): boolean {
-  return Object.values(policies).some((v) => String(v || "").trim());
+  if (policies.coverage_areas && policies.coverage_areas.length > 0) return true;
+  return POLICY_FIELDS.some((field) => String(policies[field.id] || "").trim());
 }
 
 export function formatPoliciesForCompiler(policies: BusinessPolicies): string {
@@ -102,6 +111,12 @@ export function formatPoliciesForCompiler(policies: BusinessPolicies): string {
   for (const field of POLICY_FIELDS) {
     const text = p[field.id];
     if (text) lines.push(`- ${field.label}: ${text}`);
+  }
+  if (p.coverage_areas) {
+    lines.push(`- Coverage: ${formatCoverageList(p.coverage_areas) || "(none listed)"}`);
+    lines.push(
+      "COVERAGE RULE: The Coverage line is the only service area. Delivery text is timing and other instructions."
+    );
   }
   return lines.join("\n");
 }

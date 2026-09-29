@@ -64,7 +64,16 @@ describe('home services playbooks', () => {
   it('requires slots before book_visit completion', () => {
     assert.deepEqual(
       missingHomeSlots('book_visit', { service: 'plumbing' }),
-      ['name', 'when', 'landmark']
+      ['name', 'when', 'location']
+    );
+    assert.equal(
+      canCompleteHomeIntent('book_visit', {
+        service: 'plumbing',
+        name: 'Amina',
+        when: 'tomorrow 3pm',
+        location: 'near Sarit Centre',
+      }),
+      true
     );
     assert.equal(
       canCompleteHomeIntent('book_visit', {
@@ -93,5 +102,11 @@ describe('home services playbooks', () => {
     assert.match(text, /Never invent prices/);
     assert.match(text, /not emergency/);
     assert.match(text, /never ask for the name again/);
+    assert.match(text, /Where should we come/);
+    assert.match(text, /Tuje wapi/);
+    assert.match(text, /confirm access/);
+    assert.match(text, /Never say landmark/);
+    assert.doesNotMatch(text, /then landmark/);
+    assert.doesNotMatch(text, /landmark\/address/);
   });
 });

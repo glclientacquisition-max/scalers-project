@@ -171,6 +171,23 @@ test('does not speak outcome claims or leftover prose after a tool block', () =>
   assert.strictEqual((joined.match(/We are closed right now/g) || []).length, 0);
 });
 
+test('does not speak a visit confirmation the tool did not save', () => {
+  const buf = createSpokenStreamBuffer();
+  const emitted = [];
+  emitted.push(
+    ...buf.push('I haveupdated your visit time to tomorrow at 8:00 AM, Colinx.')
+  );
+  emitted.push(
+    ...buf.push(
+      ' Your carpet cleaning visit is set for tomorrow at 8:00 AM at Runda Green Park Gate 4.'
+    )
+  );
+  emitted.push(...buf.finish());
+  const joined = emitted.join(' ');
+  assert.equal(joined.includes('visit is set'), false);
+  assert.equal(joined.toLowerCase().includes('updated'), false);
+});
+
 test('does not speak ASR_CORRECTION_PROMPT / RETOTI / NP_FALSE from HD_ff24acf5207d', () => {
   const buf = createSpokenStreamBuffer();
   const leaked =

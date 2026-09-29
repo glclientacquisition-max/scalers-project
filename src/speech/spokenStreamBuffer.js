@@ -161,7 +161,7 @@ function splitSpeakableChunks(text, opts = {}) {
  */
 function isOutcomeClaim(text) {
   const value = String(text || '');
-  return /\b(let me (book|save|send|confirm|move)|i('ve| have) (booked|saved|sent|confirmed|moved|cancelled|canceled)|you('re| are) (booked|all set)|booking (attempt|confirmed|saved)|set up that booking|book that for you|i can (still take a visit|set up)|see you (on )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|that (time|slot|day) (works|is (fine|good|booked|set))|(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today) at .{0,24}(is fine|works|is good|is booked)|nimeweka|nimekuwekea|nimehifadhi ziara)\b/i.test(
+  return /\b(let me (book|save|send|confirm|move|update)|i\s*have\s*updated|i('ve| have)\s*(booked|saved|sent|confirmed|moved|cancelled|canceled|updated)|you('re| are) (booked|all set)|visit is set|booking (attempt|confirmed|saved)|set up that booking|book that for you|i can (still take a visit|set up)|see you (on )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|that (time|slot|day) (works|is (fine|good|booked|set))|(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today) at .{0,40}(is fine|works|is good|is booked|is set)|nimeweka|nimekuwekea|nimehifadhi ziara|ziara imewekwa)\b/i.test(
     value
   );
 }

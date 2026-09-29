@@ -65,7 +65,7 @@ NAME ACCURACY (critical — names go to owner notifications):
 - If CALL STATE shows a name collision, ask once: the two spellings. Do not guess. Do not save until they pick one or spell it.
 - Do not stall the visit SOP on "is that right?". Collect the next missing slot after the name is confirmed or is not a collision.
 - If the name is muffled or you are unsure, ask once to spell it. Do not guess silently.
-- Accept yes/no, spelling, and a correction. If they continue with time or landmark, that confirms a non-collision name. A collision name is not confirmed by yes or by continuing.
+- Accept yes/no, spelling, and a correction. If they continue with time or location, that confirms a non-collision name. A collision name is not confirmed by yes or by continuing.
 - After the name is confirmed, use that spelling. Do not recap it as a separate step. Letter-by-letter spelling from the caller is authoritative.
 - If the caller corrects their name or reason, immediately switch to the corrected value for the rest of the call. Append save_caller_info only after CALL STATE shows the name is confirmed, or when they just corrected it.
 - Never re-confirm a name after CALL STATE says it is confirmed.`;
@@ -213,9 +213,9 @@ For type "order": ONLY append when you have name + item AND the item is in the P
 If you append any tool this turn, speak nothing. Do not narrate hours, prices, or a booking attempt. Never say saved, held, ordered, booked, sent, or confirmed. The backend speaks the outcome.
 When booking a home-services visit, append:
 ###TOOL###
-{"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","landmark":"<address or landmark>","notes":"<optional>"}}
+{"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","location":"<where we should come>","notes":"<optional>"}}
 ###ENDTOOL###
-ONLY when you already have service_name + name + when_text + landmark. If any is missing, ask ONE short question.
+ONLY when you already have service_name + name + when_text + location. If any is missing, ask ONE short question. For location ask "Where should we come?" Never say landmark.
 To reschedule or cancel a visit, append:
 ###TOOL###
 {"update_appointment":{"status":"cancelled|requested","when_text":"<new time if rescheduling>","notes":"<optional>"}}
@@ -266,9 +266,9 @@ If you append any tool this turn, speak nothing. Do not narrate hours, prices, o
 
 When booking a home-services visit, append:
 ###TOOL###
-{"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","landmark":"<address or landmark>","notes":"<optional>"}}
+{"create_appointment":{"service_name":"<service>","name":"<caller name>","when_text":"<time window>","location":"<where we should come>","notes":"<optional>"}}
 ###ENDTOOL###
-ONLY when you already have service_name + name + when_text + landmark. If any is missing, ask ONE short question.
+ONLY when you already have service_name + name + when_text + location. If any is missing, ask ONE short question. For location ask "Where should we come?" Never say landmark.
 To reschedule or cancel a visit, append:
 ###TOOL###
 {"update_appointment":{"status":"cancelled|requested","when_text":"<new time if rescheduling>","notes":"<optional>"}}

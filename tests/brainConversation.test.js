@@ -293,23 +293,24 @@ describe('multi-turn Brain outcomes', () => {
     });
     assert.equal(entityValue(turn.state.entities.name), '');
     assert.ok(turn.state.goal.missingSlots.includes('name'));
-    assert.ok(turn.state.goal.missingSlots.includes('landmark'));
+    assert.ok(turn.state.goal.missingSlots.includes('location'));
     assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
     assert.notEqual(turn.decision.action, 'CREATE_REQUEST');
   });
 
-  it('does not require a landmark for retail booking', () => {
+  it('does not require a location for retail booking', () => {
     const turn = runTurn(
       createBrainState(profile),
       createLanguageState(),
       'Book printer repair tomorrow at 10 AM. My name is Alex.'
     );
     assert.equal(turn.state.intent, 'booking');
+    assert.equal(turn.state.goal.missingSlots.includes('location'), false);
     assert.equal(turn.state.goal.missingSlots.includes('landmark'), false);
     assert.equal(turn.decision.action, 'CREATE_REQUEST');
   });
 
-  it('requires a landmark before home-services booking can save', () => {
+  it('requires a location before home-services booking can save', () => {
     const homeProfile = {
       vertical: 'home_services',
       servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
@@ -324,17 +325,148 @@ describe('multi-turn Brain outcomes', () => {
       { profile: homeProfile, capabilities: homeCapabilities }
     );
     assert.equal(turn.state.intent, 'booking');
-    assert.ok(turn.state.goal.missingSlots.includes('landmark'));
+    assert.ok(turn.state.goal.missingSlots.includes('location'));
     assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+    assert.equal(turn.decision.slot, 'location');
 
     ({ state: turn.state, languageState: turn.languageState } = turn);
-    turn = runTurn(turn.state, turn.languageState, 'Landmark is Barnabas', '', {
+    turn = runTurn(turn.state, turn.languageState, 'Location is Barnabas', '', {
       profile: homeProfile,
       capabilities: homeCapabilities,
     });
-    assert.equal(entityValue(turn.state.entities.landmark), 'Barnabas');
+    assert.equal(entityValue(turn.state.entities.location), 'Barnabas');
+    assert.equal(turn.state.visitPlace.quality, 'area_only');
+    assert.ok(turn.state.goal.missingSlots.includes('location'));
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+
+    ({ state: turn.state, languageState: turn.languageState } = turn);
+    turn = runTurn(turn.state, turn.languageState, 'Green Park gate', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.match(entityValue(turn.state.entities.location), /Green Park gate/i);
+    assert.equal(turn.state.visitPlace.quality, 'findable');
     assert.deepEqual(turn.state.goal.missingSlots, []);
     assert.equal(turn.decision.action, 'CREATE_REQUEST');
+  });
+
+  it('keeps the gate when the caller says the estate is in the city', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      businessPolicies: { delivery: 'Nairobi' },
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Book carpet cleaning tomorrow at 10 AM. My name is Alex.',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    turn = runTurn(
+      turn.state,
+      turn.languageState,
+      'Runda Green Park gate 4',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    assert.match(entityValue(turn.state.entities.location), /Green Park gate 4/i);
+    turn = runTurn(turn.state, turn.languageState, 'Runda is in Nairobi', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.match(entityValue(turn.state.entities.location), /Green Park gate 4/i);
+    assert.doesNotMatch(entityValue(turn.state.entities.location), /^Nairobi$/i);
+  });
+
+  it('saves an in-coverage area after one follow-up and flags confirm access', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      businessPolicies: { delivery: 'Runda, Karen, and Kilimani' },
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Book carpet cleaning tomorrow at 10 AM. My name is Alex.',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    turn = runTurn(turn.state, turn.languageState, 'Runda', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.visitPlace.quality, 'area_only');
+    assert.equal(turn.state.visitPlace.coverage, 'inside');
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+    assert.match(formatBrainStateForPrompt(turn.state), /building, gate, or junction/i);
+    assert.doesNotMatch(formatBrainStateForPrompt(turn.state), /nearby landmark/i);
+
+    turn = runTurn(turn.state, turn.languageState, 'Runda', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.visitPlace.confirmAccess, true);
+    assert.equal(turn.decision.action, 'CREATE_REQUEST');
+  });
+
+  it('does not book a visit outside Train coverage', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Home cleaning', price_range: 'quoted on site' }],
+      businessPolicies: { delivery: 'Westlands and Kilimani' },
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Book home cleaning tomorrow at 10 AM. My name is Amina.',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    turn = runTurn(turn.state, turn.languageState, 'Kericho', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.visitPlace.blocked, 'outside');
+    assert.equal(turn.decision.action, 'ANSWER');
+    assert.notEqual(turn.decision.action, 'CREATE_REQUEST');
+  });
+
+  it('does not save a visit after the caller refuses a location twice', () => {
+    const homeProfile = {
+      vertical: 'home_services',
+      servicesCatalog: [{ name: 'Carpet cleaning', price_range: '1,500-2,000' }],
+      agentTools: { escalate: true, end_call: true },
+    };
+    const homeCapabilities = buildBrainCapabilities(homeProfile);
+    let turn = runTurn(
+      createBrainState(homeProfile),
+      createLanguageState(),
+      'Book carpet cleaning tomorrow at 10 AM. My name is Alex.',
+      '',
+      { profile: homeProfile, capabilities: homeCapabilities }
+    );
+    turn = runTurn(turn.state, turn.languageState, "You'll find it", '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.decision.action, 'ASK_CLARIFICATION');
+    assert.equal(turn.decision.slot, 'location');
+    assert.equal(entityValue(turn.state.entities.location), '');
+
+    turn = runTurn(turn.state, turn.languageState, 'Just come', '', {
+      profile: homeProfile,
+      capabilities: homeCapabilities,
+    });
+    assert.equal(turn.state.visitPlace.blocked, 'refused');
+    assert.equal(turn.decision.action, 'ESCALATE');
+    assert.notEqual(turn.decision.action, 'CREATE_REQUEST');
   });
 
   it('runs the home visit SOP without re-asking a name already given', () => {
@@ -352,7 +484,7 @@ describe('multi-turn Brain outcomes', () => {
       { profile: homeProfile, capabilities: homeCapabilities }
     );
     assert.equal(turn.state.intent, 'booking');
-    assert.deepEqual(turn.state.goal.missingSlots, ['name', 'when', 'landmark']);
+    assert.deepEqual(turn.state.goal.missingSlots, ['name', 'when', 'location']);
     assert.equal(turn.decision.slot, 'name');
     assert.match(formatBrainStateForPrompt(turn.state), /Visit SOP:/);
     assert.match(formatBrainStateForPrompt(turn.state), /name=missing/);
@@ -384,7 +516,7 @@ describe('multi-turn Brain outcomes', () => {
       profile: homeProfile,
       capabilities: homeCapabilities,
     });
-    assert.equal(turn.decision.slot, 'landmark');
+    assert.equal(turn.decision.slot, 'location');
 
     turn = runTurn(turn.state, turn.languageState, 'Near Rongai', '', {
       profile: homeProfile,

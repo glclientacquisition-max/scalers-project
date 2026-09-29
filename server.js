@@ -207,6 +207,10 @@ const {
   polishSpokenReply,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
+const {
+  visitBlockSpeech,
+  coverageAskSpeech,
+} = require('./src/conversation/visitLocation');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -2408,6 +2412,39 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
+      const coverageLine = coverageAskSpeech(clean, brainProfile, callLanguage);
+      if (coverageLine) {
+        console.log(
+          `[ws/media][${callKey}] coverage local reply lang=${callLanguage}: ${coverageLine}`
+        );
+        callTranscript.pushAgent(coverageLine);
+        messages.push({ role: 'assistant', content: coverageLine, local: true });
+        turnTiming.markFirstSpokenChunk();
+        await speakText(coverageLine);
+        spokeThisTurn = true;
+        logTurnTiming(turnTiming, { outcome: 'coverage' });
+        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+        return;
+      }
+
+      const placeBlockLine = visitBlockSpeech(
+        brainState.visitPlace?.blocked,
+        callLanguage
+      );
+      if (placeBlockLine && !/^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i.test(clean)) {
+        console.log(
+          `[ws/media][${callKey}] visit block local reply lang=${callLanguage}: ${placeBlockLine}`
+        );
+        callTranscript.pushAgent(placeBlockLine);
+        messages.push({ role: 'assistant', content: placeBlockLine, local: true });
+        turnTiming.markFirstSpokenChunk();
+        await speakText(placeBlockLine);
+        spokeThisTurn = true;
+        logTurnTiming(turnTiming, { outcome: 'visit_block' });
+        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+        return;
+      }
+
       if (looksLikePhaticCallerTurn(clean)) {
         const phaticLine = pickPhaticReply({
           language: callLanguage,
@@ -4243,6 +4280,8 @@ async function applyGeminiTools(callSid, parsed) {
       profile: groundedProfile,
       state,
     }),
+    businessPolicies: groundedProfile.businessPolicies || null,
+    businessLocations: groundedProfile.businessLocations || null,
     handlers: {
       createServiceRequest: async (request) => {
         const created = await db.createServiceRequest({
@@ -4389,7 +4428,7 @@ async function applyGeminiTools(callSid, parsed) {
 
 /**
  * Stream Gemini tokens → onSpokenChunk (sentence/clause flushes) → TTS.
- * Falls back to non-streaming generateContent on stream failure.
+ * A 503 or an empty timeout does not start a second generateContent.
  */
 async function runGeminiTurnStreaming(
   messages,
@@ -4402,6 +4441,7 @@ async function runGeminiTurnStreaming(
   const buffer = createSpokenStreamBuffer();
   let fullText = '';
   let streamFailed = false;
+  let streamErr = null;
   let thoughtSignature = '';
   let modelParts = [];
   const timeoutMs = geminiTurnTimeoutMs();
@@ -4451,6 +4491,7 @@ async function runGeminiTurnStreaming(
       `[${callSid}] Gemini stream done chars=${fullText.length} spokenEmitted=${buffer.getSpokenEmitted().length}`
     );
   } catch (err) {
+    streamErr = err;
     if (isTimeoutError(err) && fullText) {
       console.warn(
         `[${callSid}] Gemini stream timed out after ${timeoutMs}ms with partial text chars=${fullText.length}`
@@ -4458,14 +4499,22 @@ async function runGeminiTurnStreaming(
     } else {
       streamFailed = true;
       console.error(
-        `[${callSid}] Gemini stream failed, falling back to generateContent:`,
+        `[${callSid}] Gemini stream failed with no text; not retrying generateContent:`,
         err?.message || err
       );
     }
   }
 
   if (streamFailed && !fullText) {
-    return runGeminiTurn(messages, callSid, systemPrompt);
+    return {
+      spokenText: '',
+      actionConfirmation: '',
+      toolResults: [],
+      shouldEndCall: false,
+      streamed: false,
+      llmFailed: true,
+      timedOut: isTimeoutError(streamErr),
+    };
   }
 
   if (!shouldAbort?.()) {

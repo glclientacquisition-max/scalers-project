@@ -217,13 +217,22 @@ const nextWhenSlot = pickSpeechGuaranteeLine({
 assert.match(nextWhenSlot, /day and time|time works/i);
 assert.doesNotMatch(nextWhenSlot, /can't finish|reach them/i);
 
-const landmarkSlot = pickClarifyProgress({
+const locationSlot = pickClarifyProgress({
   action: 'ASK_CLARIFICATION',
-  slot: 'landmark',
+  slot: 'location',
   language: 'en',
 });
-assert.match(landmarkSlot, /landmark/i);
-assert.doesNotMatch(landmarkSlot, /[—–]/);
+assert.match(locationSlot, /where should we come/i);
+assert.doesNotMatch(locationSlot, /landmark/i);
+assert.doesNotMatch(locationSlot, /[—–]/);
+assert.match(
+  pickClarifyProgress({
+    action: 'ASK_CLARIFICATION',
+    slot: 'location',
+    language: 'sw',
+  }),
+  /Tuje wapi/
+);
 
 assert.match(
   pickSpeechGuaranteeLine({
