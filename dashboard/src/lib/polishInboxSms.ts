@@ -112,10 +112,14 @@ function purposeFact(purpose: string): string | null {
   return null;
 }
 
+const INTERNAL_SMS =
+  /\bmissed purpose\b|\bsupabase\b|\bsmoke test\b|\bphase\s*\d+\b/i;
+
 function wantIsLeak(want: string): boolean {
   const text = want.trim();
   if (!text) return true;
   if (wantLooksInternal(text)) return true;
+  if (INTERNAL_SMS.test(text)) return true;
   if (/\bsmoke\b/i.test(text)) return true;
   if (/^(purpose|want|status|job_place|job_status|hold_status)\b/i.test(text)) return true;
   if (/[:=]/.test(text) && /\b(purpose|want|status|job_place|job_status|hold_status)\b/i.test(text)) {
@@ -131,6 +135,7 @@ const SMS_LABEL =
 export function suggestedSmsIsLeak(raw: string): boolean {
   const text = String(raw || "").trim();
   if (!text) return false;
+  if (INTERNAL_SMS.test(text)) return true;
   if (/\bsmoke\b/i.test(text)) return true;
   if (/\bpurpose\s*:/i.test(text)) return true;
   if (/\bwant\s*:/i.test(text)) return true;

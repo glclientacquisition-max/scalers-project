@@ -135,7 +135,7 @@ describe("inbox SMS suggest pack", () => {
     const leaks = load(`
       console.log(JSON.stringify([
         suggestedSmsIsLeak("Purpose: missed"),
-        suggestedSmsIsLeak("smoke"),
+        suggestedSmsIsLeak("Hi Smoke Test, Done and Dusted Cleaning Services here. Regarding your missed purpose, please verify Supabase Phase 1."),
         suggestedSmsIsLeak("Hi Amina, Done and Dusted here. Sorry we missed your call."),
       ]));
     `);

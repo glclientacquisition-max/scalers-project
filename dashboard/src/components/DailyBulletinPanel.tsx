@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
+import { parseVertical } from "@/lib/vertical";
 import {
   deskBulletinItems,
   eatDateLocal,
@@ -127,7 +128,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 onChange={(e) => setText(e.target.value)}
                 maxLength={160}
                 placeholder={
-                  tenant.vertical === "home_services"
+                  parseVertical(tenant.vertical) === "home_services"
                     ? "Fully booked today"
                     : "Out of chicken today"
                 }

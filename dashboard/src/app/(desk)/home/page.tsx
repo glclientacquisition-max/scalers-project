@@ -108,7 +108,7 @@ export default async function HomeOverviewPage() {
     {
       toReturn: work.toReturn,
       toFulfill: work.toFulfill,
-      toConfirm: work.toConfirm,
+      toConfirm: work.requested,
     },
     vertical
   );
@@ -141,7 +141,10 @@ export default async function HomeOverviewPage() {
       label: copy.jobFilter,
       href: callsHref({ purpose: "job" }),
       count: work.toConfirm,
-      unit: homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample),
+      unit:
+        work.requested > 0 && work.requested === work.toConfirm
+          ? homeQueueUnit(work.toConfirm, copy.jobUnit, jobSample)
+          : "",
     },
   ] as const;
 
@@ -266,8 +269,19 @@ export default async function HomeOverviewPage() {
                     </p>
                   ) : null}
                 </div>
-                {nextReturn.callerPhone ? (
-                  <div className={`${deskRowActionClass} shrink-0`}>
+                <div className={`${deskRowActionClass} flex shrink-0 items-center gap-2`}>
+                  {nextReturn.callId ? (
+                    <Link
+                      href={inboxRecordHref(nextReturn.callId, { purpose: "needs" })}
+                      className={[
+                        "inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC]",
+                        focusRingVisible,
+                      ].join(" ")}
+                    >
+                      Conversation
+                    </Link>
+                  ) : null}
+                  {nextReturn.callerPhone ? (
                     <WhatsAppLink
                       number={nextReturn.callerPhone}
                       message={followUpWhatsAppMessage({
@@ -278,8 +292,8 @@ export default async function HomeOverviewPage() {
                       variant="icon"
                       callId={nextReturn.callId}
                     />
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
             </section>
             <section
@@ -307,8 +321,19 @@ export default async function HomeOverviewPage() {
                   {nextReturnReason}
                 </p>
               ) : null}
-              {nextReturn.callerPhone ? (
-                <div className={`${deskRowActionClass} mt-3`}>
+              <div className={`${deskRowActionClass} mt-3 flex flex-wrap items-center gap-2`}>
+                {nextReturn.callId ? (
+                  <Link
+                    href={inboxRecordHref(nextReturn.callId, { purpose: "needs" })}
+                    className={[
+                      "inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC]",
+                      focusRingVisible,
+                    ].join(" ")}
+                  >
+                    Conversation
+                  </Link>
+                ) : null}
+                {nextReturn.callerPhone ? (
                   <WhatsAppLink
                     number={nextReturn.callerPhone}
                     message={followUpWhatsAppMessage({
@@ -320,8 +345,8 @@ export default async function HomeOverviewPage() {
                     label="Reply on WhatsApp"
                     callId={nextReturn.callId}
                   />
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </section>
             </>
           ) : null}
