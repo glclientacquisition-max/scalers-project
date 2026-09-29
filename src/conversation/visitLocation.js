@@ -350,6 +350,52 @@ function preferVisitPlace(previous, incoming, text = '') {
   return next;
 }
 
+function coverageAskPlace(text) {
+  let value = String(text || '')
+    .replace(/[?!.]+/g, ' ')
+    .replace(/[—–-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  value = value.replace(/^(?:(?:do you(?: guys)?|can you)\s+)+/i, 'do you ');
+  const matched =
+    /\bdo you\s+(?:do|cover|service|serve|come to|go to)\s+(.+)$/i.exec(value) ||
+    /^(?:what|how) about\s+(.+)$/i.exec(value) ||
+    /^(?:mnafika|mnaja|mnafanyia)\s+(.+)$/i.exec(value);
+  if (!matched) return '';
+  const place = matched[1].replace(/^(?:the|in|at|to)\s+/i, '').trim();
+  if (!place || place.split(/\s+/).length > 4) return '';
+  if (
+    /\b(clean|cleaning|carpet|couch|sofa|mattress|fumigation|plumb|electric|team|price|hours|name)\b/i.test(
+      place
+    )
+  ) {
+    return '';
+  }
+  if (!placeWords(place).length) return '';
+  return place;
+}
+
+/**
+ * Home-services "do you cover X" / "what about X".
+ * Settings text only. No model, no map.
+ */
+function coverageAskSpeech(text, profile = {}, language = 'en') {
+  if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
+  const place = coverageAskPlace(text);
+  if (!place) return '';
+  const coverage = assessCoverage(place, profile);
+  const lang = String(language || 'en').toLowerCase();
+  const sw = lang === 'sw' || lang.startsWith('swahili');
+  const sheng = lang === 'sheng';
+  if (coverage === 'inside') {
+    if (sw) return `Ndiyo, tunafika ${place}.`;
+    if (sheng) return `Ndio, tunafika ${place}.`;
+    return `Yes, we cover ${place}.`;
+  }
+  if (coverage === 'outside') return visitBlockSpeech('outside', language);
+  return visitBlockSpeech('unknown_coverage', language);
+}
+
 function visitBlockSpeech(blocked, language = 'en') {
   const lang = String(language || 'en').toLowerCase();
   const sw = lang === 'sw' || lang.startsWith('swahili');
@@ -389,5 +435,7 @@ module.exports = {
   decideVisitPlace,
   preferVisitPlace,
   visitBlockSpeech,
+  coverageAskPlace,
+  coverageAskSpeech,
   appendVisitNotes,
 };

@@ -270,8 +270,8 @@ assert.match(
 
 assert.match(
   source,
-  /falling back to generateContent/,
-  'a hung Gemini stream with no text must retry generateContent instead of speaking fallback immediately'
+  /not retrying generateContent/,
+  'a hung or failed Gemini stream with no text must not start a second generateContent'
 );
 
 assert.match(

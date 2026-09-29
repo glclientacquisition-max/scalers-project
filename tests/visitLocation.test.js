@@ -12,6 +12,7 @@ const {
   decideVisitPlace,
   preferVisitPlace,
   visitBlockSpeech,
+  coverageAskSpeech,
 } = require('../src/conversation/visitLocation');
 const { formatPlaybookForPrompt } = require('../src/conversation/playbooks');
 
@@ -59,6 +60,27 @@ describe('visit location ladder', () => {
     assert.match(
       preferVisitPlace(prior, 'Karen gate 2', 'not Runda, Karen gate 2'),
       /Karen gate 2/
+    );
+  });
+
+  it('answers a coverage question from settings text', () => {
+    const profile = {
+      vertical: 'home_services',
+      businessPolicies: { delivery: 'Nairobi and Westlands' },
+    };
+    assert.match(
+      coverageAskSpeech('Do you guys— do you guys do Rongai?', profile, 'en'),
+      /outside our coverage/i
+    );
+    assert.match(
+      coverageAskSpeech('What about Westlands?', profile, 'en'),
+      /Yes, we cover Westlands/i
+    );
+    assert.equal(coverageAskSpeech('Do you do carpet cleaning?', profile, 'en'), '');
+    assert.equal(coverageAskSpeech('Which team?', profile, 'en'), '');
+    assert.equal(
+      coverageAskSpeech('What about Rongai?', { vertical: 'retail', businessPolicies: { delivery: 'Nairobi' } }, 'en'),
+      ''
     );
   });
 
