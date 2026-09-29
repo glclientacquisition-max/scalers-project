@@ -4227,6 +4227,8 @@ async function applyGeminiTools(callSid, parsed) {
       profile: groundedProfile,
       state,
     }),
+    businessPolicies: groundedProfile.businessPolicies || null,
+    businessLocations: groundedProfile.businessLocations || null,
     handlers: {
       createServiceRequest: async (request) => {
         const created = await db.createServiceRequest({

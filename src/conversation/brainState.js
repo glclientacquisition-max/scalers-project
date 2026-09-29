@@ -22,6 +22,7 @@ const {
   looksLikeExistingVisitTalk,
   looksLikePastBookingTalk,
 } = require('./visitTalk');
+const { decideVisitPlace, isLocationRefusal } = require('./visitLocation');
 const {
   isRepairSignal,
   applyRepairObservation,
@@ -164,9 +165,9 @@ function inferIntent(text, opts = {}) {
   ) {
     return 'hours';
   }
-  // "Landmark is Barnabas" is a slot fill, not a where-are-you ask.
+  // "Location is Barnabas" is a slot fill, not a where-are-you ask.
   if (
-    !/\b(landmark|address)\s+(is|ni|:)\b/.test(value) &&
+    !/\b(location|landmark|address)\s+(is|ni|:)\b/.test(value) &&
     /\b(where|location|directions?|address|landmark|mko wapi|uko wapi)\b/.test(value)
   ) {
     return 'location';
@@ -247,6 +248,8 @@ function createBrainState(profile = {}) {
       answersReceived: [],
       hearAgain: false,
       phatic: false,
+      locationDetailAsked: false,
+      locationRefusals: 0,
     },
     emotion: {
       state: 'neutral',
@@ -289,16 +292,18 @@ function observeCallerTurn(state, input = {}) {
     returning: next.returning,
   });
   const previousWasMeaningful = MEANINGFUL_INTENTS.has(next.intent);
-  const fillingBookingLandmark =
+  const fillingVisitPlace =
     next.intent === 'booking' &&
     inferredIntent === 'location' &&
+    /\b(location|landmark|address)\s+(is|ni|:)\b/.test(text) &&
     Array.isArray(next.goal.missingSlots) &&
-    next.goal.missingSlots.includes('landmark');
+    (next.goal.missingSlots.includes('location') ||
+      next.goal.missingSlots.includes('landmark'));
   const preserveActiveIntent =
     previousWasMeaningful &&
     next.intent !== 'unknown' &&
     (next.goal.status === 'active' || next.handoff?.requested) &&
-    (fillingBookingLandmark ||
+    (fillingVisitPlace ||
       (inferredIntent === 'general_enquiry' &&
         (next.goal.missingSlots.length > 0 ||
           next.handoff?.requested ||
@@ -417,6 +422,24 @@ function observeCallerTurn(state, input = {}) {
     next = markRepairProgress(next);
   }
 
+  const homeVisit =
+    String(input.profile?.vertical || next.vertical || '').toLowerCase() ===
+      'home_services' && next.intent === 'booking';
+  if (homeVisit && isLocationRefusal(text)) {
+    next.conversation.locationRefusals =
+      Number(next.conversation.locationRefusals || 0) + 1;
+  }
+  if (homeVisit) {
+    const place =
+      entityValue(next.entities?.location) || entityValue(next.entities?.landmark);
+    next.visitPlace = decideVisitPlace(place, {
+      profile: input.profile || {},
+      detailAsked: Boolean(next.conversation.locationDetailAsked),
+      refusals: Number(next.conversation.locationRefusals || 0),
+    });
+  } else {
+    next.visitPlace = null;
+  }
   next.goal.missingSlots = missingGoalSlots(next, {
     ...(input.profile || {}),
     vertical: input.profile?.vertical || next.vertical,
@@ -432,6 +455,13 @@ function setNextBestAction(state, decision = {}) {
     next.resolution.targetSlot = String(decision.slot);
     next.conversation.questionsAsked.push(String(decision.slot));
     next.conversation.questionsAsked = next.conversation.questionsAsked.slice(-8);
+    const askedPlace = String(decision.slot).toLowerCase();
+    if (
+      (askedPlace === 'location' || askedPlace === 'landmark') &&
+      (entityValue(next.entities?.location) || entityValue(next.entities?.landmark))
+    ) {
+      next.conversation.locationDetailAsked = true;
+    }
   } else {
     next.resolution.targetSlot = null;
   }

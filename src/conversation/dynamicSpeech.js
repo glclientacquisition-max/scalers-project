@@ -388,9 +388,9 @@ function pickClarifyProgress(opts = {}) {
     if (sw) return 'Sawa. Niambie siku na saa.';
     return 'Okay. What day and time works?';
   }
-  if (slot === 'landmark') {
-    if (sw) return 'Sawa. Niambie landmark ya karibu.';
-    return 'Okay. What is a nearby landmark?';
+  if (slot === 'location' || slot === 'landmark') {
+    if (sw) return 'Sawa. Tuje wapi?';
+    return 'Okay. Where should we come?';
   }
   if (slot === 'service' || slot === 'subject' || slot === 'catalog_item') {
     if (sw) return 'Sawa. Unahitaji huduma gani?';

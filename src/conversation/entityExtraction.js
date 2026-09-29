@@ -12,6 +12,7 @@ const {
   parseSpelledCallerName,
   pickCollisionChoice,
 } = require('./callerNameMatch');
+const { isLocationRefusal } = require('./visitLocation');
 
 function normalizeText(value) {
   return String(value || '')
@@ -485,23 +486,43 @@ function extractPhone(text) {
   return match ? match[0].replace(/[\s-]/g, '') : null;
 }
 
+const NOT_A_VISIT_PLACE =
+  /^(?:the\s+|a\s+|an\s+|my\s+|our\s+|your\s+)?(?:morning|afternoon|evening|night|today|tomorrow|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|leo|kesho|asubuhi|jioni|mchana|kitchen|bathroom|bedroom|sitting|room)$/i;
+
 function extractLandmark(text) {
   const raw = String(text || '').trim();
-  if (!raw) return null;
+  if (!raw || isLocationRefusal(raw)) return null;
   const labeled =
-    /\b(?:landmark|address)\s+(?:is|ni|:)\s+([^,.!?]+)/i.exec(raw);
+    /\b(?:location|landmark|address)\s+(?:is|ni|:)\s+([^!?.]+)/i.exec(raw);
   if (labeled) {
-    const value = labeled[1].replace(/\s+(?:and|na)\b.*$/i, '').trim();
-    if (value && !extractWhen(value) && !/^\d/.test(value)) {
-      return value.slice(0, 80);
+    const value = labeled[1]
+      .replace(/\s+(?:and|na)\s+(?:my name|i am|i'm|naitwa)\b.*$/i, '')
+      .trim();
+    if (value && !extractWhen(value) && !NOT_A_VISIT_PLACE.test(value)) {
+      return value.slice(0, 120);
     }
   }
   const near =
-    /\b(?:near|opposite|next to|karibu(?:\s+na)?)\s+([^,.!?]+)/i.exec(raw);
+    /\b((?:near|opposite|next to|karibu(?:\s+na)?)\s+[^!?.]+)/i.exec(raw);
   if (near) {
     const value = near[1].trim();
-    if (value && !extractWhen(value) && !/^\d/.test(value)) {
-      return value.slice(0, 80);
+    if (value && !extractWhen(value)) {
+      return value.slice(0, 120);
+    }
+  }
+  const inPlace =
+    /\b(?:in|at|kwa)\s+((?:the\s+|my\s+|our\s+)?[A-Za-z][\p{L}'’-]+(?:\s+[A-Za-z][\p{L}'’-]+){0,2})/u.exec(
+      raw
+    );
+  if (inPlace) {
+    const value = inPlace[1].replace(/^(?:the|a|an|my|our|your)\s+/i, '').trim();
+    if (
+      value &&
+      !extractWhen(value) &&
+      !NOT_A_VISIT_PLACE.test(value) &&
+      !/^(?:am|pm)$/i.test(value)
+    ) {
+      return value.slice(0, 120);
     }
   }
   return null;
@@ -634,8 +655,8 @@ function extractConversationEntities(
   if (policyKey) entities.policyKey = entity(policyKey, 'caller_explicit', 0.95, true);
   const branch = extractBranch(text, profile);
   if (branch) entities.branch = entity(branch, 'tenant_location_match', 1, true);
-  const landmark = extractLandmark(text);
-  if (landmark) entities.landmark = entity(landmark, 'caller_explicit', 0.9, false);
+  const visitPlace = extractLandmark(text);
+  if (visitPlace) entities.location = entity(visitPlace, 'caller_explicit', 0.9, false);
 
   const firstMissing = state?.goal?.missingSlots?.[0];
   const shortAnswer = shortSlotAnswer(text);
@@ -672,12 +693,13 @@ function extractConversationEntities(
     entities.when = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
   }
   if (
-    !entities.landmark &&
-    firstMissing === 'landmark' &&
+    !entities.location &&
+    (firstMissing === 'location' || firstMissing === 'landmark') &&
     shortAnswer &&
+    !isLocationRefusal(shortAnswer) &&
     !extractWhen(shortAnswer)
   ) {
-    entities.landmark = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
+    entities.location = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);
   }
 
   return entities;

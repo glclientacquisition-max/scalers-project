@@ -2,6 +2,7 @@
 
 const { entityValue } = require('./entityExtraction');
 const { offeredVertical } = require('./vertical');
+const { appendVisitNotes } = require('./visitLocation');
 
 const REQUEST_INTENTS = new Set([
   'hold',
@@ -71,8 +72,8 @@ function buildAppointment(state = {}) {
     name: callerName(state),
     phone: callerPhone(state),
     whenText: slot(state, ['when']),
-    landmark: slot(state, ['landmark']),
-    notes: clean(state.goal?.description, 400),
+    landmark: slot(state, ['location', 'landmark']),
+    notes: appendVisitNotes(clean(state.goal?.description, 400), state.visitPlace || {}),
   };
 }
 
@@ -83,7 +84,7 @@ function buildAppointmentUpdate(state = {}) {
     appointmentId: reference && /^[0-9a-f-]{8,}$/i.test(reference) ? reference : '',
     status: cancel ? 'cancelled' : '',
     whenText: cancel ? '' : slot(state, ['when']),
-    landmark: slot(state, ['landmark']),
+    landmark: slot(state, ['location', 'landmark']),
     notes: clean(state.goal?.description, 400),
     serviceName: slot(state, ['service', 'product', 'requestedItem']),
     phone: callerPhone(state),
