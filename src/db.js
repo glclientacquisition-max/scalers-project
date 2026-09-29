@@ -126,7 +126,14 @@ async function resolveTenantId({ toNumber, fromNumber, tenantId }) {
     if (hit?.id) return hit.id;
   }
 
-  // Fall back to the first active tenant (single-tenant deployments).
+  // A presented number that matches no business must not inherit another tenant.
+  if (candidates.length > 0) {
+    const err = new Error('[db] No tenant for this number.');
+    err.code = 'unassigned_did';
+    throw err;
+  }
+
+  // Fall back to the first active tenant only when the webhook carried no number.
   const { data: fallback, error: fallbackError } = await supabase
     .from('tenants')
     .select('id')

@@ -7,6 +7,7 @@ const path = require('path');
 
 const serverPath = path.join(__dirname, '..', 'server.js');
 const source = fs.readFileSync(serverPath, 'utf8');
+const dbSource = fs.readFileSync(path.join(__dirname, '..', 'src/db.js'), 'utf8');
 const sttPath = path.join(__dirname, '..', 'src/speech/sonioxStt.js');
 const sttSource = fs.readFileSync(sttPath, 'utf8');
 
@@ -581,6 +582,18 @@ assert.match(
   streamBufSource,
   /stripSpokenInstructionLeaks/,
   'streamed TTS must drop ASR_CORRECTION_PROMPT / RETOTI / NP_FALSE before speak'
+);
+
+assert.match(
+  source,
+  /unassigned number — reject/,
+  'a number with no business must not open the media stream'
+);
+
+assert.match(
+  dbSource,
+  /unassigned_did/,
+  'tenant lookup must not fall through to another business'
 );
 
 console.log('Voice runtime wiring checks passed.');
