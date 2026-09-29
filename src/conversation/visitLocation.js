@@ -1,10 +1,12 @@
 // Home-visit place quality. Speech says location. Storage stays the landmark field.
-// Coverage is Train text. A county in Delivery or Coverage notes covers localities
-// in that county. The office address does not. No geocoder.
+// A saved Coverage directory is the service area. A county covers its localities.
+// Delivery text is timing and other instructions. Until a directory is saved,
+// Delivery and Coverage notes still apply. The office address does not. No geocoder.
 
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
 const { countiesMentioned, countiesForPlace } = require('./kenyaPlaces');
+const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
 
@@ -209,9 +211,14 @@ function settingsCountyText(profile = {}) {
  * The office address can match a written name. It does not expand a county.
  */
 function assessCoverage(text, profile = {}) {
+  const selected = readCoverageAreas(profile.businessPolicies);
+  const mentioned = coverageTokens(text);
+  if (selected) {
+    if (!mentioned.length || !selected.length) return 'unknown';
+    return coveredByAreas(text, selected) ? 'inside' : 'outside';
+  }
   const covered = coverageCorpus(profile);
   if (!covered.size) return 'unknown';
-  const mentioned = coverageTokens(text);
   if (!mentioned.length) return 'unknown';
   if (mentioned.some((token) => covered.has(token))) return 'inside';
   const allowed = countiesMentioned(settingsCountyText(profile));

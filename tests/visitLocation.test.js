@@ -88,6 +88,46 @@ describe('visit location ladder', () => {
     assert.equal(booked.coverage, 'inside');
   });
 
+  it('uses a saved coverage directory instead of Delivery text', () => {
+    const nairobi = {
+      businessPolicies: {
+        delivery: 'Same day before 2pm',
+        coverage_areas: ['county:nairobi'],
+      },
+    };
+    assert.equal(assessCoverage('Runda Green Park gate 4', nairobi), 'inside');
+    assert.equal(assessCoverage('Westlands', nairobi), 'inside');
+    assert.equal(assessCoverage('Ruaka', nairobi), 'outside');
+    assert.equal(assessCoverage('Rongai', nairobi), 'outside');
+    assert.equal(assessCoverage('Mombasa', nairobi), 'outside');
+    assert.equal(assessCoverage('Mombasa Road', nairobi), 'inside');
+    const narrow = {
+      businessPolicies: {
+        delivery: 'Nairobi',
+        coverage_areas: ['place:westlands', 'place:kilimani'],
+      },
+    };
+    assert.equal(assessCoverage('Westlands', narrow), 'inside');
+    assert.equal(assessCoverage('Runda', narrow), 'outside');
+    assert.equal(assessCoverage('Ruaka', narrow), 'outside');
+    const kajiado = { businessPolicies: { coverage_areas: ['county:kajiado'] } };
+    assert.equal(assessCoverage('Rongai', kajiado), 'inside');
+    assert.equal(assessCoverage('Kitengela', kajiado), 'inside');
+    assert.equal(assessCoverage('Runda', kajiado), 'outside');
+    const cleared = {
+      businessPolicies: { delivery: 'Nairobi', coverage_areas: [] },
+    };
+    assert.equal(assessCoverage('Runda', cleared), 'unknown');
+    assert.match(
+      coverageAskSpeech('What about Runda?', { vertical: 'home_services', ...nairobi }, 'en'),
+      /Yes, we cover Runda/i
+    );
+    assert.match(
+      coverageAskSpeech('What about Ruaka?', { vertical: 'home_services', ...nairobi }, 'en'),
+      /outside our coverage/i
+    );
+  });
+
   it('keeps a gate when the caller only adds the city', () => {
     const prior = 'Runda Green Park gate 4';
     assert.equal(

@@ -222,6 +222,7 @@ export type TenantRow = {
     cancellation?: string;
     warranty?: string;
     other?: string;
+    coverage_areas?: string[] | null;
   } | null;
   /** Per-tenant TTS pronunciation overrides: [{match, say, priority?}]. */
   tts_lexicon?: Array<{
