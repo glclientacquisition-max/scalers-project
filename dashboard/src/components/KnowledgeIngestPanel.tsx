@@ -2,7 +2,10 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { KNOWLEDGE_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
+import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import type { TenantRow } from "@/lib/supabase";
+import { parseVertical } from "@/lib/vertical";
 import type { IngestDraft } from "@/lib/ingest/extract";
 import { FAQ_ANSWER_MAX, FAQ_QUESTION_MAX } from "@/lib/faqs";
 import {
@@ -31,6 +34,9 @@ type SourceMode = "paste" | "url";
 
 export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
   const router = useRouter();
+  const knowledgePasteExample = useMountedPoolPick(
+    placeholderPool(KNOWLEDGE_PASTE_POOLS, parseVertical(tenant.vertical))
+  );
   const [mode, setMode] = useState<SourceMode>("paste");
   const [paste, setPaste] = useState("");
   const [url, setUrl] = useState("");
@@ -176,9 +182,7 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   onChange={(e) => setPaste(e.target.value)}
                   rows={2}
                   {...compactTextareaExpandHandlers}
-                  placeholder={
-                    "Westlands Books, Nairobi\nMon-Sat 9am-7pm\nHome cleaning from 2,500 KES\nQ: Do you cover Westlands?\nA: Yes, same day before noon."
-                  }
+                  placeholder={knowledgePasteExample}
                   className={`${fieldClass} mt-0 leading-relaxed`}
                 />
                 <div className="flex justify-end self-end">

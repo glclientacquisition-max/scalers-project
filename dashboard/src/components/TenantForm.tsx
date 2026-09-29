@@ -62,6 +62,8 @@ import {
   FAQ_STARTERS,
   normalizeFaqKey,
 } from "@/lib/faqs";
+import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
+import { useMountedPoolPick } from "@/lib/useMountedPoolPick";
 import {
   parseVertical,
   verticalBlurb,
@@ -329,6 +331,9 @@ export function TenantForm({
   );
   const [vertical, setVertical] = useState<BusinessVertical>(() =>
     parseVertical(tenant.vertical)
+  );
+  const servicesPasteExample = useMountedPoolPick(
+    placeholderPool(SERVICES_PASTE_POOLS, vertical)
   );
   const [handoffMode, setHandoffMode] = useState<HandoffMode>(() =>
     parseHandoffMode(tenant.handoff_mode)
@@ -1067,9 +1072,7 @@ export function TenantForm({
                 }}
                 rows={2}
                 {...compactTextareaExpandHandlers}
-                placeholder={
-                  "Home cleaning - from 2,500 KES\nPlumbing\nElectrical - quote after visit"
-                }
+                placeholder={servicesPasteExample}
                 className={`${denseFieldClass} text-sm leading-relaxed`}
               />
               <details className="text-xs text-ink-soft">
