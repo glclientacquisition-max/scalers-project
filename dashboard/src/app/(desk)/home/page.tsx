@@ -147,9 +147,9 @@ export default async function HomeOverviewPage() {
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
-  if (work.toConfirm > 0) {
+  if (work.requested > 0) {
     ctaHref = callsHref({ purpose: "job" });
-    ctaLabel = work.toConfirm === 1 ? copy.jobCtaOne : copy.jobCtaMany;
+    ctaLabel = work.requested === 1 ? copy.jobCtaOne : copy.jobCtaMany;
   } else if (work.toFulfill > 0) {
     ctaHref = callsHref({ purpose: "hold" });
     ctaLabel = work.toFulfill === 1 ? copy.holdCtaOne : copy.holdCtaMany;

@@ -126,7 +126,11 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 maxLength={160}
-                placeholder="Out of chicken today"
+                placeholder={
+                  tenant.vertical === "home_services"
+                    ? "Fully booked today"
+                    : "Out of chicken today"
+                }
                 className={`${settingsFieldClass} mt-0 min-w-0`}
               />
             </div>

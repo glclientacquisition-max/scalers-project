@@ -11,6 +11,7 @@ import {
   fallbackPolishInboxDraft,
   fallbackSuggestInboxSms,
   formatInboxSmsFacts,
+  suggestedSmsIsLeak,
   inboxSmsFactsFromForm,
   POLISH_INBOX_DRAFT_SYSTEM,
   SUGGEST_INBOX_SMS_SYSTEM,
@@ -105,7 +106,9 @@ export async function polishInboxSmsAction(
         timeoutMs: 8000,
       });
       const text = stripModelSms(raw);
-      if (text && !/^empty$/i.test(text)) return { text, source: "gemini" };
+      if (text && !/^empty$/i.test(text) && !suggestedSmsIsLeak(text)) {
+        return { text, source: "gemini" };
+      }
     } catch (err) {
       console.warn("[suggestInboxSms]", err instanceof Error ? err.message : err);
     }

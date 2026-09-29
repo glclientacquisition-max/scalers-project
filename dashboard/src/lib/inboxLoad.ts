@@ -10,6 +10,7 @@ import {
   type InboxJob,
 } from "@/lib/inboxPurpose";
 import { createWorkspaceDataClient } from "@/lib/tenant";
+import { collapseJobsByCall } from "@/lib/visitPlace";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
@@ -268,7 +269,12 @@ export async function loadInboxItems(
         tapeJobs.error ? [] : ((tapeJobs.data || []) as InboxJob[])
       );
   const leads = (callsRes.data || []).map(toLead);
-  const items = assembleInboxItems({ leads, holds, jobs, vertical });
+  const items = assembleInboxItems({
+    leads,
+    holds,
+    jobs: collapseJobsByCall(jobs),
+    vertical,
+  });
 
   const phones = inboxContactPhoneQueryValues(
     items

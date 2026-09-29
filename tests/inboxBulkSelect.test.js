@@ -85,7 +85,11 @@ describe("inbox bulk select", () => {
     assert.match(select, /type="checkbox"/);
     assert.match(select, /sr-only/);
     assert.match(select, /Select \{who\}/);
-    assert.match(select, /hidden md:inline-flex opacity-50/);
+    assert.match(select, /inline-flex h-11 w-11/);
+    assert.doesNotMatch(select, /hidden md:inline-flex/);
+    assert.match(select, /aria-label=\{allOn \? "Clear" : "Select all"\}/);
+    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /aria-label=\{allOn \? "Clear" : "Select all"\}/);
+    assert.match(read("dashboard/src/components/InboxRowUi.tsx"), /replace:/);
     assert.doesNotMatch(select, /hidden opacity-0/);
     assert.doesNotMatch(select, /group-hover:opacity-100/);
     assert.doesNotMatch(verbs, /id: "select"/);

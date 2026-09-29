@@ -62,6 +62,7 @@ Do not invent a time, price, name, place, or status.
 If visit status is requested, never say booked or confirmed. Say the visit is logged and we will confirm shortly.
 If the hold is open, never say ready.
 Do not mention the desk, Inbox, Confirm, or the team internal notes.
+Never repeat fact labels. Never write Purpose, Want, status=, or smoke.
 If the facts are not enough for a useful SMS, return EMPTY.`;
 
 export function emptyInboxSmsFacts(): InboxSmsFacts {
@@ -105,12 +106,45 @@ export function inboxSmsFactsFromForm(formData: FormData): InboxSmsFacts {
   };
 }
 
+function purposeFact(purpose: string): string | null {
+  if (purpose === "missed") return "The call was missed.";
+  if (purpose === "human") return "The caller asked for a person.";
+  return null;
+}
+
+function wantIsLeak(want: string): boolean {
+  const text = want.trim();
+  if (!text) return true;
+  if (wantLooksInternal(text)) return true;
+  if (/\bsmoke\b/i.test(text)) return true;
+  if (/^(purpose|want|status|job_place|job_status|hold_status)\b/i.test(text)) return true;
+  if (/[:=]/.test(text) && /\b(purpose|want|status|job_place|job_status|hold_status)\b/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+const SMS_LABEL =
+  /^(purpose|want|status|job_place|job_status|hold_status|business|customer name|visit|hold|standing)\s*[:=]/i;
+
+/** Model echo of the fact sheet, or smoke text, is not a customer SMS. */
+export function suggestedSmsIsLeak(raw: string): boolean {
+  const text = String(raw || "").trim();
+  if (!text) return false;
+  if (/\bsmoke\b/i.test(text)) return true;
+  if (/\bpurpose\s*:/i.test(text)) return true;
+  if (/\bwant\s*:/i.test(text)) return true;
+  if (/status\s*=/i.test(text)) return true;
+  return text.split("\n").some((line) => SMS_LABEL.test(line.trim()));
+}
+
 export function formatInboxSmsFacts(facts: InboxSmsFacts): string {
+  const want = facts.want && !wantIsLeak(facts.want) ? facts.want : null;
   const rows = [
     facts.businessName ? `Business: ${facts.businessName}` : null,
     facts.callerName ? `Customer name: ${facts.callerName}` : null,
-    facts.purpose ? `Purpose: ${facts.purpose}` : null,
-    facts.want ? `Want: ${facts.want}` : null,
+    purposeFact(facts.purpose),
+    want,
     facts.jobStatus
       ? `Visit: status=${facts.jobStatus}; service=${facts.jobService || "none"}; when=${facts.jobWhen || "none"}; place=${facts.jobPlace || "none"}`
       : null,

@@ -12,6 +12,8 @@ function load(scriptBody) {
       emptyInboxSmsFacts,
       fallbackPolishInboxDraft,
       fallbackSuggestInboxSms,
+      formatInboxSmsFacts,
+      suggestedSmsIsLeak,
     } from ${JSON.stringify(helperPath)};
     ${scriptBody}
   `;
@@ -115,6 +117,29 @@ describe("inbox SMS suggest pack", () => {
       text,
       "Hi Jane, Done and Dusted here. The team will call you back."
     );
+  });
+
+  it("does not feed Purpose or smoke text into a suggest", () => {
+    const packed = load(`
+      const facts = {
+        ...emptyInboxSmsFacts(),
+        businessName: "Done and Dusted",
+        purpose: "missed",
+        want: "Purpose: missed smoke",
+      };
+      console.log(JSON.stringify(formatInboxSmsFacts(facts)));
+    `);
+    assert.match(packed, /The call was missed/);
+    assert.doesNotMatch(packed, /Purpose:/);
+    assert.doesNotMatch(packed, /smoke/i);
+    const leaks = load(`
+      console.log(JSON.stringify([
+        suggestedSmsIsLeak("Purpose: missed"),
+        suggestedSmsIsLeak("smoke"),
+        suggestedSmsIsLeak("Hi Amina, Done and Dusted here. Sorry we missed your call."),
+      ]));
+    `);
+    assert.deepEqual(leaks, [true, true, false]);
   });
 
   it("returns empty when there is nothing true to send", () => {

@@ -1,8 +1,10 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { getSupabaseAdmin, type TenantRow } from "@/lib/supabase";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { defaultTenantLlmPrompt } from "@/lib/prompts";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
+import { DESK_TENANT_COOKIE } from "@/lib/deskTenantCookie";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TENANT_SELECT =
@@ -78,6 +80,48 @@ export const createWorkspaceDataClient = cache(async (): Promise<{
   return null;
 });
 
+export type OwnerWorkspace = { id: string; business_name: string | null };
+
+/** Memberships the signed-in owner can open. Oldest first. RLS only. */
+export const listOwnerWorkspaces = cache(async (): Promise<OwnerWorkspace[]> => {
+  const user = await getAuthUser();
+  if (!user) return [];
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("tenant_members")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+  if (error || !data?.length) return [];
+  const ids = data.map((row) => row.tenant_id).filter((id): id is string => Boolean(id));
+  if (!ids.length) return [];
+  const tenants = await supabase.from("tenants").select("id, business_name").in("id", ids);
+  if (tenants.error) return ids.map((id) => ({ id, business_name: null }));
+  const names = new Map(
+    (tenants.data || []).map((row) => [row.id as string, (row.business_name as string | null) || null])
+  );
+  return ids.map((id) => ({ id, business_name: names.get(id) || null }));
+});
+
+async function ownerTenantId(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("tenant_members")
+    .select("tenant_id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const ids = (data || [])
+    .map((row) => row.tenant_id)
+    .filter((id): id is string => Boolean(id));
+  if (!ids.length) return null;
+  const picked = (await cookies()).get(DESK_TENANT_COOKIE)?.value || "";
+  if (picked && ids.includes(picked)) return picked;
+  return ids[0];
+}
+
 /** Resolve the signed-in user's tenant (via tenant_members), or legacy first-active. */
 export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
   const user = await getAuthUser();
@@ -85,28 +129,20 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
   if (user) {
     // Owner path: Auth session client — RLS enforces membership.
     const supabase = await createSupabaseServerClient();
-    const { data: membership, error: memErr } = await supabase
-      .from("tenant_members")
-      .select("tenant_id")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (memErr) throw memErr;
-    if (!membership?.tenant_id) return null;
+    const tenantId = await ownerTenantId(supabase, user.id);
+    if (!tenantId) return null;
 
     let { data, error } = await supabase
       .from("tenants")
       .select(TENANT_SELECT)
-      .eq("id", membership.tenant_id)
+      .eq("id", tenantId)
       .maybeSingle();
 
     if (error && isMissingSmsAllowanceColumnError(error.message)) {
       ({ data, error } = await supabase
         .from("tenants")
         .select(TENANT_SELECT_NO_SMS_ALLOWANCE)
-        .eq("id", membership.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle());
     }
 
@@ -114,7 +150,7 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
       ({ data, error } = await supabase
         .from("tenants")
         .select(TENANT_SELECT_NO_NOTIFY_CHANNELS)
-        .eq("id", membership.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle());
     }
 
@@ -122,7 +158,7 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
       ({ data, error } = await supabase
         .from("tenants")
         .select(TENANT_SELECT_NO_SONIOX_VOICE)
-        .eq("id", membership.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle());
     }
 
@@ -130,7 +166,7 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
       ({ data, error } = await supabase
         .from("tenants")
         .select(TENANT_SELECT_NO_PRODUCT_SOCIAL)
-        .eq("id", membership.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle());
     }
 
@@ -138,7 +174,7 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
       ({ data, error } = await supabase
         .from("tenants")
         .select(TENANT_SELECT_NO_TTS_LEXICON)
-        .eq("id", membership.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle());
     }
 
@@ -146,7 +182,7 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
       ({ data, error } = await supabase
         .from("tenants")
         .select(TENANT_SELECT_NO_SOFT_LIMIT)
-        .eq("id", membership.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle());
     }
 
@@ -154,7 +190,7 @@ export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
       ({ data, error } = await supabase
         .from("tenants")
         .select(TENANT_SELECT_LEGACY)
-        .eq("id", membership.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle());
     }
 
