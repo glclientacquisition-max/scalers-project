@@ -35,7 +35,7 @@ export default async function SettingsPage({
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
   const tab = parseBusinessSettingsTab(tabRaw);
-  const trainPanel = parseBusinessSettingsPanel(panelRaw);
+  const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
 
   let curatedVoices: CuratedSonioxVoice[];
   try {

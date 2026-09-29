@@ -19,9 +19,26 @@ export type BusinessSettingsTab =
   | "alerts"
   | "appearance";
 
+const TRAIN_PANEL_ALIAS = new Set<string>([
+  "identity",
+  "hours",
+  "locations",
+  "policies",
+  "team",
+  "faqs",
+  "tools",
+  "pronunciation",
+]);
+
+/** `?tab=identity` is the same panel as `?tab=train&panel=identity`. */
+export function isTrainPanelAlias(raw: string | undefined | null): boolean {
+  return TRAIN_PANEL_ALIAS.has(String(raw || ""));
+}
+
 export function parseBusinessSettingsTab(
   raw: string | undefined | null
 ): BusinessSettingsTab {
+  if (isTrainPanelAlias(raw)) return "train";
   if (
     raw === "catalog" ||
     raw === "train" ||
@@ -41,20 +58,11 @@ export function parseBusinessSettingsTab(
 }
 
 export function parseBusinessSettingsPanel(
-  raw: string | undefined | null
+  raw: string | undefined | null,
+  tabRaw?: string | null
 ): SettingsPanel {
-  if (
-    raw === "identity" ||
-    raw === "hours" ||
-    raw === "locations" ||
-    raw === "policies" ||
-    raw === "team" ||
-    raw === "faqs" ||
-    raw === "tools" ||
-    raw === "pronunciation"
-  ) {
-    return raw;
-  }
+  if (isTrainPanelAlias(raw)) return raw as SettingsPanel;
+  if (isTrainPanelAlias(tabRaw)) return tabRaw as SettingsPanel;
   return "identity";
 }
 
@@ -142,17 +150,15 @@ export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
   trainPanel: SettingsPanel,
-  options?: { selectHubAppearance?: boolean }
+  options?: { selectHubIdentity?: boolean }
 ): boolean {
   if (target.tab === "train") {
-    return tab === "train" && trainPanel === target.panel;
-  }
-  if (
-    target.tab === "appearance" &&
-    options?.selectHubAppearance &&
-    tab === "menu"
-  ) {
-    return true;
+    if (tab === "train" && trainPanel === target.panel) return true;
+    return (
+      target.panel === "identity" &&
+      Boolean(options?.selectHubIdentity) &&
+      tab === "menu"
+    );
   }
   return tab === target.tab;
 }

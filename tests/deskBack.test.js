@@ -33,7 +33,7 @@ describe("DeskBack icon", () => {
 
   it("keeps ticket and archived href as deep links", () => {
     assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
-    assert.match(ticket, /<DeskBack href=\{backHref\}>Inbox<\/DeskBack>/);
+    assert.match(ticket, /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/);
     assert.match(
       toolbar,
       /<DeskBack href=\{backHref \|\| callsHref\(\{ q: query \|\| undefined \}\)\}>Inbox<\/DeskBack>/
@@ -44,7 +44,8 @@ describe("DeskBack icon", () => {
 
   it("sits in the ticket header row instead of a text Inbox row", () => {
     const header = ticket.slice(ticket.indexOf("<header"), ticket.indexOf("</header>"));
-    assert.match(header, /<DeskBack href=\{backHref\}>Inbox<\/DeskBack>/);
+    assert.match(header, /DeskBack href=\{backHref\}/);
+    assert.match(header, /"Home" : "Inbox"/);
     assert.match(header, /<DeskRecordLead/);
     assert.match(header, /align="center"/);
     assert.doesNotMatch(header, /mt-2 flex items-center gap-2/);

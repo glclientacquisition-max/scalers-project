@@ -3,6 +3,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { adminAuth } from "@/lib/admin-auth";
 import { hostnameOf, isAdminHostName } from "@/lib/adminHost";
 import { LEGACY_SESSION_COOKIE, SESSION_COOKIE } from "@/lib/auth";
+import { DESK_TENANT_COOKIE } from "@/lib/deskTenantCookie";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 export async function POST(request: NextRequest) {
@@ -18,6 +19,7 @@ export async function POST(request: NextRequest) {
   const res = NextResponse.redirect(new URL(nextPath, request.url), 303);
   res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
   res.cookies.set(LEGACY_SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  res.cookies.set(DESK_TENANT_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
 
   try {
     const supabase = createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {

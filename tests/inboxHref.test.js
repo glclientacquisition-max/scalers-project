@@ -26,6 +26,8 @@ function load() {
       backToday: inboxReturnHref({ from: "job", view: "today", day: "2026-09-18" }),
       backSearch: inboxReturnHref({ from: "needs", q: "Amina", page: "2" }),
       bare: inboxReturnHref({}),
+      homeOpen: inboxRecordHref("call-9", { from: "home" }),
+      homeBack: inboxReturnHref(inboxReturnFromSearch({ from: "home" })),
       contact: contactFromCallHref("ct-1", "call-1", { purpose: "job", view: "today", day: "2026-09-18" }),
       fromContact: callFromContactHref({
         from: "call",
@@ -95,6 +97,8 @@ describe("inbox return path", () => {
     assert.equal(hrefs.backHoldToday, "/calls?purpose=hold&view=today&day=2026-09-18");
     assert.equal(hrefs.backSearch, "/calls?purpose=needs&q=Amina&page=2");
     assert.equal(hrefs.bare, "/calls");
+    assert.equal(hrefs.homeOpen, "/calls/call-9?from=home");
+    assert.equal(hrefs.homeBack, "/home");
   });
 
   it("returns a contact opened from a call back to that call", () => {

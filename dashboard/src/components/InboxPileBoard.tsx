@@ -16,8 +16,31 @@ import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/Inbox
 import type { InboxReturn } from "@/lib/inboxHref";
 import { InboxPileSwipe } from "@/components/InboxPileSwipe";
 import { useInboxPileNav } from "@/components/InboxPileNav";
+import { useInboxRowUi } from "@/components/InboxRowUi";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import { btnGhost, btnPrimary, deskEmptyClass, deskShiftClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
+
+function InboxHeaderCheck() {
+  const nav = useInboxPileNav();
+  const ui = useInboxRowUi();
+  const rows = nav?.selectRows || [];
+  if (!ui || rows.length === 0) return null;
+  const ids = rows.map((row) => row.id);
+  const selected = new Set(ui.selected);
+  const allOn = ids.every((id) => selected.has(id));
+  return (
+    <label className="inline-flex h-11 w-11 shrink-0 items-center justify-center">
+      <span className="sr-only">{allOn ? "Clear" : "Select all"}</span>
+      <input
+        type="checkbox"
+        checked={allOn}
+        onChange={() => (allOn ? ui.clear() : ui.replace(ids))}
+        aria-label={allOn ? "Clear" : "Select all"}
+        className="h-4 w-4 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF]"
+      />
+    </label>
+  );
+}
 
 function EmptyInbox({
   total,
@@ -192,7 +215,7 @@ export function InboxPileBoard({
               ids={pageRows.map((item) => item.id)}
               scopeKey={`${purpose}:${page}:${q}`}
             >
-              <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
+              <ul className="mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
                 {showArchivedEntry ? (
                   <InboxArchivedPhoneRow count={counts.archived} ret={ret} />
                 ) : null}
@@ -213,8 +236,11 @@ export function InboxPileBoard({
                     <tr>
                       {inboxTableKind(purpose) === "hold" ? (
                         <>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                            Item
+                          <th scope="col" className="px-5 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                            <span className="flex items-center gap-3">
+                              <InboxHeaderCheck />
+                              Item
+                            </span>
                           </th>
                           <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
                             Who
@@ -226,8 +252,11 @@ export function InboxPileBoard({
                       ) : null}
                       {inboxTableKind(purpose) === "job" ? (
                         <>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                            {copy.jobColumn}
+                          <th scope="col" className="px-5 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                            <span className="flex items-center gap-3">
+                              <InboxHeaderCheck />
+                              {copy.jobColumn}
+                            </span>
                           </th>
                           <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
                             Who
@@ -239,8 +268,11 @@ export function InboxPileBoard({
                       ) : null}
                       {inboxTableKind(purpose) === "mixed" ? (
                         <>
-                          <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
-                            Work
+                          <th scope="col" className="px-5 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                            <span className="flex items-center gap-3">
+                              <InboxHeaderCheck />
+                              Work
+                            </span>
                           </th>
                           <th scope="col" className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.14em]">
                             Needed

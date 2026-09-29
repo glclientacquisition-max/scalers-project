@@ -55,8 +55,8 @@ export function InboxRowCheck({ item }: { item: InboxItem }) {
         "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg",
         focusRingVisible,
         ui.selecting
-          ? "hidden md:inline-flex"
-          : "hidden md:inline-flex opacity-50 hover:opacity-100 focus-within:opacity-100 has-[:checked]:opacity-100",
+          ? ""
+          : "opacity-50 hover:opacity-100 focus-within:opacity-100 has-[:checked]:opacity-100",
       ].join(" ")}
     >
       <span className="sr-only">Select {who}</span>
@@ -158,8 +158,10 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
   const [error, setError] = useState<string | null>(null);
   if (!ui || !ui.selecting) return null;
 
-  const { selected, patch, clear } = ui;
+  const { selected, patch, clear, replace } = ui;
   const chosen = items.filter((item) => selected.includes(item.id));
+  const pageIds = items.map((item) => item.id);
+  const allOn = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
   const actions = inboxBulkActions(chosen);
 
   async function run(kind: InboxListActionId) {
@@ -215,7 +217,16 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       <button type="button" className={iconHit} disabled={busy} aria-label="Close" onClick={() => clear()}>
         <CloseGlyph />
       </button>
-      <p className="mr-auto min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
+      <p className="min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
+      <button
+        type="button"
+        className={`${btnGhost} mr-auto`}
+        disabled={busy || pageIds.length === 0}
+        aria-label={allOn ? "Clear" : "Select all"}
+        onClick={() => (allOn ? clear() : replace(pageIds))}
+      >
+        {allOn ? "Clear" : "All"}
+      </button>
       {actions.map((action) => {
         const filled = action.id === "confirm" || action.id === "done";
         return (

@@ -5,7 +5,9 @@ import { nicheCopy, purposeFilters } from "@/lib/inboxNiche";
 import { inboxPileHref } from "@/lib/inboxSwipe";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
 import { useInboxPileNav } from "@/components/InboxPileNav";
+import { useInboxRowUi } from "@/components/InboxRowUi";
 import {
+  btnGhost,
   deskFieldClass,
   deskListTitleClass,
   pageTitleClass,
@@ -14,6 +16,25 @@ import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { FilterTabs } from "@/components/ui/FilterTabs";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
+
+function InboxSelectAll() {
+  const nav = useInboxPileNav();
+  const ui = useInboxRowUi();
+  const rows = nav?.selectRows || [];
+  if (!ui || rows.length === 0) return null;
+  const ids = rows.map((row) => row.id);
+  const allOn = ids.every((id) => ui.selected.includes(id));
+  return (
+    <button
+      type="button"
+      className={btnGhost}
+      aria-label={allOn ? "Clear" : "Select all"}
+      onClick={() => (allOn ? ui.clear() : ui.replace(ids))}
+    >
+      {allOn ? "Clear" : "All"}
+    </button>
+  );
+}
 
 export function InboxToolbar({
   active,
@@ -95,12 +116,20 @@ export function InboxToolbar({
             </DeskRecordLead>
           }
         >
-          {searchForm}
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 flex-1">{searchForm}</div>
+            <InboxSelectAll />
+          </div>
         </DeskIndexLead>
       ) : (
         <>
           <h1 className={deskListTitleClass}>Inbox</h1>
-          <DeskIndexLead>{searchForm}</DeskIndexLead>
+          <DeskIndexLead>
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="min-w-0 flex-1">{searchForm}</div>
+              <InboxSelectAll />
+            </div>
+          </DeskIndexLead>
         </>
       )}
 

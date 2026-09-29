@@ -14,6 +14,7 @@ import {
   type ContactTimelineEntry,
 } from "@/lib/contactPersonFile";
 import type { InboxHold, InboxJob } from "@/lib/inboxPurpose";
+import { collapseJobsByCall } from "@/lib/visitPlace";
 import {
   contactFavouriteAt,
   isContactFavourite,
@@ -483,8 +484,21 @@ export async function loadContactPileCounts(
       .eq("tenant_id", tenantId)
       .or("name.is.null,name.eq."),
   ]);
+  const recentPhones = uniqueRecentCallerPhones(recent.data || []);
+  const phoneKeys = [
+    ...new Set(recentPhones.flatMap((phone) => storedPhoneCandidates(phone))),
+  ];
+  let recents = 0;
+  if (phoneKeys.length) {
+    const counted = await client
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .in("phone", phoneKeys);
+    recents = counted.count ?? 0;
+  }
   return {
-    recents: uniqueRecentCallerPhones(recent.data || []).length,
+    recents,
     favourites: favourites.count ?? 0,
     unsaved: unsaved.count ?? 0,
   };
@@ -761,8 +775,8 @@ export async function loadContactTimeline(
     holds: uniqueById(
       [...(reqById.data || []), ...(reqByPhone.data || [])].map(asHold)
     ),
-    jobs: uniqueById(
-      [...(apptById.data || []), ...(apptByPhone.data || [])].map(asJob)
+    jobs: collapseJobsByCall(
+      uniqueById([...(apptById.data || []), ...(apptByPhone.data || [])].map(asJob))
     ),
     callMetaById,
     vertical,

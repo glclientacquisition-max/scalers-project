@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { DeskAccountBar } from "@/components/DeskAccountBar";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
@@ -59,6 +60,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
         <DeskRailLive tenantId={tenant?.id} vertical={tenant?.vertical} />
       </Suspense>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <DeskAccountBar
+          tenantId={tenant?.id || ""}
+          businessName={tenant?.business_name || null}
+        />
         <DeskOffline />
         <main className={deskMainClass}>{children}</main>
         <Suspense fallback={<DeskTabBar />}>

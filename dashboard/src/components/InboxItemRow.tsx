@@ -95,13 +95,11 @@ function InboxNextStep({ line }: { line: string | null }) {
 
 function InboxWhenMeta({
   item,
-  live,
   text,
   className = "inline-flex min-w-[5.5rem] items-center gap-1.5",
   textClassName = "min-w-0 truncate",
 }: {
   item: InboxItem;
-  live?: boolean;
   text: string;
   className?: string;
   textClassName?: string;
@@ -110,7 +108,6 @@ function InboxWhenMeta({
   const pinnedAt = local.pinnedAt === undefined ? item.pinnedAt : local.pinnedAt;
   return (
     <span className={className}>
-      <RowStateDot show={item.unread} live={live} />
       <InboxPinMark show={Boolean(pinnedAt)} />
       <span className={textClassName}>{text}</span>
     </span>
@@ -135,6 +132,7 @@ function InboxRowWho({
   return (
     <div className="flex items-center gap-3">
       <InboxRowCheck item={item} />
+      <RowStateDot show={item.unread} live={item.purpose === "live"} />
       <div className={deskRowActionClass}>
         <InboxRowAvatar
           name={item.callerName}
@@ -223,8 +221,6 @@ export function InboxTableRow({
     nextStep,
   } = inboxCopy(item, purpose, vertical, businessName, ret);
 
-  const live = item.purpose === "live";
-
   return (
     <InboxRowShell
       item={item}
@@ -254,7 +250,7 @@ export function InboxTableRow({
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
           <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
-            <InboxWhenMeta item={item} live={live} text={showHold ? needed : when} />
+            <InboxWhenMeta item={item} text={showHold ? needed : when} />
           </td>
         </>
       ) : null}
@@ -276,7 +272,7 @@ export function InboxTableRow({
             <p className={deskPreviewClass}>{item.callerName || "Caller"}</p>
           </td>
           <td className={`${deskRowMutedClass} min-w-[6.5rem] px-5 py-4 align-top text-sm text-ink-soft`}>
-            <InboxWhenMeta item={item} live={live} text={hasJob ? place : ""} />
+            <InboxWhenMeta item={item} text={hasJob ? place : ""} />
           </td>
         </>
       ) : null}
@@ -299,7 +295,7 @@ export function InboxTableRow({
             <InboxPurposeChip purpose={item.purpose} label={stamp} />
           </td>
           <td className={`${deskRowMutedClass} min-w-[6.5rem] whitespace-nowrap px-5 py-4 align-top text-sm text-ink-soft`}>
-            <InboxWhenMeta item={item} live={live} text={when} />
+            <InboxWhenMeta item={item} text={when} />
           </td>
         </>
       ) : null}
@@ -340,7 +336,6 @@ export function InboxPhoneRow({
         </p>
         <InboxWhenMeta
           item={item}
-          live={item.purpose === "live"}
           text={meta}
           className="flex min-w-[5.5rem] shrink-0 items-center justify-end gap-1.5 text-xs text-ink-soft"
           textClassName="max-w-[7.5rem] truncate"
@@ -363,6 +358,7 @@ export function InboxPhoneRow({
       ].join(" ")}
     >
       <InboxRowCheck item={item} />
+      <RowStateDot show={item.unread} live={item.purpose === "live"} />
       <div className={deskRowActionClass}>
         <InboxRowAvatar
           name={item.callerName}

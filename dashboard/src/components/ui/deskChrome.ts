@@ -40,6 +40,27 @@ export const btnDock = [
   focusRingVisible,
 ].join(" ");
 
+/** Confirmed visit. Same 48px dock as Confirm, green so it is not the blue Confirm hit. */
+export const btnDoneFill =
+  "border border-ok bg-ok-soft font-semibold text-ok hover:border-ok disabled:opacity-60";
+
+export const btnDone = [
+  "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm",
+  btnDoneFill,
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
+export const btnDockDone = [
+  deskHitClass,
+  "px-0 text-xs font-semibold leading-none",
+  btnDoneFill,
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
 export const btnDockGhost = [
   deskHitClass,
   "border border-line px-0 text-[11px] font-medium leading-none text-ink",

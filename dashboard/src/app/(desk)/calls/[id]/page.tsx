@@ -13,6 +13,7 @@ import { InboxTicketView } from "@/components/InboxTicketView";
 import { DeskError } from "@/components/ui/DeskError";
 import {
   followUpWhatsAppMessage,
+  formatCallWhenRelative,
 } from "@/lib/callsTriage";
 import {
   contactFromCallHref,
@@ -27,6 +28,7 @@ import {
   type InboxJob,
 } from "@/lib/inboxPurpose";
 import { parseHandoffMode, storedPhoneCandidates } from "@/lib/handoffMode";
+import { collapseJobsByCall } from "@/lib/visitPlace";
 import { formatEscalationDelivery } from "@/lib/escalationDelivery";
 import { formatLiveConnectStamp } from "@/lib/deskLiveTransfer";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
@@ -159,8 +161,7 @@ export default async function CallDetailPage({
       )
       .eq("tenant_id", tenant.id)
       .eq("call_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1),
+      .order("created_at", { ascending: false }),
   ]);
 
   const hold = holdRes.error
@@ -168,7 +169,7 @@ export default async function CallDetailPage({
     : (((holdRes.data || [])[0] || null) as InboxHold | null);
   const job = jobRes.error
     ? null
-    : (((jobRes.data || [])[0] || null) as InboxJob | null);
+    : collapseJobsByCall((jobRes.data || []) as InboxJob[])[0] || null;
   const workLoadError = Boolean(holdRes.error || jobRes.error);
   const purpose = classifyInboxPurpose({
     primaryIntent: row.primary_intent,
@@ -246,6 +247,9 @@ export default async function CallDetailPage({
         waMessage={waMessage}
         needsYou={needsYou}
         urgency={urgency}
+        bannerWhen={
+          purpose === "missed" ? formatCallWhenRelative(row.created_at) : null
+        }
         want={wantText || null}
         done={doneText || null}
         mood={moodLabel}

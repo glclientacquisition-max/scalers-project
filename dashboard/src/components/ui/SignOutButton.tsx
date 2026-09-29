@@ -7,7 +7,7 @@ import {
   focusRingVisible,
 } from "@/components/ui/deskChrome";
 
-/** Muted logout. Confirm, then POST `/api/logout`. Lives on Profile, not in shell chrome. */
+/** Muted logout. Confirm, then POST `/api/logout`. Profile and the owner shell both use this. */
 export function SignOutButton() {
   const [confirming, setConfirming] = useState(false);
 

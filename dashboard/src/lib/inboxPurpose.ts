@@ -366,26 +366,35 @@ export function summarizeInboxWork(items: InboxItem[]): {
   toReturn: number;
   toFulfill: number;
   toConfirm: number;
+  requested: number;
   nextReturn: InboxItem | null;
   nextHold: InboxItem | null;
   nextJob: InboxItem | null;
 } {
-  const needs = items.filter((item) => item.needsYou);
-  const toConfirm = needs.filter(
-    (item) => item.job && String(item.job.status || "").toLowerCase() === "requested"
+  const live = items.filter((item) => !itemIsArchived(item));
+  const needs = live.filter((item) => item.needsYou);
+  const visits = live.filter((item) => {
+    const status = String(item.job?.status || "").toLowerCase();
+    return status === "requested" || status === "confirmed";
+  });
+  const requested = visits.filter(
+    (item) => String(item.job?.status || "").toLowerCase() === "requested"
   );
-  const toFulfill = needs.filter(
-    (item) => item.hold && String(item.hold.status || "").toLowerCase() === "open"
+  const toFulfill = live.filter(
+    (item) => String(item.hold?.status || "").toLowerCase() === "open"
   );
-  const toReturn = needs.filter((item) => !item.job && !item.hold);
+  const toReturn = live.filter(
+    (item) => item.purpose === "human" || item.purpose === "missed"
+  );
   return {
     needs: needs.length,
     toReturn: toReturn.length,
     toFulfill: toFulfill.length,
-    toConfirm: toConfirm.length,
-    nextReturn: toReturn[0] || null,
+    toConfirm: visits.length,
+    requested: requested.length,
+    nextReturn: toReturn.find((item) => item.needsYou) || toReturn[0] || null,
     nextHold: toFulfill[0] || null,
-    nextJob: toConfirm[0] || null,
+    nextJob: requested[0] || visits[0] || null,
   };
 }
 
@@ -461,6 +470,11 @@ export function inboxNeedsYou(opts: {
   return false;
 }
 
+/** List preview must not keep a pasted bullet as the unread mark. */
+function ownerLine(raw: string): string {
+  return raw.replace(/^(?:[•●▪◦]\s*)+/, "").replace(/^\*\s+/, "").trim();
+}
+
 export function holdHeadline(hold: InboxHold, vertical?: string | null): string {
   const item = hold.item?.trim();
   if (item) {
@@ -509,13 +523,13 @@ export function buildInboxItem(opts: {
   const callerPhone =
     job?.caller_phone || hold?.caller_phone || lead?.call.caller_number || null;
 
-  let headline = lead?.reason || purposeLabel(purpose, vertical);
+  let headline = ownerLine(lead?.reason || purposeLabel(purpose, vertical));
   let detail: string | null = lead?.primaryIntent || null;
   if (job) {
-    headline = jobHeadline(job, vertical);
+    headline = ownerLine(jobHeadline(job, vertical));
     detail = jobDetail(job);
   } else if (hold) {
-    headline = holdHeadline(hold, vertical);
+    headline = ownerLine(holdHeadline(hold, vertical));
     const when = hold.when_text?.trim();
     detail = when || hold.notes;
   }

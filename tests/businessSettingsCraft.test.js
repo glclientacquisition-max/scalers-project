@@ -292,16 +292,20 @@ describe("business settings craft", () => {
     );
   });
 
-  it("selects Appearance on the hub rail, not Identity", () => {
+  it("selects Identity on the hub rail", () => {
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")
     );
-    assert.match(shell, /selectHubAppearance: true/);
+    assert.match(shell, /selectHubIdentity: isRail/);
+    assert.match(shell, /panel="identity"/);
+    assert.match(shell, /showBack=\{false\}/);
     assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
-    assert.match(activeFn, /target\.tab === "appearance"/);
+    assert.match(activeFn, /target\.panel === "identity"/);
+    assert.match(activeFn, /selectHubIdentity/);
     assert.match(activeFn, /tab === "menu"/);
-    assert.doesNotMatch(activeFn, /tab === "menu" && trainPanel/);
+    assert.doesNotMatch(shell, /selectHubAppearance/);
+    assert.doesNotMatch(shell, /<AppearancePanel \/>/);
   });
 
   it("keeps one filled primary per settings panel", () => {

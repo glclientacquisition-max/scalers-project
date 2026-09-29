@@ -29,21 +29,25 @@ function place(box: DOMRect, prefer: Side): { top: number; left: number; side: S
  * Name for an icon-only control. Shows on hover, pointer, and focus. Portaled so
  * desk overflow clip cannot hide it. Navy chip so it stays readable outside
  * `.desk-theme`. Escape and scroll dismiss. Visual only. The control keeps aria-label.
+ * Pass `open` when the parent decides visibility (resize handle).
  */
 export function DeskHint({
   label,
   children,
   side = "end",
   className,
+  open,
 }: {
   label: string;
   children: ReactNode;
   side?: Side;
   className?: string;
+  open?: boolean;
 }) {
   const wrapRef = useRef<HTMLSpanElement>(null);
   const preferRef = useRef(side);
   preferRef.current = side;
+  const controlled = open !== undefined;
   const [tip, setTip] = useState<{ top: number; left: number; side: Side } | null>(
     null
   );
@@ -55,6 +59,12 @@ export function DeskHint({
   }, []);
 
   const hide = useCallback(() => setTip(null), []);
+
+  useEffect(() => {
+    if (!controlled) return;
+    if (open) show();
+    else hide();
+  }, [controlled, open, show, hide]);
 
   useEffect(() => {
     if (!tip) return;
@@ -80,13 +90,14 @@ export function DeskHint({
     <span
       ref={wrapRef}
       className={["relative", className || "inline-flex"].join(" ")}
-      onPointerEnter={show}
-      onPointerLeave={hide}
-      onPointerDown={hide}
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocusCapture={show}
+      onPointerEnter={controlled ? undefined : show}
+      onPointerLeave={controlled ? undefined : hide}
+      onPointerDown={controlled ? undefined : hide}
+      onMouseEnter={controlled ? undefined : show}
+      onMouseLeave={controlled ? undefined : hide}
+      onFocusCapture={controlled ? undefined : show}
       onBlurCapture={(event) => {
+        if (controlled) return;
         if (!event.currentTarget.contains(event.relatedTarget as Node)) hide();
       }}
     >

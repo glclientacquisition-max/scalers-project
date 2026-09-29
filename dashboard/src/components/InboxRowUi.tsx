@@ -37,6 +37,7 @@ type InboxRowUiValue = {
   selecting: boolean;
   enter: (id: string) => void;
   toggle: (id: string) => void;
+  replace: (ids: string[]) => void;
   clear: () => void;
   teammates: InboxTeammateOption[];
 };
@@ -92,6 +93,10 @@ export function InboxRowUiProvider({
     );
   }, []);
 
+  const replace = useCallback((ids: string[]) => {
+    setSelected(ids);
+  }, []);
+
   const clear = useCallback(() => setSelected([]), []);
 
   const dismissArchive = useCallback(() => {
@@ -134,10 +139,11 @@ export function InboxRowUiProvider({
       selecting: selected.length > 0,
       enter,
       toggle,
+      replace,
       clear,
       teammates,
     }),
-    [get, patch, selected, enter, toggle, clear, teammates]
+    [get, patch, selected, enter, toggle, replace, clear, teammates]
   );
   return (
     <InboxRowUiCtx.Provider value={value}>
