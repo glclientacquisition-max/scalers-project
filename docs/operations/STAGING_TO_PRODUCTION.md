@@ -37,15 +37,18 @@ Staging and production **do not sync automatically**. Promote **code**, **SQL**,
 ## Promotion flow (overview)
 
 ```
-Change on branch
+Pull request into main
       ↓
-If Voice: land on cursor/staging-voice-468b (Railway auto-deploys)
+stage-pull-request.yml rebuilds cursor/staging-voice-468b
+as main plus pull requests still open
       ↓
-Confirm staging /healthz.gitSha, then DID test
+Railway staging Voice and Vercel scalers-staging deploy that branch
       ↓
-Test Desk on scalers-staging.vercel.app (same SHA as Voice)
+Confirm staging /healthz.gitSha is the staging tip, then DID test
       ↓
-PR → CI green → merge to main
+Test Desk on scalers-staging.vercel.app
+      ↓
+CI green → squash-merge that feature pull request into main
       ↓
 staging-validate.yml green (DB smoke on main)
       ↓
@@ -68,16 +71,16 @@ Use when the change is application code only (UI, voice logic, prompts in repo).
 - [ ] `npm run test:mvp` — pass
 - [ ] `cd dashboard && npm run lint && npm run build` — pass
 - [ ] Feature tested on **staging Desk** (`scalers-staging.vercel.app`)
-- [ ] If voice-impacting: land the commit on **`cursor/staging-voice-468b`** first (Railway staging follows that branch). Do not merge to `main` to get a Voice test. Then `GET https://scalers-staging-staging.up.railway.app/healthz` and confirm `gitSha` matches the staging-branch commit. Only then call the staging test DID. One-off PR deploys can still use `.github/workflows/staging-voice-deploy.yml` (`workflow_dispatch`, `confirm_target=staging`).
+- [ ] If voice-impacting: wait until **Stage pull request** has merged this pull request onto **`cursor/staging-voice-468b`**. Then `GET https://scalers-staging-staging.up.railway.app/healthz` and confirm `gitSha` is the staging branch tip named on the pull request. Only then call the staging test DID. One-off deploys of a single commit can still use `.github/workflows/staging-voice-deploy.yml` (`workflow_dispatch`, `confirm_target=staging`).
 
-Desk preview URLs are not Voice. Railway staging does not auto-build PR branches. `main` is the promotion vehicle, not the test vehicle.
+Desk preview URLs are not Voice. `main` is the promotion vehicle. The staging branch is the test vehicle.
 
-**Staging desk URL:** Voice DID work still lands on `cursor/staging-voice-468b`. Do not promote a random feature SHA onto `scalers-staging.vercel.app`. See [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md).
+**Staging desk URL:** The stage workflow lands the pull request on `cursor/staging-voice-468b`. Assign `scalers-staging.vercel.app` only to that branch. See [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md).
 
 ### Merge
 
-1. Open a PR from **`cursor/staging-voice-468b` → `main`**. Wait for **CI** green.
-2. In Cursor / GitHub: **Mark as ready**, then **Squash and merge**. That is the promote. Do not Vercel-Promote a preview onto `scalers-project`.
+1. Wait for **CI** and **Stage pull request** on the feature pull request.
+2. In Cursor / GitHub: **Mark as ready**, then **Squash and merge** that feature pull request into `main`. That is the promote.
 3. Confirm **staging-validate** workflow green on `main` (smoke + schema).
 
 ### Deploy production (manual)
@@ -169,8 +172,8 @@ After env changes: **redeploy** the affected Vercel/Railway service.
 
 | You changed… | Staging action | Production action |
 | --- | --- | --- |
-| React / Next.js desk UI | Land on `cursor/staging-voice-468b`, test on `scalers-staging.vercel.app` | Squash-merge staging → `main` (Vercel `scalers-project` follows `main`) |
-| `server.js` / voice lane | Land on `cursor/staging-voice-468b`, confirm `/healthz.gitSha`, then test DID `+254709221536`. One-off PR deploys can still use `staging-voice-deploy.yml` | Squash-merge staging → `main` (Railway production follows `main`) |
+| React / Next.js desk UI | Open a PR into `main`. Stage workflow puts it on `cursor/staging-voice-468b` with the other open PRs. Test `scalers-staging.vercel.app`. Close the PR to take it off staging. | Squash-merge that PR into `main` (Vercel `scalers-project` follows `main`) |
+| `server.js` / voice lane | Same rebuild, then confirm `/healthz.gitSha` is the staging tip and call DID `+254709221536`. Close the PR to take it off the practice line. One-off deploys can still use `staging-voice-deploy.yml` | Squash-merge that PR into `main` (Railway production follows `main`) |
 | New SQL script | Apply on `sgcdncjxauhsbunobmob` | Approved apply on ALCR |
 | Grant / RLS only | SQL on staging | Approved SQL on ALCR |
 | GitHub Actions / docs only | CI on PR | Merge; no app deploy unless needed |

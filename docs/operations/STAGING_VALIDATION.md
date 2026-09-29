@@ -8,18 +8,20 @@
 ## Lifecycle
 
 ```
-PR or push → cursor/staging-voice-468b
+PR opened, updated, reopened, or closed against main
+  ↓ stage-pull-request.yml rebuilds cursor/staging-voice-468b
+     as main plus pull requests still open
   ↓ Railway staging Voice + Vercel scalers-staging deploy that branch
   ↓ confirm staging /healthz.gitSha and scalers-staging.vercel.app
   ↓ DID + desk test
-  ↓ PR staging branch → main (Ready for review, then squash-merge)
+  ↓ squash-merge that feature PR into main, or close it to take it off staging
   ↓ production Desk (scalers-project) and production Voice follow main
   ↓ staging-validate.yml (DB smoke)
   ↓ release candidate approval
   ↓ production (human-approved SQL + deploy)
 ```
 
-Official staging Desk is `https://scalers-staging.vercel.app`. Official staging Voice is Railway. Both run **`cursor/staging-voice-468b`**. Vercel `scalers-staging` skips production builds that are not that branch, so a `main` merge does not overwrite the staging Desk URL. Feature PRs still get a preview URL for a UI glance. Do not Vercel-Promote a preview onto `scalers-project`. Promote is squash-merge to `main`. Leave **scalers-project** production branch on `main`. Optional: set **scalers-staging → Settings → Git → Production Branch** to `cursor/staging-voice-468b` so the official URL auto-assigns on every staging-branch push.
+Official staging Desk is `https://scalers-staging.vercel.app`. Official staging Voice is Railway. Both run **`cursor/staging-voice-468b`**. `stage-pull-request.yml` rebuilds that branch as `main` plus open pull requests. Closing a pull request rebuilds staging without it. Vercel `scalers-staging` skips production builds that are not that branch, so a `main` merge does not overwrite the staging Desk URL. Feature PRs still get a preview URL for a UI glance. Promote by squash-merging the tested feature pull request into `main`. Leave **scalers-project** production branch on `main`. Optional: set **scalers-staging → Settings → Git → Production Branch** to `cursor/staging-voice-468b` so the official URL auto-assigns on every staging-branch push.
 
 ---
 
@@ -28,6 +30,7 @@ Official staging Desk is `https://scalers-staging.vercel.app`. Official staging 
 | Trigger | Workflow | Requires secrets |
 | --- | --- | --- |
 | Every PR | `ci.yml` | No |
+| PR opened, updated, reopened, or closed against `main`, and every push to `main` | `stage-pull-request.yml` | No. Uses `GITHUB_TOKEN` to force-push the staging branch. |
 | Push to `main` | `staging-validate.yml` | Staging Supabase (warns if missing) |
 | Manual | `workflow_dispatch` on staging-validate | Staging Supabase |
 | Manual | `staging-voice-deploy.yml` on a PR branch | Railway staging token + IDs |

@@ -20,11 +20,11 @@ TEST          — lane test gates (see below)
   ↓
 REVIEW        — PR with clear description; no unrelated changes
   ↓
-STAGING       — land on `cursor/staging-voice-468b` (see below)
+STAGING       — rebuild `cursor/staging-voice-468b` as `main` plus open PRs
   ↓
 BETA          — beta tenants; billing_enforcement=off default
   ↓
-PRODUCTION    — squash-merge staging branch into `main`
+PRODUCTION    — squash-merge that tested PR into `main`
 ```
 
 For AI agents, the mandatory sequence for significant changes:
@@ -79,13 +79,14 @@ One integration branch: **`cursor/staging-voice-468b`**. Not a second git repo.
 
 Day to day:
 
-1. Feature branch (one lane). PR preview on Desk is a glance only.
-2. Merge or push the work onto `cursor/staging-voice-468b`.
-3. Confirm Voice `/healthz.gitSha` and open `scalers-staging.vercel.app`. Call `+254709221536`.
-4. Open a PR **from that branch into `main`**. In Cursor / GitHub: **Mark as ready**, then **Squash and merge**. That is the promote. It ships everything already on the staging branch.
-5. Do not Vercel-Promote a preview onto `scalers-project`. Do not merge feature PRs straight to `main` to get a DID or staging-desk test.
+1. Feature branch (one lane). Open a pull request into `main`.
+2. `.github/workflows/stage-pull-request.yml` rebuilds `cursor/staging-voice-468b` as `main` plus every open pull request into `main`. This starts after the workflow file is on `main`.
+3. Staging Desk and staging Voice deploy from that branch. Open `scalers-staging.vercel.app`. For voice, confirm `/healthz.gitSha` is the staging branch tip from the pull request note, then call `+254709221536`.
+4. If the test is good, mark that feature pull request ready and squash-merge it into `main`. Production Desk and production Voice follow `main`.
+5. If the test is not good, close the pull request. The workflow rebuilds staging without it. The practice desk and practice phone go back to `main` plus the pull requests still open.
+6. A preview URL on the feature pull request is a glance. The shared staging URL is `https://scalers-staging.vercel.app`.
 
-To ship one feature only: keep other unfinished work off the staging branch, or open a separate PR of that feature into `main` after it was tested on staging.
+Promote by squash-merging the tested pull request into `main`. The staging branch is only the practice copy.
 
 ---
 
