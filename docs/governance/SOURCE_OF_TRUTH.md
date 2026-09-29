@@ -35,7 +35,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | --- | --- | --- | --- | --- | --- |
 | Agent runtime | Gemini turn loop | `server.js` `runGeminiTurn*` | `@google/genai` import; called from media handler | `/ws/relay` path | CORE |
 | Human handoff (async) | Escalate notify + desk note | `src/conversation/escalationFeature.js`, `server.js` `maybeSendEscalationNotification` | [`../ESCALATION.md`](../ESCALATION.md) | Live Dial | CORE |
-| Human handoff (live) | Conference + outbound REST (cold Dial after Stream blocked) | Gated off (`VOICE_LIVE_TRANSFER`) | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED |
+| Human handoff (live) | Conference + outbound REST (coded). Cold Dial is not queued | Gated off (`VOICE_LIVE_TRANSFER`) until a human rings | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md), ADR-0004 | Closing `/ws/media` for Dial | PROPOSED (flag off) |
 | Runtime prompt assembly | Context + rules + profile | `src/prompts.js` | `buildSystemPrompt`, `buildContextHeader` | Env `BUSINESS_*` | CORE |
 | Brain state | Per-call semantic memory, seeded from returning-caller card | `src/conversation/brainState.js` | `callBrainStates` Map in `server.js` | None | CORE |
 | Returning-caller card | Compact phone file at call setup | `src/conversation/callerMemory.js` + `getCallerMemory` | CONTEXT HEADER; ADR-0005 | Transcript dump, RAG | CORE |
@@ -123,7 +123,7 @@ Status labels: **CORE** (production path), **LEGACY** (wired but superseded), **
 | --- | --- | --- | --- | --- | --- |
 | Call wallet debit | RPC `charge_call_to_wallet` | `src/db.js` | Idempotent per `call_id` | None | CORE |
 | Inbound minutes | Env `WALLET_RATE_KES_PER_MINUTE` | default 0 | SautiKit inbound cost KES 0/min | Raise env if SautiKit starts charging | CORE |
-| Outbound live transfer | Env `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | default 4 | SautiKit outbound cost **KES 3/min** answered; tenant **KES 4/min**; unanswered 0 | Conference executor not live | PROPOSED (executor) / CORE (rates) |
+| Outbound live transfer | Env `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | default 4 | SautiKit outbound cost **KES 3/min** answered; tenant **KES 4/min**; unanswered 0 | Flag stays off until a human rings | PROPOSED (executor) / CORE (rates) |
 | Transfer billing helpers | `src/billing/liveTransferLegs.js` | Ops | [`../LIVE_TRANSFER.md`](../LIVE_TRANSFER.md) §8 | Fold outbound into inbound | CORE (do not fold) |
 
 ---

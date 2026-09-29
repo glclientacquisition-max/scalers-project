@@ -143,6 +143,10 @@ const callBrainStates = new Map();
 const callBrainCapabilities = new Map();
 /** Per-call tenant grounding (product catalogue) for hold/order validation. */
 const callTenantProfiles = new Map();
+/** Public HTTP origin captured from /voice/incoming Host, used for conference callbacks. */
+const voiceHttpBaseByCall = new Map();
+/** Ring timers for conference transfers that have not bridged yet. */
+const conferenceRingTimers = new Map();
 /** First-forward hangup signals keyed by callSid (calls.summary.first_forward). */
 const callFirstForward = new Map();
 
@@ -245,11 +249,29 @@ const {
 } = require('./src/sautikit/whatsappInbound');
 const {
   consumeLiveTransferWebhook,
-  queuePendingLiveTransfer,
   hasPendingLiveTransfer,
   buildAnswerStreamXml,
   emptyVoiceXml,
 } = require('./src/sautikit/pendingLiveTransfer');
+const {
+  armConferenceTransfer,
+  conferenceRoomName,
+  conferenceKeepsCallOpen,
+  decideTransferContinue,
+  decideAgentJoin,
+  decideConferenceEvent,
+  claimOriginate,
+  bindOutboundLeg,
+  markConferenceStatus,
+  getConferenceTransfer,
+  parentCallForOutbound,
+  outboundLegResult,
+  postOutboundTransfer,
+  postConferenceCommand,
+  hangupOutboundLeg,
+  buildFallbackDocument,
+  maskE164,
+} = require('./src/sautikit/liveTransferConference');
 const {
   extractEventKind,
   extractEventCallSids,
@@ -477,6 +499,7 @@ app.get('/healthz', (_req, res) => {
     liveTransfer: {
       executor: envLiveTransferExecutorEnabled(),
       ignoreHours: envLiveTransferIgnoreHours(),
+      mode: 'conference',
     },
     voiceProfile: publicVoiceProfile(),
   });
@@ -603,6 +626,19 @@ function buildVoiceTransferContinueUrl(req, callSid) {
   }
   const sid = encodeURIComponent(String(callSid || '').trim());
   return `${requestHttpProto(req)}://${host}/voice/transfer?callSid=${sid}`;
+}
+
+function rememberVoiceHttpBase(callSid, req) {
+  const sid = String(callSid || '').trim();
+  const host = requestHost(req);
+  if (!sid || !host) return;
+  voiceHttpBaseByCall.set(sid, `${requestHttpProto(req)}://${host}`);
+}
+
+function voiceHttpBaseFor(callSid) {
+  const remembered = voiceHttpBaseByCall.get(String(callSid || '').trim());
+  if (remembered) return remembered;
+  return String(PUBLIC_BASE_URL || '').replace(/\/$/, '') || null;
 }
 
 /** Digits-only phone compare (+2547… vs 2547…). */
@@ -1084,6 +1120,7 @@ async function handleVoiceIncoming(req, res) {
     // Always have a durable id for Supabase even if SautiKit omits CallSid.
     const callSid = extracted.callSid || `sautikit_call_${Date.now()}`;
     rememberProviderCallIds(callSid, req.body);
+    rememberVoiceHttpBase(callSid, req);
 
     // Load tenant DIDs and undo WebRTC/header flips before persisting.
     let tenantDids = [];
@@ -1123,6 +1160,26 @@ async function handleVoiceIncoming(req, res) {
     // the stream, persist the call, and let the later Completed event close it.
     const sid = extracted.callSid || callSid;
     if (shouldSkipMediaStream(callSessionState, req.body, sid)) {
+      const conference = decideTransferContinue({
+        callSid: sid,
+        callSessionState,
+        body: req.body,
+        source: 'incoming_edge',
+      });
+      if (conference?.kind === 'caller_conference') {
+        persistConferenceAttempt(sid, conference.attempt, 'caller_holding');
+        console.log(`[voice/incoming] conference admit callSid=${sid}`);
+        return res.json(conference.document);
+      }
+      if (conference?.kind === 'terminal_drop') {
+        markConferenceStatus(sid, 'cancelled');
+        persistConferenceAttempt(sid, conference.attempt, 'cancelled');
+        console.log(`[voice/incoming] conference terminal drop callSid=${sid} — no Dial`);
+        return res.type('text/xml').send(emptyVoiceXml());
+      }
+      if (conference) {
+        return res.type('text/xml').send(emptyVoiceXml());
+      }
       const transferXml = consumeLiveTransferWebhook({
         callSid: sid,
         callSessionState,
@@ -1320,6 +1377,26 @@ async function handleVoiceTransferContinue(req, res) {
     const extracted = extractVoiceNumbers(req.body || {});
     const callSid =
       String(req.query?.callSid || '').trim() || extracted.callSid || '';
+    const conference = decideTransferContinue({
+      callSid,
+      callSessionState: extracted.callSessionState,
+      body: req.body || {},
+      source: 'transfer_continue',
+    });
+    if (conference?.kind === 'caller_conference') {
+      persistConferenceAttempt(callSid, conference.attempt, 'caller_holding');
+      console.log(`[voice/transfer] conference admit callSid=${callSid}`);
+      return res.json(conference.document);
+    }
+    if (conference?.kind === 'terminal_drop') {
+      markConferenceStatus(callSid, 'cancelled');
+      persistConferenceAttempt(callSid, conference.attempt, 'cancelled');
+      console.log(`[voice/transfer] conference terminal drop callSid=${callSid} — no originate`);
+      return res.type('text/xml').send(emptyVoiceXml());
+    }
+    if (conference) {
+      return res.type('text/xml').send(emptyVoiceXml());
+    }
     const transferXml = consumeLiveTransferWebhook({
       callSid,
       callSessionState: extracted.callSessionState,
@@ -1344,6 +1421,37 @@ async function handleVoiceTransferContinue(req, res) {
 }
 
 app.post('/voice/transfer', sautikitWebhookGuard, handleVoiceTransferContinue);
+
+function handleVoiceTransferAgent(req, res) {
+  const callSid = String(req.query?.callSid || '').trim();
+  const room = String(req.query?.room || '').trim();
+  const decision = decideAgentJoin({ callSid, room });
+  console.log(
+    `[voice/transfer-agent] ${decision.kind} callSid=${callSid || 'none'} room=${room || decision.attempt?.room || 'none'}`
+  );
+  return res.json(decision.document);
+}
+
+function handleVoiceTransferFallback(req, res) {
+  const callSid = String(req.query?.callSid || '').trim();
+  if (callSid) {
+    const row = getConferenceTransfer(callSid);
+    if (row && row.status !== 'bridged') {
+      markConferenceStatus(callSid, 'failed', { error: 'fallback' });
+      persistConferenceAttempt(callSid, row, 'failed');
+    }
+  }
+  return res.json(buildFallbackDocument());
+}
+
+app.post('/voice/transfer-agent', sautikitWebhookGuard, handleVoiceTransferAgent);
+app.post('/voice/conference-events', sautikitWebhookGuard, (req, res) => {
+  res.sendStatus(200);
+  handleConferenceEvent(req).catch((err) => {
+    console.error('[voice/conference-events] failed:', err?.message || err);
+  });
+});
+app.post('/voice/transfer-fallback', sautikitWebhookGuard, handleVoiceTransferFallback);
 
 // ---------------------------------------------------------------------------
 // 2. Recording attach helper (provider-agnostic). Used when a recording URL
@@ -1448,6 +1556,12 @@ app.post('/voice/events', sautikitWebhookGuard, async (req, res) => {
 
     if (termination.terminal && callSid) {
       const terminalSid = sidByProviderCallId.get(callSid) || callSid;
+      await noteOutboundTransferEdge({
+        eventCallSid: callSid,
+        terminalSid,
+        status: termination.status,
+        durationSeconds,
+      });
       await markCallTerminalFromWebhook({
         callSid: terminalSid,
         status: termination.status,
@@ -2822,10 +2936,15 @@ mediaWss.on('connection', (ws, req) => {
             /* ignore */
           }
         }, 800);
-      } else if (hasPendingLiveTransfer(sessionCallSid) && !bargeInActive) {
+      } else if (
+        !bargeInActive &&
+        (hasPendingLiveTransfer(sessionCallSid) ||
+          getConferenceTransfer(sessionCallSid)?.status === 'armed')
+      ) {
         // Staging spikes proved SautiKit does not continue the voice document
         // after Stream (no Redirect, no StreamStopped on /voice/incoming).
         // Closing media leaves dead air. Keep the AI on the line; SMS already sent.
+        // Conference admission is /voice/transfer, not a socket close.
         console.warn(
           `[ws/media][${sidLabel()}] live transfer Dial blocked — Stream does not continue; AI stays`
         );
@@ -3342,7 +3461,11 @@ mediaWss.on('connection', (ws, req) => {
     }
     // Fallback: if SautiKit never posts call.completed, still leave the row finished.
     // Do not close the desk row while a cold Dial is waiting on Redirect.
-    if (sessionCallSid && !hasPendingLiveTransfer(sessionCallSid)) {
+    if (
+      sessionCallSid &&
+      !hasPendingLiveTransfer(sessionCallSid) &&
+      !conferenceKeepsCallOpen(sessionCallSid)
+    ) {
       const durationSeconds = Math.max(0, Math.round(ms / 1000));
       markCallTerminalFromWebhook({
         callSid: sessionCallSid,
@@ -3588,6 +3711,195 @@ async function maybeSendEscalationNotification(callSid, escalate = {}) {
   }
 }
 
+function persistConferenceAttempt(callSid, attempt, status) {
+  if (!callSid) return;
+  db.saveTransferAttempt({
+    callSid,
+    attempt: {
+      status,
+      mode: 'conference',
+      to: attempt?.to || null,
+      caller_id: attempt?.callerId || null,
+      timeout_s: attempt?.timeoutS || null,
+      room: attempt?.room || null,
+      error: attempt?.error || null,
+      ended_at:
+        status === 'failed' || status === 'cancelled' ? new Date().toISOString() : null,
+    },
+  }).catch((err) => {
+    console.warn(`[${callSid}] saveTransferAttempt failed:`, err?.message || err);
+  });
+}
+
+function clearConferenceRingTimer(callSid) {
+  const timer = conferenceRingTimers.get(callSid);
+  if (timer) clearTimeout(timer);
+  conferenceRingTimers.delete(callSid);
+}
+
+function armConferenceRingTimer(attempt) {
+  const callSid = attempt?.callSid;
+  if (!callSid) return;
+  clearConferenceRingTimer(callSid);
+  const ms = (Number(attempt.timeoutS) || 30) * 1000;
+  const timer = setTimeout(() => {
+    conferenceRingTimers.delete(callSid);
+    failUnbridgedConference(callSid, 'timeout', { exitCaller: true }).catch((err) => {
+      console.warn(`[${callSid}] conference timeout failed:`, err?.message || err);
+    });
+  }, ms);
+  if (typeof timer.unref === 'function') timer.unref();
+  conferenceRingTimers.set(callSid, timer);
+}
+
+async function exitCallerToFallback(attempt) {
+  if (!attempt?.room) return;
+  await postConferenceCommand({
+    room: attempt.room,
+    command: 'exit',
+    participant: attempt.callerParticipant || undefined,
+    callbackUrl: attempt.fallbackUrl,
+  });
+}
+
+async function failUnbridgedConference(callSid, reason, { exitCaller = false } = {}) {
+  const row = getConferenceTransfer(callSid);
+  if (!row || row.status === 'bridged' || row.status === 'failed' || row.status === 'cancelled') {
+    return;
+  }
+  clearConferenceRingTimer(callSid);
+  if (row.outboundCallSid) {
+    hangupOutboundLeg({ outboundCallSid: row.outboundCallSid }).catch((err) => {
+      console.warn(`[${callSid}] outbound hangup failed:`, err?.message || err);
+    });
+  }
+  const failed = markConferenceStatus(callSid, 'failed', { error: reason });
+  persistConferenceAttempt(callSid, failed || row, 'failed');
+  console.log(`[${callSid}] conference transfer failed reason=${reason}`);
+  if (exitCaller) {
+    await exitCallerToFallback(failed || row).catch((err) => {
+      console.warn(`[${callSid}] conference exit failed:`, err?.message || err);
+    });
+  }
+}
+
+async function originateConferenceLeg(attempt) {
+  if (!attempt?.callSid) return;
+  const claimed = claimOriginate(attempt.callSid);
+  if (!claimed) return;
+  if (claimed.denied) {
+    clearConferenceRingTimer(attempt.callSid);
+    persistConferenceAttempt(attempt.callSid, claimed.attempt, 'failed');
+    console.log(
+      `[${attempt.callSid}] conference originate denied reason=${claimed.reason || 'denied'}`
+    );
+    await exitCallerToFallback(claimed.attempt).catch((err) => {
+      console.warn(`[${attempt.callSid}] conference exit failed:`, err?.message || err);
+    });
+    return;
+  }
+  armConferenceRingTimer(claimed.attempt);
+  const placed = await postOutboundTransfer({ attempt: claimed.attempt });
+  const current = getConferenceTransfer(attempt.callSid);
+  if (!current || current.status === 'failed' || current.status === 'cancelled') {
+    if (placed.outboundCallSid) {
+      hangupOutboundLeg({ outboundCallSid: placed.outboundCallSid }).catch(() => {});
+    }
+    return;
+  }
+  if (!placed.ok || !placed.outboundCallSid) {
+    await failUnbridgedConference(attempt.callSid, placed.reason || 'originate_failed', {
+      exitCaller: true,
+    });
+    return;
+  }
+  bindOutboundLeg(attempt.callSid, placed.outboundCallSid);
+  const profile = callTenantProfiles.get(attempt.callSid) || {};
+  const tenantId = claimed.attempt.tenantId || profile.id || null;
+  if (tenantId) {
+    await db
+      .persistOutboundTransferLeg({
+        inboundCallSid: attempt.callSid,
+        outboundCallSid: placed.outboundCallSid,
+        tenantId,
+        fromNumber: claimed.attempt.callerId,
+        toNumber: claimed.attempt.to,
+      })
+      .catch((err) => {
+        console.warn(`[${attempt.callSid}] outbound leg persist failed:`, err?.message || err);
+      });
+  } else {
+    console.warn(`[${attempt.callSid}] outbound leg has no tenant id — wallet row skipped`);
+  }
+  await db
+    .saveTransferAttempt({
+      callSid: attempt.callSid,
+      attempt: {
+        status: 'dialing',
+        mode: 'conference',
+        outbound_call_sid: placed.outboundCallSid,
+      },
+    })
+    .catch(() => {});
+  console.log(
+    `[${attempt.callSid}] conference originate outbound=${placed.outboundCallSid} to=${maskE164(claimed.attempt.to)}`
+  );
+}
+
+async function handleConferenceEvent(req) {
+  const callSid = String(req.query?.callSid || '').trim();
+  const room = String(req.query?.room || '').trim();
+  const decision = decideConferenceEvent({ callSid, room, body: req.body || {} });
+  const attempt = decision.attempt;
+  if (!attempt) return;
+  if (decision.action === 'caller_joined' && decision.originate) {
+    await originateConferenceLeg(attempt);
+    return;
+  }
+  if (decision.action === 'bridged') {
+    clearConferenceRingTimer(attempt.callSid);
+    await db
+      .saveTransferAttempt({
+        callSid: attempt.callSid,
+        attempt: {
+          status: 'bridged',
+          mode: 'conference',
+          bridged_at: new Date().toISOString(),
+        },
+      })
+      .catch(() => {});
+    console.log(`[${attempt.callSid}] conference bridged room=${attempt.room}`);
+    return;
+  }
+  if (decision.action === 'caller_left') {
+    await failUnbridgedConference(attempt.callSid, 'caller_left', { exitCaller: false });
+  }
+}
+
+async function noteOutboundTransferEdge({ eventCallSid, terminalSid, status, durationSeconds }) {
+  const parent = parentCallForOutbound(eventCallSid) || parentCallForOutbound(terminalSid);
+  if (parent) {
+    const result = outboundLegResult({
+      status,
+      durationSeconds,
+      conferenceStatus: parent.status,
+    });
+    if (result === 'missed') {
+      await failUnbridgedConference(parent.callSid, 'outbound_missed', { exitCaller: true });
+    }
+    return;
+  }
+  const inbound = getConferenceTransfer(terminalSid) || getConferenceTransfer(eventCallSid);
+  if (!inbound || inbound.status === 'bridged' || inbound.status === 'failed') return;
+  if (inbound.status === 'armed') {
+    markConferenceStatus(inbound.callSid, 'cancelled');
+    clearConferenceRingTimer(inbound.callSid);
+    persistConferenceAttempt(inbound.callSid, inbound, 'cancelled');
+    return;
+  }
+  await failUnbridgedConference(inbound.callSid, 'caller_gone', { exitCaller: false });
+}
+
 async function maybeQueueLiveTransfer({
   callSid,
   escalate,
@@ -3601,26 +3913,46 @@ async function maybeQueueLiveTransfer({
   const callerE164 = normalizeKenyaE164(callerNumber);
   if (callerE164 && callerE164 === dest.phone) {
     console.warn(
-      `[${callSid}] live transfer skipped: Dial destination is the caller ${dest.phone}`
+      `[${callSid}] live transfer skipped: destination is the caller ${maskE164(dest.phone)}`
     );
     return false;
   }
   const callerId = normalizeKenyaE164(profile?.did) || null;
-  const queued = queuePendingLiveTransfer({
+  if (!callerId) {
+    console.warn(`[${callSid}] live transfer skipped: tenant DID is not a Kenya E.164`);
+    return false;
+  }
+  const base = voiceHttpBaseFor(callSid);
+  if (!base) {
+    console.warn(`[${callSid}] live transfer skipped: no public HTTP base for conference callbacks`);
+    return false;
+  }
+  const sid = encodeURIComponent(String(callSid || '').trim());
+  const room = conferenceRoomName(callSid);
+  const armed = armConferenceTransfer({
     callSid,
     to: dest.phone,
     callerId,
+    callerNumber: callerE164 || callerNumber,
+    timeoutS: Number(process.env.VOICE_TRANSFER_TIMEOUT_S) || 30,
+    eventsUrl: `${base}/voice/conference-events?callSid=${sid}`,
+    agentUrl: `${base}/voice/transfer-agent?callSid=${sid}&room=${encodeURIComponent(room)}`,
+    fallbackUrl: `${base}/voice/transfer-fallback?callSid=${sid}`,
+    billingEnforcement: profile?.billingEnforcement,
+    walletBalanceKes: profile?.walletBalanceKes,
   });
-  if (!queued) return false;
+  if (!armed) return false;
+  armed.tenantId = profile?.id || null;
   await db
     .saveTransferAttempt({
       callSid,
       attempt: {
-        status: queued.status,
-        mode: 'cold_dial',
+        status: 'pending',
+        mode: 'conference',
         to: dest.phone,
         caller_id: callerId,
-        timeout_s: queued.timeoutS,
+        timeout_s: armed.timeoutS,
+        room: armed.room,
         started_at: new Date().toISOString(),
         teammate: { name: dest.name, role: dest.role, phone: dest.phone },
       },
@@ -3628,7 +3960,9 @@ async function maybeQueueLiveTransfer({
     .catch((err) => {
       console.warn(`[${callSid}] saveTransferAttempt failed:`, err?.message || err);
     });
-  console.log(`[${callSid}] live transfer queued Dial ${dest.phone}`);
+  console.log(
+    `[${callSid}] live transfer conference armed room=${armed.room} to=${maskE164(dest.phone)}`
+  );
   return true;
 }
 

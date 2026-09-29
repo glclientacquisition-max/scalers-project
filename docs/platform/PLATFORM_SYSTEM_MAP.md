@@ -35,8 +35,8 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Voice inbound | SautiKit Stream XML → PCM `/ws/media` | `server.js` `/`, `/voice/incoming`, `/voice`; `src/sautikit/webhook.js` | **live** | None if Desk says the DID answers. Do not say “Online”. |
 | Voice media / STT / TTS | Soniox realtime, 16 kHz PCM | `src/speech/*` | **live** | Outage speech is a recording + hangup, not a fake turn. |
 | Voice events / recordings | Terminal + `recording.ready` | `server.js` `/voice/events`, `/voice/recording-status`; `src/sautikit/recording*.js` | **live** | Recording URL may lag; do not claim “recording ready” from call start. |
-| Voice outbound PSTN | SautiKit `POST /v1/calls` for live transfer | `src/billing/liveTransferLegs.js` (gate only); no live originate in media path | **blocked** | See §2. Desk must not say Rings / transferred. |
-| Live transfer executor | Cold Dial after Stream; conference REST is next | `src/sautikit/pendingLiveTransfer.js`; `server.js` `/voice/transfer`; `src/conversation/liveTransferReady.js` | **blocked** | Staging 2026-09-06: StreamStopped never re-POSTs Dial. Default `VOICE_LIVE_TRANSFER=off`. |
+| Voice outbound PSTN | SautiKit `POST /v1/calls` for live transfer | `src/sautikit/liveTransferConference.js` `postOutboundTransfer` | **coded, flag off** | Originate only after caller join. Desk must not say Rings / transferred. |
+| Live transfer executor | Conference + REST. Cold Dial is not queued | `src/sautikit/liveTransferConference.js`; `server.js` `/voice/transfer`, `/voice/conference-events`; `src/conversation/liveTransferReady.js` | **coded, flag off** | Do not enable until a human rings. Default `VOICE_LIVE_TRANSFER=off`. |
 | Voice brain (live call) | Gemini turn + tools + playbooks | `src/prompts.js`, `src/conversation/*`, `server.js` `runGeminiTurn*` | **live** | Brain may say “texted the team” only after notify OK. Transfer copy only if `liveTransfer: true`. |
 | Returning-caller card | Compact phone file at call setup | `src/db.js` `getCallerMemory`; `src/conversation/callerMemory.js`; ADR-0005 | **live** | Candidate by phone. Bind the speaker before using the name or visit. |
 | Post-call review | Hangup Gemini JSON → `owner_review` | `src/conversation/callTranscriptReview.js` | **live** (kill: `POST_CALL_GEMINI_REVIEW=off`) | Lands 1–2 min after mid-call SMS. Do not SMS the four-block card. |
@@ -68,7 +68,10 @@ Status: **live** = production path in code and used. **partial** = code exists, 
 | Route | Job |
 | --- | --- |
 | `POST /`, `/voice/incoming`, `/voice` | SautiKit answer → `<Stream connect="true"/>` (or transfer continue) |
-| `POST /voice/transfer` | Pending Dial XML (never product while flag off / conference unproven) |
+| `POST /voice/transfer` | Conference JSON when armed (legacy Dial only if a cold-dial row still exists). Flag off until a human rings |
+| `POST /voice/transfer-agent` | Outbound leg joins the same conference |
+| `POST /voice/conference-events` | Caller join originates `POST /v1/calls`. Missed leg exits to fallback |
+| `POST /voice/transfer-fallback` | Say fallback, then hangup |
 | `POST /voice/events` | `call.completed` / recording; also demuxes WhatsApp if `X-Sautikit-Event-Kind` |
 | `POST /voice/recording-status` | Attach recording |
 | `POST /whatsapp/events` | Platform Cloud inbound + delivery statuses |
@@ -132,7 +135,7 @@ Tools that write the business: `save_caller_info`, `create_service_request`, `cr
 
 ### What exists vs what Desk may claim
 
-Code for cold Dial is real: `queuePendingLiveTransfer`, `/voice/transfer`, `saveTransferAttempt`, billing helpers. ADR-0004 executor is **superseded**: StreamStopped rides `events_url` (cannot return Dial); Redirect after `<Stream connect="true"/>` did not run on staging (`HD_ae71b5349f5e`, `HD_4f14d4d55244`). Next lab is **conference + REST outbound**, not another WS-close.
+Conference originate is in Voice code and stays idle while `VOICE_LIVE_TRANSFER=off`. Cold Dial is no longer queued, so Completed cannot emit Dial. ADR-0004 executor is **superseded**: StreamStopped rides `events_url` (cannot return Dial); Redirect after `<Stream connect="true"/>` did not run on staging (`HD_ae71b5349f5e`, `HD_4f14d4d55244`). Do not close `/ws/media` for transfer. Do not enable the flag until a human rings.
 
 Desk Train copy today (`TenantForm.tsx`): if the executor env is **off**, live_transfer shows “Messages {name}.” If someone turns `VOICE_LIVE_TRANSFER=on` on the **desk** host without a working conference, the same panel will say **“Rings {name} during open hours.”** That is the remaining lie. Voice host and Vercel env must stay **off** until a human actually rings.
 

@@ -222,6 +222,18 @@ assert.match(
 
 assert.match(
   source,
+  /\/voice\/transfer-agent/,
+  'outbound transfer leg must join via /voice/transfer-agent'
+);
+
+assert.match(
+  source,
+  /\/voice\/conference-events/,
+  'conference status must hit /voice/conference-events before originate'
+);
+
+assert.match(
+  source,
   /liveTransfer: \{/,
   'healthz must expose liveTransfer executor flags for staging Dial verification'
 );

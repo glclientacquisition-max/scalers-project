@@ -362,7 +362,7 @@ Staging Voice is on `cursor/live-transfer-spec-3c65`. `/healthz` shows `liveTran
 
 **Do not repeat the WS-close spike.** Staging `VOICE_LIVE_TRANSFER` is **off** again so callers get SMS + AI on the line, not dead air.
 
-Next build: conference hold + `POST /v1/calls` into the same room ([SautiKit call-center guide](https://sautikit.com/developers/guides/build-a-call-center-with-conferences)). That is a dedicated Voice spike. Do not turn the env flag on until Alvin’s phone rings.
+**2026-09-29:** Voice arms a conference instead of cold Dial. `/voice/transfer` returns Conference JSON. `POST /v1/calls` waits for caller `join`. Completed does not admit or originate. `/ws/media` is not closed for transfer. Flag stays off until a staging ring.
 
 ---
 
