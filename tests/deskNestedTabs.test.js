@@ -82,7 +82,7 @@ describe("desk nested tab hide", () => {
     assert.equal(got.settingsHubSearch, false);
     assert.equal(got.settingsMenu, false);
     assert.equal(got.settingsUnknown, false);
-    assert.equal(got.settingsAppearance, true);
+    assert.equal(got.settingsAppearance, false);
     assert.equal(got.settingsTrain, true);
     assert.equal(got.settingsBareTicket, false);
     assert.equal(got.empty, false);

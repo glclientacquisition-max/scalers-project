@@ -15,8 +15,7 @@ export type BusinessSettingsTab =
   | "train"
   | "import"
   | "test"
-  | "alerts"
-  | "appearance";
+  | "alerts";
 
 const TRAIN_PANEL_ALIAS = new Set<string>([
   "identity",
@@ -43,12 +42,12 @@ export function parseBusinessSettingsTab(
     raw === "train" ||
     raw === "import" ||
     raw === "test" ||
-    raw === "alerts" ||
-    raw === "appearance"
+    raw === "alerts"
   ) {
     return raw;
   }
-  // Updates live on Home. Old ?tab=updates and ?tab=today bookmarks open the hub.
+  // Updates live on Home. Appearance lives on the account menu.
+  // Old ?tab=updates, ?tab=today, and ?tab=appearance bookmarks open the hub.
   return "menu";
 }
 
@@ -88,7 +87,7 @@ export type SettingsNavSection = {
 /**
  * Settings destinations. /settings is the phone index.
  * Business → Assistant → Knowledge → Alerts.
- * Appearance stays on the account menu (`?tab=appearance`), not this index.
+ * Appearance is the account-menu theme cluster. It is not a settings tab.
  * Extra shipped panels sit in the closest group. URLs stay `?tab=` / `?panel=`.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
@@ -175,7 +174,6 @@ export function settingsPanelHeading(
       : "Import Knowledge";
   }
   if (tab === "test") return "Test";
-  if (tab === "appearance") return "Appearance";
   if (tab !== "train") return null;
   const item = settingsNavItems().find(
     (entry) => entry.target.tab === "train" && entry.target.panel === trainPanel

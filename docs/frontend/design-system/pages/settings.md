@@ -7,7 +7,7 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 
 ## IA
 
-`/settings` is the Settings tab. Bare `/settings` is the hub: destination index. Sign out stays inside the account menu. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance` from the account menu only. It is not a settings row. No new field screens.
+`/settings` is the Settings tab. Bare `/settings` is the hub: destination index. Sign out stays inside the account menu. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is the theme cluster in the account menu. Opening it does not open Settings and does not wait on the Settings load. It is not a settings row. Old `?tab=appearance` redirects to the hub. No new field screens.
 
 ```text
 Business       Identity · Hours · Locations · Policies
@@ -20,17 +20,17 @@ Shipped panels that do not map 1:1 sit in the closest group. Locations and Polic
 
 Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Settings hub keeps tabs. `DeskBack` icon, aria-label Settings (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
-Sticky Save on Catalog and Train panels, top-right of the panel header. Alerts, Import, Test, and Appearance use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
+Sticky Save on Catalog and Train panels, top-right of the panel header. Alerts, Import, and Test use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
 
-Bare `/settings` is the hub. lg+ hub shows Identity in the panel. `?tab=updates` and `?tab=today` open the hub. Updates stay on Home. `?tab=alerts` is Alerts. `?tab=appearance` is Appearance. Hash `#train` is not routed. `Train` is the verb on Save.
+Bare `/settings` is the hub. lg+ hub shows Identity in the panel. `?tab=updates`, `?tab=today`, and `?tab=appearance` open the hub. Updates stay on Home. Appearance stays on the account menu. `?tab=alerts` is Alerts. Hash `#train` is not routed. `Train` is the verb on Save.
 
 ## Chrome
 
-Short in-page title Settings plus compact workspace name on the hub. The top strip is initials only. Line live / Number pending stays on Test. Appearance, Import, Catalog, and the other panels do not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the last account-menu item (`POST /api/logout` after confirm). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Settings. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
+Short in-page title Settings plus compact workspace name on the hub. The top strip is initials only. Line live / Number pending stays on Test. Import, Catalog, and the other panels do not repeat it. The account-menu theme cluster does not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the last account-menu item (`POST /api/logout` after confirm). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Settings. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Appearance is the three theme cards, not that strip. Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, and Alerts use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Account-menu Appearance is the three theme cards, not that strip. Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
@@ -54,7 +54,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
 | Test | Generate preview filled plus large tel control | One filled control: Call when live, else Generate preview. The other is ghost |
-| Appearance | Three theme cards | System / Light / Dark cluster. Label **This device**. `localStorage["scalers-desk-theme"]` |
+| Appearance | Account menu, not a Settings row | System / Light / Dark cluster. Label **This device**. `localStorage["scalers-desk-theme"]`. No Settings fetch |
 | Sign out | Ghost, instant POST | Ghost until confirm. **Sign out?** then filled **Sign out** / ghost **Stay**. POST `/api/logout` only after confirm |
 
 Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
@@ -191,7 +191,9 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 | Remove person | icon ghost | drops a row | Whole business after Save |
 | Save and train | filled sticky | compile | Assistant on calls |
 
-### Appearance (`?tab=appearance`, account menu)
+### Appearance (account menu)
+
+Opening Appearance stays on the current desk page. It does not navigate to `/settings` and does not wait on tenant, catalog, or voice data.
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
 import {
   parseBusinessSettingsPanel,
@@ -27,6 +28,11 @@ export default function SettingsPage(props: SettingsPageProps) {
 }
 
 async function SettingsBody({ searchParams }: SettingsPageProps) {
+  const params = (await searchParams) || {};
+  const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
+  if (tabRaw === "appearance") redirect("/settings");
+
   let tenant;
   try {
     tenant = await getCurrentTenant();
@@ -37,10 +43,6 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   if (!tenant) {
     return <DeskNoWorkspace />;
   }
-
-  const params = (await searchParams) || {};
-  const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
-  const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
   const tab = parseBusinessSettingsTab(tabRaw);
   const trainPanel = parseBusinessSettingsPanel(panelRaw, tabRaw);
   const needsVoices = tab === "test" || (tab === "train" && trainPanel === "tools");

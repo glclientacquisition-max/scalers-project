@@ -18,7 +18,6 @@ const KEEP: Record<string, readonly (keyof TenantRow)[]> = {
   test: ["services_catalog", "services_offered", "tts_lexicon"],
   import: [],
   alerts: [],
-  appearance: [],
 };
 
 export function settingsViewKey(tab: string, panel: string): string {
