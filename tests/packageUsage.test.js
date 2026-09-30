@@ -36,15 +36,30 @@ describe("package usage meter", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
     assert.match(page, /loadOwnerPackageMeter\(tenant\.id\)/);
     assert.match(page, /Minutes left/);
-    assert.match(page, /bucketLabel\(pack\.minutesUsed, pack\.minutesIncluded\)/);
-    assert.match(page, /bucketLabel\(pack\.smsUsed, pack\.smsIncluded\)/);
-    assert.match(page, /bucketLabel\(pack\.emailUsed, pack\.emailIncluded\)/);
-    assert.match(page, /bucketLabel\(pack\.waUsed, pack\.waIncluded\)/);
-    assert.match(page, /bucketLabel\(pack\.seatsUsed, pack\.seatsIncluded\)/);
-    assert.match(page, /KES \{inboundMin\}\/min/);
+    assert.match(page, /label: "Minutes", left: minutesLeft, used: pack\.minutesUsed/);
+    assert.match(page, /label: "SMS", left: smsLeft, used: pack\.smsUsed/);
+    assert.match(page, /label: "Email", left: emailLeft, used: pack\.emailUsed/);
+    assert.match(page, /label: "WhatsApp", left: waLeft, used: pack\.waUsed/);
+    assert.match(page, /label: "Seats"/);
+    assert.match(page, /On-demand rates/);
+    assert.match(page, /KES \{kes\(inboundMin\)\}\/min/);
     assert.doesNotMatch(page, /WalletTopUpButton/);
     assert.doesNotMatch(page, /Top up prepaid/);
     assert.doesNotMatch(page, /daysRemainingAtPace/);
+  });
+
+  it("lists package prices on the landing page from the catalog", () => {
+    const catalog = read("dashboard/src/lib/packageCatalog.ts");
+    const landing = read("dashboard/src/components/marketing/LandingPage.tsx");
+    const prices = read("dashboard/src/components/marketing/PackagePrices.tsx");
+    const home = read("dashboard/src/app/page.tsx");
+    assert.match(catalog, /export async function loadPublicPackageOffers/);
+    assert.match(catalog, /annualPriceKes\(monthlyPriceKes, rates\.annualDiscountPercent\)/);
+    assert.match(home, /loadPublicPackageOffers/);
+    assert.match(landing, /id="packages"/);
+    assert.match(prices, /Not set/);
+    assert.match(prices, /past included/);
+    assert.doesNotMatch(prices, /Most popular/);
   });
 
   it("opts into on-demand after included buckets hit zero", () => {

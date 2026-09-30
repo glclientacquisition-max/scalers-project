@@ -28,8 +28,12 @@ function kindLabel(kind: string): string {
   return kind;
 }
 
-function bucketLabel(used: number, included: number): string {
-  return `${used.toLocaleString("en-KE")} / ${included.toLocaleString("en-KE")}`;
+function count(n: number): string {
+  return n.toLocaleString("en-KE");
+}
+
+function kes(n: number): string {
+  return n.toLocaleString("en-KE", { maximumFractionDigits: 2 });
 }
 
 export default async function WalletPage({
@@ -93,17 +97,24 @@ export default async function WalletPage({
   const packLabel = pack.packageName
     ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
     : "No package";
+  const minuteMax = Math.max(0, pack.minutesIncluded);
+  const minuteLeftPct = minuteMax > 0 ? Math.min(100, Math.round((minutesLeft / minuteMax) * 100)) : 0;
+  const buckets = [
+    { label: "Minutes", left: minutesLeft, used: pack.minutesUsed },
+    { label: "SMS", left: smsLeft, used: pack.smsUsed },
+    { label: "Email", left: emailLeft, used: pack.emailUsed },
+    { label: "WhatsApp", left: waLeft, used: pack.waUsed },
+    { label: "Seats", left: remainingCount(pack.seatsIncluded, pack.seatsUsed), used: pack.seatsUsed },
+  ];
 
   return (
     <div className="max-w-3xl">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <h1 className={deskListTitleClass}>Usage</h1>
-        {usage.isBeta ? (
-          <span className="inline-flex min-h-12 items-center rounded-xl border border-accent/30 bg-accent/5 px-6 py-3 text-sm font-medium text-accent-deep">
-            Free beta
-          </span>
-        ) : null}
+        <p className="text-sm text-ink-soft">{packLabel}</p>
       </header>
+
+      {usage.isBeta ? <p className="mt-3 text-sm text-ink-soft">Free beta</p> : null}
 
       {capNotice ? (
         <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
@@ -111,69 +122,45 @@ export default async function WalletPage({
         </p>
       ) : null}
 
-      <section className="mt-8 rounded-2xl border border-line bg-surface p-6 sm:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Minutes left</p>
-            <p className="mt-2 font-display text-3xl tracking-tight text-ink sm:text-4xl">
-              {minutesLeft.toLocaleString("en-KE")}
-            </p>
-            <p className="mt-2 text-sm text-ink-soft">{packLabel}</p>
+      <section className="mt-6">
+        <p className="text-sm text-ink-soft">Minutes left</p>
+        <p className="mt-1 font-display text-display tabular-nums text-ink">
+          {count(minutesLeft)}
+        </p>
+        {minuteMax > 0 ? (
+          <div
+            className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2"
+            role="meter"
+            aria-label="Minutes left"
+            aria-valuemin={0}
+            aria-valuemax={minuteMax}
+            aria-valuenow={minutesLeft}
+          >
+            <div className="h-full bg-accent" style={{ width: `${minuteLeftPct}%` }} />
           </div>
-          <dl className="grid min-w-[12rem] gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">Minutes</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
-                {bucketLabel(pack.minutesUsed, pack.minutesIncluded)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">SMS</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
-                {bucketLabel(pack.smsUsed, pack.smsIncluded)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">Email</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
-                {bucketLabel(pack.emailUsed, pack.emailIncluded)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">WhatsApp</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
-                {bucketLabel(pack.waUsed, pack.waIncluded)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-ink-soft">Seats</dt>
-              <dd className="mt-1 text-lg font-semibold text-ink">
-                {bucketLabel(pack.seatsUsed, pack.seatsIncluded)}
-              </dd>
-            </div>
-          </dl>
-        </div>
+        ) : (
+          <p className="mt-2 text-sm text-ink-soft">No package minutes</p>
+        )}
 
-        <dl className="mt-8 grid gap-3 border-t border-line pt-6 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <dt className="text-ink-soft">Inbound</dt>
-            <dd className="mt-1 font-medium text-ink">KES {inboundMin}/min</dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">Outbound</dt>
-            <dd className="mt-1 font-medium text-ink">KES {outboundMin}/min</dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">WhatsApp</dt>
-            <dd className="mt-1 font-medium text-ink">KES {pack.rates.whatsappKes}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-soft">SMS / email</dt>
-            <dd className="mt-1 font-medium text-ink">
-              KES {pack.rates.smsKes} / {pack.rates.emailKes}
-            </dd>
-          </div>
-        </dl>
+        <table className="mt-6 w-full text-left text-sm">
+          <caption className="sr-only">Included amounts</caption>
+          <thead className="border-b border-line text-ink-soft">
+            <tr>
+              <th scope="col" className="py-2 pr-3 font-medium">Included</th>
+              <th scope="col" className="px-3 py-2 text-right font-medium">Left</th>
+              <th scope="col" className="py-2 pl-3 text-right font-medium">Used</th>
+            </tr>
+          </thead>
+          <tbody>
+            {buckets.map((row) => (
+              <tr key={row.label} className="border-b border-line">
+                <th scope="row" className="py-3 pr-3 font-normal text-ink">{row.label}</th>
+                <td className="px-3 py-3 text-right font-medium tabular-nums text-ink">{count(row.left)}</td>
+                <td className="py-3 pl-3 text-right tabular-nums text-ink-soft">{count(row.used)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <div className="mt-6">
@@ -182,6 +169,35 @@ export default async function WalletPage({
           enabled={Boolean(tenant.on_demand_usage_enabled)}
         />
       </div>
+
+      <section className="mt-6">
+        <h2 className="font-display text-xl tracking-tight text-ink">On-demand rates</h2>
+        <table className="mt-3 w-full text-left text-sm">
+          <caption className="sr-only">Prices past the included amounts</caption>
+          <tbody>
+            <tr className="border-b border-line">
+              <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls in</th>
+              <td className="py-3 text-right tabular-nums text-ink">KES {kes(inboundMin)}/min</td>
+            </tr>
+            <tr className="border-b border-line">
+              <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls out</th>
+              <td className="py-3 text-right tabular-nums text-ink">KES {kes(outboundMin)}/min</td>
+            </tr>
+            <tr className="border-b border-line">
+              <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>
+              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.smsKes)}</td>
+            </tr>
+            <tr className="border-b border-line">
+              <th scope="row" className="py-3 pr-3 font-normal text-ink">Email</th>
+              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.emailKes)}</td>
+            </tr>
+            <tr className="border-b border-line">
+              <th scope="row" className="py-3 pr-3 font-normal text-ink">WhatsApp</th>
+              <td className="py-3 text-right tabular-nums text-ink">KES {kes(pack.rates.whatsappKes)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
 
       <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
         <h2 className="px-4 pt-4 font-display text-xl tracking-tight text-ink">Activity</h2>

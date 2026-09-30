@@ -1,14 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { brandAssets } from "@/components/brand/assets";
+import { PackagePrices } from "@/components/marketing/PackagePrices";
+import { strawPublicBoard, type PublicPackageBoard } from "@/lib/packageCatalog";
 
 /**
- * Logged-out marketing home: one hero composition.
- * brand → value → single CTA group. Authenticated users never see this.
+ * Logged-out marketing home: hero, then the package table.
+ * Authenticated users never see this.
  */
-export function LandingPage() {
+export function LandingPage({ board }: { board?: PublicPackageBoard }) {
+  const offers = board ?? strawPublicBoard();
   return (
-    <main className="relative min-h-dvh overflow-hidden">
+    <main>
+      <section className="relative min-h-dvh overflow-hidden">
       {/* Full-bleed brand visual plane */}
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <div className="absolute inset-0 bg-brand-900" />
@@ -30,12 +34,20 @@ export function LandingPage() {
           <span className="font-display text-lg tracking-tight text-white sm:text-xl">
             Scalers
           </span>
-          <Link
-            href="/login"
-            className="rounded-xl px-3 py-2 text-sm font-medium text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
-          >
-            Sign in
-          </Link>
+          <nav className="flex items-center gap-2">
+            <a
+              href="#packages"
+              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              Packages
+            </a>
+            <Link
+              href="/login"
+              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-white/85 hover:text-white focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              Sign in
+            </Link>
+          </nav>
         </header>
 
         <section className="flex flex-1 flex-col justify-center py-16 sm:py-20">
@@ -86,6 +98,13 @@ export function LandingPage() {
           Built for local businesses in Kenya that can&apos;t afford a missed lead.
         </p>
       </div>
+      </section>
+
+      <section id="packages" className="bg-canvas px-6 py-16 text-ink sm:px-8">
+        <div className="mx-auto max-w-desk">
+          <PackagePrices board={offers} />
+        </div>
+      </section>
     </main>
   );
 }
