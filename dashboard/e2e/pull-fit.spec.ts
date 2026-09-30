@@ -120,7 +120,6 @@ async function swipeDown(page: Page) {
       if (markEl) break;
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
-    const markEl = document.querySelector("[data-pull-refresh]");
     const markBox = markEl?.getBoundingClientRect() ?? null;
     const tab = document.querySelector("[data-desk-tabbar]");
     const tabShown =
@@ -171,28 +170,28 @@ test.describe("desk pull and fit", () => {
     test.skip(!phone(testInfo), "Bottom tabs are the phone nav");
     await page.goto("/dev/home");
     await settle(page);
-    await expect(page.locator("[data-desk-tabbar]")).toBeVisible();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(1);
     await page.goto("/dev/contacts");
     await settle(page);
-    await expect(page.locator("[data-desk-tabbar]")).toBeVisible();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(1);
     await page.goto("/dev/usage");
     await settle(page);
-    await expect(page.locator("[data-desk-tabbar]")).toBeVisible();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(1);
     await page.goto("/dev/settings");
     await settle(page);
-    await expect(page.locator("[data-desk-tabbar]")).toBeVisible();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(1);
     await page.goto("/dev/ticket");
     await settle(page);
-    await expect(page.locator("[data-desk-tabbar]")).toHaveCount(0);
-    await page.getByRole("link", { name: "Home" }).click();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(0);
+    await page.getByRole("link", { name: "Inbox" }).click();
     await expect(page).toHaveURL(/\/dev\/home/);
-    await expect(page.locator("[data-desk-tabbar]")).toBeVisible();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(1);
     await page.goto("/dev/contacts/file");
     await settle(page);
-    await expect(page.locator("[data-desk-tabbar]")).toHaveCount(0);
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(0);
     await page.getByRole("link", { name: "Contacts" }).click();
     await expect(page).toHaveURL(/\/dev\/contacts$/);
-    await expect(page.locator("[data-desk-tabbar]")).toBeVisible();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(1);
   });
 
   test("wide layouts keep the rail and hide bottom tabs", async ({ page }, testInfo) => {
@@ -200,10 +199,10 @@ test.describe("desk pull and fit", () => {
     await page.goto("/dev/home");
     await settle(page);
     await expect(page.locator("[data-desk-rail]")).toBeVisible();
-    await expect(page.locator("[data-desk-tabbar]")).toBeHidden();
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(0);
     await page.goto("/dev/ticket");
     await settle(page);
-    await expect(page.locator("[data-desk-tabbar]")).toHaveCount(0);
+    await expect(page.locator("[data-desk-tabbar]:visible")).toHaveCount(0);
   });
 
   test("phone pull refreshes Home and Usage at the top only", async ({ page }, testInfo) => {
