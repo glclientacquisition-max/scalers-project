@@ -97,8 +97,26 @@ assert.match(
 
 assert.match(
   source,
-  /!bareCloser && looksLikePhaticCallerTurn\(clean\)/,
-  'how-are-you turns must speak a local line and skip Gemini; closers must not'
+  /const localReply = resolveLocalReply\(\{[\s\S]*?nextBestAction,\s*\}\);/,
+  'every caller turn must pass the one local turn contract (turnPolicy.resolveLocalReply) before Gemini'
+);
+
+assert.match(
+  source,
+  /guardSpokenReply\(prepareStreamedSpeech\(String\(chunk \|\| ''\)\)/,
+  'streamed chunks must pass the speech guard before TTS'
+);
+
+assert.match(
+  source,
+  /guardToolPlan\(\s*ensureRequiredEscalate\(\s*ensureRequiredCreateRequest\(/,
+  'Gemini tool markers must pass the tool guard after required-tool injection'
+);
+
+assert.match(
+  source,
+  /finalSpeechGuardOpts\(callSid, execution\.results\)/,
+  'final spoken reply must carry state, profile, and tool results into the speech guard'
 );
 
 assert.match(
@@ -342,9 +360,9 @@ assert.match(
 );
 
 assert.match(
-  source,
+  fs.readFileSync(path.join(__dirname, '..', 'src/conversation/turnPolicy.js'), 'utf8'),
   /pickIdentityReply/,
-  'who-are-you must be a local name-plus-shop line'
+  'who-are-you must be a local name-plus-shop line inside the turn contract'
 );
 
 assert.match(

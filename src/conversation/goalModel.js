@@ -8,6 +8,7 @@ const {
   hasConcreteUrgentNeed,
   looksLikeUrgentContact,
 } = require('./callCorrectives');
+const { whenNeedsClockTime } = require('./visitTime');
 
 const GOAL_REQUIREMENTS = Object.freeze({
   price: [{ slot: 'subject', anyOf: ['product', 'service', 'requestedItem'] }],
@@ -50,6 +51,10 @@ function slotFilled(state, requirement) {
 function missingGoalSlots(state, profile = {}) {
   const intent = String(state?.intent || 'unknown');
   const requirements = [...(GOAL_REQUIREMENTS[intent] || [])];
+  // A product order needs a count before it is saved. Never guess one.
+  if (intent === 'order' && entityValue(state?.entities?.product)) {
+    requirements.splice(2, 0, { slot: 'quantity', anyOf: ['quantity'] });
+  }
   if (intent === 'location') {
     const locations = normalizeLocations(profile.businessLocations);
     if (locations.length > 1) {
@@ -65,22 +70,42 @@ function missingGoalSlots(state, profile = {}) {
   const missing = requirements
     .filter((requirement) => !slotFilled(state, requirement))
     .map((requirement) => requirement.slot);
-  if (visitDecision?.ask && !missing.includes('location')) {
-    missing.push('location');
+  if (visitDecision?.ask) {
+    const slot = visitDecision.askArea ? 'area' : 'location';
+    if (!missing.includes(slot)) missing.push(slot);
   }
   if (intent === 'human' && urgentContactNeedsReason(state) && !missing.includes('reason')) {
     missing.push('reason');
   }
+  if (
+    homeVisit &&
+    !missing.includes('when') &&
+    whenNeedsClockTime(state, { ...profile, vertical: vertical || profile.vertical })
+  ) {
+    missing.push('time');
+  }
   return missing;
 }
 
+/**
+ * "Contact me urgently" needs a name and a need before notify. The name turn
+ * ("Dennis.") is not the need. Any concrete turn from the urgent ask onward is.
+ */
 function urgentContactNeedsReason(state) {
   const desc = String(state?.goal?.description || '');
-  const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
-  const urgent =
-    looksLikeUrgentContact(desc) || looksLikeUrgentContact(latest);
-  if (!urgent) return false;
-  return !hasConcreteUrgentNeed(desc) && !hasConcreteUrgentNeed(latest);
+  const turns = Array.isArray(state?.conversation?.answersReceived)
+    ? state.conversation.answersReceived
+    : [];
+  const urgentAt = turns.findIndex((turn) => looksLikeUrgentContact(turn));
+  if (urgentAt < 0 && !looksLikeUrgentContact(desc)) return false;
+  if (entityValue(state?.entities?.reason)) return false;
+  const name = String(state?.caller?.name || '').trim().toLowerCase();
+  const candidates = [desc, ...turns.slice(Math.max(0, urgentAt))];
+  return !candidates.some((turn) => {
+    const clean = String(turn || '').trim().toLowerCase().replace(/[.!?]+$/, '');
+    if (!clean || clean === name) return false;
+    return hasConcreteUrgentNeed(turn);
+  });
 }
 
 function homeVisitDecision(state, profile = {}) {
@@ -90,6 +115,7 @@ function homeVisitDecision(state, profile = {}) {
   return decideVisitPlace(place, {
     profile,
     detailAsked: Boolean(state?.conversation?.locationDetailAsked),
+    areaAsked: Boolean(state?.conversation?.areaAsked),
     refusals: Number(state?.conversation?.locationRefusals || 0),
   });
 }
@@ -153,7 +179,10 @@ function formatVisitSopForPrompt(state) {
       if (slot === 'location') return !decision?.bookable;
       return !visitSopSlotValue(state, slot);
     });
-    if (next === 'location' && decision?.quality === 'area_only') {
+    if (next === 'location' && decision?.askArea) {
+      nextLine =
+        'You have a landmark but not the area. Ask once which area or estate it is in. Do not refuse. Never say landmark.';
+    } else if (next === 'location' && decision?.quality === 'area_only') {
       nextLine =
         'You have the area. Ask once which building, gate, or junction. Never say landmark.';
     } else if (next) {
@@ -177,10 +206,13 @@ function clarificationForSlot(slot) {
     when: 'Name the job you have, then ask for the day and time.',
     when_or_reference: 'Name the open visit if you have it, then ask for the new time or the visit to cancel.',
     branch: 'Ask which branch or location they mean.',
+    time: 'You have the day. Ask only what time that day, or morning or afternoon. Do not invent a time. Do not call the tool yet.',
     location:
       'Name the job and time you have, then ask where we should come: "Where should we come?" If you already have an area, ask once which building, gate, or junction. Never say landmark.',
     landmark:
       'Name the job and time you have, then ask where we should come: "Where should we come?" If you already have an area, ask once which building, gate, or junction. Never say landmark.',
+    area:
+      'You have the place but cannot tell which area it is in. Ask once: "Which area is that in?" Do not refuse. Do not call the tool yet. Never say landmark.',
   };
   return hints[slot] || `Ask for ${slot}.`;
 }
