@@ -17,7 +17,7 @@ Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend do
 
 - Colors: `canvas`, `surface`, `surface-2`, `hairline`, `ink`, `ink-2`, `ink-3`, `accent`, `accent-tonal`, `brand`, `attention`, `ok`, `whatsapp`. No hex in `.tsx`.
 - `#005CCC` (`accent`) is the only filled action color. One filled action per viewport. `#0096FF` (`brand`) is the mark, the focus ring, and the active indicator. Never for text.
-- Radius by role: `rounded-sm` chips and inline fields, `rounded-md` controls, `rounded-lg` sheets and dialogs, `rounded-full` avatars and dots.
+- Radius by role: `rounded-md` chips and tooltips, `rounded-xl` controls, fields, and menus, `rounded-2xl` sheets and cards, `rounded-full` avatars, dots, and icon buttons. Nothing else.
 - Type: `text-caption`, `text-meta`, `text-body`, `text-title`, `text-page`, `text-display`. Numbers are `tabular-nums`.
 - System UI font in the app. Sora only on marketing.
 
