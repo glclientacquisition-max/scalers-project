@@ -101,10 +101,7 @@ describe("admin console polish", () => {
     assert.match(read("dashboard/src/components/AdminBusinessesPanel.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminWalletsPanel.tsx"), /btnPrimary/);
     assert.match(read("dashboard/src/components/AdminVoicesManager.tsx"), /btnPrimary/);
-    assert.match(
-      read("dashboard/src/components/BuyNumberPanel.tsx"),
-      /bg-accent-fill[\s\S]*text-accent-on-fill/
-    );
+    assert.match(read("dashboard/src/components/BuyNumberPanel.tsx"), /btnPrimary/);
   });
 
   it("renders overview attention as a dense table with row tap", () => {
@@ -117,14 +114,15 @@ describe("admin console polish", () => {
     assert.doesNotMatch(page, /Manage →/);
   });
 
-  it("lists businesses in one dense table", () => {
+  it("lists businesses as identity rows with package, wallet, and actions", () => {
     const panel = read("dashboard/src/components/AdminBusinessesPanel.tsx");
-    assert.match(panel, /<table/);
+    assert.match(panel, /AdminIdentityRow/);
     assert.doesNotMatch(panel, /lg:hidden/);
+    assert.doesNotMatch(panel, /rounded-2xl/);
     assert.match(panel, /Assign next number/);
     assert.match(panel, /Adjust wallet/);
-    assert.match(panel, />Package</);
     assert.match(panel, /b\.package_name/);
+    assert.match(panel, /wallet_balance_kes/);
   });
 
   it("lists DID pool rows in one dense table", () => {
@@ -135,7 +133,7 @@ describe("admin console polish", () => {
     assert.match(panel, /Assign next available/);
   });
 
-  it("standardizes admin page titles on text-2xl", () => {
+  it("uses the desk list title on admin list roots", () => {
     for (const rel of [
       "dashboard/src/app/admin/(console)/wallets/page.tsx",
       "dashboard/src/app/admin/(console)/packages/page.tsx",
@@ -144,18 +142,19 @@ describe("admin console polish", () => {
       "dashboard/src/app/admin/(console)/numbers/page.tsx",
     ]) {
       const src = read(rel);
-      assert.match(src, /font-display text-2xl tracking-tight/);
-      assert.doesNotMatch(src, /font-display text-3xl/);
-      assert.doesNotMatch(src, /font-display text-4xl/);
+      assert.match(src, /deskListTitleClass/);
     }
   });
 
-  it("documents the admin left-rail exception", () => {
+  it("documents the admin shell as the desk geometry with its own links", () => {
     const master = read("docs/frontend/design-system/MASTER.md");
     assert.match(master, /## Super Admin/);
-    assert.match(master, /labeled navy sidebar on `lg\+`/);
-    assert.match(master, /Do not copy the ops sidebar onto `\(desk\)`/);
+    assert.match(master, /ADMIN_LINKS/);
+    assert.match(master, /Do not copy the ops shell onto `\(desk\)`/);
+    assert.doesNotMatch(master, /labeled navy sidebar/);
     const page = read("docs/frontend/design-system/pages/admin.md");
-    assert.match(page, /fixed navy labeled sidebar on `lg\+`/);
+    assert.match(page, /Icon rail on `md\+`/);
+    assert.match(page, /Bottom tabs below `md`/);
+    assert.doesNotMatch(page, /navy/);
   });
 });

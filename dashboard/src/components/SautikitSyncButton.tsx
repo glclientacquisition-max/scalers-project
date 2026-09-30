@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { btnGhost } from "@/components/ui/deskChrome";
 
 type SyncDiagnostics = {
   configured?: boolean;
@@ -52,7 +53,7 @@ export function SautikitSyncButton() {
           type="button"
           onClick={sync}
           disabled={busy}
-          className="rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--ink)] hover:border-[var(--accent)] disabled:opacity-60"
+          className={btnGhost}
         >
           {busy ? "Syncing…" : "Sync from SautiKit"}
         </button>

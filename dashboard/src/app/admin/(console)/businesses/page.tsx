@@ -1,4 +1,5 @@
 import { AdminSetupError } from "@/components/AdminSetupError";
+import { deskListTitleClass } from "@/components/ui/deskChrome";
 import { AdminBusinessesPanel } from "@/components/AdminBusinessesPanel";
 import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
@@ -17,7 +18,7 @@ export default async function AdminBusinessesPage() {
 
   return (
     <div>
-      <h2 className="font-display text-2xl tracking-tight">Businesses</h2>
+      <h1 className={deskListTitleClass}>Businesses</h1>
       <div className="mt-6">
         <AdminBusinessesPanel
           businesses={overview.businesses}

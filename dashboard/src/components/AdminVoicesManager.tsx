@@ -2,7 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import {
+  AdminIdentityList,
+  AdminIdentityRow,
+  adminRowActionClass,
+  adminRowDangerClass,
+  adminRowMutedClass,
+} from "@/components/AdminIdentityList";
+import { btnGhost, btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { Empty } from "@/components/ui/Empty";
 import type { PlatformSonioxVoiceRow } from "@/lib/sonioxVoiceCatalog";
 
 export function AdminVoicesManager({
@@ -52,8 +60,8 @@ export function AdminVoicesManager({
 
   return (
     <div className="space-y-8">
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl tracking-tight">
+      <div className="border-b border-line/70 pb-6">
+        <h2 className="text-title font-medium text-ink">
           {editingId ? "Edit voice" : "Add Soniox voice"}
         </h2>
         <form
@@ -77,7 +85,7 @@ export function AdminVoicesManager({
               onChange={(e) => setId(e.target.value)}
               required
               disabled={Boolean(editingId)}
-              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 font-mono text-sm disabled:opacity-60"
+              className={`mt-1 font-mono ${deskFieldClass} disabled:opacity-60`}
               placeholder="7b197f3c-84b4-4404-986f-114e4dac1432"
             />
           </label>
@@ -87,7 +95,7 @@ export function AdminVoicesManager({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={160}
-              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+              className={`mt-1 ${deskFieldClass}`}
               placeholder="Warm Kenyan receptionist tone"
             />
           </label>
@@ -100,7 +108,7 @@ export function AdminVoicesManager({
                 max={9999}
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className="mt-1 w-28 rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                className={`mt-1 w-28 ${deskFieldClass}`}
               />
             </label>
             <label className="flex items-center gap-2 pb-2 text-sm">
@@ -122,7 +130,7 @@ export function AdminVoicesManager({
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+                className={btnGhost}
               >
                 Cancel
               </button>
@@ -136,97 +144,81 @@ export function AdminVoicesManager({
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
-        <h2 className="font-display text-2xl tracking-tight">Catalog</h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]">
-          {initialVoices.length} voice{initialVoices.length === 1 ? "" : "s"} in
-          the platform allowlist.
+      <div>
+        <h2 className="text-title font-medium text-ink">Catalog</h2>
+        <p className="mt-1 text-meta text-ink-2">
+          {initialVoices.length} voice{initialVoices.length === 1 ? "" : "s"} in the platform allowlist.
         </p>
-        <ul className="mt-4 divide-y divide-[var(--line)]">
-          {initialVoices.map((voice) => (
-            <li
-              key={voice.id}
-              className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-[var(--ink)]">
-                  {voice.description || "Untitled voice"}
-                  {voice.is_default ? (
-                    <span className="ml-2 text-xs font-normal text-[var(--accent)]">
-                      Default
-                    </span>
-                  ) : null}
-                  {!voice.is_active ? (
-                    <span className="ml-2 text-xs font-normal text-[var(--ink-soft)]">
-                      Inactive
-                    </span>
-                  ) : null}
-                </p>
-                <p className="mt-1 break-all font-mono text-xs text-[var(--ink-soft)]">
-                  {voice.id}
-                </p>
-                <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                  Sort {voice.sort_order}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => startEdit(voice)}
-                  className="rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium"
-                >
-                  Edit
-                </button>
-                {!voice.is_default ? (
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => void run({ action: "set_default", id: voice.id })}
-                    className="rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium"
-                  >
-                    Make default
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() =>
-                    void run({
-                      action: "set_active",
-                      id: voice.id,
-                      is_active: !voice.is_active,
-                    })
+        {!initialVoices.length ? (
+          <Empty title="No voices yet." line="Add a Soniox voice UUID above." />
+        ) : (
+          <AdminIdentityList label="Voices">
+            {initialVoices.map((voice) => {
+              const flags = [
+                voice.is_default ? "Default" : "",
+                voice.is_active ? "" : "Inactive",
+                `Sort ${voice.sort_order}`,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <AdminIdentityRow
+                  key={voice.id}
+                  title={voice.description || "Untitled voice"}
+                  line={voice.id}
+                  aside={flags}
+                  actions={
+                    <>
+                      <button type="button" disabled={pending} onClick={() => startEdit(voice)} className={adminRowMutedClass}>
+                        Edit
+                      </button>
+                      {!voice.is_default ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => void run({ action: "set_default", id: voice.id })}
+                          className={adminRowActionClass}
+                        >
+                          Make default
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          void run({
+                            action: "set_active",
+                            id: voice.id,
+                            is_active: !voice.is_active,
+                          })
+                        }
+                        className={adminRowMutedClass}
+                      >
+                        {voice.is_active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          if (
+                            confirm(
+                              "Remove this voice from the catalog? Workspaces using it will fall back to the default."
+                            )
+                          ) {
+                            void run({ action: "delete", id: voice.id });
+                          }
+                        }}
+                        className={adminRowDangerClass}
+                      >
+                        Delete
+                      </button>
+                    </>
                   }
-                  className="rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium"
-                >
-                  {voice.is_active ? "Deactivate" : "Activate"}
-                </button>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Remove this voice from the catalog? Workspaces using it will fall back to the default."
-                      )
-                    ) {
-                      void run({ action: "delete", id: voice.id });
-                    }
-                  }}
-                  className="rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--warn)]"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-          {!initialVoices.length ? (
-            <li className="py-6 text-sm text-[var(--ink-soft)]">
-              No voices yet. Add your first Soniox cloned voice UUID above.
-            </li>
-          ) : null}
-        </ul>
+                />
+              );
+            })}
+          </AdminIdentityList>
+        )}
       </div>
     </div>
   );

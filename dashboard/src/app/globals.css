@@ -88,8 +88,8 @@
 }
 
 /*
- * Dark desk palette. Scoped to .desk-theme (the owner desk); marketing, auth,
- * onboarding, and admin stay light. Activation: <html data-theme="dark">, or
+ * Dark palette for the owner desk and the Super Admin shell. Marketing, auth,
+ * and onboarding stay light. Activation: <html data-theme="dark">, or
  * system dark with no explicit choice. The two blocks must stay in sync.
  */
 :root[data-theme="dark"] .desk-theme,
@@ -158,13 +158,15 @@
   }
 }
 
-:root[data-theme="dark"] .desk-theme ::selection {
+:root[data-theme="dark"] .desk-theme ::selection,
+:root[data-theme="dark"] .admin-theme ::selection {
   background: color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--ink);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .desk-theme ::selection {
+  :root:not([data-theme="light"]) .desk-theme ::selection,
+  :root:not([data-theme="light"]) .admin-theme ::selection {
     background: color-mix(in srgb, var(--accent) 45%, transparent);
     color: var(--ink);
   }
@@ -181,20 +183,29 @@
   caret-color: var(--ink);
 }
 
+.admin-theme {
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+
 /* Shell is position:fixed. Do not scroll the light canvas out from under it. */
 html:has(.desk-theme),
-html:has(.desk-theme) body {
+html:has(.desk-theme) body,
+html:has([data-admin-shell]),
+html:has([data-admin-shell]) body {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
 }
 
-:root[data-theme="dark"] body:has(.desk-theme) {
+:root[data-theme="dark"] body:has(.desk-theme),
+:root[data-theme="dark"] body:has([data-admin-shell]) {
   background: #0b1220;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) body:has(.desk-theme) {
+  :root:not([data-theme="light"]) body:has(.desk-theme),
+  :root:not([data-theme="light"]) body:has([data-admin-shell]) {
     background: #0b1220;
   }
 }
@@ -205,6 +216,21 @@ html:has(.desk-theme) body {
   color: var(--ink);
   caret-color: var(--ink);
   color-scheme: inherit;
+}
+
+.admin-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+.admin-theme textarea,
+.admin-theme select {
+  color: var(--ink);
+  caret-color: var(--ink);
+  color-scheme: inherit;
+}
+
+/* iOS zooms focused fields under 16px. Admin fields stay 16px at every width. */
+.admin-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="color"]),
+.admin-theme textarea,
+.admin-theme select {
+  font-size: 16px;
 }
 
 /* iOS zooms focused fields under 16px. Phone desk fields stay 16px. Zoom stays on. */
@@ -224,12 +250,15 @@ html:has(.desk-theme) body {
 }
 
 .desk-theme input::placeholder,
-.desk-theme textarea::placeholder {
+.desk-theme textarea::placeholder,
+.admin-theme input::placeholder,
+.admin-theme textarea::placeholder {
   color: color-mix(in srgb, var(--ink-soft) 70%, transparent);
   opacity: 1;
 }
 
-.desk-theme option {
+.desk-theme option,
+.admin-theme option {
   color: var(--ink);
   background-color: var(--card);
 }
@@ -238,11 +267,27 @@ html:has(.desk-theme) body {
 .desk-theme input:-webkit-autofill:hover,
 .desk-theme input:-webkit-autofill:focus,
 .desk-theme textarea:-webkit-autofill,
-.desk-theme select:-webkit-autofill {
+.desk-theme select:-webkit-autofill,
+.admin-theme input:-webkit-autofill,
+.admin-theme input:-webkit-autofill:hover,
+.admin-theme input:-webkit-autofill:focus,
+.admin-theme textarea:-webkit-autofill,
+.admin-theme select:-webkit-autofill {
   -webkit-text-fill-color: var(--ink);
   caret-color: var(--ink);
   box-shadow: 0 0 0 1000px var(--card) inset;
   border-color: var(--line);
+}
+
+@media (max-width: 767px) {
+  .admin-theme[data-admin-nested] {
+    --desk-tabbar-h: 0px;
+    --desk-tabbar-clearance: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  }
+
+  .admin-theme[data-admin-nested] [data-admin-tabbar] {
+    display: none;
+  }
 }
 
 @media (max-width: 767px) {

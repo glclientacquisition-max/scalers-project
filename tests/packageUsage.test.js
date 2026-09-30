@@ -128,7 +128,7 @@ describe("package usage meter", () => {
     const panel = read("dashboard/src/components/AdminBusinessesPanel.tsx");
     assert.match(admin, /loadBusinessPackageNames/);
     assert.match(admin, /package_name: pack\?\.packageName \|\| null/);
-    assert.match(panel, />Package</);
     assert.match(panel, /b\.package_name/);
+    assert.match(panel, /packLabel/);
   });
 });

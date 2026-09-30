@@ -69,7 +69,7 @@ The desk (`app/(desk)`) ships a dark palette; marketing, auth, onboarding, and a
 
 ## Super Admin
 
-Ops console (`/admin`) keeps a labeled navy sidebar on `lg+`, horizontal nav below `lg`. Owner desk uses a compact icon rail (`DESK_LINKS`) on `md+` and bottom tabs below `md`. Admin stays light. Do not copy the ops sidebar onto `(desk)`. Page note: [`pages/admin.md`](pages/admin.md).
+Ops console (`/admin`) uses `ADMIN_LINKS`: icon rail on `md+`, bottom tabs below `md`. Same canvas, ink, hairline, and focus ring as the owner desk. Owner desk keeps `DESK_LINKS`. Do not copy the ops shell onto `(desk)`, and do not import either link list into the other shell. Page note: [`pages/admin.md`](pages/admin.md).
 
 ---
 

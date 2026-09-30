@@ -4,7 +4,15 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBusiness } from "@/lib/admin";
 import type { PendingTenant } from "@/lib/didPool";
-import { btnPrimary } from "@/components/ui/deskChrome";
+import {
+  AdminIdentityList,
+  AdminIdentityRow,
+  adminRowActionClass,
+  adminRowDangerClass,
+  adminRowMutedClass,
+} from "@/components/AdminIdentityList";
+import { btnGhost, btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { Empty } from "@/components/ui/Empty";
 
 function statusLabel(status: AdminBusiness["status"]) {
   if (status === "waiting") return "Waiting for number";
@@ -65,7 +73,7 @@ export function AdminBusinessesPanel({
             type="button"
             disabled={pending || availableDidCount === 0}
             onClick={() => void run({ action: "assign_next", business_id: b.id })}
-            className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)] disabled:opacity-50"
+            className={adminRowActionClass}
           >
             Assign next number
           </button>
@@ -75,7 +83,7 @@ export function AdminBusinessesPanel({
             type="button"
             disabled={pending}
             onClick={() => void run({ action: "release_did", business_id: b.id })}
-            className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]"
+            className={adminRowMutedClass}
           >
             Release number
           </button>
@@ -88,7 +96,7 @@ export function AdminBusinessesPanel({
             setDeltaKes("1000");
             setAdjustNote("Wallet top-up");
           }}
-          className="text-sm text-[var(--accent)] hover:text-[var(--accent-deep)]"
+          className={adminRowActionClass}
         >
           Adjust wallet
         </button>
@@ -99,7 +107,7 @@ export function AdminBusinessesPanel({
             setConfirmRemoveId(b.id);
             setConfirmText("");
           }}
-          className="text-sm text-[var(--warn)] hover:underline"
+          className={adminRowDangerClass}
         >
           Remove
         </button>
@@ -134,7 +142,7 @@ export function AdminBusinessesPanel({
           <input
             value={query}
             onChange={(e) => setQueryAndReset(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+            className={`mt-1 ${deskFieldClass}`}
             placeholder="Name or phone number"
           />
         </label>
@@ -145,66 +153,29 @@ export function AdminBusinessesPanel({
 
       {error ? <p className="text-sm text-[var(--warn)]">{error}</p> : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
-        <table className="w-full min-w-[980px] text-left text-sm">
-          <thead className="bg-[var(--bg-deep)]/70 text-ink-soft">
-            <tr>
-              <th className="px-4 py-3 font-medium">Business</th>
-              <th className="px-4 py-3 font-medium">Phone number</th>
-              <th className="px-4 py-3 font-medium">Package</th>
-              <th className="px-4 py-3 font-medium">Wallet</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-ink-soft">
-                  No businesses match.
-                </td>
-              </tr>
-            ) : (
-              pageRows.map((b) => {
-                const waiting = b.status === "waiting";
-                const kes = Number(b.wallet_balance_kes ?? b.telecom_wallet_balance_kes ?? 0);
-                const packLabel = b.package_name
-                  ? `${b.package_name}${b.package_period ? ` / ${b.package_period}` : ""}`
-                  : "None";
-                return (
-                  <tr key={b.id} className="border-t border-line/70 align-top hover:bg-accent-soft/40">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{b.business_name}</p>
-                      <p className="text-xs text-ink-soft">
-                        {new Date(b.created_at).toLocaleDateString("en-KE")}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {waiting ? (
-                        <span className="text-ink-soft">Not assigned</span>
-                      ) : (
-                        b.sautikit_virtual_number
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{packLabel}</td>
-                    <td className="px-4 py-3 text-xs leading-relaxed">
-                      <p>KES {kes.toLocaleString("en-KE")}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-[var(--bg-deep)] px-2.5 py-1 text-xs">
-                        {statusLabel(b.status)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Actions b={b} />
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      {pageRows.length === 0 ? (
+        <Empty title="No businesses match." />
+      ) : (
+        <AdminIdentityList label="Businesses">
+          {pageRows.map((b) => {
+            const waiting = b.status === "waiting";
+            const kes = Number(b.wallet_balance_kes ?? b.telecom_wallet_balance_kes ?? 0);
+            const packLabel = b.package_name
+              ? `${b.package_name}${b.package_period ? ` / ${b.package_period}` : ""}`
+              : "None";
+            const phone = waiting ? "Not assigned" : b.sautikit_virtual_number;
+            return (
+              <AdminIdentityRow
+                key={b.id}
+                title={b.business_name}
+                line={`${phone} · ${packLabel}`}
+                aside={`KES ${kes.toLocaleString("en-KE")} · ${statusLabel(b.status)}`}
+                actions={<Actions b={b} />}
+              />
+            );
+          })}
+        </AdminIdentityList>
+      )}
 
       {filtered.length > PAGE_SIZE ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -217,7 +188,7 @@ export function AdminBusinessesPanel({
               type="button"
               disabled={safePage <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="min-h-11 rounded-lg border border-line px-3 text-sm disabled:opacity-40"
+              className={`${btnGhost} disabled:opacity-40`}
             >
               Previous
             </button>
@@ -225,7 +196,7 @@ export function AdminBusinessesPanel({
               type="button"
               disabled={safePage >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="min-h-11 rounded-lg border border-line px-3 text-sm disabled:opacity-40"
+              className={`${btnGhost} disabled:opacity-40`}
             >
               Next
             </button>
@@ -234,7 +205,7 @@ export function AdminBusinessesPanel({
       ) : null}
 
       {adjustId ? (
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5">
+        <div className="border-t border-line/70 pt-4">
           <p className="font-medium">Adjust wallet</p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
             Single KES prepaid wallet. Positive credits, negative debits. Writes a ledger entry.
@@ -246,7 +217,7 @@ export function AdminBusinessesPanel({
               <input
                 value={deltaKes}
                 onChange={(e) => setDeltaKes(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                className={`mt-1 ${deskFieldClass}`}
               />
             </label>
             <label className="text-sm">
@@ -254,7 +225,7 @@ export function AdminBusinessesPanel({
               <input
                 value={adjustNote}
                 onChange={(e) => setAdjustNote(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                className={`mt-1 ${deskFieldClass}`}
               />
             </label>
           </div>
@@ -277,7 +248,7 @@ export function AdminBusinessesPanel({
             <button
               type="button"
               onClick={() => setAdjustId(null)}
-              className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm"
+              className={btnGhost}
             >
               Cancel
             </button>
@@ -286,7 +257,7 @@ export function AdminBusinessesPanel({
       ) : null}
 
       {confirmRemoveId ? (
-        <div className="rounded-2xl border border-[var(--warn)]/40 bg-white p-5">
+        <div className="border-t border-attention/40 pt-4">
           <p className="font-medium text-[var(--warn)]">Remove this business?</p>
           <p className="mt-2 text-sm text-[var(--ink-soft)] leading-relaxed">
             This releases its phone number back to Available, deletes its call history, and removes
@@ -296,7 +267,7 @@ export function AdminBusinessesPanel({
           <input
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
-            className="mt-3 w-full max-w-xs rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+            className={`mt-3 max-w-xs ${deskFieldClass}`}
             placeholder="REMOVE"
           />
           <div className="mt-4 flex gap-3">
@@ -306,14 +277,14 @@ export function AdminBusinessesPanel({
               onClick={() =>
                 void run({ action: "remove", business_id: confirmRemoveId })
               }
-              className="rounded-xl bg-[var(--warn)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="inline-flex min-h-11 items-center rounded-xl bg-attention px-4 text-sm font-medium text-accent-on disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               Confirm remove
             </button>
             <button
               type="button"
               onClick={() => setConfirmRemoveId(null)}
-              className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm"
+              className={btnGhost}
             >
               Cancel
             </button>

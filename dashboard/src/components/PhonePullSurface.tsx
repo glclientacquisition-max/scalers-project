@@ -8,6 +8,7 @@ import { shellPullErrorCopy, shellPullPlan } from "@/lib/endlessList";
 import { DeskError } from "@/components/ui/DeskError";
 import {
   PullRefreshMark,
+  adminGestureScrollTop,
   deskGestureScrollTop,
   elementScrolls,
   pullRootVisible,
@@ -72,7 +73,7 @@ function PhonePullSurface({
   surface,
 }: {
   rootSelector: "[data-desk-main]" | "[data-admin-main]";
-  scroll: "desk" | "window";
+  scroll: "desk" | "window" | "admin";
   yieldToOwned?: boolean;
   surface: "desk" | "admin";
 }) {
@@ -141,7 +142,12 @@ function PhonePullSurface({
 
   const pulling = usePhoneListPull(rootRef, refresh, {
     allow: yieldToOwned ? () => !visibleOwnedPullRoot() : undefined,
-    getScrollTop: scroll === "window" ? () => windowGestureScrollTop() : (target) => deskGestureScrollTop(target),
+    getScrollTop:
+      scroll === "window"
+        ? () => windowGestureScrollTop()
+        : scroll === "admin"
+          ? () => adminGestureScrollTop()
+          : (target) => deskGestureScrollTop(target),
   });
   usePhoneTabRefresh(refresh, () => {
     if (!pullRootVisible(rootRef.current)) return false;
@@ -169,6 +175,6 @@ export function DeskPhonePull() {
   return <PhonePullSurface rootSelector="[data-desk-main]" scroll="desk" yieldToOwned surface="desk" />;
 }
 
-export function AdminPhonePull() {
-  return <PhonePullSurface rootSelector="[data-admin-main]" scroll="window" surface="admin" />;
+export function AdminPhonePull({ scroll = "window" }: { scroll?: "window" | "admin" }) {
+  return <PhonePullSurface rootSelector="[data-admin-main]" scroll={scroll} surface="admin" />;
 }

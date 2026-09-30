@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { AdminSetupError } from "@/components/AdminSetupError";
 import { SautikitTelecomPanel } from "@/components/SautikitTelecomPanel";
-import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
+import { btnGhost, btnPrimary, deskPreviewClass } from "@/components/ui/deskChrome";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { Empty } from "@/components/ui/Empty";
 import { getAdminOverview } from "@/lib/admin";
 import { logAdminError } from "@/lib/adminErrors";
 
@@ -11,10 +13,10 @@ export const instant = false;
 
 function Kpi({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface px-5 py-4">
-      <p className="text-xs uppercase tracking-wide text-ink-soft">{label}</p>
-      <p className="mt-2 font-display text-3xl tracking-tight text-ink">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-ink-soft">{hint}</p> : null}
+    <div className="border-t border-line/70 px-4 py-3 sm:border-l sm:border-t-0 sm:first:border-l-0">
+      <p className="text-body font-medium tabular-nums text-ink">{value}</p>
+      <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>{label}</p>
+      {hint ? <p className={`text-meta text-ink-3 ${deskPreviewClass}`}>{hint}</p> : null}
     </div>
   );
 }
@@ -30,7 +32,7 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="space-y-8">
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid border-y border-line/70 sm:grid-cols-2 lg:grid-cols-4" aria-label="Overview totals">
         <Kpi label="Businesses" value={overview.totalBusinesses} hint={`${overview.activeBusinesses} live`} />
         <Kpi
           label="Waiting for a number"
@@ -62,27 +64,27 @@ export default async function AdminOverviewPage() {
 
       <SautikitTelecomPanel />
 
-      <section className="overflow-hidden rounded-2xl border border-line bg-surface">
-        <h2 className="px-4 pt-4 font-display text-2xl tracking-tight sm:px-5">Needs attention</h2>
+      <section>
+        <h2 className="text-title font-medium text-ink">Needs attention</h2>
         {overview.attention.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-ink-soft sm:px-5">Nothing waiting.</p>
+          <Empty title="Nothing waiting." />
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-ink-soft">
+              <thead className="text-ink-2">
                 <tr className="border-b border-line/70">
-                  <th className="px-4 py-2 font-medium sm:px-5">Business</th>
-                  <th className="px-4 py-2 font-medium sm:px-5">Status</th>
+                  <th className={adminThClass}>Business</th>
+                  <th className={adminThClass}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {overview.attention.map((b) => (
-                  <tr key={b.id} className="relative border-t border-line/70 hover:bg-accent-soft/40">
-                    <td className="px-4 py-3 sm:px-5">
+                  <tr key={b.id} className="relative border-t border-line/70">
+                    <td className={adminTdClass}>
                       <DeskRowHit href="/admin/businesses" label={b.business_name} />
-                      <p className={`${deskRowMutedClass} font-medium text-ink`}>{b.business_name}</p>
+                      <p className={`${deskRowMutedClass} font-medium text-ink ${deskPreviewClass}`}>{b.business_name}</p>
                     </td>
-                    <td className="px-4 py-3 text-ink-soft sm:px-5">
+                    <td className={`${adminTdClass} text-ink-2`}>
                       <span className={deskRowMutedClass}>
                         {b.status === "waiting" ? "Waiting for a number" : "Archived"}
                       </span>

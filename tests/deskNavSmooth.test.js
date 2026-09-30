@@ -150,14 +150,16 @@ describe("desk navigation smoothness", () => {
   });
 
   it("keeps Super Admin nav separate, 44px, and highlighted before commit", () => {
+    const links = read("dashboard/src/lib/adminLinks.ts");
     assert.match(admin, /min-h-11/);
     assert.match(admin, /useLinkStatus/);
     assert.match(admin, /aria-label="Super Admin"/);
     assert.doesNotMatch(admin, /DESK_LINKS/);
+    assert.doesNotMatch(links, /DESK_LINKS/);
     assert.doesNotMatch(admin, /DeskNavHost/);
-    assert.doesNotMatch(admin, /scroll=\{false\}/);
-    assert.match(admin, /href: "\/admin\/packages", label: "Packages"/);
+    assert.match(admin, /scroll=\{false\}/);
+    assert.match(links, /href: "\/admin\/packages", label: "Packages"/);
     assert.match(admin, /deskShiftClass/);
-    assert.match(admin, /focus-visible:ring-brand/);
+    assert.match(admin, /focusRingVisible/);
   });
 });

@@ -57,6 +57,13 @@ function solePullPane(desk: HTMLElement): HTMLElement | null {
   return panes.length === 1 ? panes[0] : null;
 }
 
+/** Admin well. Same gate as the desk: pull only when this scroller is at the top. */
+export function adminGestureScrollTop(): number {
+  const main = document.querySelector("[data-admin-main]");
+  if (!(main instanceof HTMLElement) || !elementScrolls(main)) return 1;
+  return main.scrollTop;
+}
+
 /** Desk well, or the open ticket pane when the well itself does not scroll. */
 export function deskGestureScrollTop(target: EventTarget | null): number {
   const desk = document.querySelector("[data-desk-main]");

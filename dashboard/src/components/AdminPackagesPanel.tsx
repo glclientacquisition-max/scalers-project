@@ -2,7 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
+import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
+import { btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { Empty } from "@/components/ui/Empty";
 import {
   annualPriceKes,
   inboundKesPerMinute,
@@ -87,8 +89,8 @@ export function AdminPackagesPanel({
         </p>
       ) : null}
 
-      <section className="rounded-2xl border border-line bg-surface p-5">
-        <h2 className="font-display text-xl tracking-tight text-ink">On-demand rates</h2>
+      <section className="border-b border-line/70 pb-6">
+        <h2 className="text-title font-medium text-ink">On-demand rates</h2>
         <form
           className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           onSubmit={(event) => {
@@ -200,40 +202,46 @@ export function AdminPackagesPanel({
         </form>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5">
-        <h2 className="font-display text-xl tracking-tight text-ink">Landing</h2>
+      <section className="border-b border-line/70 pb-6">
+        <h2 className="text-title font-medium text-ink">Landing</h2>
         {packs.some((pack) => pack.isActive) ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {packs
-              .filter((pack) => pack.isActive)
-              .map((pack) => (
-                <article key={pack.id} className="rounded-xl border border-line bg-canvas p-4">
-                  <h3 className="font-display text-title text-ink">{pack.name}</h3>
-                  <p className="mt-3 font-display text-page tabular-nums text-ink">
-                    {packagePriceLabel(pack.monthlyPriceKes)}
-                  </p>
-                  <p className="text-meta text-ink-soft">Per month</p>
-                  <p className="mt-3 text-title tabular-nums text-ink">
-                    {packagePriceLabel(annualPriceKes(pack.monthlyPriceKes, rates.annualDiscountPercent))}
-                  </p>
-                  <p className="text-meta text-ink-soft">Per year</p>
-                  <p className="mt-3 text-body tabular-nums text-ink">
-                    {pack.minutes.toLocaleString("en-KE")} min
-                  </p>
-                </article>
-              ))}
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead className="text-ink-2">
+                <tr className="border-b border-line/70">
+                  <th className={adminThClass}>Package</th>
+                  <th className={adminThClass}>Per month</th>
+                  <th className={adminThClass}>Per year</th>
+                  <th className={adminThClass}>Minutes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {packs
+                  .filter((pack) => pack.isActive)
+                  .map((pack) => (
+                    <tr key={pack.id} className="border-t border-line/70">
+                      <td className={`${adminTdClass} font-medium text-ink`}>{pack.name}</td>
+                      <td className={`${adminTdClass} tabular-nums`}>{packagePriceLabel(pack.monthlyPriceKes)}</td>
+                      <td className={`${adminTdClass} tabular-nums`}>
+                        {packagePriceLabel(annualPriceKes(pack.monthlyPriceKes, rates.annualDiscountPercent))}
+                      </td>
+                      <td className={`${adminTdClass} tabular-nums`}>{pack.minutes.toLocaleString("en-KE")}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-ink-soft">None live.</p>
+          <Empty title="None live." />
         )}
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-display text-xl tracking-tight text-ink">Packages</h2>
+        <h2 className="text-title font-medium text-ink">Packages</h2>
         {packs.map((pack, index) => (
           <form
             key={pack.id}
-            className="rounded-2xl border border-line bg-surface p-5"
+            className="border-b border-line/70 py-6"
             onSubmit={(event) => {
               event.preventDefault();
               void post(
@@ -321,34 +329,42 @@ export function AdminPackagesPanel({
         ))}
       </section>
 
-      <section className="overflow-x-auto rounded-2xl border border-line bg-surface">
-        <h2 className="px-5 pt-5 font-display text-xl tracking-tight text-ink">Businesses</h2>
+      <section>
+        <h2 className="text-title font-medium text-ink">Businesses</h2>
         {businesses.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-ink-soft">No businesses.</p>
+          <Empty title="No businesses." />
         ) : (
-          <table className="mt-3 w-full min-w-[520px] text-left text-sm">
-            <thead className="border-b border-line text-ink-soft">
-              <tr>
-                <th className="px-4 py-2">Business</th>
-                <th className="px-4 py-2">Package</th>
-                <th className="px-4 py-2">Period</th>
-              </tr>
-            </thead>
-            <tbody>
-              {businesses.map((row) => (
-                <tr key={row.tenantId} className="border-t border-line/70">
-                  <td className="px-4 py-2 font-medium text-ink">{row.businessName}</td>
-                  <td className="px-4 py-2 text-ink-soft">{row.packageName || "None"}</td>
-                  <td className="px-4 py-2 text-ink-soft">{row.period || "None"}</td>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead className="text-ink-2">
+                <tr className="border-b border-line/70">
+                  <th className={adminThClass}>Business</th>
+                  <th className={adminThClass}>Package</th>
+                  <th className={adminThClass}>Period</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {businesses.map((row) => (
+                  <tr key={row.tenantId} className="border-t border-line/70">
+                    <td className={adminTdClass}>
+                      <p className={`font-medium text-ink ${deskPreviewClass}`}>{row.businessName}</p>
+                      <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>
+                        {row.packageName || "None"}
+                        {row.period ? ` · ${row.period}` : ""}
+                      </p>
+                    </td>
+                    <td className={`${adminTdClass} text-ink-2`}>{row.packageName || "None"}</td>
+                    <td className={`${adminTdClass} text-ink-2`}>{row.period || "None"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5">
-        <h2 className="font-display text-xl tracking-tight text-ink">Assign</h2>
+      <section className="border-t border-line/70 pt-6">
+        <h2 className="text-title font-medium text-ink">Assign</h2>
         <form
           className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           onSubmit={(event) => {

@@ -2,6 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
+import { btnGhost, btnPrimary } from "@/components/ui/deskChrome";
+import { Empty } from "@/components/ui/Empty";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 type AvailableRow = {
   inventory_id: string;
@@ -72,16 +76,14 @@ export function BuyNumberPanel() {
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-6">
+    <div className="border-b border-line/70 pb-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-2xl tracking-tight">Buy from SautiKit</h2>
-        </div>
+        <h2 className="text-title font-medium text-ink">Buy from SautiKit</h2>
         <button
           type="button"
           onClick={() => void load()}
           disabled={loading || pending}
-          className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline disabled:opacity-60"
+          className={btnGhost}
         >
           Refresh list
         </button>
@@ -98,9 +100,11 @@ export function BuyNumberPanel() {
       {status ? <p className="mt-4 text-sm text-[var(--ok)]">{status}</p> : null}
 
       {loading ? (
-        <p className="mt-6 text-sm text-[var(--ink-soft)]">Loading inventory…</p>
+        <div className="mt-4">
+          <SkeletonList rows={4} />
+        </div>
       ) : rows.length === 0 ? (
-        <p className="mt-6 text-sm text-[var(--ink-soft)]">No voice numbers available to claim.</p>
+        <Empty title="No voice numbers available to claim." />
       ) : (
         <>
           <p className="mt-4 text-xs text-[var(--ink-soft)]">
@@ -109,25 +113,25 @@ export function BuyNumberPanel() {
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="text-[var(--ink-soft)]">
-                <tr className="border-b border-[var(--line)]/70">
-                  <th className="py-2 pr-4 font-medium">Number</th>
-                  <th className="py-2 pr-4 font-medium">Monthly</th>
-                  <th className="py-2 pr-4 font-medium">Capabilities</th>
-                  <th className="py-2 font-medium"></th>
+                <tr className="border-b border-line/70">
+                  <th className={adminThClass}>Number</th>
+                  <th className={adminThClass}>Monthly</th>
+                  <th className={adminThClass}>Capabilities</th>
+                  <th className={adminThClass}>Buy</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((row) => (
-                  <tr key={row.inventory_id} className="border-b border-[var(--line)]/40 last:border-0">
-                    <td className="py-2.5 pr-4 font-medium whitespace-nowrap">{row.e164}</td>
-                    <td className="py-2.5 pr-4 whitespace-nowrap">{row.monthly}</td>
-                    <td className="py-2.5 pr-4">{(row.capabilities || []).join(", ")}</td>
-                    <td className="py-2.5 text-right">
+                  <tr key={row.inventory_id} className="border-t border-line/70">
+                    <td className={`${adminTdClass} font-medium whitespace-nowrap tabular-nums`}>{row.e164}</td>
+                    <td className={`${adminTdClass} whitespace-nowrap tabular-nums`}>{row.monthly}</td>
+                    <td className={adminTdClass}>{(row.capabilities || []).join(", ")}</td>
+                    <td className={`${adminTdClass} text-right`}>
                       <button
                         type="button"
                         disabled={Boolean(buyingId) || !buyConfigured}
                         onClick={() => void buy(row.inventory_id, row.e164)}
-                        className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-fill px-3 text-xs font-medium text-accent-on-fill hover:bg-accent-fill-hover disabled:opacity-50"
+                        className={btnPrimary}
                       >
                         {buyingId === row.inventory_id ? "Buying…" : "Buy"}
                       </button>
@@ -147,7 +151,7 @@ export function BuyNumberPanel() {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-40"
+                  className={`${btnGhost} disabled:opacity-40`}
                 >
                   Previous
                 </button>
@@ -155,7 +159,7 @@ export function BuyNumberPanel() {
                   type="button"
                   disabled={page >= Math.ceil(rows.length / PAGE_SIZE)}
                   onClick={() => setPage((p) => p + 1)}
-                  className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-40"
+                  className={`${btnGhost} disabled:opacity-40`}
                 >
                   Next
                 </button>
