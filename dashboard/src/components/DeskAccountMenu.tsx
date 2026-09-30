@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { switchDeskTenant } from "@/app/(desk)/tenantActions";
+import { BrandLockup } from "@/components/brand/BrandMark";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { deskShiftClass, focusRing, focusRingVisible } from "@/components/ui/deskChrome";
 import { deskRowInitials } from "@/components/ui/deskRow";
@@ -19,7 +20,7 @@ function accountInitials(name: string): string {
   return deskRowInitials(name) || name.trim().slice(0, 1).toUpperCase() || "W";
 }
 
-/** Quiet account trigger. Appearance, then Sign out. */
+/** Phone mark, avatar, then Appearance and Sign out. The workspace name stays in the menu. */
 export function DeskAccountMenu({
   name,
   tenantId,
@@ -76,8 +77,18 @@ export function DeskAccountMenu({
     <div
       ref={rootRef}
       data-account-bar=""
-      className="relative flex min-h-12 shrink-0 items-center justify-end border-b border-line bg-surface px-3 sm:px-4"
+      className="relative flex min-h-12 shrink-0 items-center justify-end gap-2 border-b border-line bg-surface px-3 sm:px-4"
     >
+      <div className="me-auto md:hidden">
+        <BrandLockup
+          href="/home"
+          name="Scalers"
+          size="sm"
+          markOnly
+          scroll={false}
+          className="min-h-11 min-w-11 justify-center"
+        />
+      </div>
       <button
         ref={triggerRef}
         type="button"
@@ -87,13 +98,20 @@ export function DeskAccountMenu({
         aria-label={name}
         onClick={() => setOpen((current) => !current)}
         className={[
-          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-muted text-sm font-semibold text-ink",
+          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
           deskShiftClass,
           "hover:bg-accent/[0.08] active:bg-accent/[0.12]",
           focusRingVisible,
         ].join(" ")}
       >
-        {initials}
+        <span
+          className={[
+            "inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-on",
+            open ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "",
+          ].join(" ")}
+        >
+          {initials}
+        </span>
       </button>
       {open ? (
         <div
@@ -102,11 +120,15 @@ export function DeskAccountMenu({
           role="menu"
           aria-label="Account"
           data-account-menu=""
-          className="absolute end-3 top-12 z-40 w-[min(16rem,calc(100vw-1.5rem))] rounded-xl border border-line bg-surface p-1"
+          className="absolute end-3 top-12 z-40 w-[min(16rem,calc(100vw-1.5rem))] rounded-xl border border-line bg-surface p-1 shadow-menu"
         >
+          <p className="pointer-events-none truncate px-3 pb-1 pt-2 text-sm font-semibold text-ink">
+            {name}
+          </p>
+          <div className="mx-2 my-1 border-t border-line" role="separator" />
           {many ? (
             <div className="pb-1">
-              <p className="pointer-events-none px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <p className="pointer-events-none px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-ink-3">
                 Workspace
               </p>
               {workspaces.map((row) => {

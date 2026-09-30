@@ -20,9 +20,17 @@ describe("desk account bar", () => {
     assert.match(menu, /data-account-bar=""/);
     assert.match(menu, /aria-haspopup="menu"/);
     assert.match(menu, /h-11 w-11/);
+    assert.match(menu, /h-7 w-7/);
+    assert.match(menu, /bg-accent text-xs font-semibold text-accent-on/);
+    assert.match(menu, /ring-2 ring-accent ring-offset-2 ring-offset-surface/);
+    assert.match(menu, /shadow-menu/);
+    assert.match(menu, /md:hidden/);
+    assert.match(menu, /markOnly/);
+    assert.match(menu, /href="\/home"/);
     assert.match(menu, /aria-label=\{name\}/);
-    const visibleName = menu.replace(/aria-label=\{name\}/, "");
-    assert.doesNotMatch(visibleName, /\{name\}/);
+    const trigger = menu.slice(menu.indexOf("<button"), menu.indexOf("</button>")).replace(/aria-label=\{name\}/, "");
+    assert.doesNotMatch(trigger, /\{name\}/);
+    assert.match(menu, /pointer-events-none truncate[\s\S]*\{name\}/);
     const appearance = menu.indexOf(">\n            Appearance\n");
     const signOut = menu.indexOf('<SignOutButton layout="menu"');
     assert.doesNotMatch(menu, />\s*Profile\s*</);
@@ -35,6 +43,8 @@ describe("desk account bar", () => {
     assert.match(menu, /switchDeskTenant/);
     assert.match(menu, /name="tenant_id"/);
     assert.match(menu, />\s*Workspace\s*</);
+    assert.match(menu, /text-ink-3/);
+    assert.doesNotMatch(menu, /text-gray-500/);
     assert.match(menu, /pointer-events-none/);
   });
 

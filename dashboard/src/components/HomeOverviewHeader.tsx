@@ -1,5 +1,3 @@
-import { BrandLockup } from "@/components/brand/BrandMark";
-
 export function HomeOverviewHeader({
   today,
 }: {
@@ -7,8 +5,7 @@ export function HomeOverviewHeader({
 }) {
   return (
     <header className="min-w-0">
-      <BrandLockup href={null} name="Scalers" size="sm" />
-      <p className="mt-2 truncate text-sm text-ink-soft">
+      <p className="truncate text-sm text-ink-soft">
         <time dateTime={today.iso}>{today.label}</time>
       </p>
     </header>

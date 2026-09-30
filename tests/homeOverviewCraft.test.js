@@ -12,8 +12,9 @@ describe("home overview craft", () => {
   const headerFile = read("dashboard/src/components/HomeOverviewHeader.tsx");
   const triage = read("dashboard/src/lib/callsTriage.ts");
 
-  it("keeps the Scalers lockup and date without a second business name", () => {
+  it("keeps the date without a second business name", () => {
     const header = headerFile.slice(headerFile.indexOf("<header"), headerFile.indexOf("</header>"));
+    const account = read("dashboard/src/components/DeskAccountMenu.tsx");
     assert.match(page, /<HomeOverviewHeader today=\{today\} \/>/);
     const lockup = read("dashboard/src/components/brand/BrandMark.tsx");
     const sm = lockup.slice(lockup.indexOf("sm:"), lockup.indexOf("md:"));
@@ -21,14 +22,11 @@ describe("home overview craft", () => {
     assert.doesNotMatch(header, /<h1/);
     assert.doesNotMatch(header, /\{business\}/);
     assert.doesNotMatch(header, /text-lg font-semibold/);
-    assert.doesNotMatch(header, /size="lg"/);
-    assert.doesNotMatch(header, /size="xs"/);
-    assert.match(header, /BrandLockup/);
-    assert.match(header, /href=\{null\}/);
-    assert.match(header, /name="Scalers"/);
-    assert.match(header, /size="sm"/);
-    assert.doesNotMatch(header, /markOnly/);
-    assert.doesNotMatch(header, /md:hidden/);
+    assert.doesNotMatch(header, /BrandLockup/);
+    assert.match(account, /markOnly/);
+    assert.match(account, /md:hidden/);
+    assert.match(account, /name="Scalers"/);
+    assert.match(account, /size="sm"/);
     assert.match(header, /<time dateTime=\{today\.iso\}>/);
     assert.match(header, /text-sm text-ink-soft/);
     assert.doesNotMatch(lockup, /min-h-11/);
