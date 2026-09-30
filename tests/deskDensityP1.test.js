@@ -25,7 +25,8 @@ describe("desk density P1", () => {
   const table = read("dashboard/src/components/InboxItemRow.tsx");
 
   it("drops the Home business h1", () => {
-    assert.match(header, /BrandLockup/);
+    assert.doesNotMatch(header, /BrandLockup/);
+    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /markOnly/);
     assert.doesNotMatch(header, /<h1/);
     assert.doesNotMatch(header, /\{business\}/);
     assert.match(home, /<HomeOverviewHeader today=\{today\} \/>/);

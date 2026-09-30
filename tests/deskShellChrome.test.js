@@ -188,12 +188,12 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(settingsShell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /HomeOverviewHeader/);
-    assert.match(homeHeader, /BrandLockup/);
-    assert.match(homeHeader, /name="Scalers"/);
-    assert.match(homeHeader, /size="sm"/);
-    assert.match(homeHeader, /href=\{null\}/);
-    assert.doesNotMatch(homeHeader, /markOnly/);
-    assert.doesNotMatch(homeHeader, /md:hidden/);
+    assert.doesNotMatch(homeHeader, /BrandLockup/);
+    const account = read("dashboard/src/components/DeskAccountMenu.tsx");
+    assert.match(account, /name="Scalers"/);
+    assert.match(account, /size="sm"/);
+    assert.match(account, /markOnly/);
+    assert.match(account, /md:hidden/);
     assert.doesNotMatch(homeHeader, /size="xs"/);
     assert.doesNotMatch(homeHeader, /size="lg"/);
     assert.doesNotMatch(homeHeader, /deskListTitleClass/);
