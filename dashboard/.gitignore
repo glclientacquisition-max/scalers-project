@@ -43,3 +43,7 @@ next-env.d.ts
 
 AGENTS.md
 CLAUDE.md
+
+# playwright
+/test-results/
+/playwright-report/
