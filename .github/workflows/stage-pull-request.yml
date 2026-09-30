@@ -3,6 +3,10 @@
 # Production still follows main.
 # This workflow runs from main (pull_request_target) and only git-merges pull
 # request refs. It does not install or run code from those pull requests.
+#
+# Railway scalers staging must follow this branch with no commit SHA. A pin
+# ignores later pushes. After the git rebuild, this workflow connects the
+# staging Voice service to the branch again so a pin cannot stick.
 
 name: Stage pull request
 
@@ -54,6 +58,69 @@ jobs:
           STAGE_RESULT_PATH: ${{ runner.temp }}/stage-result.json
         run: node scripts/stage-pull-request.js
         continue-on-error: true
+
+      - name: Connect Railway staging Voice to the staging branch
+        if: always() && steps.stage.outcome != 'skipped'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID }}
+          SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
+          ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for name in RAILWAY_TOKEN PROJECT_ID SERVICE_ID ENVIRONMENT_ID; do
+            eval "value=\${$name}"
+            if [ -z "$value" ]; then
+              echo "::error::$name is not set. Staging Voice will stay on whatever commit it is pinned to."
+              exit 1
+            fi
+          done
+          GQL=https://backboard.railway.com/graphql/v2
+          AUTH=(-H "Authorization: Bearer $RAILWAY_TOKEN" -H "Content-Type: application/json" -H "User-Agent: scalers-stage-pull-request")
+          RESP=$(curl -sS "$GQL" "${AUTH[@]}" \
+            -d "{\"query\":\"query(\$id: String!) { environment(id: \$id) { name } }\",\"variables\":{\"id\":\"$ENVIRONMENT_ID\"}}")
+          echo "$RESP" | python3 -c '
+          import json, sys
+          body = json.load(sys.stdin)
+          if body.get("errors"):
+              raise SystemExit("Railway environment lookup failed: " + json.dumps(body["errors"]))
+          name = ((body.get("data") or {}).get("environment") or {}).get("name") or ""
+          print("railway_environment=" + name)
+          if name.strip().lower() != "staging":
+              raise SystemExit("Refusing: Railway environment name is %r, expected staging" % name)
+          '
+          VARS=$(curl -sS "$GQL" "${AUTH[@]}" \
+            -d "{\"query\":\"query(\$projectId: String!, \$environmentId: String!, \$serviceId: String) { variables(projectId: \$projectId, environmentId: \$environmentId, serviceId: \$serviceId) }\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"environmentId\":\"$ENVIRONMENT_ID\",\"serviceId\":\"$SERVICE_ID\"}}")
+          echo "$VARS" | python3 -c '
+          import json, sys
+          body = json.load(sys.stdin)
+          if body.get("errors"):
+              raise SystemExit("Railway variables lookup failed: " + json.dumps(body["errors"]))
+          variables = (body.get("data") or {}).get("variables") or {}
+          if isinstance(variables, list):
+              mapped = {}
+              for item in variables:
+                  if isinstance(item, dict) and item.get("name"):
+                      mapped[item["name"]] = item.get("value") or ""
+              variables = mapped
+          url = str(variables.get("SUPABASE_URL") or "")
+          if "fjxcdccgyhnvnnlnovcl" in url:
+              raise SystemExit("Refusing: target SUPABASE_URL points at production ALCR")
+          if url and "sgcdncjxauhsbunobmob" not in url:
+              raise SystemExit("Refusing: target SUPABASE_URL is not staging sgcdncjxauhsbunobmob")
+          print("supabase_url_host_ok=1")
+          '
+          CONNECT=$(curl -sS "$GQL" "${AUTH[@]}" \
+            -d "{\"query\":\"mutation(\$id: String!, \$input: ServiceConnectInput!) { serviceConnect(id: \$id, input: \$input) { id } }\",\"variables\":{\"id\":\"$SERVICE_ID\",\"input\":{\"repo\":\"$GITHUB_REPOSITORY\",\"branch\":\"cursor/staging-voice-468b\"}}}")
+          echo "$CONNECT" | python3 -c '
+          import json, sys
+          body = json.load(sys.stdin)
+          if body.get("errors"):
+              raise SystemExit("serviceConnect failed: " + json.dumps(body["errors"]))
+          print("connected_service=" + str(((body.get("data") or {}).get("serviceConnect") or {}).get("id") or ""))
+          '
+          echo "Railway staging Voice follows cursor/staging-voice-468b with no commit pin."
 
       - name: Record the result on the pull request
         if: always()
