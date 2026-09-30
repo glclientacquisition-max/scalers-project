@@ -44,7 +44,7 @@ describe("business settings craft", () => {
     assert.match(nav, /id: "assistant"/);
     assert.match(nav, /id: "knowledge"/);
     assert.match(nav, /id: "alerts"/);
-    assert.match(nav, /id: "device"/);
+    assert.doesNotMatch(nav, /id: "device"/);
     assert.match(nav, /title: "Business"/);
     assert.match(nav, /title: "Assistant"/);
     assert.doesNotMatch(nav, /label: "Assistant"/);
@@ -52,7 +52,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(nav, /title: "Receptionist"/);
     assert.match(nav, /title: "Knowledge"/);
     assert.match(nav, /title: "Alerts"/);
-    assert.match(nav, /title: "This device"/);
+    assert.doesNotMatch(nav, /title: "This device"/);
     assert.match(nav, /label: "Identity"/);
     assert.match(nav, /label: "Hours"/);
     assert.match(nav, /label: "Locations"/);
@@ -66,7 +66,7 @@ describe("business settings craft", () => {
     assert.match(nav, /label: "Import"/);
     assert.match(nav, /label: "Alerts"/);
     assert.match(nav, /label: "Team"/);
-    assert.match(nav, /label: "Appearance"/);
+    assert.doesNotMatch(nav, /label: "Appearance"/);
     assert.match(nav, /panel: "identity"/);
     assert.match(nav, /panel: "hours"/);
     assert.match(nav, /panel: "locations"/);
@@ -80,7 +80,7 @@ describe("business settings craft", () => {
     assert.match(nav, /tab: "catalog"/);
     assert.match(nav, /tab: "import"/);
     assert.match(nav, /tab: "alerts"/);
-    assert.match(nav, /tab: "appearance"/);
+    assert.match(nav, /if \(tab === "appearance"\) return "Appearance"/);
     assert.match(nav, /raw === "alerts"/);
     assert.match(nav, /raw === "appearance"/);
     assert.match(shell, /tab === "alerts"/);
@@ -125,19 +125,23 @@ describe("business settings craft", () => {
     assert.match(ui, /md:sticky md:top-4/);
   });
 
-  it("parks Sign out in the account menu and Appearance under This device", () => {
+  it("parks Sign out in the account menu and Appearance off the settings index", () => {
     const header = ui.slice(
       ui.indexOf("export function SettingsPageHeader"),
       ui.indexOf("compactTextareaExpandHandlers")
     );
+    const account = read("dashboard/src/components/DeskAccountMenu.tsx");
     assert.doesNotMatch(header, /SignOutButton/);
     assert.doesNotMatch(shell, /SignOutButton/);
     assert.doesNotMatch(shell, /SettingsSignOutRow/);
-    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
+    assert.match(account, /<SignOutButton layout="menu"/);
+    assert.match(account, /businessSettingsHref\("appearance"\)/);
+    assert.doesNotMatch(account, />\s*Profile\s*</);
     assert.match(shell, /<ThemePicker \/>/);
     assert.match(shell, /title="This device"/);
-    assert.match(nav, /title: "This device"/);
-    assert.match(nav, /label: "Appearance"/);
+    assert.match(shell, /tab === "appearance"/);
+    assert.doesNotMatch(nav, /title: "This device"/);
+    assert.doesNotMatch(nav, /label: "Appearance"/);
   });
 
   it("confirms Sign out before POST /api/logout", () => {

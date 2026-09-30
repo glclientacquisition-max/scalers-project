@@ -27,7 +27,7 @@ export const DESK_LINKS = [
   { href: "/calls", label: "Inbox" },
   { href: "/contacts", label: "Contacts" },
   { href: "/wallet", label: "Usage" },
-  { href: "/settings", label: "Profile" },
+  { href: "/settings", label: "Settings" },
 ] as const;
 
 /**
@@ -95,16 +95,18 @@ function TabIcon({ name, className }: { name: string; className?: string }) {
       </svg>
     );
   }
-  if (name === "Profile") {
+  if (name === "Settings") {
     return (
       <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={cls}>
-        <circle cx="10" cy="6.5" r="2.5" stroke="currentColor" strokeWidth="1.5" />
         <path
-          d="M4.5 16.5c.7-3.1 2.8-4.75 5.5-4.75s4.8 1.65 5.5 4.75"
+          d="M3.5 6h3.2M10.3 6H16.5M3.5 10h7.2M14.3 10H16.5M3.5 14h1.2M8.3 14H16.5"
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
         />
+        <circle cx="8.5" cy="6" r="1.6" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="12.5" cy="10" r="1.6" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="6.5" cy="14" r="1.6" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     );
   }
@@ -211,7 +213,7 @@ function DeskDestinationLink({
   );
 }
 
-/** md+ destination rail. Same DESK_LINKS as DeskTabBar. Sign out lives on Profile. */
+/** md+ destination rail. Same DESK_LINKS as DeskTabBar. Sign out lives in the account menu. */
 export function DeskRail({
   needsCount = 0,
   homeHref = "/home",

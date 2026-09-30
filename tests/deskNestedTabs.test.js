@@ -95,7 +95,7 @@ describe("desk nested tab hide", () => {
     assert.match(nav, /md:flex/);
   });
 
-  it("marks contact file, import, and Profile nested panels for CSS hide", () => {
+  it("marks contact file, import, and Settings nested panels for CSS hide", () => {
     assert.match(contactFile, /data-desk-nested/);
     assert.match(contactFile, /<DeskBack href=\{backHref\}>\{backLabel\}<\/DeskBack>/);
     assert.match(contactImport, /data-desk-nested/);
@@ -135,6 +135,6 @@ describe("desk nested tab hide", () => {
     assert.doesNotMatch(master, /Stays on nested contact screens/);
     assert.match(contactsNote, /data-desk-nested/);
     assert.match(settingsNote, /data-desk-nested/);
-    assert.match(settingsNote, /Profile hub keeps tabs/);
+    assert.match(settingsNote, /Settings hub keeps tabs/);
   });
 });

@@ -85,7 +85,7 @@ function SettingsMenu({
   const isRail = variant === "rail";
   return (
     <nav
-      aria-label="Business Profile sections"
+      aria-label="Settings sections"
       data-settings-menu={variant}
       className={isRail ? settingsRailClass : "min-w-0 w-full"}
     >

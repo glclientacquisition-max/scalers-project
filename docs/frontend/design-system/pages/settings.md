@@ -1,25 +1,24 @@
-# Profile `/settings`
+# Settings `/settings`
 
-**Job:** Account hub. Teach and configure the assistant. Sign out.  
+**Job:** Teach and configure the business and the assistant.  
 **This page is the knowledge IA benchmark.** Do not flatten it into one long form chrome.
 
 See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `settingsUi.tsx`.
 
 ## IA
 
-`/settings` is the Profile tab. Bare `/settings` is the account hub: destination index. Sign out stays inside the account menu. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance` and the first account-menu item. No new field screens.
+`/settings` is the Settings tab. Bare `/settings` is the hub: destination index. Sign out stays inside the account menu. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance` from the account menu only. It is not a settings row. No new field screens.
 
 ```text
 Business       Identity · Hours · Locations · Policies
 Assistant      Voice · Pronunciation · Test
 Knowledge      FAQs · Catalog · Import
 Alerts         Alerts · Team
-This device    Appearance
 ```
 
 Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Test stays under Assistant. Team stays under Alerts. Import stays under Knowledge. Updates stay on Home.
 
-Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Profile hub keeps tabs. `DeskBack` icon, aria-label Profile (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
+Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Settings hub keeps tabs. `DeskBack` icon, aria-label Settings (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
 Sticky Save on Catalog and Train panels, top-right of the panel header. Alerts, Import, Test, and Appearance use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
 
@@ -27,7 +26,7 @@ Bare `/settings` is the hub. lg+ hub shows Identity in the panel. `?tab=updates`
 
 ## Chrome
 
-Short in-page title Profile plus compact workspace name on the hub. The top strip is initials only. Line live / Number pending stays on Test. Appearance, Import, Catalog, and the other panels do not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the last account-menu item (`POST /api/logout` after confirm). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
+Short in-page title Settings plus compact workspace name on the hub. The top strip is initials only. Line live / Number pending stays on Test. Appearance, Import, Catalog, and the other panels do not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the last account-menu item (`POST /api/logout` after confirm). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Settings. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
@@ -35,7 +34,7 @@ Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
-Density stays 8. Fill the canvas. Do not double page padding or import landing-scale type, glass, or a generic settings card stack. Do not add Billing or Security sections. Appearance is This device only.
+Density stays 8. Fill the canvas. Do not double page padding or import landing-scale type, glass, or a generic settings card stack. Do not add Billing or Security sections. Appearance stays on the account menu. It is this browser only.
 
 ## Panels
 
@@ -130,7 +129,7 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 
 ### Updates
 
-Home only. `DailyBulletinPanel` is not a Profile destination. Old `?tab=updates` links open the hub.
+Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates` links open the hub.
 
 ### Test (`?tab=test`)
 
@@ -192,7 +191,7 @@ Home only. `DailyBulletinPanel` is not a Profile destination. Old `?tab=updates`
 | Remove person | icon ghost | drops a row | Whole business after Save |
 | Save and train | filled sticky | compile | Assistant on calls |
 
-### Appearance (`?tab=appearance`, also lg+ hub)
+### Appearance (`?tab=appearance`, account menu)
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |

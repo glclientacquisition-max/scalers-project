@@ -60,7 +60,7 @@ export const settingsPanelHeadingClass =
 export const settingsBlockTitleClass =
   "text-[11px] font-bold uppercase tracking-wide text-gray-500";
 
-/** Non-clickable group header. Same dialect as the Profile rail. */
+/** Non-clickable group header. Same dialect as the settings rail. */
 export const settingsGroupTitleClass =
   "pointer-events-none mb-0 select-none text-xs font-bold uppercase tracking-wide text-gray-500";
 
@@ -334,7 +334,7 @@ export const settingsGhostButtonClass =
 export function SettingsBackLink() {
   return (
     <DeskBack href="/settings" className="lg:hidden">
-      Profile
+      Settings
     </DeskBack>
   );
 }
@@ -374,7 +374,7 @@ export function SettingsPageHeader({
   if (index) {
     return (
       <header className="mb-4 min-w-0">
-        <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Profile</h1>
+        <h1 className="font-display text-xl font-semibold tracking-tight text-ink">Settings</h1>
         <p className="mt-1 min-w-0 truncate text-sm font-medium text-ink">{businessName}</p>
         {line}
       </header>
