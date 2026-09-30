@@ -127,10 +127,14 @@ describe("theme activation", () => {
     assert.match(themeLib, /delete root\.dataset\.theme/);
     assert.match(themeLib, /root\.dataset\.theme = choice/);
     const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
+    const account = read("dashboard/src/components/DeskAccountMenu.tsx");
     const settingsNav = read("dashboard/src/lib/businessSettingsNav.ts");
-    assert.match(shell, /<ThemePicker \/>/);
-    assert.match(shell, /title="This device"/);
-    assert.match(settingsNav, /raw === "appearance"/);
+    assert.match(account, /<ThemePicker \/>/);
+    assert.match(account, />\s*This device\s*</);
+    assert.doesNotMatch(account, /\/settings/);
+    assert.doesNotMatch(shell, /<ThemePicker \/>/);
+    assert.doesNotMatch(shell, /title="This device"/);
+    assert.doesNotMatch(settingsNav, /raw === "appearance"/);
     assert.doesNotMatch(settingsNav, /title: "This device"/);
     assert.doesNotMatch(settingsNav, /label: "Appearance"/);
   });

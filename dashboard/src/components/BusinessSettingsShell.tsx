@@ -20,16 +20,13 @@ import {
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
 import {
-  SettingsGroup,
   SettingsPageHeader,
   settingsConsoleClass,
   settingsGroupTitleClass,
   settingsPanelClass,
-  settingsPanelHeadingClass,
   settingsRailClass,
   settingsRailWrapClass,
 } from "@/components/settingsUi";
-import { ThemePicker } from "@/components/ThemePicker";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 
 function SettingsChevron() {
@@ -58,19 +55,6 @@ function SettingsIdentityRedirect() {
     router.replace("/settings?tab=train&panel=identity");
   }, [router]);
   return null;
-}
-
-function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
-  return (
-    <section className="min-w-0 w-full space-y-6">
-      {showHeading ? <h2 className={settingsPanelHeadingClass}>Appearance</h2> : null}
-      <SettingsGroup title="This device">
-        <div className="p-4">
-          <ThemePicker />
-        </div>
-      </SettingsGroup>
-    </section>
-  );
 }
 
 function SettingsMenu({
@@ -171,7 +155,7 @@ function SettingsPanelBody({
   tenant,
   curatedVoices,
 }: {
-  tab: Exclude<BusinessSettingsTab, "menu" | "catalog" | "train" | "alerts">;
+  tab: "import" | "test";
   tenant: TenantRow;
   curatedVoices: CuratedSonioxVoice[];
 }) {
@@ -182,10 +166,7 @@ function SettingsPanelBody({
       <KnowledgeIngestPanel tenant={tenant} />
     );
   }
-  if (tab === "test") {
-    return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
-  }
-  return <AppearancePanel showHeading={false} />;
+  return <TestLinePanel tenant={tenant} curatedVoices={curatedVoices} />;
 }
 
 /**
@@ -288,7 +269,7 @@ export function BusinessSettingsShell({
                   showBack
                   title={heading}
                 />
-                {tab === "import" || tab === "test" || tab === "appearance" ? (
+                {tab === "import" || tab === "test" ? (
                   <SettingsPanelBody
                     tab={tab}
                     tenant={tenant}

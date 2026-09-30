@@ -109,7 +109,7 @@ describe("desk navigation smoothness", () => {
     assert.equal(got.cases.wallet, "/wallet");
     assert.equal(got.cases.settings, "/settings");
     assert.equal(got.cases.settingsHours, "/settings?tab=hours");
-    assert.equal(got.cases.settingsAppearance, null);
+    assert.equal(got.cases.settingsAppearance, "/settings?tab=appearance");
     assert.equal(got.cases.requests, "/requests?status=open");
     assert.equal(got.cases.appointments, "/appointments");
     assert.equal(got.cases.unknown, null);

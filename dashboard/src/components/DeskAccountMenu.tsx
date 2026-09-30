@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { switchDeskTenant } from "@/app/(desk)/tenantActions";
 import { BrandLockup } from "@/components/brand/BrandMark";
+import { ThemePicker } from "@/components/ThemePicker";
 import { SignOutButton } from "@/components/ui/SignOutButton";
 import { deskShiftClass, focusRing, focusRingVisible } from "@/components/ui/deskChrome";
 import { deskRowInitials } from "@/components/ui/deskRow";
-import { businessSettingsHref } from "@/lib/businessSettingsNav";
 
 const itemClass = [
   "flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-ink",
@@ -31,10 +30,12 @@ export function DeskAccountMenu({
   workspaces: Array<{ id: string; name: string }>;
 }) {
   const [open, setOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const themeId = useId();
   const many = workspaces.length > 1;
   const initials = accountInitials(name);
 
@@ -45,18 +46,25 @@ export function DeskAccountMenu({
     first?.focus();
 
     function onPointer(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        setThemeOpen(false);
+      }
     }
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
         setOpen(false);
+        setThemeOpen(false);
         triggerRef.current?.focus();
         return;
       }
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      const items = [...(menu?.querySelectorAll<HTMLElement>("[role='menuitem']") || [])];
+      const items = [
+        ...(menu?.querySelectorAll<HTMLElement>("[role='menuitem'], [data-theme-cluster] [role='radio']") ||
+          []),
+      ];
       if (!items.length) return;
       event.preventDefault();
       const index = items.indexOf(document.activeElement as HTMLElement);
@@ -96,7 +104,10 @@ export function DeskAccountMenu({
         aria-expanded={open}
         aria-controls={menuId}
         aria-label={name}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOpen((current) => !current);
+          setThemeOpen(false);
+        }}
         className={[
           "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
           deskShiftClass,
@@ -120,7 +131,12 @@ export function DeskAccountMenu({
           role="menu"
           aria-label="Account"
           data-account-menu=""
-          className="absolute end-3 top-12 z-40 w-[min(16rem,calc(100vw-1.5rem))] rounded-xl border border-line bg-surface p-1 shadow-menu"
+          className={[
+            "absolute end-3 top-12 z-40 rounded-xl border border-line bg-surface p-1 shadow-menu",
+            themeOpen
+              ? "w-[min(22rem,calc(100vw-1.5rem))]"
+              : "w-[min(16rem,calc(100vw-1.5rem))]",
+          ].join(" ")}
         >
           <p className="pointer-events-none truncate px-3 pb-1 pt-2 text-sm font-semibold text-ink">
             {name}
@@ -154,14 +170,24 @@ export function DeskAccountMenu({
               <div className="mx-2 my-1 border-t border-line" role="separator" />
             </div>
           ) : null}
-          <Link
-            href={businessSettingsHref("appearance")}
+          <button
+            type="button"
             role="menuitem"
+            aria-expanded={themeOpen}
+            aria-controls={themeId}
             className={itemClass}
-            onClick={() => setOpen(false)}
+            onClick={() => setThemeOpen((current) => !current)}
           >
             Appearance
-          </Link>
+          </button>
+          {themeOpen ? (
+            <div id={themeId} data-account-appearance="" className="px-2 pb-2">
+              <p className="pointer-events-none px-1 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-ink-3">
+                This device
+              </p>
+              <ThemePicker />
+            </div>
+          ) : null}
           <div className="mx-2 my-1 border-t border-line" role="separator" />
           <SignOutButton layout="menu" />
         </div>

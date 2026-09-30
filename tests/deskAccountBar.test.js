@@ -48,7 +48,7 @@ describe("desk account bar", () => {
     assert.match(menu, /pointer-events-none/);
   });
 
-  it("shows a theme cluster on Appearance and keeps Line live off that panel", () => {
+  it("shows a theme cluster on Appearance and keeps Line live off that control", () => {
     assert.match(picker, /role="radiogroup"/);
     assert.match(picker, /aria-label="This device"/);
     assert.match(picker, /data-theme-cluster=""/);
@@ -56,12 +56,16 @@ describe("desk account bar", () => {
       assert.match(picker, new RegExp(`label: "${label}"`));
     }
     assert.doesNotMatch(picker, /Line live|SettingsSegmented|bg-white|#[0-9a-fA-F]{6}/);
-    assert.match(shell, /title="This device"/);
-    assert.match(shell, /<ThemePicker \/>/);
+    assert.match(menu, /<ThemePicker \/>/);
+    assert.match(menu, />\s*This device\s*</);
+    assert.match(menu, /data-account-appearance=""/);
+    assert.doesNotMatch(menu, /\/settings/);
+    assert.doesNotMatch(shell, /<ThemePicker \/>/);
+    assert.doesNotMatch(shell, /AppearancePanel/);
     assert.match(shell, /showLine=\{tab === "test"\}/);
-    const appearance = shell.slice(
-      shell.indexOf("function AppearancePanel"),
-      shell.indexOf("function SettingsMenu")
+    const appearance = menu.slice(
+      menu.indexOf("data-account-appearance"),
+      menu.indexOf('<SignOutButton layout="menu"')
     );
     assert.doesNotMatch(appearance, /Line live/);
   });
