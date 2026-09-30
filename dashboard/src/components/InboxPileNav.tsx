@@ -24,8 +24,9 @@ import {
 } from "@/lib/inboxPurpose";
 import { orderHoldList } from "@/lib/holdSheet";
 import { orderVisitList } from "@/lib/runSheet";
+import { refreshInboxList } from "@/app/(desk)/calls/listActions";
 import { scrollDeskWellToTop } from "@/components/EndlessList";
-import { nextShown } from "@/lib/endlessList";
+import { listAfterPullRefresh, nextShown } from "@/lib/endlessList";
 import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
   adjacentPileHrefs,
@@ -45,6 +46,9 @@ type InboxPileNavValue = {
   page: number;
   hasMore: boolean;
   loadMore: () => void;
+  refreshing: boolean;
+  refreshError: string | null;
+  refreshFirst: () => void;
   paint: "pending" | "empty" | "rows";
   goPile: (next: string) => void;
   setQuery: (next: string) => void;
@@ -120,9 +124,25 @@ export function InboxPileNavProvider({
   const filterKey = `${localPurpose}\0${localQ.trim()}`;
   const [shown, setShown] = useState(DEFAULT_PAGE_SIZE);
   const [shownFor, setShownFor] = useState(filterKey);
+  const [source, setSource] = useState(items);
+  const [sourceFrom, setSourceFrom] = useState(items);
+  const sourceRef = useRef(items);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [errorFor, setErrorFor] = useState(filterKey);
+  const refreshFlight = useRef(false);
+  if (items !== sourceFrom) {
+    setSourceFrom(items);
+    setSource(items);
+  }
+  sourceRef.current = source;
   if (shownFor !== filterKey) {
     setShownFor(filterKey);
     setShown(DEFAULT_PAGE_SIZE);
+  }
+  if (errorFor !== filterKey) {
+    setErrorFor(filterKey);
+    setRefreshError(null);
   }
   const windowCount = shownFor === filterKey ? shown : DEFAULT_PAGE_SIZE;
   const pendingRef = useRef<string | null>(null);
@@ -226,11 +246,42 @@ export function InboxPileNavProvider({
     qWait.current = setTimeout(sync, 300);
   }, [router]);
 
+  const refreshFirst = useCallback(() => {
+    if (refreshFlight.current) return;
+    refreshFlight.current = true;
+    setRefreshing(true);
+    void refreshInboxList()
+      .then((res) => {
+        const next = listAfterPullRefresh(
+          sourceRef.current,
+          res.error ? null : res.items,
+          Boolean(res.error)
+        );
+        if (!next.reset) {
+          setRefreshError("Could not load inbox.");
+          return;
+        }
+        setRefreshError(null);
+        setSource(next.rows);
+        setShown(DEFAULT_PAGE_SIZE);
+        setShownFor(`${purposeRef.current}\0${qRef.current.trim()}`);
+        scrollDeskWellToTop();
+        router.refresh();
+      })
+      .catch(() => {
+        setRefreshError("Could not load inbox.");
+      })
+      .finally(() => {
+        refreshFlight.current = false;
+        setRefreshing(false);
+      });
+  }, [router]);
+
   const searched = useMemo(() => {
     const text = localQ.trim();
-    if (!text) return items;
-    return items.filter((item) => itemMatchesQuery(item, text));
-  }, [items, localQ]);
+    if (!text) return source;
+    return source.filter((item) => itemMatchesQuery(item, text));
+  }, [source, localQ]);
 
   const counts = useMemo(() => countInboxPurposes(searched), [searched]);
 
@@ -272,6 +323,9 @@ export function InboxPileNavProvider({
       page: 1,
       hasMore,
       loadMore,
+      refreshing,
+      refreshError,
+      refreshFirst,
       paint,
       goPile,
       setQuery,
@@ -285,6 +339,9 @@ export function InboxPileNavProvider({
       pageRows,
       hasMore,
       loadMore,
+      refreshing,
+      refreshError,
+      refreshFirst,
       paint,
       goPile,
       setQuery,

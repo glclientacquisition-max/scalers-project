@@ -85,6 +85,13 @@ describe("ticket chat follow-ups", () => {
     );
     assert.match(css, /desk-theme:has\(\[data-ticket-chat\]\)[\s\S]{0,160}--desk-tabbar-h:\s*0px/);
     assert.match(css, /\[data-desk-tabbar\]/);
+    assert.match(css, /data-desk-ticket-chat\] \[data-account-bar\]/);
+    assert.match(css, /:not\(\[data-desk-route-ready\]\) \[data-account-bar\]/);
+    assert.match(ticket, /safe-area-inset-top/);
+    assert.match(read("dashboard/src/components/ui/DeskBack.tsx"), /min-h-11 min-w-11/);
+    assert.match(read("dashboard/src/components/DeskRouteChrome.tsx"), /isDeskTicketChatPath\(pathname\)/);
+    assert.match(read("dashboard/src/components/DeskRouteChrome.tsx"), /data-desk-ticket-chat/);
+    assert.match(callDetail, /account strip is off this route/);
     assert.match(nav, /export function DeskRail/);
     assert.match(nav, /md:flex/);
     assert.match(nav, /md:hidden/);

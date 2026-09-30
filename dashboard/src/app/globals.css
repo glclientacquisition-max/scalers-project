@@ -246,16 +246,29 @@ html:has(.desk-theme) body {
 }
 
 @media (max-width: 767px) {
-  .desk-theme:has([data-ticket-chat]),
-  .desk-theme:has([data-desk-nested]) {
+  /* First paint only. After DeskRouteChrome sets data-desk-route-ready, a hidden
+     Activity copy of the ticket must not keep the bar off the list. */
+  .desk-theme:has([data-ticket-chat]):not([data-desk-route-ready]) {
     --desk-tabbar-h: 0px;
     --desk-tabbar-clearance: env(safe-area-inset-bottom, 0px);
   }
 
-  .desk-theme:has([data-ticket-chat]) [data-desk-tabbar],
-  .desk-theme:has([data-desk-nested]) [data-desk-tabbar] {
+  .desk-theme:has([data-desk-nested]):not([data-desk-route-ready]),
+  .desk-theme[data-desk-nested-route] {
+    --desk-tabbar-h: 0px;
+    --desk-tabbar-clearance: env(safe-area-inset-bottom, 0px);
+  }
+
+  .desk-theme:has([data-ticket-chat]):not([data-desk-route-ready]) [data-desk-tabbar],
+  .desk-theme:has([data-desk-nested]):not([data-desk-route-ready]) [data-desk-tabbar],
+  .desk-theme[data-desk-nested-route] [data-desk-tabbar] {
     display: none;
   }
+}
+
+.desk-theme:has([data-ticket-chat]):not([data-desk-route-ready]) [data-account-bar],
+.desk-theme[data-desk-ticket-chat] [data-account-bar] {
+  display: none;
 }
 
 @media (min-width: 768px) {

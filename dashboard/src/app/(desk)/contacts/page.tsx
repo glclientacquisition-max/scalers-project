@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AddContactPanel } from "@/components/AddContactPanel";
-import { ContactsEndlessList } from "@/components/ContactsEndlessList";
+import { ContactsPullHost } from "@/components/ContactsEndlessList";
 import { ContactsSearch } from "@/components/ContactsSearch";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { DeskError } from "@/components/ui/DeskError";
@@ -109,38 +109,36 @@ export default async function ContactsPage({
         </div>
       </header>
 
-      {rows.length === 0 ? (
-        <div className={deskEmptyClass}>
-          <p className="font-display text-2xl tracking-tight text-ink">
-            {emptyCopy(saved, q)}
-          </p>
-          {q ? (
-            <Link
-              href={contactsHref({ saved, sort })}
-              className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-            >
-              Clear
-            </Link>
-          ) : saved !== "all" ? (
-            <Link href={contactsHref({ sort })} className={`${btnGhost} mt-6`}>
-              Show all
-            </Link>
-          ) : (
-            <Link href="/contacts/import" className={`${btnPrimary} mt-6`}>
-              Import
-            </Link>
-          )}
-        </div>
-      ) : (
-        <ContactsEndlessList
-          key={`${saved}:${sort}:${q}`}
-          rows={rows}
-          total={total}
-          saved={saved}
-          sort={sort}
-          q={q}
-        />
-      )}
+      <ContactsPullHost
+        seed={rows}
+        total={total}
+        saved={saved}
+        sort={sort}
+        q={q}
+        empty={
+          <div className={deskEmptyClass}>
+            <p className="font-display text-2xl tracking-tight text-ink">
+              {emptyCopy(saved, q)}
+            </p>
+            {q ? (
+              <Link
+                href={contactsHref({ saved, sort })}
+                className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+              >
+                Clear
+              </Link>
+            ) : saved !== "all" ? (
+              <Link href={contactsHref({ sort })} className={`${btnGhost} mt-6`}>
+                Show all
+              </Link>
+            ) : (
+              <Link href="/contacts/import" className={`${btnPrimary} mt-6`}>
+                Import
+              </Link>
+            )}
+          </div>
+        }
+      />
     </div>
   );
 }

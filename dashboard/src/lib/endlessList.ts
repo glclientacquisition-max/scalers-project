@@ -14,6 +14,35 @@ export function nextShown(shown: number, total: number, pageSize: number): numbe
   return Math.min(cap, base + size);
 }
 
+const PULL_REFRESH_PX = 64;
+
+/**
+ * Phone pull at the top of a list. A desktop pointer, a mid-list scroll,
+ * and a sideways move (pile swipe) do not commit.
+ */
+export function pullRefreshCommit(input: {
+  phone: boolean;
+  scrollTop: number;
+  dx: number;
+  dy: number;
+}): boolean {
+  if (!input.phone) return false;
+  if (input.scrollTop > 0) return false;
+  if (!(input.dy >= PULL_REFRESH_PX)) return false;
+  if (Math.abs(input.dx) >= input.dy) return false;
+  return true;
+}
+
+/** Failed refresh keeps the rows on screen. Success replaces them with the first slice. */
+export function listAfterPullRefresh<T>(
+  current: readonly T[],
+  incoming: readonly T[] | null,
+  failed: boolean
+): { rows: T[]; reset: boolean } {
+  if (failed || incoming == null) return { rows: [...current], reset: false };
+  return { rows: [...incoming], reset: true };
+}
+
 export function appendUniqueById<T extends { id: string }>(
   current: readonly T[],
   incoming: readonly T[]
