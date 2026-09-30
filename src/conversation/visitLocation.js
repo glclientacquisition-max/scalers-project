@@ -9,6 +9,7 @@ const { countiesMentioned, countiesForPlace } = require('./kenyaPlaces');
 const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
+const AREA_UNCONFIRMED_NOTE = 'area not confirmed, check coverage';
 
 const FINDABLE_CUE =
   /\b(gate|gates|building|buildings|apt|apartment|apartments|flat|flats|house|nyumba|junction|road|street|floor|plot|court|mall|stage|block|door|wing|near|opposite|next to|karibu)\b/i;
@@ -213,9 +214,12 @@ function settingsCountyText(profile = {}) {
 function assessCoverage(text, profile = {}) {
   const selected = readCoverageAreas(profile.businessPolicies);
   const mentioned = coverageTokens(text);
+  // Outside means the place is known and sits elsewhere. A landmark nobody
+  // can place ("near Naivas") is unknown; the ladder confirms, never refuses.
   if (selected) {
     if (!mentioned.length || !selected.length) return 'unknown';
-    return coveredByAreas(text, selected) ? 'inside' : 'outside';
+    if (coveredByAreas(text, selected)) return 'inside';
+    return countiesForPlace(text).length ? 'outside' : 'unknown';
   }
   const covered = coverageCorpus(profile);
   if (!covered.size) return 'unknown';
@@ -223,6 +227,7 @@ function assessCoverage(text, profile = {}) {
   if (mentioned.some((token) => covered.has(token))) return 'inside';
   const allowed = countiesMentioned(settingsCountyText(profile));
   const placeCounties = countiesForPlace(text);
+  if (!placeCounties.length) return 'unknown';
   if (placeCounties.some((county) => allowed.has(county))) return 'inside';
   return 'outside';
 }
@@ -231,9 +236,15 @@ function assessCoverage(text, profile = {}) {
  * Wave 1 ladder. Assumption A5: after one detail follow-up, area-only saves
  * only when coverage text matches. Outside never saves. Two refusals do not save.
  */
+function hasCoverageText(profile = {}) {
+  const selected = readCoverageAreas(profile.businessPolicies);
+  if (selected) return selected.length > 0;
+  return coverageCorpus(profile).size > 0;
+}
+
 function decideVisitPlace(
   text,
-  { profile = {}, detailAsked = false, refusals = 0 } = {}
+  { profile = {}, detailAsked = false, areaAsked = false, refusals = 0 } = {}
 ) {
   const place = cleanPlace(text, 240);
   const quality = classifyVisitLocation(place);
@@ -246,6 +257,26 @@ function decideVisitPlace(
     mentionsPin(place) &&
     quality !== 'empty' &&
     quality !== 'refused';
+
+  // A landmark with no area ("near the big church") when coverage is on file:
+  // ask which area once. Never refuse it, never book it blind.
+  if (
+    coverage === 'unknown' &&
+    (quality === 'findable' || quality === 'pin_promised') &&
+    !areaAsked &&
+    hasCoverageText(profile)
+  ) {
+    return {
+      quality,
+      coverage,
+      ask: true,
+      askArea: true,
+      bookable: false,
+      blocked: '',
+      confirmAccess: false,
+      pinNote,
+    };
+  }
 
   if (quality === 'empty' || quality === 'refused') {
     if (Number(refusals) >= 2) {
@@ -290,6 +321,7 @@ function decideVisitPlace(
       bookable: true,
       blocked: '',
       confirmAccess: false,
+      areaUnconfirmed: coverage === 'unknown' && hasCoverageText(profile),
       pinNote,
     };
   }
@@ -444,6 +476,9 @@ function appendVisitNotes(notes, decision = {}) {
     const pin = 'caller will share pin';
     next = next ? `${next}. ${pin}` : pin;
   }
+  if (decision.areaUnconfirmed && !/area not confirmed/i.test(next)) {
+    next = next ? `${next}. ${AREA_UNCONFIRMED_NOTE}` : AREA_UNCONFIRMED_NOTE;
+  }
   return next.slice(0, 400);
 }
 
@@ -454,6 +489,7 @@ module.exports = {
   mentionsPin,
   classifyVisitLocation,
   assessCoverage,
+  hasCoverageText,
   decideVisitPlace,
   preferVisitPlace,
   visitBlockSpeech,

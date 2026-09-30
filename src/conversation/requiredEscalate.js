@@ -1,6 +1,32 @@
 // Ensure required escalate tool fires when Brain already decided ESCALATE + name is known.
 
 const { entityValue } = require('./entityExtraction');
+const {
+  hasConcreteUrgentNeed,
+  looksLikeUrgentContact,
+} = require('./callCorrectives');
+
+const GENERIC_REASON = /requested a human|human requested|live transfer is unavailable/i;
+
+/**
+ * The team should read what the caller needs, not why the Brain escalated.
+ * Picks the latest concrete caller turn after the human/urgent ask.
+ */
+function statedNeed(state = {}) {
+  const turns = Array.isArray(state.conversation?.answersReceived)
+    ? state.conversation.answersReceived
+    : [];
+  const name = String(state.caller?.name || '').trim().toLowerCase();
+  const askAt = turns.findIndex((turn) => looksLikeUrgentContact(turn));
+  const scan = turns.slice(Math.max(0, askAt));
+  for (let i = scan.length - 1; i >= 0; i -= 1) {
+    const turn = String(scan[i] || '').trim();
+    const clean = turn.toLowerCase().replace(/[.!?]+$/, '');
+    if (!clean || clean === name) continue;
+    if (hasConcreteUrgentNeed(turn)) return turn.slice(0, 200);
+  }
+  return '';
+}
 
 /**
  * When next-best-action is ESCALATE and the caller name is known, inject an
@@ -27,12 +53,13 @@ function ensureRequiredEscalate(parsed, state = {}, capabilities = {}) {
   ).trim();
   if (!name) return next;
 
-  const reason =
-    String(
-      state.handoff?.reason ||
-        state.goal?.description ||
-        'Caller requested a human'
-    ).trim() || 'Caller requested a human';
+  const decided = String(
+    state.handoff?.reason || state.goal?.description || ''
+  ).trim();
+  const need = decided && !GENERIC_REASON.test(decided) ? '' : statedNeed(state);
+  const reason = need
+    ? `Caller says: ${need}`
+    : decided || 'Caller requested a human';
 
   const reasonLower = reason.toLowerCase();
   let teammate = 'General queries';

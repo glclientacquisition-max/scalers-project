@@ -62,8 +62,8 @@ describe('visit location ladder', () => {
     assert.equal(assessCoverage('Mombasa Road', nairobi), 'inside');
     assert.equal(assessCoverage('rwaka', nairobi), 'outside');
     assert.equal(assessCoverage('kitengele', nairobi), 'outside');
-    assert.equal(assessCoverage('rongae', nairobi), 'outside');
-    assert.equal(assessCoverage('near the stage', nairobi), 'outside');
+    assert.equal(assessCoverage('rongae', nairobi), 'unknown');
+    assert.equal(assessCoverage('near the stage', nairobi), 'unknown');
     const part = { businessPolicies: { delivery: 'Westlands and Kilimani' } };
     assert.equal(assessCoverage('Westlands', part), 'inside');
     assert.equal(assessCoverage('Runda', part), 'outside');
