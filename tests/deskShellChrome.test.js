@@ -157,7 +157,7 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(contactImport, /<h1[\s\S]{0,120}>Contacts<\/h1>/);
   });
 
-  it("drops the phone lockup, keeps tabs, and parks Sign out on Profile", () => {
+  it("drops the phone lockup, keeps tabs, and parks Sign out in the account menu", () => {
     const css = read("dashboard/src/app/globals.css");
     const signOut = read("dashboard/src/components/ui/SignOutButton.tsx");
     assert.doesNotMatch(layout, /DeskPhoneHeader/);
@@ -174,7 +174,8 @@ describe("desk shell chrome", () => {
     assert.match(signOut, /btnPrimary/);
     assert.match(signOut, /if \(!confirming\)/);
     assert.doesNotMatch(settingsUi, /SignOutButton/);
-    assert.match(settingsUi, />Profile</);
+    assert.match(settingsUi, />Settings</);
+    assert.doesNotMatch(settingsUi, />Profile</);
     assert.doesNotMatch(settingsShell, /SignOutButton/);
     assert.doesNotMatch(settingsShell, /SettingsSignOutRow/);
     assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);

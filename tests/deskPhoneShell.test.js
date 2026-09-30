@@ -31,13 +31,14 @@ describe("desk phone shell", () => {
     assert.match(nav, /label: "Inbox"/);
     assert.match(nav, /label: "Contacts"/);
     assert.match(nav, /href: "\/wallet", label: "Usage"/);
-    assert.match(nav, /href: "\/settings", label: "Profile"/);
+    assert.match(nav, /href: "\/settings", label: "Settings"/);
+    assert.doesNotMatch(nav, /label: "Profile"/);
     assert.doesNotMatch(nav, /label: "Business"/);
     assert.doesNotMatch(nav, /label: "Business Profile"/);
     assert.doesNotMatch(nav, /label: "Wallet"/);
     assert.ok(
-      nav.indexOf('label: "Usage"') < nav.indexOf('label: "Profile"'),
-      "Usage occupies the old Business slot; Profile occupies the old Wallet slot"
+      nav.indexOf('label: "Usage"') < nav.indexOf('label: "Settings"'),
+      "Usage occupies the old Business slot; Settings occupies the old Wallet slot"
     );
     assert.doesNotMatch(nav, /Menu/);
     assert.doesNotMatch(nav, /hamburger/i);
@@ -92,7 +93,7 @@ describe("desk phone shell", () => {
     assert.match(constitution, /bottom tab bar/);
     assert.match(constitution, /icon rail is `DESK_LINKS`/);
     assert.match(constitution, /do not live in a hamburger drawer/);
-    assert.match(constitution, /Overview, Inbox, Contacts, Usage, Profile/);
+    assert.match(constitution, /Overview, Inbox, Contacts, Usage, Settings/);
     assert.doesNotMatch(constitution, /phone sticky bar/);
     const hint = read("dashboard/src/components/ui/DeskHint.tsx");
     assert.match(hint, /createPortal/);

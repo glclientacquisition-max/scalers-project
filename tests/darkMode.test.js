@@ -130,8 +130,9 @@ describe("theme activation", () => {
     const settingsNav = read("dashboard/src/lib/businessSettingsNav.ts");
     assert.match(shell, /<ThemePicker \/>/);
     assert.match(shell, /title="This device"/);
-    assert.match(settingsNav, /This device/);
-    assert.match(settingsNav, /label: "Appearance"/);
+    assert.match(settingsNav, /raw === "appearance"/);
+    assert.doesNotMatch(settingsNav, /title: "This device"/);
+    assert.doesNotMatch(settingsNav, /label: "Appearance"/);
   });
 });
 

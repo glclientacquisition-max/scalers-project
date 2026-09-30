@@ -8,5 +8,5 @@ export default function SettingsError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  return <DeskCrash title="Could not load Business Profile." onRetry={reset} />;
+  return <DeskCrash title="Could not load Settings." onRetry={reset} />;
 }

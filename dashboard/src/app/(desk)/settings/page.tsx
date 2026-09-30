@@ -24,7 +24,7 @@ export default async function SettingsPage({
   try {
     tenant = await getCurrentTenant();
   } catch {
-    return <DeskLoadError>Could not load Business Profile.</DeskLoadError>;
+    return <DeskLoadError>Could not load Settings.</DeskLoadError>;
   }
 
   if (!tenant) {

@@ -1,7 +1,7 @@
 import { DeskAccountMenu } from "@/components/DeskAccountMenu";
 import { listOwnerWorkspaces } from "@/lib/tenant";
 
-/** Quiet account strip. Initials open Appearance, Profile, and Sign out. */
+/** Quiet account strip. Initials open Appearance and Sign out. */
 export async function DeskAccountBar({
   tenantId,
   businessName,
