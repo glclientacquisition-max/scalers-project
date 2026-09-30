@@ -23,9 +23,12 @@ export const DESK_LINKS = [
   { href: "/settings", label: "Profile" },
 ] as const;
 
-/** Viewport desk chrome. Scroll stays inside main so the light body never shows under the shell. */
+/**
+ * Viewport desk chrome. Fixed to the same box as the tab bar.
+ * `h-dvh` is shorter than that box on phones, so the light body showed under the shell.
+ */
 export const deskShellClass =
-  "desk-theme flex h-dvh min-h-dvh min-w-0 overflow-hidden";
+  "desk-theme fixed inset-0 flex min-w-0 overflow-hidden";
 
 /** Page frame next to the rail. Ticket pages opt into bleed with `data-desk-bleed`. */
 export const deskMainClass =
@@ -146,7 +149,7 @@ export function DeskRail({
   return (
     <div
       data-desk-rail=""
-      className="hidden h-dvh w-[5.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
+      className="hidden h-full w-[5.5rem] shrink-0 flex-col border-r border-line/80 bg-surface md:flex"
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">

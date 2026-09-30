@@ -181,6 +181,24 @@
   caret-color: var(--ink);
 }
 
+/* Shell is position:fixed. Do not scroll the light canvas out from under it. */
+html:has(.desk-theme),
+html:has(.desk-theme) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+:root[data-theme="dark"] body:has(.desk-theme) {
+  background: #0b1220;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body:has(.desk-theme) {
+    background: #0b1220;
+  }
+}
+
 .desk-theme input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
 .desk-theme textarea,
 .desk-theme select {
