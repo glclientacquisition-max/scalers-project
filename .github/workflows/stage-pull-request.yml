@@ -7,6 +7,9 @@
 # Railway scalers staging must follow this branch with no commit SHA. A pin
 # ignores later pushes. After the git rebuild, this workflow connects the
 # staging Voice service to the branch again so a pin cannot stick.
+# Preview deploys do not take scalers-staging.vercel.app. This workflow assigns
+# that hostname to the READY deploy of this branch. It does not touch
+# scalers-project or scalers.co.ke.
 
 name: Stage pull request
 
@@ -63,19 +66,16 @@ jobs:
         if: always() && steps.stage.outcome != 'skipped'
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID }}
-          SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID }}
-          ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+          PROJECT_ID: ${{ secrets.RAILWAY_STAGING_PROJECT_ID != '' && secrets.RAILWAY_STAGING_PROJECT_ID || '7d397b45-3d3d-4939-bd2b-a0e1e71d9dd7' }}
+          SERVICE_ID: ${{ secrets.RAILWAY_STAGING_SERVICE_ID != '' && secrets.RAILWAY_STAGING_SERVICE_ID || 'e37d143d-d0ca-4d02-8cdf-347eb3fc647b' }}
+          ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID != '' && secrets.RAILWAY_STAGING_ENVIRONMENT_ID || '99dd41c1-2f1a-4763-a8a1-7c9f3bd87d13' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          for name in RAILWAY_TOKEN PROJECT_ID SERVICE_ID ENVIRONMENT_ID; do
-            eval "value=\${$name}"
-            if [ -z "$value" ]; then
-              echo "::error::$name is not set. Staging Voice will stay on whatever commit it is pinned to."
-              exit 1
-            fi
-          done
+          if [ -z "${RAILWAY_TOKEN}" ]; then
+            echo "::error::RAILWAY_TOKEN is not set. Staging Voice will stay on whatever commit it is pinned to."
+            exit 1
+          fi
           GQL=https://backboard.railway.com/graphql/v2
           AUTH=(-H "Authorization: Bearer $RAILWAY_TOKEN" -H "Content-Type: application/json" -H "User-Agent: scalers-stage-pull-request")
           RESP=$(curl -sS "$GQL" "${AUTH[@]}" \
@@ -121,6 +121,14 @@ jobs:
           print("connected_service=" + str(((body.get("data") or {}).get("serviceConnect") or {}).get("id") or ""))
           '
           echo "Railway staging Voice follows cursor/staging-voice-468b with no commit pin."
+
+      - name: Point staging desk at the staging branch
+        if: always() && steps.stage.outcome != 'skipped'
+        timeout-minutes: 20
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          STAGE_RESULT_PATH: ${{ runner.temp }}/stage-result.json
+        run: node scripts/stage-desk-alias.js
 
       - name: Record the result on the pull request
         if: always()
