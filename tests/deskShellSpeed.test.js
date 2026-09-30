@@ -64,6 +64,30 @@ describe("desk shell speed", () => {
     assert.match(line, /^desk-timing route=desk-shell auth;dur=\d+,shell;dur=\d+$/);
   });
 
+  it("paints a page skeleton on a desk tap without a route loading file", () => {
+    const pages = [
+      "dashboard/src/app/(desk)/home/page.tsx",
+      "dashboard/src/app/(desk)/calls/page.tsx",
+      "dashboard/src/app/(desk)/contacts/page.tsx",
+      "dashboard/src/app/(desk)/wallet/page.tsx",
+      "dashboard/src/app/(desk)/settings/page.tsx",
+      "dashboard/src/app/(desk)/calls/[id]/page.tsx",
+      "dashboard/src/app/(desk)/contacts/[id]/page.tsx",
+    ];
+    for (const rel of pages) {
+      const src = read(rel);
+      assert.match(src, /DeskPageGate/);
+      assert.doesNotMatch(src, /export const instant = false/);
+    }
+    assert.match(layout, /export const instant = false/);
+    assert.match(layout, /DeskPendingSlot/);
+    assert.match(read("dashboard/src/components/DeskNavState.tsx"), /DeskPageSkeleton/);
+    assert.equal(
+      fs.existsSync(path.join(__dirname, "..", "dashboard/src/app/(desk)/loading.tsx")),
+      false
+    );
+  });
+
   it("loads the voice catalog only for Voice and Test", () => {
     assert.match(settings, /tab === "test" \|\| \(tab === "train" && trainPanel === "tools"\)/);
     assert.match(settings, /tenantForSettingsView/);

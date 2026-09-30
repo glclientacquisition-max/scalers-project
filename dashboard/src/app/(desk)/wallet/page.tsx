@@ -15,7 +15,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
 import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 
-export const instant = false;
+import { DeskPageGate } from "@/components/DeskPageGate";
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
@@ -35,11 +35,19 @@ function kes(n: number): string {
   return n.toLocaleString("en-KE", { maximumFractionDigits: 2 });
 }
 
-export default async function WalletPage({
-  searchParams,
-}: {
+type WalletPageProps = {
   searchParams: Promise<{ page?: string }>;
-}) {
+};
+
+export default function WalletPage(props: WalletPageProps) {
+  return (
+    <DeskPageGate>
+      <WalletBody {...props} />
+    </DeskPageGate>
+  );
+}
+
+async function WalletBody({ searchParams }: WalletPageProps) {
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const tenant = await getCurrentTenant();

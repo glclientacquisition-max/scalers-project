@@ -3,11 +3,17 @@ import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { DeskPageGate } from "@/components/DeskPageGate";
 
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
+export default function ContactImportPage() {
+  return (
+    <DeskPageGate>
+      <ContactImportBody />
+    </DeskPageGate>
+  );
+}
 
-export default async function ContactImportPage() {
+async function ContactImportBody() {
   const tenant = await getCurrentTenant();
   if (!tenant) {
     return <DeskNoWorkspace />;

@@ -75,13 +75,9 @@ function fileHref(
   return qs ? `/contacts/${id}?${qs}` : `/contacts/${id}`;
 }
 
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
+import { DeskPageGate } from "@/components/DeskPageGate";
 
-export default async function ContactDetailPage({
-  params,
-  searchParams,
-}: {
+type ContactDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     from?: string;
@@ -98,7 +94,17 @@ export default async function ContactDetailPage({
     saved?: string;
     sort?: string;
   }>;
-}) {
+};
+
+export default function ContactDetailPage(props: ContactDetailPageProps) {
+  return (
+    <DeskPageGate>
+      <ContactDetailBody {...props} />
+    </DeskPageGate>
+  );
+}
+
+async function ContactDetailBody({ params, searchParams }: ContactDetailPageProps) {
   const { id } = await params;
   const sp = await searchParams;
   const callBack = callFromContactHref(sp);

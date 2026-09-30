@@ -24,7 +24,7 @@ Map the request to a **surface type**, then to one verb. If it does not map, do 
 | **Empty / loading** | **pending** or none | Spinner on route pending. Empty is static. |
 | **Numbers** | none | Instant `tabular-nums`. |
 | **Form** | **shift** | Focus/border. Errors mount instantly. |
-| **Route** | none | No page fade. |
+| **Route** | none | No page fade. The page slot shows the list skeleton while data streams. |
 
 | Verb | When | Primitive |
 | --- | --- | --- |

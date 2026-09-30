@@ -28,8 +28,7 @@ import {
   type ContactSavedFilter,
 } from "@/lib/contactsLoad";
 
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
+import { DeskPageGate } from "@/components/DeskPageGate";
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -42,11 +41,19 @@ function emptyCopy(saved: ContactSavedFilter, q: string): string {
   return "No callers";
 }
 
-export default async function ContactsPage({
-  searchParams,
-}: {
+type ContactsPageProps = {
   searchParams: Promise<{ saved?: string; sort?: string; q?: string }>;
-}) {
+};
+
+export default function ContactsPage(props: ContactsPageProps) {
+  return (
+    <DeskPageGate>
+      <ContactsBody {...props} />
+    </DeskPageGate>
+  );
+}
+
+async function ContactsBody({ searchParams }: ContactsPageProps) {
   const sp = await searchParams;
   const saved = resolveContactSavedFilter(sp.saved);
   const sort = resolveContactSort(sp.sort);

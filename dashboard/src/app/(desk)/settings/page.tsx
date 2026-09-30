@@ -9,18 +9,24 @@ import { getCurrentTenant } from "@/lib/tenant";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
-
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
+import { DeskPageGate } from "@/components/DeskPageGate";
 
 /** Allow URL fetch + Gemini extract/compile without premature platform cutoffs. */
 export const maxDuration = 60;
 
-export default async function SettingsPage({
-  searchParams,
-}: {
+type SettingsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+};
+
+export default function SettingsPage(props: SettingsPageProps) {
+  return (
+    <DeskPageGate>
+      <SettingsBody {...props} />
+    </DeskPageGate>
+  );
+}
+
+async function SettingsBody({ searchParams }: SettingsPageProps) {
   let tenant;
   try {
     tenant = await getCurrentTenant();

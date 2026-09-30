@@ -5,7 +5,7 @@ import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
 import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { DeskRouteChrome } from "@/components/DeskRouteChrome";
-import { DeskNavHost, DeskNeedsCountBridge, DeskScrollRestore } from "@/components/DeskNavState";
+import { DeskNavHost, DeskNeedsCountBridge, DeskPendingSlot, DeskScrollRestore } from "@/components/DeskNavState";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
@@ -75,7 +75,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
             <Suspense fallback={null}>
               <DeskPhonePull />
             </Suspense>
-            <Suspense fallback={<DeskPageSkeleton />}>{children}</Suspense>
+            <Suspense fallback={<DeskPageSkeleton />}>
+              <DeskPendingSlot>{children}</DeskPendingSlot>
+            </Suspense>
             <Suspense fallback={null}>
               <DeskScrollRestore />
               <DeskRouteChrome />

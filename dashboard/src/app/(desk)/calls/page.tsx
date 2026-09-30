@@ -35,13 +35,9 @@ import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { createDeskTimer } from "@/lib/deskTiming";
+import { DeskPageGate } from "@/components/DeskPageGate";
 
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
-
-export default async function CallsPage({
-  searchParams,
-}: {
+type CallsPageProps = {
   searchParams: Promise<{
     page?: string;
     status?: string;
@@ -53,7 +49,17 @@ export default async function CallsPage({
     from?: string;
     rpage?: string;
   }>;
-}) {
+};
+
+export default function CallsPage(props: CallsPageProps) {
+  return (
+    <DeskPageGate>
+      <CallsBody {...props} />
+    </DeskPageGate>
+  );
+}
+
+async function CallsBody({ searchParams }: CallsPageProps) {
   const timer = createDeskTimer();
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
