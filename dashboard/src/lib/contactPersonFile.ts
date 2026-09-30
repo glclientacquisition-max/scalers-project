@@ -1,3 +1,4 @@
+import { callOpenedFromContactHref } from "@/lib/deskBackTarget";
 import { inboxRecordHref } from "@/lib/inboxHref";
 import {
   buildInboxItem,
@@ -139,6 +140,7 @@ export function contactHistoryEntries(opts: {
   jobs: InboxJob[];
   callMetaById?: Record<string, ContactCallMeta>;
   vertical?: string | null;
+  contactId?: string | null;
 }): ContactTimelineEntry[] {
   const vertical = opts.vertical || null;
   const holdByCall = new Map<string, InboxHold>();
@@ -187,7 +189,11 @@ export function contactHistoryEntries(opts: {
       headline: item.headline,
       detail: item.detail,
       callId: item.callId,
-      href: item.callId ? inboxRecordHref(item.callId) : null,
+      href: item.callId
+        ? opts.contactId
+          ? callOpenedFromContactHref(item.callId, opts.contactId)
+          : inboxRecordHref(item.callId)
+        : null,
       status: item.job?.status || item.hold?.status || item.lead?.call.status || null,
       jobStatus: item.job?.status || null,
       stamp: itemSignalLabel(item, opts.vertical),

@@ -27,7 +27,8 @@ describe("inbox row avatar vs conversation hit", () => {
     assert.match(avatar, /if \(contactHref\)/);
     assert.match(inbox, /contactFromInboxHref/);
     assert.match(contact, /inboxFromContactHref/);
-    assert.match(contact, /inboxBack \? "Inbox"/);
+    assert.match(contact, /contactDeskBack/);
+    assert.match(read("dashboard/src/lib/deskBackTarget.ts"), /label: "Inbox"/);
   });
 
   it("leaves the phone Conversation link wrapping name and preview only", () => {

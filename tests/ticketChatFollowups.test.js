@@ -81,7 +81,7 @@ describe("ticket chat follow-ups", () => {
     assert.match(ticket, /data-ticket-chat/);
     assert.match(
       ticket,
-      /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/
+      /<DeskBack href=\{backHref\}>\{backLabel\}<\/DeskBack>/
     );
     assert.match(css, /desk-theme:has\(\[data-ticket-chat\]\)[\s\S]{0,160}--desk-tabbar-h:\s*0px/);
     assert.match(css, /\[data-desk-tabbar\]/);

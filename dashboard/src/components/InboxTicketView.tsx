@@ -300,6 +300,7 @@ function ticketSmsFacts(opts: {
 export function InboxTicketView({
   callId,
   backHref,
+  backLabel = "Inbox",
   contactHref,
   callerName,
   lastContactAt,
@@ -330,6 +331,7 @@ export function InboxTicketView({
 }: {
   callId: string;
   backHref: string;
+  backLabel?: string;
   contactHref: string | null;
   callerName: string | null;
   lastContactAt: string | null;
@@ -513,7 +515,7 @@ export function InboxTicketView({
         <DeskRecordLead
           align="center"
           back={
-            <DeskBack href={backHref}>{backHref === "/home" ? "Home" : "Inbox"}</DeskBack>
+            <DeskBack href={backHref}>{backLabel}</DeskBack>
           }
           trail={
             <InboxTicketMore

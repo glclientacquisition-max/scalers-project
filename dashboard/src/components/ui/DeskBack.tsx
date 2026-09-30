@@ -17,7 +17,7 @@ function BackChevron() {
   );
 }
 
-/** Previous screen. Icon-only chevron. 44px muted ghost. Label is aria-label from the destination. */
+/** Previous screen. Chevron plus the destination name. 44px. Never the word Back. */
 export function DeskBack({
   href,
   children,
@@ -34,16 +34,17 @@ export function DeskBack({
         aria-label={children}
         title={children}
         className={[
-          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-soft",
+          "inline-flex min-h-11 min-w-11 max-w-[11rem] shrink-0 items-center gap-1 rounded-xl px-2 text-sm font-medium text-ink-soft",
           deskShiftClass,
           "hover:bg-surface-muted hover:text-ink",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+          "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
           className,
         ]
           .filter(Boolean)
           .join(" ")}
       >
         <BackChevron />
+        <span className="truncate">{children}</span>
       </Link>
     </DeskHint>
   );

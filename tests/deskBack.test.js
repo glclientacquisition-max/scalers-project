@@ -14,7 +14,7 @@ describe("DeskBack icon", () => {
   const toolbar = read("dashboard/src/components/InboxToolbar.tsx");
   const settings = read("dashboard/src/components/settingsUi.tsx");
 
-  it("renders a chevron without the visible word Inbox", () => {
+  it("renders a chevron plus the destination name", () => {
     const icon = back.slice(
       back.indexOf("export function DeskBack"),
       back.indexOf("export function DeskRecordLead")
@@ -24,16 +24,19 @@ describe("DeskBack icon", () => {
     assert.match(icon, /title=\{children\}/);
     assert.match(icon, /min-h-11 min-w-11/);
     assert.match(icon, /<BackChevron/);
+    assert.match(icon, /<span className="truncate">\{children\}<\/span>/);
+    assert.match(icon, /focus:outline-none focus:ring-2 focus:ring-\[#0096FF\]/);
     assert.match(back, /<svg viewBox="0 0 16 16"/);
-    assert.doesNotMatch(icon, />\{children\}</);
+    assert.doesNotMatch(icon, />\s*Back\s*</);
     assert.doesNotMatch(icon, /hover:underline/);
     assert.doesNotMatch(icon, /bg-accent-fill/);
     assert.match(icon, /text-ink-soft/);
   });
 
   it("keeps ticket and archived href as deep links", () => {
+    assert.match(detail, /ticketDeskBack/);
     assert.match(detail, /inboxReturnHref\(inboxReturn\)/);
-    assert.match(ticket, /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/);
+    assert.match(ticket, /<DeskBack href=\{backHref\}>\{backLabel\}<\/DeskBack>/);
     assert.match(
       toolbar,
       /<DeskBack href=\{backHref \|\| callsHref\(\{ q: query \|\| undefined \}\)\}>Inbox<\/DeskBack>/
@@ -45,7 +48,7 @@ describe("DeskBack icon", () => {
   it("sits in the ticket header row instead of a text Inbox row", () => {
     const header = ticket.slice(ticket.indexOf("<header"), ticket.indexOf("</header>"));
     assert.match(header, /DeskBack href=\{backHref\}/);
-    assert.match(header, /"Home" : "Inbox"/);
+    assert.match(header, /\{backLabel\}/);
     assert.match(header, /<DeskRecordLead/);
     assert.match(header, /align="center"/);
     assert.doesNotMatch(header, /mt-2 flex items-center gap-2/);

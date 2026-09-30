@@ -26,6 +26,7 @@ import {
   inboxReturnFromSearch,
   inboxReturnHref,
 } from "@/lib/inboxHref";
+import { ticketDeskBack } from "@/lib/deskBackTarget";
 import {
   classifyInboxPurpose,
   inboxNeedsYou,
@@ -59,6 +60,7 @@ export default async function CallDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     from?: string;
+    contact?: string;
     view?: string;
     week?: string;
     day?: string;
@@ -69,7 +71,7 @@ export default async function CallDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const inboxReturn = inboxReturnFromSearch(sp);
-  const backHref = inboxReturnHref(inboxReturn);
+  const inboxHref = inboxReturnHref(inboxReturn);
 
   const tenant = await getCurrentTenant();
   if (!tenant) notFound();
@@ -128,6 +130,12 @@ export default async function CallDetailPage({
   const summaryName = typeof meta.name === "string" ? meta.name.trim() : "";
   const contactName = person?.name?.trim() || "";
   const name = contactName || summaryName || null;
+  const namedBack = ticketDeskBack({
+    from: sp.from,
+    contactId: sp.contact,
+    contactName: person?.id && person.id === sp.contact ? contactName : null,
+    inboxHref,
+  });
   const reason = pickCallOwnerReason(meta);
   const want = pickCallOwnerWant(meta);
   const summaryCard = pickCallOwnerCard(meta);
@@ -233,7 +241,8 @@ export default async function CallDetailPage({
       {workLoadError ? <DeskLoadError>Could not load visit or hold.</DeskLoadError> : null}
       <InboxTicketView
         callId={row.id}
-        backHref={backHref}
+        backHref={namedBack.href}
+        backLabel={namedBack.label}
         contactHref={
           person?.id ? contactFromCallHref(person.id, row.id, inboxReturn) : null
         }

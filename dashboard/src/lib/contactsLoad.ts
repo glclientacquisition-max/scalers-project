@@ -771,6 +771,7 @@ export async function loadContactTimeline(
   }
 
   return contactHistoryEntries({
+    contactId: contact.id,
     leads,
     holds: uniqueById(
       [...(reqById.data || []), ...(reqByPhone.data || [])].map(asHold)

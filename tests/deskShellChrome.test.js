@@ -139,7 +139,7 @@ describe("desk shell chrome", () => {
     const ticketHeader = ticket.slice(ticket.indexOf("<header"), ticket.indexOf("</header>"));
     assert.match(
       ticketHeader,
-      /<DeskBack href=\{backHref\}>\{backHref === "\/home" \? "Home" : "Inbox"\}<\/DeskBack>/
+      /<DeskBack href=\{backHref\}>\{backLabel\}<\/DeskBack>/
     );
     assert.doesNotMatch(ticketHeader, /deskListTitleClass/);
     assert.doesNotMatch(ticketHeader, /<h1[\s\S]{0,120}>Inbox<\/h1>/);

@@ -45,6 +45,7 @@ import {
   type ContactHistoryFilter,
 } from "@/lib/contactHistoryView";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
+import { contactDeskBack } from "@/lib/deskBackTarget";
 
 function fileHref(
   id: string,
@@ -103,8 +104,14 @@ export default async function ContactDetailPage({
   const sp = await searchParams;
   const callBack = callFromContactHref(sp);
   const inboxBack = inboxFromContactHref(sp);
-  const backHref = callBack || inboxBack || contactsReturnHref(sp);
-  const backLabel = callBack ? "Call" : inboxBack ? "Inbox" : "Contacts";
+  const namedBack = contactDeskBack({
+    from: sp.from,
+    callHref: callBack,
+    inboxHref: inboxBack,
+    contactsHref: contactsReturnHref(sp),
+  });
+  const backHref = namedBack.href;
+  const backLabel = namedBack.label;
   const historyFilter = resolveContactHistoryFilter(sp.history);
   const historyQ = sanitizeSearchQuery(sp.hq);
   const tenant = await getCurrentTenant();
