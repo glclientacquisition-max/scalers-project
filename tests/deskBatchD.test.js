@@ -16,9 +16,11 @@ describe("desk batch D screen fit and recovery", () => {
     assert.match(ticket, /pt-\[var\(--desk-header-h\)\]/);
     assert.match(ticket, /pb-\[env\(safe-area-inset-bottom,0px\)\]/);
     assert.doesNotMatch(ticket, /100dvh-var\(--desk-header-h\)/);
-    assert.match(nav, /has-\[\[data-desk-bleed\]\]:h-full/);
-    assert.match(nav, /has-\[\[data-desk-bleed\]\]:overflow-hidden/);
-    assert.doesNotMatch(nav, /md:has-\[\[data-desk-bleed\]\]:h-full/);
+    assert.doesNotMatch(nav, /has-\[\[data-desk-bleed\]\]:overflow-hidden/);
+    assert.doesNotMatch(nav, /has-\[\[data-desk-bleed\]\]:h-full/);
+    assert.match(css, /data-desk-ticket-chat\] \[data-desk-main\]/);
+    assert.match(css, /height:\s*100%/);
+    assert.match(css, /overflow:\s*hidden/);
     assert.match(css, /--desk-tabbar-clearance:\s*env\(safe-area-inset-bottom, 0px\)/);
   });
 
