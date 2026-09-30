@@ -142,7 +142,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 | State | Treatment |
 | --- | --- |
-| Loading | No `(desk)/loading.tsx`. The layout suspends the page slot on a list-shaped skeleton. Rail and tabs stay mounted. Mutation pending stays `pendingSpinnerInkClass` on the control. No invented numbers |
+| Loading | No `(desk)/loading.tsx`. The layout suspends the page slot on a list-shaped skeleton. A tap covers that slot with the same skeleton until the page body commits. Rail and tabs stay mounted. Mutation pending stays `pendingSpinnerInkClass` on the control. No invented numbers |
 | Empty | `deskEmptyClass`. Title + one link. No workspace: `DeskNoWorkspace` |
 | Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"`. Home inbox load failure uses this, not a zero queue. Call/contact query failure uses this, not 404. Holds or visits failing while calls load: same banner, lists stay. |
 | Crash | `DeskCrash`. Try again. Never a stack trace |
@@ -181,7 +181,7 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 | Empty / loading | `deskEmptyClass` | Empty is static. A desk tap shows the list skeleton in the page slot. Mutation pending is the ink spinner on the control. No `animate-pulse` except the pronunciation recording dot and the list skeleton. |
 | Numbers | Wallet balance, Home counts, call duration | Instant `tabular-nums`. No count-up. |
 | Form | Fields, field errors | Focus/border: `shift`. Errors mount instantly next to the field. No shake. |
-| Route | Overview, Inbox, Contacts, Usage, Settings | Instant shell. A tap paints the list skeleton in the page slot while that page's data streams. No fade. No route spinner. The new page's lists land on later inserts only. |
+| Route | Overview, Inbox, Contacts, Usage, Settings | Instant shell. A tap paints the list skeleton over the page slot and holds it until that page's content commits. No fade. No route spinner. The new page's lists land on later inserts only. |
 
 Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
 
