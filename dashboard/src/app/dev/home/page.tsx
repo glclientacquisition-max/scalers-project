@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
+import { DeskAccountMenu } from "@/components/DeskAccountMenu";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { ThemePicker } from "@/components/ThemePicker";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
@@ -18,6 +19,7 @@ export default function DevHomePage() {
     <div className={deskShellClass}>
       <DeskRail needsCount={3} homeHref="/dev/home" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
+        <DeskAccountMenu name="Chapter One Dental" tenantId="" workspaces={[]} />
         <main className={deskMainClass}>
           <HomeOverviewHeader today={{ iso: "2026-09-20", label: "Sunday 20 September" }} />
           <section className="mt-6 min-w-0" aria-labelledby="work-heading">

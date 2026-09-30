@@ -65,7 +65,7 @@ function AppearancePanel({ showHeading = true }: { showHeading?: boolean }) {
     <section className="min-w-0 w-full space-y-6">
       {showHeading ? <h2 className={settingsPanelHeadingClass}>Appearance</h2> : null}
       <SettingsGroup title="This device">
-        <div className="px-4 py-2">
+        <div className="p-4">
           <ThemePicker />
         </div>
       </SettingsGroup>
