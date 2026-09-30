@@ -19,7 +19,7 @@ Specialized Cursor agents / chats. One task → one lane → one PR.
 3. Paste the lane prompt from `docs/agents/PROMPTS.md` (or `@docs/agents/…`) at the start of each new chat.
 4. Prefer fresh chats per ticket; do not keep one eternal mega-thread.
 5. Schema / RPC / auth contract changes: **Platform first**, then feature lanes.
-6. `.github/workflows/stage-pull-request.yml` rebuilds `cursor/staging-voice-468b` as `main` plus open pull requests (once that workflow is on `main`). Closing a pull request removes it from staging. Promote by squash-merging the tested feature pull request into `main`.
+6. `.github/workflows/stage-pull-request.yml` rebuilds `cursor/staging-voice-468b` as `main` plus every open pull request (once that workflow is on `main`). Open the pull request into `main` so the rebuild starts immediately. A pull request into another feature branch joins on the next rebuild. Closing a pull request removes it from staging. Promote by squash-merging the tested feature pull request into `main`.
 
 ---
 

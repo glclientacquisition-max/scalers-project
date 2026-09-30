@@ -8,9 +8,9 @@
 ## Lifecycle
 
 ```
-PR opened, updated, reopened, or closed against main
+PR opened, updated, retargeted, reopened, or closed against main
   ↓ stage-pull-request.yml rebuilds cursor/staging-voice-468b
-     as main plus pull requests still open
+     as main plus every pull request still open
   ↓ Railway staging Voice + Vercel scalers-staging deploy that branch
   ↓ confirm staging /healthz.gitSha and scalers-staging.vercel.app
   ↓ DID + desk test
@@ -21,7 +21,7 @@ PR opened, updated, reopened, or closed against main
   ↓ production (human-approved SQL + deploy)
 ```
 
-Official staging Desk is `https://scalers-staging.vercel.app`. Official staging Voice is Railway. Both run **`cursor/staging-voice-468b`**. `stage-pull-request.yml` rebuilds that branch as `main` plus open pull requests, then connects Railway **scalers staging** to that branch with no commit SHA, then assigns `scalers-staging.vercel.app` to the ready deploy of that branch. A pinned SHA ignores the branch, so `/healthz` stays on the old commit until the pin is cleared. Closing a pull request rebuilds staging without it. Vercel `scalers-staging` ignores builds from `main`, so a merge does not overwrite the staging Desk URL. Feature PRs still get a preview URL for a UI glance. Promote by squash-merging the tested feature pull request into `main`. Leave **scalers-project** production branch on `main`.
+Official staging Desk is `https://scalers-staging.vercel.app`. Official staging Voice is Railway. Both run **`cursor/staging-voice-468b`**. `stage-pull-request.yml` rebuilds that branch as `main` plus every open pull request, including one that targets another feature branch, then connects Railway **scalers staging** to that branch with no commit SHA, then assigns `scalers-staging.vercel.app` to the ready deploy of that branch. A pinned SHA ignores the branch, so `/healthz` stays on the old commit until the pin is cleared. Closing a pull request rebuilds staging without it. Vercel `scalers-staging` ignores builds from `main`, so a merge does not overwrite the staging Desk URL. Feature PRs still get a preview URL for a UI glance. Promote by squash-merging the tested feature pull request into `main`. Leave **scalers-project** production branch on `main`.
 
 ---
 
@@ -30,7 +30,7 @@ Official staging Desk is `https://scalers-staging.vercel.app`. Official staging 
 | Trigger | Workflow | Requires secrets |
 | --- | --- | --- |
 | Every PR | `ci.yml` | No |
-| PR opened, updated, reopened, or closed against `main`, and every push to `main` | `stage-pull-request.yml` | `GITHUB_TOKEN` force-pushes the staging branch. `RAILWAY_TOKEN` reconnects **scalers staging** to that branch with no commit SHA. `VERCEL_TOKEN` assigns `scalers-staging.vercel.app` to the ready deploy of that branch. |
+| PR opened, updated, retargeted, reopened, or closed against `main`, and every push to `main` | `stage-pull-request.yml` | `GITHUB_TOKEN` force-pushes the staging branch. `RAILWAY_TOKEN` reconnects **scalers staging** to that branch with no commit SHA. `VERCEL_TOKEN` assigns `scalers-staging.vercel.app` to the ready deploy of that branch. |
 | Push to `main` | `staging-validate.yml` | Staging Supabase (warns if missing) |
 | Manual | `workflow_dispatch` on staging-validate | Staging Supabase |
 | Manual | `staging-voice-deploy.yml` on a PR branch | Railway staging token + IDs |

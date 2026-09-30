@@ -79,8 +79,8 @@ One integration branch: **`cursor/staging-voice-468b`**. Not a second git repo.
 
 Day to day:
 
-1. Feature branch (one lane). Open a pull request into `main`.
-2. `.github/workflows/stage-pull-request.yml` rebuilds `cursor/staging-voice-468b` as `main` plus every open pull request into `main`. This starts after the workflow file is on `main`.
+1. Feature branch (one lane). Open the pull request into `main` so the rebuild starts on open. A pull request into another feature branch is still staging work, and it joins on the next rebuild.
+2. `.github/workflows/stage-pull-request.yml` rebuilds `cursor/staging-voice-468b` as `main` plus every open pull request. This starts after the workflow file is on `main`. Changing the pull request base to `main` starts a rebuild.
 3. Staging Desk and staging Voice deploy from that branch. The stage workflow assigns `scalers-staging.vercel.app` to the ready deploy of that branch. Open that URL. For voice, confirm `/healthz.gitSha` is the staging branch tip from the pull request note, then call `+254709221536`.
 4. If the test is good, mark that feature pull request ready and squash-merge it into `main`. Production Desk and production Voice follow `main`.
 5. If the test is not good, close the pull request. The workflow rebuilds staging without it. The practice desk and practice phone go back to `main` plus the pull requests still open.

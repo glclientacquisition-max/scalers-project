@@ -1,5 +1,7 @@
-# Rebuild cursor/staging-voice-468b as main plus open pull requests into main.
-# Closing a pull request rebuilds staging without it.
+# Rebuild cursor/staging-voice-468b as main plus every open pull request.
+# A pull request into another feature branch is included on the next rebuild.
+# Changing its base to main starts a rebuild. Closing a pull request rebuilds
+# staging without it.
 # Production still follows main.
 # This workflow runs from main (pull_request_target) and only git-merges pull
 # request refs. It does not install or run code from those pull requests.
@@ -15,7 +17,7 @@ name: Stage pull request
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened, closed, edited]
     branches: [main]
   push:
     branches: [main]
