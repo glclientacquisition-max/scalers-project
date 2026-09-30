@@ -168,6 +168,12 @@ export function isLiveCallStatus(status?: string | null): boolean {
   return s === "in_progress" || s === "ringing" || s === "queued";
 }
 
+/** Caller never reached the receptionist. Same pair as missed-call SMS. */
+export function isSilenceCallStatus(status?: string | null): boolean {
+  const s = String(status || "").toLowerCase();
+  return s === "failed" || s === "no_answer";
+}
+
 export function purposeLabel(purpose: InboxPurpose, vertical?: string | null): string {
   const copy = nicheCopy(vertical);
   switch (purpose) {
@@ -428,6 +434,8 @@ export function classifyInboxPurpose(opts: {
   if (isLiveCallStatus(opts.callStatus)) return "live";
   if (opts.job) return "job";
   if (opts.hold) return "hold";
+  // Silence only. A call the receptionist held is not Missed.
+  if (isSilenceCallStatus(opts.callStatus)) return "missed";
 
   const intent = canonicalInboxIntent(opts.primaryIntent);
   const resolution = opts.resolution || "unknown";
@@ -435,11 +443,8 @@ export function classifyInboxPurpose(opts: {
   if (HUMAN_INTENTS.has(intent) || resolution === "needs_human") return "human";
   if (JOB_INTENTS.has(intent)) return "job";
   if (HOLD_INTENTS.has(intent)) return "hold";
-  if (resolution === "abandoned" || resolution === "unresolved") return "missed";
-  // Product inquiry is an active lead unless a job or hold row already attached.
-  if (intent === "product_inquiry") return "missed";
   if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
-  if (opts.leadStatus === "new") return "missed";
+  // Abandoned, unresolved, product inquiry, and a new lead are not Missed.
   return "answered";
 }
 

@@ -235,6 +235,91 @@ describe('mergeTranscriptReview', () => {
     assert.doesNotMatch(merged.reason, /visit request saved/i);
   });
 
+  it('states the last place and time for a talked visit with nothing saved', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'unresolved' },
+      summary: { reason: 'Caller asked for carpet cleaning.' },
+      toolFlags: {
+        holdSaved: false,
+        visitSaved: false,
+        callbackSaved: false,
+        visitRequested: false,
+        visitAsk: true,
+        service: 'carpet cleaning',
+        place: 'Runda',
+        when: 'morning',
+        callerName: '',
+        refusedWhen: ['7:00 AM'],
+        refusedPlaces: ['Rongai'],
+      },
+      review: {
+        reason: 'Callback was noted for carpet cleaning in Rongai at 7:00 AM.',
+        want: 'They want carpet cleaning in Rongai at 7:00 AM. Callback was noted.',
+        done: 'Callback was noted.',
+        next: 'Callback noted.',
+        mood: 'calm',
+        primary_intent: 'book_visit',
+        needs_human: false,
+        confidence: 0.4,
+      },
+    });
+    assert.equal(merged.resolution, 'needs_human');
+    assert.equal(merged.primaryIntent, 'human');
+    assert.equal(merged.want, 'Carpet cleaning in Runda in the morning. No name.');
+    assert.equal(merged.done, 'None.');
+    assert.equal(merged.next, 'Call them back.');
+    assert.doesNotMatch(merged.want, /7:00|Rongai|callback was noted/i);
+    assert.doesNotMatch(merged.reason, /callback was noted/i);
+    assert.doesNotMatch(merged.done, /callback/i);
+  });
+
+  it('keeps a callback sentence only when a callback row exists', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'callback', resolution: 'resolved' },
+      summary: { reason: 'Callback was noted.' },
+      toolFlags: {
+        holdSaved: true,
+        callbackSaved: true,
+        visitSaved: false,
+      },
+      review: {
+        reason: 'Callback was noted for a quote.',
+        want: 'Callback was noted for a quote.',
+        done: 'Callback was noted.',
+        next: 'Call them back.',
+        primary_intent: 'human',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.match(merged.want, /callback was noted/i);
+    assert.match(merged.done, /callback was noted/i);
+  });
+
+  it('does not ask for a callback after a finished answer', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'hours_open', resolution: 'resolved' },
+      summary: { reason: 'Caller asked about hours.' },
+      toolFlags: {
+        ...emptyFlags,
+        finishedAnswer: true,
+      },
+      review: {
+        reason: 'Caller asked if the shop is open on Sunday. Receptionist said 10 to 4.',
+        want: 'Sunday hours.',
+        done: 'Hours answered.',
+        next: 'Call them back.',
+        primary_intent: 'hours_open',
+        needs_human: false,
+        needs_owner: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.resolution, 'resolved');
+    assert.equal(merged.next, 'None.');
+    assert.equal(merged.done, 'Hours answered.');
+  });
+
   it('rewrites booked hangup copy while the visit is still requested', () => {
     const merged = mergeTranscriptReview({
       derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
@@ -363,6 +448,52 @@ describe('toolFlagsFromBrain', () => {
     assert.equal(flags.handoff, true);
   });
 
+  it('keeps the last wanted place and drops a refused hour and place', () => {
+    let state = createBrainState({ vertical: 'home_services' });
+    state.intent = 'booking';
+    state.entities.service = {
+      value: 'carpet cleaning',
+      source: 'caller_explicit',
+      confidence: 0.9,
+      confirmed: false,
+    };
+    state.entities.location = {
+      value: 'Runda',
+      source: 'caller_explicit',
+      confidence: 0.9,
+      confirmed: false,
+    };
+    state.entities.when = {
+      value: 'morning',
+      source: 'caller_explicit',
+      confidence: 0.9,
+      confirmed: false,
+    };
+    state.visitPlace = { blocked: '' };
+    state = recordActionResults(state, [
+      {
+        action: 'create_appointment',
+        status: 'invalid',
+        code: 'outside_coverage',
+        value: { landmark: 'Rongai', serviceName: 'carpet cleaning' },
+      },
+      {
+        action: 'create_appointment',
+        status: 'invalid',
+        code: 'outside_hours',
+        value: { whenText: '7:00 AM', serviceName: 'carpet cleaning' },
+      },
+    ]);
+    const flags = toolFlagsFromBrain(state);
+    assert.equal(flags.place, 'Runda');
+    assert.equal(flags.when, 'morning');
+    assert.equal(flags.service, 'carpet cleaning');
+    assert.equal(flags.callerName, '');
+    assert.equal(flags.visitSaved, false);
+    assert.ok(flags.refusedWhen.some((row) => /7:00 AM/i.test(row)));
+    assert.ok(flags.refusedPlaces.some((row) => /Rongai/i.test(row)));
+  });
+
   it('keeps visitRequested after a later non-visit tool turn', () => {
     let state = recordActionResults(createBrainState(), [
       {
@@ -422,6 +553,33 @@ describe('runPostCallTranscriptReview', () => {
     assert.equal(saved[0].merged.done, 'None.');
     assert.equal(saved[0].merged.next, 'None.');
     assert.equal(saved[0].merged.resolution, 'resolved');
+  });
+
+  it('writes No conversation for silence with no transcript', async () => {
+    const saved = [];
+    const result = await runPostCallTranscriptReview(
+      { callSid: 'CA_silence', callStatus: 'no_answer' },
+      {
+        waitMs: 0,
+        retryMs: 0,
+        delay: async () => {},
+        loadTurns: async () => [],
+        generateText: async () => {
+          throw new Error('should not generate');
+        },
+        save: async (payload) => {
+          saved.push(payload);
+        },
+      }
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.silence, true);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].merged.want, 'No conversation.');
+    assert.equal(saved[0].merged.done, 'None.');
+    assert.equal(saved[0].merged.mood, 'unknown');
+    assert.equal(saved[0].merged.next, 'None.');
+    assert.equal(saved[0].merged.applied.resolution, false);
   });
 
   it('no-ops without turns', async () => {

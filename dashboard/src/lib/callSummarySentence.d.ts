@@ -32,3 +32,20 @@ export function displayContactLastReason(opts: {
 export function usefulOwnerFact(raw: string | null | undefined): string;
 
 export function usefulMoodLabel(raw: string | null | undefined): string;
+
+export function shapeTicketChat(opts: {
+  silence?: boolean;
+  want?: string | null;
+  done?: string | null;
+  mood?: string | null;
+  next?: string | null;
+  needsYou?: boolean;
+  stamp?: string | null;
+  whenLabel?: string | null;
+}): {
+  want: string;
+  done: string;
+  mood: string;
+  urgency: string;
+  bannerWhen: string;
+};

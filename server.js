@@ -972,6 +972,7 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
         summary,
         toolFlags: toolFlagsFromBrain(brainState),
         turns: Array.isArray(opts.turns) ? opts.turns : null,
+        callStatus: opts.callStatus || null,
       });
     }
     if (saved) {
@@ -1006,7 +1007,7 @@ async function markCallTerminalFromWebhook({ callSid, status, durationSeconds, s
       found: Boolean(updated),
     });
     // Best-effort outcome while Brain state may still be in memory.
-    await persistCallResolution(callSid, source, { turns });
+    await persistCallResolution(callSid, source, { turns, callStatus: status });
     await persistFirstForwardAcceptance(callSid, durationSeconds);
     if (updated) {
       // Fire-and-forget: SMS latency must not hold the webhook open.

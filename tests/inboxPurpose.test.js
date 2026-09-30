@@ -53,19 +53,22 @@ function canonicalInboxIntent(raw) {
   return INTENT_ALIASES[key] || key;
 }
 
+function isSilenceCallStatus(status) {
+  const s = String(status || "").toLowerCase();
+  return s === "failed" || s === "no_answer";
+}
+
 function classify({ primaryIntent, resolution, leadStatus, hold, job, callStatus }) {
   const s = String(callStatus || "").toLowerCase();
   if (s === "in_progress" || s === "ringing" || s === "queued") return "live";
   if (job) return "job";
   if (hold) return "hold";
+  if (isSilenceCallStatus(callStatus)) return "missed";
   const intent = canonicalInboxIntent(primaryIntent);
   if (HUMAN_INTENTS.has(intent) || resolution === "needs_human") return "human";
   if (JOB_INTENTS.has(intent)) return "job";
   if (HOLD_INTENTS.has(intent)) return "hold";
-  if (resolution === "abandoned" || resolution === "unresolved") return "missed";
-  if (intent === "product_inquiry") return "missed";
   if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
-  if (leadStatus === "new") return "missed";
   return "answered";
 }
 
@@ -242,7 +245,7 @@ describe("inbox purpose", () => {
     assert.equal(classify({ callStatus: "in_progress", primaryIntent: "product_inquiry" }), "live");
   });
 
-  it("stamps hangup product inquiry as an active lead, not answered", () => {
+  it("stamps a finished product inquiry as answered", () => {
     assert.equal(
       classify({
         callStatus: "complete",
@@ -250,7 +253,7 @@ describe("inbox purpose", () => {
         resolution: "resolved",
         leadStatus: "new",
       }),
-      "missed"
+      "answered"
     );
     assert.equal(
       classify({
@@ -285,8 +288,39 @@ describe("inbox purpose", () => {
     assert.equal(classify({ primaryIntent: "hours", resolution: "resolved" }), "answered");
   });
 
-  it("stamps abandoned as missed", () => {
-    assert.equal(classify({ resolution: "abandoned" }), "missed");
+  it("stamps silence as missed and a held call as answered or human", () => {
+    assert.equal(
+      classify({ callStatus: "failed", resolution: "abandoned", leadStatus: "new" }),
+      "missed"
+    );
+    assert.equal(
+      classify({ callStatus: "no_answer", primaryIntent: "product_inquiry" }),
+      "missed"
+    );
+    assert.equal(classify({ callStatus: "complete", resolution: "abandoned" }), "answered");
+    assert.equal(
+      classify({
+        callStatus: "complete",
+        resolution: "unresolved",
+        leadStatus: "new",
+      }),
+      "answered"
+    );
+    assert.equal(
+      classify({
+        callStatus: "complete",
+        primaryIntent: "book_visit",
+        resolution: "needs_human",
+      }),
+      "human"
+    );
+    assert.equal(
+      classify({
+        callStatus: "no_answer",
+        hold: { id: "r1" },
+      }),
+      "hold"
+    );
   });
 
   it("reads Brain hold_or_pickup and order_enquiry as hold", () => {
@@ -295,10 +329,10 @@ describe("inbox purpose", () => {
     assert.equal(classify({ primaryIntent: "order_enquiry" }), "hold");
   });
 
-  it("treats a new product inquiry as Needs you unless a booking or hold exists", () => {
+  it("does not stamp a talked product inquiry as missed", () => {
     assert.equal(
       classify({ primaryIntent: "product_inquiry", leadStatus: "new" }),
-      "missed"
+      "answered"
     );
     assert.equal(
       classify({
@@ -720,7 +754,10 @@ describe("inboxPurpose source lockstep", () => {
     assert.match(src, /filter === "all" \|\| filter === "answered" \|\| filter === "archived" \|\| filter === "hold"/);
     assert.match(nav, /orderInboxItems\(/);
     assert.doesNotMatch(src, /if \(item\.needsYou\) return 1;/);
-    assert.match(src, /if \(intent === "product_inquiry"\) return "missed";/);
+    assert.match(src, /if \(isSilenceCallStatus\(opts\.callStatus\)\) return "missed";/);
+    assert.doesNotMatch(src, /if \(intent === "product_inquiry"\) return "missed";/);
+    assert.doesNotMatch(src, /resolution === "abandoned" \|\| resolution === "unresolved"/);
+    assert.doesNotMatch(src, /leadStatus === "new"\) return "missed"/);
     assert.doesNotMatch(src, /"product_inquiry",\s*"service_inquiry"/);
     assert.match(src, /if \(!opts\.job\) return copy\.visitGhostStamp;/);
     assert.match(src, /if \(!opts\.hold\) return copy\.holdGhostStamp;/);

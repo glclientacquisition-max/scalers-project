@@ -11,8 +11,7 @@ import {
   pickCallOwnerCard,
   pickCallOwnerReason,
   pickCallOwnerWant,
-  usefulMoodLabel,
-  usefulOwnerFact,
+  shapeTicketChat,
 } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxTicketView } from "@/components/InboxTicketView";
@@ -29,6 +28,7 @@ import {
 import {
   classifyInboxPurpose,
   inboxNeedsYou,
+  isSilenceCallStatus,
   signalLabel,
   type InboxHold,
   type InboxJob,
@@ -197,13 +197,9 @@ export default async function CallDetailPage({
   const doNextText = String(summaryCard?.next || "")
     .replace(/\s+/g, " ")
     .trim();
-  const doNextLabel =
-    doNextText && !/^none\.?$/i.test(doNextText) ? doNextText : null;
   const wantText = String(summaryCard?.want || want || "")
     .replace(/\s+/g, " ")
     .trim();
-  const doneText = usefulOwnerFact(summaryCard?.done);
-  const moodLabel = usefulMoodLabel(summaryCard?.mood);
   const stamp = signalLabel({
     purpose,
     hold,
@@ -226,7 +222,21 @@ export default async function CallDetailPage({
       row.receives_escalation === true &&
       Boolean(String(row.phone || "").trim() || String(row.email || "").trim())
   );
-  const urgency = needsYou ? doNextLabel || wantText || stamp : null;
+  const talked = turns.some((turn) => {
+    const speaker = String(turn.speaker || "").toLowerCase();
+    if (speaker !== "caller" && speaker !== "agent") return false;
+    return Boolean(String(turn.text_content || "").trim());
+  });
+  const chat = shapeTicketChat({
+    silence: isSilenceCallStatus(row.status) && !talked,
+    want: wantText,
+    done: summaryCard?.done,
+    mood: summaryCard?.mood,
+    next: doNextText,
+    needsYou,
+    stamp,
+    whenLabel: formatCallWhenRelative(row.created_at),
+  });
 
   return (
     <>
@@ -244,13 +254,11 @@ export default async function CallDetailPage({
         callerPhone={row.caller_number}
         waMessage={waMessage}
         needsYou={needsYou}
-        urgency={urgency}
-        bannerWhen={
-          purpose === "missed" ? formatCallWhenRelative(row.created_at) : null
-        }
-        want={wantText || null}
-        done={doneText || null}
-        mood={moodLabel || null}
+        urgency={chat.urgency || null}
+        bannerWhen={chat.bannerWhen || null}
+        want={chat.want || null}
+        done={chat.done || null}
+        mood={chat.mood || null}
         job={job}
         hold={hold}
         turns={turns}
