@@ -17,6 +17,7 @@ const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
+const { billableTalkSeconds } = require('./billing/packageOverage');
 
 function throwIfError(context, error) {
   if (error) {
@@ -593,17 +594,18 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
     }
   }
 
+  const direction = isOutboundTransfer ? 'outbound' : 'inbound';
+
   if (Object.keys(patch).length === 0) {
-    // Still attempt charge if we already have minutes (idempotent).
-    if (WALLET_CHARGING_ENABLED && existing.id && Number(existing.ai_processing_minutes) > 0) {
-      await chargeCallToWallet({
-        callId: existing.id,
-        minutes: Number(existing.ai_processing_minutes),
-        rateKesPerMin: outboundRate,
-      }).catch((err) => {
-        console.warn('[db] chargeCallToWallet:', err?.message || err);
-      });
-    }
+    await settleCallUsage({
+      callId: existing.id,
+      outboundUnanswered:
+        isOutboundTransfer && String(existing.status || '').toLowerCase() !== 'complete',
+      durationSeconds: existing.duration_seconds,
+      minutes: existing.ai_processing_minutes,
+      rateKesPerMin: outboundRate,
+      direction,
+    });
     return existing;
   }
 
@@ -617,19 +619,14 @@ async function updateCallStatus({ callSid, status, durationSeconds, force = fals
   throwIfError('updateCallStatus', error);
   const shaped = shapeCall(data);
 
-  if (
-    WALLET_CHARGING_ENABLED &&
-    shaped?.id &&
-    Number(shaped.ai_processing_minutes || patch.ai_processing_minutes || 0) > 0
-  ) {
-    await chargeCallToWallet({
-      callId: shaped.id,
-      minutes: Number(shaped.ai_processing_minutes || patch.ai_processing_minutes),
-      rateKesPerMin: outboundRate,
-    }).catch((err) => {
-      console.warn('[db] chargeCallToWallet:', err?.message || err);
-    });
-  }
+  await settleCallUsage({
+    callId: shaped?.id,
+    outboundUnanswered: isOutboundTransfer && finalStatus !== 'complete',
+    durationSeconds: shaped?.duration_seconds ?? patch.duration_seconds,
+    minutes: shaped?.ai_processing_minutes ?? patch.ai_processing_minutes,
+    rateKesPerMin: outboundRate,
+    direction,
+  });
 
   return shaped;
 }
@@ -686,8 +683,109 @@ async function setCallResolution({
 }
 
 /**
+ * Package pool first. Included seconds are free.
+ * Past the cap with on-demand off: meter only, no debit.
+ * Falls back to charge_call_to_wallet only when consume_call_seconds is not applied yet.
+ */
+async function settleCallUsage({
+  callId,
+  outboundUnanswered,
+  durationSeconds,
+  minutes,
+  rateKesPerMin,
+  direction,
+} = {}) {
+  if (!WALLET_CHARGING_ENABLED || !callId) return null;
+  const seconds = billableTalkSeconds({
+    outboundUnanswered,
+    durationSeconds,
+    minutes,
+  });
+  if (seconds <= 0) return null;
+
+  const metered = await consumeCallSeconds({ callId, seconds, direction });
+  if (metered.applied) {
+    const amount = Number(metered.row?.amount_kes || 0);
+    if (amount > 0) {
+      console.log(
+        `[db] package overage call=${callId} amount_kes=${amount} reason=${metered.row?.reason || ''}`
+      );
+      await notifyWalletBalanceForCall(callId);
+    }
+    return metered.row || null;
+  }
+  if (metered.reason !== 'rpc_missing') return null;
+  return chargeCallToWallet({
+    callId,
+    minutes: Number(minutes),
+    rateKesPerMin,
+  }).catch((err) => {
+    console.warn('[db] chargeCallToWallet:', err?.message || err);
+    return null;
+  });
+}
+
+async function consumeCallSeconds({ callId, seconds, direction } = {}) {
+  const secs = Math.max(0, Math.round(Number(seconds) || 0));
+  if (!callId || secs <= 0) return { applied: false, reason: 'no_seconds' };
+  const { data, error } = await supabase.rpc('consume_call_seconds', {
+    p_call_id: callId,
+    p_seconds: secs,
+    p_direction: direction === 'outbound' ? 'outbound' : 'inbound',
+  });
+  if (error) {
+    if (
+      /consume_call_seconds|does not exist|schema cache|package_seconds_applied|minutes_included/i.test(
+        error.message || ''
+      )
+    ) {
+      console.warn(
+        '[db] consume_call_seconds missing — apply docs/supabase/package_minute_consume.sql'
+      );
+      return { applied: false, reason: 'rpc_missing' };
+    }
+    console.warn('[db] consume_call_seconds:', error.message);
+    return { applied: false, reason: 'rpc_failed' };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return { applied: true, reason: row?.reason || 'ok', row: row || null };
+}
+
+async function notifyWalletBalanceForCall(callId) {
+  try {
+    const { data: callRow, error: callErr } = await supabase
+      .from('calls')
+      .select('tenant_id')
+      .eq('id', callId)
+      .maybeSingle();
+    if (!callErr && callRow?.tenant_id) {
+      const { maybeNotifyWalletBalanceAlerts } = require('./notifications/walletAlerts');
+      const alerted = await maybeNotifyWalletBalanceAlerts(supabase, {
+        tenantId: callRow.tenant_id,
+      });
+      for (const a of alerted?.alerts || []) {
+        if (a.channel) {
+          console.log(
+            `[db] wallet ${a.kind} alert via ${a.channel}` +
+              (a.to ? ` → ${a.to}` : '') +
+              ` tenant=${callRow.tenant_id}`
+          );
+        } else {
+          console.warn(
+            `[db] wallet ${a.kind} alert skipped (${a.reason || 'no_channel'}) tenant=${callRow.tenant_id}`
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[db] wallet balance alert:', err?.message || err);
+  }
+}
+
+/**
  * Debit tenant KES wallet for a completed call.
  * Idempotent in Postgres (unique ledger reference = call id).
+ * Fallback until consume_call_seconds is applied. Package overage uses that RPC.
  */
 async function chargeCallToWallet({ callId, minutes, rateKesPerMin } = {}) {
   if (!callId) return null;
@@ -718,36 +816,7 @@ async function chargeCallToWallet({ callId, minutes, rateKesPerMin } = {}) {
     console.log(
       `[db] wallet charge call=${callId} amount_kes=${row.amount_kes} balance=${row.wallet_balance_kes}`
     );
-  }
-
-  // Automatic live low/empty prepaid alerts (idempotent). Never blocks the call path.
-  try {
-    const { data: callRow, error: callErr } = await supabase
-      .from('calls')
-      .select('tenant_id')
-      .eq('id', callId)
-      .maybeSingle();
-    if (!callErr && callRow?.tenant_id) {
-      const { maybeNotifyWalletBalanceAlerts } = require('./notifications/walletAlerts');
-      const alerted = await maybeNotifyWalletBalanceAlerts(supabase, {
-        tenantId: callRow.tenant_id,
-      });
-      for (const a of alerted?.alerts || []) {
-        if (a.channel) {
-          console.log(
-            `[db] wallet ${a.kind} alert via ${a.channel}` +
-              (a.to ? ` → ${a.to}` : '') +
-              ` tenant=${callRow.tenant_id}`
-          );
-        } else {
-          console.warn(
-            `[db] wallet ${a.kind} alert skipped (${a.reason || 'no_channel'}) tenant=${callRow.tenant_id}`
-          );
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('[db] wallet balance alert:', err?.message || err);
+    await notifyWalletBalanceForCall(callId);
   }
 
   return row || null;

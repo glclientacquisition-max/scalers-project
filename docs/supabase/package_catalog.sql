@@ -1,6 +1,6 @@
 -- package_catalog.sql
 -- Purpose: Super Admin package SKUs, overage rate card, tenant subscription.
---          Control plane only. Voice consume_minutes is a later apply.
+--          Control plane. Hangup metering is package_minute_consume.sql.
 -- Run after: package_entitlements.sql
 -- Owners cannot write these tables. Service role only.
 

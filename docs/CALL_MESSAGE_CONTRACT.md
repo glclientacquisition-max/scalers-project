@@ -223,7 +223,7 @@ Every accepted SMS, WhatsApp, or email writes `notify_sends` (`docs/supabase/not
 | `tenant` | Staff lead, escalate, visit, hold, order, enquiry, callback. Caller visit/hold/order/callback/note. Missed text-back. |
 | `platform` | Wallet low/empty. Speech or reasoning outage. Scalers pays. |
 
-SMS units are segments (GSM-7 160 / 153, UCS-2 70 / 67). Email and WhatsApp count as 1 unit on their own channel. No KES debit. Duplicate dest + kind + call is idempotent.
+SMS units are segments (GSM-7 160 / 153, UCS-2 70 / 67). Email and WhatsApp count as 1 unit on their own channel. On-demand off does not debit. On-demand SMS past the cap debits `sms_kes` after `package_minute_consume.sql`. Duplicate dest + kind + call is idempotent.
 
 ### Stop at included (same on-demand toggle as minutes)
 
@@ -234,7 +234,7 @@ Apply `docs/supabase/sms_allowance.sql` after the ledger SQL. Default included i
 | Beta (`billing_enforcement = off`) | Send. Meter `sms_used_units`. Never block. |
 | Paid, under cap | Send. `overage = false`. |
 | Paid, at cap, on-demand off | Skip SMS. Staff WhatsApp / email / desk note still try. Escalate still saves. |
-| Paid, at cap, on-demand on | Send. `overage = true`. |
+| Paid, at cap, on-demand on | Send. `overage = true`. Debit `sms_kes` per overage segment. |
 | Platform (`wallet_*`, `outage_*`) | Always send. Never consume tenant units. |
 
 Missing `notify_sends` table or `consume_sms_units` RPC: do not claim sent. Skip tenant SMS (`table_missing` / `rpc_missing`). WhatsApp / email / desk note still try only when the ledger can record. Appointment / request / escalate still save. Desk caller note at cap returns an error.

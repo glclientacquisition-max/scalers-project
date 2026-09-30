@@ -37,6 +37,7 @@ import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/
 import { LivePing } from "@/components/ui/deskRow";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
+import { homeMinuteStatus } from "@/lib/usageCap";
 
 // instant = false: request-time desk data under the owner auth shell.
 export const instant = false;
@@ -96,7 +97,12 @@ export default async function HomeOverviewPage() {
   const packLabel = pack.packageName
     ? `${pack.packageName}${pack.period ? ` / ${pack.period}` : ""}`
     : "No package";
-  const minutesExhausted = pack.minutesIncluded > 0 && minutesLeft <= 0;
+  const minuteStatus = homeMinuteStatus({
+    isBeta,
+    onDemand: Boolean(tenant.on_demand_usage_enabled),
+    minutesIncluded: pack.minutesIncluded,
+    minutesLeft,
+  });
   const digest = inbox.callsTruncated
     ? null
     : homeDigestLine(inbox.items, dayStart, vertical);
@@ -398,7 +404,10 @@ export default async function HomeOverviewPage() {
                 {minutesLeft.toLocaleString("en-KE")} min left
               </p>
               <p className="mt-0.5 text-xs text-ink-soft">{packLabel}</p>
-              {minutesExhausted && !isBeta ? (
+              {minuteStatus ? (
+                <p className="mt-0.5 text-xs font-medium text-ink">{minuteStatus}</p>
+              ) : null}
+              {minuteStatus && !isBeta ? (
                 <Link
                   href="/wallet"
                   className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warn hover:underline ${focusRingVisible}`}
