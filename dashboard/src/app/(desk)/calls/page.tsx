@@ -19,7 +19,7 @@ import {
   InboxPileSelectChrome,
 } from "@/components/InboxPileNav";
 import { InboxPileBoard } from "@/components/InboxPileBoard";
-import { inboxPileHref, SWIPE_PILES } from "@/lib/inboxSwipe";
+import { inboxPileHref } from "@/lib/inboxSwipe";
 import { VisitWeekCalendar } from "@/components/VisitWeekCalendar";
 import { RunSheetToday } from "@/components/RunSheetToday";
 import { visitBoardForDay, visitBoardItems } from "@/lib/runSheet";
@@ -30,7 +30,7 @@ import {
   shiftDayYmd,
   shiftWeekYmd,
 } from "@/lib/visitCalendar";
-import { showsVisitQueue } from "@/lib/inboxNiche";
+import { purposeFilters, purposeForPack } from "@/lib/inboxNiche";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
@@ -84,12 +84,7 @@ export default async function CallsPage({
     : assembled;
   const counts = countInboxPurposes(searched);
   const resolvedFilter = resolvePurposeFilter(sp.purpose, sp.status, counts.needs);
-  const activeFilter =
-    resolvedFilter === "job" && !showsVisitQueue(vertical)
-      ? counts.needs > 0
-        ? "needs"
-        : "all"
-      : resolvedFilter;
+  const activeFilter = purposeForPack(resolvedFilter, vertical, counts.needs);
   const rawView = String(sp.view || "");
   const view = rawView === "work" ? "today" : rawView;
   const weekView = activeFilter === "job" && view === "week";
@@ -127,7 +122,10 @@ export default async function CallsPage({
     day: todayView || holdTodayView ? day : archivedReturn?.day,
   };
   const pileHrefs = Object.fromEntries(
-    SWIPE_PILES.map((id) => [id, inboxPileHref(id, pileHrefOpts)])
+    purposeFilters(vertical).map((row) => {
+      const id = row.id;
+      return [id, inboxPileHref(id, pileHrefOpts)];
+    })
   );
 
   return (

@@ -149,12 +149,17 @@ export function nicheCopy(vertical?: string | null): InboxNicheCopy {
   return { ...copy, ...HOSPITALITY_RESERVATION_AFFORDANCES };
 }
 
-/** Shop has holds and returns. Visits stay on home services. */
+/** Shop book is holds. Visits stay on home services. */
 export function showsVisitQueue(vertical?: string | null): boolean {
   return parseVertical(vertical) !== "retail";
 }
 
-/** Act, tape, book, closed. 08:00 owner, live watcher, visit confirmer. */
+/** Home services book is visits. Holds stay on a shop. */
+export function showsHoldQueue(vertical?: string | null): boolean {
+  return parseVertical(vertical) !== "home_services";
+}
+
+/** Act, tape, one book, closed. The pack owns this list. */
 export function purposeFilters(vertical?: string | null): {
   id: InboxPurposeFilterId;
   label: string;
@@ -168,10 +173,25 @@ export function purposeFilters(vertical?: string | null): {
   if (showsVisitQueue(vertical)) {
     rows.push({ id: "job", label: copy.jobFilter, divide: true });
   }
+  if (showsHoldQueue(vertical)) {
+    rows.push({ id: "hold", label: copy.holdFilter, divide: !showsVisitQueue(vertical) });
+  }
   rows.push(
-    { id: "hold", label: copy.holdFilter, divide: !showsVisitQueue(vertical) },
     { id: "human", label: copy.returnCtaMany, divide: true },
     { id: "answered", label: "Answered" }
   );
   return rows;
+}
+
+/** A book this pack does not own opens Needs you, or All when that pile is empty. */
+export function purposeForPack(
+  filter: string,
+  vertical: string | null | undefined,
+  needsCount: number
+): InboxPurposeFilterId {
+  if (filter === "archived") return "archived";
+  if (purposeFilters(vertical).some((row) => row.id === filter)) {
+    return filter as InboxPurposeFilterId;
+  }
+  return needsCount > 0 ? "needs" : "all";
 }

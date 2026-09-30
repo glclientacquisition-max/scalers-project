@@ -16,6 +16,7 @@ import {
   inboxSwipeCommitPx,
   inboxSwipeFollowPx,
   purposeAfterSwipe,
+  swipeOrder,
   swipePileCommit,
 } from "@/lib/inboxSwipe";
 
@@ -166,7 +167,7 @@ export function InboxPileSwipe({
       pointerType: event.pointerType,
       selecting: Boolean(ui?.selecting),
     });
-    const next = purposeAfterSwipe(purpose, dir);
+    const next = purposeAfterSwipe(purpose, dir, swipeOrder(pileHrefs));
     if (!dir || !next || !pileHrefs[next]) {
       setShift(0, true);
       return;

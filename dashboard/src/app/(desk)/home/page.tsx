@@ -25,7 +25,7 @@ import {
   summarizeInboxWork,
 } from "@/lib/inboxPurpose";
 import { loadCachedInboxItems } from "@/lib/inboxLoad";
-import { nicheCopy, showsVisitQueue } from "@/lib/inboxNiche";
+import { nicheCopy, showsHoldQueue, showsVisitQueue } from "@/lib/inboxNiche";
 import { visitBoardForDay } from "@/lib/runSheet";
 import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
@@ -112,10 +112,11 @@ export default async function HomeOverviewPage() {
   const todayWork = visitBoardForDay(inbox.items, eatYmd()).length;
   const waitingCount = work.needs;
   const visitQueue = showsVisitQueue(vertical);
+  const holdQueue = showsHoldQueue(vertical);
   const briefing = homeBriefing(
     {
       toReturn: work.toReturn,
-      toFulfill: work.toFulfill,
+      toFulfill: holdQueue ? work.toFulfill : 0,
       toConfirm: visitQueue ? work.requested : 0,
     },
     vertical
@@ -137,13 +138,17 @@ export default async function HomeOverviewPage() {
       count: work.toReturn,
       unit: "",
     },
-    {
-      id: "hold",
-      label: copy.holdFilter,
-      href: callsHref({ purpose: "hold" }),
-      count: work.toFulfill,
-      unit: homeQueueUnit(work.toFulfill, copy.holdUnit, holdSample),
-    },
+    ...(holdQueue
+      ? [
+          {
+            id: "hold",
+            label: copy.holdFilter,
+            href: callsHref({ purpose: "hold" }),
+            count: work.toFulfill,
+            unit: homeQueueUnit(work.toFulfill, copy.holdUnit, holdSample),
+          },
+        ]
+      : []),
     ...(visitQueue
       ? [
           {
@@ -162,13 +167,15 @@ export default async function HomeOverviewPage() {
 
   let ctaHref = businessSettingsHref("test");
   let ctaLabel = "Test line";
-  if (work.toReturn > work.requested && work.toReturn > work.toFulfill) {
+  const confirmForCta = visitQueue ? work.requested : 0;
+  const fulfillForCta = holdQueue ? work.toFulfill : 0;
+  if (work.toReturn > confirmForCta && work.toReturn > fulfillForCta) {
     ctaHref = callsHref({ purpose: "human" });
     ctaLabel = work.toReturn === 1 ? copy.returnCtaOne : copy.returnCtaMany;
   } else if (visitQueue && work.requested > 0) {
     ctaHref = callsHref({ purpose: "job" });
     ctaLabel = work.requested === 1 ? copy.jobCtaOne : copy.jobCtaMany;
-  } else if (work.toFulfill > 0) {
+  } else if (holdQueue && work.toFulfill > 0) {
     ctaHref = callsHref({ purpose: "hold" });
     ctaLabel = work.toFulfill === 1 ? copy.holdCtaOne : copy.holdCtaMany;
   } else if (work.toReturn > 0) {
@@ -177,6 +184,9 @@ export default async function HomeOverviewPage() {
   } else if (visitQueue && todayWork > 0) {
     ctaHref = callsHref({ purpose: "job", view: "today" });
     ctaLabel = "Today";
+  } else if (waitingCount > 0) {
+    ctaHref = callsHref({ purpose: "needs" });
+    ctaLabel = "Needs you";
   } else if (line === "needs_training") {
     ctaHref = businessSettingsHref("train");
     ctaLabel = "Train";

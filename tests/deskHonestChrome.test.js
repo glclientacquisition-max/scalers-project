@@ -65,13 +65,19 @@ describe("honest chrome P0", () => {
     assert.doesNotMatch(shell, /tab === "updates"/);
   });
 
-  it("hides Visits on Shop and keeps them on home services", () => {
+  it("hides Visits on Shop and Holds on home services", () => {
     const niche = read("dashboard/src/lib/inboxNiche.ts");
     assert.match(niche, /return parseVertical\(vertical\) !== "retail"/);
+    assert.match(niche, /return parseVertical\(vertical\) !== "home_services"/);
     assert.match(niche, /if \(showsVisitQueue\(vertical\)\)/);
+    assert.match(niche, /if \(showsHoldQueue\(vertical\)\)/);
+    assert.match(niche, /export function purposeForPack/);
     assert.match(home, /showsVisitQueue/);
+    assert.match(home, /showsHoldQueue/);
     assert.match(home, /visitQueue \? work\.requested : 0/);
-    assert.match(calls, /resolvedFilter === "job" && !showsVisitQueue\(vertical\)/);
+    assert.match(home, /holdQueue \? work\.toFulfill : 0/);
+    assert.match(calls, /purposeForPack\(resolvedFilter, vertical, counts\.needs\)/);
+    assert.match(calls, /purposeFilters\(vertical\)/);
   });
 
   it("uses one Text URL CSV importer and keeps book SKUs off home services import", () => {
