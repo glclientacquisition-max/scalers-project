@@ -862,9 +862,7 @@ export function TenantForm({
             </div>
           </div>
 
-          {socialHandles.channels.length === 0 ? (
-            <p className="px-1 text-sm text-ink-soft">No contacts yet.</p>
-          ) : (
+          {socialHandles.channels.length === 0 ? null : (
             <>
             <div className="space-y-3 md:hidden">
               {socialHandles.channels.map((channel, index) => (
@@ -1352,9 +1350,7 @@ export function TenantForm({
             </div>
           ) : null}
 
-          {products.length === 0 ? (
-            <p className="text-sm text-ink-soft">No products yet.</p>
-          ) : (
+          {products.length === 0 ? null : (
             <>
             <div className="space-y-3 md:hidden">
               {visibleProducts.map((product, localIndex) => {

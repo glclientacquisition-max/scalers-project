@@ -7,7 +7,7 @@ import { RowIdentity } from "@/components/ui/deskRow";
 import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
-import { DeskError } from "@/components/ui/DeskError";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
   callFromContactHref,
@@ -115,7 +115,7 @@ export default async function ContactDetailPage({
 
   const { contact, error } = await loadContactById(workspace.client, tenant.id, id);
   if (error) {
-    return <DeskError>Could not load this contact.</DeskError>;
+    return <DeskLoadError>Could not load this contact.</DeskLoadError>;
   }
   if (!contact) notFound();
 

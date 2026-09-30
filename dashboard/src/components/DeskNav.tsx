@@ -29,7 +29,7 @@ export const deskShellClass =
 
 /** Page frame next to the rail. Ticket pages opt into bleed with `data-desk-bleed`. */
 export const deskMainClass =
-  "mx-auto w-full min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6 md:p-6 md:has-[[data-desk-bleed]]:h-full md:has-[[data-desk-bleed]]:max-w-none md:has-[[data-desk-bleed]]:overflow-hidden md:has-[[data-desk-bleed]]:p-0 md:has-[[data-settings-console]]:max-w-none";
+  "mx-auto w-full min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto px-4 pt-4 pb-[var(--desk-tabbar-clearance)] sm:px-6 sm:pt-6 md:p-6 has-[[data-desk-bleed]]:flex has-[[data-desk-bleed]]:h-full has-[[data-desk-bleed]]:max-w-none has-[[data-desk-bleed]]:flex-col has-[[data-desk-bleed]]:overflow-hidden has-[[data-desk-bleed]]:p-0 md:has-[[data-settings-console]]:max-w-none";
 
 function pathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);

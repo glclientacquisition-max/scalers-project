@@ -16,7 +16,7 @@ import {
 } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxTicketView } from "@/components/InboxTicketView";
-import { DeskError } from "@/components/ui/DeskError";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import {
   followUpWhatsAppMessage,
   formatCallWhenRelative,
@@ -109,7 +109,7 @@ export default async function CallDetailPage({
   }
 
   if (error) {
-    return <DeskError>Could not load this call.</DeskError>;
+    return <DeskLoadError>Could not load this call.</DeskLoadError>;
   }
   if (!call) notFound();
   const row = call;
@@ -230,7 +230,7 @@ export default async function CallDetailPage({
 
   return (
     <>
-      {workLoadError ? <DeskError>Could not load visit or hold.</DeskError> : null}
+      {workLoadError ? <DeskLoadError>Could not load visit or hold.</DeskLoadError> : null}
       <InboxTicketView
         callId={row.id}
         backHref={backHref}

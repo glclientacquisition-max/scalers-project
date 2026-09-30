@@ -10,7 +10,7 @@ export function DeskDataTable({
 }) {
   return (
     <div className="max-w-full min-w-0 overflow-x-auto rounded-2xl border border-line bg-surface">
-      <table className={`w-full text-left text-sm ${minWidthClass}`}>
+      <table className={`w-full text-left text-sm [&_th]:whitespace-nowrap ${minWidthClass}`}>
         {children}
       </table>
     </div>

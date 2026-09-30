@@ -9,6 +9,7 @@ import {
 } from "@/lib/packageCatalog";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { Pagination } from "@/components/ui/Pagination";
 import { deskListTitleClass, deskPreviewCellClass, deskPreviewClass } from "@/components/ui/deskChrome";
@@ -59,7 +60,7 @@ export default async function WalletPage({
       softSpendLimitKes: tenant.soft_spend_limit_kes,
     });
   } catch {
-    return <DeskError>Could not load Usage.</DeskError>;
+    return <DeskLoadError>Could not load Usage.</DeskLoadError>;
   }
 
   const pack = await loadOwnerPackageMeter(tenant.id);

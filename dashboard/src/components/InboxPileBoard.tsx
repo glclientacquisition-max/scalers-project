@@ -68,14 +68,14 @@ function EmptyInbox({
           <button
             type="button"
             onClick={() => nav.setQuery("")}
-            className={`mt-6 font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+            className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
           >
             Clear
           </button>
         ) : (
           <Link
             href={callsHref({ purpose })}
-            className={`mt-6 inline-flex font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+            className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
           >
             Clear
           </Link>
