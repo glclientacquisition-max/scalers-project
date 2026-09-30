@@ -63,6 +63,11 @@ describe('visit location ladder', () => {
     assert.equal(assessCoverage('rwaka', nairobi), 'outside');
     assert.equal(assessCoverage('kitengele', nairobi), 'outside');
     assert.equal(assessCoverage('rongae', nairobi), 'unknown');
+    assert.equal(assessCoverage('ronga', nairobi), 'outside');
+    assert.equal(
+      preferVisitPlace('Ronga', 'The grace apartments', 'The grace apartments, eh?'),
+      'The grace apartments, Rongai'
+    );
     assert.equal(assessCoverage('near the stage', nairobi), 'unknown');
     const part = { businessPolicies: { delivery: 'Westlands and Kilimani' } };
     assert.equal(assessCoverage('Westlands', part), 'inside');

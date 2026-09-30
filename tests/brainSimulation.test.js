@@ -291,6 +291,48 @@ describe('consent gate', () => {
   });
 });
 
+describe('brain simulation: 06:59 call', () => {
+  it('binds Ronga to Rongai, stores Alvin, and does not save the visit', async () => {
+    const sim = createSimulator({ profile: home, leak: 'none' });
+    await sim.run([
+      'Tomorrow, Carpet cleaning in Ronga.',
+      'Alvin, yeah?',
+      'The grace apartments, eh?',
+    ]);
+    assert.match(sim.turns[0].agentLine, /outside our coverage/i);
+    assert.equal(sim.turns[1].state.caller.name, 'Alvin');
+    assert.match(String(sim.turns[2].state.entities.location?.value || ''), /grace apartments, Rongai/i);
+    assert.equal(sim.saved.appointments.length, 0);
+    assert.equal(sim.saved.serviceRequests.length, 0);
+    assert.doesNotMatch(lines(sim).join('\n'), /all set/i);
+    clean(sim);
+  });
+
+  it('keeps the day on 7:00 AM, drops a false close, and refuses the hour', async () => {
+    const sim = createSimulator({
+      profile: home,
+      gemini: () =>
+        'Carpet cleaning at Grace Apartments Rongai is all set. How else can I help you today?',
+    });
+    await sim.run([
+      'Carpet cleaning tomorrow in Kitengela near the stage.',
+      'Alvin, yeah?',
+      '7:00 AM.',
+    ]);
+    assert.equal(sim.turns[1].state.caller.name, 'Alvin');
+    assert.doesNotMatch(lines(sim).join('\n'), /all set/i);
+    assert.equal(sim.turns[2].state.entities.quantity, undefined);
+    assert.match(String(sim.turns[2].state.entities.when?.value || ''), /tomorrow/i);
+    assert.match(String(sim.turns[2].state.entities.when?.value || ''), /7:00 AM/i);
+    assert.equal(sim.saved.appointments.length, 0);
+    const invalid = sim.turns[2].toolResults.find((row) => row.status === 'invalid');
+    assert.equal(invalid?.code, 'outside_hours');
+    assert.match(sim.turns[2].agentLine, /outside our hours/i);
+    assert.ok(sim.state.actions.refusedHours.length > 0);
+    clean(sim);
+  });
+});
+
 describe('speech gate', () => {
   const ctx = { callerTurns: ['I want twenty diaries'], profile: retail, language: 'en' };
 
@@ -298,6 +340,20 @@ describe('speech gate', () => {
     assert.equal(guardSpokenReply('Twenty diaries at 350 each.', ctx), 'Twenty diaries at 350 each.');
     assert.equal(guardSpokenReply('That is 20 diaries. It costs 500.', ctx), 'That is 20 diaries.');
     assert.equal(guardSpokenReply('One moment please.', ctx), 'One moment please.');
+  });
+
+  it('drops a false all-set close when the slot is still open', () => {
+    const state = {
+      goal: { missingSlots: ['name'] },
+      entities: { location: { value: 'Kitengela' } },
+    };
+    assert.equal(
+      guardSpokenReply(
+        'Carpet cleaning at Grace Apartments Rongai is all set. How else can I help you today?',
+        { ...ctx, state, callerTurns: ['Kitengela'], allowEmpty: true }
+      ),
+      ''
+    );
   });
 
   it('drops saved claims without a tool and transfer claims without live transfer', () => {

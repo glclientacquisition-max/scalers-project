@@ -45,7 +45,10 @@ Set in `brainState.observeCallerTurn` and read by `nextBestAction`,
 | Leave it | "Just leave it", "wacha", "forget it" after a block. | Speak "Okay. Nothing saved." No tool. Block line is not repeated. |
 | Quantity | An order for a catalogue product needs a count the caller said (digits or words, en/sw). | "Then." asks "Diary. How many?" The saved row never carries a guessed count. |
 | Visit time ladder | Day without a clock time asks "What time tomorrow?", then "Morning or afternoon?". A bare hour asks "N in the morning or afternoon?" or "Twelve noon?". | Two asks (or "any time" after one) waive the time: a callback service request is saved with "Visit time to confirm. Place: …". Never a calendar row without a time. |
-| Coverage | `assessCoverage`: `inside` when the place or its county matches Train text; `outside` only when the place resolves to a county that is not covered; `unknown` when nobody can place it. | Outside speaks the block and offers a callback note. Unknown never refuses. |
+| Coverage | `assessCoverage`: `inside` when the place or its county matches Train text; `outside` only when the place resolves to a county that is not covered; `unknown` when nobody can place it. A clipped token that is a one-letter prefix of exactly one Kenya name binds (`Ronga` → Rongai). Two substitutions stay unknown (`rongae`). | Outside speaks the block and offers a callback note. Unknown never refuses. A building replaces a bad token and keeps the resolved area (`The grace apartments, Rongai`). |
+| Name particle | When name is open, `Alvin, yeah?` / `eh` / `yes` is the name. | The particle is not stored. |
+| Clock | A clock answer keeps the day already stored. A clock is not a quantity. | `Tomorrow` plus `7:00 AM` stays `tomorrow 7:00 AM`. An hour outside the file is refused and remembered on `actions.refusedHours`. |
+| Desk card | "Visit request saved" and a refused clock in want require a succeeded visit. A callback does not authorize the refused hour. | No row means done is None. |
 | Area | A landmark with no area ("near the big church") while coverage is on file. | One ask: "Which area is that in?" Then book, with `area not confirmed, check coverage` in the notes if the caller cannot say. |
 | Urgent contact | "Contact me urgently" needs a name and a concrete need. The name turn is not the need. | Escalate once, after both. Reason reads `Caller says: <need>`. |
 
@@ -60,8 +63,9 @@ Dropped sentence by sentence:
   caller turns, profile JSON, tool results, and state entities. Number words
   count (`numberWords.js`), so "twenty" matches "20". "One moment" is not a
   number. Hours on file as `HH:MM` allow the 12-hour form.
-- **Saved / booked / noted / "the team will call"** unless a tool succeeded
-  this turn.
+- **Saved / booked / noted / "the team will call" / "all set"** unless a tool succeeded
+  this turn. A leftover "How else can I help?" after that close is dropped when a slot is still open, so the turn speech guarantee asks the slot.
+- **A locality the slot, the caller, and the file do not hold.** "Rongai" is not spoken from a slot that still says an unbound token.
 - **Transfer claims** ("stay on the line", "transferring you") unless
   `capabilities.liveTransfer`.
 - **Coverage flips** ("we can come to Runda") unless `assessCoverage` says
@@ -69,7 +73,9 @@ Dropped sentence by sentence:
 
 If the caller asked a price, count, or time and the only answer was dropped,
 the line becomes "I don't have that on file. I can note it for the team."
-(sw / sheng variants). Silence is never the outcome of the guard.
+(sw / sheng variants). An empty guard result is only for a dropped close while a
+slot is open: the turn then speaks the slot ask or the tool line. Dead air is
+still a simulator failure.
 
 ### 3. Tool gate (`requiredCreateRequest.guardToolPlan`)
 

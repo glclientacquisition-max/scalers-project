@@ -160,7 +160,18 @@ function extractName(text, opts = {}) {
       /\b(?:it'?s|ni)\s+([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})/iu.exec(raw);
     if (spoken) return cleanNameCapture(spoken[1], opts);
   }
+  const particle = namePlusParticle(raw);
+  if (particle && opts.firstMissing === 'name') return cleanNameCapture(particle, opts);
   return null;
+}
+
+/** "Alvin, yeah?" is the name. The particle is not part of it. */
+function namePlusParticle(text) {
+  const match =
+    /^([\p{L}'’-]+)(?:\s*,)?\s+(?:yeah|yep|yes|eh|eeh|ndio|ndiyo)\b[.?!]*$/iu.exec(
+      String(text || '').trim()
+    );
+  return match ? match[1] : '';
 }
 
 const NAME_AFFIRMATION =
@@ -574,7 +585,22 @@ function extractLandmark(text) {
       return value.slice(0, 120);
     }
   }
+  const building = buildingAnswer(raw);
+  if (building) return building;
   return null;
+}
+
+const BUILDING_ANSWER =
+  /^(?:the\s+|my\s+|our\s+)?[\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,4}\s+(?:apartments?|gates?|buildings?|flats?|courts?|mall|stage|house|nyumba)\b/iu;
+
+function buildingAnswer(raw) {
+  let value = String(raw || '').trim();
+  value = value.replace(/[, ]*(?:eh|yeah|yep|yes|okay|ok)\b[.?!]*$/i, '').trim();
+  value = value.replace(/[?.!,]+$/g, '').trim();
+  if (!BUILDING_ANSWER.test(value)) return null;
+  if (extractWhen(value)) return null;
+  if (value.split(/\s+/).length > 6) return null;
+  return value.slice(0, 120);
 }
 
 function extractWhen(text) {
@@ -595,11 +621,16 @@ function extractQuantity(text, intent) {
   if (!['hold', 'order', 'booking'].includes(intent)) return null;
   if (looksLikeNonConsentAck(text)) return null;
   const raw = String(text || '');
-  const digit = /\b(\d{1,3})\b/.exec(raw);
-  if (digit && !/\b(?:at|saa)\s*$/.test(raw.slice(0, digit.index).toLowerCase())) {
+  // A clock is the visit time, not a count. "7:00 AM" must not become quantity 7.
+  const stripped = raw.replace(
+    /\b(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi,
+    ' '
+  );
+  const digit = /\b(\d{1,3})\b/.exec(stripped);
+  if (digit && !/\b(?:at|saa)\s*$/.test(stripped.slice(0, digit.index).toLowerCase())) {
     return digit[1];
   }
-  return quantityWord(raw);
+  return quantityWord(stripped);
 }
 
 function extractBudget(text) {
@@ -673,10 +704,11 @@ function extractConversationEntities(
       false
     );
   }
+  const missingSlots = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];
   const name =
     entityValue(entities.name) ||
     extractName(text, {
-      firstMissing: state?.goal?.missingSlots?.[0],
+      firstMissing: missingSlots.includes('name') ? 'name' : missingSlots[0],
       knownNames,
       preferKnown,
     });

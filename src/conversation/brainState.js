@@ -20,6 +20,7 @@ const {
   isHomeVisitState,
   mergeTimeAnswer,
   timeAskCount,
+  dayCue,
   whenHasClockTime,
   whenNeedsClockTime,
   whenValue,
@@ -38,6 +39,7 @@ const {
 } = require('./visitTalk');
 const {
   decideVisitPlace,
+  foldCanonicalPlace,
   isLocationRefusal,
   preferVisitPlace,
 } = require('./visitLocation');
@@ -323,6 +325,7 @@ function createBrainState(profile = {}) {
       lastResults: [],
       savedWork: [],
       openHolds: [],
+      refusedHours: [],
     },
   };
 }
@@ -422,6 +425,24 @@ function observeCallerTurn(state, input = {}) {
   if (input.entities && typeof input.entities === 'object') {
     next.entities = { ...next.entities, ...input.entities };
   }
+  const previousWhen = entityValue(state?.entities?.when);
+  const incomingWhen = entityValue(next.entities?.when);
+  if (
+    previousWhen &&
+    incomingWhen &&
+    incomingWhen !== previousWhen &&
+    dayCue(previousWhen) &&
+    !dayCue(incomingWhen) &&
+    whenHasClockTime(incomingWhen)
+  ) {
+    next.entities.when = {
+      ...(typeof next.entities.when === 'object' ? next.entities.when : {}),
+      value: `${dayCue(previousWhen)} ${incomingWhen}`.trim(),
+      source: 'caller_explicit',
+      confidence: 0.9,
+      confirmed: false,
+    };
+  }
   const { collectKnownCallerNames } = require('./callerNameMatch');
   const nameResolution = applyCallerNameConfirmation(
     {
@@ -491,10 +512,11 @@ function observeCallerTurn(state, input = {}) {
     const previous =
       entityValue(state?.entities?.location) || entityValue(state?.entities?.landmark);
     const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
-    const place =
+    const place = foldCanonicalPlace(
       lastAsk === 'area' && previous && incoming && !/[\s,]/.test(incoming.trim())
         ? `${incoming.trim()}, ${previous}`
-        : preferVisitPlace(previous, incoming, text);
+        : preferVisitPlace(previous, incoming, text)
+    );
     const keptSpecific = Boolean(place && incoming && place !== incoming);
     if (keptSpecific) {
       next.entities.location = {
@@ -662,6 +684,17 @@ function recordActionResults(state, results = []) {
       : {}),
     ...(result.soft ? { soft: true } : {}),
   }));
+  if (!Array.isArray(next.actions.refusedHours)) next.actions.refusedHours = [];
+  for (const result of safeResults) {
+    if (result?.status === 'invalid' && result?.code === 'outside_hours') {
+      const whenText = String(
+        result.value?.whenText || result.value?.when_text || result.hours?.whenText || ''
+      ).trim();
+      if (whenText && !next.actions.refusedHours.includes(whenText)) {
+        next.actions.refusedHours.push(whenText);
+      }
+    }
+  }
   if (!Array.isArray(next.actions.savedWork)) next.actions.savedWork = [];
   next.actions.savedWork = mergeWorkResults(
     next.actions.savedWork,

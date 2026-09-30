@@ -5,7 +5,7 @@
 
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
-const { countiesMentioned, countiesForPlace } = require('./kenyaPlaces');
+const { canonicalPlaceName, countiesMentioned, countiesForPlace } = require('./kenyaPlaces');
 const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
@@ -375,12 +375,51 @@ function mentionsPlaceToken(text, place) {
  * A later "in Nairobi" must not replace a gate or building already heard.
  * An explicit correction ("not Runda, Karen gate") still replaces it.
  */
+function displayPlaceName(key) {
+  return String(key || '').replace(/(^|[\s-])[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function areaKey(place) {
+  const parts = String(place || '')
+    .split(/[\s,]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const name = canonicalPlaceName(parts[i]);
+    if (name) return name;
+  }
+  return '';
+}
+
+/**
+ * A clipped token ("Ronga") becomes the Kenya name ("Rongai") before coverage.
+ * A building does not drop that area.
+ */
+function foldCanonicalPlace(place) {
+  const raw = cleanPlace(place, 240);
+  if (!raw) return raw;
+  return raw
+    .split(/\s*,\s*/)
+    .map((part) => {
+      const token = part.trim();
+      if (!token || /\s/.test(token)) return token;
+      const name = canonicalPlaceName(token);
+      return name ? displayPlaceName(name) : token;
+    })
+    .join(', ');
+}
+
 function preferVisitPlace(previous, incoming, text = '') {
   const prev = cleanPlace(previous, 240);
   const next = cleanPlace(incoming, 240);
   if (!next) return prev;
   if (!prev) return next;
   if (prev.toLowerCase() === next.toLowerCase()) return prev;
+  const prevArea = areaKey(prev);
+  const nextArea = areaKey(next);
+  if (prevArea && !nextArea && classifyVisitLocation(next) === 'findable') {
+    return `${next}, ${displayPlaceName(prevArea)}`;
+  }
   if (
     /\b(?:not|instead|rather|badala|hapana|siyo|location is|landmark is|address is)\b/i.test(
       text
@@ -492,6 +531,7 @@ module.exports = {
   hasCoverageText,
   decideVisitPlace,
   preferVisitPlace,
+  foldCanonicalPlace,
   visitBlockSpeech,
   coverageAskPlace,
   coverageAskSpeech,

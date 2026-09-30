@@ -317,6 +317,14 @@ function prepareStreamedSpeech(text) {
   return stripUnsavedCloses(spaceSpokenWords(text));
 }
 
+/** Spoken ask for the first open slot. Empty when the job has no open slot. */
+function openSlotLine(state, language) {
+  const missing = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];
+  const slot = missing.find((name) => name) || '';
+  if (!slot) return '';
+  return missingSlotLine(slot, language || state?.language?.current);
+}
+
 module.exports = {
   ackIsConsent,
   looksLikeLeaveIt,
@@ -329,4 +337,6 @@ module.exports = {
   spaceSpokenWords,
   stripUnsavedCloses,
   prepareStreamedSpeech,
+  missingSlotLine,
+  openSlotLine,
 };

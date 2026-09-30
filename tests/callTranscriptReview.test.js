@@ -208,6 +208,33 @@ describe('mergeTranscriptReview', () => {
     assert.equal(merged.resolution, 'resolved');
   });
 
+  it('does not say a visit was saved when no row succeeded', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'unresolved' },
+      summary: { reason: 'Caller asked for carpet cleaning.' },
+      toolFlags: {
+        holdSaved: false,
+        visitSaved: false,
+        callbackSaved: false,
+        visitRequested: false,
+        refusedWhen: ['tomorrow 7:00 AM'],
+      },
+      review: {
+        reason: 'Visit request saved — confirm on desk.',
+        want: 'Alvin wants a visit for carpet cleaning at The Grace Apartments in Rongai tomorrow at 7:00 AM.',
+        done: 'Visit request saved — confirm on desk.',
+        next: 'Confirm the visit.',
+        primary_intent: 'book_visit',
+        needs_human: true,
+        confidence: 0.8,
+      },
+    });
+    assert.equal(merged.done, 'None.');
+    assert.equal(merged.reason, 'Caller asked for carpet cleaning.');
+    assert.doesNotMatch(merged.want, /7:00 AM/i);
+    assert.doesNotMatch(merged.reason, /visit request saved/i);
+  });
+
   it('rewrites booked hangup copy while the visit is still requested', () => {
     const merged = mergeTranscriptReview({
       derived: { primaryIntent: 'book_visit', resolution: 'resolved' },

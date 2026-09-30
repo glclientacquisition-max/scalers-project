@@ -2586,6 +2586,7 @@ mediaWss.on('connection', (ws, req) => {
           toolResults: [],
           capabilities,
           extra: JSON.stringify(brainState.entities || {}),
+          state: brainState,
           language: callLanguage,
           allowEmpty: true,
         });

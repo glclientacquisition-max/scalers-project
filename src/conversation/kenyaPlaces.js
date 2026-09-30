@@ -53,17 +53,37 @@ function countiesForToken(token) {
   return INDEX.places[key] || [];
 }
 
-function fuzzyCounties(token) {
-  const key = normalizePlaceKey(token);
-  if (!key || key.length < 5 || key.includes(' ') || INDEX.places[key]) return [];
-  let found = null;
+function oneEditNames(key) {
+  const names = [];
   for (const name of PLACE_KEYS) {
     if (name.includes(' ') || Math.abs(name.length - key.length) > 1) continue;
     if (!withinOneEdit(key, name)) continue;
-    if (found) return [];
-    found = INDEX.places[name];
+    names.push(name);
   }
-  return found || [];
+  return names;
+}
+
+/**
+ * Exact place, or the one Kenya name a clipped token points at.
+ * "Ronga" is a prefix of Rongai only, so the cut-off letter still binds.
+ * Two substitutions (rongae → rongai and ronge) stay unknown.
+ * @returns {string}
+ */
+function canonicalPlaceName(token) {
+  const key = normalizePlaceKey(token);
+  if (!key || key.includes(' ') || key.length < 5) return '';
+  if (INDEX.places[key]) return key;
+  const names = oneEditNames(key);
+  if (names.length === 1) return names[0];
+  const prefixed = names.filter((name) => name.startsWith(key) && name.length === key.length + 1);
+  return prefixed.length === 1 ? prefixed[0] : '';
+}
+
+function fuzzyCounties(token) {
+  const key = normalizePlaceKey(token);
+  if (!key || key.length < 5 || key.includes(' ') || INDEX.places[key]) return [];
+  const name = canonicalPlaceName(key);
+  return name ? INDEX.places[name] || [] : [];
 }
 
 /**
@@ -105,6 +125,7 @@ function countiesForPlace(text) {
 
 module.exports = {
   normalizePlaceKey,
+  canonicalPlaceName,
   countiesMentioned,
   countiesForPlace,
 };

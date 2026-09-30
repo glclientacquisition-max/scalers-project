@@ -326,6 +326,7 @@ describe('Brain state and next-best-action', () => {
     assert.equal(extractName('Naitwa Alvin'), 'Alvin');
     assert.equal(extractName('I am looking for cleaning'), null);
     assert.equal(extractName("It's Alvin", { firstMissing: 'name' }), 'Alvin');
+    assert.equal(extractName('Alvin, yeah?', { firstMissing: 'name' }), 'Alvin');
     assert.equal(extractName('My name is Isha'), 'Aisha');
     assert.equal(extractName('A I S H A'), 'Aisha');
     assert.equal(extractName('Naitwa Asha'), 'Asha');

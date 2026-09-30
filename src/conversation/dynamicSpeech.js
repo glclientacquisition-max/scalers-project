@@ -378,6 +378,7 @@ function polishSpokenReply(text, opts = {}) {
       toolResults: opts.toolResults || [],
       capabilities: opts.capabilities || {},
       extra: JSON.stringify(opts.state?.entities || {}),
+      state: opts.state,
       language: opts.language,
       allowEmpty: true,
     });

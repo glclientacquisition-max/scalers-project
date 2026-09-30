@@ -81,16 +81,16 @@ Return ONLY valid JSON (no markdown fences):
 
 Rules:
 - want: name the caller if known. State the visit, hold, or question. If they only said hello, "No clear ask."
-- done: Visit request saved — confirm on desk. Hold saved. Hours answered. Escalation sent only if SMS/WhatsApp/email delivered. Notify failed if not. Or "None." Never say booked for a visit that is only requested.
+- done: Visit request saved — confirm on desk ONLY when the snapshot says visitSaved or visitRequested. Hold saved only when holdSaved. Hours answered. Escalation sent only if SMS/WhatsApp/email delivered. Notify failed if not. Or "None." If nothing was saved, done is None. Never say booked for a visit that is only requested. Never state a refused hour (snapshot refusedWhen) as the visit time.
 - mood: how they came across. unknown if you cannot tell. Not a medical label.
 - next: Confirm the visit. Call them back. Nothing. Hours were answered. One line.
-- reason: Inbox one-liner. Same truth as want. For a requested visit use exactly: Visit request saved — confirm on desk.
+- reason: Inbox one-liner. Same truth as want. For a requested visit use exactly: Visit request saved — confirm on desk. Use that line only when visitSaved or visitRequested is true. Otherwise do not say a visit was saved.
 - needs_human: true only if a person still must return the call (callback, complaint, asked for a human, failed save). False when hours/FAQ was answered or a hold/visit was confirmed saved.
 - needs_owner: true if the receptionist guessed, deferred, or lacked a fact the owner should add later. That alone is not a return call.
 - urgent: true only for emergency, safety, angry complaint, or explicit now.
 - confidence: 0 to 1 from this transcript.
 - If a hold or visit was clearly saved, primary_intent is hold_or_pickup or book_visit and needs_human is false.
-- A saved visit is a request until the owner Confirms. Say exactly: Visit request saved — confirm on desk. Do not say booked, confirmed, or scheduled as done.
+- A saved visit is a request until the owner Confirms. Say exactly: Visit request saved — confirm on desk. Do not say booked, confirmed, or scheduled as done. If visitSaved is false and no callback was saved, done is None.
 - If the caller asked for a person and no hold/visit was saved, needs_human is true.
 - Prefer the trusted Brain snapshot for tools that already succeeded.`;
 
@@ -151,6 +151,17 @@ function callerSpeechChars(turns) {
     n += turnText(turn).length;
   }
   return n;
+}
+
+function stripRefusedClocks(text, refusedWhen) {
+  let next = String(text || '');
+  for (const when of Array.isArray(refusedWhen) ? refusedWhen : []) {
+    const clock = String(when || '').match(/\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)/i);
+    if (!clock) continue;
+    const phrase = clock[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+    next = next.replace(new RegExp(`\\b(?:at\\s+)?${phrase}\\b`, 'ig'), ' ');
+  }
+  return next.replace(/\s+/g, ' ').replace(/\s+([,.])/g, '$1').trim();
 }
 
 function looksLikeVisitRequestedNote(raw) {
@@ -307,10 +318,15 @@ function toolFlagsFromBrain(brainState) {
     visit?.appointmentStatus || visit?.record?.status || 'requested'
   ).toLowerCase();
   const holdStatus = String(hold?.requestStatus || hold?.record?.status || 'open').toLowerCase();
+  const holdType = String(hold?.requestType || hold?.value?.type || '').toLowerCase();
   return {
     holdSaved: ok('create_service_request'),
+    callbackSaved: ok('create_service_request') && holdType === 'callback',
     visitSaved: ok('create_appointment') || ok('update_appointment'),
     visitRequested: Boolean(visit) && (!visitStatus || visitStatus === 'requested'),
+    refusedWhen: Array.isArray(brainState?.actions?.refusedHours)
+      ? brainState.actions.refusedHours.filter(Boolean)
+      : [],
     holdOpen: Boolean(hold) && (!holdStatus || holdStatus === 'open'),
     escalateSaved: ok('escalate'),
     handoff: Boolean(
@@ -379,6 +395,20 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
     } else {
       out.want = VISIT_REQUESTED_NOTE;
     }
+  }
+  if (!flags.visitSaved && !flags.callbackSaved) {
+    if (looksLikeVisitRequestedNote(out.reason) || looksLikeVisitRequestedNote(out.done)) {
+      const summaryReason = cleanReason(summary?.reason || '');
+      out.reason = looksLikeVisitRequestedNote(summaryReason) ? 'No visit saved.' : summaryReason || 'No visit saved.';
+      out.done = 'None.';
+      out.applied.reason = true;
+      out.applied.card = true;
+    }
+    if (/visit request saved/i.test(out.done)) out.done = 'None.';
+  }
+  if (!flags.visitSaved && Array.isArray(flags.refusedWhen) && flags.refusedWhen.length) {
+    out.want = stripRefusedClocks(out.want, flags.refusedWhen);
+    out.reason = stripRefusedClocks(out.reason, flags.refusedWhen);
   }
   if (cleanedNext) {
     out.next = cleanedNext;
@@ -464,6 +494,8 @@ function formatTrustedSnapshot(ctx) {
     `holdSaved: ${Boolean(flags.holdSaved)}`,
     `visitSaved: ${Boolean(flags.visitSaved)}`,
     `visitRequested: ${Boolean(flags.visitRequested)}`,
+    `callbackSaved: ${Boolean(flags.callbackSaved)}`,
+    `refusedWhen: ${(Array.isArray(flags.refusedWhen) ? flags.refusedWhen : []).join('; ') || 'none'}`,
     `escalateSaved: ${Boolean(flags.escalateSaved)}`,
     `handoff: ${Boolean(flags.handoff)}`,
   ].join('\n');

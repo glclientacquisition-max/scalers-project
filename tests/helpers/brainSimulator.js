@@ -33,6 +33,7 @@ const { spokenTextForToolTurn } = require('../../src/conversation/geminiVoice');
 const { pickSpeechGuaranteeLine, polishSpokenReply } = require('../../src/conversation/dynamicSpeech');
 const {
   SAVED_CLAIM,
+  JOB_CLOSE,
   TRANSFER_CLAIM,
   knownNumbers,
   numbersIn,
@@ -198,6 +199,7 @@ function createSimulator({
     if (turn.outcome !== 'gemini' && words(line).length > MAX_LOCAL_WORDS) flag('local_line_too_long');
     if (GLUED_WORDS.test(line)) flag('glued_words');
     if (SAVED_CLAIM.test(line) && !toolSucceededThisTurn(turn.toolResults)) flag('saved_claim_without_tool');
+    if (JOB_CLOSE.test(line) && !toolSucceededThisTurn(turn.toolResults)) flag('job_close_without_tool');
     if (TRANSFER_CLAIM.test(line) && !caps.liveTransfer) flag('transfer_claim');
     const known = knownNumbers({
       callerTurns,
