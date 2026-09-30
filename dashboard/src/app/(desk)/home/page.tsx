@@ -38,12 +38,15 @@ import { LivePing } from "@/components/ui/deskRow";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
 import { homeMinuteStatus } from "@/lib/usageCap";
+import { createDeskTimer } from "@/lib/deskTiming";
 
 // instant = false: request-time desk data under the owner auth shell.
 export const instant = false;
 
 export default async function HomeOverviewPage() {
+  const timer = createDeskTimer();
   const tenant = await getCurrentTenant();
+  timer.mark("tenant");
   if (!tenant) {
     return <DeskNoWorkspace />;
   }
@@ -90,6 +93,8 @@ export default async function HomeOverviewPage() {
     loadCachedInboxItems(tenant.id, vertical),
     loadOwnerPackageMeter(tenant.id),
   ]);
+  timer.mark("data");
+  console.info(timer.line("home"));
   if (inbox.error) {
     return <DeskLoadError>Could not load Overview.</DeskLoadError>;
   }

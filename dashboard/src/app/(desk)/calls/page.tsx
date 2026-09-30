@@ -34,6 +34,7 @@ import { purposeFilters, purposeForPack } from "@/lib/inboxNiche";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
+import { createDeskTimer } from "@/lib/deskTiming";
 
 // instant = false: request-time desk data under the owner auth shell.
 export const instant = false;
@@ -53,11 +54,13 @@ export default async function CallsPage({
     rpage?: string;
   }>;
 }) {
+  const timer = createDeskTimer();
   const sp = await searchParams;
   const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const q = sanitizeSearchQuery(sp.q);
 
   const tenant = await getCurrentTenant();
+  timer.mark("tenant");
   if (!tenant) {
     return <DeskNoWorkspace />;
   }
@@ -74,6 +77,8 @@ export default async function CallsPage({
     tenant.id,
     vertical
   );
+  timer.mark("data");
+  console.info(timer.line("inbox"));
 
   if (error) {
     return <DeskLoadError>Could not load inbox.</DeskLoadError>;

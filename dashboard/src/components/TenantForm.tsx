@@ -737,6 +737,7 @@ export function TenantForm({
           />
 
       <input type="hidden" name="id" value={tenant.id} />
+      <input type="hidden" name="settings_scope" value={panel} />
       <input type="hidden" name="business_name" value={businessName} />
       <input type="hidden" name="services_offered" value={servicesOfferedSummary} />
       <input type="hidden" name="services_catalog" value={servicesJson} />

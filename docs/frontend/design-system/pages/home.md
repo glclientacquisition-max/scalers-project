@@ -10,7 +10,7 @@
 
 **Chrome:** Left-aligned date, not a centered billboard. The phone account bar carries the Scalers mark (`BrandLockup` `size="sm"`, `markOnly`, `md:hidden`, href `/home`). From `md` the rail keeps that mark, so the bar does not repeat it. The workspace name stays inside the account menu, not as a strip title and not as a page `h1`. Overview is the muted Nairobi date (`text-sm text-ink-soft` `<time>`). Not sticky, not a bare Sign out, not the word Overview, no time-of-day greeting. One aside: today + line + remaining minutes. The docked CTA is omitted when it would repeat Return calls.
 
-**Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
+**Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh. Coming back to the tab does not reload the page. Pull to refresh still does.
 
 **Desktop gains a second column.** Below `lg` the page is one column: Work, then aside, then Updates. At `lg` the grid is 7/5: Work (queues + Next to return) on the left (`lg:col-span-7 lg:row-start-1`), aside on the right (`lg:col-span-5 lg:row-span-2`), Updates under Work (`lg:row-start-2`). The aside is sticky (`top-24`). The extra width is real content, not margin.
 

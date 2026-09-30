@@ -142,7 +142,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 | State | Treatment |
 | --- | --- |
-| Loading | No `(desk)/loading.tsx`. Client navigation keeps the current page until the next page is ready. Mutation pending stays `pendingSpinnerInkClass` on the control. No skeletons, no invented numbers |
+| Loading | No `(desk)/loading.tsx`. The layout suspends the page slot on a list-shaped skeleton. Rail and tabs stay mounted. Mutation pending stays `pendingSpinnerInkClass` on the control. No invented numbers |
 | Empty | `deskEmptyClass`. Title + one link. No workspace: `DeskNoWorkspace` |
 | Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"`. Home inbox load failure uses this, not a zero queue. Call/contact query failure uses this, not 404. Holds or visits failing while calls load: same banner, lists stay. |
 | Crash | `DeskCrash`. Try again. Never a stack trace |

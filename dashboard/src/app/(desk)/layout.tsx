@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
+import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
 import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { DeskRouteChrome } from "@/components/DeskRouteChrome";
@@ -8,9 +9,10 @@ import { DeskNavHost, DeskNeedsCountBridge, DeskScrollRestore } from "@/componen
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
+import { createDeskTimer } from "@/lib/deskTiming";
 import { loadCachedInboxNeedsCount } from "@/lib/inboxLoad";
 import { tenantNeedsOnboarding } from "@/lib/onboarding";
-import { getCurrentTenant } from "@/lib/tenant";
+import { getDeskShellTenant } from "@/lib/tenant";
 
 // instant = false: owner cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
@@ -31,7 +33,9 @@ async function DeskNeedsCountLive({
  * md+: DESK_LINKS as a left icon rail. Phone: the same list as bottom tabs. No sticky lockup.
  */
 export default async function AppShell({ children }: { children: React.ReactNode }) {
+  const timer = createDeskTimer();
   const authUser = await getAuthUser();
+  timer.mark("auth");
 
   if (!authUser) {
     if (await isLegacyAuthenticated()) {
@@ -40,7 +44,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
     redirect("/login");
   }
 
-  const tenant = await getCurrentTenant();
+  const tenant = await getDeskShellTenant();
+  timer.mark("shell");
+  console.info(timer.line("desk-shell"));
   if (tenant && tenantNeedsOnboarding(tenant)) {
     redirect("/onboarding");
   }
@@ -51,16 +57,25 @@ export default async function AppShell({ children }: { children: React.ReactNode
         {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
         <DeskRail />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <DeskAccountBar
-            tenantId={tenant?.id || ""}
-            businessName={tenant?.business_name || null}
-          />
+          <Suspense
+            fallback={
+              <div
+                className="min-h-12 shrink-0 border-b border-line bg-surface"
+                aria-hidden="true"
+              />
+            }
+          >
+            <DeskAccountBar
+              tenantId={tenant?.id || ""}
+              businessName={tenant?.business_name || null}
+            />
+          </Suspense>
           <DeskOffline />
           <main data-desk-main="" className={deskMainClass}>
             <Suspense fallback={null}>
               <DeskPhonePull />
             </Suspense>
-            {children}
+            <Suspense fallback={<DeskPageSkeleton />}>{children}</Suspense>
             <Suspense fallback={null}>
               <DeskScrollRestore />
               <DeskRouteChrome />

@@ -122,6 +122,82 @@ async function ownerTenantId(
   return ids[0];
 }
 
+const SHELL_SELECT =
+  "id, business_name, vertical, services_offered, business_hours, agent_tone";
+
+export type DeskShellTenant = {
+  id: string;
+  business_name: string;
+  vertical: string | null;
+  services_offered: string | null;
+  business_hours: string | null;
+  agent_tone: string | null;
+  llm_system_prompt: string | null;
+};
+
+function shellProfileComplete(row: {
+  services_offered?: string | null;
+  business_hours?: string | null;
+  agent_tone?: string | null;
+}): boolean {
+  return (
+    Boolean(String(row.services_offered || "").trim()) &&
+    Boolean(String(row.business_hours || "").trim()) &&
+    Boolean(String(row.agent_tone || "").trim())
+  );
+}
+
+/**
+ * Chrome read. Name and vertical, plus the three profile fields the onboarding
+ * gate can decide from. The prompt is loaded only when that profile is incomplete.
+ */
+export const getDeskShellTenant = cache(async (): Promise<DeskShellTenant | null> => {
+  const user = await getAuthUser();
+  if (!user) return null;
+  const supabase = await createSupabaseServerClient();
+  const tenantId = await ownerTenantId(supabase, user.id);
+  if (!tenantId) return null;
+
+  let { data, error } = await supabase
+    .from("tenants")
+    .select(SHELL_SELECT)
+    .eq("id", tenantId)
+    .maybeSingle();
+
+  if (error && /vertical|services_offered|business_hours|agent_tone|column/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("tenants")
+      .select("id, business_name")
+      .eq("id", tenantId)
+      .maybeSingle());
+  }
+
+  if (error) throw error;
+  if (!data?.id) return null;
+
+  const row = data as Partial<DeskShellTenant> & { id: string; business_name?: string | null };
+  const shell: DeskShellTenant = {
+    id: row.id,
+    business_name: row.business_name || "",
+    vertical: row.vertical ?? null,
+    services_offered: row.services_offered ?? null,
+    business_hours: row.business_hours ?? null,
+    agent_tone: row.agent_tone ?? null,
+    llm_system_prompt: null,
+  };
+  if (shellProfileComplete(shell)) return shell;
+
+  const prompt = await supabase
+    .from("tenants")
+    .select("llm_system_prompt")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (!prompt.error) {
+    shell.llm_system_prompt = (prompt.data?.llm_system_prompt as string | null) ?? null;
+  }
+  return shell;
+});
+
 /** Resolve the signed-in user's tenant (via tenant_members), or legacy first-active. */
 export const getCurrentTenant = cache(async (): Promise<TenantRow | null> => {
   const user = await getAuthUser();
