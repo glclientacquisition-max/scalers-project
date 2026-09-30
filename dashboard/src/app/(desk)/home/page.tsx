@@ -39,11 +39,17 @@ import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
 import { homeMinuteStatus } from "@/lib/usageCap";
 import { createDeskTimer } from "@/lib/deskTiming";
+import { DeskPageGate } from "@/components/DeskPageGate";
 
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
+export default function HomeOverviewPage() {
+  return (
+    <DeskPageGate>
+      <HomeOverviewBody />
+    </DeskPageGate>
+  );
+}
 
-export default async function HomeOverviewPage() {
+async function HomeOverviewBody() {
   const timer = createDeskTimer();
   const tenant = await getCurrentTenant();
   timer.mark("tenant");

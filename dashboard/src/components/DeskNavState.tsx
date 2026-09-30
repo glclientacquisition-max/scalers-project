@@ -12,6 +12,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
 import {
   applyDeskScroll,
   deskListScrollKey,
@@ -33,9 +34,30 @@ export function DeskNavHost({ children }: { children: ReactNode }) {
   const [needsCount, setNeedsCount] = useState(0);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPendingHref(null);
   }, [pathname]);
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const dest = inAppPath((event.target as Element | null)?.closest?.("a") ?? null);
+      if (!dest) return;
+      const path = dest.split("?")[0] || dest;
+      if (path === window.location.pathname) return;
+      const deskPath =
+        path.startsWith("/home") ||
+        path.startsWith("/calls") ||
+        path.startsWith("/contacts") ||
+        path.startsWith("/wallet") ||
+        path.startsWith("/settings");
+      if (!deskPath) return;
+      setPendingHref(path);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
 
   return (
     <NeedsCountContext.Provider value={needsCount}>
@@ -69,6 +91,19 @@ export function useDeskPendingHref(): string | null {
 
 export function useDeskPendingSetter(): Dispatch<SetStateAction<string | null>> {
   return useContext(SetPendingHrefContext);
+}
+
+/** Paints the list skeleton on the click, before the next page's data commits. */
+export function DeskPendingSlot({ children }: { children: ReactNode }) {
+  const pending = useDeskPendingHref();
+  return (
+    <>
+      <div className={pending ? undefined : "contents"} hidden={pending != null}>
+        {children}
+      </div>
+      {pending ? <DeskPageSkeleton /> : null}
+    </>
+  );
 }
 
 function deskMain(): HTMLElement | null {

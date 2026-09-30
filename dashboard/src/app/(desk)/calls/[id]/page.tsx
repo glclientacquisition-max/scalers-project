@@ -39,8 +39,7 @@ import { formatEscalationDelivery } from "@/lib/escalationDelivery";
 import { formatLiveConnectStamp } from "@/lib/deskLiveTransfer";
 import { normalizeTeamDirectory } from "@/lib/teamNotify";
 
-// instant = false: request-time desk data under the owner auth shell.
-export const instant = false;
+import { DeskPageGate } from "@/components/DeskPageGate";
 
 /** Allow Gemini FAQ suggest + compile without premature cutoffs. */
 export const maxDuration = 60;
@@ -52,10 +51,7 @@ const CALL_SELECT_LEAD =
 const CALL_SELECT_LEGACY =
   "id, created_at, tenant_id, caller_number, sautikit_call_sid, status, duration_seconds, recording_url, summary, sentiment";
 
-export default async function CallDetailPage({
-  params,
-  searchParams,
-}: {
+type CallDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     from?: string;
@@ -65,7 +61,17 @@ export default async function CallDetailPage({
     q?: string;
     page?: string;
   }>;
-}) {
+};
+
+export default function CallDetailPage(props: CallDetailPageProps) {
+  return (
+    <DeskPageGate>
+      <CallDetailBody {...props} />
+    </DeskPageGate>
+  );
+}
+
+async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   const { id } = await params;
   const sp = await searchParams;
   const inboxReturn = inboxReturnFromSearch(sp);

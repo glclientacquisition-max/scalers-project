@@ -178,10 +178,10 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 | Notice | Archive undo, Saved | `DeskNotice` + `useNotify`. Enter `translateY(12px)`, exit `translateY(8px)`, opacity. Transform only. `role="status"`. One pattern. |
 | Modal | `DeskDialog`, overflow menu, `DeskHint` | Enter-static. No scale, no overlay fade. |
 | State | Filter tabs, badges, chips | `shift` / `filterTabClass`. No `layoutId`. |
-| Empty / loading | `deskEmptyClass` | Empty is static. Route changes do not blank the page. Mutation pending is the ink spinner on the control. No skeleton pulse. No `animate-pulse` except the pronunciation recording dot. |
+| Empty / loading | `deskEmptyClass` | Empty is static. A desk tap shows the list skeleton in the page slot. Mutation pending is the ink spinner on the control. No `animate-pulse` except the pronunciation recording dot and the list skeleton. |
 | Numbers | Wallet balance, Home counts, call duration | Instant `tabular-nums`. No count-up. |
 | Form | Fields, field errors | Focus/border: `shift`. Errors mount instantly next to the field. No shake. |
-| Route | Overview, Inbox, Contacts, Usage, Settings | Instant. Previous page stays until the next page is ready. No route spinner. The new page's lists land on later inserts only. |
+| Route | Overview, Inbox, Contacts, Usage, Settings | Instant shell. A tap paints the list skeleton in the page slot while that page's data streams. No fade. No route spinner. The new page's lists land on later inserts only. |
 
 Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
 
