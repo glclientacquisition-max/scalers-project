@@ -253,6 +253,107 @@ test.describe("desk pull and fit", () => {
     expect(pulled.commits ?? "0").toBe("0");
   });
 
+  test("phone active tab refreshes Home and scrolls the well to the top", async ({ page }, testInfo) => {
+    test.skip(!phone(testInfo), "Active-tab refresh is the phone tab bar");
+    await page.goto("/dev/home");
+    await settle(page);
+    const bar = page.locator("[data-desk-tabbar]");
+    const overview = bar.locator('a[href="/dev/home"]');
+    await expect(overview).toHaveAttribute("aria-current", "page");
+    await expect(bar.locator('a[href="/calls"]')).toHaveCount(1);
+    await page.evaluate(() => {
+      const main = document.querySelector("[data-desk-main]");
+      if (!(main instanceof HTMLElement)) return;
+      const spacer = document.createElement("div");
+      spacer.style.height = "1600px";
+      main.appendChild(spacer);
+      main.scrollTop = 320;
+    });
+    await overview.click();
+    await expect(page).toHaveURL(/\/dev\/home$/);
+    await expect.poll(async () => page.locator("[data-pull-host]").getAttribute("data-pull-commits")).toBe("1");
+    await expect.poll(async () => page.evaluate(() => {
+      const main = document.querySelector("[data-desk-main]");
+      return main instanceof HTMLElement ? main.scrollTop : -1;
+    })).toBe(0);
+  });
+
+  test("phone ticket pull stays on the latest turn and does not jump when scrolled up", async ({ page }, testInfo) => {
+    test.skip(!phone(testInfo), "Thread pull is phone width only");
+    await page.goto("/dev/ticket");
+    await settle(page);
+
+    function threadBox() {
+      return page.evaluate(() => {
+        const nodes = [...document.querySelectorAll("[data-pull-scroll]")].filter((node): node is HTMLElement => {
+          if (!(node instanceof HTMLElement)) return false;
+          const oy = getComputedStyle(node).overflowY;
+          return (oy === "auto" || oy === "scroll" || oy === "overlay") && node.getClientRects().length > 0;
+        });
+        const el = nodes[0];
+        if (!el) return null;
+        const max = Math.max(0, el.scrollHeight - el.clientHeight);
+        return { top: el.scrollTop, max };
+      });
+    }
+
+    await expect.poll(async () => {
+      const box = await threadBox();
+      if (!box || box.max < 160) return -1;
+      return box.max - box.top;
+    }).toBeLessThanOrEqual(96);
+
+    const composer = page.locator("#inbox-sms");
+    await composer.evaluate((el, value) => {
+      const area = el as HTMLTextAreaElement;
+      const proto = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value");
+      proto?.set?.call(area, value);
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    }, "Bring the keys");
+    const pinned = await swipeDown(page);
+    expect(pinned.commits).toBe("1");
+    const still = await threadBox();
+    expect(still).not.toBeNull();
+    expect(still!.max - still!.top).toBeLessThanOrEqual(96);
+    await expect(composer).toHaveValue("Bring the keys");
+
+    const parked = await page.evaluate(() => {
+      const nodes = [...document.querySelectorAll("[data-pull-scroll]")].filter((node): node is HTMLElement => {
+        if (!(node instanceof HTMLElement)) return false;
+        const oy = getComputedStyle(node).overflowY;
+        return (oy === "auto" || oy === "scroll" || oy === "overlay") && node.getClientRects().length > 0;
+      });
+      const el = nodes[0];
+      if (!(el instanceof HTMLElement)) return null;
+      const max = Math.max(0, el.scrollHeight - el.clientHeight);
+      const top = Math.min(140, Math.max(24, Math.floor(max / 2)));
+      el.scrollTop = top;
+      return { top: el.scrollTop, max };
+    });
+    expect(parked).not.toBeNull();
+    expect(parked!.max - parked!.top).toBeGreaterThan(96);
+    const held = await swipeDown(page);
+    expect(held.commits).toBe("1");
+    const stayed = await threadBox();
+    expect(stayed).not.toBeNull();
+    expect(Math.abs(stayed!.top - parked!.top)).toBeLessThanOrEqual(1);
+
+    await page.evaluate(() => {
+      const nodes = [...document.querySelectorAll("[data-pull-scroll]")].filter((node): node is HTMLElement => {
+        if (!(node instanceof HTMLElement)) return false;
+        const oy = getComputedStyle(node).overflowY;
+        return (oy === "auto" || oy === "scroll" || oy === "overlay") && node.getClientRects().length > 0;
+      });
+      const el = nodes[0];
+      if (el instanceof HTMLElement) el.scrollTop = 0;
+    });
+    const fromStart = await swipeDown(page);
+    expect(fromStart.commits).toBe("2");
+    const atStart = await threadBox();
+    expect(atStart).not.toBeNull();
+    expect(atStart!.top).toBeLessThanOrEqual(1);
+  });
+
   test("phone admin list pull refreshes at the top only", async ({ page }, testInfo) => {
     test.skip(!phone(testInfo), "Pull is phone width only");
     await page.goto("/dev/packages");

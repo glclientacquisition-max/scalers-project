@@ -12,6 +12,7 @@ import {
   elementScrolls,
   pullRootVisible,
   usePhoneListPull,
+  usePhoneTabRefresh,
   windowGestureScrollTop,
 } from "@/components/PhonePullRefresh";
 
@@ -49,6 +50,7 @@ function usePullMarkSlot(show: boolean, portal: boolean): HTMLElement | "inline"
     }
     const el = document.createElement("div");
     el.setAttribute("data-pull-slot", "");
+    el.className = "sticky top-0 z-10 bg-surface";
     pane.insertBefore(el, pane.firstChild);
     setSlot(el);
     return () => {
@@ -109,40 +111,43 @@ function PhonePullSurface({
     };
   }, [rootSelector, pathname, search]);
 
-  const pulling = usePhoneListPull(
-    rootRef,
-    () => {
-      if (flight.current) return;
-      if (shellPullPlan({ dirty: dirtyRef.current, failed: false }) !== "refresh") return;
-      flight.current = true;
-      setRefreshing(true);
-      setError(null);
-      void (async () => {
-        try {
-          if (!pathname.startsWith("/dev/")) {
-            const res = await revalidateDeskPull(pathname);
-            if (shellPullPlan({ dirty: false, failed: !res.ok }) === "keep") {
-              setError(shellPullErrorCopy(pathname));
-              return;
-            }
-          }
-          router.refresh();
-          setCommits((count) => count + 1);
-        } catch {
-          if (shellPullPlan({ dirty: false, failed: true }) === "keep") {
+  function refresh() {
+    if (flight.current) return;
+    if (shellPullPlan({ dirty: dirtyRef.current, failed: false }) !== "refresh") return;
+    flight.current = true;
+    setRefreshing(true);
+    setError(null);
+    void (async () => {
+      try {
+        if (!pathname.startsWith("/dev/")) {
+          const res = await revalidateDeskPull(pathname);
+          if (shellPullPlan({ dirty: false, failed: !res.ok }) === "keep") {
             setError(shellPullErrorCopy(pathname));
+            return;
           }
-        } finally {
-          flight.current = false;
-          setRefreshing(false);
         }
-      })();
-    },
-    {
-      allow: yieldToOwned ? () => !visibleOwnedPullRoot() : undefined,
-      getScrollTop: scroll === "window" ? () => windowGestureScrollTop() : (target) => deskGestureScrollTop(target),
-    }
-  );
+        router.refresh();
+        setCommits((count) => count + 1);
+      } catch {
+        if (shellPullPlan({ dirty: false, failed: true }) === "keep") {
+          setError(shellPullErrorCopy(pathname));
+        }
+      } finally {
+        flight.current = false;
+        setRefreshing(false);
+      }
+    })();
+  }
+
+  const pulling = usePhoneListPull(rootRef, refresh, {
+    allow: yieldToOwned ? () => !visibleOwnedPullRoot() : undefined,
+    getScrollTop: scroll === "window" ? () => windowGestureScrollTop() : (target) => deskGestureScrollTop(target),
+  });
+  usePhoneTabRefresh(refresh, () => {
+    if (!pullRootVisible(rootRef.current)) return false;
+    if (yieldToOwned && visibleOwnedPullRoot()) return false;
+    return true;
+  });
 
   const showMark = pulling || refreshing;
   const slot = usePullMarkSlot(showMark, scroll === "desk");
