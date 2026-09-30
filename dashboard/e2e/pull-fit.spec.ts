@@ -269,7 +269,7 @@ test.describe("desk pull and fit", () => {
       main.appendChild(spacer);
       main.scrollTop = 320;
     });
-    await overview.click();
+    await overview.evaluate((el: HTMLAnchorElement) => el.click());
     await expect(page).toHaveURL(/\/dev\/home$/);
     await expect.poll(async () => page.locator("[data-pull-host]").getAttribute("data-pull-commits")).toBe("1");
     await expect.poll(async () => page.evaluate(() => {

@@ -500,8 +500,9 @@ export function InboxTicketView({
     }
 
     function bind() {
-      const el = scrollerEl();
-      if (!el) return () => {};
+      const scroller = scrollerEl();
+      if (!scroller) return () => {};
+      const el: HTMLElement = scroller;
       applyStick(el, readStick(el));
       requestAnimationFrame(() => {
         if (!el.isConnected || readStick(el) !== "latest") return;
