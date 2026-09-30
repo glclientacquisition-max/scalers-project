@@ -13,7 +13,6 @@ describe("universal row anatomy", () => {
   const row = read("dashboard/src/components/ui/deskRow.tsx");
   const inbox = read("dashboard/src/components/InboxItemRow.tsx");
   const avatar = read("dashboard/src/components/InboxRowAvatar.tsx");
-  const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
   const master = read("docs/frontend/design-system/MASTER.md");
 
   it("ships the shared primitives", () => {
@@ -34,8 +33,13 @@ describe("universal row anatomy", () => {
   });
 
   it("carries state as a blue dot plus type weight, never opacity", () => {
-    assert.match(row, /rounded-full bg-accent/);
-    assert.match(row, /aria-label="Unread"/);
+    assert.match(row, /rounded-full bg-brand/);
+    assert.match(row, /data-unread-slot/);
+    assert.match(row, /h-2\.5 w-2\.5/);
+    assert.match(row, /h-2 w-2/);
+    assert.match(row, /aria-hidden/);
+    assert.doesNotMatch(row, /aria-label="Unread"/);
+    assert.match(inbox, /sr-only">Unread/);
     assert.match(row, /font-semibold text-ink/);
     assert.match(row, /font-medium text-ink/);
     assert.doesNotMatch(inbox, /opacity-\[0\.92\]/);
@@ -57,10 +61,11 @@ describe("universal row anatomy", () => {
 
   it("applies the identity circle to Contacts mobile and desktop", () => {
     const list = read("dashboard/src/components/ContactListRow.tsx");
+    const endless = read("dashboard/src/components/ContactsEndlessList.tsx");
     const uses = list.match(/RowIdentity/g) || [];
     assert.ok(uses.length >= 3, `import + mobile + desktop, got ${uses.length}`);
-    assert.match(contacts, /<ContactPhoneRow/);
-    assert.match(contacts, /<ContactTableRow/);
+    assert.match(endless, /<ContactPhoneRow/);
+    assert.match(endless, /<ContactTableRow/);
   });
 
   it("initials skip phone numbers and placeholders", () => {

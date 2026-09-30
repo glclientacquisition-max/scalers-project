@@ -42,6 +42,7 @@ const ROWS: InboxItem[] = [
     callerName: "Amina",
     headline: "On the line",
     intent: null,
+    unread: true,
   }),
   item({
     id: "human",
@@ -50,6 +51,7 @@ const ROWS: InboxItem[] = [
     headline: "Asked for a person",
     intent: "human",
     pinnedAt: "2026-09-18T08:00:00.000Z",
+    unread: true,
   }),
   item({
     id: "job",

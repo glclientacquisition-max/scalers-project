@@ -60,7 +60,11 @@ describe("inbox row overflow menu", () => {
   });
 
   it("opens a custom menu on md+ and selects on long-press, with no phone sheet", () => {
-    assert.match(overflow, /LONG_PRESS_MS = 500/);
+    assert.match(overflow, /LONG_PRESS_MS = 400/);
+    assert.match(overflow, /isRowBodyPress/);
+    assert.match(overflow, /data-inbox-row-body/);
+    assert.match(overflow, /opacity-80/);
+    assert.doesNotMatch(overflow, /transition-all/);
     assert.match(overflow, /role="menuitem"/);
     assert.match(overflow, /aria-haspopup="menu"/);
     assert.match(overflow, /onContextMenu/);

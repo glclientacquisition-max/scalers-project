@@ -93,6 +93,27 @@ function InboxNextStep({ line }: { line: string | null }) {
   return <p className={`mt-0.5 text-xs text-ink-soft ${deskPreviewClass}`}>{line}</p>;
 }
 
+/** Name line. Unread and Live are for assistive tech. The dot slot stays silent. */
+function InboxRowLabel({
+  unread,
+  live,
+  className,
+  children,
+}: {
+  unread: boolean;
+  live: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {live ? <span className="sr-only">Live</span> : null}
+      {unread ? <span className="sr-only">Unread</span> : null}
+      <p className={className}>{children}</p>
+    </>
+  );
+}
+
 function InboxWhenMeta({
   item,
   text,
@@ -238,11 +259,13 @@ export function InboxTableRow({
           <td className={`px-3 py-2 align-top ${deskPreviewCellClass}`}>
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
-              <p
+              <InboxRowLabel
+                unread={item.unread}
+                live={item.purpose === "live"}
                 className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {item.headline}
-              </p>
+              </InboxRowLabel>
               <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
@@ -260,11 +283,13 @@ export function InboxTableRow({
           <td className={`px-3 py-2 align-top ${deskPreviewCellClass}`}>
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
-              <p
+              <InboxRowLabel
+                unread={item.unread}
+                live={item.purpose === "live"}
                 className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {hasJob ? visit : stamp}
-              </p>
+              </InboxRowLabel>
               <InboxNextStep line={nextStep} />
             </InboxRowWho>
           </td>
@@ -282,11 +307,13 @@ export function InboxTableRow({
           <td className={`px-3 py-2 align-top ${deskPreviewCellClass}`}>
             <InboxRowHit href={openHref} label="Conversation" itemId={item.id} />
             <InboxRowWho item={item} purpose={purpose} ret={ret}>
-              <p
+              <InboxRowLabel
+                unread={item.unread}
+                live={item.purpose === "live"}
                 className={`text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)} ${item.muted ? "text-ink-soft" : ""}`}
               >
                 {who}
-              </p>
+              </InboxRowLabel>
               <p className={`mt-0.5 text-sm text-ink ${deskPreviewClass}`}>{item.headline}</p>
               <InboxNextStep line={nextStep} />
             </InboxRowWho>
@@ -331,9 +358,13 @@ export function InboxPhoneRow({
   const body = (
     <div className="min-w-0 flex-1 overflow-hidden">
       <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-        <p className={`min-w-0 sm:flex-1 text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)}`}>
+        <InboxRowLabel
+          unread={item.unread}
+          live={item.purpose === "live"}
+          className={`min-w-0 sm:flex-1 text-sm tracking-tight ${deskPreviewClass} ${deskRowWeightClass(item.unread)}`}
+        >
           {who}
-        </p>
+        </InboxRowLabel>
         <InboxWhenMeta
           item={item}
           text={meta}
