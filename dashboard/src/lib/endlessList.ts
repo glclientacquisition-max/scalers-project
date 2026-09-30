@@ -43,6 +43,50 @@ export function listAfterPullRefresh<T>(
   return { rows: [...incoming], reset: true };
 }
 
+/**
+ * Which scroller gates a phone pull. A ticket locks the desk well, so the
+ * open pane's scrollTop wins. A scrolling desk well wins over that pane.
+ */
+export function pickPullScrollTop(input: {
+  deskScrolls: boolean;
+  deskTop: number;
+  paneScrolls: boolean;
+  paneTop: number;
+}): number {
+  if (input.deskScrolls) return input.deskTop;
+  if (input.paneScrolls) return input.paneTop;
+  return input.deskTop;
+}
+
+/** Dirty profile text skips the reload. A failed reload keeps the screen. */
+export function shellPullPlan(input: { dirty: boolean; failed: boolean }): "skip" | "keep" | "refresh" {
+  if (input.dirty) return "skip";
+  if (input.failed) return "keep";
+  return "refresh";
+}
+
+/** A field is dirty when its current token differs from the value first seen. New fields are clean. */
+export function deskFieldsDirty(
+  baseline: Readonly<Record<string, string>>,
+  current: Readonly<Record<string, string>>
+): boolean {
+  for (const [key, value] of Object.entries(current)) {
+    if (Object.prototype.hasOwnProperty.call(baseline, key) && baseline[key] !== value) return true;
+  }
+  return false;
+}
+
+/** Same sentences the pages already use when a load fails. */
+export function shellPullErrorCopy(pathname: string): string {
+  const path = String(pathname || "").split("?")[0].split("#")[0] || "/";
+  if (path.startsWith("/calls/")) return "Could not load this call.";
+  if (path.startsWith("/contacts/")) return "Could not load this contact.";
+  if (path === "/wallet" || path.startsWith("/wallet/")) return "Could not load Usage.";
+  if (path === "/settings" || path.startsWith("/settings/")) return "Could not load Business Profile.";
+  if (path === "/home" || path.startsWith("/home/")) return "Could not load Overview.";
+  return "Could not refresh.";
+}
+
 export function appendUniqueById<T extends { id: string }>(
   current: readonly T[],
   incoming: readonly T[]

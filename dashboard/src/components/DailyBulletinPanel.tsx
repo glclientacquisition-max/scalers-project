@@ -115,7 +115,7 @@ export function DailyBulletinPanel({ tenant }: { tenant: TenantRow }) {
 
   return (
     <section className="min-w-0 w-full space-y-3">
-      <form action={postAction} className="min-w-0 space-y-3">
+      <form action={postAction} data-pull-dirty-guard="" className="min-w-0 space-y-3">
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="expiry" value={expiry} />
         <input type="hidden" name="starts_at" value={startsLocal} />
