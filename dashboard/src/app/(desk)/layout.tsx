@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
+import { DeskNavHost, DeskNeedsCountBridge, DeskScrollRestore } from "@/components/DeskNavState";
 import { LiveInbox } from "@/components/LiveInbox";
 import { DeskOffline } from "@/components/ui/DeskOffline";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
@@ -12,7 +13,7 @@ import { getCurrentTenant } from "@/lib/tenant";
 // instant = false: owner cookie session must run before chrome. Do not wrap the gate in Suspense.
 export const instant = false;
 
-async function DeskRailLive({
+async function DeskNeedsCountLive({
   tenantId,
   vertical,
 }: {
@@ -20,18 +21,7 @@ async function DeskRailLive({
   vertical?: string | null;
 }) {
   const needsCount = tenantId ? await loadCachedInboxNeedsCount(tenantId, vertical) : 0;
-  return <DeskRail needsCount={needsCount} />;
-}
-
-async function DeskTabBarLive({
-  tenantId,
-  vertical,
-}: {
-  tenantId?: string;
-  vertical?: string | null;
-}) {
-  const needsCount = tenantId ? await loadCachedInboxNeedsCount(tenantId, vertical) : 0;
-  return <DeskTabBar needsCount={needsCount} />;
+  return <DeskNeedsCountBridge count={needsCount} />;
 }
 
 /**
@@ -54,22 +44,28 @@ export default async function AppShell({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className={deskShellClass}>
-      {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
-      <Suspense fallback={<DeskRail />}>
-        <DeskRailLive tenantId={tenant?.id} vertical={tenant?.vertical} />
-      </Suspense>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <DeskAccountBar
-          tenantId={tenant?.id || ""}
-          businessName={tenant?.business_name || null}
-        />
-        <DeskOffline />
-        <main className={deskMainClass}>{children}</main>
-        <Suspense fallback={<DeskTabBar />}>
-          <DeskTabBarLive tenantId={tenant?.id} vertical={tenant?.vertical} />
+    <DeskNavHost>
+      <div className={deskShellClass}>
+        {tenant ? <LiveInbox tenantId={tenant.id} /> : null}
+        <DeskRail />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <DeskAccountBar
+            tenantId={tenant?.id || ""}
+            businessName={tenant?.business_name || null}
+          />
+          <DeskOffline />
+          <main data-desk-main="" className={deskMainClass}>
+            {children}
+            <Suspense fallback={null}>
+              <DeskScrollRestore />
+            </Suspense>
+          </main>
+          <DeskTabBar />
+        </div>
+        <Suspense fallback={null}>
+          <DeskNeedsCountLive tenantId={tenant?.id} vertical={tenant?.vertical} />
         </Suspense>
       </div>
-    </div>
+    </DeskNavHost>
   );
 }
