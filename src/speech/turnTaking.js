@@ -42,6 +42,16 @@ const CONFIRM_TOKENS = new Set([
   'exactly',
 ]);
 
+const SPEAKING_SOFT_OVERLAP = new Set([
+  'fine',
+  'great',
+  'alright',
+  'all right',
+  'mm hmm',
+  'mm-hmm',
+  'mmhmm',
+]);
+
 const SOFT_BACKCHANNELS = new Set([
   'ok',
   'okay',
@@ -266,6 +276,18 @@ function hasBargeContent(text) {
   return words.length >= 2 && t.length >= 6;
 }
 
+/**
+ * One-word overlap while the agent is still speaking.
+ * Leave the current audio playing. A real wait/stop is not this.
+ * @param {string} text
+ */
+function isSoftOverlap(text) {
+  const t = normalizeSpeech(text);
+  if (!t) return false;
+  if (SOFT_BACKCHANNELS.has(t)) return true;
+  return SPEAKING_SOFT_OVERLAP.has(t);
+}
+
 function isNamedEarlyCue(text) {
   const t = normalizeSpeech(text);
   if (!t) return false;
@@ -441,6 +463,12 @@ function decideCallerEvent(opts = {}) {
       skip: true,
       replay,
     });
+  }
+
+  // Soft overlap (sawa / okay / mm / fine) must not kill the stream or
+  // queue a second mouth. Wait/stop already returned above.
+  if (phase === 'speaking' && isSoftOverlap(text)) {
+    return outcome({ ...base, action: 'ignore', reason: 'backchannel', skip: true });
   }
 
   if (kind === 'yes') {

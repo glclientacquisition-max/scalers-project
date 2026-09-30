@@ -139,7 +139,7 @@ Success: freeze N2-style barge scripts stop cutting mid-clause; `voice-timing` f
 
 LiveKit: `false_interruption_timeout` 2s + `resume_false_interruption=true`. If the barge was a backchannel or noise and no new transcript lands, **continue the paused PCM**, do not start "I'm listening."
 
-We already classify `SOFT_BACKCHANNELS`. We cancel TTS. We do not resume.
+While the agent is still speaking, `sawa` / `okay` / `mm` / `fine` / `great` (and `Okay.` / `mm-hmm`) do not cancel TTS and do not queue a second turn. `wait` / `stop` still cut. After she finishes, `sawa` answering a question still reaches Gemini.
 
 Success: V9 pass on wait **and** no new stream after a lone "sawa" over a price line.
 

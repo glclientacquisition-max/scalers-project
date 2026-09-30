@@ -641,6 +641,61 @@ test('echo / empty / short noise', () => {
   assert.strictEqual(noise.stopTts, false);
 });
 
+test('soft overlap while audio is playing does not cut or start a new turn', () => {
+  const now = Date.now();
+  const price = 'Couch cleaning is six hundred shillings per seat. Does that work?';
+  for (const text of ['sawa', 'Okay.', 'ok', 'mm', 'mm-hmm', 'fine', 'Great.']) {
+    const d = decideCallerEvent({
+      text,
+      speaking: true,
+      turnBusy: true,
+      speakStartedAt: now - 1200,
+      lastAgentText: price,
+      lastAgentAskedQuestion: true,
+      now,
+    });
+    assert.strictEqual(d.stopTts, false, `${text} stopTts`);
+    assert.strictEqual(d.interrupt, false, `${text} interrupt`);
+    assert.strictEqual(d.runGemini, false, `${text} runGemini`);
+    assert.strictEqual(d.action, 'ignore', `${text} action=${d.action} reason=${d.reason}`);
+  }
+
+  const wait = decideCallerEvent({
+    text: 'wait',
+    speaking: true,
+    turnBusy: true,
+    speakStartedAt: now - 1200,
+    lastAgentText: price,
+    lastAgentAskedQuestion: true,
+    now,
+  });
+  assert.strictEqual(wait.action, 'barge_listen');
+  assert.strictEqual(wait.stopTts, true);
+
+  const job = decideCallerEvent({
+    text: 'I need carpet cleaning',
+    speaking: true,
+    turnBusy: true,
+    speakStartedAt: now - 1200,
+    lastAgentText: price,
+    now,
+  });
+  assert.strictEqual(job.stopTts, true);
+  assert.strictEqual(job.action, 'barge_gemini');
+
+  const after = decideCallerEvent({
+    text: 'sawa',
+    speaking: false,
+    turnBusy: false,
+    lastAgentText: price,
+    lastAgentAskedQuestion: true,
+    now,
+  });
+  assert.strictEqual(after.action, 'process_turn');
+  assert.strictEqual(after.runGemini, true);
+  assert.strictEqual(after.stopTts, false);
+});
+
 test('skip-turn does not undo barge_listen or answers', () => {
   assert.strictEqual(shouldSkipCallerTurn('wait', { lastAgentText: AGENT_LINE }), true);
   assert.strictEqual(shouldSkipCallerTurn('sorry', { lastAgentText: BOOK_Q }), true);

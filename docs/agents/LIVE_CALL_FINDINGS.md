@@ -406,7 +406,7 @@ Reconstructed behavior:
    After barge-in, finals like `Wait.` / `Stop, stop, stop.` still hit the LLM, which invents more speech (“I'm listening…”), so the agent talks *again* instead of yielding.
 
 3. **Barge-in still feels weak in the wild**  
-   Phase 2 `killAudio` + interim accumulation helped detection, but the post-barge reply path re-opens speech too eagerly.
+   Phase 2 `killAudio` + interim accumulation helped detection, but the post-barge reply path re-opens speech too eagerly. Soft overlap while audio is playing (`sawa`, `okay`, `mm`, `fine`, `great`) now leaves that audio playing. `wait` / `stop` still cut.
 
 ### P0 — Brain / knowledge (hand-off)
 
