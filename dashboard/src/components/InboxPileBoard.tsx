@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { EndlessSentinel } from "@/components/EndlessList";
-import { PullRefreshMark, usePhoneListPull } from "@/components/PhonePullRefresh";
+import { PullRefreshMark, pullRootVisible, usePhoneListPull, usePhoneTabRefresh } from "@/components/PhonePullRefresh";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { listWindowClass } from "@/lib/endlessList";
@@ -166,6 +166,7 @@ export function InboxPileBoard({
   const nav = useInboxPileNav();
   const pullRef = useRef<HTMLDivElement>(null);
   const pulling = usePhoneListPull(pullRef, () => nav?.refreshFirst());
+  usePhoneTabRefresh(() => nav?.refreshFirst(), () => pullRootVisible(pullRef.current));
   const purpose = nav?.purpose ?? "all";
   const pageRows = nav?.pageRows || [];
   const page = nav?.page ?? 1;

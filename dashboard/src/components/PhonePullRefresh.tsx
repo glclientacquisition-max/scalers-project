@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { pendingSpinnerInkClass } from "@/components/ui/deskChrome";
-import { pickPullScrollTop, pullRefreshCommit } from "@/lib/endlessList";
+import {
+  PHONE_TAB_REFRESH_EVENT,
+  pickPullScrollTop,
+  pullRefreshCommit,
+  threadPullAllowed,
+  threadScrollAnchor,
+  type ThreadAnchor,
+} from "@/lib/endlessList";
 
 function phoneWidth(): boolean {
   return window.matchMedia("(max-width: 767px)").matches;
@@ -83,6 +90,59 @@ type PhonePullOptions = {
   getScrollTop?: (target: EventTarget | null) => number;
 };
 
+type PullPlace = {
+  scrollTop: number;
+  thread: HTMLElement | null;
+  anchor: ThreadAnchor | "list";
+};
+
+function findThreadScroller(target: EventTarget | null): HTMLElement | null {
+  const desks = document.querySelectorAll("[data-desk-main]");
+  for (const desk of desks) {
+    if (!(desk instanceof HTMLElement) || !pullRootVisible(desk)) continue;
+    const mark = desk.querySelector("[data-ticket-chat], [data-thread-pull]");
+    if (!(mark instanceof HTMLElement) || !pullRootVisible(mark)) continue;
+    return closestPullPane(target, desk) ?? solePullPane(desk);
+  }
+  return null;
+}
+
+/** Keep a thread on the newest line, or on the top after a pull from the start. */
+export function stickThreadScroll(node: HTMLElement, anchor: "latest" | "start") {
+  const apply = () => {
+    if (!node.isConnected) return;
+    node.setAttribute("data-thread-stick", anchor);
+    node.scrollTop = anchor === "start" ? 0 : Math.max(0, node.scrollHeight - node.clientHeight);
+  };
+  apply();
+  requestAnimationFrame(() => {
+    apply();
+    requestAnimationFrame(apply);
+  });
+}
+
+/**
+ * Already-selected phone tab. Callers that own a list pass `allow`.
+ * A hidden root must not refresh.
+ */
+export function usePhoneTabRefresh(onRefresh: () => void, allow?: () => boolean) {
+  const onRefreshRef = useRef(onRefresh);
+  onRefreshRef.current = onRefresh;
+  const allowRef = useRef(allow);
+  allowRef.current = allow;
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    function onTab() {
+      if (!mq.matches) return;
+      if (allowRef.current && !allowRef.current()) return;
+      onRefreshRef.current();
+    }
+    window.addEventListener(PHONE_TAB_REFRESH_EVENT, onTab);
+    return () => window.removeEventListener(PHONE_TAB_REFRESH_EVENT, onTab);
+  }, []);
+}
+
 /**
  * Touch pull on a phone list. No listener work on md+.
  * The callback ref stays current so the listener is bound once.
@@ -106,14 +166,52 @@ export function usePhoneListPull(
     let startY = 0;
     let tracking = false;
     let armed = false;
+    let startAnchor: PullPlace["anchor"] = "list";
+    let threadNode: HTMLElement | null = null;
+    let lockNode: HTMLElement | null = null;
 
-    function readTop(target: EventTarget | null): number {
-      if (getScrollTopRef.current) return getScrollTopRef.current(target);
-      return defaultScrollTop();
+    function readPlace(target: EventTarget | null): PullPlace {
+      const thread = findThreadScroller(target);
+      if (thread) {
+        return {
+          scrollTop: thread.scrollTop,
+          thread,
+          anchor: threadScrollAnchor({
+            scrollTop: thread.scrollTop,
+            scrollHeight: thread.scrollHeight,
+            clientHeight: thread.clientHeight,
+          }),
+        };
+      }
+      const scrollTop = getScrollTopRef.current ? getScrollTopRef.current(target) : defaultScrollTop();
+      return { scrollTop, thread: null, anchor: "list" };
+    }
+
+    function pinLatest(node: HTMLElement) {
+      const max = Math.max(0, node.scrollHeight - node.clientHeight);
+      if (node.scrollTop !== max) node.scrollTop = max;
+    }
+
+    function blockMove(event: TouchEvent) {
+      if (!lockNode) return;
+      if (event.cancelable) event.preventDefault();
+      pinLatest(lockNode);
+    }
+
+    function armLock(node: HTMLElement) {
+      lockNode = node;
+      document.addEventListener("touchmove", blockMove, { capture: true, passive: false });
+    }
+
+    function clearLock() {
+      if (!lockNode) return;
+      lockNode = null;
+      document.removeEventListener("touchmove", blockMove, { capture: true });
     }
 
     function disarm() {
       tracking = false;
+      clearLock();
       if (armed) setPulling(false);
       armed = false;
     }
@@ -123,27 +221,51 @@ export function usePhoneListPull(
       if (!pullRootVisible(rootRef.current)) return;
       if (fieldTarget(event.target)) return;
       if (allowRef.current && !allowRef.current()) return;
-      if (readTop(event.target) > 0) return;
+      const place = readPlace(event.target);
+      if (place.thread && place.anchor !== "list") {
+        const scrollerTop = place.thread.getBoundingClientRect().top;
+        if (
+          !threadPullAllowed({
+            anchor: place.anchor,
+            clientY: event.touches[0].clientY,
+            scrollerTop,
+          })
+        ) {
+          return;
+        }
+      } else if (place.scrollTop > 0) {
+        return;
+      }
       startX = event.touches[0].clientX;
       startY = event.touches[0].clientY;
+      startAnchor = place.anchor;
+      threadNode = place.thread;
       tracking = true;
       armed = false;
+      if (place.thread && place.anchor === "latest") armLock(place.thread);
     }
 
     function onMove(event: TouchEvent) {
       if (!tracking || event.touches.length !== 1) return;
-      const scrollTop = readTop(event.target);
+      const place = readPlace(event.target);
       const dx = event.touches[0].clientX - startX;
       const dy = event.touches[0].clientY - startY;
-      if (scrollTop > 0 || (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy))) {
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) {
+        disarm();
+        return;
+      }
+      if (startAnchor === "latest") {
+        if (place.thread) pinLatest(place.thread);
+      } else if (place.scrollTop > 0 || (place.anchor === "older")) {
         disarm();
         return;
       }
       const next = pullRefreshCommit({
         phone: phoneWidth(),
-        scrollTop,
+        scrollTop: startAnchor === "latest" ? 0 : place.scrollTop,
         dx,
         dy,
+        pinnedLatest: startAnchor === "latest",
       });
       if (next !== armed) {
         armed = next;
@@ -154,8 +276,12 @@ export function usePhoneListPull(
     function onEnd() {
       if (!tracking) return;
       const commit = armed && pullRootVisible(rootRef.current);
+      const node = threadNode;
+      const anchor = startAnchor;
       disarm();
-      if (commit) onRefreshRef.current();
+      if (!commit) return;
+      if (node && (anchor === "latest" || anchor === "start")) stickThreadScroll(node, anchor);
+      onRefreshRef.current();
     }
 
     function bind() {
@@ -183,6 +309,7 @@ export function usePhoneListPull(
     mq.addEventListener("change", onChange);
     return () => {
       unbind();
+      clearLock();
       mq.removeEventListener("change", onChange);
     };
   }, [rootRef]);

@@ -3,6 +3,30 @@ function deskPathname(pathname: string | null | undefined): string {
   return pathname.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
 }
 
+const DEV_PHONE_TAB: Record<string, string> = {
+  "/dev/home": "/home",
+  "/dev/inbox": "/calls",
+  "/dev/contacts": "/contacts",
+  "/dev/usage": "/wallet",
+  "/dev/settings": "/settings",
+};
+
+/** Map a local fixture path onto the desk tab it stands in for. */
+export function deskPhoneTabPath(pathname: string | null | undefined): string {
+  const path = deskPathname(pathname);
+  return DEV_PHONE_TAB[path] || path;
+}
+
+/**
+ * Phone tab href. Fixture pages retap their own path.
+ * Production tabs stay on DESK_LINKS.
+ */
+export function deskPhoneTabHref(itemHref: string, pathname: string | null | undefined): string {
+  const path = deskPathname(pathname);
+  if (deskPhoneTabPath(path) === itemHref && path !== itemHref) return path;
+  return itemHref;
+}
+
 /** Phone ticket chat: hide DESK_LINKS tabs. Rail on md+ stays. */
 export function isDeskTicketChatPath(pathname: string | null | undefined): boolean {
   return /^\/calls\/[^/]+$/.test(deskPathname(pathname));

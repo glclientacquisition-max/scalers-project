@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, type MouseEvent } from "react";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import {
   useDeskNeedsCount,
@@ -19,7 +19,8 @@ import {
   formatAttentionCount,
   formatInboxNavAriaLabel,
 } from "@/lib/deskAttentionCount";
-import { isDeskNestedPath } from "@/lib/deskTicketChat";
+import { deskPhoneTabHref, isDeskNestedPath } from "@/lib/deskTicketChat";
+import { PHONE_TAB_REFRESH_EVENT } from "@/lib/endlessList";
 
 export const DESK_LINKS = [
   { href: "/home", label: "Overview" },
@@ -165,6 +166,7 @@ function DeskDestinationLink({
   idleClassName,
   labelClassName,
   ariaLabel,
+  onRetap,
 }: {
   href: string;
   label: string;
@@ -174,16 +176,27 @@ function DeskDestinationLink({
   idleClassName: string;
   labelClassName: string;
   ariaLabel?: string;
+  onRetap?: () => void;
 }) {
   const pathname = usePathname();
   const pendingHref = useDeskPendingHref();
-  const active = pendingHref ? pendingHref === href : pathActive(pathname, href);
+  const current = pathActive(pathname, href);
+  const active = pendingHref ? pendingHref === href : current;
+
+  function onClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (!onRetap || !current || pendingHref) return;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    event.preventDefault();
+    onRetap();
+  }
+
   return (
     <Link
       href={href}
       scroll={false}
       aria-current={active ? "page" : undefined}
       aria-label={ariaLabel}
+      onClick={onClick}
       className={[
         className,
         deskShiftClass,
@@ -246,6 +259,12 @@ export function DeskRail({
   );
 }
 
+function retapPhoneTab() {
+  const well = document.querySelector("[data-desk-main]");
+  if (well instanceof HTMLElement) well.scrollTop = 0;
+  window.dispatchEvent(new Event(PHONE_TAB_REFRESH_EVENT));
+}
+
 /** Phone thumb destinations. Same DESK_LINKS as the desktop rail. Hidden on nested insides. */
 export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
   const pathname = usePathname();
@@ -263,10 +282,11 @@ export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
         {DESK_LINKS.map((item) => (
           <li key={item.href} className="min-w-0 flex-1 overflow-visible">
             <DeskDestinationLink
-              href={item.href}
+              href={deskPhoneTabHref(item.href, pathname)}
               label={item.label}
               count={count}
               ariaLabel={inboxLinkAria(item.label, count)}
+              onRetap={retapPhoneTab}
               className="flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight"
               activeClassName="font-semibold text-accent-deep"
               idleClassName="font-medium text-ink-soft"

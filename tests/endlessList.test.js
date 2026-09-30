@@ -11,7 +11,7 @@ function read(rel) {
 function load() {
   const helperPath = path.join(__dirname, "../dashboard/src/lib/endlessList.ts");
   const script = `
-    import { nextShown, appendUniqueById, LIST_SLICE, pullRefreshCommit, listAfterPullRefresh, pickPullScrollTop, shellPullPlan, deskFieldsDirty, shellPullErrorCopy } from ${JSON.stringify(helperPath)};
+    import { nextShown, appendUniqueById, LIST_SLICE, pullRefreshCommit, listAfterPullRefresh, pickPullScrollTop, shellPullPlan, deskFieldsDirty, shellPullErrorCopy, threadScrollAnchor, threadPullAllowed } from ${JSON.stringify(helperPath)};
     const first = [{ id: "a" }, { id: "b" }];
     const more = appendUniqueById(first, [{ id: "b" }, { id: "c" }, { id: "" }]);
     const again = appendUniqueById(more.rows, [{ id: "c" }]);
@@ -46,6 +46,16 @@ function load() {
       contactCopy: shellPullErrorCopy("/contacts/abc"),
       profileCopy: shellPullErrorCopy("/settings"),
       homeCopy: shellPullErrorCopy("/home"),
+      anchorLatest: threadScrollAnchor({ scrollTop: 480, scrollHeight: 900, clientHeight: 400 }),
+      anchorOlder: threadScrollAnchor({ scrollTop: 120, scrollHeight: 900, clientHeight: 400 }),
+      anchorStart: threadScrollAnchor({ scrollTop: 0, scrollHeight: 900, clientHeight: 400 }),
+      anchorShort: threadScrollAnchor({ scrollTop: 0, scrollHeight: 200, clientHeight: 400 }),
+      pullLatest: threadPullAllowed({ anchor: "latest", clientY: 36, scrollerTop: 120 }),
+      bodyLatest: threadPullAllowed({ anchor: "latest", clientY: 280, scrollerTop: 120 }),
+      pullOlder: threadPullAllowed({ anchor: "older", clientY: 36, scrollerTop: 120 }),
+      pullStart: threadPullAllowed({ anchor: "start", clientY: 280, scrollerTop: 120 }),
+      pinned: pullRefreshCommit({ phone: true, scrollTop: 480, dx: 0, dy: 72, pinnedLatest: true }),
+      pinnedNudge: pullRefreshCommit({ phone: true, scrollTop: 480, dx: 0, dy: 20, pinnedLatest: true }),
     }));
   `;
   const ran = spawnSync(
@@ -90,6 +100,16 @@ describe("endless list slices", () => {
     assert.equal(out.contactCopy, "Could not load this contact.");
     assert.equal(out.profileCopy, "Could not load Business Profile.");
     assert.equal(out.homeCopy, "Could not load Overview.");
+    assert.equal(out.anchorLatest, "latest");
+    assert.equal(out.anchorOlder, "older");
+    assert.equal(out.anchorStart, "start");
+    assert.equal(out.anchorShort, "start");
+    assert.equal(out.pullLatest, true);
+    assert.equal(out.bodyLatest, false);
+    assert.equal(out.pullOlder, false);
+    assert.equal(out.pullStart, true);
+    assert.equal(out.pinned, true);
+    assert.equal(out.pinnedNudge, false);
   });
 
   it("keeps one contacts row at every width, with a quiet loading row", () => {
@@ -164,6 +184,16 @@ describe("endless list slices", () => {
     assert.doesNotMatch(action, /topup|payment/i);
     assert.match(read("dashboard/src/components/BusinessSettingsShell.tsx"), /data-pull-dirty-guard/);
     assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /data-pull-scroll/);
+    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /data-thread-stick/);
+    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /threadScrollAnchor/);
+    assert.match(read("dashboard/src/components/PhonePullRefresh.tsx"), /pinnedLatest/);
+    assert.match(read("dashboard/src/components/PhonePullRefresh.tsx"), /usePhoneTabRefresh/);
+    assert.match(read("dashboard/src/components/PhonePullSurface.tsx"), /usePhoneTabRefresh/);
+    assert.match(read("dashboard/src/components/DeskNav.tsx"), /PHONE_TAB_REFRESH_EVENT/);
+    assert.match(read("dashboard/src/components/DeskNav.tsx"), /onRetap/);
+    assert.match(read("dashboard/src/components/DeskNav.tsx"), /deskPhoneTabHref/);
+    assert.doesNotMatch(read("dashboard/src/components/PhonePullRefresh.tsx"), /[\u2014\u2013]/);
+    assert.doesNotMatch(read("dashboard/src/components/DeskNav.tsx"), /[\u2014\u2013]/);
     assert.match(read("dashboard/src/lib/deskTicketChat.ts"), /\/dev\/ticket/);
     assert.doesNotMatch(read("dashboard/src/app/(desk)/wallet/page.tsx"), /location\.reload/);
   });
