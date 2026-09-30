@@ -3,9 +3,53 @@ function deskPathname(pathname: string | null | undefined): string {
   return pathname.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
 }
 
+const DEV_PHONE_TAB: Record<string, string> = {
+  "/dev/home": "/home",
+  "/dev/inbox": "/calls",
+  "/dev/contacts": "/contacts",
+  "/dev/usage": "/wallet",
+  "/dev/settings": "/settings",
+};
+
+/** Map a local fixture path onto the desk tab it stands in for. */
+export function deskPhoneTabPath(pathname: string | null | undefined): string {
+  const path = deskPathname(pathname);
+  return DEV_PHONE_TAB[path] || path;
+}
+
+/**
+ * Phone tab href. Fixture pages retap their own path.
+ * Production tabs stay on DESK_LINKS.
+ */
+export function deskPhoneTabHref(itemHref: string, pathname: string | null | undefined): string {
+  const path = deskPathname(pathname);
+  if (deskPhoneTabPath(path) === itemHref && path !== itemHref) return path;
+  return itemHref;
+}
+
 /** Phone ticket chat: hide DESK_LINKS tabs. Rail on md+ stays. */
 export function isDeskTicketChatPath(pathname: string | null | undefined): boolean {
   return /^\/calls\/[^/]+$/.test(deskPathname(pathname));
+}
+
+/**
+ * A ticket Next kept in a hidden Activity must not take hits or host a pull
+ * after the owner is back on a list. The visible ticket on a live chat stays active.
+ */
+export function markHiddenDeskTickets(shell: Element): void {
+  const live = shell.hasAttribute("data-desk-ticket-chat");
+  for (const node of shell.querySelectorAll("[data-ticket-chat]")) {
+    if (!(node instanceof HTMLElement)) continue;
+    const shown = live && node.getClientRects().length > 0;
+    if (shown) {
+      node.removeAttribute("inert");
+      if (node.getAttribute("aria-hidden") === "true") node.removeAttribute("aria-hidden");
+      continue;
+    }
+    node.setAttribute("inert", "");
+    node.setAttribute("aria-hidden", "true");
+    node.removeAttribute("data-pull-host");
+  }
 }
 
 function settingsSearchTab(search: string | null | undefined): string {
@@ -37,7 +81,7 @@ export function isDeskNestedPath(
   if (!path) return false;
   if (isDeskTicketChatPath(path)) return true;
   if (path === "/contacts/import") return true;
-  if (path === "/dev/contacts/file") return true;
+  if (path === "/dev/contacts/file" || path === "/dev/ticket") return true;
   if (/^\/contacts\/[^/]+$/.test(path)) return true;
   if (path === "/settings") {
     return isSettingsNestedTab(settingsSearchTab(search));

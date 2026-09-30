@@ -29,6 +29,7 @@ import {
   clampTicketSummaryWidth,
 } from "@/lib/ticketSplit";
 import { ownerAssistLabel, ownerDeskLine, plainOwnerCopy } from "@/lib/deskTicketChat";
+import { THREAD_PIN_PX, threadScrollAnchor, type ThreadAnchor } from "@/lib/endlessList";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxPingPerson } from "@/components/InboxPingTeammate";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
@@ -470,36 +471,79 @@ export function InboxTicketView({
   }
 
   useEffect(() => {
+    let writing = false;
+
     function scrollerEl() {
       return window.matchMedia("(min-width: 1024px)").matches
         ? threadRef.current
         : paneRef.current;
     }
+
     function measure() {
       const el = scrollerEl();
       if (!el) return;
-      setAway(el.scrollHeight - el.scrollTop - el.clientHeight > 96);
+      setAway(el.scrollHeight - el.scrollTop - el.clientHeight > THREAD_PIN_PX);
     }
+
+    function readStick(el: HTMLElement): ThreadAnchor {
+      const marked = el.getAttribute("data-thread-stick");
+      if (marked === "latest" || marked === "older" || marked === "start") return marked;
+      return "latest";
+    }
+
+    function applyStick(el: HTMLElement, stick: ThreadAnchor) {
+      writing = true;
+      el.setAttribute("data-thread-stick", stick);
+      if (stick === "start") el.scrollTop = 0;
+      else if (stick === "latest") el.scrollTop = el.scrollHeight;
+      writing = false;
+    }
+
     function bind() {
-      const el = scrollerEl();
-      if (!el) return () => {};
-      el.scrollTop = el.scrollHeight;
+      const scroller = scrollerEl();
+      if (!scroller) return () => {};
+      const el: HTMLElement = scroller;
+      applyStick(el, readStick(el));
+      requestAnimationFrame(() => {
+        if (!el.isConnected || readStick(el) !== "latest") return;
+        applyStick(el, "latest");
+      });
+      function onScroll() {
+        if (!writing) {
+          const anchor = threadScrollAnchor({
+            scrollTop: el.scrollTop,
+            scrollHeight: el.scrollHeight,
+            clientHeight: el.clientHeight,
+          });
+          el.setAttribute("data-thread-stick", anchor);
+        }
+        measure();
+      }
+      el.addEventListener("scroll", onScroll);
       measure();
-      el.addEventListener("scroll", measure);
-      return () => el.removeEventListener("scroll", measure);
+      return () => el.removeEventListener("scroll", onScroll);
     }
+
     let unbind = bind();
     const mq = window.matchMedia("(min-width: 1024px)");
     const onChange = () => {
       unbind();
       unbind = bind();
     };
+    const onResize = () => {
+      const el = scrollerEl();
+      if (el) {
+        const stick = readStick(el);
+        if (stick !== "older") applyStick(el, stick);
+      }
+      measure();
+    };
     mq.addEventListener("change", onChange);
-    window.addEventListener("resize", measure);
+    window.addEventListener("resize", onResize);
     return () => {
       unbind();
       mq.removeEventListener("change", onChange);
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", onResize);
     };
   }, [turns.length]);
 
@@ -559,10 +603,12 @@ export function InboxTicketView({
       >
         <div
           ref={paneRef}
+          data-pull-scroll=""
           className="absolute inset-0 overflow-y-auto lg:contents"
         >
           <aside
             data-ticket-summary=""
+            data-pull-scroll=""
             className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
           >
             <InboxPurposeChip purpose={purpose} label={plainOwnerCopy(stamp)} />
@@ -675,6 +721,7 @@ export function InboxTicketView({
           <section data-ticket-thread="" className="relative min-h-0">
             <div
               ref={threadRef}
+              data-pull-scroll=""
               className="space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
             >
               <CallTranscript turns={turns} mode="thread" />

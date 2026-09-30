@@ -172,7 +172,7 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 
 | Type | Surfaces | Motion |
 | --- | --- | --- |
-| Shell | `deskShellClass` + `DeskRail` + tab bar | None. Shell is `fixed inset-0 overflow-hidden` (same box as the tab bar). One rail and one tab bar stay mounted. Main (`deskMainClass`, `[data-desk-main]`) is `min-h-0 overflow-y-auto`. List scroll is restored per list URL. `DESK_LINKS` use `scroll={false}`. Do not animate the shell or scroll containers. The light body canvas must not show under the desk. |
+| Shell | `deskShellClass` + `DeskRail` + tab bar | None. Shell is `fixed inset-0 overflow-hidden` (same box as the tab bar). One rail and one tab bar stay mounted. Main (`deskMainClass`, `[data-desk-main]`) is `min-h-0 overflow-y-auto` on list routes. A live ticket (`data-desk-ticket-chat`) sets that well to `overflow: hidden`. A hidden Activity copy of the ticket must not. List scroll is restored per list URL. `DESK_LINKS` use `scroll={false}`. Do not animate the shell or scroll containers. The light body canvas must not show under the desk. |
 | List | Inbox queue, Contacts, wallet ledger | `land` on a live insert after first paint. Row hover/selected: `shift`. Stable keys (`item.id`). No enter-stagger. No layout reorder. |
 | Detail | Ticket transcript, contact profile, action dock | Instant swap. Key the route by record id. Panel chrome does not slide. |
 | Notice | Archive undo, Saved | `DeskNotice` + `useNotify`. Enter `translateY(12px)`, exit `translateY(8px)`, opacity. Transform only. `role="status"`. One pattern. |

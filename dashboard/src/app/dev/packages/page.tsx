@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { AdminPhonePull } from "@/components/PhonePullSurface";
 import { AdminPackagesPanel } from "@/components/AdminPackagesPanel";
 import type { BillingPackage, BillingRateCard, TenantSubscriptionRow } from "@/lib/packageCatalog";
 
@@ -83,7 +85,10 @@ export default function DevPackagesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-8 text-ink sm:px-6">
+    <main data-admin-main="" data-pull-dirty-guard="" className="min-h-screen bg-canvas px-4 py-8 text-ink sm:px-6">
+      <Suspense fallback={null}>
+        <AdminPhonePull />
+      </Suspense>
       <div className="mx-auto max-w-5xl space-y-4">
         <h1 className="font-display text-page">Packages</h1>
         <AdminPackagesPanel rates={RATES} packages={PACKAGES} businesses={BUSINESSES} />

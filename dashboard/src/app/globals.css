@@ -271,6 +271,24 @@ html:has(.desk-theme) body {
   display: none;
 }
 
+/* Live ticket fills the column. First paint may use :has before DeskRouteChrome.
+   After route-ready, a hidden Activity copy still has [data-desk-bleed] and must
+   not lock the list well or sit on top of it. */
+.desk-theme:not([data-desk-route-ready]):has([data-desk-bleed]) [data-desk-main],
+.desk-theme[data-desk-ticket-chat] [data-desk-main] {
+  display: flex;
+  height: 100%;
+  max-width: none;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.desk-theme[data-desk-route-ready]:not([data-desk-ticket-chat]) [data-ticket-chat] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
 @media (min-width: 768px) {
   :root {
     --desk-header-h: 0px;

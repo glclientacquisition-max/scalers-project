@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { loadContactsSlice } from "@/app/(desk)/contacts/listActions";
 import { ContactPhoneRow } from "@/components/ContactListRow";
 import { EndlessSentinel, scrollDeskWellToTop } from "@/components/EndlessList";
-import { PullRefreshMark, usePhoneListPull } from "@/components/PhonePullRefresh";
+import { PullRefreshMark, pullRootVisible, usePhoneListPull, usePhoneTabRefresh } from "@/components/PhonePullRefresh";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import {
@@ -164,7 +164,7 @@ export function ContactsPullHost({
   const shownRef = useRef(shown);
   shownRef.current = shown;
 
-  const pulling = usePhoneListPull(rootRef, () => {
+  function refreshList() {
     if (flight.current) return;
     flight.current = true;
     setRefreshing(true);
@@ -193,7 +193,10 @@ export function ContactsPullHost({
         flight.current = false;
         setRefreshing(false);
       });
-  });
+  }
+
+  const pulling = usePhoneListPull(rootRef, refreshList);
+  usePhoneTabRefresh(refreshList, () => pullRootVisible(rootRef.current));
 
   return (
     <div ref={rootRef} data-pull-root="" className="min-w-0">
