@@ -6,11 +6,10 @@ import {
   type AppointmentStatusState,
 } from "@/app/(desk)/appointments/actions";
 import {
-  btnDock,
-  btnDockDone,
-  btnDockGhost,
   btnDone,
   btnGhost,
+  btnListConfirm,
+  btnListDone,
   btnPrimary,
   pendingSpinnerClass,
   pendingSpinnerInkClass,
@@ -59,15 +58,14 @@ export function InboxJobActions({
               name="status"
               value="confirmed"
               disabled={pending}
-              className={wide ? `${btnPrimary} w-full` : btnDock}
+              className={wide ? `${btnPrimary} w-full` : btnListConfirm}
               aria-label={pending ? "Saving" : "Confirm"}
             >
               {pending ? (
-                wide ? (
-                  "Saving"
-                ) : (
+                <span className="inline-flex items-center gap-2">
                   <span aria-hidden="true" className={pendingSpinnerClass} />
-                )
+                  Saving
+                </span>
               ) : (
                 "Confirm"
               )}
@@ -78,7 +76,7 @@ export function InboxJobActions({
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={extra ? `${btnGhost} w-full` : btnDockGhost}
+                className={`${btnGhost} w-full`}
               >
                 Cancel
               </button>
@@ -92,15 +90,14 @@ export function InboxJobActions({
               name="status"
               value="done"
               disabled={pending}
-              className={wide ? `${btnDone} w-full` : btnDockDone}
+              className={wide ? `${btnDone} w-full` : btnListDone}
               aria-label={pending ? "Saving" : "Done"}
             >
               {pending ? (
-                wide ? (
-                  "Saving"
-                ) : (
+                <span className="inline-flex items-center gap-2">
                   <span aria-hidden="true" className={pendingSpinnerInkClass} />
-                )
+                  Saving
+                </span>
               ) : (
                 "Done"
               )}
@@ -111,7 +108,7 @@ export function InboxJobActions({
                 name="status"
                 value="cancelled"
                 disabled={pending}
-                className={extra ? `${btnGhost} w-full` : btnDockGhost}
+                className={`${btnGhost} w-full`}
               >
                 Cancel
               </button>
@@ -123,7 +120,7 @@ export function InboxJobActions({
             className={
               extra
                 ? "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-ok-soft text-sm font-semibold text-ok"
-                : `${btnDock} pointer-events-none bg-ok-soft text-ok shadow-none`
+                : "inline-flex h-11 items-center justify-center rounded-xl bg-ok-soft px-3 text-sm font-semibold text-ok"
             }
           >
             Done
@@ -135,7 +132,7 @@ export function InboxJobActions({
             name="status"
             value="requested"
             disabled={pending}
-            className={extra ? `${btnGhost} w-full` : btnDockGhost}
+            className={extra ? `${btnGhost} w-full` : btnGhost}
           >
             Reopen
           </button>

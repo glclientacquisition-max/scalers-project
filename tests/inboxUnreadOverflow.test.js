@@ -282,8 +282,8 @@ describe("inbox unread since last customer event", () => {
   it("shows the blue dot and unread weight only when unread is true", () => {
     const row = read("dashboard/src/components/InboxItemRow.tsx");
     const desk = read("dashboard/src/components/ui/deskRow.tsx");
-    assert.match(row, /RowStateDot show=\{item\.unread\}/);
-    assert.match(row, /deskRowWeightClass\(item\.unread\)/);
+    assert.match(row, /unread=\{item\.unread \|\| item\.purpose === "live"\}/);
+    assert.match(read("dashboard/src/components/ui/ListRow.tsx"), /unread \? "font-semibold" : "font-medium"/);
     assert.doesNotMatch(row, /itemInNeedsYouPile/);
     assert.doesNotMatch(row, /RowStateDot show=\{item\.needsYou\}/);
     assert.doesNotMatch(row, /RowStateDot show=\{needsYouPile\}/);

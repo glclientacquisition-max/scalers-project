@@ -29,13 +29,16 @@ describe("inbox outside and inside anatomy", () => {
     assert.doesNotMatch(phone, /InboxPurposeChip/);
     assert.doesNotMatch(phone, /\{place\}/);
     assert.match(row, /deskPreviewClass/);
+    assert.match(row, /preview=\{<span className=\{deskPreviewClass\}>\{item\.headline\}<\/span>\}/);
+    assert.doesNotMatch(row, /line-clamp-2/);
   });
 
-  it("keeps isolated hold and visit table cells to one preview line", () => {
-    const holdBlock = row.slice(row.indexOf('{kind === "hold"'), row.indexOf('{kind === "job"'));
-    assert.doesNotMatch(holdBlock, /holdTypeLabel/);
-    const jobBlock = row.slice(row.indexOf('{kind === "job"'), row.indexOf('{kind === "mixed"'));
-    assert.doesNotMatch(jobBlock, /item\.headline/);
+  it("keeps one preview line instead of hold and visit table cells", () => {
+    assert.match(row, /const showHold = kind === "hold" && hasHold/);
+    assert.match(row, /whenText = showHold \? needed : showJob \? visit : when/);
+    assert.doesNotMatch(row, /holdTypeLabel/);
+    assert.doesNotMatch(row, /\{place\}/);
+    assert.doesNotMatch(row, /<th/);
   });
 
   it("uses FilterTabs for List and Work, with Today Week under Work", () => {
@@ -116,8 +119,9 @@ describe("inbox outside and inside anatomy", () => {
     const editorHold = read("dashboard/src/components/InboxHoldEditor.tsx");
     const back = read("dashboard/src/components/ui/DeskBack.tsx");
     const contact = read("dashboard/src/app/(desk)/contacts/[id]/page.tsx");
-    assert.match(jobActions, /wide \? `\$\{btnPrimary\} w-full` : btnDock/);
-    assert.match(holdActions, /wide \? `\$\{btnPrimary\} w-full` : btnDock/);
+    assert.match(jobActions, /wide \? `\$\{btnPrimary\} w-full` : btnListConfirm/);
+    assert.match(holdActions, /wide \? `\$\{btnPrimary\} w-full` : btnListConfirm/);
+    assert.match(jobActions, /wide \? `\$\{btnDone\} w-full` : btnListDone/);
     const fulfilled = holdActions.slice(
       holdActions.indexOf('{normalized === "fulfilled"'),
       holdActions.indexOf('{normalized === "cancelled"')

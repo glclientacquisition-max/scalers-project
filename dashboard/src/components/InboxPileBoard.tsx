@@ -1,18 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy } from "@/lib/inboxNiche";
 import type { InboxPurposeFilterId } from "@/lib/inboxPurpose";
-import {
-  InboxPhoneRow,
-  InboxTableRow,
-  inboxTableKind,
-} from "@/components/InboxItemRow";
-import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
+import { InboxPhoneRow } from "@/components/InboxItemRow";
+import { InboxArchivedPhoneRow } from "@/components/InboxArchivedRow";
 import type { InboxReturn } from "@/lib/inboxHref";
 import { InboxPileSwipe } from "@/components/InboxPileSwipe";
 import { useInboxPileNav } from "@/components/InboxPileNav";
@@ -170,7 +165,6 @@ export function InboxPileBoard({
   const q = (nav?.q ?? urlQ).trim();
   const counts = nav?.counts ?? urlCounts;
   const pileHrefs = nav?.hrefs ?? hrefs;
-  const copy = nicheCopy(vertical);
   const ret: InboxReturn = { ...inboxRet, purpose, page, q: q || undefined };
   const showArchivedEntry =
     purpose !== "archived" && counts.archived > 0 && page === 1;
@@ -215,94 +209,23 @@ export function InboxPileBoard({
               ids={pageRows.map((item) => item.id)}
               scopeKey={`${purpose}:${page}:${q}`}
             >
-              <ul className="mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
-                {showArchivedEntry ? (
-                  <InboxArchivedPhoneRow count={counts.archived} ret={ret} />
-                ) : null}
-                {pageRows.map((item) => (
-                  <InboxPhoneRow
-                    key={item.id}
-                    item={item}
-                    businessName={businessName}
-                    purpose={purpose}
-                    vertical={vertical}
-                    ret={ret}
-                  />
-                ))}
-              </ul>
-              <div className="mt-8 hidden lg:block">
-                <DeskDataTable minWidthClass="min-w-0">
-                  <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-                    <tr>
-                      {inboxTableKind(purpose) === "hold" ? (
-                        <>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            <span className="flex items-center gap-3">
-                              <InboxHeaderCheck />
-                              Item
-                            </span>
-                          </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            Who
-                          </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            Needed
-                          </th>
-                        </>
-                      ) : null}
-                      {inboxTableKind(purpose) === "job" ? (
-                        <>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            <span className="flex items-center gap-3">
-                              <InboxHeaderCheck />
-                              {copy.jobColumn}
-                            </span>
-                          </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            Who
-                          </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            Place
-                          </th>
-                        </>
-                      ) : null}
-                      {inboxTableKind(purpose) === "mixed" ? (
-                        <>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            <span className="flex items-center gap-3">
-                              <InboxHeaderCheck />
-                              Work
-                            </span>
-                          </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            Needed
-                          </th>
-                          <th scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]">
-                            When
-                          </th>
-                        </>
-                      ) : null}
-                      <th scope="col" className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-[0.14em]">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {showArchivedEntry ? (
-                      <InboxArchivedTableRow count={counts.archived} ret={ret} />
-                    ) : null}
-                    {pageRows.map((item) => (
-                      <InboxTableRow
-                        key={item.id}
-                        item={item}
-                        businessName={businessName}
-                        purpose={purpose}
-                        vertical={vertical}
-                        ret={ret}
-                      />
-                    ))}
-                  </tbody>
-                </DeskDataTable>
+              <div className="mt-4">
+                <InboxHeaderCheck />
+                <ul className="list-none divide-y divide-hairline">
+                  {showArchivedEntry ? (
+                    <InboxArchivedPhoneRow count={counts.archived} ret={ret} />
+                  ) : null}
+                  {pageRows.map((item) => (
+                    <InboxPhoneRow
+                      key={item.id}
+                      item={item}
+                      businessName={businessName}
+                      purpose={purpose}
+                      vertical={vertical}
+                      ret={ret}
+                    />
+                  ))}
+                </ul>
               </div>
             </DeskLandScope>
           </InboxPileSwipe>

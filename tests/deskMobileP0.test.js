@@ -16,11 +16,11 @@ describe("mobile P0", () => {
   const player = read("dashboard/src/components/CallAudioPlayer.tsx");
 
   it("keeps the caller name visible and the time off the Call button", () => {
-    assert.match(phone, /flex min-w-0 flex-col gap-0\.5 sm:flex-row/);
-    assert.match(phone, /min-w-0 sm:flex-1 text-sm tracking-tight/);
-    assert.match(phone, /overflow-hidden/);
-    assert.doesNotMatch(phone, /min-w-\[5\.5rem\] shrink-0/);
-    assert.match(phone, /<InboxTrailingAction item=\{item\} message=\{message\} \/>/);
+    assert.match(inbox, /function InboxListRow/);
+    assert.match(inbox, /<ListRow/);
+    assert.match(read("dashboard/src/components/ui/ListRow.tsx"), /min-w-0 flex-1 truncate/);
+    assert.doesNotMatch(inbox, /min-w-\[5\.5rem\] shrink-0/);
+    assert.match(inbox, /<InboxTrailingAction item=\{item\} message=\{message\} \/>/);
   });
 
   it("uses 16px desk fields on phone and leaves zoom on", () => {

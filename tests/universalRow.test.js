@@ -42,15 +42,11 @@ describe("universal row anatomy", () => {
   });
 
   it("applies the anatomy to Inbox phone and table rows", () => {
-    const who = inbox.match(/<InboxRowWho /g) || [];
-    assert.equal(who.length, 3, `InboxRowWho in 3 table kinds, got ${who.length}`);
-    const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
-    assert.match(phone, /<InboxRowAvatar/);
+    assert.match(inbox, /<ListRow/);
+    assert.match(inbox, /<InboxRowAvatar/);
     assert.match(avatar, /RowIdentity name=\{name\}/);
-    assert.match(inbox, /RowStateDot show=\{item\.unread\}/);
-    assert.match(inbox, /deskRowWeightClass\(item\.unread\)/);
+    assert.match(inbox, /unread=\{item\.unread \|\| item\.purpose === "live"\}/);
     assert.match(inbox, /deskPreviewClass/);
-    assert.match(inbox, /deskPreviewCellClass/);
     assert.doesNotMatch(inbox, /line-clamp-2/);
     assert.doesNotMatch(inbox, /item\.detail/);
   });
@@ -90,10 +86,10 @@ describe("inbox call action", () => {
   });
 
   it("sits left of the WhatsApp icon in the inbox trailing dock", () => {
-    assert.match(inbox, /import \{ CallLink \} from "@\/components\/CallLink"/);
-    const dock = inbox.indexOf("<CallLink number={item.callerPhone} />");
-    const wa = inbox.indexOf('variant="icon"');
-    assert.ok(dock > -1 && wa > -1 && dock < wa, "CallLink before WhatsApp icon");
+    assert.match(inbox, /import \{ telHref \} from "@\/components\/CallLink"/);
+    const dock = inbox.indexOf("<IconButtonAnchor");
+    const wa = inbox.indexOf('tone="whatsapp"');
+    assert.ok(dock > -1 && wa > -1 && dock < wa, "Call circle before WhatsApp circle");
     assert.match(master, /`CallLink`/);
     assert.match(master, /Inbox Action dock/);
     assert.match(inbox, /Visit requested → Confirm\. Confirmed visit → Done\. Hold → Done/);
@@ -105,8 +101,8 @@ describe("inbox call action", () => {
     assert.ok(recipeAt > -1 && confirmAt > recipeAt && holdAt > confirmAt && phoneAt > holdAt);
     assert.doesNotMatch(inbox.slice(actionFn, actionFn + 1600), /Send SMS|mailto:/);
     assert.match(inbox, /flex shrink-0 items-center justify-end gap-2/);
-    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnDock/);
-    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnDock/);
+    assert.match(read("dashboard/src/components/InboxJobActions.tsx"), /btnListConfirm/);
+    assert.match(read("dashboard/src/components/RequestStatusToggle.tsx"), /btnListConfirm/);
     assert.match(call, /DeskHint label="Call"/);
     assert.match(read("dashboard/src/components/WhatsAppLink.tsx"), /DeskHint label="WhatsApp"/);
   });

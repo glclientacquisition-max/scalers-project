@@ -26,7 +26,7 @@ export const btnPrimary = [
   focusRingVisible,
 ].join(" ");
 
-/** One Action-dock hit. Confirm, Done, Call, and WhatsApp share this box. */
+/** Icon hit. Call and WhatsApp on a row use a 44px `IconButton` circle, not this square. */
 export const deskHitClass =
   "box-border inline-flex h-12 w-12 min-h-12 min-w-12 max-h-12 max-w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl p-0";
 
@@ -46,6 +46,24 @@ export const btnDoneFill =
 
 export const btnDone = [
   "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm",
+  btnDoneFill,
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
+/** Labeled Confirm on a list row. Full word, 44px tall. Not an 11px square. */
+export const btnListConfirm = [
+  "inline-flex h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold",
+  btnPrimaryFill,
+  deskShiftClass,
+  "active:scale-[0.99] motion-reduce:active:scale-100",
+  focusRingVisible,
+].join(" ");
+
+/** Labeled Done on a list row. Full word, 44px tall. Not an 11px square. */
+export const btnListDone = [
+  "inline-flex h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold",
   btnDoneFill,
   deskShiftClass,
   "active:scale-[0.99] motion-reduce:active:scale-100",

@@ -10,6 +10,7 @@ import { cx } from "@/lib/cx";
 export function ListRow({
   href,
   onOpen,
+  aside,
   leading,
   title,
   preview,
@@ -17,12 +18,16 @@ export function ListRow({
   stamp,
   actions,
   unread = false,
+  selected = false,
   className,
   ariaLabel,
+  as = "li",
 }: {
   href?: string;
   onOpen?: () => void;
-  /** Avatar or icon. */
+  /** Checkbox or other hit that must not sit inside the row link. */
+  aside?: ReactNode;
+  /** Avatar or icon. Inside the row link. */
   leading?: ReactNode;
   title: ReactNode;
   preview?: ReactNode;
@@ -30,14 +35,18 @@ export function ListRow({
   when?: ReactNode;
   /** A `Stamp`. Right of the preview. */
   stamp?: ReactNode;
-  /** `IconButton`s or a `Button size="sm"`. Not inside the link. */
+  /** `IconButton`s or a `Button`. Not inside the link. */
   actions?: ReactNode;
   unread?: boolean;
+  selected?: boolean;
   className?: string;
   ariaLabel?: string;
+  /** `div` when a parent already owns the list item (long-press shell). */
+  as?: "li" | "div";
 }) {
   const bodyClass =
-    "flex min-w-0 flex-1 items-center gap-3 py-3 ps-4 pe-2 text-start outline-none transition-colors duration-fast ease-out focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
+    "flex min-w-0 flex-1 items-center gap-3 py-3 pe-2 text-start outline-none transition-colors duration-fast ease-out focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand " +
+    (aside ? "ps-2" : "ps-4");
   const content = (
     <>
       {leading ? <span className="shrink-0">{leading}</span> : null}
@@ -68,13 +77,16 @@ export function ListRow({
     </>
   );
 
+  const Tag = as;
   return (
-    <li
+    <Tag
       className={cx(
-        "flex items-stretch bg-surface transition-colors duration-fast ease-out hover:bg-surface-2/60 has-[a:active]:bg-surface-2 has-[button:active]:bg-surface-2",
+        "flex min-w-0 items-stretch transition-colors duration-fast ease-out hover:bg-surface-2/60 has-[a:active]:bg-surface-2 has-[button:active]:bg-surface-2",
+        selected ? "bg-accent-tonal" : "bg-surface",
         className,
       )}
     >
+      {aside ? <div className="flex shrink-0 items-center gap-1 ps-3">{aside}</div> : null}
       {href ? (
         <Link href={href} aria-label={ariaLabel} className={bodyClass}>
           {content}
@@ -87,6 +99,6 @@ export function ListRow({
         <div className={bodyClass}>{content}</div>
       )}
       {actions ? <div className="flex shrink-0 items-center gap-1 pe-3">{actions}</div> : null}
-    </li>
+    </Tag>
   );
 }

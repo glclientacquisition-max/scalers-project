@@ -20,8 +20,10 @@ describe("desk resilience and anti-slop", () => {
     assert.match(globalError, /Could not load Scalers/);
     assert.match(globalError, /Try again/);
     assert.doesNotMatch(globalError, /error\.message|stack/);
-    assert.match(loading, /pendingSpinnerInkClass/);
-    assert.doesNotMatch(loading, /skeleton|KES|85 to return/);
+    assert.match(loading, /Skeleton/);
+    assert.match(loading, /SkeletonRow/);
+    assert.doesNotMatch(loading, /pendingSpinnerInkClass/);
+    assert.doesNotMatch(loading, /KES|85 to return/);
     assert.match(notFound, /Page not found/);
     assert.match(notFound, /href="\/home"/);
     assert.match(crash, /Try again/);

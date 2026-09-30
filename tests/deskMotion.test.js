@@ -160,7 +160,7 @@ describe("desk motion wiring", () => {
     assert.match(board, /<DeskLandScope/);
     assert.match(board, /scopeKey=\{`\$\{purpose\}:\$\{page\}:\$\{q\}`\}/);
     assert.match(inbox, /item\.purpose === "live"/);
-    assert.match(inbox, /RowStateDot show=\{item\.unread\} live=/);
+    assert.match(inbox, /tone=\{item\.purpose === "live" \? "live" : inboxStampTone/);
     const swipe = read("dashboard/src/components/InboxPileSwipe.tsx");
     assert.match(swipe, /deskShiftClass/);
     assert.doesNotMatch(swipe, /transition-all|framer-motion/);

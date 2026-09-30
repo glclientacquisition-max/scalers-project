@@ -125,8 +125,8 @@ describe("inbox archive folder and leave verbs", () => {
     const trailing = row.slice(row.indexOf("function InboxTrailingAction"), row.indexOf("export function InboxTableRow"));
     const verbs = read("dashboard/src/lib/inboxListVerbs.ts");
     assert.match(trailing, /inboxListDockRecipe\(item\)/);
-    assert.match(trailing, /CallLink/);
-    assert.match(trailing, /WhatsAppLink/);
+    assert.match(trailing, /IconButtonAnchor/);
+    assert.match(trailing, /tone="whatsapp"/);
     assert.match(verbs, /if \(itemIsArchived\(item\)\) \{\s*return item.callerPhone \? "call_wa" : "none"/);
     assert.match(trailing, /recipe === "confirm" \|\| recipe === "visit_done"/);
     assert.match(trailing, /recipe === "hold_done"/);
@@ -140,7 +140,7 @@ describe("inbox archive folder and leave verbs", () => {
     assert.match(folder, /h-11 w-11/);
     assert.match(folder, /min-h-12/);
     assert.match(folder, /tabular-nums/);
-    assert.match(folder, /label="Archived"/);
+    assert.match(folder, /ariaLabel="Archived"/);
     assert.match(board, /showArchivedEntry/);
     assert.match(nav, /inboxArchivedHref/);
     assert.match(nav, /page: opts.rpage/);

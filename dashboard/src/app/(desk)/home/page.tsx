@@ -4,7 +4,6 @@ import {
   callsHref,
   followUpWhatsAppMessage,
   formatCallWhenRelative,
-  nairobiDateLabel,
   nairobiDayStartIso,
 } from "@/lib/callsTriage";
 import { inboxRecordHref } from "@/lib/inboxHref";
@@ -33,7 +32,7 @@ import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
-import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
+import { ListRow } from "@/components/ui/ListRow";
 import { LivePing } from "@/components/ui/deskRow";
 import { isBetaBilling } from "@/lib/wallet";
 import { loadOwnerPackageMeter, remainingCount } from "@/lib/packageCatalog";
@@ -56,7 +55,6 @@ export default async function HomeOverviewPage() {
   const dayStart = nairobiDayStartIso();
   const isBeta = isBetaBilling(tenant.billing_enforcement);
   const business = tenant.business_name?.trim() || "your workspace";
-  const today = nairobiDateLabel();
 
   const readiness = assessMvpAnswerReadiness({
     businessName: tenant.business_name,
@@ -182,7 +180,7 @@ export default async function HomeOverviewPage() {
 
   return (
     <div className="w-full min-w-0">
-      <HomeOverviewHeader today={today} />
+      <HomeOverviewHeader />
 
       {inbox.partialError ? (
         <div className="mt-6">
@@ -250,116 +248,42 @@ export default async function HomeOverviewPage() {
           </ul>
 
           {nextReturn && (nextReturn.callerPhone || nextReturn.callId) ? (
-            <>
-            <section
-              id="next-return-phone"
-              aria-labelledby="next-return-heading-phone"
-              className="relative mt-3 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden"
-            >
-              <DeskRowHit
-                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
-                label="Conversation"
-              />
-              <div className="flex min-h-12 items-center gap-3 px-4 py-2">
-                <div className="min-w-0 flex-1">
-                  <h2
-                    id="next-return-heading-phone"
-                    className={`${deskRowMutedClass} text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft`}
-                  >
-                    Next to return
-                  </h2>
-                  <p className={`${deskRowMutedClass} mt-0.5 text-sm font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
-                    {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
-                    {nextReturnWhen ? (
-                      <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
+            <ul className="mt-3 list-none divide-y divide-hairline">
+              <ListRow
+                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : undefined}
+                ariaLabel="Conversation"
+                title={nextReturn.callerName || nextReturn.callerPhone || "Caller"}
+                preview={nextReturnReason || undefined}
+                when={nextReturnWhen}
+                actions={
+                  <>
+                    {nextReturn.callId ? (
+                      <Link
+                        href={inboxRecordHref(nextReturn.callId, { from: "home" })}
+                        className={[
+                          "inline-flex min-h-11 items-center px-1 text-sm font-semibold text-accent",
+                          focusRingVisible,
+                        ].join(" ")}
+                      >
+                        Conversation
+                      </Link>
                     ) : null}
-                  </p>
-                  {nextReturnReason ? (
-                    <p className={`${deskRowMutedClass} text-sm text-ink-soft ${deskPreviewClass}`}>
-                      {nextReturnReason}
-                    </p>
-                  ) : null}
-                </div>
-                <div className={`${deskRowActionClass} flex shrink-0 items-center gap-2`}>
-                  {nextReturn.callId ? (
-                    <Link
-                      href={inboxRecordHref(nextReturn.callId, { from: "home" })}
-                      className={[
-                        "inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC]",
-                        focusRingVisible,
-                      ].join(" ")}
-                    >
-                      Conversation
-                    </Link>
-                  ) : null}
-                  {nextReturn.callerPhone ? (
-                    <WhatsAppLink
-                      number={nextReturn.callerPhone}
-                      message={followUpWhatsAppMessage({
-                        businessName: business,
-                        name: nextReturn.callerName,
-                        reason: nextReturnReason,
-                      })}
-                      variant="icon"
-                      callId={nextReturn.callId}
-                    />
-                  ) : null}
-                </div>
-              </div>
-            </section>
-            <section
-              aria-labelledby="next-return-heading"
-              className="relative mt-6 hidden rounded-2xl border border-line bg-surface p-4 lg:block"
-            >
-              <DeskRowHit
-                href={nextReturn.callId ? inboxRecordHref(nextReturn.callId, { from: "home" }) : null}
-                label="Conversation"
+                    {nextReturn.callerPhone ? (
+                      <WhatsAppLink
+                        number={nextReturn.callerPhone}
+                        message={followUpWhatsAppMessage({
+                          businessName: business,
+                          name: nextReturn.callerName,
+                          reason: nextReturnReason,
+                        })}
+                        variant="icon"
+                        callId={nextReturn.callId}
+                      />
+                    ) : null}
+                  </>
+                }
               />
-              <h2
-                id="next-return-heading"
-                className={`${deskRowMutedClass} text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft`}
-              >
-                Next to return
-              </h2>
-              <p className={`${deskRowMutedClass} mt-2 text-sm font-semibold tracking-tight text-ink ${deskPreviewClass}`}>
-                {nextReturn.callerName || nextReturn.callerPhone || "Caller"}
-                {nextReturnWhen ? (
-                  <span className="font-normal text-ink-soft"> · {nextReturnWhen}</span>
-                ) : null}
-              </p>
-              {nextReturnReason ? (
-                <p className={`${deskRowMutedClass} mt-0.5 text-sm text-ink-soft ${deskPreviewClass}`}>
-                  {nextReturnReason}
-                </p>
-              ) : null}
-              <div className={`${deskRowActionClass} mt-3 flex flex-wrap items-center gap-2`}>
-                {nextReturn.callId ? (
-                  <Link
-                    href={inboxRecordHref(nextReturn.callId, { from: "home" })}
-                    className={[
-                      "inline-flex min-h-11 items-center text-sm font-semibold text-[#005CCC]",
-                      focusRingVisible,
-                    ].join(" ")}
-                  >
-                    Conversation
-                  </Link>
-                ) : null}
-                {nextReturn.callerPhone ? (
-                  <WhatsAppLink
-                    number={nextReturn.callerPhone}
-                    message={followUpWhatsAppMessage({
-                      businessName: business,
-                      name: nextReturn.callerName,
-                      reason: nextReturnReason,
-                    })}
-                    variant="ghost"
-                    label="Reply on WhatsApp"
-                    callId={nextReturn.callId}
-                  />
-                ) : null}
-              </div>
-            </section>
-            </>
+            </ul>
           ) : null}
         </section>
         </div>

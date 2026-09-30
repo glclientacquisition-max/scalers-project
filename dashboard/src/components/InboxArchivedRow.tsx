@@ -1,5 +1,4 @@
-import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
-import { deskPreviewClass, deskShiftClass } from "@/components/ui/deskChrome";
+import { ListRow } from "@/components/ui/ListRow";
 import { inboxArchivedHref, type InboxReturn } from "@/lib/inboxHref";
 
 function ArchiveGlyph() {
@@ -35,27 +34,18 @@ export function InboxArchivedPhoneRow({
   ret?: InboxReturn;
 }) {
   return (
-    <li
-      className={[
-        "relative flex min-h-12 min-w-0 items-center gap-3 border-t border-line/70 px-4 py-3 first:border-t-0",
-        deskShiftClass,
-        "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
-      ].join(" ")}
-    >
-      <DeskRowHit href={inboxArchivedHref(ret)} label="Archived" />
-      <div className={deskRowMutedClass}>
-        <ArchiveMark />
-      </div>
-      <div className={`${deskRowMutedClass} min-w-0 flex-1`}>
-        <div className="flex items-baseline justify-between gap-3">
-          <p className={`text-sm font-medium tracking-tight ${deskPreviewClass}`}>Archived</p>
-          <p className="shrink-0 text-xs tabular-nums text-ink-soft">{count}</p>
-        </div>
-      </div>
-    </li>
+    <ListRow
+      href={inboxArchivedHref(ret)}
+      ariaLabel="Archived"
+      className="min-h-12"
+      leading={<ArchiveMark />}
+      title="Archived"
+      when={<span className="tabular-nums">{count}</span>}
+    />
   );
 }
 
+/** Same archived row. The pile no longer has a separate table. */
 export function InboxArchivedTableRow({
   count,
   ret,
@@ -63,26 +53,5 @@ export function InboxArchivedTableRow({
   count: number;
   ret?: InboxReturn;
 }) {
-  return (
-    <tr
-      className={[
-        "relative border-t border-line/70",
-        deskShiftClass,
-        "hover:bg-accent/[0.04] active:bg-accent/[0.07]",
-      ].join(" ")}
-    >
-      <td colSpan={4} className="relative min-h-12 px-3 py-2">
-        <DeskRowHit href={inboxArchivedHref(ret)} label="Archived" />
-        <div className="flex items-center gap-3">
-          <div className={deskRowMutedClass}>
-            <ArchiveMark />
-          </div>
-          <p className={`${deskRowMutedClass} min-w-0 text-sm font-medium tracking-tight ${deskPreviewClass}`}>
-            Archived
-          </p>
-          <p className={`${deskRowMutedClass} ml-auto shrink-0 text-sm tabular-nums text-ink-soft`}>{count}</p>
-        </div>
-      </td>
-    </tr>
-  );
+  return <InboxArchivedPhoneRow count={count} ret={ret} />;
 }

@@ -178,8 +178,9 @@ describe("Needs you whose-turn next-step", () => {
   it("mounts the line under the preview, not as a second dock verb", () => {
     const row = read("dashboard/src/components/InboxItemRow.tsx");
     assert.match(row, /inboxNeedsYouNextStep\(item, vertical\)/);
-    assert.match(row, /function InboxNextStep/);
-    assert.match(row, /text-xs text-ink-soft/);
+    assert.match(row, /const glance = nextStep \|\| stamp/);
+    assert.match(row, /\{glance\}/);
+    assert.doesNotMatch(row, /function InboxNextStep/);
     const trailing = row.slice(
       row.indexOf("function InboxTrailingAction"),
       row.indexOf("export function InboxTableRow")

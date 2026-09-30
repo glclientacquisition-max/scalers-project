@@ -34,7 +34,7 @@ describe("desk preview truncate", () => {
 
   it("clamps Inbox Work to one line and drops mixed detail", () => {
     assert.match(inbox, /deskPreviewClass/);
-    assert.match(inbox, /deskPreviewCellClass/);
+    assert.doesNotMatch(inbox, /deskPreviewCellClass/);
     assert.doesNotMatch(inbox, /line-clamp-2/);
     assert.doesNotMatch(inbox, /item\.detail/);
     assert.doesNotMatch(inbox, /overflow-wrap:anywhere/);

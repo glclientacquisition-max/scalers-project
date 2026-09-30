@@ -25,10 +25,10 @@ describe("desk density P1", () => {
   const table = read("dashboard/src/components/InboxItemRow.tsx");
 
   it("drops the Home business h1", () => {
-    assert.match(header, /BrandLockup/);
+    assert.doesNotMatch(header, /BrandLockup/);
     assert.doesNotMatch(header, /<h1/);
     assert.doesNotMatch(header, /\{business\}/);
-    assert.match(home, /<HomeOverviewHeader today=\{today\} \/>/);
+    assert.match(home, /<HomeOverviewHeader \/>/);
   });
 
   it("keeps Return calls on the Work queue and skips the twin aside CTA", () => {
@@ -107,9 +107,10 @@ describe("desk density P1", () => {
   });
 
   it("tightens desktop inbox and contacts cells without touching the phone row", () => {
-    assert.match(table, /px-3 py-2 align-top/);
-    assert.match(table, /px-4 py-3 first:border-t-0/);
+    assert.match(table, /<ListRow/);
+    assert.match(table, /deskPreviewClass/);
     assert.doesNotMatch(table, /px-5 py-4/);
+    assert.doesNotMatch(table, /DeskDataTable/);
     assert.match(contactRow, /lg:px-3 lg:py-2/);
     assert.doesNotMatch(contactRow, /lg:px-5 lg:py-5/);
   });
