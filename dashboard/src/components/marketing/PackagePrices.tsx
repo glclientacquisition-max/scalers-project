@@ -2,19 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { PublicPackageBoard } from "@/lib/packageCatalog";
+import type { PublicPackageBoard, PublicPackageOffer } from "@/lib/packageCatalog";
+import { formatKes, packagePriceLabel } from "@/lib/packagePriceLabel";
 
-function formatKes(amount: number): string {
-  return amount.toLocaleString("en-KE", { maximumFractionDigits: 2 });
-}
-
-function priceLabel(amount: number): string {
-  if (!(amount > 0)) return "Not set";
-  return `KES ${formatKes(amount)}`;
-}
-
-const ROWS: Array<{ label: string; key: "minutes" | "sms" | "email" | "staffWa" | "seats" | "dids" }> = [
-  { label: "Minutes", key: "minutes" },
+const INCLUDED: Array<{ label: string; key: "sms" | "email" | "staffWa" | "seats" | "dids" }> = [
   { label: "SMS", key: "sms" },
   { label: "Email", key: "email" },
   { label: "WhatsApp", key: "staffWa" },
@@ -22,9 +13,43 @@ const ROWS: Array<{ label: string; key: "minutes" | "sms" | "email" | "staffWa" 
   { label: "Number", key: "dids" },
 ];
 
+function PlanCard({
+  pack,
+  period,
+  anchor,
+}: {
+  pack: PublicPackageOffer;
+  period: "month" | "year";
+  anchor: boolean;
+}) {
+  const price = period === "year" ? pack.annualPriceKes : pack.monthlyPriceKes;
+  return (
+    <article
+      className={`flex flex-col rounded-2xl border bg-surface p-5 ${anchor ? "border-accent" : "border-line"}`}
+    >
+      <h3 className="font-display text-title text-ink">{pack.name}</h3>
+      <p className="mt-4 font-display text-display tabular-nums text-ink">{packagePriceLabel(price)}</p>
+      <p className="mt-1 text-meta text-ink-soft">{period === "month" ? "Per month" : "Per year"}</p>
+      <p className="mt-5 font-display text-title tabular-nums text-ink">
+        {pack.minutes.toLocaleString("en-KE")}
+        <span className="ml-1 text-meta font-normal text-ink-soft">min</span>
+      </p>
+      <dl className="mt-4 border-t border-line">
+        {INCLUDED.map((row) => (
+          <div key={row.key} className="flex items-baseline justify-between gap-3 border-b border-line py-2">
+            <dt className="text-meta text-ink-soft">{row.label}</dt>
+            <dd className="text-body tabular-nums text-ink">{pack[row.key].toLocaleString("en-KE")}</dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  );
+}
+
 export function PackagePrices({ board }: { board: PublicPackageBoard }) {
   const [period, setPeriod] = useState<"month" | "year">("month");
   const packs = board.packages;
+  const anchorSku = packs.length === 3 ? "growth" : "";
 
   return (
     <div>
@@ -50,51 +75,13 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
         </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[20rem] text-left text-sm">
-          <caption className="sr-only">
-            {period === "month" ? "Monthly package prices and included amounts" : "Yearly package prices and included amounts"}
-          </caption>
-          <thead>
-            <tr className="border-b border-line text-ink">
-              <th scope="col" className="py-3 pr-3 font-medium">
-                {period === "month" ? "Per month" : "Per year"}
-              </th>
-              {packs.map((pack) => (
-                <th key={pack.sku} scope="col" className="px-2 py-3 text-right font-display text-base font-medium">
-                  {pack.name}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-line">
-              <th scope="row" className="py-3 pr-3 font-medium text-ink">
-                Price
-              </th>
-              {packs.map((pack) => (
-                <td key={pack.sku} className="px-2 py-3 text-right text-base font-medium tabular-nums text-ink">
-                  {priceLabel(period === "year" ? pack.annualPriceKes : pack.monthlyPriceKes)}
-                </td>
-              ))}
-            </tr>
-            {ROWS.map((row) => (
-              <tr key={row.key} className="border-b border-line">
-                <th scope="row" className="py-3 pr-3 font-normal text-ink-soft">
-                  {row.label}
-                </th>
-                {packs.map((pack) => (
-                  <td key={pack.sku} className="px-2 py-3 text-right tabular-nums text-ink">
-                    {pack[row.key].toLocaleString("en-KE")}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {packs.map((pack) => (
+          <PlanCard key={pack.sku} pack={pack} period={period} anchor={pack.sku === anchorSku} />
+        ))}
       </div>
 
-      <p className="mt-4 max-w-xl text-sm leading-relaxed text-ink-soft">
+      <p className="mt-6 max-w-xl text-sm leading-relaxed text-ink-soft">
         On-demand, past included: calls KES {formatKes(board.inboundKesPerMinute)}/min in, KES{" "}
         {formatKes(board.outboundKesPerMinute)}/min out. SMS KES {formatKes(board.smsKes)}. Email KES{" "}
         {formatKes(board.emailKes)}. WhatsApp KES {formatKes(board.whatsappKes)}.

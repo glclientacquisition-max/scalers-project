@@ -57,9 +57,45 @@ describe("package usage meter", () => {
     assert.match(catalog, /annualPriceKes\(monthlyPriceKes, rates\.annualDiscountPercent\)/);
     assert.match(home, /loadPublicPackageOffers/);
     assert.match(landing, /id="packages"/);
-    assert.match(prices, /Not set/);
+    assert.match(prices, /packagePriceLabel/);
     assert.match(prices, /past included/);
+    assert.match(prices, /Per month/);
+    assert.match(prices, /Per year/);
     assert.doesNotMatch(prices, /Most popular/);
+    const label = read("dashboard/src/lib/packagePriceLabel.ts");
+    assert.match(label, /if \(!\(amount > 0\)\) return "Not set"/);
+  });
+
+  it("labels a zero package price as Not set and keeps the assigned period", async () => {
+    const { packagePriceLabel, assignmentFromBusiness } = await import(
+      "../dashboard/src/lib/packagePriceLabel.ts"
+    );
+    assert.equal(packagePriceLabel(0), "Not set");
+    assert.equal(packagePriceLabel(-4), "Not set");
+    assert.match(packagePriceLabel(1500), /^KES /);
+    assert.deepEqual(assignmentFromBusiness({ packageId: "pkg-growth", period: "year" }), {
+      packageId: "pkg-growth",
+      period: "year",
+    });
+    assert.deepEqual(assignmentFromBusiness({ packageId: "", period: "week" }), {
+      packageId: null,
+      period: null,
+    });
+    assert.deepEqual(assignmentFromBusiness(null), { packageId: null, period: null });
+  });
+
+  it("previews landing prices and follows the selected business on Admin", () => {
+    const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
+    assert.match(panel, /packagePriceLabel/);
+    assert.match(panel, />Landing</);
+    assert.match(panel, /Per year/);
+    assert.match(panel, /live on landing/);
+    assert.match(panel, /Now \$\{selected\.packageName/);
+    assert.match(panel, /Now none/);
+    assert.match(panel, /assignmentFromBusiness/);
+    assert.match(panel, /action: "save_package"/);
+    assert.match(panel, /action: "assign"/);
+    assert.doesNotMatch(panel, /Most popular/);
   });
 
   it("opts into on-demand after included buckets hit zero", () => {
