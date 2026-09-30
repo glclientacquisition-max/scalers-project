@@ -66,7 +66,7 @@ Then apply `docs/supabase/package_entitlements.sql` (reserved email + seat inclu
 |---|---|
 | Prepaid balance | Paid wallet money used first for call + line charges |
 | Automatic live alerts | WhatsApp/email when balance drops under `wallet_low_balance_kes` (default 200) and again at ≤ 0. No owner soft-limit setup required. |
-| On-demand usage (opt-in) | Default **off**. When prepaid ≤ 0 and on-demand off → further call charges pause until top-up. When on → keep charging (overdraft). Same toggle: included SMS stops at cap unless on. |
+| On-demand usage (opt-in) | Default **off**. Package included minutes and SMS are not a wallet debit. Past the cap with on-demand off: the next inbound call is rejected, tenant SMS stops, no usage debit. Past the cap with on-demand on: answer and debit the rate card once `package_minute_consume.sql` is applied. Until that RPC exists, `charge_call_to_wallet` still runs and pauses only when the prepaid balance is already 0. |
 | Soft inbound block | Separate hard-enforcement step (not this migration) |
 
 Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit. The same toggle covers included SMS (`sms_allowance.sql`).
@@ -80,10 +80,10 @@ Staff SMS and caller SMS share one tenant bucket. Wallet, line-outage, and speec
 | Included SMS | Default **200** segments (`tenants.sms_included_units`). Packages later replace this number. |
 | Meter | `sms_used_units` increments via `consume_sms_units` before each tenant SMS. Ledger `notify_sends.overage` is true when the send is past included. |
 | Stop at cap | Paid + on-demand **off**: skip tenant SMS. Staff WhatsApp / email / desk note still try. Escalate still saves. |
-| On-demand | Same Wallet toggle as prepaid minutes. Tenant SMS continues past included. |
-| Beta (`billing_enforcement = off`) | Meter only. Never block. |
+| On-demand | Same Wallet toggle as minutes. Tenant SMS continues past included and debits `sms_kes` after `package_minute_consume.sql`. |
+| Beta (`billing_enforcement = off`) | Meter only. Never block. Never debit. |
 
-No KES debit for SMS yet. Missing RPC fails open so staging still sends until the SQL is applied.
+Missing `consume_sms_units` fails open so staging still sends until the SQL is applied. On-demand off never debits SMS.
 
 Package buckets (email, seats, later SKUs): [`PACKAGES.md`](./PACKAGES.md). Columns reserved in `package_entitlements.sql`. Do not gate email or invites yet.
 

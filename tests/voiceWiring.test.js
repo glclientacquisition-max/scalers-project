@@ -615,6 +615,12 @@ assert.match(
 );
 
 assert.match(
+  source,
+  /package exhausted — reject/,
+  'a used-up package with on-demand off must not open the media stream'
+);
+
+assert.match(
   dbSource,
   /unassigned_did/,
   'tenant lookup must not fall through to another business'

@@ -7,6 +7,7 @@ import {
   outboundKesPerMinute,
   remainingCount,
 } from "@/lib/packageCatalog";
+import { usageCapNotice } from "@/lib/usageCap";
 import { OnDemandUsagePanel } from "@/components/OnDemandUsagePanel";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -19,6 +20,7 @@ export const instant = false;
 
 function kindLabel(kind: string): string {
   if (kind === "call_charge") return "Call";
+  if (kind === "sms_charge") return "SMS";
   if (kind === "line_rental") return "Line fee";
   if (kind === "admin_adjustment") return "Adjustment";
   if (kind === "topup") return "Top-up";
@@ -70,11 +72,18 @@ export default async function WalletPage({
   const waLeft = remainingCount(pack.waIncluded, pack.waUsed);
   const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
   const outboundMin = outboundKesPerMinute(pack.rates.outboundKesPerSecond);
-  const exhausted =
-    (pack.minutesIncluded > 0 && minutesLeft <= 0) ||
-    (pack.smsIncluded > 0 && smsLeft <= 0) ||
-    (pack.emailIncluded > 0 && emailLeft <= 0) ||
-    (pack.waIncluded > 0 && waLeft <= 0);
+  const capNotice = usageCapNotice({
+    isBeta: usage.isBeta,
+    onDemand: Boolean(tenant.on_demand_usage_enabled),
+    minutesIncluded: pack.minutesIncluded,
+    minutesLeft,
+    smsIncluded: pack.smsIncluded,
+    smsLeft,
+    emailIncluded: pack.emailIncluded,
+    emailLeft,
+    waIncluded: pack.waIncluded,
+    waLeft,
+  });
 
   const safePage = clampListPage(page, usage.ledgerTotal, DEFAULT_PAGE_SIZE);
   if (safePage !== page) {
@@ -96,9 +105,9 @@ export default async function WalletPage({
         ) : null}
       </header>
 
-      {exhausted && !tenant.on_demand_usage_enabled && !usage.isBeta ? (
+      {capNotice ? (
         <p className="mt-4 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-warn">
-          Included units used. Enable on-demand or switch package.
+          {capNotice}
         </p>
       ) : null}
 

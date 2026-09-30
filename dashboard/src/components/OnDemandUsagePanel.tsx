@@ -50,7 +50,7 @@ export function OnDemandUsagePanel({
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span className="text-ink">
-            Continue after included minutes, SMS, email, or WhatsApp hit zero
+            Charge the wallet for minutes and SMS past included
           </span>
         </label>
 

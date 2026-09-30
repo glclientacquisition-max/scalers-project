@@ -2,7 +2,7 @@
 
 **Destination:** Owners buy a monthly or annual package with included buckets. Exhausted buckets continue only if on-demand is on, or the owner upgrades. Super Admin owns the catalog at `/admin/packages` after the existing username + access code login.  
 **Lane:** Ops & Billing (numbers, Admin). Platform (SQL/RPC). Desk (Usage). Voice (consume minutes on hangup, later).  
-**Status:** Control plane shipping. Owner Usage and Home read remaining buckets. Voice consume and prepaid strip are later.  
+**Status:** Control plane shipping. Owner Usage and Home read remaining buckets. Hangup consume is `package_minute_consume.sql` (apply before it meters). Prepaid env-rate charge remains only until that RPC exists.  
 **Companion:** [`../../PACKAGES.md`](../../PACKAGES.md), [`../../supabase/package_catalog.sql`](../../supabase/package_catalog.sql)
 
 ## Decisions so far
@@ -13,7 +13,7 @@
 - One minute pool. Inbound and live-transfer share included minutes.
 - Seats are a hard cap. Never on-demand.
 - One on-demand toggle for minutes, SMS, email, staff WA.
-- Minutes exhaust + on-demand off: the caller still gets an answer. We meter. We do not debit.
+- Minutes exhaust + on-demand off: the next call is rejected. A call already connected can finish. We meter that call. We do not debit.
 - SMS exhaust may fall through to WhatsApp, then email, until that bucket is gone.
 - Beta stays `billing_enforcement = off` until a Free SKU exists. Assigning a package does not leave beta. Wallets Plan still does that.
 - Ops assigns SKUs from Super Admin. Owner checkout is later.
@@ -32,7 +32,7 @@
 
 - Founder monthly prices (type them in the panel; seed is 0).
 - Mid-period upgrade money.
-- `consume_minutes` / `consume_email_units` / WhatsApp consume on the voice path.
+- `consume_email_units` / WhatsApp consume. Minutes are `consume_call_seconds`.
 - When to drop prepaid columns.
 
 ## Out of scope
@@ -41,7 +41,6 @@
 - Per-tenant WABA.
 - Marketing WhatsApp templates.
 - Extra DIDs as a v1 add-on.
-- Hard inbound reject when minutes are empty.
 
 ## Straw included defaults (editable in Super Admin)
 
@@ -59,7 +58,7 @@ Ops applies [`package_catalog.sql`](../../supabase/package_catalog.sql) on stagi
 
 ### task / Wire consume on hangup
 
-Replace `charge_call_to_wallet` as the owner meter with per-second consume. Later PR.
+`consume_call_seconds` meters the shared pool and debits on-demand overage only. Apply `package_minute_consume.sql`. Until that RPC exists, hangup still uses `charge_call_to_wallet`.
 
 ### task / Usage page reads package remaining
 

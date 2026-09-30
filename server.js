@@ -1155,6 +1155,21 @@ async function handleVoiceIncoming(req, res) {
     const preTerminal = detectCallTermination(req.body, callSessionState).terminal;
 
     try {
+      const gate = await db.packageInboundOpen({ toNumber, fromNumber });
+      if (gate && gate.open === false) {
+        console.warn(`[${callSid}] package exhausted — reject`);
+        return res
+          .type('text/xml')
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+      }
+    } catch (gateErr) {
+      console.warn(
+        '[voice/incoming] package gate failed (answering):',
+        gateErr?.message || gateErr
+      );
+    }
+
+    try {
       await db.upsertCall({
         callSid,
         fromNumber: fromNumber || 'unknown',
