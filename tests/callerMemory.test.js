@@ -660,4 +660,135 @@ describe('returning-caller card', () => {
     assert.match(asAmina.nextAppointment, /carpet cleaning/);
     assert.equal(asAmina.standing, 'Usually carpet.');
   });
+
+  it('does not offer a long-past booking as tomorrow', () => {
+    const now = new Date('2026-09-30T08:00:00.000Z');
+    const card = buildCallerMemoryCard({
+      now,
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        last_reason: 'visit, carpet cleaning, tomorrow morning, Rongai',
+        metadata: {},
+      },
+      nextAppointment: {
+        id: 'old-visit',
+        service_name: 'carpet cleaning',
+        when_text: 'tomorrow morning',
+        status: 'requested',
+        address_landmark: 'Rongai',
+        created_at: '2026-06-01T06:00:00.000Z',
+      },
+    });
+    assert.equal(card.nextAppointment, null);
+    assert.equal(card.nextVisitWhen, null);
+    assert.match(card.recentBookings[0], /past/i);
+    assert.doesNotMatch(card.recentBookings.join(' '), /\b(tomorrow|today|kesho|leo)\b/i);
+    assert.doesNotMatch(card.lastReason, /\b(tomorrow|today|kesho|leo)\b/i);
+    assert.match(card.lastReason, /past/i);
+    const block = formatReturningCallerForPrompt(bindCallerMemoryCard(card, 'Jane'));
+    assert.doesNotMatch(block, /Open: visit/);
+    assert.doesNotMatch(block, /\b(tomorrow|today|kesho|leo)\b/i);
+    assert.match(block, /History:/);
+    assert.match(block, /past/i);
+    const state = createBrainState({ callerMemory: bindCallerMemoryCard(card, 'Jane') });
+    assert.equal(state.returning.nextVisit, null);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /open visit/i);
+    assert.doesNotMatch(formatBrainStateForPrompt(state), /\btomorrow\b/i);
+  });
+
+  it('calls a visit today when it was saved as tomorrow and the window is today', () => {
+    const now = new Date('2026-09-30T05:00:00.000Z');
+    const card = buildCallerMemoryCard({
+      now,
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        last_reason: 'visit tomorrow at 10 AM',
+        metadata: {},
+      },
+      nextAppointment: {
+        service_name: 'carpet cleaning',
+        when_text: 'tomorrow at 10 AM',
+        status: 'confirmed',
+        window_start: '2026-09-30T07:00:00.000Z',
+      },
+    });
+    assert.match(card.nextAppointment, /today at 10 AM/);
+    assert.doesNotMatch(card.nextAppointment, /tomorrow/);
+    assert.match(card.lastReason, /today at 10 AM/);
+    assert.doesNotMatch(card.lastReason, /tomorrow/);
+  });
+
+  it('keeps tomorrow when the window is actually tomorrow', () => {
+    const now = new Date('2026-09-30T05:00:00.000Z');
+    const card = buildCallerMemoryCard({
+      now,
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        metadata: {},
+      },
+      nextAppointment: {
+        service_name: 'carpet cleaning',
+        when_text: 'tomorrow at 10 AM',
+        status: 'requested',
+        window_start: '2026-10-01T07:00:00.000Z',
+      },
+    });
+    assert.match(card.nextAppointment, /tomorrow at 10 AM/);
+  });
+
+  it('prefers a later upcoming visit over a newer booking whose date has passed', () => {
+    const now = new Date('2026-09-30T08:00:00.000Z');
+    const card = buildCallerMemoryCard({
+      now,
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        metadata: {},
+      },
+      nextAppointment: {
+        id: 'stale',
+        service_name: 'carpet cleaning',
+        when_text: 'tomorrow morning',
+        status: 'requested',
+        created_at: '2026-06-02T06:00:00.000Z',
+      },
+      recentAppointments: [
+        {
+          id: 'ahead',
+          service_name: 'sofa cleaning',
+          when_text: 'Friday at 2 PM',
+          status: 'confirmed',
+          window_start: '2026-10-02T11:00:00.000Z',
+        },
+      ],
+    });
+    assert.match(card.nextAppointment, /sofa cleaning/);
+    assert.doesNotMatch(card.nextAppointment, /tomorrow/);
+    assert.match(card.recentBookings.join(' '), /past/i);
+    assert.doesNotMatch(card.recentBookings.join(' '), /\btomorrow\b/i);
+  });
+
+  it('drops a hold whose relative day is already past', () => {
+    const now = new Date('2026-09-30T08:00:00.000Z');
+    const card = buildCallerMemoryCard({
+      now,
+      contact: {
+        phone: '+254700000001',
+        name: 'Jane',
+        metadata: {},
+      },
+      openRequests: [
+        {
+          request_type: 'hold',
+          item: 'Atomic Habits',
+          when_text: 'tomorrow',
+          created_at: '2026-06-01T06:00:00.000Z',
+        },
+      ],
+    });
+    assert.equal(card.openRequests.length, 0);
+  });
 });
