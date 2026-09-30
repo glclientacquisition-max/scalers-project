@@ -51,21 +51,17 @@ describe("desk preview truncate", () => {
     assert.doesNotMatch(home, /overflow-wrap:anywhere/);
   });
 
-  it("clamps Contacts phone rows to name plus one preview", () => {
-    const contacts = read("dashboard/src/app/(desk)/contacts/page.tsx");
+  it("clamps Contacts rows to name plus one preview at every width", () => {
+    const list = read("dashboard/src/components/ContactsEndlessList.tsx");
     const phone = read("dashboard/src/components/ContactListRow.tsx");
-    const phoneRow = phone.slice(
-      phone.indexOf("export function ContactPhoneRow"),
-      phone.indexOf("export function ContactTableRow")
-    );
-    assert.match(contacts, /md:hidden/);
-    assert.match(phoneRow, /deskPreviewClass/);
-    assert.match(phoneRow, /contactListSubline/);
+    assert.doesNotMatch(list, /md:hidden|ContactTableRow|DeskDataTable/);
+    assert.match(phone, /deskPreviewClass/);
+    assert.match(phone, /contactListSubline/);
     assert.match(phone, /function lastCallStamp/);
     assert.match(phone, /formatCallWhenRelative/);
-    assert.doesNotMatch(phoneRow, /font-mono text-sm text-ink/);
-    assert.doesNotMatch(phoneRow, /line-clamp-2/);
-    assert.match(phoneRow, /<ContactListDock phone=\{row\.phone\} \/>/);
+    assert.doesNotMatch(phone, /font-mono text-sm text-ink/);
+    assert.doesNotMatch(phone, /line-clamp-2|break-words|overflow-wrap|whitespace-normal/);
+    assert.match(phone, /<ContactListDock phone=\{row\.phone\} \/>/);
     assert.match(phone, /<CallLink number=\{number\} \/>/);
   });
 

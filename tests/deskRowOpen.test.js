@@ -27,9 +27,10 @@ describe("desk rows open the record", () => {
     const list = read("dashboard/src/components/ContactListRow.tsx");
     assert.match(inbox, /InboxRowHit/);
     assert.match(list, /DeskRowHit/);
-    assert.match(contacts, /ContactPhoneRow/);
+    assert.match(read("dashboard/src/components/ContactsEndlessList.tsx"), /ContactPhoneRow/);
     assert.match(home, /DeskRowHit/);
-    assert.match(contact, /DeskRowHit/);
+    assert.match(contact, /<ContactHistory/);
+    assert.match(read("dashboard/src/components/ContactHistory.tsx"), /DeskRowHit/);
   });
 
   it("drops Open and Call list links", () => {

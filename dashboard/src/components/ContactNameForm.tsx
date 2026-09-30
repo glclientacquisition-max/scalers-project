@@ -82,7 +82,7 @@ export function ContactNameForm({
           type="button"
           data-contact-add-name=""
           onClick={() => setOpen(true)}
-          className={`text-sm font-medium text-[#005CCC] ${deskShiftClass} ${focusRingVisible} rounded-md px-1`}
+          className={`inline-flex min-h-11 items-center rounded-md px-1 text-sm font-medium text-accent focus:outline-none focus:ring-2 focus:ring-brand ${deskShiftClass}`}
         >
           + Add name
         </button>
