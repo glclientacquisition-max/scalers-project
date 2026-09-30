@@ -8,6 +8,7 @@ const {
 } = require('./businessAssistantIntro');
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
+const { prepareStreamedSpeech } = require('./callCorrectives');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
@@ -363,7 +364,10 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
 function polishSpokenReply(text, opts = {}) {
   return trimSpokenServiceDump(
     stripPrematureOutcomeClaims(
-      stripSpokenHedges(stripSpokenInstructionLeaks(text, { final: true }), opts),
+      stripSpokenHedges(
+        stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true }),
+        opts
+      ),
       opts
     ),
     opts

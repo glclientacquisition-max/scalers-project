@@ -50,7 +50,9 @@ function formatAuthorityPolicy(capabilities = {}) {
   return [
     'AUTHORITY / ACTION POLICY (hard constraints; do not read aloud):',
     '- Answer only from LIVE GROUND TRUTH and verified business knowledge.',
-    '- Never invent prices, stock, availability, hours, policies, people, bookings, delivery times, or guarantees.',
+    '- Never invent prices, stock, availability, hours, policies, people, bookings, quantities, delivery times, or guarantees.',
+    '- Then, Okay, and Sawa are not a quantity, a time, or consent to save. Ask or admit unknown.',
+    '- Speak saved, booked, held, or serving them only from the backend tool result.',
     '- Resolve directly when the answer is known. Do not collect a name or create a callback for a fully answered question.',
     `- Create request: ${capabilities.createServiceRequest ? 'allowed' : 'not available'}.`,
     `- Create appointment: ${capabilities.createAppointment ? 'allowed' : 'not available'}.`,

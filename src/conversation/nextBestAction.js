@@ -8,6 +8,10 @@ const {
   looksLikePastBookingTalk,
 } = require('./visitTalk');
 const { looksLikePaceOnlyTurn } = require('./dynamicSpeech');
+const {
+  looksLikeLeaveIt,
+  looksLikeNonConsentAck,
+} = require('./callCorrectives');
 
 const DIRECT_ANSWER_INTENTS = new Set([
   'hours',
@@ -140,11 +144,13 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   }
 
   const placeGate = String(state?.visitPlace?.blocked || '');
+  const ackOnly = looksLikeNonConsentAck(latestUtterance) || looksLikeLeaveIt(latestUtterance);
   if (placeGate === 'outside') {
     return {
       action: ACTIONS.ANSWER,
-      reason:
-        'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Decline or offer to note a callback. Never say landmark.',
+      reason: ackOnly
+        ? 'Out of coverage. Callback note only. Okay, Sawa, or leave it is not a booking. Do not create_appointment. Do not say you will serve them tomorrow.'
+        : 'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Decline or offer to note a callback. Never say landmark.',
     };
   }
   if (placeGate === 'unknown_coverage') {
@@ -167,6 +173,41 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
           reason:
             'The caller refused a location twice. Log an enquiry. Do not save a visit. Never say landmark.',
         };
+  }
+
+  if (ackOnly) {
+    const quantityKnown = Boolean(
+      state?.entities?.quantity &&
+        String(
+          typeof state.entities.quantity === 'object'
+            ? state.entities.quantity.value
+            : state.entities.quantity
+        ).trim()
+    );
+    if ((intent === 'order' || intent === 'hold') && !quantityKnown) {
+      return {
+        action: ACTIONS.ASK_CLARIFICATION,
+        slot: 'quantity',
+        reason:
+          'Then, Okay, or Sawa is not a quantity. Ask how many. Do not invent a count. Do not say the order is saved.',
+      };
+    }
+    if (missingSlots.length) {
+      return {
+        action: ACTIONS.ASK_CLARIFICATION,
+        slot: missingSlots[0],
+        reason:
+          'Acknowledgment is not consent. Ask for the missing fact. Do not invent a time or a booking.',
+      };
+    }
+    if (REQUEST_INTENTS.has(intent)) {
+      return {
+        action: ACTIONS.ASK_CLARIFICATION,
+        slot: 'confirm',
+        reason:
+          'Okay, Sawa, or leave it is not a yes. Confirm the facts. Do not lock the visit or order. Do not say it is saved.',
+      };
+    }
   }
 
   if (missingSlots.length) {
