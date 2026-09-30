@@ -1,9 +1,12 @@
 // Returning-caller card: compact phone file for the next live call.
 // Not Brain state (that dies with the call) and not a transcript dump.
+// Visit lines are refreshed against now (EAT). A stored "tomorrow" is not
+// repeated once that window or date has passed.
 
 const { namesMatch } = require('./contactIdentity');
 const { isJunkCallerName } = require('./callerNameQuality');
 const { compactNameKey } = require('./callerNameMatch');
+const { classifyLivedVisit } = require('./visitCalendar');
 
 const CLIP = 80;
 
@@ -42,41 +45,44 @@ function buildCallerMemoryCard({
   openRequests = [],
   nextAppointment = null,
   recentAppointments = [],
+  now = new Date(),
 } = {}) {
   if (!contact || typeof contact !== 'object') return null;
   const phone = String(contact.phone || '').trim();
   const name = String(contact.name || '').trim() || null;
   const alternates = alternateNames(contact.metadata);
   const sharedLine = alternates.length > 0;
-  const lastReason = clip(contact.last_reason);
+  const lived = collectLivedAppointments(nextAppointment, recentAppointments, now);
+  const nextItem = lived.open[0] || null;
+  const nextRow = nextItem ? nextItem.row : null;
+  const lastReason = clip(scrubLivedReason(contact.last_reason, lived));
   const notes = clip(contact.notes, 60);
-  const requests = (Array.isArray(openRequests) ? openRequests : [])
+  const requests = freshOpenRequestRows(openRequests, now)
     .slice(0, 2)
     .map(clipRequestLine)
     .filter(Boolean);
-  const appointment = clipVisitLine(nextAppointment);
-  const nextVisitService = nextAppointment && typeof nextAppointment === 'object'
-    ? clip(nextAppointment.service_name || nextAppointment.serviceName, 48) || null
+  const appointment = clipVisitLine(nextRow);
+  const nextVisitService = nextRow
+    ? clip(nextRow.service_name || nextRow.serviceName, 48) || null
     : null;
-  const nextVisitWhen = nextAppointment && typeof nextAppointment === 'object'
-    ? clip(nextAppointment.when_text || nextAppointment.whenText, 32) || null
+  const nextVisitWhen = nextRow
+    ? clip(nextRow.when_text || nextRow.whenText, 32) || null
     : null;
-  const nextVisitStatus = nextAppointment && typeof nextAppointment === 'object'
-    ? clip(nextAppointment.status, 16) || null
-    : null;
-  const nextVisitLandmark = nextAppointment && typeof nextAppointment === 'object'
+  const nextVisitStatus = nextRow ? clip(nextRow.status, 16) || null : null;
+  const nextVisitLandmark = nextRow
     ? clip(
-        nextAppointment.address_landmark ||
-          nextAppointment.addressLandmark ||
-          nextAppointment.landmark,
+        nextRow.address_landmark || nextRow.addressLandmark || nextRow.landmark,
         48
       ) || null
     : null;
-  const recentRows = selectRecentAppointmentRows(recentAppointments, nextAppointment);
+  const recentRows = selectRecentAppointmentRows(
+    [...lived.history, ...lived.open.slice(1).map((item) => item.row)],
+    null
+  );
   const recentBookings = recentRows.map((row) => clipVisitLine(row)).filter(Boolean);
   const profile = clipCallerProfile(contact.metadata);
   const place = profile.landmark || nextVisitLandmark || derivePlace(recentRows);
-  const usualJob = profile.typicalJob || deriveUsualJob(recentRows, nextAppointment);
+  const usualJob = profile.typicalJob || deriveUsualJob(recentRows, nextRow);
   const standing = profile.standing;
   const language = profile.language;
   const personProfiles = clipPersonProfiles(contact.metadata);
@@ -178,6 +184,82 @@ function clipPersonProfiles(metadata) {
       typical_job: clip(row.typical_job, 48) || null,
       landmark: clip(row.landmark, 48) || null,
     };
+  }
+  return out;
+}
+
+function refreshLivedRow(row, lived) {
+  const whenText = lived.whenLabel || row.when_text || row.whenText || '';
+  return { ...row, when_text: whenText, whenText };
+}
+
+function collectLivedAppointments(nextAppointment, recentAppointments, now) {
+  const seen = new Set();
+  const source = [];
+  const rows = [
+    nextAppointment,
+    ...(Array.isArray(recentAppointments) ? recentAppointments : []),
+  ];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const id = String(row.id || '').trim();
+    if (id) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+    }
+    source.push(row);
+  }
+  const open = [];
+  const history = [];
+  const judged = [];
+  for (const row of source) {
+    const lived = classifyLivedVisit(row, now);
+    const refreshed = refreshLivedRow(row, lived);
+    const status = String(row.status || '').toLowerCase();
+    const openStatus = !status || status === 'requested' || status === 'confirmed';
+    const isOpen = openStatus && !lived.past;
+    judged.push({ lived, open: isOpen });
+    if (isOpen) open.push({ row: refreshed, lived });
+    else history.push(refreshed);
+  }
+  open.sort((a, b) => {
+    const ta = a.lived.instant ? a.lived.instant.getTime() : Number.POSITIVE_INFINITY;
+    const tb = b.lived.instant ? b.lived.instant.getTime() : Number.POSITIVE_INFINITY;
+    return ta - tb;
+  });
+  return { open, history, judged };
+}
+
+function scrubLivedReason(text, lived) {
+  const raw = String(text || '');
+  if (!/\b(?:today|tomorrow|tonight|leo|kesho)\b/i.test(raw)) return raw;
+  const judged = Array.isArray(lived?.judged) ? lived.judged : [];
+  const open = Array.isArray(lived?.open) ? lived.open : [];
+  const pastRelative = judged.some((item) => item.lived.past && item.lived.relative);
+  const openRelative = open.some((item) => item.lived.relative);
+  if (pastRelative && !openRelative) {
+    return raw
+      .replace(/\b(?:today|tomorrow|tonight|leo|kesho)\b/gi, 'past')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  const lead = open.find((item) => item.lived.relative && item.lived.spokenDay);
+  if (!lead) return raw;
+  const word = lead.lived.spokenDay;
+  if (word === 'today') {
+    return raw.replace(/\b(?:tomorrow|kesho)\b/gi, 'today').replace(/\s+/g, ' ').trim();
+  }
+  if (word === 'tomorrow' || word === 'past') return raw;
+  return raw.replace(/\b(?:tomorrow|kesho)\b/gi, word).replace(/\s+/g, ' ').trim();
+}
+
+function freshOpenRequestRows(rows, now) {
+  const out = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row || typeof row !== 'object') continue;
+    const lived = classifyLivedVisit(row, now);
+    if (lived.past) continue;
+    out.push(refreshLivedRow(row, lived));
   }
   return out;
 }

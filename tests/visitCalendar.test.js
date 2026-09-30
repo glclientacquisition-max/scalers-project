@@ -9,6 +9,8 @@ const {
   stampScheduleWindows,
   groupVisitsByDay,
   formatOpenVisitsForPrompt,
+  classifyLivedVisit,
+  visitOverlapsOpen,
 } = require('../src/conversation/visitCalendar');
 
 function eat(year, month, day, hour, minute = 0) {
@@ -116,13 +118,17 @@ describe('visit calendar', () => {
     const slot = eat(2026, 9, 8, 10, 0);
     const hours = { resolved: { instant: slot } };
     const { visitOverlapsOpen } = require('../src/conversation/visitCalendar');
-    const hit = visitOverlapsOpen(hours, [
-      {
-        id: 'a',
-        status: 'requested',
-        window_start: slot.toISOString(),
-      },
-    ]);
+    const hit = visitOverlapsOpen(
+      hours,
+      [
+        {
+          id: 'a',
+          status: 'requested',
+          window_start: slot.toISOString(),
+        },
+      ],
+      slot
+    );
     assert.equal(hit?.code, 'overlap');
     const self = visitOverlapsOpen(
       hours,
@@ -131,5 +137,73 @@ describe('visit calendar', () => {
       { ignoreId: 'a' }
     );
     assert.equal(self, null);
+  });
+
+  it('omits a past window and does not keep its stored tomorrow label', () => {
+    const now = eat(2026, 9, 30, 11, 0);
+    const block = formatOpenVisitsForPrompt(
+      [
+        {
+          when_text: 'tomorrow morning',
+          service_name: 'Carpet cleaning',
+          status: 'requested',
+          window_start: eat(2026, 6, 2, 10, 0).toISOString(),
+        },
+        {
+          when_text: 'tomorrow at 10 AM',
+          service_name: 'Sofa',
+          status: 'requested',
+          window_start: eat(2026, 10, 1, 10, 0).toISOString(),
+        },
+      ],
+      now
+    );
+    assert.doesNotMatch(block, /Carpet/);
+    assert.doesNotMatch(block, /tomorrow morning/);
+    assert.match(block, /Sofa/);
+    assert.match(block, /tomorrow at 10 AM/);
+  });
+
+  it('relabels a stored tomorrow when the window is today', () => {
+    const now = eat(2026, 9, 30, 8, 0);
+    const block = formatOpenVisitsForPrompt(
+      [
+        {
+          when_text: 'tomorrow at 10 AM',
+          service_name: 'Carpet cleaning',
+          status: 'confirmed',
+          window_start: eat(2026, 9, 30, 10, 0).toISOString(),
+        },
+      ],
+      now
+    );
+    assert.match(block, /today at 10 AM/);
+    assert.doesNotMatch(block, /tomorrow/);
+  });
+
+  it('anchors tomorrow morning to created_at when no window was stored', () => {
+    const now = eat(2026, 9, 30, 11, 0);
+    const lived = classifyLivedVisit(
+      {
+        when_text: 'tomorrow morning',
+        status: 'requested',
+        created_at: eat(2026, 6, 1, 9, 0).toISOString(),
+      },
+      now
+    );
+    assert.equal(lived.past, true);
+    assert.doesNotMatch(lived.whenLabel, /\b(tomorrow|today)\b/i);
+    assert.match(lived.whenLabel, /past/i);
+  });
+
+  it('ignores a window that has already ended when checking overlap', () => {
+    const now = eat(2026, 9, 30, 12, 0);
+    const slot = eat(2026, 9, 30, 10, 0);
+    const hit = visitOverlapsOpen(
+      { resolved: { instant: slot } },
+      [{ id: 'old', status: 'requested', window_start: slot.toISOString() }],
+      now
+    );
+    assert.equal(hit, null);
   });
 });
