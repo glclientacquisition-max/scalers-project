@@ -49,6 +49,7 @@ export function ContactNameForm({
   const form = (
     <form
       data-contact-name-form=""
+      data-pull-dirty-guard=""
       className="flex min-w-0 flex-wrap items-center gap-2"
       onSubmit={(e) => {
         e.preventDefault();

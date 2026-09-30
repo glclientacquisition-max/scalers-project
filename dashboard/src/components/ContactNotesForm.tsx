@@ -42,6 +42,7 @@ export function ContactNotesForm({
       </button>
       {open ? (
         <form
+          data-pull-dirty-guard=""
           className="mt-3 space-y-3"
           onSubmit={(e) => {
             e.preventDefault();

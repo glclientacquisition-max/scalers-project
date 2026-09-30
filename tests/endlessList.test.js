@@ -11,7 +11,7 @@ function read(rel) {
 function load() {
   const helperPath = path.join(__dirname, "../dashboard/src/lib/endlessList.ts");
   const script = `
-    import { nextShown, appendUniqueById, LIST_SLICE, pullRefreshCommit, listAfterPullRefresh } from ${JSON.stringify(helperPath)};
+    import { nextShown, appendUniqueById, LIST_SLICE, pullRefreshCommit, listAfterPullRefresh, pickPullScrollTop, shellPullPlan, deskFieldsDirty, shellPullErrorCopy } from ${JSON.stringify(helperPath)};
     const first = [{ id: "a" }, { id: "b" }];
     const more = appendUniqueById(first, [{ id: "b" }, { id: "c" }, { id: "" }]);
     const again = appendUniqueById(more.rows, [{ id: "c" }]);
@@ -33,6 +33,19 @@ function load() {
       keptIds: listAfterPullRefresh([{ id: "a" }, { id: "b" }], null, true).rows.map((row) => row.id),
       fresh: listAfterPullRefresh([{ id: "a" }, { id: "b" }], [{ id: "c" }], false).reset,
       freshIds: listAfterPullRefresh([{ id: "a" }], [{ id: "c" }], false).rows.map((row) => row.id),
+      deskTop: pickPullScrollTop({ deskScrolls: true, deskTop: 0, paneScrolls: true, paneTop: 40 }),
+      paneTop: pickPullScrollTop({ deskScrolls: false, deskTop: 0, paneScrolls: true, paneTop: 40 }),
+      paneClear: pickPullScrollTop({ deskScrolls: false, deskTop: 0, paneScrolls: true, paneTop: 0 }),
+      skipDirty: shellPullPlan({ dirty: true, failed: false }),
+      keepFail: shellPullPlan({ dirty: false, failed: true }),
+      refreshClean: shellPullPlan({ dirty: false, failed: false }),
+      fieldsDirty: deskFieldsDirty({ name: "Amina" }, { name: "Otieno" }),
+      fieldsClean: deskFieldsDirty({ name: "Amina" }, { name: "Amina", extra: "new" }),
+      usageCopy: shellPullErrorCopy("/wallet"),
+      ticketCopy: shellPullErrorCopy("/calls/abc"),
+      contactCopy: shellPullErrorCopy("/contacts/abc"),
+      profileCopy: shellPullErrorCopy("/settings"),
+      homeCopy: shellPullErrorCopy("/home"),
     }));
   `;
   const ran = spawnSync(
@@ -64,6 +77,19 @@ describe("endless list slices", () => {
     assert.deepEqual(out.keptIds, ["a", "b"]);
     assert.equal(out.fresh, true);
     assert.deepEqual(out.freshIds, ["c"]);
+    assert.equal(out.deskTop, 0);
+    assert.equal(out.paneTop, 40);
+    assert.equal(out.paneClear, 0);
+    assert.equal(out.skipDirty, "skip");
+    assert.equal(out.keepFail, "keep");
+    assert.equal(out.refreshClean, "refresh");
+    assert.equal(out.fieldsDirty, true);
+    assert.equal(out.fieldsClean, false);
+    assert.equal(out.usageCopy, "Could not load Usage.");
+    assert.equal(out.ticketCopy, "Could not load this call.");
+    assert.equal(out.contactCopy, "Could not load this contact.");
+    assert.equal(out.profileCopy, "Could not load Business Profile.");
+    assert.equal(out.homeCopy, "Could not load Overview.");
   });
 
   it("keeps one contacts row at every width, with a quiet loading row", () => {
@@ -122,5 +148,23 @@ describe("endless list slices", () => {
     assert.match(board, /data-pull-root/);
     assert.doesNotMatch(pull, /[\u2014\u2013]/);
     assert.doesNotMatch(list, /Pull to refresh/);
+    assert.doesNotMatch(pull, /location\.reload/);
+    const surface = read("dashboard/src/components/PhonePullSurface.tsx");
+    const action = read("dashboard/src/lib/deskPullAction.ts");
+    assert.match(read("dashboard/src/app/(desk)/layout.tsx"), /DeskPhonePull/);
+    assert.match(read("dashboard/src/app/admin/(console)/layout.tsx"), /AdminPhonePull/);
+    assert.match(read("dashboard/src/app/admin/(console)/layout.tsx"), /data-admin-main/);
+    assert.match(surface, /router\.refresh\(\)/);
+    assert.match(surface, /shellPullPlan/);
+    assert.match(surface, /data-pull-dirty-guard/);
+    assert.match(surface, /visibleOwnedPullRoot|data-pull-root/);
+    assert.doesNotMatch(surface, /location\.reload/);
+    assert.doesNotMatch(surface, /[\u2014\u2013]/);
+    assert.match(action, /revalidatePath/);
+    assert.doesNotMatch(action, /topup|payment/i);
+    assert.match(read("dashboard/src/components/BusinessSettingsShell.tsx"), /data-pull-dirty-guard/);
+    assert.match(read("dashboard/src/components/InboxTicketView.tsx"), /data-pull-scroll/);
+    assert.match(read("dashboard/src/lib/deskTicketChat.ts"), /\/dev\/ticket/);
+    assert.doesNotMatch(read("dashboard/src/app/(desk)/wallet/page.tsx"), /location\.reload/);
   });
 });
