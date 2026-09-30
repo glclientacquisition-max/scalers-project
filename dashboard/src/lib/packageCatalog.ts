@@ -38,6 +38,30 @@ export type PackageCatalog = {
   businesses: TenantSubscriptionRow[];
 };
 
+/** Public landing fields only. No tenant ids, wallets, or ledger rows. */
+export type PublicPackageOffer = {
+  sku: string;
+  name: string;
+  monthlyPriceKes: number;
+  annualPriceKes: number;
+  seats: number;
+  minutes: number;
+  sms: number;
+  email: number;
+  staffWa: number;
+  dids: number;
+};
+
+export type PublicPackageBoard = {
+  discountPercent: number;
+  inboundKesPerMinute: number;
+  outboundKesPerMinute: number;
+  smsKes: number;
+  emailKes: number;
+  whatsappKes: number;
+  packages: PublicPackageOffer[];
+};
+
 const DEFAULT_RATES: BillingRateCard = {
   inboundKesPerSecond: 0.05,
   outboundKesPerSecond: 0.1,
@@ -163,6 +187,81 @@ function isMissingCatalog(message: string): boolean {
   return /billing_rate_card|billing_packages|tenant_subscriptions|does not exist|schema cache/i.test(
     message
   );
+}
+
+const STRAW_OFFERS: Array<Omit<PublicPackageOffer, "annualPriceKes">> = [
+  { sku: "starter", name: "Starter", monthlyPriceKes: 0, seats: 2, minutes: 300, sms: 200, email: 100, staffWa: 200, dids: 1 },
+  { sku: "growth", name: "Growth", monthlyPriceKes: 0, seats: 5, minutes: 800, sms: 500, email: 250, staffWa: 500, dids: 1 },
+  { sku: "scale", name: "Scale", monthlyPriceKes: 0, seats: 10, minutes: 2000, sms: 1500, email: 500, staffWa: 1000, dids: 1 },
+];
+
+export function strawPublicBoard(): PublicPackageBoard {
+  return {
+    discountPercent: DEFAULT_RATES.annualDiscountPercent,
+    inboundKesPerMinute: inboundKesPerMinute(DEFAULT_RATES.inboundKesPerSecond),
+    outboundKesPerMinute: outboundKesPerMinute(DEFAULT_RATES.outboundKesPerSecond),
+    smsKes: DEFAULT_RATES.smsKes,
+    emailKes: DEFAULT_RATES.emailKes,
+    whatsappKes: DEFAULT_RATES.whatsappKes,
+    packages: STRAW_OFFERS.map((pack) => ({
+      ...pack,
+      annualPriceKes: annualPriceKes(pack.monthlyPriceKes, DEFAULT_RATES.annualDiscountPercent),
+    })),
+  };
+}
+
+export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
+  try {
+    const admin = getSupabaseAdmin();
+    const [ratesRes, packsRes] = await Promise.all([
+      admin
+        .from("billing_rate_card")
+        .select(
+          "inbound_kes_per_second, outbound_kes_per_second, whatsapp_kes, sms_kes, email_kes, annual_discount_percent"
+        )
+        .eq("id", 1)
+        .maybeSingle(),
+      admin
+        .from("billing_packages")
+        .select("sku, name, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids, sort_order, is_active")
+        .order("sort_order", { ascending: true }),
+    ]);
+    if (packsRes.error || !packsRes.data?.length) return strawPublicBoard();
+    const rates =
+      ratesRes.error || !ratesRes.data
+        ? { ...DEFAULT_RATES }
+        : mapRates(ratesRes.data as Record<string, unknown>);
+    const packages = packsRes.data
+      .filter((row) => row.is_active !== false)
+      .map((row) => {
+        const monthlyPriceKes = num(row.monthly_price_kes);
+        return {
+          sku: String(row.sku || ""),
+          name: String(row.name || ""),
+          monthlyPriceKes,
+          annualPriceKes: annualPriceKes(monthlyPriceKes, rates.annualDiscountPercent),
+          seats: num(row.seats),
+          minutes: num(row.minutes),
+          sms: num(row.sms),
+          email: num(row.email),
+          staffWa: num(row.staff_wa),
+          dids: num(row.dids, 1),
+        };
+      })
+      .filter((pack) => pack.name);
+    if (!packages.length) return strawPublicBoard();
+    return {
+      discountPercent: rates.annualDiscountPercent,
+      inboundKesPerMinute: inboundKesPerMinute(rates.inboundKesPerSecond),
+      outboundKesPerMinute: outboundKesPerMinute(rates.outboundKesPerSecond),
+      smsKes: rates.smsKes,
+      emailKes: rates.emailKes,
+      whatsappKes: rates.whatsappKes,
+      packages,
+    };
+  } catch {
+    return strawPublicBoard();
+  }
 }
 
 export async function loadPackageCatalog(): Promise<PackageCatalog> {

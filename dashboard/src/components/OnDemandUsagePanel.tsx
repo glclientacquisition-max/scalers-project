@@ -30,22 +30,17 @@ export function OnDemandUsagePanel({
   }, [state.ok, router]);
 
   return (
-    <section className="rounded-2xl border border-line bg-surface p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl tracking-tight text-ink">On-demand usage</h2>
-        <span className="rounded-full border border-line px-3 py-1 text-xs font-medium text-ink-soft">
-          {enabled ? "On" : "Off"}
-        </span>
-      </div>
+    <section>
+      <h2 className="font-display text-xl tracking-tight text-ink">On-demand</h2>
 
-      <form action={formAction} className="mt-4 space-y-4">
+      <form action={formAction} className="mt-3 space-y-4">
         <input type="hidden" name="tenant_id" value={tenantId} />
         <input type="hidden" name="enabled" value={enabled ? "1" : "0"} />
 
-        <label className="flex items-start gap-3 text-sm">
+        <label className="flex min-h-11 items-center gap-3 text-sm">
           <input
             type="checkbox"
-            className="mt-1"
+            className="h-5 w-5"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
           />

@@ -3,6 +3,7 @@ import { Sora } from "next/font/google";
 import { redirect } from "next/navigation";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { LandingPage } from "@/components/marketing/LandingPage";
+import { loadPublicPackageOffers } from "@/lib/packageCatalog";
 
 /* Display face ships on marketing only. The app runs on the system stack. */
 const display = Sora({
@@ -28,5 +29,6 @@ async function HomeGate() {
   ]);
   if (user) redirect("/home");
   if (legacy) redirect("/admin");
-  return <LandingPage />;
+  const board = await loadPublicPackageOffers();
+  return <LandingPage board={board} />;
 }
