@@ -151,7 +151,8 @@ describe("contacts segment filter chrome", () => {
 
   it("opens the profile from the row and Back restores the Contacts segment", () => {
     assert.match(row, /DeskRowHit href=\{href\}/);
-    assert.match(page, /contactProfileHref/);
+    assert.match(page, /ContactsEndlessList/);
+    assert.match(read("dashboard/src/components/ContactsEndlessList.tsx"), /contactProfileHref/);
     assert.match(profile, /contactsReturnHref/);
     assert.match(load, /export function contactProfileHref/);
     assert.match(load, /export function contactsReturnHref/);

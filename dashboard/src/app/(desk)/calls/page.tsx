@@ -99,13 +99,6 @@ export default async function CallsPage({
   const monday = parseWeekParam(sp.week);
   const day = parseDayParam(sp.day);
 
-  const paginationParams: Record<string, string | undefined> = {
-    purpose: activeFilter,
-    q: q || undefined,
-    view: weekView ? "week" : todayView || holdTodayView ? "today" : undefined,
-    week: weekView ? monday : undefined,
-    day: todayView || holdTodayView ? day : undefined,
-  };
   const inboxRet: InboxReturn = {
     purpose: activeFilter,
     q: q || undefined,
@@ -144,7 +137,6 @@ export default async function CallsPage({
       items={assembled}
       q={q}
       hrefs={pileHrefs}
-      page={boardView || holdTodayView ? 1 : page}
       view={pileHrefOpts.view}
       week={pileHrefOpts.week}
       day={pileHrefOpts.day}
@@ -252,7 +244,6 @@ export default async function CallsPage({
           businessName={businessName}
           counts={counts}
           inboxRet={inboxRet}
-          viewParams={paginationParams}
           hrefs={pileHrefs}
         />
       )}

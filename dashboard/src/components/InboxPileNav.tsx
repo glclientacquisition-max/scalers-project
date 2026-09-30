@@ -13,7 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
-import { inboxArchivedHref, inboxReturnHref } from "@/lib/inboxHref";
+import { inboxArchivedHref } from "@/lib/inboxHref";
 import {
   countInboxPurposes,
   itemMatchesPurpose,
@@ -24,7 +24,9 @@ import {
 } from "@/lib/inboxPurpose";
 import { orderHoldList } from "@/lib/holdSheet";
 import { orderVisitList } from "@/lib/runSheet";
-import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
+import { scrollDeskWellToTop } from "@/components/EndlessList";
+import { nextShown } from "@/lib/endlessList";
+import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
   adjacentPileHrefs,
   filterCachedPile,
@@ -41,6 +43,8 @@ type InboxPileNavValue = {
   selectRows: InboxItem[];
   counts: Record<InboxPurposeFilterId, number>;
   page: number;
+  hasMore: boolean;
+  loadMore: () => void;
   paint: "pending" | "empty" | "rows";
   goPile: (next: string) => void;
   setQuery: (next: string) => void;
@@ -89,7 +93,6 @@ export function InboxPileNavProvider({
   purpose,
   items,
   hrefs,
-  page: urlPage,
   q: urlQ = "",
   view,
   week,
@@ -102,7 +105,6 @@ export function InboxPileNavProvider({
   purpose: InboxPurposeFilterId;
   items: InboxItem[];
   hrefs: Partial<Record<string, string>>;
-  page: number;
   q?: string;
   view?: string;
   week?: string;
@@ -114,8 +116,15 @@ export function InboxPileNavProvider({
 }) {
   const router = useRouter();
   const [localPurpose, setLocalPurpose] = useState(purpose);
-  const [localPage, setLocalPage] = useState(urlPage);
   const [localQ, setLocalQ] = useState(urlQ);
+  const filterKey = `${localPurpose}\0${localQ.trim()}`;
+  const [shown, setShown] = useState(DEFAULT_PAGE_SIZE);
+  const [shownFor, setShownFor] = useState(filterKey);
+  if (shownFor !== filterKey) {
+    setShownFor(filterKey);
+    setShown(DEFAULT_PAGE_SIZE);
+  }
+  const windowCount = shownFor === filterKey ? shown : DEFAULT_PAGE_SIZE;
   const pendingRef = useRef<string | null>(null);
   const pendingQRef = useRef<string | null>(null);
   const qWait = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,7 +195,6 @@ export function InboxPileNavProvider({
     pendingRef.current = next;
     setLocalPurpose(next as InboxPurposeFilterId);
     purposeRef.current = next as InboxPurposeFilterId;
-    setLocalPage(1);
     const href = hrefsRef.current[next];
     if (href) router.replace(href);
   }, [localPurpose, router]);
@@ -196,7 +204,6 @@ export function InboxPileNavProvider({
     setLocalQ(value);
     qRef.current = value;
     pendingQRef.current = value;
-    setLocalPage(1);
     if (qWait.current) clearTimeout(qWait.current);
     const sync = () => {
       const opts = searchOptsRef.current;
@@ -241,50 +248,17 @@ export function InboxPileNavProvider({
   );
 
   useEffect(() => {
-    if (pendingRef.current) return;
-    if (pendingQRef.current !== null) return;
-    const pages = Math.max(1, Math.ceil(listed.length / DEFAULT_PAGE_SIZE) || 1);
-    if (urlPage <= pages) {
-      setLocalPage(urlPage);
-      return;
-    }
-    const next = pages;
-    setLocalPage(next);
-    const text = sanitizeSearchQuery(localQ);
-    if (localPurpose === "archived") {
-      router.replace(
-        inboxArchivedHref(
-          {
-            purpose: from,
-            q: text || undefined,
-            page: rpage,
-            view,
-            week,
-            day,
-          },
-          next
-        )
-      );
-      return;
-    }
-    router.replace(
-      inboxReturnHref({
-        purpose: localPurpose,
-        q: text || undefined,
-        page: next,
-        view,
-        week,
-        day,
-      })
-    );
-  }, [urlPage, listed.length, localPurpose, localQ, view, week, day, from, rpage, router]);
+    scrollDeskWellToTop();
+  }, [filterKey]);
 
-  const safePage = clampListPage(localPage, listed.length, DEFAULT_PAGE_SIZE);
-
-  const pageRows = useMemo(() => {
-    const fromIndex = (safePage - 1) * DEFAULT_PAGE_SIZE;
-    return listed.slice(fromIndex, fromIndex + DEFAULT_PAGE_SIZE);
-  }, [listed, safePage]);
+  const pageRows = useMemo(
+    () => listed.slice(0, windowCount),
+    [listed, windowCount]
+  );
+  const hasMore = pageRows.length < listed.length;
+  const loadMore = useCallback(() => {
+    setShown((current) => nextShown(current, listed.length, DEFAULT_PAGE_SIZE));
+  }, [listed.length]);
 
   const value = useMemo(
     () => ({
@@ -295,7 +269,9 @@ export function InboxPileNavProvider({
       pageRows,
       selectRows: enableSelect ? pageRows : [],
       counts,
-      page: safePage,
+      page: 1,
+      hasMore,
+      loadMore,
       paint,
       goPile,
       setQuery,
@@ -307,7 +283,8 @@ export function InboxPileNavProvider({
       liveHrefs,
       listed,
       pageRows,
-      safePage,
+      hasMore,
+      loadMore,
       paint,
       goPile,
       setQuery,

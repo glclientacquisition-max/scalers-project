@@ -1,16 +1,12 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { AddContactPanel } from "@/components/AddContactPanel";
-import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
+import { ContactsEndlessList } from "@/components/ContactsEndlessList";
 import { ContactsSearch } from "@/components/ContactsSearch";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
-import { DeskLandScope } from "@/components/ui/DeskLand";
-import { Pagination } from "@/components/ui/Pagination";
-import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
+import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
   btnGhost,
   btnPrimary,
@@ -24,14 +20,12 @@ import { sanitizeSearchQuery } from "@/lib/callsTriage";
 import { ContactSortSelect } from "@/components/ContactSortSelect";
 import {
   contactFilterPills,
-  contactProfileHref,
   contactsHref,
   loadContactPileCounts,
   loadContactsPage,
   resolveContactSavedFilter,
   resolveContactSort,
   type ContactSavedFilter,
-  type ContactSort,
 } from "@/lib/contactsLoad";
 
 // instant = false: request-time desk data under the owner auth shell.
@@ -48,29 +42,15 @@ function emptyCopy(saved: ContactSavedFilter, q: string): string {
   return "No callers";
 }
 
-function listQuery(
-  saved: ContactSavedFilter,
-  sort: ContactSort,
-  q: string
-) {
-  return {
-    saved,
-    sort,
-    q: q || undefined,
-  };
-}
-
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; saved?: string; sort?: string; q?: string }>;
+  searchParams: Promise<{ saved?: string; sort?: string; q?: string }>;
 }) {
   const sp = await searchParams;
-  const page = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const saved = resolveContactSavedFilter(sp.saved);
   const sort = resolveContactSort(sp.sort);
   const q = sanitizeSearchQuery(sp.q);
-  const query = listQuery(saved, sort, q);
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -83,7 +63,7 @@ export default async function ContactsPage({
   }
 
   const [{ rows, total, error }, piles] = await Promise.all([
-    loadContactsPage(workspace.client, tenant.id, page, PAGE_SIZE, saved, {
+    loadContactsPage(workspace.client, tenant.id, 1, PAGE_SIZE, saved, {
       q,
       sort,
     }),
@@ -93,18 +73,6 @@ export default async function ContactsPage({
   if (error) {
     return <DeskLoadError>Could not load contacts.</DeskLoadError>;
   }
-
-  const safePage = clampListPage(page, total, PAGE_SIZE);
-  if (safePage !== page) {
-    redirect(contactsHref({ saved, sort, q, page: safePage }));
-  }
-
-  const listParams = {
-    saved: saved === "all" ? undefined : saved,
-    sort: sort === "recent" ? undefined : sort,
-    q: q || undefined,
-  };
-  const listReturn = { ...query, page };
 
   return (
     <div className="min-w-0 overflow-x-clip">
@@ -164,67 +132,14 @@ export default async function ContactsPage({
           )}
         </div>
       ) : (
-        <>
-          <DeskLandScope
-            ids={rows.map((row) => row.id)}
-            scopeKey={`${saved}:${sort}:${q}:${page}`}
-          >
-            <ul className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface md:mt-8 md:hidden">
-              {rows.map((row) => (
-                <ContactPhoneRow
-                  key={row.id}
-                  row={row}
-                  href={contactProfileHref(row.id, listReturn)}
-                />
-              ))}
-            </ul>
-            <div className="mt-6 hidden min-w-0 md:mt-8 md:block">
-              <DeskDataTable minWidthClass="min-w-0">
-                <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-3 lg:py-2"
-                    >
-                      Name
-                    </th>
-                    <th
-                      scope="col"
-                      className="hidden px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:table-cell lg:px-3 lg:py-2"
-                    >
-                      Phone
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-3 lg:py-2"
-                    >
-                      Last call
-                    </th>
-                    <th scope="col" className="w-px px-3 py-3 lg:px-3 lg:py-2">
-                      <span className="sr-only">Call and WhatsApp</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <ContactTableRow
-                      key={row.id}
-                      row={row}
-                      href={contactProfileHref(row.id, listReturn)}
-                    />
-                  ))}
-                </tbody>
-              </DeskDataTable>
-            </div>
-          </DeskLandScope>
-          <Pagination
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            href="/contacts"
-            params={listParams}
-          />
-        </>
+        <ContactsEndlessList
+          key={`${saved}:${sort}:${q}`}
+          rows={rows}
+          total={total}
+          saved={saved}
+          sort={sort}
+          q={q}
+        />
       )}
     </div>
   );
