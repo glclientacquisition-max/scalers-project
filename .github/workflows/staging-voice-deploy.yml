@@ -1,5 +1,7 @@
 # One-off: deploy THIS git commit to Railway staging Voice.
 # Default path: land on cursor/staging-voice-468b (Railway staging follows that branch).
+# Do not connect the service with a commit SHA. A pin ignores later pushes to
+# that branch. stage-pull-request.yml reconnects the branch with no SHA.
 # Desk previews are not Voice. Do not merge to main to get a DID test.
 #
 # GitHub → Actions → Deploy staging Voice → Run workflow from the PR branch.
