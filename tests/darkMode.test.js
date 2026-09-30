@@ -113,8 +113,9 @@ describe("theme activation", () => {
     const themeLib = read("dashboard/src/lib/deskTheme.ts");
     const ui = read("dashboard/src/components/settingsUi.tsx");
     assert.match(ui, /role="radiogroup"/);
-    assert.match(picker, /SettingsSegmented/);
-    assert.match(picker, /label="This device"/);
+    assert.match(picker, /role="radiogroup"/);
+    assert.match(picker, /aria-label="This device"/);
+    assert.match(picker, /data-theme-cluster=""/);
     assert.match(picker, /readDeskTheme/);
     assert.match(picker, /writeDeskTheme/);
     assert.match(picker, /applyDeskTheme/);

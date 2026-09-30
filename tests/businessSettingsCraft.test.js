@@ -125,7 +125,7 @@ describe("business settings craft", () => {
     assert.match(ui, /md:sticky md:top-4/);
   });
 
-  it("parks Sign out on the account bar and Appearance under This device", () => {
+  it("parks Sign out in the account menu and Appearance under This device", () => {
     const header = ui.slice(
       ui.indexOf("export function SettingsPageHeader"),
       ui.indexOf("compactTextareaExpandHandlers")
@@ -133,7 +133,7 @@ describe("business settings craft", () => {
     assert.doesNotMatch(header, /SignOutButton/);
     assert.doesNotMatch(shell, /SignOutButton/);
     assert.doesNotMatch(shell, /SettingsSignOutRow/);
-    assert.match(read("dashboard/src/components/DeskAccountBar.tsx"), /<SignOutButton/);
+    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
     assert.match(shell, /<ThemePicker \/>/);
     assert.match(shell, /title="This device"/);
     assert.match(nav, /title: "This device"/);
@@ -161,7 +161,7 @@ describe("business settings craft", () => {
   it("labels Appearance as This device and persists with scalers-desk-theme", () => {
     const themeLib = read("dashboard/src/lib/deskTheme.ts");
     const layout = read("dashboard/src/app/layout.tsx");
-    assert.match(theme, /label="This device"/);
+    assert.match(theme, /aria-label="This device"/);
     assert.match(theme, /readDeskTheme/);
     assert.match(theme, /writeDeskTheme/);
     assert.match(themeLib, /export const DESK_THEME_STORAGE_KEY = "scalers-desk-theme"/);
@@ -261,8 +261,10 @@ describe("business settings craft", () => {
     assert.match(alerts, /<ToolSwitch/);
     assert.match(alerts, /ALERTS_SETTINGS_FORM_ID/);
     assert.match(alerts, /form=\{ALERTS_SETTINGS_FORM_ID\}/);
-    assert.match(theme, /SettingsSegmented/);
-    assert.match(theme, /label="This device"/);
+    assert.match(theme, /role="radiogroup"/);
+    assert.match(theme, /aria-label="This device"/);
+    assert.match(theme, /data-theme-cluster=""/);
+    assert.doesNotMatch(theme, /SettingsSegmented/);
     assert.match(ui, /deskRateCardClass/);
     assert.match(ui, /deskRateCardRowClass/);
     assert.doesNotMatch(ui, /filterTabClass/);

@@ -4,11 +4,19 @@ import { useEffect, useState } from "react";
 import {
   btnPrimary,
   deskShiftClass,
+  focusRing,
   focusRingVisible,
 } from "@/components/ui/deskChrome";
 
-/** Muted logout. Confirm, then POST `/api/logout`. Profile and the owner shell both use this. */
-export function SignOutButton() {
+const stayClass = [
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft",
+  deskShiftClass,
+  "hover:bg-surface hover:text-ink active:bg-line",
+  focusRingVisible,
+].join(" ");
+
+/** Confirm, then POST `/api/logout`. The account menu uses `layout="menu"`. */
+export function SignOutButton({ layout = "inline" }: { layout?: "inline" | "menu" }) {
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
@@ -24,6 +32,23 @@ export function SignOutButton() {
   }, [confirming]);
 
   if (!confirming) {
+    if (layout === "menu") {
+      return (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => setConfirming(true)}
+          className={[
+            "flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-medium text-warn",
+            deskShiftClass,
+            "hover:bg-warn-soft active:bg-warn-soft",
+            focusRing,
+          ].join(" ")}
+        >
+          Sign out
+        </button>
+      );
+    }
     return (
       <button
         type="button"
@@ -39,30 +64,31 @@ export function SignOutButton() {
     );
   }
 
-  return (
-    <div
-      role="group"
-      aria-label="Sign out?"
-      className="flex flex-wrap items-center gap-2"
-    >
+  const confirm = (
+    <>
       <p className="text-sm font-medium text-ink">Sign out?</p>
       <form action="/api/logout" method="post">
         <button type="submit" className={btnPrimary}>
           Sign out
         </button>
       </form>
-      <button
-        type="button"
-        onClick={() => setConfirming(false)}
-        className={[
-          "inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-ink-soft",
-          deskShiftClass,
-          "hover:bg-surface hover:text-ink active:bg-line",
-          focusRingVisible,
-        ].join(" ")}
-      >
+      <button type="button" onClick={() => setConfirming(false)} className={stayClass}>
         Stay
       </button>
+    </>
+  );
+
+  if (layout === "menu") {
+    return (
+      <div role="group" aria-label="Sign out?" className="flex flex-wrap items-center gap-2 px-2 py-2">
+        {confirm}
+      </div>
+    );
+  }
+
+  return (
+    <div role="group" aria-label="Sign out?" className="flex flex-wrap items-center gap-2">
+      {confirm}
     </div>
   );
 }

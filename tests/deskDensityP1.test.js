@@ -24,7 +24,7 @@ describe("desk density P1", () => {
   const board = read("dashboard/src/components/InboxPileBoard.tsx");
   const table = read("dashboard/src/components/InboxItemRow.tsx");
 
-  it("keeps the account-bar name and drops the Home business h1", () => {
+  it("drops the Home business h1", () => {
     assert.match(header, /BrandLockup/);
     assert.doesNotMatch(header, /<h1/);
     assert.doesNotMatch(header, /\{business\}/);
@@ -39,9 +39,10 @@ describe("desk density P1", () => {
     assert.match(home, /const showCta = !\(line === "pending" && waitingCount === 0\) && !returnSidebar/);
   });
 
-  it("signs out from the account bar only", () => {
+  it("signs out from the account menu only", () => {
     assert.doesNotMatch(shell, /SignOutButton/);
-    assert.match(read("dashboard/src/components/DeskAccountBar.tsx"), /<SignOutButton/);
+    assert.match(read("dashboard/src/components/DeskAccountMenu.tsx"), /<SignOutButton layout="menu"/);
+    assert.doesNotMatch(read("dashboard/src/components/DeskAccountBar.tsx"), />\s*Sign out\s*</);
   });
 
   it("shows Line live on Test and not on Appearance or other settings headers", () => {

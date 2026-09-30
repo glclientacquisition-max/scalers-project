@@ -7,7 +7,7 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 
 ## IA
 
-`/settings` is the Profile tab. Bare `/settings` is the account hub: destination index. Sign out stays on the account bar. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance`. No new field screens.
+`/settings` is the Profile tab. Bare `/settings` is the account hub: destination index. Sign out stays inside the account menu. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is `?tab=appearance` and the first account-menu item. No new field screens.
 
 ```text
 Business       Identity · Hours · Locations · Policies
@@ -27,11 +27,11 @@ Bare `/settings` is the hub. lg+ hub shows Identity in the panel. `?tab=updates`
 
 ## Chrome
 
-Short in-page title Profile plus compact workspace name. Line live / Number pending stays on Test. Appearance, Import, Catalog, and the other panels do not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the account bar (`POST /api/logout`). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
+Short in-page title Profile plus compact workspace name on the hub. The top strip is initials only. Line live / Number pending stays on Test. Appearance, Import, Catalog, and the other panels do not repeat it. Do not use `deskListTitleClass` on the hub. Sign out is the last account-menu item (`POST /api/logout` after confirm). No giant Business Profile `h1`. Sub-panels keep `DeskBack` in the title row (`DeskRecordLead`, `lg:hidden`). Hours, Pronunciation, and the other panels share that lead. Back never owns its own row. Save stays sticky top-right on form tabs (`SettingsPageHeader` + `TenantSettingsSaveButton`). The desk nav label is Profile. Path stays `/settings`. Import Knowledge and Import Catalog are the settings import titles. Import Contacts is `/contacts/import`.
 
 Phone index: full-width grouped destination rows (`min-h-12`, label + chevron). lg+ sidebar: group headers + tabs, no chevron. Section titles are non-clickable (`uppercase tracking-wide text-gray-500`). Hover, active, and the canonical focus ring.
 
-Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
+Panel titles use `settingsPanelHeadingClass` (`text-xl font-semibold`). Identity, Hours, Policies, Voice, Alerts, and Appearance use grouped settings rows (`SettingsGroup` / `SettingsRow`: label left, control right). Booleans are a native checkbox switch (`ToolSwitch`, 44px hit, on-state `bg-accent-fill`). Two or three-option enums use `SettingsSegmented` rate cards (`deskRateCardClass`, same as Inbox and Contacts chips). Appearance is the three theme cards, not that strip. Four-plus enums use `SettingsSelect`. Catalog, FAQs, Team, Locations, and Public contacts stay tables on `md+`/`lg+`. Phone stacks those records.
 
 Primitives in `settingsUi.tsx` define hover, focus, and active. Do not invent a `Button.tsx`.
 
@@ -55,7 +55,7 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
 | Test | Generate preview filled plus large tel control | One filled control: Call when live, else Generate preview. The other is ghost |
-| Appearance | Three filled segment pills | System / Light / Dark rate cards. Label **This device**. `localStorage["scalers-desk-theme"]` |
+| Appearance | Three theme cards | System / Light / Dark cluster. Label **This device**. `localStorage["scalers-desk-theme"]` |
 | Sign out | Ghost, instant POST | Ghost until confirm. **Sign out?** then filled **Sign out** / ghost **Stay**. POST `/api/logout` only after confirm |
 
 Do not invent fields. Do not change compile keys. Alerts persist `whatsapp_notification_number`, `alert_email`, and `notify_channels` without recompiling the assistant prompt.
@@ -196,15 +196,15 @@ Home only. `DailyBulletinPanel` is not a Profile destination. Old `?tab=updates`
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
-| This device (System / Light / Dark) | segmented (3) | `localStorage["scalers-desk-theme"]` + `html[data-theme]`. Never tenant / Brain | This device |
+| This device (System / Light / Dark) | theme cards (3) | `localStorage["scalers-desk-theme"]` + `html[data-theme]`. Never tenant / Brain | This device |
 
 Pre-paint script in `app/layout.tsx` reads the same key so the choice survives reload on that browser.
 
-### Sign out (account bar)
+### Sign out (account menu, last)
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
-| Sign out (idle) | ghost | none | This session, after confirm |
+| Sign out (idle) | menu row, warn text | none | This session, after confirm |
 | Sign out? | confirm cluster | none until submit | This session |
 | Sign out (confirm) | filled | `POST /api/logout` (clears session cookies, Supabase sign-out) | This device session |
 | Stay | ghost | dismisses confirm | This device |
