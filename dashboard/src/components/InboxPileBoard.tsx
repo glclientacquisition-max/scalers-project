@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { EndlessSentinel } from "@/components/EndlessList";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
+import { listWindowClass } from "@/lib/endlessList";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy } from "@/lib/inboxNiche";
@@ -147,7 +148,6 @@ export function InboxPileBoard({
   businessName,
   counts: urlCounts,
   inboxRet,
-  viewParams,
   hrefs,
 }: {
   assembledCount: number;
@@ -158,12 +158,10 @@ export function InboxPileBoard({
   businessName: string;
   counts: Record<InboxPurposeFilterId, number>;
   inboxRet: InboxReturn;
-  viewParams: Record<string, string | undefined>;
   hrefs: Partial<Record<string, string>>;
 }) {
   const nav = useInboxPileNav();
   const purpose = nav?.purpose ?? "all";
-  const listed = nav?.listed || [];
   const pageRows = nav?.pageRows || [];
   const page = nav?.page ?? 1;
   const paint = nav?.paint ?? "rows";
@@ -215,7 +213,7 @@ export function InboxPileBoard({
               ids={pageRows.map((item) => item.id)}
               scopeKey={`${purpose}:${page}:${q}`}
             >
-              <ul className="mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
+              <ul className={`mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden ${listWindowClass}`}>
                 {showArchivedEntry ? (
                   <InboxArchivedPhoneRow count={counts.archived} ret={ret} />
                 ) : null}
@@ -287,7 +285,7 @@ export function InboxPileBoard({
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className={listWindowClass}>
                     {showArchivedEntry ? (
                       <InboxArchivedTableRow count={counts.archived} ret={ret} />
                     ) : null}
@@ -307,12 +305,11 @@ export function InboxPileBoard({
             </DeskLandScope>
           </InboxPileSwipe>
 
-          <Pagination
-            page={page}
-            pageSize={DEFAULT_PAGE_SIZE}
-            total={listed.length}
-            href="/calls"
-            params={{ ...viewParams, purpose, q: q || undefined }}
+          <EndlessSentinel
+            hasMore={nav?.hasMore ?? false}
+            loading={false}
+            loaded={pageRows.length}
+            onLoad={nav?.loadMore || (() => {})}
           />
         </>
       )}
