@@ -6,7 +6,7 @@
 
 ## Current rule
 
-`scalers-staging.vercel.app` serves the ready deploy of `cursor/staging-voice-468b`. That branch is `main` plus open pull requests. The stage workflow assigns the hostname after each rebuild.
+`scalers-staging.vercel.app` serves the ready deploy of `cursor/staging-voice-468b`. That branch is `main` plus every open pull request, including one that targets another feature branch. The stage workflow assigns the hostname after each rebuild.
 
 A push to `main` must not take this URL. Production desk is `scalers-project` (`scalers.co.ke`). Production voice is Railway. Do not change those from a staging desk fix.
 

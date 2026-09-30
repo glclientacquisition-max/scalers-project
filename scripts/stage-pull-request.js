@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Rebuild the staging branch as main plus the open pull requests into main.
- * Closing a pull request runs this again, so that change leaves staging.
+ * Rebuild the staging branch as main plus every open pull request.
+ * A pull request into another feature branch is included. Closing one runs
+ * this again, so that change leaves staging.
  *
  * The workflow checks out main and runs this file. It fetches pull request
  * refs and merges those refs. It does not execute files from the pull requests.
@@ -43,6 +44,19 @@ function runGit(cwd, args, { allowFail = false } = {}) {
   }
 }
 
+function selectStagingPulls(rows, { stagingBranch = STAGING_BRANCH } = {}) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter(
+      (row) =>
+        row &&
+        row.headRefName !== stagingBranch &&
+        row.baseRefName !== stagingBranch
+    )
+    .map((row) => Number(row.number))
+    .filter((number) => Number.isInteger(number) && number > 0)
+    .sort((a, b) => b - a);
+}
+
 function listOpenPullNumbers({ repo, stagingBranch = STAGING_BRANCH } = {}) {
   if (!repo) throw new Error("GITHUB_REPOSITORY is required to list open pull requests");
   const raw = execFileSync(
@@ -52,22 +66,16 @@ function listOpenPullNumbers({ repo, stagingBranch = STAGING_BRANCH } = {}) {
       "list",
       "--repo",
       repo,
-      "--base",
-      "main",
       "--state",
       "open",
       "--limit",
       "200",
       "--json",
-      "number,headRefName",
+      "number,headRefName,baseRefName",
     ],
     { encoding: "utf8" }
   );
-  const rows = JSON.parse(raw);
-  return rows
-    .filter((row) => row.headRefName !== stagingBranch)
-    .map((row) => Number(row.number))
-    .sort((a, b) => b - a);
+  return selectStagingPulls(JSON.parse(raw), { stagingBranch });
 }
 
 function rebuildStaging({
@@ -150,7 +158,7 @@ function noteBody(status, stagingSha) {
       NOTE_MARKER,
       "This pull request is off the staging branch.",
       "",
-      "Staging is main plus the pull requests still open.",
+      "Staging is main plus the pull requests still open, including one that targets another feature branch.",
       "",
       `Staging desk: ${STAGING_DESK_URL}`,
       ...tip,
@@ -238,6 +246,7 @@ module.exports = {
   STAGING_DESK_URL,
   NOTE_MARKER,
   decideStage,
+  selectStagingPulls,
   listOpenPullNumbers,
   rebuildStaging,
   statusForPull,

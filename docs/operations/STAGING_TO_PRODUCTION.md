@@ -37,10 +37,10 @@ Staging and production **do not sync automatically**. Promote **code**, **SQL**,
 ## Promotion flow (overview)
 
 ```
-Pull request into main
+Open pull request
       ↓
 stage-pull-request.yml rebuilds cursor/staging-voice-468b
-as main plus pull requests still open
+as main plus every open pull request
       ↓
 Railway staging Voice and Vercel scalers-staging deploy that branch
       ↓
@@ -172,7 +172,7 @@ After env changes: **redeploy** the affected Vercel/Railway service.
 
 | You changed… | Staging action | Production action |
 | --- | --- | --- |
-| React / Next.js desk UI | Open a PR into `main`. Stage workflow puts it on `cursor/staging-voice-468b` with the other open PRs. Test `scalers-staging.vercel.app`. Close the PR to take it off staging. | Squash-merge that PR into `main` (Vercel `scalers-project` follows `main`) |
+| React / Next.js desk UI | Open a PR into `main` so the rebuild starts on open. A PR into another feature branch joins on the next rebuild. Stage workflow puts it on `cursor/staging-voice-468b` with every other open PR. Test `scalers-staging.vercel.app`. Close the PR to take it off staging. | Squash-merge that PR into `main` (Vercel `scalers-project` follows `main`) |
 | `server.js` / voice lane | Same rebuild, then confirm `/healthz.gitSha` is the staging tip and call DID `+254709221536`. Close the PR to take it off the practice line. One-off deploys can still use `staging-voice-deploy.yml` | Squash-merge that PR into `main` (Railway production follows `main`) |
 | New SQL script | Apply on `sgcdncjxauhsbunobmob` | Approved apply on ALCR |
 | Grant / RLS only | SQL on staging | Approved SQL on ALCR |

@@ -7,6 +7,7 @@ const path = require("node:path");
 const {
   STAGING_BRANCH,
   decideStage,
+  selectStagingPulls,
   rebuildStaging,
   noteBody,
   noteRequest,
@@ -90,6 +91,18 @@ describe("decideStage", () => {
       }).reason,
       "staging-branch"
     );
+  });
+});
+
+describe("selectStagingPulls", () => {
+  it("includes a pull request into main and one into another feature branch", () => {
+    const numbers = selectStagingPulls([
+      { number: 10, headRefName: "cursor/older", baseRefName: "main" },
+      { number: 12, headRefName: "cursor/stacked", baseRefName: "cursor/older" },
+      { number: 11, headRefName: STAGING_BRANCH, baseRefName: "main" },
+      { number: 9, headRefName: "cursor/into-staging", baseRefName: STAGING_BRANCH },
+    ]);
+    assert.deepEqual(numbers, [12, 10]);
   });
 });
 
