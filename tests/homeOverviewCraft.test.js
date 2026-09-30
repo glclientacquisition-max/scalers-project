@@ -12,38 +12,28 @@ describe("home overview craft", () => {
   const headerFile = read("dashboard/src/components/HomeOverviewHeader.tsx");
   const triage = read("dashboard/src/lib/callsTriage.ts");
 
-  it("keeps the Scalers lockup and date without a second business name", () => {
-    const header = headerFile.slice(headerFile.indexOf("<header"), headerFile.indexOf("</header>"));
-    assert.match(page, /<HomeOverviewHeader today=\{today\} \/>/);
+  it("opens on Work without an in-page lockup or date", () => {
+    assert.match(page, /<HomeOverviewHeader \/>/);
+    assert.match(page, />\s*Work\s*</);
     const lockup = read("dashboard/src/components/brand/BrandMark.tsx");
     const sm = lockup.slice(lockup.indexOf("sm:"), lockup.indexOf("md:"));
-    assert.doesNotMatch(header, /deskListTitleClass/);
-    assert.doesNotMatch(header, /<h1/);
-    assert.doesNotMatch(header, /\{business\}/);
-    assert.doesNotMatch(header, /text-lg font-semibold/);
-    assert.doesNotMatch(header, /size="lg"/);
-    assert.doesNotMatch(header, /size="xs"/);
-    assert.match(header, /BrandLockup/);
-    assert.match(header, /href=\{null\}/);
-    assert.match(header, /name="Scalers"/);
-    assert.match(header, /size="sm"/);
-    assert.doesNotMatch(header, /markOnly/);
-    assert.doesNotMatch(header, /md:hidden/);
-    assert.match(header, /<time dateTime=\{today\.iso\}>/);
-    assert.match(header, /text-sm text-ink-soft/);
+    assert.doesNotMatch(headerFile, /BrandLockup/);
+    assert.doesNotMatch(headerFile, /<time/);
+    assert.doesNotMatch(headerFile, /<h1/);
+    assert.doesNotMatch(headerFile, /deskListTitleClass/);
+    assert.doesNotMatch(page, /nairobiDateLabel\(\)/);
+    assert.match(triage, /export function nairobiDateLabel/);
     assert.doesNotMatch(lockup, /min-h-11/);
     assert.match(sm, /box: "h-8 w-8"/);
     assert.match(sm, /width: 32/);
     assert.match(sm, /height: 32/);
     assert.doesNotMatch(sm, /text-4xl/);
-    assert.match(page, /nairobiDateLabel\(\)/);
-    assert.match(triage, /export function nairobiDateLabel/);
     assert.doesNotMatch(page, /nairobiGreeting/);
     assert.doesNotMatch(triage, /nairobiGreeting/);
-    assert.doesNotMatch(header, /Good morning|Good afternoon|Good evening|GOOD AFTERNOON/);
-    assert.doesNotMatch(header, /uppercase tracking-\[0\.14em\]/);
-    assert.doesNotMatch(header, /text-center|justify-center/);
-    assert.doesNotMatch(header, /sticky/);
+    assert.doesNotMatch(headerFile, /Good morning|Good afternoon|Good evening|GOOD AFTERNOON/);
+    assert.doesNotMatch(headerFile, /uppercase tracking-\[0\.14em\]/);
+    assert.doesNotMatch(headerFile, /text-center|justify-center/);
+    assert.doesNotMatch(headerFile, /sticky/);
     assert.doesNotMatch(page, />Overview</);
     assert.doesNotMatch(page, /Sign out/);
     const devHome = read("dashboard/src/app/dev/home/page.tsx");
@@ -82,12 +72,15 @@ describe("home overview craft", () => {
     assert.match(cta, /copy\.returnCtaMany/);
   });
 
-  it("earns desktop width with a Next to return column", () => {
+  it("shows the next return as one row at every width", () => {
     assert.match(page, /nextReturn/);
-    assert.match(page, /Next to return/);
-    assert.match(page, /Reply on WhatsApp/);
-    assert.match(page, /DeskRowHit/);
+    assert.match(page, /<ListRow/);
+    assert.match(page, /text-accent/);
     assert.match(page, /Conversation/);
+    assert.doesNotMatch(page, /Next to return/);
+    assert.doesNotMatch(page, /Reply on WhatsApp/);
+    assert.doesNotMatch(page, /#005CCC/);
+    assert.doesNotMatch(page, /lg:hidden/);
     assert.doesNotMatch(page, /Open call/);
     assert.match(page, /lg:col-span-7/);
     assert.match(page, /lg:col-span-5/);
@@ -114,12 +107,12 @@ describe("home overview craft", () => {
     assert.match(note, /DailyBulletinPanel/);
   });
 
-  it("keeps one blue action and shows Next to return on phone", () => {
-    assert.match(page, /variant="ghost"/);
+  it("links the conversation with the accent token on one row", () => {
+    assert.match(page, /text-accent/);
+    assert.match(page, /variant="icon"/);
+    assert.doesNotMatch(page, /variant="ghost"/);
     assert.doesNotMatch(page, /variant="primary"/);
-    assert.match(page, /hidden rounded-2xl border border-line bg-surface p-4 lg:block/);
-    assert.match(page, /lg:hidden/);
-    assert.match(page, /next-return-phone/);
+    assert.doesNotMatch(page, /next-return-phone/);
     assert.match(page, /nextReturn\.callerPhone \|\| nextReturn\.callId/);
   });
 

@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/deskChrome";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { FilterTabs } from "@/components/ui/FilterTabs";
-import { InboxFilterPills } from "@/components/InboxFilterPills";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 
 export function InboxToolbar({
@@ -107,13 +106,14 @@ export function InboxToolbar({
       )}
 
       {archived ? null : (
-      <InboxFilterPills
+      <FilterTabs
         label="Filter by purpose"
         active={current}
         items={filters.map((item) => ({
           id: item.id,
           label: item.label,
           count: chipCounts[item.id],
+          divide: item.divide,
           href: inboxPileHref(item.id, {
             q: query,
             active: current,

@@ -60,7 +60,8 @@ describe("desk control craft", () => {
     );
     assert.doesNotMatch(niche, /id: "archived"/);
     assert.match(read("dashboard/src/components/ui/FilterTabs.tsx"), /item\.divide/);
-    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /<InboxFilterPills/);
+    assert.match(read("dashboard/src/components/InboxToolbar.tsx"), /divide: item\.divide/);
+    assert.doesNotMatch(read("dashboard/src/components/InboxToolbar.tsx"), /InboxFilterPills/);
   });
 
   it("does not keep the unused TriageLeadCard", () => {

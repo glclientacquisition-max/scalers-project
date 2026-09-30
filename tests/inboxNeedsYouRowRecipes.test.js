@@ -170,8 +170,8 @@ describe("Needs you row recipes", () => {
     assert.match(trailing, /recipe === "call_wa"/);
     assert.match(trailing, /InboxJobActions id=\{item.job.id\} status=\{item.job.status\} extra=\{false\}/);
     assert.match(trailing, /RequestStatusToggle id=\{item.hold.id\} status=\{item.hold.status\} extra=\{false\}/);
-    assert.match(trailing, /<CallLink number=\{item.callerPhone\} \/>/);
-    assert.match(trailing, /variant="icon"/);
+    assert.match(trailing, /<IconButtonAnchor/);
+    assert.match(trailing, /tone="whatsapp"/);
     assert.doesNotMatch(trailing, /if \(itemIsArchived\(item\)\)/);
     assert.doesNotMatch(trailing, /if \(item.job\)/);
     assert.doesNotMatch(trailing, /if \(item.hold\)/);

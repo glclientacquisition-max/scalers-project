@@ -261,8 +261,9 @@ describe("inbox swipe wiring", () => {
     assert.match(pills, /bg-gradient-to-l from-surface/);
     assert.doesNotMatch(pills, /md:flex-wrap|md:overflow-visible|max-md/);
     assert.match(toolbar, /inboxPileHref\(item\.id/);
-    const purposeCall = toolbar.match(/<InboxFilterPills[\s\S]*?\/>/);
-    assert.ok(purposeCall, "purpose row is InboxFilterPills");
+    assert.doesNotMatch(toolbar, /InboxFilterPills/);
+    assert.match(toolbar, /<FilterTabs/);
+    assert.match(toolbar, /label="Filter by purpose"/);
     assert.match(niche, /id: "needs"/);
     assert.match(niche, /id: "answered"/);
     assert.doesNotMatch(niche, /label: "Archived"/);

@@ -21,7 +21,7 @@ export default function DevHomePage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <DeskAccountMenu name="Chapter One Dental" tenantId="" workspaces={[]} />
         <main className={deskMainClass}>
-          <HomeOverviewHeader today={{ iso: "2026-09-20", label: "Sunday 20 September" }} />
+          <HomeOverviewHeader />
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
           <section
             className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-1"

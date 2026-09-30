@@ -25,11 +25,12 @@ describe("desk rows open the record", () => {
 
   it("opens Inbox, Contacts, and Home from the row", () => {
     const list = read("dashboard/src/components/ContactListRow.tsx");
-    assert.match(inbox, /InboxRowHit/);
+    assert.match(inbox, /<ListRow/);
+    assert.match(inbox, /href=\{!selecting && openHref \? openHref : undefined\}/);
     assert.match(list, /DeskRowHit/);
     assert.match(contacts, /ContactPhoneRow/);
-    assert.match(home, /DeskRowHit/);
-    assert.match(contact, /DeskRowHit/);
+    assert.match(home, /<ListRow/);
+    assert.match(contact, /inboxFromContactHref|DeskBack/);
   });
 
   it("drops Open and Call list links", () => {

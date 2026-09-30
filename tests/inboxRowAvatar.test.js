@@ -31,19 +31,18 @@ describe("inbox row avatar vs conversation hit", () => {
   });
 
   it("leaves the phone Conversation link wrapping name and preview only", () => {
-    const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
-    const avatarAt = phone.indexOf("<InboxRowAvatar");
-    const openAt = phone.indexOf("<InboxPhoneOpen");
+    const list = inbox.slice(inbox.indexOf("function InboxListRow"));
+    const avatarAt = list.indexOf("<InboxRowAvatar");
+    const openAt = list.indexOf('ariaLabel="Conversation"');
     assert.ok(avatarAt > -1 && openAt > -1);
     assert.ok(avatarAt < openAt, "avatar sits before the Conversation open");
-    assert.match(phone, /InboxTrailingAction/);
+    assert.match(list, /InboxTrailingAction/);
   });
 
-  it("raises the table avatar above DeskRowHit", () => {
-    assert.match(inbox, /deskRowActionClass/);
-    assert.match(inbox, /<InboxRowHit href=\{openHref\} label="Conversation" itemId=\{item.id\} \/>/);
-    const who = inbox.slice(inbox.indexOf("function InboxRowWho"), inbox.indexOf("function InboxTrailingAction"));
-    assert.match(who, /deskRowActionClass/);
-    assert.match(who, /InboxRowAvatar/);
+  it("keeps the avatar outside the conversation link", () => {
+    assert.match(inbox, /ariaLabel="Conversation"/);
+    const list = inbox.slice(inbox.indexOf("function InboxListRow"), inbox.indexOf("export function InboxPhoneRow"));
+    assert.match(list, /aside=/);
+    assert.match(list, /InboxRowAvatar/);
   });
 });

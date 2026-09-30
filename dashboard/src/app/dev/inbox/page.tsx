@@ -2,12 +2,11 @@ import { notFound } from "next/navigation";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { InboxToolbar } from "@/components/InboxToolbar";
-import { InboxPhoneRow, InboxTableRow } from "@/components/InboxItemRow";
-import { InboxArchivedPhoneRow, InboxArchivedTableRow } from "@/components/InboxArchivedRow";
+import { InboxPhoneRow } from "@/components/InboxItemRow";
+import { InboxArchivedPhoneRow } from "@/components/InboxArchivedRow";
 import { InboxRowUiProvider } from "@/components/InboxRowUi";
 import { InboxSelectChrome } from "@/components/InboxRowSelect";
 import { ThemePicker } from "@/components/ThemePicker";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import type { InboxItem } from "@/lib/inboxPurpose";
 import type { TranscriptRow } from "@/lib/supabase";
 
@@ -216,7 +215,7 @@ export default function DevInboxPage() {
           </div>
         </div>
         </InboxSelectChrome>
-        <ul className="mt-8 overflow-hidden rounded-2xl border border-line bg-surface lg:hidden">
+        <ul className="mt-8 list-none divide-y divide-hairline">
           <InboxArchivedPhoneRow count={14} />
           {ROWS.map((row) => (
             <InboxPhoneRow
@@ -228,31 +227,6 @@ export default function DevInboxPage() {
             />
           ))}
         </ul>
-        <div className="mt-8 hidden lg:block">
-          <DeskDataTable minWidthClass="min-w-0">
-            <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-              <tr>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Work</th>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">Caller</th>
-                <th scope="col" className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em]">When</th>
-                <th scope="col" className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em]">Action</th>
-              </tr>
-            </thead>
-              <tbody>
-                <InboxArchivedTableRow count={14} />
-                {ROWS.map((row) => (
-                <InboxTableRow
-                  key={row.id}
-                  item={row}
-                  businessName="Workspace"
-                  purpose="needs"
-                  vertical={null}
-                  ret={{ purpose: "needs" }}
-                />
-              ))}
-            </tbody>
-          </DeskDataTable>
-        </div>
         </InboxRowUiProvider>
         <div className="mt-10">
           <InboxTicketView

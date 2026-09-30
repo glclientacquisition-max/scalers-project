@@ -27,15 +27,16 @@ describe("inbox filters and empty states", () => {
     assert.doesNotMatch(purpose, /if \(lead\.leadStatus === "archived"\) continue/);
     assert.doesNotMatch(niche, /Unread/);
     assert.doesNotMatch(niche, /Assigned to me/);
-    assert.match(toolbar, /<InboxFilterPills/);
-    assert.match(toolbar, /label="Filter by purpose"/);
     assert.match(toolbar, /<FilterTabs/);
+    assert.match(toolbar, /label="Filter by purpose"/);
+    assert.doesNotMatch(toolbar, /InboxFilterPills/);
     assert.match(toolbar, /label="Visit sort"/);
     assert.match(toolbar, /archived \? null/);
     const entry = read("dashboard/src/components/InboxArchivedRow.tsx");
     assert.match(entry, /InboxArchivedPhoneRow/);
     assert.match(entry, /InboxArchivedTableRow/);
-    assert.match(entry, /label="Archived"/);
+    assert.match(entry, /ariaLabel="Archived"/);
+    assert.match(entry, /title="Archived"/);
     assert.match(inbox, /showArchivedEntry/);
     assert.match(board, /ret=\{ret\}/);
     assert.match(page, /backHref=\{archivedBackHref\}/);
@@ -44,12 +45,14 @@ describe("inbox filters and empty states", () => {
     assert.match(harness, /InboxArchivedPhoneRow/);
   });
 
-  it("keeps phone rows through md so the Action dock is not clipped", () => {
+  it("uses one list at every width, not a card and a table", () => {
     const inbox = read("dashboard/src/app/(desk)/calls/page.tsx") +
       read("dashboard/src/components/InboxPileBoard.tsx");
-    assert.match(inbox, /lg:hidden/);
-    assert.match(inbox, /hidden lg:block/);
-    assert.match(inbox, /minWidthClass="min-w-0"/);
+    assert.match(inbox, /divide-y divide-hairline/);
+    assert.doesNotMatch(inbox, /lg:hidden/);
+    assert.doesNotMatch(inbox, /hidden lg:block/);
+    assert.doesNotMatch(inbox, /DeskDataTable/);
+    assert.doesNotMatch(inbox, /rounded-2xl border border-line bg-surface/);
     assert.doesNotMatch(inbox, /min-w-\[720px\]/);
   });
 
@@ -85,26 +88,19 @@ describe("inbox filters and empty states", () => {
     assert.match(toolbar, /inboxPileHref\(item\.id/);
   });
 
-  it("renders the six purpose piles as snap-scrolling pill chips", () => {
+  it("renders purpose filters as the same underline tabs as visit sort", () => {
     const pills = read("dashboard/src/components/InboxFilterPills.tsx");
-    const chrome = read("dashboard/src/components/ui/deskChrome.ts");
     assert.match(pills, /deskRateCardRowClass/);
-    assert.match(pills, /snap-start/);
-    assert.match(pills, /deskRateCardClass/);
-    assert.match(chrome, /rounded-full/);
-    assert.match(chrome, /bg-\[#005CCC\] text-white/);
-    assert.match(pills, /bg-gradient-to-l from-surface/);
-    assert.match(pills, /item\.count/);
-    assert.doesNotMatch(pills, /border-b-2/);
-    assert.doesNotMatch(pills, /filterTabClass/);
-    assert.match(toolbar, /<InboxFilterPills/);
+    assert.doesNotMatch(toolbar, /InboxFilterPills/);
     assert.match(toolbar, /label="Filter by purpose"/);
     assert.match(toolbar, /label="Visit sort"/);
     assert.match(toolbar, /label="Hold sort"/);
     assert.match(toolbar, /label="Work date"/);
-    const purposeCall = toolbar.match(/<InboxFilterPills[\s\S]*?\/>/);
-    assert.ok(purposeCall, "purpose row is InboxFilterPills");
-    assert.doesNotMatch(purposeCall[0], /<FilterTabs/);
+    assert.match(toolbar, /divide: item\.divide/);
+    const purposeAt = toolbar.indexOf('label="Filter by purpose"');
+    const visitAt = toolbar.indexOf('label="Visit sort"');
+    assert.ok(purposeAt > -1 && purposeAt < visitAt);
+    assert.match(toolbar.slice(0, visitAt), /<FilterTabs/);
     assert.doesNotMatch(niche, /Unread|Snooze/);
   });
 });

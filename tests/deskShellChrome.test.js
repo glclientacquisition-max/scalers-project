@@ -69,7 +69,9 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(toolbar, /formatAttentionCount/);
     assert.doesNotMatch(toolbar, /deskStatusChipClass/);
     assert.doesNotMatch(toolbar, /purpose: "needs"/);
-    assert.match(toolbar, /<InboxFilterPills/);
+    assert.match(toolbar, /<FilterTabs/);
+    assert.match(toolbar, /label="Filter by purpose"/);
+    assert.doesNotMatch(toolbar, /InboxFilterPills/);
     assert.match(toolbar, /<h1 className=\{pageTitleClass\}>Archived<\/h1>/);
   });
 
@@ -187,10 +189,9 @@ describe("desk shell chrome", () => {
     assert.doesNotMatch(settingsShell, /max-w-5xl|max-w-xl/);
     assert.doesNotMatch(home, /Sign out/);
     assert.match(home, /HomeOverviewHeader/);
-    assert.match(homeHeader, /BrandLockup/);
-    assert.match(homeHeader, /name="Scalers"/);
-    assert.match(homeHeader, /size="sm"/);
-    assert.match(homeHeader, /href=\{null\}/);
+    assert.doesNotMatch(homeHeader, /BrandLockup/);
+    assert.doesNotMatch(homeHeader, /<time/);
+    assert.doesNotMatch(home, /nairobiDateLabel/);
     assert.doesNotMatch(homeHeader, /markOnly/);
     assert.doesNotMatch(homeHeader, /md:hidden/);
     assert.doesNotMatch(homeHeader, /size="xs"/);
