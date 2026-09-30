@@ -210,7 +210,7 @@ export default function DevContactsPage() {
                   </div>
                 </div>
               </DeskIndexLead>
-              <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <InboxFilterPills
                   label="Filter contacts"
                   active="all"

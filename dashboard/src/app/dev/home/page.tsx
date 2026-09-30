@@ -22,7 +22,11 @@ export default function DevHomePage() {
         <DeskAccountMenu name="Chapter One Dental" tenantId="" workspaces={[]} />
         <main className={deskMainClass}>
           <HomeOverviewHeader today={{ iso: "2026-09-20", label: "Sunday 20 September" }} />
-          <section className="mt-6 min-w-0" aria-labelledby="work-heading">
+          <div className="mt-6 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
+          <section
+            className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-1"
+            aria-labelledby="work-heading"
+          >
             <h2 id="work-heading" className="font-display text-xl tracking-tight text-ink">
               Work
             </h2>
@@ -40,7 +44,19 @@ export default function DevHomePage() {
               ))}
             </ul>
           </section>
-          <section className="mt-6 min-w-0" aria-labelledby="updates-heading">
+          <aside
+            className="min-w-0 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1"
+            aria-label="Today"
+          >
+            <div className="overflow-hidden rounded-2xl border border-line bg-surface px-4 py-4">
+              <p className="text-sm text-ink-soft">Calls today</p>
+              <p className="mt-3 text-sm font-medium text-ink">Line live</p>
+            </div>
+          </aside>
+          <section
+            className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-2"
+            aria-labelledby="updates-heading"
+          >
             <h2
               id="updates-heading"
               className="flex items-center gap-2 font-display text-xl tracking-tight text-ink"
@@ -68,6 +84,7 @@ export default function DevHomePage() {
               />
             </div>
           </section>
+          </div>
           <div className="mt-6 max-w-lg">
             <ThemePicker />
           </div>
