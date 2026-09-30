@@ -24,9 +24,9 @@ describe("desk account bar", () => {
     const visibleName = menu.replace(/aria-label=\{name\}/, "");
     assert.doesNotMatch(visibleName, /\{name\}/);
     const appearance = menu.indexOf(">\n            Appearance\n");
-    const profile = menu.indexOf(">\n            Profile\n");
     const signOut = menu.indexOf('<SignOutButton layout="menu"');
-    assert.ok(appearance > 0 && profile > appearance && signOut > profile);
+    assert.doesNotMatch(menu, />\s*Profile\s*</);
+    assert.ok(appearance > 0 && signOut > appearance);
     assert.match(menu, /role="separator"/);
   });
 

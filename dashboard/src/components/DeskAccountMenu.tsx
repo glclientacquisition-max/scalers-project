@@ -19,7 +19,7 @@ function accountInitials(name: string): string {
   return deskRowInitials(name) || name.trim().slice(0, 1).toUpperCase() || "W";
 }
 
-/** Quiet account trigger. Appearance, Profile, then Sign out. */
+/** Quiet account trigger. Appearance, then Sign out. */
 export function DeskAccountMenu({
   name,
   tenantId,
@@ -139,14 +139,6 @@ export function DeskAccountMenu({
             onClick={() => setOpen(false)}
           >
             Appearance
-          </Link>
-          <Link
-            href="/settings"
-            role="menuitem"
-            className={itemClass}
-            onClick={() => setOpen(false)}
-          >
-            Profile
           </Link>
           <div className="mx-2 my-1 border-t border-line" role="separator" />
           <SignOutButton layout="menu" />
