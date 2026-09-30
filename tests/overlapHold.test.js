@@ -60,17 +60,16 @@ test('B: no during TTS after a yes/no question is queued once', () => {
   assert.strictEqual(hold.drain(2).duplicate, true);
 });
 
-test('C: sawa during TTS after a question is queued as an answer', () => {
+test('C: sawa during TTS after a question does not cut or queue a second turn', () => {
   const d = decideCallerEvent({
     text: 'sawa',
     ...speakingQuestion({ lastAgentAskedQuestion: true }),
   });
-  assert.strictEqual(d.action, 'queue');
-  assert.strictEqual(d.reason, 'answer_yes');
+  assert.strictEqual(d.action, 'ignore');
+  assert.strictEqual(d.reason, 'backchannel');
   assert.strictEqual(d.stopTts, false);
-  const hold = createOverlapHold();
-  hold.enqueue('sawa', 3);
-  assert.strictEqual(hold.drain(3).text, 'sawa');
+  assert.strictEqual(d.runGemini, false);
+  assert.strictEqual(d.queue, false);
 });
 
 console.log('D–E endpoint vs playback');
