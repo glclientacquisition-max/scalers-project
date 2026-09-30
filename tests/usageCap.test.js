@@ -30,7 +30,7 @@ describe("usage cap copy", () => {
     );
   });
 
-  it("says calls still answer and tenant SMS stops when those caps are hit", () => {
+  it("says calls stop and tenant SMS stops when those caps are hit", () => {
     assert.equal(
       usageCapNotice({ ...empty, minutesLeft: 0 }),
       "Included minutes used. Calls stopped."
