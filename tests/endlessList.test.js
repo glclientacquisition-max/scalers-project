@@ -11,7 +11,7 @@ function read(rel) {
 function load() {
   const helperPath = path.join(__dirname, "../dashboard/src/lib/endlessList.ts");
   const script = `
-    import { nextShown, appendUniqueById, LIST_SLICE } from ${JSON.stringify(helperPath)};
+    import { nextShown, appendUniqueById, LIST_SLICE, pullRefreshCommit, listAfterPullRefresh } from ${JSON.stringify(helperPath)};
     const first = [{ id: "a" }, { id: "b" }];
     const more = appendUniqueById(first, [{ id: "b" }, { id: "c" }, { id: "" }]);
     const again = appendUniqueById(more.rows, [{ id: "c" }]);
@@ -24,6 +24,15 @@ function load() {
       added: more.added,
       ids: more.rows.map((row) => row.id),
       again: again.added,
+      phone: pullRefreshCommit({ phone: true, scrollTop: 0, dx: 0, dy: 72 }),
+      nudge: pullRefreshCommit({ phone: true, scrollTop: 0, dx: 0, dy: 20 }),
+      scrolled: pullRefreshCommit({ phone: true, scrollTop: 40, dx: 0, dy: 80 }),
+      sideways: pullRefreshCommit({ phone: true, scrollTop: 0, dx: 90, dy: 80 }),
+      desktop: pullRefreshCommit({ phone: false, scrollTop: 0, dx: 0, dy: 90 }),
+      kept: listAfterPullRefresh([{ id: "a" }], null, true).reset,
+      keptIds: listAfterPullRefresh([{ id: "a" }, { id: "b" }], null, true).rows.map((row) => row.id),
+      fresh: listAfterPullRefresh([{ id: "a" }, { id: "b" }], [{ id: "c" }], false).reset,
+      freshIds: listAfterPullRefresh([{ id: "a" }], [{ id: "c" }], false).rows.map((row) => row.id),
     }));
   `;
   const ran = spawnSync(
@@ -46,6 +55,15 @@ describe("endless list slices", () => {
     assert.equal(out.added, 1);
     assert.deepEqual(out.ids, ["a", "b", "c"]);
     assert.equal(out.again, 0);
+    assert.equal(out.phone, true);
+    assert.equal(out.nudge, false);
+    assert.equal(out.scrolled, false);
+    assert.equal(out.sideways, false);
+    assert.equal(out.desktop, false);
+    assert.equal(out.kept, false);
+    assert.deepEqual(out.keptIds, ["a", "b"]);
+    assert.equal(out.fresh, true);
+    assert.deepEqual(out.freshIds, ["c"]);
   });
 
   it("keeps one contacts dataset for phone and desktop, with a quiet loading row", () => {
@@ -76,5 +94,32 @@ describe("endless list slices", () => {
     assert.match(board, /hidden lg:block/);
     assert.match(board, /listWindowClass/);
     assert.doesNotMatch(board, /<Pagination/);
+  });
+
+  it("pulls to refresh the phone list and keeps rows when the reload fails", () => {
+    const list = read("dashboard/src/components/ContactsEndlessList.tsx");
+    const nav = read("dashboard/src/components/InboxPileNav.tsx");
+    const board = read("dashboard/src/components/InboxPileBoard.tsx");
+    const pull = read("dashboard/src/components/PhonePullRefresh.tsx");
+    const page = read("dashboard/src/app/(desk)/contacts/page.tsx");
+    assert.match(pull, /max-width: 767px/);
+    assert.match(pull, /pullRefreshCommit/);
+    assert.match(pull, /md:hidden/);
+    assert.match(pull, /getClientRects/);
+    assert.match(pull, /Loading/);
+    assert.match(list, /listAfterPullRefresh/);
+    assert.match(list, /Could not load contacts\./);
+    assert.match(list, /loadContactsSlice\(\{ page: 1/);
+    assert.match(list, /setEpoch/);
+    assert.match(list, /DeskError/);
+    assert.match(page, /ContactsPullHost/);
+    assert.match(nav, /refreshInboxList/);
+    assert.match(nav, /Could not load inbox\./);
+    assert.match(nav, /listAfterPullRefresh/);
+    assert.match(nav, /setShown\(DEFAULT_PAGE_SIZE\)/);
+    assert.match(board, /usePhoneListPull/);
+    assert.match(board, /data-pull-root/);
+    assert.doesNotMatch(pull, /[\u2014\u2013]/);
+    assert.doesNotMatch(list, /Pull to refresh/);
   });
 });

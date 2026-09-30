@@ -509,7 +509,7 @@ export function InboxTicketView({
       data-ticket-chat=""
       className="flex h-full min-h-0 flex-1 flex-col pt-[var(--desk-header-h)] pb-[env(safe-area-inset-bottom,0px)] md:pb-0"
     >
-      <header className="shrink-0 border-b border-line bg-surface px-2 py-2 sm:px-4">
+      <header className="shrink-0 border-b border-line bg-surface px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] sm:px-4">
         <DeskRecordLead
           align="center"
           back={

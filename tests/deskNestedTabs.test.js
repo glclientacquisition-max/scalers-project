@@ -113,6 +113,18 @@ describe("desk nested tab hide", () => {
     assert.match(css, /desk-theme:has\(\[data-desk-nested\]\)/);
     assert.match(css, /--desk-tabbar-h:\s*0px/);
     assert.match(css, /\[data-desk-tabbar\]/);
+    assert.match(css, /:not\(\[data-desk-route-ready\]\)/);
+    assert.match(css, /data-desk-nested-route/);
+    const chrome = read("dashboard/src/components/DeskRouteChrome.tsx");
+    const layout = read("dashboard/src/app/(desk)/layout.tsx");
+    assert.match(chrome, /isDeskNestedPath\(pathname, search\)/);
+    assert.match(chrome, /toggleAttribute\("data-desk-nested-route", nested\)/);
+    assert.match(chrome, /data-desk-route-ready/);
+    assert.match(layout, /<DeskRouteChrome \/>/);
+    assert.equal(
+      fs.existsSync(path.join(__dirname, "..", "dashboard/src/app/(desk)/loading.tsx")),
+      false
+    );
   });
 
   it("documents the hide on nested insides, not list roots", () => {

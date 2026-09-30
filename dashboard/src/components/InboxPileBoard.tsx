@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { EndlessSentinel } from "@/components/EndlessList";
+import { PullRefreshMark, usePhoneListPull } from "@/components/PhonePullRefresh";
+import { DeskError } from "@/components/ui/DeskError";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { listWindowClass } from "@/lib/endlessList";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
@@ -161,6 +164,8 @@ export function InboxPileBoard({
   hrefs: Partial<Record<string, string>>;
 }) {
   const nav = useInboxPileNav();
+  const pullRef = useRef<HTMLDivElement>(null);
+  const pulling = usePhoneListPull(pullRef, () => nav?.refreshFirst());
   const purpose = nav?.purpose ?? "all";
   const pageRows = nav?.pageRows || [];
   const page = nav?.page ?? 1;
@@ -176,7 +181,13 @@ export function InboxPileBoard({
     paint !== "pending" && pageRows.length === 0 && !showArchivedEntry;
 
   return (
-    <>
+    <div ref={pullRef} data-pull-root="" className="min-w-0">
+      {nav?.refreshError ? (
+        <div className="mt-4">
+          <DeskError>{nav.refreshError}</DeskError>
+        </div>
+      ) : null}
+      <PullRefreshMark show={pulling || Boolean(nav?.refreshing)} />
       {paint === "pending" ? (
         <InboxPileSwipe
           active={purpose}
@@ -313,6 +324,6 @@ export function InboxPileBoard({
           />
         </>
       )}
-    </>
+    </div>
   );
 }
