@@ -10,11 +10,22 @@ const {
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
 const {
+  ackIsConsent,
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
   looksLikeUrgentContact,
 } = require('./callCorrectives');
 const { mergeWorkResults } = require('./callResolution');
+const {
+  isHomeVisitState,
+  mergeTimeAnswer,
+  timeAskCount,
+  clockPhrase,
+  dayCue,
+  whenHasClockTime,
+  whenNeedsClockTime,
+  whenValue,
+} = require('./visitTime');
 const {
   applyLiveCallerFile,
   formatReturningFileForCallState,
@@ -29,6 +40,7 @@ const {
 } = require('./visitTalk');
 const {
   decideVisitPlace,
+  foldCanonicalPlace,
   isLocationRefusal,
   preferVisitPlace,
 } = require('./visitLocation');
@@ -280,8 +292,12 @@ function createBrainState(profile = {}) {
       hearAgain: false,
       phatic: false,
       nonConsentAck: false,
+      consentAck: false,
       leaveIt: false,
+      pendingHour: null,
+      timeWaived: false,
       locationDetailAsked: false,
+      areaAsked: false,
       locationRefusals: 0,
     },
     emotion: {
@@ -310,6 +326,7 @@ function createBrainState(profile = {}) {
       lastResults: [],
       savedWork: [],
       openHolds: [],
+      refusedHours: [],
     },
   };
 }
@@ -356,7 +373,10 @@ function observeCallerTurn(state, input = {}) {
   next.conversation.stage = next.goal.status === 'unknown' ? 'discovery' : 'understanding';
   next.conversation.hearAgain = isHearAgainSignal(text);
   next.conversation.phatic = looksLikePhaticCallerTurn(text);
-  next.conversation.nonConsentAck = looksLikeNonConsentAck(text);
+  // Okay after "Should I continue?" is a yes. Okay anywhere else is a filler.
+  next.conversation.consentAck = ackIsConsent(next.conversation.questionsAsked, text);
+  next.conversation.nonConsentAck =
+    looksLikeNonConsentAck(text) && !next.conversation.consentAck;
   next.conversation.leaveIt = looksLikeLeaveIt(text);
   if (text) next.conversation.answersReceived.push(text);
   next.conversation.answersReceived = next.conversation.answersReceived.slice(-8);
@@ -405,6 +425,24 @@ function observeCallerTurn(state, input = {}) {
 
   if (input.entities && typeof input.entities === 'object') {
     next.entities = { ...next.entities, ...input.entities };
+  }
+  const previousWhen = entityValue(state?.entities?.when);
+  const incomingWhen = entityValue(next.entities?.when);
+  if (
+    previousWhen &&
+    incomingWhen &&
+    incomingWhen !== previousWhen &&
+    dayCue(previousWhen) &&
+    !dayCue(incomingWhen) &&
+    whenHasClockTime(incomingWhen)
+  ) {
+    next.entities.when = {
+      ...(typeof next.entities.when === 'object' ? next.entities.when : {}),
+      value: `${dayCue(previousWhen)} ${incomingWhen}`.trim(),
+      source: 'caller_explicit',
+      confidence: 0.9,
+      confirmed: false,
+    };
   }
   const { collectKnownCallerNames } = require('./callerNameMatch');
   const nameResolution = applyCallerNameConfirmation(
@@ -474,7 +512,13 @@ function observeCallerTurn(state, input = {}) {
       entityValue(next.entities?.location) || entityValue(next.entities?.landmark);
     const previous =
       entityValue(state?.entities?.location) || entityValue(state?.entities?.landmark);
-    const place = preferVisitPlace(previous, incoming, text);
+    const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
+    const place = foldCanonicalPlace(
+      lastAsk === 'area' && previous && incoming && !/[\s,]/.test(incoming.trim())
+        ? `${incoming.trim()}, ${previous}`
+        : preferVisitPlace(previous, incoming, text),
+      input.profile
+    );
     const keptSpecific = Boolean(place && incoming && place !== incoming);
     if (keptSpecific) {
       next.entities.location = {
@@ -492,6 +536,7 @@ function observeCallerTurn(state, input = {}) {
       next.visitPlace = decideVisitPlace(place, {
         profile: input.profile || {},
         detailAsked: Boolean(next.conversation.locationDetailAsked),
+        areaAsked: Boolean(next.conversation.areaAsked),
         refusals: Number(next.conversation.locationRefusals || 0),
       });
     } else {
@@ -500,12 +545,60 @@ function observeCallerTurn(state, input = {}) {
   } else {
     next.visitPlace = null;
   }
+  next = applyVisitTimeAnswer(next, text, input.profile || {});
   next.goal.missingSlots = missingGoalSlots(next, {
     ...(input.profile || {}),
     vertical: input.profile?.vertical || next.vertical,
   });
   return next;
 }
+
+/**
+ * Time slot ladder for home visits. Ask 1: what time. Ask 2: morning or
+ * afternoon. A bare hour waits for its half of the day. After two asks with
+ * no time, waive to a callback note. Never loop the same ask.
+ */
+function applyVisitTimeAnswer(state, text, profile = {}) {
+  const next = state;
+  const asked = timeAskCount(next);
+  const lastAsk = (next.conversation.questionsAsked || []).slice(-1)[0];
+  const answeringTime = lastAsk === 'time' || next.conversation.pendingHour != null;
+  const homeVisit = isHomeVisitState(next, profile);
+  if (!homeVisit || !text) return next;
+  const when = whenValue(next);
+  if (answeringTime && when && !whenHasClockTime(when)) {
+    const merged = mergeTimeAnswer({
+      when,
+      pendingHour: next.conversation.pendingHour ?? null,
+      text,
+    });
+    if (merged.changed) {
+      next.conversation.pendingHour = merged.pendingHour;
+      if (merged.when !== when) {
+        next.entities.when = {
+          value: merged.when,
+          source: 'caller_explicit',
+          confidence: 0.9,
+          confirmed: true,
+        };
+      }
+      return next;
+    }
+  }
+  const noPreference = TIME_NO_PREFERENCE.test(text);
+  if (
+    answeringTime &&
+    (asked >= 2 || (asked >= 1 && noPreference)) &&
+    whenNeedsClockTime(next, profile)
+  ) {
+    next.conversation.timeWaived = true;
+    next.conversation.pendingHour = null;
+  }
+  return next;
+}
+
+const TIME_NO_PREFERENCE =
+  /\b(any ?time|anytime|whenever|any (?:is|time is) fine|don'?t (?:know|mind|care)|not sure|wakati wowote|saa yoyote|sijui|yoyote)\b/i;
 
 function setNextBestAction(state, decision = {}) {
   const next = structuredClone(state || createBrainState());
@@ -522,6 +615,7 @@ function setNextBestAction(state, decision = {}) {
     ) {
       next.conversation.locationDetailAsked = true;
     }
+    if (askedPlace === 'area') next.conversation.areaAsked = true;
   } else {
     next.resolution.targetSlot = null;
   }
@@ -592,6 +686,33 @@ function recordActionResults(state, results = []) {
       : {}),
     ...(result.soft ? { soft: true } : {}),
   }));
+  if (!Array.isArray(next.actions.refusedHours)) next.actions.refusedHours = [];
+  for (const result of safeResults) {
+    if (result?.status === 'invalid' && result?.code === 'outside_hours') {
+      const whenText = String(
+        result.value?.whenText || result.value?.when_text || result.hours?.whenText || ''
+      ).trim();
+      if (whenText && !next.actions.refusedHours.includes(whenText)) {
+        next.actions.refusedHours.push(whenText);
+      }
+      const current = whenValue(next);
+      const refusedClock = clockPhrase(whenText);
+      if (current && refusedClock && clockPhrase(current) === refusedClock) {
+        const day = dayCue(current);
+        if (day) {
+          next.entities.when = {
+            value: day,
+            source: 'caller_explicit',
+            confidence: 0.9,
+            confirmed: false,
+          };
+        }
+      }
+    }
+  }
+  if (next.actions.refusedHours.length) {
+    next.goal.missingSlots = missingGoalSlots(next, { vertical: next.vertical });
+  }
   if (!Array.isArray(next.actions.savedWork)) next.actions.savedWork = [];
   next.actions.savedWork = mergeWorkResults(
     next.actions.savedWork,
@@ -715,6 +836,12 @@ function formatBrainStateForPrompt(state) {
     formatReturningFileForCallState(value.returning),
     value.conversation?.nonConsentAck
       ? '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
+      : '',
+    value.conversation?.consentAck
+      ? '- The caller answered your confirm ask with Okay. That is a yes. Proceed with the tool. Do not ask again.'
+      : '',
+    value.conversation?.timeWaived
+      ? '- No visit time after two asks. Do not ask again. Save a callback note with the day via create_service_request. The team confirms the time. Do not say booked.'
       : '',
     value.conversation?.phatic
       ? speakerPendingOnFile(value.returning)

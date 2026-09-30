@@ -14,6 +14,7 @@ const {
   classifyVisitLocation,
   assessCoverage,
   appendVisitNotes,
+  hasCoverageText,
   mentionsPin,
 } = require('./visitLocation');
 
@@ -350,6 +351,10 @@ function validateEscalation(raw, { agentName = '', businessName = '', knownNames
 }
 
 function stampVisitWindow(value, hours) {
+  // A period ("tomorrow morning") is not a clock. Drop any 10:00 the model sent.
+  if (hours?.resolved?.periodLabel) {
+    return { ...value, windowStart: '', windowEnd: '' };
+  }
   const instant = hours?.resolved?.instant;
   if (!instant || Number.isNaN(instant.getTime())) return value;
   const iso = instant.toISOString();
@@ -387,6 +392,8 @@ function applyVisitPlaceNotes(value, profile) {
     notes: appendVisitNotes(value.notes, {
       confirmAccess: quality === 'area_only' && coverage === 'inside',
       pinNote: mentionsPin(value.landmark),
+      areaUnconfirmed:
+        quality === 'findable' && coverage === 'unknown' && hasCoverageText(profile),
     }),
   };
 }
@@ -442,6 +449,19 @@ function validateCreateAppointment(
       value,
     };
   }
+  const coverageProfile = visitCoverageProfile({
+    businessPolicies,
+    businessLocations,
+  });
+  if (outsideVisitPlace(place, coverageProfile)) {
+    return {
+      valid: false,
+      reason: 'Outside coverage.',
+      code: 'outside_coverage',
+      missingSlots: [],
+      value,
+    };
+  }
   const hours = visitTimeGate(value.whenText, {
     hoursSchedule,
     now,
@@ -453,19 +473,6 @@ function validateCreateAppointment(
       code: hours.code,
       missingSlots: ['when_text'],
       hours: hours.hours,
-      value,
-    };
-  }
-  const coverageProfile = visitCoverageProfile({
-    businessPolicies,
-    businessLocations,
-  });
-  if (outsideVisitPlace(place, coverageProfile)) {
-    return {
-      valid: false,
-      reason: 'Outside coverage.',
-      code: 'outside_coverage',
-      missingSlots: [],
       value,
     };
   }
@@ -967,13 +974,19 @@ function formatVisitTimeProblem(code, hours, language) {
   }
   if (code === 'outside_hours') {
     const until = hours.closeLabel || 'close';
+    const from = hours.openLabel || 'open';
+    if (hours.beforeOpen) {
+      if (sw) return `Tuko wazi kutoka ${from}. Huo muda uko nje ya masaa. Saa ngapi baada ya ${from}?`;
+      if (sheng) return `Tuko open kutoka ${from}. Hiyo time iko nje ya hours. Time gani baada ya ${from}?`;
+      return `We're open from ${from}. That time is outside our hours. What time after ${from}?`;
+    }
     if (sw) {
       return `Tuko wazi hadi ${until}. Huo muda uko nje ya masaa. Ungependa muda kabla ya ${until}?`;
     }
     if (sheng) {
       return `Tuko open hadi ${until}. Hiyo time iko nje ya hours. Time kabla ya ${until}?`;
     }
-    return `We're open until ${until}. That time is outside our hours. Would you like a time before ${until}?`;
+    return `We're open until ${until}. That time is outside our hours. What time before ${until}?`;
   }
   if (code === 'currently_closed') {
     if (sw) {
@@ -985,12 +998,24 @@ function formatVisitTimeProblem(code, hours, language) {
     return "We're closed right now. I can still take a visit during normal business hours.";
   }
   if (code === 'unparsed_when') {
+    // A day is already on file: ask only for the time. Never re-ask the day.
+    const day = DAY_CUE.exec(String(hours?.whenText || ''))?.[1]?.toLowerCase() || '';
+    if (day) {
+      const daySw =
+        day === 'tomorrow' || day === 'kesho' ? 'kesho' : day === 'today' || day === 'leo' ? 'leo' : 'siku hiyo';
+      if (sw) return `Saa ngapi ${daySw}?`;
+      if (sheng) return `Time gani ${daySw}?`;
+      return `What time ${day}?`;
+    }
     if (sw) return 'Niambie siku na saa unayopendelea.';
     if (sheng) return 'Niambie day na time unataka.';
     return 'What day and time would you prefer?';
   }
   return '';
 }
+
+const DAY_CUE =
+  /\b(today|tomorrow|tonight|leo|kesho|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jumatatu|jumanne|jumatano|alhamisi|ijumaa|jumamosi|jumapili)\b/i;
 
 function formatToolConfirmation(results = [], language = 'en') {
   const meaningful = results.find((result) =>
@@ -1042,7 +1067,11 @@ function formatToolConfirmation(results = [], language = 'en') {
         if (sheng) return 'Hiyo area iko nje. Naweza andika callback.';
         return 'That area is outside our coverage. I can note a callback.';
       }
-      const timeProblem = formatVisitTimeProblem(code, hours, lang);
+      const timeProblem = formatVisitTimeProblem(
+        code,
+        { ...(hours || {}), whenText: hours?.whenText || meaningful.value?.whenText || '' },
+        lang
+      );
       if (timeProblem) return timeProblem;
       const missing = Array.isArray(meaningful.missingSlots)
         ? meaningful.missingSlots

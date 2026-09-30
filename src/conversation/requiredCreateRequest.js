@@ -4,6 +4,8 @@ const { entityValue } = require('./entityExtraction');
 const { offeredVertical } = require('./vertical');
 const { appendVisitNotes } = require('./visitLocation');
 const { looksLikeLeaveIt, looksLikeNonConsentAck } = require('./callCorrectives');
+const { clockPhrase, dayCue, whenHasClockTime } = require('./visitTime');
+const { numbersIn } = require('./numberWords');
 
 const REQUEST_INTENTS = new Set([
   'hold',
@@ -108,6 +110,128 @@ function buildServiceRequest(state = {}) {
   };
 }
 
+/** Day known, time never given. Save the visit as a callback note, not a calendar slot. */
+function mentionsRefusedClock(whenText, state) {
+  const clock = clockPhrase(whenText);
+  if (!clock) return false;
+  return (state?.actions?.refusedHours || []).some((item) => clockPhrase(item) === clock);
+}
+
+function withoutRefusedClock(text, state) {
+  let out = String(text || '');
+  for (const item of state?.actions?.refusedHours || []) {
+    const clock = String(item || '').match(/\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)/i);
+    if (!clock) continue;
+    const phrase = clock[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+    out = out.replace(new RegExp(`\\b(?:at\\s+)?${phrase}\\b`, 'ig'), ' ');
+  }
+  return clean(out);
+}
+
+function buildVisitCallback(state = {}) {
+  const service = slot(state, ['service', 'product', 'requestedItem']);
+  const place = slot(state, ['location', 'landmark']);
+  let whenText = slot(state, ['when']);
+  if (mentionsRefusedClock(whenText, state)) whenText = dayCue(whenText);
+  return {
+    type: 'callback',
+    name: callerName(state),
+    phone: callerPhone(state),
+    item: service || 'visit',
+    quantity: '',
+    whenText,
+    notes: clean(
+      [
+        'Visit time to confirm.',
+        place ? `Place: ${place}.` : '',
+        withoutRefusedClock(state.goal?.description || '', state),
+      ]
+        .filter(Boolean)
+        .join(' '),
+      400
+    ),
+  };
+}
+
+function latestCallerTurn(state = {}) {
+  return String((state.conversation?.answersReceived || []).slice(-1)[0] || '');
+}
+
+/** Okay, Sawa, Then, or leave it. Not consent unless it answered a confirm ask. */
+function ackWithoutConsent(state = {}) {
+  if (state.conversation?.leaveIt) return true;
+  if (state.conversation?.consentAck) return false;
+  const latest = latestCallerTurn(state);
+  return (
+    Boolean(state.conversation?.nonConsentAck) ||
+    looksLikeNonConsentAck(latest) ||
+    looksLikeLeaveIt(latest)
+  );
+}
+
+function callerSaidNumber(state = {}, value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (!raw) return true;
+  const digits = raw.match(/\d+/g) || [];
+  if (!digits.length) return true;
+  const turns = (state.conversation?.answersReceived || []).join('. ');
+  const said = numbersIn(turns);
+  if (/\b(?:one|moja)\b/i.test(turns)) said.add('1');
+  return digits.every((d) => said.has(d.replace(/^0+(?=\d)/, '')));
+}
+
+/**
+ * Tool contract for every playbook. Applied to Gemini's own markers and to
+ * injected ones. An acknowledgment never fires a save. A quantity the caller
+ * never said is dropped. A visit with a day but no time is not a calendar row.
+ */
+function guardToolPlan(parsed, state = {}, capabilities = {}) {
+  const next = parsed && typeof parsed === 'object' ? { ...parsed } : {};
+  if (ackWithoutConsent(state)) {
+    delete next.serviceRequest;
+    delete next.appointment;
+    delete next.appointmentUpdate;
+    delete next.escalate;
+    next.consentBlocked = true;
+    return next;
+  }
+  if (next.appointment && typeof next.appointment === 'object') {
+    const whenText = String(next.appointment.whenText || next.appointment.when_text || '');
+    if (mentionsRefusedClock(whenText, state)) delete next.appointment;
+  }
+  if (next.serviceRequest && typeof next.serviceRequest === 'object') {
+    const whenText = String(next.serviceRequest.whenText || next.serviceRequest.when_text || '');
+    if (mentionsRefusedClock(whenText, state)) {
+      if (state.conversation?.timeWaived) {
+        next.serviceRequest = {
+          ...next.serviceRequest,
+          whenText: dayCue(whenText),
+          notes: withoutRefusedClock(next.serviceRequest.notes || '', state),
+        };
+      } else {
+        delete next.serviceRequest;
+      }
+    }
+  }
+  if (next.serviceRequest && typeof next.serviceRequest === 'object') {
+    const request = { ...next.serviceRequest };
+    if (!callerSaidNumber(state, request.quantity)) request.quantity = '';
+    next.serviceRequest = request;
+  }
+  if (next.appointment && typeof next.appointment === 'object') {
+    const whenText = String(next.appointment.whenText || next.appointment.when_text || '');
+    if (whenText && dayCue(whenText) && !whenHasClockTime(whenText)) {
+      if (state.conversation?.timeWaived && capabilities.createServiceRequest) {
+        if (!next.serviceRequest) next.serviceRequest = buildVisitCallback(state);
+      } else {
+        next.needsVisitTime = whenText;
+      }
+      delete next.appointment;
+    }
+  }
+  return next;
+}
+
 function appointmentReady(payload) {
   return Boolean(
     payload.serviceName && payload.name && payload.whenText && payload.landmark
@@ -138,19 +262,16 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
   const action = String(state.resolution?.nextBestAction || '');
   if (action !== 'CREATE_REQUEST') return next;
   if (!slotsComplete(state)) return next;
-  const latest = String((state.conversation?.answersReceived || []).slice(-1)[0] || '');
-  if (
-    state.conversation?.nonConsentAck ||
-    state.conversation?.leaveIt ||
-    looksLikeNonConsentAck(latest) ||
-    looksLikeLeaveIt(latest)
-  ) {
-    return next;
-  }
+  if (ackWithoutConsent(state)) return next;
   if (!REQUEST_INTENTS.has(intentId(state))) return next;
 
   if (isHomeVisit(state)) {
     if (next.appointment || next.appointmentUpdate) return next;
+    if (state.conversation?.timeWaived && intentId(state) === 'booking') {
+      if (!capabilities.createServiceRequest || next.serviceRequest) return next;
+      next.serviceRequest = buildVisitCallback(state);
+      return next;
+    }
     if (intentId(state) === 'cancellation' || intentId(state) === 'cancel' || intentId(state) === 'reschedule') {
       if (!capabilities.updateAppointment) return next;
       const payload = buildAppointmentUpdate(state);
@@ -188,7 +309,9 @@ function formatCreateRequestDirective(state = {}) {
   const tool = homeVisit
     ? cancel
       ? 'update_appointment'
-      : 'create_appointment'
+      : state.conversation?.timeWaived
+        ? 'create_service_request'
+        : 'create_appointment'
     : 'create_service_request';
 
   return [
@@ -199,6 +322,8 @@ function formatCreateRequestDirective(state = {}) {
 }
 
 module.exports = {
+  buildVisitCallback,
   ensureRequiredCreateRequest,
   formatCreateRequestDirective,
+  guardToolPlan,
 };

@@ -9,6 +9,7 @@ const {
 const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech } = require('./callCorrectives');
+const { guardSpokenReply } = require('./speechGuard');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
@@ -361,15 +362,29 @@ function stripPrematureOutcomeClaims(text, opts = {}) {
   return raw;
 }
 
+/**
+ * Final spoken text. When the caller has a brain state (`opts.state`) the
+ * speech guard runs too: no new numbers, no saved claim without a tool result,
+ * no coverage flip, no transfer claim. See speechGuard.js.
+ */
 function polishSpokenReply(text, opts = {}) {
+  let spoken = stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true });
+  // Guard whole sentences first. Stripping a verb phrase after the fact would
+  // leave a fragment ("that for you.") that the guard can no longer see.
+  if (opts.state || opts.profile) {
+    spoken = guardSpokenReply(spoken, {
+      callerTurns: opts.callerTurns || opts.state?.conversation?.answersReceived || [],
+      profile: opts.profile || {},
+      toolResults: opts.toolResults || [],
+      capabilities: opts.capabilities || {},
+      extra: JSON.stringify(opts.state?.entities || {}),
+      state: opts.state,
+      language: opts.language,
+      allowEmpty: true,
+    });
+  }
   return trimSpokenServiceDump(
-    stripPrematureOutcomeClaims(
-      stripSpokenHedges(
-        stripSpokenInstructionLeaks(prepareStreamedSpeech(text), { final: true }),
-        opts
-      ),
-      opts
-    ),
+    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
     opts
   );
 }
@@ -437,6 +452,10 @@ function pickClarifyProgress(opts = {}) {
   if (slot === 'location' || slot === 'landmark') {
     if (sw) return 'Sawa. Tuje wapi?';
     return 'Okay. Where should we come?';
+  }
+  if (slot === 'area') {
+    if (sw) return 'Sawa. Hiyo ni eneo gani?';
+    return 'Okay. Which area is that in?';
   }
   if (slot === 'service' || slot === 'subject' || slot === 'catalog_item') {
     if (sw) return 'Sawa. Unahitaji huduma gani?';

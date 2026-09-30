@@ -281,6 +281,7 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
 
   const instant = eatInstant(now, offset, minutes);
   const parts = eatParts(instant);
+  const periodLabel = clock == null ? periodWord(raw) : '';
   return {
     ok: true,
     instant,
@@ -288,7 +289,17 @@ function resolveAppointmentWhen(whenText, now = new Date()) {
     weekday: parts.weekday,
     weekdayLong: parts.weekdayLong,
     minutesSinceMidnight: minutes,
+    periodLabel,
   };
+}
+
+function periodWord(raw) {
+  const text = String(raw || '');
+  if (/\b(morning|asubuhi)\b/i.test(text)) return 'morning';
+  if (/\b(afternoon|mchana)\b/i.test(text)) return 'afternoon';
+  if (/\b(evening|jioni)\b/i.test(text)) return 'evening';
+  if (/\btonight\b/i.test(text)) return 'tonight';
+  return '';
 }
 
 function nextOpenDay(schedule, now = new Date()) {
@@ -344,6 +355,7 @@ function classifyInstant(schedule, instant, { isNow = false } = {}) {
       code: CODES.outside_hours,
       valid: false,
       enforced: true,
+      beforeOpen: t < open,
       weekday: parts.weekday,
       weekdayLong: parts.weekdayLong || FULL_DAY[parts.weekday],
       open: day.open,
@@ -395,8 +407,13 @@ function formatRequestedWhenLabel(hours, language = 'en') {
     resolved.weekdayLong ||
     FULL_DAY[resolved.weekday] ||
     '';
+  if (!day) return '';
+  // A period is the caller's word. Morning is not 10:00.
+  if (resolved.periodLabel) {
+    return lang === 'en' ? `${day} ${resolved.periodLabel}` : `${day}, ${resolved.periodLabel}`;
+  }
   const time = minutesToHour12(resolved.minutesSinceMidnight);
-  if (!day || !time) return '';
+  if (!time) return '';
   return lang === 'en' ? `${day} at ${time}` : `${day}, ${time}`;
 }
 

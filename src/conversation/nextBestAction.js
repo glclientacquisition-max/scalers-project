@@ -144,7 +144,9 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
   }
 
   const placeGate = String(state?.visitPlace?.blocked || '');
-  const ackOnly = looksLikeNonConsentAck(latestUtterance) || looksLikeLeaveIt(latestUtterance);
+  const ackOnly =
+    !state?.conversation?.consentAck &&
+    (looksLikeNonConsentAck(latestUtterance) || looksLikeLeaveIt(latestUtterance));
   if (placeGate === 'outside') {
     return {
       action: ACTIONS.ANSWER,

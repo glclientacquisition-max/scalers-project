@@ -134,6 +134,7 @@ const {
 const {
   ensureRequiredCreateRequest,
   formatCreateRequestDirective,
+  guardToolPlan,
 } = require('./src/conversation/requiredCreateRequest');
 
 /** Per-call tool toggles (escalate / end_call) from tenants.agent_tools. */
@@ -200,22 +201,12 @@ const {
   shouldSkipCallerTurn,
   shouldSpeakThinkingAck,
   looksLikeBareCloser,
-  looksLikePhaticCallerTurn,
-  looksLikeIdentityQuestion,
-  looksLikeRobotQuestion,
-  pickIdentityReply,
-  pickPhaticReply,
   polishSpokenReply,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
-const {
-  pickCorrectiveReply,
-  prepareStreamedSpeech,
-} = require('./src/conversation/callCorrectives');
-const {
-  visitBlockSpeech,
-  coverageAskSpeech,
-} = require('./src/conversation/visitLocation');
+const { prepareStreamedSpeech } = require('./src/conversation/callCorrectives');
+const { resolveLocalReply } = require('./src/conversation/turnPolicy');
+const { guardSpokenReply } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -2404,95 +2395,32 @@ mediaWss.on('connection', (ws, req) => {
     let spokeThisTurn = false;
     let progressAlreadySpoken = false;
     try {
-      if (looksLikeRobotQuestion(clean) || looksLikeIdentityQuestion(clean)) {
-        const identityLine = pickIdentityReply({
-          agentName,
-          businessName,
-          discloseAi: looksLikeRobotQuestion(clean),
-        });
-        console.log(
-          `[ws/media][${callKey}] identity local reply lang=${callLanguage}: ${identityLine}`
-        );
-        callTranscript.pushAgent(identityLine);
-        messages.push({ role: 'assistant', content: identityLine, local: true });
-        turnTiming.markFirstSpokenChunk();
-        await speakText(identityLine);
-        spokeThisTurn = true;
-        logTurnTiming(turnTiming, { outcome: 'identity' });
-        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-        return;
-      }
-
-      const coverageLine = coverageAskSpeech(clean, brainProfile, callLanguage);
-      if (coverageLine) {
-        console.log(
-          `[ws/media][${callKey}] coverage local reply lang=${callLanguage}: ${coverageLine}`
-        );
-        callTranscript.pushAgent(coverageLine);
-        messages.push({ role: 'assistant', content: coverageLine, local: true });
-        turnTiming.markFirstSpokenChunk();
-        await speakText(coverageLine);
-        spokeThisTurn = true;
-        logTurnTiming(turnTiming, { outcome: 'coverage' });
-        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-        return;
-      }
-
-      const placeBlockLine = visitBlockSpeech(
-        brainState.visitPlace?.blocked,
-        callLanguage
-      );
-      if (placeBlockLine && !/^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i.test(clean)) {
-        console.log(
-          `[ws/media][${callKey}] visit block local reply lang=${callLanguage}: ${placeBlockLine}`
-        );
-        callTranscript.pushAgent(placeBlockLine);
-        messages.push({ role: 'assistant', content: placeBlockLine, local: true });
-        turnTiming.markFirstSpokenChunk();
-        await speakText(placeBlockLine);
-        spokeThisTurn = true;
-        logTurnTiming(turnTiming, { outcome: 'visit_block' });
-        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-        return;
-      }
-
-      const correctiveLine = pickCorrectiveReply({
+      // One turn contract for every playbook: identity → coverage ask →
+      // place block → corrective → visit time ladder → phatic. Gemini only
+      // runs when this returns null. See docs/agents/BRAIN_TURN_CONTRACT.md.
+      const localReply = resolveLocalReply({
         text: clean,
         state: brainState,
+        profile: brainProfile,
         language: callLanguage,
+        agentName,
+        businessName,
+        nextBestAction,
       });
-      if (correctiveLine) {
+      if (localReply) {
         console.log(
-          `[ws/media][${callKey}] corrective local reply lang=${callLanguage}: ${correctiveLine}`
+          `[ws/media][${callKey}] ${localReply.outcome} local reply lang=${callLanguage}: ${localReply.line}`
         );
-        callTranscript.pushAgent(correctiveLine);
-        messages.push({ role: 'assistant', content: correctiveLine, local: true });
+        callTranscript.pushAgent(localReply.line);
+        messages.push({ role: 'assistant', content: localReply.line, local: true });
         turnTiming.markFirstSpokenChunk();
-        await speakText(correctiveLine);
+        await speakText(localReply.line);
         spokeThisTurn = true;
-        logTurnTiming(turnTiming, { outcome: 'corrective' });
+        logTurnTiming(turnTiming, { outcome: localReply.outcome });
         if (activeTurnTiming === turnTiming) activeTurnTiming = null;
         return;
       }
-
       const bareCloser = looksLikeBareCloser(clean);
-      if (!bareCloser && looksLikePhaticCallerTurn(clean)) {
-        const phaticLine = pickPhaticReply({
-          language: callLanguage,
-          callerMemory: brainProfile.callerMemory,
-        });
-        console.log(
-          `[ws/media][${callKey}] phatic local reply lang=${callLanguage}: ${phaticLine}`
-        );
-        callTranscript.pushAgent(phaticLine);
-        messages.push({ role: 'assistant', content: phaticLine, local: true });
-        turnTiming.markFirstSpokenChunk();
-        await speakText(phaticLine);
-        spokeThisTurn = true;
-        logTurnTiming(turnTiming, { outcome: 'phatic' });
-        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
-        return;
-      }
 
       const actionMayExecute = ['CREATE_REQUEST', 'CAPTURE', 'ESCALATE', 'TRANSFER'].includes(
         nextBestAction.action
@@ -2649,7 +2577,19 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       async function onSpokenChunk(chunk) {
-        const text = prepareStreamedSpeech(String(chunk || ''));
+        // Streamed chunks are spoken before tools run, so a saved claim or a
+        // number the caller never said must not reach TTS. Confirmation of a
+        // save comes from formatToolConfirmation after the tool result.
+        const text = guardSpokenReply(prepareStreamedSpeech(String(chunk || '')), {
+          callerTurns: brainState.conversation?.answersReceived || [],
+          profile: brainProfile,
+          toolResults: [],
+          capabilities,
+          extra: JSON.stringify(brainState.entities || {}),
+          state: brainState,
+          language: callLanguage,
+          allowEmpty: true,
+        });
         if (!text || !tts) return;
         firstSpokenChunk = true;
         spokeThisTurn = true;
@@ -4215,6 +4155,23 @@ function spokenTextWithoutToolFallback({ spoken = '', actionConfirmation = '' } 
   return actionConfirmation ? '' : '';
 }
 
+/**
+ * Context for the final speech guard: the caller's own words, the business
+ * file, and this turn's tool results are the only sources of numbers and of
+ * saved claims. Same contract as the streamed chunks.
+ */
+function finalSpeechGuardOpts(callSid, toolResults = []) {
+  const state = callBrainStates.get(callSid) || createBrainState();
+  return {
+    language: state.language?.current || 'en',
+    state,
+    profile: callTenantProfiles.get(callSid) || {},
+    capabilities: callBrainCapabilities.get(callSid) || {},
+    callerTurns: state.conversation?.answersReceived || [],
+    toolResults,
+  };
+}
+
 async function safeApplyGeminiTools(callSid, parsed) {
   try {
     return await applyGeminiTools(callSid, parsed);
@@ -4291,11 +4248,23 @@ async function applyGeminiTools(callSid, parsed) {
     capabilitiesForProfile(callTenantProfiles.get(callSid) || {}, tools);
   const state = callBrainStates.get(callSid) || createBrainState();
   const groundedProfile = callTenantProfiles.get(callSid) || {};
-  const enforcedParsed = ensureRequiredEscalate(
-    ensureRequiredCreateRequest(parsed, state, capabilities),
+  // Tool contract: required tools first, then the guard strips what the caller
+  // never consented to or never said (ack turns, invented quantity, day-only
+  // visits). Gemini's own markers pass through the same gate as injected ones.
+  const enforcedParsed = guardToolPlan(
+    ensureRequiredEscalate(
+      ensureRequiredCreateRequest(parsed, state, capabilities),
+      state,
+      capabilities
+    ),
     state,
     capabilities
   );
+  if (enforcedParsed.consentBlocked || enforcedParsed.needsVisitTime) {
+    console.log(
+      `[${callSid}] tool guard ${enforcedParsed.consentBlocked ? 'consent_blocked' : 'needs_visit_time'}`
+    );
+  }
   const execution = await executeBrainTools({
     parsed: enforcedParsed,
     capabilities,
@@ -4410,6 +4379,17 @@ async function applyGeminiTools(callSid, parsed) {
         maybeSendEscalationNotification(callSid, escalation),
     },
   });
+  if (enforcedParsed.needsVisitTime) {
+    // Day-only visit never reached the calendar. Speak the time ask, not dead air.
+    execution.results.push({
+      action: 'create_appointment',
+      status: 'invalid',
+      code: 'unparsed_when',
+      reason: 'Visit has a day but no time.',
+      missingSlots: ['when_text'],
+      hours: { whenText: String(enforcedParsed.needsVisitTime) },
+    });
+  }
 
   let updatedState = recordActionResults(state, execution.results);
   if (execution.shouldEndCall) {
@@ -4582,7 +4562,7 @@ async function runGeminiTurnStreaming(
       }),
       toolResults: execution.results,
     }),
-    { language: callBrainStates.get(callSid)?.language?.current || 'en' }
+    finalSpeechGuardOpts(callSid, execution.results)
   );
 
   const geminiParts = modelPartsForHistory({
@@ -4676,7 +4656,7 @@ async function runGeminiTurn(messages, callSid, systemPrompt = buildSystemPrompt
       }),
       toolResults: execution.results,
     }),
-    { language: callBrainStates.get(callSid)?.language?.current || 'en' }
+    finalSpeechGuardOpts(callSid, execution.results)
   );
 
   const thoughtSignature = extractThoughtSignature(response) || undefined;

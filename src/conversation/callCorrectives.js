@@ -94,6 +94,17 @@ function looksLikeNonConsentAck(text) {
   return words.every((word) => FILLER_WORDS.has(word));
 }
 
+/**
+ * Okay or Sawa is consent only as the direct answer to an explicit confirm
+ * ask ("I have not saved that. Should I continue?"). Anywhere else it is a
+ * filler. Leave it is never consent.
+ * @param {string[]} questionsAsked  slots asked before this caller turn
+ */
+function ackIsConsent(questionsAsked, text) {
+  const lastAsk = (Array.isArray(questionsAsked) ? questionsAsked : []).slice(-1)[0];
+  return lastAsk === 'confirm' && looksLikeNonConsentAck(text) && !looksLikeLeaveIt(text);
+}
+
 function looksLikeUrgentContact(text) {
   const t = normalizeAckText(text);
   if (!t) return false;
@@ -101,16 +112,20 @@ function looksLikeUrgentContact(text) {
     return false;
   }
   return (
-    /\bcontact\b.{0,24}\burgent\b/.test(t) ||
-    /\burgent\b.{0,24}\bcontact\b/.test(t) ||
-    /\b(?:it is|its|this is) urgent\b/.test(t)
+    /\bcontact\b.{0,24}\burgent(?:ly)?\b/.test(t) ||
+    /\burgent(?:ly)?\b.{0,24}\bcontact\b/.test(t) ||
+    /\b(?:it is|its|this is) urgent\b/.test(t) ||
+    /\b(?:ni|iko) (?:haraka|dharura)\b/.test(t)
   );
 }
 
 function hasConcreteUrgentNeed(text) {
   if (looksLikeNameIntroductionOnly(text) || looksLikeNonConsentAck(text)) return false;
   const t = normalizeAckText(text)
-    .replace(/\b(contact|urgent|please|me|now|right|away|the|a|an|team)\b/g, ' ')
+    .replace(
+      /\b(contact|urgent|urgently|please|me|now|right|away|the|a|an|team|call|back|asap|soon|someone|somebody|need|to|it|is|this|very|really|kindly|haraka|dharura|tafadhali)\b/g,
+      ' '
+    )
     .replace(/\s+/g, ' ')
     .trim();
   return t.length >= 4;
@@ -166,9 +181,9 @@ function quantityLine(state, lang) {
     slotValue(state, 'requestedItem') ||
     slotValue(state, 'service');
   if (lang === 'sw' || lang === 'sheng') {
-    return item ? `Unataka ${item} ngapi?` : 'Unataka ngapi?';
+    return item ? `${item}. Ngapi?` : 'Unataka ngapi?';
   }
-  return item ? `How many ${item} would you like?` : 'How many would you like?';
+  return item ? `${item}. How many?` : 'How many would you like?';
 }
 
 function missingSlotLine(slot, lang) {
@@ -178,9 +193,11 @@ function missingSlotLine(slot, lang) {
   if (slot === 'when' || slot === 'when_text' || slot === 'when_or_reference') {
     return sw ? 'Siku na saa gani?' : 'What day and time works?';
   }
+  if (slot === 'time') return sw ? 'Saa ngapi siku hiyo?' : 'What time that day?';
   if (slot === 'location' || slot === 'landmark') {
     return sw ? 'Tuje wapi?' : 'Where should we come?';
   }
+  if (slot === 'area') return sw ? 'Hiyo ni eneo gani?' : 'Which area is that in?';
   if (slot === 'quantity') return quantityLine({}, lang);
   if (slot === 'service' || slot === 'subject' || slot === 'catalog_item') {
     return sw ? 'Unahitaji huduma gani?' : 'What do you need done?';
@@ -230,7 +247,7 @@ function pickCorrectiveReply(opts = {}) {
     return missingSlotLine('reason', lang);
   }
 
-  if (looksLikeNonConsentAck(text)) {
+  if (looksLikeNonConsentAck(text) && !state.conversation?.consentAck) {
     const quantity = slotValue(state, 'quantity');
     if ((intent === 'order' || intent === 'hold') && !quantity) {
       return quantityLine(state, lang);
@@ -300,7 +317,16 @@ function prepareStreamedSpeech(text) {
   return stripUnsavedCloses(spaceSpokenWords(text));
 }
 
+/** Spoken ask for the first open slot. Empty when the job has no open slot. */
+function openSlotLine(state, language) {
+  const missing = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];
+  const slot = missing.find((name) => name) || '';
+  if (!slot) return '';
+  return missingSlotLine(slot, language || state?.language?.current);
+}
+
 module.exports = {
+  ackIsConsent,
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
   looksLikeUrgentContact,
@@ -311,4 +337,6 @@ module.exports = {
   spaceSpokenWords,
   stripUnsavedCloses,
   prepareStreamedSpeech,
+  missingSlotLine,
+  openSlotLine,
 };

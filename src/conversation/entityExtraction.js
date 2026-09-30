@@ -14,6 +14,7 @@ const {
 } = require('./callerNameMatch');
 const { isLocationRefusal } = require('./visitLocation');
 const { looksLikeNonConsentAck } = require('./callCorrectives');
+const { quantityWord } = require('./numberWords');
 
 function normalizeText(value) {
   return String(value || '')
@@ -38,6 +39,24 @@ function phraseAppears(text, phrase) {
   return Boolean(needle && haystack.includes(` ${needle} `));
 }
 
+const GENERIC_SERVICE_WORDS = new Set([
+  'cleaning', 'clean', 'service', 'services', 'repair', 'repairs', 'wash', 'washing',
+  'general', 'deep', 'home', 'house', 'office', 'full', 'basic', 'standard', 'premium',
+  'usafi', 'kusafisha', 'huduma', 'installation', 'install', 'maintenance', 'visit',
+]);
+
+function distinctiveServiceTokens(name, services) {
+  const tokens = normalizeText(name)
+    .split(' ')
+    .filter((word) => word.length >= 4 && !GENERIC_SERVICE_WORDS.has(word));
+  return tokens.filter((token) => {
+    const owners = services.filter((service) =>
+      normalizeText(service.name).split(' ').includes(token)
+    );
+    return owners.length === 1;
+  });
+}
+
 function findCatalogMatch(text, profile = {}) {
   const products = normalizeProducts(profile.productCatalog);
   const candidates = [];
@@ -48,11 +67,14 @@ function findCatalogMatch(text, profile = {}) {
       terms: [product.name, product.sku, ...product.aliases].filter(Boolean),
     });
   }
-  for (const service of normalizeServices(profile.servicesCatalog)) {
+  const services = normalizeServices(profile.servicesCatalog);
+  for (const service of services) {
     candidates.push({
       kind: 'service',
       canonical: service.name,
-      terms: [service.name].filter(Boolean),
+      // "usafi wa carpet" or "the sofa" names the job by its object. A token
+      // that appears in exactly one service name is enough to pick that service.
+      terms: [service.name, ...distinctiveServiceTokens(service.name, services)].filter(Boolean),
     });
   }
 
@@ -138,7 +160,18 @@ function extractName(text, opts = {}) {
       /\b(?:it'?s|ni)\s+([\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,2})/iu.exec(raw);
     if (spoken) return cleanNameCapture(spoken[1], opts);
   }
+  const particle = namePlusParticle(raw);
+  if (particle && opts.firstMissing === 'name') return cleanNameCapture(particle, opts);
   return null;
+}
+
+/** "Alvin, yeah?" is the name. The particle is not part of it. */
+function namePlusParticle(text) {
+  const match =
+    /^([\p{L}'’-]+)(?:\s*,)?\s+(?:yeah|yep|yes|eh|eeh|ndio|ndiyo)\b[.?!]*$/iu.exec(
+      String(text || '').trim()
+    );
+  return match ? match[1] : '';
 }
 
 const NAME_AFFIRMATION =
@@ -416,6 +449,15 @@ const NAME_BLOCKLIST = new Set([
   'about',
   'near',
   'opposite',
+  'great',
+  'yeah',
+  'yep',
+  'yup',
+  'monthly',
+  'morning',
+  'afternoon',
+  'charge',
+  'fine',
 ]);
 
 /**
@@ -508,6 +550,32 @@ function extractLandmark(text) {
   if (near) {
     const value = near[1].trim();
     if (value && !extractWhen(value)) {
+      // "Kitengela, near Naivas": the area before the landmark decides coverage.
+      const lead = raw.slice(0, near.index).replace(/[,\s]+$/, '').trim();
+      const leadIsPlace =
+        /^[A-Za-z][\p{L}'’-]+(?:\s+[A-Za-z][\p{L}'’-]+){0,2}$/u.test(lead) &&
+        !NOT_A_VISIT_PLACE.test(lead) &&
+        !extractWhen(lead) &&
+        !/^(?:i|we|it|yes|no|okay|sawa|niko|tuko|the|at|in)\b/i.test(lead);
+      if (leadIsPlace) return `${lead}, ${value}`.slice(0, 120);
+      // "... in Kitengela near the stage": the area sits right before the landmark.
+      const areaBefore =
+        /\b(?:in|at|kwa)\s+([A-Z][\p{L}'’-]+(?:\s+[A-Z][\p{L}'’-]+){0,2})$/u.exec(lead);
+      const area = areaBefore ? areaBefore[1].trim() : '';
+      if (area && !NOT_A_VISIT_PLACE.test(area) && !extractWhen(area)) {
+        return `${area}, ${value}`.slice(0, 120);
+      }
+      return value.slice(0, 120);
+    }
+  }
+  // "come to Rongai", "kuja Rongai": the destination is the visit place.
+  const comeTo =
+    /\b(?:come|coming|reach|deliver|kuja|kufika|fika)\s+(?:out\s+)?(?:to\s+)?([A-Z][\p{L}'’-]+(?:\s+[A-Z][\p{L}'’-]+){0,2})/u.exec(
+      raw
+    );
+  if (comeTo) {
+    const value = comeTo[1].trim();
+    if (value && !extractWhen(value) && !NOT_A_VISIT_PLACE.test(value)) {
       return value.slice(0, 120);
     }
   }
@@ -526,7 +594,22 @@ function extractLandmark(text) {
       return value.slice(0, 120);
     }
   }
+  const building = buildingAnswer(raw);
+  if (building) return building;
   return null;
+}
+
+const BUILDING_ANSWER =
+  /^(?:the\s+|my\s+|our\s+)?[\p{L}'’-]+(?:\s+[\p{L}'’-]+){0,4}\s+(?:apartments?|gates?|buildings?|flats?|courts?|mall|stage|house|nyumba)\b/iu;
+
+function buildingAnswer(raw) {
+  let value = String(raw || '').trim();
+  value = value.replace(/[, ]*(?:eh|yeah|yep|yes|okay|ok)\b[.?!]*$/i, '').trim();
+  value = value.replace(/[?.!,]+$/g, '').trim();
+  if (!BUILDING_ANSWER.test(value)) return null;
+  if (extractWhen(value)) return null;
+  if (value.split(/\s+/).length > 6) return null;
+  return value.slice(0, 120);
 }
 
 function extractWhen(text) {
@@ -547,24 +630,15 @@ function extractQuantity(text, intent) {
   if (!['hold', 'order', 'booking'].includes(intent)) return null;
   if (looksLikeNonConsentAck(text)) return null;
   const raw = String(text || '');
-  const digit = /\b(\d{1,3})\b/.exec(raw);
-  if (digit && !/\b(?:at|saa)\s*$/.test(raw.slice(0, digit.index).toLowerCase())) {
+  // A clock is the visit time, not a count. "7:00 AM" must not become quantity 7.
+  const stripped = raw
+    .replace(/\b(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi, ' ')
+    .replace(/\b\d{1,2}\s+is\s+(?:okay|ok|fine)\b/gi, ' ');
+  const digit = /\b(\d{1,3})\b/.exec(stripped);
+  if (digit && !/\b(?:at|saa)\s*$/.test(stripped.slice(0, digit.index).toLowerCase())) {
     return digit[1];
   }
-  const words = {
-    one: '1',
-    two: '2',
-    three: '3',
-    four: '4',
-    five: '5',
-    moja: '1',
-    mbili: '2',
-    tatu: '3',
-    nne: '4',
-    tano: '5',
-  };
-  const word = new RegExp(`\\b(${Object.keys(words).join('|')})\\b`, 'i').exec(raw);
-  return word ? words[word[1].toLowerCase()] : null;
+  return quantityWord(stripped);
 }
 
 function extractBudget(text) {
@@ -638,10 +712,11 @@ function extractConversationEntities(
       false
     );
   }
+  const missingSlots = Array.isArray(state?.goal?.missingSlots) ? state.goal.missingSlots : [];
   const name =
     entityValue(entities.name) ||
     extractName(text, {
-      firstMissing: state?.goal?.missingSlots?.[0],
+      firstMissing: missingSlots.includes('name') ? 'name' : missingSlots[0],
       knownNames,
       preferKnown,
     });
@@ -697,9 +772,10 @@ function extractConversationEntities(
   }
   if (
     !entities.location &&
-    (firstMissing === 'location' || firstMissing === 'landmark') &&
+    (firstMissing === 'location' || firstMissing === 'landmark' || firstMissing === 'area') &&
     shortAnswer &&
     !isLocationRefusal(shortAnswer) &&
+    !/\b(?:don'?t know|not sure|no idea|sijui|hakuna)\b/i.test(shortAnswer) &&
     !extractWhen(shortAnswer)
   ) {
     entities.location = entity(shortAnswer, 'contextual_slot_answer', 0.75, false);

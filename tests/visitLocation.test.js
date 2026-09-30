@@ -11,6 +11,7 @@ const {
   assessCoverage,
   decideVisitPlace,
   preferVisitPlace,
+  foldCanonicalPlace,
   visitBlockSpeech,
   coverageAskSpeech,
 } = require('../src/conversation/visitLocation');
@@ -62,8 +63,13 @@ describe('visit location ladder', () => {
     assert.equal(assessCoverage('Mombasa Road', nairobi), 'inside');
     assert.equal(assessCoverage('rwaka', nairobi), 'outside');
     assert.equal(assessCoverage('kitengele', nairobi), 'outside');
-    assert.equal(assessCoverage('rongae', nairobi), 'outside');
-    assert.equal(assessCoverage('near the stage', nairobi), 'outside');
+    assert.equal(assessCoverage('rongae', nairobi), 'unknown');
+    assert.equal(assessCoverage('ronga', nairobi), 'outside');
+    assert.equal(
+      preferVisitPlace('Ronga', 'The grace apartments', 'The grace apartments, eh?'),
+      'The grace apartments, Rongai'
+    );
+    assert.equal(assessCoverage('near the stage', nairobi), 'unknown');
     const part = { businessPolicies: { delivery: 'Westlands and Kilimani' } };
     assert.equal(assessCoverage('Westlands', part), 'inside');
     assert.equal(assessCoverage('Runda', part), 'outside');
@@ -118,6 +124,13 @@ describe('visit location ladder', () => {
       businessPolicies: { delivery: 'Nairobi', coverage_areas: [] },
     };
     assert.equal(assessCoverage('Runda', cleared), 'unknown');
+    const dusted = {
+      businessPolicies: { coverage_areas: ['county:nairobi', 'place:kitengela'] },
+    };
+    assert.equal(foldCanonicalPlace('Rwangai', dusted), 'Rongai');
+    assert.equal(foldCanonicalPlace('Rwangai'), 'Rwangai');
+    assert.equal(assessCoverage(foldCanonicalPlace('Rwangai', dusted), dusted), 'outside');
+    assert.equal(foldCanonicalPlace('Shy, 7 is okay, Rongai', dusted), 'Rongai');
     assert.match(
       coverageAskSpeech('What about Runda?', { vertical: 'home_services', ...nairobi }, 'en'),
       /Yes, we cover Runda/i

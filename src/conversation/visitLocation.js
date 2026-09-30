@@ -5,10 +5,17 @@
 
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
-const { countiesMentioned, countiesForPlace } = require('./kenyaPlaces');
+const {
+  canonicalPlaceName,
+  countiesMentioned,
+  countiesForPlace,
+  nearestAllowedPlace,
+  placesInCounties,
+} = require('./kenyaPlaces');
 const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
+const AREA_UNCONFIRMED_NOTE = 'area not confirmed, check coverage';
 
 const FINDABLE_CUE =
   /\b(gate|gates|building|buildings|apt|apartment|apartments|flat|flats|house|nyumba|junction|road|street|floor|plot|court|mall|stage|block|door|wing|near|opposite|next to|karibu)\b/i;
@@ -213,9 +220,12 @@ function settingsCountyText(profile = {}) {
 function assessCoverage(text, profile = {}) {
   const selected = readCoverageAreas(profile.businessPolicies);
   const mentioned = coverageTokens(text);
+  // Outside means the place is known and sits elsewhere. A landmark nobody
+  // can place ("near Naivas") is unknown; the ladder confirms, never refuses.
   if (selected) {
     if (!mentioned.length || !selected.length) return 'unknown';
-    return coveredByAreas(text, selected) ? 'inside' : 'outside';
+    if (coveredByAreas(text, selected)) return 'inside';
+    return countiesForPlace(text).length ? 'outside' : 'unknown';
   }
   const covered = coverageCorpus(profile);
   if (!covered.size) return 'unknown';
@@ -223,6 +233,7 @@ function assessCoverage(text, profile = {}) {
   if (mentioned.some((token) => covered.has(token))) return 'inside';
   const allowed = countiesMentioned(settingsCountyText(profile));
   const placeCounties = countiesForPlace(text);
+  if (!placeCounties.length) return 'unknown';
   if (placeCounties.some((county) => allowed.has(county))) return 'inside';
   return 'outside';
 }
@@ -231,9 +242,15 @@ function assessCoverage(text, profile = {}) {
  * Wave 1 ladder. Assumption A5: after one detail follow-up, area-only saves
  * only when coverage text matches. Outside never saves. Two refusals do not save.
  */
+function hasCoverageText(profile = {}) {
+  const selected = readCoverageAreas(profile.businessPolicies);
+  if (selected) return selected.length > 0;
+  return coverageCorpus(profile).size > 0;
+}
+
 function decideVisitPlace(
   text,
-  { profile = {}, detailAsked = false, refusals = 0 } = {}
+  { profile = {}, detailAsked = false, areaAsked = false, refusals = 0 } = {}
 ) {
   const place = cleanPlace(text, 240);
   const quality = classifyVisitLocation(place);
@@ -246,6 +263,26 @@ function decideVisitPlace(
     mentionsPin(place) &&
     quality !== 'empty' &&
     quality !== 'refused';
+
+  // A landmark with no area ("near the big church") when coverage is on file:
+  // ask which area once. Never refuse it, never book it blind.
+  if (
+    coverage === 'unknown' &&
+    (quality === 'findable' || quality === 'pin_promised') &&
+    !areaAsked &&
+    hasCoverageText(profile)
+  ) {
+    return {
+      quality,
+      coverage,
+      ask: true,
+      askArea: true,
+      bookable: false,
+      blocked: '',
+      confirmAccess: false,
+      pinNote,
+    };
+  }
 
   if (quality === 'empty' || quality === 'refused') {
     if (Number(refusals) >= 2) {
@@ -290,6 +327,7 @@ function decideVisitPlace(
       bookable: true,
       blocked: '',
       confirmAccess: false,
+      areaUnconfirmed: coverage === 'unknown' && hasCoverageText(profile),
       pinNote,
     };
   }
@@ -343,12 +381,95 @@ function mentionsPlaceToken(text, place) {
  * A later "in Nairobi" must not replace a gate or building already heard.
  * An explicit correction ("not Runda, Karen gate") still replaces it.
  */
+function displayPlaceName(key) {
+  return String(key || '').replace(/(^|[\s-])[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function areaKey(place) {
+  const parts = String(place || '')
+    .split(/[\s,]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const name = canonicalPlaceName(parts[i]);
+    if (name) return name;
+  }
+  return '';
+}
+
+function dropPlaceClause(part) {
+  if (/^(?:shy|yeah|yep|uh|um|ok|okay|great)$/i.test(part)) return true;
+  if (/\bis (?:okay|ok|fine)\b/i.test(part)) return true;
+  if (/^\d{1,2}(?::\d{2})?(?:\s*(?:a\.?m\.?|p\.?m\.?))?$/i.test(part)) return true;
+  return false;
+}
+
+/**
+ * Counties and places this tenant actually serves, plus the other places in
+ * those counties, so a misheard neighbour can bind without searching Kenya.
+ */
+function coverageNeighbourNames(profile = {}) {
+  const selected = readCoverageAreas(profile.businessPolicies);
+  const counties = new Set();
+  const names = new Set();
+  if (selected && selected.length) {
+    for (const id of selected) {
+      const split = id.indexOf(':');
+      const kind = id.slice(0, split);
+      const name = id.slice(split + 1);
+      if (kind === 'county') counties.add(name);
+      if (kind === 'place') names.add(name);
+    }
+  } else if (selected == null) {
+    for (const token of coverageCorpus(profile)) {
+      if (countiesForPlace(token).length && !token.includes(' ')) {
+        const exact = canonicalPlaceName(token);
+        if (exact) names.add(exact);
+      }
+    }
+  }
+  for (const name of names) {
+    for (const county of countiesForPlace(name)) counties.add(county);
+  }
+  for (const name of placesInCounties(counties)) names.add(name);
+  return names;
+}
+
+/**
+ * A clipped token ("Ronga") becomes the Kenya name ("Rongai") before coverage.
+ * A misheard neighbour ("Rwangai") binds only inside this tenant's coverage
+ * counties. A building does not drop that area. A clock clause is not a place.
+ */
+function foldCanonicalPlace(place, profile) {
+  const raw = cleanPlace(place, 240);
+  if (!raw) return raw;
+  const allowed = profile ? coverageNeighbourNames(profile) : null;
+  return raw
+    .split(/\s*,\s*/)
+    .map((part) => part.trim())
+    .filter((part) => part && !dropPlaceClause(part))
+    .map((token) => {
+      if (/\s/.test(token)) return token;
+      const name =
+        allowed && allowed.size
+          ? nearestAllowedPlace(token, allowed)
+          : canonicalPlaceName(token);
+      return name ? displayPlaceName(name) : token;
+    })
+    .join(', ');
+}
+
 function preferVisitPlace(previous, incoming, text = '') {
   const prev = cleanPlace(previous, 240);
   const next = cleanPlace(incoming, 240);
   if (!next) return prev;
   if (!prev) return next;
   if (prev.toLowerCase() === next.toLowerCase()) return prev;
+  const prevArea = areaKey(prev);
+  const nextArea = areaKey(next);
+  if (prevArea && !nextArea && classifyVisitLocation(next) === 'findable') {
+    return `${next}, ${displayPlaceName(prevArea)}`;
+  }
   if (
     /\b(?:not|instead|rather|badala|hapana|siyo|location is|landmark is|address is)\b/i.test(
       text
@@ -444,6 +565,9 @@ function appendVisitNotes(notes, decision = {}) {
     const pin = 'caller will share pin';
     next = next ? `${next}. ${pin}` : pin;
   }
+  if (decision.areaUnconfirmed && !/area not confirmed/i.test(next)) {
+    next = next ? `${next}. ${AREA_UNCONFIRMED_NOTE}` : AREA_UNCONFIRMED_NOTE;
+  }
   return next.slice(0, 400);
 }
 
@@ -454,8 +578,10 @@ module.exports = {
   mentionsPin,
   classifyVisitLocation,
   assessCoverage,
+  hasCoverageText,
   decideVisitPlace,
   preferVisitPlace,
+  foldCanonicalPlace,
   visitBlockSpeech,
   coverageAskPlace,
   coverageAskSpeech,

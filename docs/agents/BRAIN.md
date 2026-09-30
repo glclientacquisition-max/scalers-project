@@ -48,6 +48,8 @@ Voice loads tenant profile per call
   → backend result → caller confirmation
 ```
 
+One turn, one path, three gates (state, speech, tool) that every playbook passes through: [`BRAIN_TURN_CONTRACT.md`](./BRAIN_TURN_CONTRACT.md). Offline proof with an adversarial model stub: `tests/brainSimulation.test.js`.
+
 Core runtime modules:
 
 - `src/conversation/brainState.js` — call-local semantic memory
@@ -55,6 +57,7 @@ Core runtime modules:
 - `src/conversation/brainPolicy.js`, `nextBestAction.js` — authority + resolution ladder
 - `src/conversation/conversationRepair.js` — bounded contextual repair
 - `src/conversation/toolExecution.js` — validated actions and confirmed results
+- `src/conversation/turnPolicy.js`, `speechGuard.js`, `requiredCreateRequest.js` (`guardToolPlan`) — the three gates of the turn contract
 - `src/conversation/brainObservability.js` — PII-safe structured decision traces
 
 ## Invariants
