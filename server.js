@@ -199,6 +199,7 @@ const {
   pickLlmRecoverySaved,
   shouldSkipCallerTurn,
   shouldSpeakThinkingAck,
+  looksLikeBareCloser,
   looksLikePhaticCallerTurn,
   looksLikeIdentityQuestion,
   looksLikeRobotQuestion,
@@ -2451,7 +2452,8 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
-      if (looksLikePhaticCallerTurn(clean)) {
+      const bareCloser = looksLikeBareCloser(clean);
+      if (!bareCloser && looksLikePhaticCallerTurn(clean)) {
         const phaticLine = pickPhaticReply({
           language: callLanguage,
           callerMemory: brainProfile.callerMemory,
@@ -2475,11 +2477,13 @@ mediaWss.on('connection', (ws, req) => {
       // Human handoff with missing name uses ASK_CLARIFICATION. Speak now so
       // the caller never waits silently on Gemini (live miss: HD_02bda14e6547).
       // Skip if they already gave a name (live miss: HD_b4cb560bae33 / Alvin).
-      const handoffNameAsk = shouldSpeakHandoffNameAsk({
-        nextBestAction,
-        brainState,
-        userText: clean,
-      });
+      const handoffNameAsk =
+        !bareCloser &&
+        shouldSpeakHandoffNameAsk({
+          nextBestAction,
+          brainState,
+          userText: clean,
+        });
       const needsImmediateProgress = actionMayExecute || handoffNameAsk;
 
       // Action / handoff-clarify turns disable streaming and wait on Gemini+tools.
@@ -2522,7 +2526,7 @@ mediaWss.on('connection', (ws, req) => {
         fillerMode !== 'off' &&
         !fillerUsedThisCall &&
         !needsImmediateProgress &&
-        shouldSpeakThinkingAck(clean);
+        !bareCloser && shouldSpeakThinkingAck(clean);
       const fillerDelayMs = resolveVoiceProfile().fillerDelayMs;
       const fillerText =
         fillerMode === 'ack' || fillerMode === 'auto'

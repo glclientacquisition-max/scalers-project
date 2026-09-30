@@ -85,14 +85,20 @@ assert.match(
 
 assert.match(
   source,
-  /shouldSpeakThinkingAck\(clean\)/,
-  'how-are-you turns must not get a thinking-ack stall'
+  /looksLikeBareCloser\(clean\)/,
+  'bare Okay/ok/fine/great must share one closer matcher on the media path'
 );
 
 assert.match(
   source,
-  /looksLikePhaticCallerTurn\(clean\)/,
-  'how-are-you turns must speak a local line and skip Gemini'
+  /!bareCloser && shouldSpeakThinkingAck\(clean\)/,
+  'how-are-you and bare closers must not get a thinking-ack stall'
+);
+
+assert.match(
+  source,
+  /!bareCloser && looksLikePhaticCallerTurn\(clean\)/,
+  'how-are-you turns must speak a local line and skip Gemini; closers must not'
 );
 
 assert.match(
