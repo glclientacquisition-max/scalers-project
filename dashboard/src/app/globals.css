@@ -2,40 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Frontend 2.0 tokens. Canon: docs/frontend/FRONTEND_2_0_CHARTER.md §4.
+ * Semantic roles are the source. Legacy names below them are aliases and go
+ * away when their last caller is rebuilt.
+ */
 :root {
-  /* Scalers ribbon blue */
-  --brand: #0096ff;
-  --brand-deep: #005ccc;
-  --brand-ink: #0a192f;
+  /* Type. System UI in the app: zero font bytes, native on Android and iOS. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-  --bg: #f4f7fb;
-  --bg-deep: #e8eef6;
+  /* Color roles */
+  --canvas: #f4f7fb;
+  --surface: #ffffff;
+  --surface-2: #e9eef5;
+  --hairline: #dde4ee;
   --ink: #0a192f;
-  --ink-soft: #4a5b73;
-  --line: #d5dee9;
-  --card: #ffffff;
-  --accent: #0096ff;
-  --accent-deep: #005ccc;
-  --accent-deep-hover: #004a99;
-  --accent-soft: #eaf6ff;
-  --accent-fill: #005ccc;
-  --accent-fill-hover: #004aad;
-  --accent-fill-active: #003d99;
-  --accent-on-fill: #ffffff;
-  --warn: #c2410c;
-  --warn-soft: #fdf3ec;
-  --warn-deep: #9a3209;
+  --ink-2: #4a5b73;
+  --ink-3: #5b6d85;
+  --accent: #005ccc;
+  --accent-hover: #004aad;
+  --accent-active: #003d99;
+  --accent-tonal: #e3eeff;
+  --accent-on: #ffffff;
+  --brand: #0096ff;
+  --attention: #c2410c;
+  --attention-tonal: #fdf0e8;
   --ok: #15803d;
-  --ok-soft: #eaf6f0;
+  --ok-tonal: #e8f5ee;
   --lead: #b98a1f;
   --whatsapp: #25d366;
   --whatsapp-deep: #128c7e;
   --bubble-caller: #d9f4e2;
   --bubble-caller-ink: #2f6b3a;
   --sms: #0284c7;
-  --email: #005ccc;
 
-  --background: var(--bg);
+  /* Elevation and motion */
+  --shadow-sheet: 0 12px 32px -12px rgb(10 25 47 / 0.28);
+  --shadow-menu: 0 8px 24px -8px rgb(10 25 47 / 0.24);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --sheet-ms: 240ms;
+
+  /* Legacy aliases */
+  --brand-deep: var(--accent);
+  --brand-ink: var(--ink);
+  --bg: var(--canvas);
+  --bg-deep: var(--surface-2);
+  --ink-soft: var(--ink-2);
+  --line: var(--hairline);
+  --card: var(--surface);
+  --accent-deep: var(--accent);
+  --accent-deep-hover: var(--accent-hover);
+  --accent-soft: var(--accent-tonal);
+  --accent-fill: var(--accent);
+  --accent-fill-hover: var(--accent-hover);
+  --accent-fill-active: var(--accent-active);
+  --accent-on-fill: var(--accent-on);
+  --warn: var(--attention);
+  --warn-soft: var(--attention-tonal);
+  --warn-deep: #9a3209;
+  --ok-soft: var(--ok-tonal);
+  --email: var(--accent);
+
+  --background: var(--canvas);
   --foreground: var(--ink);
 
   /* Desk sticky chrome. No phone lockup; header token is 0 at every width. Phone tab bar is 0 from md. */
@@ -64,73 +92,69 @@
  * onboarding, and admin stay light. Activation: <html data-theme="dark">, or
  * system dark with no explicit choice. The two blocks must stay in sync.
  */
-:root[data-theme="dark"] .desk-theme {
-  --bg: #0a1420;
-  --bg-deep: #0e1a2a;
+:root[data-theme="dark"] .desk-theme,
+:root[data-theme="dark"] .admin-theme {
+  --canvas: #0b1220;
+  --surface: #121c2c;
+  --surface-2: #1a2638;
+  --hairline: #24324a;
   --ink: #e9eff7;
-  --ink-soft: #9dafc6;
-  --line: #24374f;
-  --card: #122236;
-  --accent: #2aa8ff;
-  --accent-deep: #6bc2ff;
-  --accent-deep-hover: #a8daff;
-  --accent-soft: #0e2438;
-  --accent-fill: #1f9fff;
-  --accent-fill-hover: #4db4ff;
-  --accent-fill-active: #0096ff;
-  --accent-on-fill: #062033;
-  --warn: #f4955a;
-  --warn-soft: #2b1a12;
-  --warn-deep: #fdba74;
+  --ink-2: #9dafc6;
+  --ink-3: #8496b0;
+  --accent: #3d9bff;
+  --accent-hover: #63b0ff;
+  --accent-active: #2a8cf5;
+  --accent-tonal: #12294a;
+  --accent-on: #071426;
+  --brand: #2aa8ff;
+  --attention: #f4955a;
+  --attention-tonal: #2b1a12;
   --ok: #4ade80;
-  --ok-soft: #122a1c;
+  --ok-tonal: #122a1c;
   --lead: #d9a62e;
   --whatsapp-deep: #25d366;
   --bubble-caller: #14321f;
   --bubble-caller-ink: #7fe3a5;
   --sms: #38bdf8;
-  --email: #6bc2ff;
-  --brand-ink: #e9eff7;
-  --tw-ring-offset-color: var(--card);
+  --warn-deep: #fdba74;
+  --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+  --tw-ring-offset-color: var(--surface);
   color-scheme: dark;
-  background:
-    radial-gradient(1100px 520px at 0% -10%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, transparent 55%),
-    var(--bg);
+  background: var(--canvas);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .desk-theme {
-    --bg: #0a1420;
-    --bg-deep: #0e1a2a;
+  :root:not([data-theme="light"]) .desk-theme,
+  :root:not([data-theme="light"]) .admin-theme {
+    --canvas: #0b1220;
+    --surface: #121c2c;
+    --surface-2: #1a2638;
+    --hairline: #24324a;
     --ink: #e9eff7;
-    --ink-soft: #9dafc6;
-    --line: #24374f;
-    --card: #122236;
-    --accent: #2aa8ff;
-    --accent-deep: #6bc2ff;
-    --accent-deep-hover: #a8daff;
-    --accent-soft: #0e2438;
-    --accent-fill: #1f9fff;
-    --accent-fill-hover: #4db4ff;
-    --accent-fill-active: #0096ff;
-    --accent-on-fill: #062033;
-    --warn: #f4955a;
-    --warn-soft: #2b1a12;
-    --warn-deep: #fdba74;
+    --ink-2: #9dafc6;
+    --ink-3: #8496b0;
+    --accent: #3d9bff;
+    --accent-hover: #63b0ff;
+    --accent-active: #2a8cf5;
+    --accent-tonal: #12294a;
+    --accent-on: #071426;
+    --brand: #2aa8ff;
+    --attention: #f4955a;
+    --attention-tonal: #2b1a12;
     --ok: #4ade80;
-    --ok-soft: #122a1c;
+    --ok-tonal: #122a1c;
     --lead: #d9a62e;
     --whatsapp-deep: #25d366;
     --bubble-caller: #14321f;
     --bubble-caller-ink: #7fe3a5;
     --sms: #38bdf8;
-    --email: #6bc2ff;
-    --brand-ink: #e9eff7;
-    --tw-ring-offset-color: var(--card);
+    --warn-deep: #fdba74;
+    --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
+    --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+    --tw-ring-offset-color: var(--surface);
     color-scheme: dark;
-    background:
-      radial-gradient(1100px 520px at 0% -10%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, transparent 55%),
-      var(--bg);
+    background: var(--canvas);
   }
 }
 
@@ -233,22 +257,22 @@ html {
 
 body {
   color: var(--ink);
-  background:
-    radial-gradient(1100px 520px at 0% -10%, color-mix(in srgb, var(--brand) 14%, white) 0%, transparent 55%),
-    radial-gradient(900px 480px at 100% 0%, color-mix(in srgb, var(--brand-deep) 8%, white) 0%, transparent 50%),
-    var(--bg);
-  font-family: var(--font-sans), ui-sans-serif, sans-serif;
+  background: var(--canvas);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 0;
   min-height: 100vh;
   min-height: 100dvh;
   max-width: 100%;
   overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* Display face is marketing only. Elsewhere `--font-display` is unset and falls through to the system stack. */
 h1,
 h2,
 h3,
 .font-display {
-  font-family: var(--font-display), var(--font-sans), ui-sans-serif, sans-serif;
+  font-family: var(--font-display, var(--font-sans));
   letter-spacing: -0.02em;
 }
 

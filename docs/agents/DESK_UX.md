@@ -45,7 +45,10 @@ Use for landing, signup/onboarding UX, calls inbox, settings presentation, navig
 ```bash
 cd dashboard && npm run lint
 cd dashboard && npm run build
+cd dashboard && npm run test:e2e          # structural gate: overflow, hit sizes, axe, screenshots at 360/390/768/1280
 ```
+
+`test:e2e` starts `next dev` on 3077 with `DASHBOARD_OPEN=true`. Against a running server: `E2E_BASE_URL=http://localhost:3020 npm run test:e2e`. Kit fixture: `/dev/kit`.
 
 Spot-check: `/`, `/signup`, `/onboarding`, `/calls`, `/settings` as owner; confirm `/admin` still redirects owners away.
 

@@ -42,7 +42,7 @@ describe("desk resilience and anti-slop", () => {
     const css = read("dashboard/src/app/globals.css");
     assert.doesNotMatch(home, /left-0 w-1 bg-accent/);
     assert.doesNotMatch(css, /#4f46e5|#a5b4fc|#6366f1/);
-    assert.match(css, /--email: #005ccc;/);
+    assert.match(css, /--email: var\(--accent\);/);
   });
 
   it("treats Home inbox failure and missing workspace as designed states", () => {

@@ -1,13 +1,23 @@
 import { Suspense } from "react";
+import { Sora } from "next/font/google";
 import { redirect } from "next/navigation";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
+/* Display face ships on marketing only. The app runs on the system stack. */
+const display = Sora({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+
 export default function Home() {
   return (
-    <Suspense fallback={<LandingPage />}>
-      <HomeGate />
-    </Suspense>
+    <div className={`${display.variable} contents`}>
+      <Suspense fallback={<LandingPage />}>
+        <HomeGate />
+      </Suspense>
+    </div>
   );
 }
 

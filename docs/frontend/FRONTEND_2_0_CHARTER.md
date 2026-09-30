@@ -69,7 +69,7 @@ Each rule below is removed or replaced on merge of this charter. The always-on r
 | Old rule | Verdict | Replacement |
 | --- | --- | --- |
 | Two typefaces (DM Sans body, Sora display) in the app | Removed | System UI stack in the app (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`). Sora stays for marketing display only. Kenyan Android renders Roboto, the same face WhatsApp shows. Zero font bytes on the desk. |
-| Hardcode every `textarea` to `rows={2}` | Removed | `Textarea` primitive auto-grows. Each field picks its own starting rows. A Knowledge paste box at two rows is hostile. |
+| Hardcode every `textarea` to `rows={2}` | Relaxed | `Textarea` primitive starts at two rows and auto-grows (`field-sizing: content`, capped at half the viewport). A field may pass a larger `rows` when a paste box is the point. |
 | Global Save sticky top right | Replaced | Save docks to the form. Phone: sticky footer above the tab bar. Desktop: end of the section it saves. Top-right sticky fights the thumb zone. |
 | `deskHitClass` 48×48 box for Confirm, Done, Call, WhatsApp; "label length does not change the hit" | Replaced | Call and WhatsApp: 44px circular tonal `IconButton`. Confirm and Done: labeled tonal `Button` size `sm` (36px tall, 44px hit via padding). A word in an 11px 48px square clips. |
 | Dense tables over cards for every list; `md+` uses the table | Refined | One `ListRow` recipe at every width for Inbox, Contacts, and admin entity lists (name, one preview line, when, one glance state, compact actions). Tables only for numeric data (wallet ledger, DID pool, packages). No checkboxes unless bulk actions exist on that screen. |
@@ -78,7 +78,7 @@ Each rule below is removed or replaced on merge of this charter. The always-on r
 | Appearance as three large cards | Replaced | `Segmented` inside the account menu. Instant apply. |
 | Radial gradient washes on `body` and dark desk | Removed | Flat canvas. `#F4F7FB` light, `#0B1220` dark. |
 | Class-string exports as the design system | Replaced | Components in `dashboard/src/components/ui/`. The strings stay exported from the same files during migration and are deleted when the last caller is gone. |
-| Hand-rolled dialog, menu, tooltip, select | Replaced | Base UI (`@base-ui-components/react`) for behavior, Tailwind for looks. |
+| Hand-rolled dialog, menu, tooltip, select | Replaced | Base UI (`@base-ui/react`) for behavior, Tailwind for looks. |
 | Inline SVG icons per component | Replaced | Heroicons (`@heroicons/react`), outline 24 for nav and rows, solid 24 for the active tab, mini 20 for inline. One stroke weight. |
 | "Desk lane leaves `Admin*` panels to Ops unless pure styling" | Replaced | Frontend 2.0 owns admin presentation. Ops still owns behavior, RPC calls, and wallet logic. Same shell, same kit. |
 | "Do not install impeccable, Anthropic frontend-design, shadcn" (`.cursor/skills/README.md`) | Removed | Installed 2026-09-30. See §7. |
@@ -111,7 +111,7 @@ Color roles
   --hairline        1px separators             #DDE4EE   dark #24324A
   --ink             primary text               #0A192F   dark #E9EFF7
   --ink-2           secondary text             #4A5B73   dark #9DAFC6
-  --ink-3           disabled, placeholder      #8A99AF   dark #667A96
+  --ink-3           timestamps, placeholder    #5B6D85   dark #8496B0   (4.5:1 on every surface)
   --accent          filled action, links       #005CCC   dark #3D9BFF
   --accent-tonal    tonal button bg            #E3EEFF   dark #12294A
   --accent-on       label on accent            #FFFFFF   dark #071426
@@ -121,7 +121,8 @@ Color roles
   --ok              done, live                 #15803D   dark #4ADE80
   --ok-tonal                                   #E8F5EE   dark #122A1C
   --whatsapp        glyph only                 #25D366
-Radius     --r-sm 6px  --r-md 10px  --r-lg 16px
+Radius     rounded-md 6px (chips, tooltip)  rounded-xl 10px (controls, fields, menus)  rounded-2xl 16px (sheets, cards)
+           Legacy rounded-sm/lg/3xl/panel collapse onto those three in tailwind.config.ts; no page edits needed.
 Elevation  --shadow-sheet 0 12px 32px -12px rgb(10 25 47 / .28)
            --shadow-menu  0 8px 24px -8px rgb(10 25 47 / .24)
 Type       --t-caption 11/14  --t-meta 13/18  --t-body 15/22  --t-title 17/24  --t-page 22/28  --t-display 28/32
@@ -129,7 +130,7 @@ Z          --z-sticky 10  --z-tabbar 20  --z-sheet 30  --z-menu 40  --z-toast 50
 Motion     --ease-out cubic-bezier(0.23, 1, 0.32, 1)  --fast 150ms  --sheet 240ms
 ```
 
-Tailwind maps these to `bg-canvas`, `bg-surface`, `text-ink-2`, `rounded-md`, `text-body`, `shadow-sheet`, `z-menu`. ESLint bans `#[0-9a-f]{3,8}` and `rounded-(xl|2xl|3xl)` in `.tsx`.
+Tailwind maps these to `bg-canvas`, `bg-surface`, `text-ink-2`, `rounded-xl`, `text-body`, `shadow-sheet`, `z-menu`. Every colour token goes through `color-mix()` so opacity modifiers (`bg-ink/40`, `ring-brand/40`) work in both themes. ESLint warns on `#[0-9a-f]{3,8}` in `className`, `text-[Npx]`, and `rounded-3xl` in `.tsx` (Phase 1: warn; Phase 8: error).
 
 ### 4.2 Primitives (`dashboard/src/components/ui/`)
 
@@ -142,7 +143,7 @@ Each is one file, one component, tokens only, dark-safe, keyboard-safe. Behavior
 | `Field`, `Input`, `Textarea`, `Select` | label, hint, error, auto-grow textarea | `deskFieldClass`, `settingsUi` field wrappers |
 | `Segmented` | underline tabs with counts, scrollable on phone, `aria-selected` | `deskRateCardClass`, `FilterTabs`, `ThemePicker` cards |
 | `Stamp` | glance state: dot plus text, `tone: attention | ok | neutral` | six colored chips |
-| `Avatar` | initials or image, 32/40/48, squircle | `InboxRowAvatar`, contact circles |
+| `Avatar` | initials or image, 32/40/48, circle | `InboxRowAvatar`, contact circles |
 | `ListRow` | avatar, title, one preview line, when, stamp, trailing actions; link or button | `InboxItemRow`, `ContactListRow`, `deskRow*` |
 | `PageHeader` | title, optional back, optional trailing action, consistent top rhythm | ad hoc `h1` blocks, `DeskIndexLead`, `DeskRecordLead` |
 | `Sheet` | phone bottom sheet, desktop centered dialog, one component; Base UI Dialog | `DeskDialog` |
@@ -165,7 +166,7 @@ One `AppShell` in `src/components/shell/`:
 
 ### 4.4 Dependencies added
 
-`@base-ui-components/react`, `@heroicons/react`, `@playwright/test` (dev). Nothing else. No Framer Motion, no Radix, no shadcn runtime (the shadcn skill is used for patterns, not packages). Tailwind stays on 3.4 for this program; the token layer is CSS variables so a v4 move later is mechanical.
+`@base-ui/react`, `@heroicons/react`, `@playwright/test` and `@axe-core/playwright` (dev). Nothing else. No Framer Motion, no Radix, no shadcn runtime (the shadcn skill is used for patterns, not packages). Tailwind stays on 3.4 for this program; the token layer is CSS variables so a v4 move later is mechanical.
 
 ---
 
@@ -178,7 +179,7 @@ One `AppShell` in `src/components/shell/`:
 5. **Forms post to server actions** with `useActionState`, pending on the button, error under the field.
 6. **No monolith over 400 lines.** `TenantForm` becomes one panel component per settings section. `PronunciationCoach` and `InboxTicketView` split by responsibility.
 7. **Tokens or nothing.** ESLint enforces no hex, no arbitrary radius, no arbitrary `text-[Npx]`.
-8. **Every screen at four widths.** 360, 390, 768, 1280 in Playwright, light and dark, before a PR is marked ready.
+8. **Every screen at four widths.** 360, 390, 768, 1280 in Playwright, light and dark, before a PR is marked ready. `dashboard/e2e/structure.spec.ts` checks no horizontal overflow, no control under 24px (under 44px attached as a warning), and zero serious or critical axe violations, then attaches a full-page screenshot per route and width. Routes in its `strict` list fail the run; legacy routes report findings as `debt` annotations until their phase lands, then move to `strict`. Run `npm run test:e2e` (starts its own server on 3077) or `E2E_BASE_URL=http://localhost:3020 npm run test:e2e` against a running dev server with `DASHBOARD_OPEN=true`.
 
 ---
 

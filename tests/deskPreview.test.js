@@ -25,8 +25,7 @@ describe("desk preview truncate", () => {
   });
 
   it("encodes WhatsApp-style list preview as law", () => {
-    assert.match(mandate, /Preview truncate/);
-    assert.match(mandate, /Identity plus one ellipsized line/);
+    assert.match(mandate, /Lists are `ListRow`: identity, one truncated preview line/);
     assert.match(constitution, /List preview is one truncated line/);
     assert.match(constitution, /WhatsApp, Instagram, Messenger, iOS Mail/);
     assert.match(calls, /Preview \(one line\)/);

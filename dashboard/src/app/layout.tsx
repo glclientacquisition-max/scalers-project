@@ -1,20 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, Sora } from "next/font/google";
 import { NotifyHost } from "@/components/ui/DeskNotice";
 import { DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
 import "./globals.css";
-
-const sans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const display = Sora({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || "https://scalers-project.vercel.app";
@@ -68,8 +55,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable}`}>
-      <body className="min-h-dvh bg-surface-canvas font-sans text-ink antialiased">
+    <html lang="en">
+      <body className="min-h-dvh bg-canvas font-sans text-ink antialiased">
         {/* Desk theme before paint: explicit choice wins, otherwise system decides. */}
         <script
           dangerouslySetInnerHTML={{

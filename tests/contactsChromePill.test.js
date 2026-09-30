@@ -54,7 +54,7 @@ describe("contacts chrome pill ACCEPT", () => {
     const chrome = read("dashboard/src/components/ui/deskChrome.ts");
     assert.match(pills, /deskRateCardClass/);
     assert.match(chrome, /rounded-full/);
-    assert.match(chrome, /bg-\[#005CCC\] text-white/);
+    assert.match(chrome, /bg-accent text-accent-on/);
     assert.match(pills, /item\.count/);
     assert.doesNotMatch(pills, /filterTabClass/);
     assert.match(dev, /<InboxFilterPills/);
