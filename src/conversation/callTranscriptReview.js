@@ -2,7 +2,7 @@
 // Hangup must stay instant: Brain persist first, this run is fire-and-forget.
 // Gemini never hears live audio. Transcript text is untrusted.
 
-const { isPlausibleCallerName } = require('./entityExtraction');
+const { entityValue, isPlausibleCallerName } = require('./entityExtraction');
 const {
   VISIT_REQUESTED_NOTE,
   HOLD_OPEN_NOTE,
@@ -80,10 +80,10 @@ Return ONLY valid JSON (no markdown fences):
 }
 
 Rules:
-- want: name the caller if known. State the visit, hold, or question. If they only said hello, "No clear ask."
-- done: Visit request saved — confirm on desk ONLY when the snapshot says visitSaved or visitRequested. Hold saved only when holdSaved. Hours answered. Escalation sent only if SMS/WhatsApp/email delivered. Notify failed if not. Or "None." If nothing was saved, done is None. Never say booked for a visit that is only requested. Never state a refused hour (snapshot refusedWhen) as the visit time.
+- want: name the caller if known. State the last place and the last time they still wanted. If they only said hello, "No clear ask." A refused hour (snapshot refusedWhen) is never the visit time. A refused place (snapshot refusedPlaces) is not the place to go. If callerName is none, do not invent a name.
+- done: Visit request saved — confirm on desk ONLY when the snapshot says visitSaved or visitRequested. Hold saved only when holdSaved. Hours answered. Escalation sent only if SMS/WhatsApp/email delivered. Notify failed if not. Or "None." If nothing was saved, done is None. Never say booked for a visit that is only requested. Never say a callback was noted unless callbackSaved is true.
 - mood: how they came across. unknown if you cannot tell. Not a medical label.
-- next: Confirm the visit. Call them back. Nothing. Hours were answered. One line.
+- next: "Call them back." only when name, place, or time is still missing and the caller did not hang up on a finished answer. Otherwise "None." or "Hours were answered." or "Confirm the visit." Never say a callback was noted unless callbackSaved is true.
 - reason: Inbox one-liner. Same truth as want. For a requested visit use exactly: Visit request saved — confirm on desk. Use that line only when visitSaved or visitRequested is true. Otherwise do not say a visit was saved.
 - needs_human: true only if a person still must return the call (callback, complaint, asked for a human, failed save). False when hours/FAQ was answered or a hold/visit was confirmed saved.
 - needs_owner: true if the receptionist guessed, deferred, or lacked a fact the owner should add later. That alone is not a return call.
@@ -162,6 +162,131 @@ function stripRefusedClocks(text, refusedWhen) {
     next = next.replace(new RegExp(`\\b(?:at\\s+)?${phrase}\\b`, 'ig'), ' ');
   }
   return next.replace(/\s+/g, ' ').replace(/\s+([,.])/g, '$1').trim();
+}
+
+function stripRefusedPlaces(text, refusedPlaces) {
+  let next = String(text || '');
+  const places = (Array.isArray(refusedPlaces) ? refusedPlaces : [])
+    .map((place) => String(place || '').trim())
+    .filter((place) => place.length >= 3)
+    .sort((a, b) => b.length - a.length);
+  for (const place of places) {
+    const phrase = place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    next = next.replace(new RegExp(`\\b(?:in|at|to|from|near)\\s+${phrase}\\b`, 'ig'), ' ');
+    next = next.replace(new RegExp(`\\b${phrase}\\b`, 'ig'), ' ');
+  }
+  return next.replace(/\s+/g, ' ').replace(/\s+([,.])/g, '$1').trim();
+}
+
+function stripUnsavedCallbackClaim(text, callbackSaved) {
+  if (callbackSaved) return String(text || '').replace(/\s+/g, ' ').trim();
+  return String(text || '')
+    .replace(
+      /\b(?:a |the )?callback (?:was |has been |is )?(?:noted|saved|logged|recorded)\b/gi,
+      ' '
+    )
+    .replace(/\b(?:noted|saved|logged|recorded) (?:a |the )?callback\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.])/g, '$1')
+    .trim();
+}
+
+function polishCardLine(text, flags) {
+  return stripUnsavedCallbackClaim(
+    stripRefusedPlaces(
+      stripRefusedClocks(text, flags?.refusedWhen),
+      flags?.refusedPlaces
+    ),
+    flags?.callbackSaved
+  );
+}
+
+function cleanPiece(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function stillWantedWhen(when) {
+  const text = cleanPiece(when);
+  if (!text) return '';
+  const daypart = text.match(/^(?:in the\s+)?(morning|afternoon|evening)$/i);
+  if (daypart) return `in the ${daypart[1].toLowerCase()}`;
+  return text;
+}
+
+/** Last place and time they still wanted. No invented name. No refused facts. */
+function unfinishedWant(flags) {
+  const service = cleanPiece(flags?.service);
+  const place = cleanPiece(flags?.place);
+  const when = stillWantedWhen(flags?.when);
+  const name = cleanPiece(flags?.callerName);
+  const parts = [];
+  if (service) parts.push(service);
+  if (place) parts.push(`in ${place}`);
+  if (when) parts.push(when);
+  if (!parts.length) return '';
+  let ask = parts.join(' ').replace(/\s+/g, ' ').trim();
+  ask = ask.charAt(0).toUpperCase() + ask.slice(1);
+  if (name) {
+    const rest = ask.charAt(0).toLowerCase() + ask.slice(1);
+    return `${name} wants ${rest}.`;
+  }
+  if (!/[.!?]$/.test(ask)) ask += '.';
+  return `${ask} No name.`;
+}
+
+function ownerMustDial(flags, derived) {
+  if (flags?.visitSaved || flags?.holdSaved || flags?.callbackSaved || flags?.escalateSaved) {
+    return false;
+  }
+  if (flags?.finishedAnswer) return false;
+  if (String(derived?.resolution || '') === 'resolved') return false;
+  const intent = String(derived?.primaryIntent || flags?.intent || '');
+  const visit =
+    flags?.visitAsk === true || intent === 'book_visit' || intent === 'booking';
+  if (!visit) return false;
+  const missingName = !cleanPiece(flags?.callerName);
+  const missingPlace = !cleanPiece(flags?.place);
+  const missingTime = !cleanPiece(flags?.when);
+  return missingName || missingPlace || missingTime;
+}
+
+function applyUnfinishedReturn(out, flags) {
+  const built = unfinishedWant(flags);
+  if (built) {
+    out.want = built;
+    out.reason = built;
+    out.applied.reason = true;
+  }
+  out.done = 'None.';
+  out.next = 'Call them back.';
+  out.applied.card = true;
+  if (out.primaryIntent !== 'human') {
+    out.primaryIntent = 'human';
+    out.applied.intent = true;
+  }
+  if (out.resolution !== 'needs_human') {
+    out.resolution = 'needs_human';
+    out.applied.resolution = true;
+  }
+  return out;
+}
+
+function silenceReviewMerged() {
+  return {
+    primaryIntent: null,
+    resolution: 'unknown',
+    reason: 'No conversation.',
+    want: 'No conversation.',
+    done: 'None.',
+    mood: 'unknown',
+    next: 'None.',
+    applied: { reason: true, intent: false, resolution: false, card: true },
+  };
+}
+
+function isSilenceStatus(status) {
+  const key = String(status || '').toLowerCase();
+  return key === 'failed' || key === 'no_answer';
 }
 
 function looksLikeVisitRequestedNote(raw) {
@@ -332,6 +457,55 @@ function toolFlagsFromBrain(brainState) {
     handoff: Boolean(
       brainState?.handoff?.requested || brainState?.handoff?.required
     ),
+    ...askSnapshot(brainState),
+  };
+}
+
+function askSnapshot(brainState) {
+  const entities = brainState?.entities || {};
+  const refusedWhen = Array.isArray(brainState?.actions?.refusedHours)
+    ? brainState.actions.refusedHours.filter(Boolean)
+    : [];
+  const refusedPlaces = Array.isArray(brainState?.actions?.refusedPlaces)
+    ? brainState.actions.refusedPlaces.filter(Boolean)
+    : [];
+  const blocked = String(brainState?.visitPlace?.blocked || '');
+  let place =
+    entityValue(entities.location) || entityValue(entities.landmark) || '';
+  if (blocked === 'outside' || blocked === 'refused') place = '';
+  if (
+    place &&
+    refusedPlaces.some((row) => String(row).toLowerCase() === place.toLowerCase())
+  ) {
+    place = '';
+  }
+  let when = stripRefusedClocks(entityValue(entities.when) || '', refusedWhen)
+    .replace(/\bat\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!when || /^[,.]+$/.test(when)) when = '';
+  const rawName = String(
+    brainState?.caller?.name || entityValue(entities.name) || ''
+  ).trim();
+  const callerName = isPlausibleCallerName(rawName) ? rawName : '';
+  const intent = String(brainState?.intent || '');
+  const nba = String(brainState?.resolution?.nextBestAction || '');
+  const resStatus = String(brainState?.resolution?.status || '');
+  const goalStatus = String(brainState?.goal?.status || '');
+  return {
+    callerName,
+    service:
+      entityValue(entities.service) ||
+      entityValue(entities.product) ||
+      entityValue(entities.requestedItem) ||
+      '',
+    place,
+    when,
+    refusedPlaces,
+    intent,
+    visitAsk: intent === 'booking' || intent === 'book_visit',
+    finishedAnswer:
+      resStatus === 'resolved' || nba === 'END' || goalStatus === 'completed',
   };
 }
 
@@ -410,8 +584,20 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
     out.want = stripRefusedClocks(out.want, flags.refusedWhen);
     out.reason = stripRefusedClocks(out.reason, flags.refusedWhen);
   }
+  out.want = polishCardLine(out.want, flags);
+  out.reason = polishCardLine(out.reason, flags);
+  out.done = polishCardLine(out.done, flags);
+  if (
+    !flags.visitSaved &&
+    !flags.holdSaved &&
+    !flags.callbackSaved &&
+    !cleanPiece(out.done)
+  ) {
+    out.done = 'None.';
+    out.applied.card = true;
+  }
   if (cleanedNext) {
-    out.next = cleanedNext;
+    out.next = polishCardLine(cleanedNext, flags);
     out.applied.card = true;
   }
   if (mood && mood !== 'unknown') {
@@ -420,6 +606,8 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
   } else {
     out.mood = mood;
   }
+
+  if (ownerMustDial(flags, derived)) return applyUnfinishedReturn(out, flags);
 
   if (!review) return out;
 
@@ -478,6 +666,14 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
     }
   }
 
+  if (
+    !flags.visitSaved &&
+    !flags.visitRequested &&
+    /^call them back\.?$/i.test(out.next)
+  ) {
+    out.next = 'None.';
+  }
+
   return out;
 }
 
@@ -495,7 +691,13 @@ function formatTrustedSnapshot(ctx) {
     `visitSaved: ${Boolean(flags.visitSaved)}`,
     `visitRequested: ${Boolean(flags.visitRequested)}`,
     `callbackSaved: ${Boolean(flags.callbackSaved)}`,
+    `callerName: ${cleanPiece(flags.callerName) || 'none'}`,
+    `service: ${cleanPiece(flags.service) || 'none'}`,
+    `place: ${cleanPiece(flags.place) || 'none'}`,
+    `when: ${cleanPiece(flags.when) || 'none'}`,
     `refusedWhen: ${(Array.isArray(flags.refusedWhen) ? flags.refusedWhen : []).join('; ') || 'none'}`,
+    `refusedPlaces: ${(Array.isArray(flags.refusedPlaces) ? flags.refusedPlaces : []).join('; ') || 'none'}`,
+    `finishedAnswer: ${Boolean(flags.finishedAnswer)}`,
     `escalateSaved: ${Boolean(flags.escalateSaved)}`,
     `handoff: ${Boolean(flags.handoff)}`,
   ].join('\n');
@@ -826,6 +1028,26 @@ async function runPostCallTranscriptReview(ctx, deps = {}) {
 
   const turns = await loadTurnsForReview(ctx, deps);
   if (!turns.length) {
+    if (isSilenceStatus(ctx.callStatus)) {
+      const merged = silenceReviewMerged();
+      await save({
+        callSid,
+        merged,
+        review: {
+          needs_human: false,
+          needs_owner: false,
+          urgent: false,
+          confidence: 1,
+          primary_intent: null,
+        },
+        derived: {
+          resolution: ctx.derived?.resolution || 'unknown',
+          primaryIntent: ctx.derived?.primaryIntent || null,
+          resolutionNote: null,
+        },
+      });
+      return { ok: true, merged, silence: true };
+    }
     console.warn(`[transcript-review] ${callSid} no turns`);
     return { ok: false, reason: 'no_turns' };
   }

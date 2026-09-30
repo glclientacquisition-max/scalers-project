@@ -327,6 +327,7 @@ function createBrainState(profile = {}) {
       savedWork: [],
       openHolds: [],
       refusedHours: [],
+      refusedPlaces: [],
     },
   };
 }
@@ -542,6 +543,15 @@ function observeCallerTurn(state, input = {}) {
     } else {
       next.visitPlace = null;
     }
+    if (
+      next.visitPlace?.blocked === 'outside' ||
+      next.visitPlace?.blocked === 'refused'
+    ) {
+      rememberRefusedPlace(
+        next,
+        place || entityValue(next.entities?.location) || entityValue(next.entities?.landmark)
+      );
+    }
   } else {
     next.visitPlace = null;
   }
@@ -599,6 +609,17 @@ function applyVisitTimeAnswer(state, text, profile = {}) {
 
 const TIME_NO_PREFERENCE =
   /\b(any ?time|anytime|whenever|any (?:is|time is) fine|don'?t (?:know|mind|care)|not sure|wakati wowote|saa yoyote|sijui|yoyote)\b/i;
+
+function rememberRefusedPlace(state, place) {
+  const text = String(place || '').replace(/\s+/g, ' ').trim();
+  if (!text) return;
+  if (!state.actions) state.actions = {};
+  if (!Array.isArray(state.actions.refusedPlaces)) state.actions.refusedPlaces = [];
+  const known = state.actions.refusedPlaces.some(
+    (row) => String(row).toLowerCase() === text.toLowerCase()
+  );
+  if (!known) state.actions.refusedPlaces.push(text);
+}
 
 function setNextBestAction(state, decision = {}) {
   const next = structuredClone(state || createBrainState());
@@ -687,7 +708,16 @@ function recordActionResults(state, results = []) {
     ...(result.soft ? { soft: true } : {}),
   }));
   if (!Array.isArray(next.actions.refusedHours)) next.actions.refusedHours = [];
+  if (!Array.isArray(next.actions.refusedPlaces)) next.actions.refusedPlaces = [];
   for (const result of safeResults) {
+    if (result?.status === 'invalid' && result?.code === 'outside_coverage') {
+      rememberRefusedPlace(
+        next,
+        result.value?.landmark ||
+          result.value?.address_landmark ||
+          result.value?.location
+      );
+    }
     if (result?.status === 'invalid' && result?.code === 'outside_hours') {
       const whenText = String(
         result.value?.whenText || result.value?.when_text || result.hours?.whenText || ''

@@ -222,6 +222,23 @@ function highWaterPrimaryIntent({ liveIntent, results = [] } = {}) {
  *   callStatus?: string,
  * }} opts
  */
+/** Talked visit, nothing saved, and name, place, or time still open. */
+function ownerMustReturnCall(state) {
+  const intent = String(state?.intent || '');
+  if (intent !== 'booking' && intent !== 'book_visit') return false;
+  if (String(state?.goal?.status || '') === 'completed') return false;
+  if (String(state?.resolution?.status || '') === 'resolved') return false;
+  if (String(state?.resolution?.nextBestAction || '') === 'END') return false;
+  const missing = Array.isArray(state?.goal?.missingSlots)
+    ? state.goal.missingSlots
+    : [];
+  const openSlot = missing.some((slot) =>
+    ['name', 'when', 'time', 'location', 'landmark', 'area'].includes(String(slot))
+  );
+  const name = String(state?.caller?.name || '').trim();
+  return openSlot || !name;
+}
+
 function deriveCallResolution(opts = {}) {
   const state = opts.brainState || {};
   const results = hangupResults(state, opts.toolResults);
@@ -297,6 +314,9 @@ function deriveCallResolution(opts = {}) {
   } else if (turnCount <= 1) {
     resolution = 'abandoned';
     note = 'Very short call — little conversation';
+  } else if (ownerMustReturnCall(state)) {
+    resolution = 'needs_human';
+    note = '';
   } else if (state.resolution?.status === 'unresolved') {
     resolution = 'unresolved';
     note = clean(state.resolution?.reason || 'Goal not completed', 200);

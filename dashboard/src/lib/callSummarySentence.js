@@ -44,6 +44,47 @@ function usefulMoodLabel(raw) {
 }
 
 /**
+ * Call chat card.
+ * Silence (failed or no_answer, no transcript): Want is "No conversation.",
+ * Done and Mood stay off, and the Needs you banner is the clock only.
+ *
+ * @param {{
+ *   silence?: boolean,
+ *   want?: string | null,
+ *   done?: string | null,
+ *   mood?: string | null,
+ *   next?: string | null,
+ *   needsYou?: boolean,
+ *   stamp?: string | null,
+ *   whenLabel?: string | null,
+ * }} opts
+ */
+function shapeTicketChat(opts) {
+  if (opts.silence) {
+    return {
+      want: "No conversation.",
+      done: "",
+      mood: "",
+      urgency: "",
+      bannerWhen: trimText(opts.whenLabel),
+    };
+  }
+  const want = trimText(opts.want);
+  const done = usefulOwnerFact(opts.done);
+  const mood = usefulMoodLabel(opts.mood);
+  const next = usefulOwnerFact(opts.next);
+  const stamp = trimText(opts.stamp);
+  const urgency = opts.needsYou ? next || want || stamp : "";
+  return {
+    want,
+    done,
+    mood,
+    urgency,
+    bannerWhen: "",
+  };
+}
+
+/**
  * Inbox one-liner. Hangup `reason` first, then Want, then live reason.
  *
  * @param {Record<string, unknown> | null | undefined} meta
@@ -157,4 +198,5 @@ module.exports = {
   displayContactLastReason,
   usefulOwnerFact,
   usefulMoodLabel,
+  shapeTicketChat,
 };

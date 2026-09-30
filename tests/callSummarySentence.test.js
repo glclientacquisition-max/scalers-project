@@ -8,6 +8,7 @@ const {
   pickCallOwnerCard,
   pickCallOwnerReason,
   pickCallOwnerWant,
+  shapeTicketChat,
   usefulMoodLabel,
   usefulOwnerFact,
 } = require('../dashboard/src/lib/callSummarySentence');
@@ -110,8 +111,62 @@ describe('contact last reason matches call summary', () => {
       path.join(__dirname, '../dashboard/src/app/(desk)/calls/[id]/page.tsx'),
       'utf8'
     );
-    assert.match(callPage, /usefulOwnerFact\(summaryCard\?\.done\)/);
-    assert.match(callPage, /usefulMoodLabel\(summaryCard\?\.mood\)/);
+    assert.match(callPage, /shapeTicketChat\(/);
+    assert.match(callPage, /isSilenceCallStatus\(row\.status\) && !talked/);
     assert.doesNotMatch(callPage, /moodKey !== "unknown"/);
+  });
+});
+
+describe('call chat card occasions', () => {
+  it('shows No conversation for silence and keeps the clock as the banner', () => {
+    const card = shapeTicketChat({
+      silence: true,
+      want: 'They asked for a quote.',
+      done: 'Callback was noted.',
+      mood: 'upset',
+      next: 'Call them back.',
+      needsYou: true,
+      stamp: 'Missed',
+      whenLabel: 'Today, 9:04 AM',
+    });
+    assert.equal(card.want, 'No conversation.');
+    assert.equal(card.done, '');
+    assert.equal(card.mood, '');
+    assert.equal(card.urgency, '');
+    assert.equal(card.bannerWhen, 'Today, 9:04 AM');
+  });
+
+  it('keeps Want, Done, and next on a talked call', () => {
+    const card = shapeTicketChat({
+      silence: false,
+      want: 'Carpet cleaning in Runda in the morning. No name.',
+      done: 'None.',
+      mood: 'unknown',
+      next: 'Call them back.',
+      needsYou: true,
+      stamp: 'Human asked',
+      whenLabel: 'Today, 9:04 AM',
+    });
+    assert.equal(card.want, 'Carpet cleaning in Runda in the morning. No name.');
+    assert.equal(card.done, '');
+    assert.equal(card.mood, '');
+    assert.equal(card.urgency, 'Call them back.');
+    assert.equal(card.bannerWhen, '');
+  });
+
+  it('leaves the banner off when the receptionist finished the call', () => {
+    const card = shapeTicketChat({
+      silence: false,
+      want: 'Sunday hours.',
+      done: 'Hours answered.',
+      mood: 'calm',
+      next: 'None.',
+      needsYou: false,
+      stamp: 'Answered',
+    });
+    assert.equal(card.done, 'Hours answered.');
+    assert.equal(card.mood, 'Calm');
+    assert.equal(card.urgency, '');
+    assert.equal(card.bannerWhen, '');
   });
 });

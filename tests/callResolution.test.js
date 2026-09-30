@@ -108,6 +108,20 @@ describe('deriveCallResolution', () => {
     assert.equal(out.resolution, 'needs_human');
   });
 
+  it('marks a talked visit with nothing saved as a return call', () => {
+    const state = createBrainState({ vertical: 'home_services' });
+    state.intent = 'booking';
+    state.conversation.turnCount = 6;
+    state.caller.name = null;
+    state.goal.missingSlots = ['name'];
+    state.entities.service = { value: 'carpet cleaning' };
+    state.entities.location = { value: 'Runda' };
+    state.entities.when = { value: 'morning' };
+    const out = deriveCallResolution({ brainState: state });
+    assert.equal(out.resolution, 'needs_human');
+    assert.equal(out.primaryIntent, 'book_visit');
+  });
+
   it('marks very short calls as abandoned', () => {
     const out = deriveCallResolution({
       brainState: createBrainState(),

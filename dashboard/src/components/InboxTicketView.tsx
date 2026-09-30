@@ -339,7 +339,7 @@ export function InboxTicketView({
   waMessage: string;
   needsYou: boolean;
   urgency: string | null;
-  /** Missed-call banner clock. Other banners stay a next step only. */
+  /** Silence banner clock. Other banners stay a next step only. */
   bannerWhen?: string | null;
   want: string | null;
   done: string | null;
@@ -532,11 +532,14 @@ export function InboxTicketView({
         </DeskRecordLead>
       </header>
 
-      {needsYou && urgency ? (
+      {needsYou && (urgency || bannerWhen) ? (
         <p className="shrink-0 border-b border-warn/40 bg-warn-soft px-4 py-2 text-sm font-medium text-warn sm:px-6">
-          {plainOwnerCopy(urgency)}
+          {urgency ? plainOwnerCopy(urgency) : null}
           {bannerWhen ? (
-            <span className="font-normal"> · {plainOwnerCopy(bannerWhen)}</span>
+            <span className={urgency ? "font-normal" : undefined}>
+              {urgency ? " · " : ""}
+              {plainOwnerCopy(bannerWhen)}
+            </span>
           ) : null}
         </p>
       ) : null}
