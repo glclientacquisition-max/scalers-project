@@ -94,7 +94,7 @@ export function ContactImportForm() {
           />
           {pickerError ? <p className="text-sm text-warn">{pickerError}</p> : null}
 
-          <form action={previewAction} className="space-y-4">
+          <form action={previewAction} data-pull-dirty-guard="" className="space-y-4">
             <label className="text-xs font-medium uppercase tracking-wide text-ink-soft">
               CSV
               <input
@@ -170,7 +170,7 @@ export function ContactImportForm() {
             </ul>
           ) : null}
 
-          <form action={applyAction} className="flex flex-wrap items-center gap-2">
+          <form action={applyAction} data-pull-dirty-guard="" className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="csvText" value={csvText} />
             <input type="hidden" name="confirm" value="1" />
             <button

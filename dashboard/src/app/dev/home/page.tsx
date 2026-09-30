@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
 import { DeskAccountMenu } from "@/components/DeskAccountMenu";
+import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { ThemePicker } from "@/components/ThemePicker";
 import { DailyBulletinPanel } from "@/components/DailyBulletinPanel";
@@ -20,7 +22,10 @@ export default function DevHomePage() {
       <DeskRail needsCount={3} homeHref="/dev/home" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
         <DeskAccountMenu name="Chapter One Dental" tenantId="" workspaces={[]} />
-        <main className={deskMainClass}>
+        <main data-desk-main="" className={deskMainClass}>
+          <Suspense fallback={null}>
+            <DeskPhonePull />
+          </Suspense>
           <HomeOverviewHeader today={{ iso: "2026-09-20", label: "Sunday 20 September" }} />
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
           <section

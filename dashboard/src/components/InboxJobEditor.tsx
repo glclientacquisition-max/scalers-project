@@ -27,7 +27,7 @@ export function InboxJobEditor({
 
   return (
     <div className="space-y-3">
-      <form action={formAction} className="space-y-2">
+      <form action={formAction} data-pull-dirty-guard="" className="space-y-2">
         <input type="hidden" name="id" value={id} />
         <label className="block text-xs font-medium text-ink-soft" htmlFor={`when-${id}`}>
           When

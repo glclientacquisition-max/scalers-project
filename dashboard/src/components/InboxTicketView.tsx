@@ -559,10 +559,12 @@ export function InboxTicketView({
       >
         <div
           ref={paneRef}
+          data-pull-scroll=""
           className="absolute inset-0 overflow-y-auto lg:contents"
         >
           <aside
             data-ticket-summary=""
+            data-pull-scroll=""
             className="space-y-4 px-4 py-4 sm:px-6 lg:min-h-0 lg:overflow-y-auto"
           >
             <InboxPurposeChip purpose={purpose} label={plainOwnerCopy(stamp)} />
@@ -675,6 +677,7 @@ export function InboxTicketView({
           <section data-ticket-thread="" className="relative min-h-0">
             <div
               ref={threadRef}
+              data-pull-scroll=""
               className="space-y-2.5 px-4 py-4 sm:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
             >
               <CallTranscript turns={turns} mode="thread" />

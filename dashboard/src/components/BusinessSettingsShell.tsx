@@ -232,7 +232,7 @@ export function BusinessSettingsShell({
   if (isMenu) {
     return (
       <>
-        <div className="w-full min-w-0 md:hidden" data-settings-console="">
+        <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
           <SettingsPageHeader
             businessName={businessName}
             lineLive={lineLive}
@@ -243,7 +243,7 @@ export function BusinessSettingsShell({
             <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
           </div>
         </div>
-        <div className="hidden w-full min-w-0 md:block">
+        <div className="hidden w-full min-w-0 md:block" data-pull-dirty-guard="">
           <SettingsIdentityRedirect />
           <TenantForm
             key={tenantFormKey}
@@ -261,7 +261,7 @@ export function BusinessSettingsShell({
   }
 
   return (
-    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="">
+    <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">
       {showForm ? (
         <TenantForm
           key={tenantFormKey}

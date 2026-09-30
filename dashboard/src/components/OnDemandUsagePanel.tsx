@@ -33,7 +33,7 @@ export function OnDemandUsagePanel({
     <section>
       <h2 className="font-display text-xl tracking-tight text-ink">On-demand</h2>
 
-      <form action={formAction} className="mt-3 space-y-4">
+      <form action={formAction} data-pull-dirty-guard="" className="mt-3 space-y-4">
         <input type="hidden" name="tenant_id" value={tenantId} />
         <input type="hidden" name="enabled" value={enabled ? "1" : "0"} />
 

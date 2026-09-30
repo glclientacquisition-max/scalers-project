@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DeskAccountBar } from "@/components/DeskAccountBar";
+import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { DeskRail, DeskTabBar, deskMainClass, deskShellClass } from "@/components/DeskNav";
 import { DeskRouteChrome } from "@/components/DeskRouteChrome";
 import { DeskNavHost, DeskNeedsCountBridge, DeskScrollRestore } from "@/components/DeskNavState";
@@ -56,6 +57,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
           />
           <DeskOffline />
           <main data-desk-main="" className={deskMainClass}>
+            <Suspense fallback={null}>
+              <DeskPhonePull />
+            </Suspense>
             {children}
             <Suspense fallback={null}>
               <DeskScrollRestore />

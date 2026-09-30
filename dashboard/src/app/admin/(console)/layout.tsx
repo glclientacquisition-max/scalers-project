@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { AdminPhonePull } from "@/components/PhonePullSurface";
 import { BrandLockup } from "@/components/brand/BrandMark";
 import { AdminNav } from "@/components/AdminNav";
 import { getAdminSession, getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
@@ -53,7 +55,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </aside>
 
-      <main className="flex-1 px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+      <main data-admin-main="" data-pull-dirty-guard="" className="flex-1 px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+        <Suspense fallback={null}>
+          <AdminPhonePull />
+        </Suspense>
         <div className="mx-auto max-w-5xl">{children}</div>
       </main>
     </div>

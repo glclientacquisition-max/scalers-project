@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { DeskPhonePull } from "@/components/PhonePullSurface";
 import { ContactActionDock } from "@/components/ContactActionDock";
 import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
 import { ContactNameForm } from "@/components/ContactNameForm";
@@ -31,7 +33,10 @@ export default function DevContactFilePage() {
     <div className={deskShellClass}>
       <DeskRail needsCount={0} homeHref="/dev/contacts" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:overflow-hidden">
-        <main className={deskMainClass}>
+        <main data-desk-main="" className={deskMainClass}>
+          <Suspense fallback={null}>
+            <DeskPhonePull />
+          </Suspense>
           <div className="max-w-6xl min-w-0 overflow-x-clip" data-desk-nested="">
             <div className="space-y-4">
               <DeskRecordLead
