@@ -42,7 +42,9 @@ describe("package usage meter", () => {
     assert.match(page, /label: "WhatsApp", left: waLeft, used: pack\.waUsed/);
     assert.match(page, /label: "Seats"/);
     assert.match(page, /On-demand rates/);
+    assert.match(page, />Calls</);
     assert.match(page, /KES \{kes\(inboundMin\)\}\/min/);
+    assert.doesNotMatch(page, /Calls out/);
     assert.doesNotMatch(page, /WalletTopUpButton/);
     assert.doesNotMatch(page, /Top up prepaid/);
     assert.doesNotMatch(page, /daysRemainingAtPace/);
@@ -59,6 +61,8 @@ describe("package usage meter", () => {
     assert.match(landing, /id="packages"/);
     assert.match(prices, /packagePriceLabel/);
     assert.match(prices, /past included/);
+    assert.match(prices, /calls KES \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
+    assert.doesNotMatch(prices, /min out/);
     assert.match(prices, /Per month/);
     assert.match(prices, /Per year/);
     assert.doesNotMatch(prices, /Most popular/);

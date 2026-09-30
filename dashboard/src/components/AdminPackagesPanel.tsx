@@ -142,7 +142,7 @@ export function AdminPackagesPanel({
               }
             />
             <span className="mt-1 block text-xs text-ink-soft">
-              KES {rates.outboundKesPerSecond}/sec
+              KES {rates.outboundKesPerSecond}/sec. Stored. Hidden until live transfer.
             </span>
           </label>
           <label className="block text-sm">

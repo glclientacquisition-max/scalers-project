@@ -63,8 +63,8 @@ export type PublicPackageBoard = {
 };
 
 const DEFAULT_RATES: BillingRateCard = {
-  inboundKesPerSecond: 0.05,
-  outboundKesPerSecond: 0.1,
+  inboundKesPerSecond: 0.1,
+  outboundKesPerSecond: 0.15,
   whatsappKes: 2,
   smsKes: 1,
   emailKes: 1,
@@ -151,12 +151,12 @@ export function emptyOwnerPackageMeter(): OwnerPackageMeter {
   };
 }
 
-export function inboundKesForSeconds(seconds: number, kesPerSecond = 0.05): number {
+export function inboundKesForSeconds(seconds: number, kesPerSecond = 0.1): number {
   const secs = Math.max(0, Math.ceil(Number(seconds) || 0));
   return Math.round(secs * Number(kesPerSecond) * 100) / 100;
 }
 
-export function outboundKesForSeconds(seconds: number, kesPerSecond = 0.1): number {
+export function outboundKesForSeconds(seconds: number, kesPerSecond = 0.15): number {
   const secs = Math.max(0, Math.ceil(Number(seconds) || 0));
   return Math.round(secs * Number(kesPerSecond) * 100) / 100;
 }

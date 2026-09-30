@@ -6,8 +6,8 @@
 
 create table if not exists public.billing_rate_card (
   id integer primary key default 1 check (id = 1),
-  inbound_kes_per_second numeric not null default 0.05,
-  outbound_kes_per_second numeric not null default 0.10,
+  inbound_kes_per_second numeric not null default 0.10,
+  outbound_kes_per_second numeric not null default 0.15,
   whatsapp_kes numeric not null default 2,
   sms_kes numeric not null default 1,
   email_kes numeric not null default 1,

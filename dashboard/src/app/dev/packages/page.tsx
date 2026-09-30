@@ -7,8 +7,8 @@ import type { BillingPackage, BillingRateCard, TenantSubscriptionRow } from "@/l
  * Straw prices match the public seed (monthly 0) so the Landing preview shows Not set.
  */
 const RATES: BillingRateCard = {
-  inboundKesPerSecond: 0.05,
-  outboundKesPerSecond: 0.1,
+  inboundKesPerSecond: 0.1,
+  outboundKesPerSecond: 0.15,
   whatsappKes: 2,
   smsKes: 1,
   emailKes: 1,

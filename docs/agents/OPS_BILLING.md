@@ -39,7 +39,8 @@ Use for wallets, ledger, DID pool assign/release, SautiKit admin telecom actions
 ## Rate card defaults (env)
 
 - `WALLET_RATE_KES_PER_MINUTE` (inbound, default **0**; SautiKit inbound is currently free)
-- `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (outbound live transfer, default **4**; SautiKit outbound cost is **KES 3 / min**)
+- `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (legacy fallback only when `consume_call_seconds` is missing; default **4**)
+- Package rate card (`billing_rate_card`): inbound **KES 0.10/sec** (KES 6/min), outbound **KES 0.15/sec** (KES 9/min). Outbound is stored and hidden until live transfer. SautiKit outbound cost is **KES 3 / min** answered.
 - `WALLET_LINE_FEE_KES_PER_MONTH` (default 1000)
 - `WALLET_CHARGING_ENABLED`
 

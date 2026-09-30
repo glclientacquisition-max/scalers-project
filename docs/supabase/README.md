@@ -125,6 +125,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 | 24e | [`package_entitlements.sql`](./package_entitlements.sql) | `sms_allowance.sql` | Reserved email + seat included columns. No email/invite gate. |
 | 24g | [`package_catalog.sql`](./package_catalog.sql) | `package_entitlements.sql` | SKUs, rate card, `tenant_subscriptions`, minutes/WA included columns, `assign_tenant_package`. **`tenants_protect_wallet_columns()` latest.** |
 | 24h | [`package_minute_consume.sql`](./package_minute_consume.sql) | `package_catalog.sql` | Hangup `consume_call_seconds`. Included seconds free. On-demand off: meter, no debit. On-demand SMS debit. Does not replace the protect trigger. |
+| 24i | [`package_rate_card_ondemand_6_9.sql`](./package_rate_card_ondemand_6_9.sql) | `package_catalog.sql` | Sets the existing rate card to inbound KES 0.10/sec and outbound KES 0.15/sec. Does not change package prices. |
 | 24f | [`whatsapp_threads.sql`](./whatsapp_threads.sql) | `notify_send_ledger.sql` | Platform two-way WhatsApp persist (`whatsapp_threads` / `whatsapp_messages`). Service role only. Not voice DID routing. |
 
 ---

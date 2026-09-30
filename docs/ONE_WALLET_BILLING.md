@@ -24,8 +24,8 @@ AI cost is included in the per-minute retail rate — not a separate client bala
 
 | Line item | Ledger kind | Amount |
 |---|---|---|
-| Receptionist minutes (inbound) | `call_charge` | **KES 0**. Matches SautiKit inbound (currently free). Revisit if SautiKit starts charging inbound. |
-| Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 4 / min** retail. SautiKit costs **KES 3 / min**. Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
+| Receptionist minutes (inbound on-demand) | `call_charge` via `consume_call_seconds` | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. Included seconds are free. SautiKit inbound is currently free. |
+| Live transfer outbound | `call_charge` on a **second** `calls` row | **KES 9 / min** stored (`billing_rate_card` 0.15/sec). Not offered until live transfer. SautiKit costs **KES 3 / min**. Never fold into the inbound `call_id`. Beta does not originate outbound. See [`LIVE_TRANSFER.md`](./LIVE_TRANSFER.md) §8. |
 | Line rental | `line_rental` | Fixed KES / calendar month (UTC) |
 | Ops seed / correction | `admin_adjustment` | Signed KES |
 | Future M-Pesa | `topup` | Positive KES |
@@ -45,6 +45,8 @@ WALLET_RATE_KES_PER_MINUTE=0
 WALLET_TRANSFER_RATE_KES_PER_MINUTE=4
 WALLET_LINE_FEE_KES_PER_MONTH=1000
 ```
+
+Package on-demand reads `billing_rate_card`, not these env rates. The env outbound default 4 applies only when `consume_call_seconds` is missing.
 
 ## Apply after one_wallet_billing
 

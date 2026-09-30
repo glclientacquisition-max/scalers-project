@@ -23,14 +23,15 @@
   - Staff WhatsApp: KES 2 / send
   - SMS: KES 1 / segment
   - Email: KES 1 / send
-  - Inbound: **KES 0.05 / sec** (KES 3 / min). Whole seconds, money to 2 decimals.
-  - Outbound / live-transfer: **KES 0.10 / sec** (KES 6 / min)
+  - Inbound: **KES 0.10 / sec** (KES 6 / min). Whole seconds, money to 2 decimals. Shown on landing and Usage.
+  - Outbound / live-transfer: **KES 0.15 / sec** (KES 9 / min). Stored on the rate card and in Super Admin. Hidden on landing and Usage until live transfer ships.
+- Recommended monthly prices, not seeded: Starter **KES 2,000**, Growth **KES 5,000**, Scale **KES 12,000**. Round thousands. Each pack sits under the on-demand piece-sum (KES 2,500 / 6,550 / 16,000 at KES 6/min) and above a heavy full-pack month. Founder types them in Admin. Seed stays 0 until then.
 - Super Admin login is username + access code (`/admin/login`, `ADMIN_OPERATORS` or `ADMIN_ACCESS_CODE`). That session opens Packages. No third password.
 - `/admin/packages` edits rates, SKU included numbers, monthly KES, annual discount %, and assigns a package to a business.
 
 ## Not yet specified
 
-- Founder monthly prices (type them in the panel; seed is 0).
+- Founder still types the recommended monthly prices in Admin. Seed stays 0.
 - Mid-period upgrade money.
 - `consume_email_units` / WhatsApp consume. Minutes are `consume_call_seconds`.
 - When to drop prepaid columns.
