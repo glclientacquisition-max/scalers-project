@@ -94,7 +94,8 @@ describe("theme activation", () => {
 
   it("scopes the desk layout and the dev bench to the theme", () => {
     assert.match(read("dashboard/src/app/(desk)/layout.tsx"), /deskShellClass/);
-    assert.match(read("dashboard/src/components/DeskNav.tsx"), /desk-theme flex h-dvh/);
+    assert.match(read("dashboard/src/components/DeskNav.tsx"), /desk-theme fixed inset-0 flex/);
+    assert.match(read("dashboard/src/app/globals.css"), /body:has\(\.desk-theme\)/);
     assert.match(read("dashboard/src/app/dev/inbox/page.tsx"), /deskShellClass/);
   });
 

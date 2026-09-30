@@ -61,7 +61,11 @@ describe("desk phone shell", () => {
     assert.doesNotMatch(nav, /backdrop-blur/);
     assert.match(layout, /deskShellClass/);
     assert.match(nav, /export const deskShellClass/);
-    assert.match(nav, /h-dvh min-h-dvh min-w-0 overflow-hidden/);
+    assert.match(nav, /fixed inset-0 flex min-w-0 overflow-hidden/);
+    assert.doesNotMatch(nav, /deskShellClass =\s*\n\s*"desk-theme flex h-dvh/);
+    assert.match(css, /html:has\(\.desk-theme\)/);
+    assert.match(css, /overscroll-behavior: none/);
+    assert.match(css, /body:has\(\.desk-theme\) \{\s*background: #0b1220;/);
     assert.match(nav, /min-h-0 min-w-0 max-w-desk flex-1 overflow-y-auto/);
     assert.doesNotMatch(layout, /context=\{businessName\}/);
     const inboxRow = read("dashboard/src/components/InboxItemRow.tsx");
