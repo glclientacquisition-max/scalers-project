@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ContactTimelineWhat } from "@/components/ContactTimelineWhat";
 import { InboxFilterPills } from "@/components/InboxFilterPills";
@@ -133,7 +134,27 @@ export function ContactHistory({
         />
       </div>
       {rows.length === 0 ? (
-        <p className="mt-4 text-sm text-ink-soft">No calls or jobs yet.</p>
+        <div className="mt-8 border-y border-line py-8 text-center">
+          <p className="font-display text-2xl tracking-tight text-ink">
+            {q.trim() ? "No matches" : filter === "all" ? "No calls or jobs yet" : "Nothing in this filter"}
+          </p>
+          {q.trim() ? (
+            <button
+              type="button"
+              className={`${btnGhost} mt-6`}
+              onClick={() => {
+                setValue("");
+                syncQuery("");
+              }}
+            >
+              Clear
+            </button>
+          ) : filter !== "all" ? (
+            <Link href={chipHrefs.all} className={`${btnGhost} mt-6`}>
+              Show all
+            </Link>
+          ) : null}
+        </div>
       ) : (
         <>
           <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface md:hidden">

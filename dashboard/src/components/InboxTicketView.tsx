@@ -507,7 +507,7 @@ export function InboxTicketView({
     <div
       data-desk-bleed=""
       data-ticket-chat=""
-      className="-mx-4 -mb-[var(--desk-tabbar-clearance)] -mt-6 flex h-[calc(100dvh-var(--desk-header-h))] min-h-0 flex-col pb-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:-mx-6 sm:-mt-10 md:mx-0 md:mb-0 md:mt-0 md:h-full md:pb-0"
+      className="flex h-full min-h-0 flex-1 flex-col pt-[var(--desk-header-h)] pb-[env(safe-area-inset-bottom,0px)] md:pb-0"
     >
       <header className="shrink-0 border-b border-line bg-surface px-2 py-2 sm:px-4">
         <DeskRecordLead

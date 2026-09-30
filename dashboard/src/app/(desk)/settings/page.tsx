@@ -5,7 +5,7 @@ import {
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
 import { getCurrentTenant } from "@/lib/tenant";
-import { DeskError } from "@/components/ui/DeskError";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { deskLiveTransferExecutorEnabled } from "@/lib/deskLiveTransfer";
 
@@ -24,7 +24,7 @@ export default async function SettingsPage({
   try {
     tenant = await getCurrentTenant();
   } catch {
-    return <DeskError>Could not load Business Profile.</DeskError>;
+    return <DeskLoadError>Could not load Business Profile.</DeskLoadError>;
   }
 
   if (!tenant) {

@@ -12,11 +12,11 @@
 
 **Live.** The desk-shell `LiveInbox` subscription re-runs this page when a work-table row lands, and `revalidatePath` keeps Home current even if the owner is on another desk route. Briefing, queues, digest, and Next to return stay current without a manual refresh.
 
-**Desktop gains a second column.** Below `lg` the page is one column: Work, then aside. At `lg` the grid is 7/5: Work (queues + Next to return) on the left, aside on the right. The aside is sticky (`top-24`). The extra width is real content, not margin.
+**Desktop gains a second column.** Below `lg` the page is one column: Work, then aside, then Updates. At `lg` the grid is 7/5: Work (queues + Next to return) on the left (`lg:col-span-7 lg:row-start-1`), aside on the right (`lg:col-span-5 lg:row-span-2`), Updates under Work (`lg:row-start-2`). The aside is sticky (`top-24`). The extra width is real content, not margin.
 
 **Next to return.** The first open return call from `summarizeInboxWork.nextReturn`. Who, when (`formatCallWhenRelative`), one truncated reason (`deskPreviewClass`). Tap the card to open the conversation. Ghost WhatsApp is the only button. No Open call link. On phone (`lg:hidden`) it is a compact row under Work. At `lg` it is the left-column card (`hidden lg:block`).
 
-**Updates.** Same `DailyBulletinPanel` as Profile `?tab=updates`. Callers hear, Until chips (Tonight · Tomorrow night · I clear it · Pick), Post update, Clear. Pick uses From Now / Later plus date and time fields (not `datetime-local`). One preview line states the window. Writes `daily_bulletin` `starts_at` / `ends_at` through `bulletinActions`. Callers hear a row only after start and before end (`isBulletinLive`). Scheduled rows stay on the desk list. Always on Home after Work (and Next to return when that row exists). Not a second persist path. Post update stays filled and docked to the field.
+**Updates.** Same `DailyBulletinPanel` as Profile `?tab=updates`. Callers hear, Until chips (Tonight · Tomorrow night · I clear it · Pick), Post update, Clear. Pick uses From Now / Later plus date and time fields (not `datetime-local`). One preview line states the window. Writes `daily_bulletin` `starts_at` / `ends_at` through `bulletinActions`. Callers hear a row only after start and before end (`isBulletinLive`). Scheduled rows stay on the desk list. On phone, Updates follows the aside so Work is the first fold. At `lg`, Updates stays in the 7 column under Work. Not a second persist path. Post update stays filled and docked to the field.
 
 **One blue action per screen.** The aside CTA is the work primary when it is not Return calls. Next to return uses a ghost WhatsApp button (green glyph). Post update is the Updates primary, docked to Callers hear.
 

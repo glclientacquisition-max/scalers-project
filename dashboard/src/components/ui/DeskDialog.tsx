@@ -45,7 +45,7 @@ export function DeskDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+      className="fixed inset-x-0 top-0 z-40 flex items-end justify-center bg-ink/40 p-4 bottom-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] sm:items-center"
       role="presentation"
       onClick={() => {
         if (!pending) onClose();
@@ -58,7 +58,7 @@ export function DeskDialog({
         aria-labelledby={headingId}
         tabIndex={-1}
         className={[
-          "max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-xl focus:outline-none",
+          "max-h-full w-full overflow-y-auto rounded-2xl border border-line bg-surface p-4 focus:outline-none sm:p-6",
           panelClassName,
         ].join(" ")}
         onClick={(event) => event.stopPropagation()}
@@ -75,7 +75,7 @@ export function DeskDialog({
             onClick={() => {
               if (!pending) onClose();
             }}
-            className="rounded-lg px-2 py-1 text-sm text-ink-soft hover:bg-surface-canvas hover:text-ink"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm text-ink-soft hover:bg-surface-canvas hover:text-ink"
             aria-label="Close"
           >
             Close

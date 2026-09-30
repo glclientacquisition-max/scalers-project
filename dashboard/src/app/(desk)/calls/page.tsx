@@ -32,6 +32,7 @@ import {
 } from "@/lib/visitCalendar";
 import { showsVisitQueue } from "@/lib/inboxNiche";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 
 // instant = false: request-time desk data under the owner auth shell.
@@ -75,7 +76,7 @@ export default async function CallsPage({
   );
 
   if (error) {
-    return <DeskError>Could not load inbox.</DeskError>;
+    return <DeskLoadError>Could not load inbox.</DeskLoadError>;
   }
 
   const searched = q
@@ -173,7 +174,7 @@ export default async function CallsPage({
 
       {partialError ? (
         <div className="mt-6">
-          <DeskError>{partialError}</DeskError>
+          <DeskLoadError>{partialError}</DeskLoadError>
         </div>
       ) : null}
 

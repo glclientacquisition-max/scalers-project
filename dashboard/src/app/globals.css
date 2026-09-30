@@ -207,7 +207,7 @@
   .desk-theme:has([data-ticket-chat]),
   .desk-theme:has([data-desk-nested]) {
     --desk-tabbar-h: 0px;
-    --desk-tabbar-clearance: 0px;
+    --desk-tabbar-clearance: env(safe-area-inset-bottom, 0px);
   }
 
   .desk-theme:has([data-ticket-chat]) [data-desk-tabbar],

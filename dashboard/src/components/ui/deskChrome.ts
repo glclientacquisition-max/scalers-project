@@ -136,7 +136,7 @@ export function deskRateCardCountClass(active: boolean) {
 }
 
 export const deskRateCardRowClass =
-  "-mx-1 flex flex-nowrap snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  "-mx-1 flex flex-nowrap snap-x snap-mandatory gap-2 overflow-x-auto px-1 pe-8 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 export function filterTabClass(active: boolean) {
   return [

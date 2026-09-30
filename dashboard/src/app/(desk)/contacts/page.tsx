@@ -12,10 +12,13 @@ import { DeskLandScope } from "@/components/ui/DeskLand";
 import { Pagination } from "@/components/ui/Pagination";
 import { clampListPage, DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
+  btnGhost,
+  btnPrimary,
   deskEmptyClass,
   deskListTitleClass,
   deskShiftClass,
 } from "@/components/ui/deskChrome";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskIndexLead } from "@/components/ui/DeskIndexLead";
 import { sanitizeSearchQuery } from "@/lib/callsTriage";
 import { ContactSortSelect } from "@/components/ContactSortSelect";
@@ -88,7 +91,7 @@ export default async function ContactsPage({
   ]);
 
   if (error) {
-    return <DeskError>Could not load contacts.</DeskError>;
+    return <DeskLoadError>Could not load contacts.</DeskLoadError>;
   }
 
   const safePage = clampListPage(page, total, PAGE_SIZE);
@@ -120,7 +123,7 @@ export default async function ContactsPage({
             </div>
           </div>
         </DeskIndexLead>
-        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex-1">
             <InboxFilterPills
               label="Filter contacts"
@@ -146,24 +149,19 @@ export default async function ContactsPage({
           {q ? (
             <Link
               href={contactsHref({ saved, sort })}
-              className={`mt-6 inline-flex font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+              className={`mt-6 inline-flex min-h-11 items-center font-medium text-ink-soft ${deskShiftClass} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             >
               Clear
             </Link>
-          ) : saved === "all" &&
-            String(tenant.sautikit_virtual_number || "").startsWith("pending:") ? (
-            <p className="mt-2 text-sm text-ink-soft">Number being assigned</p>
-          ) : saved === "all" && tenant.sautikit_virtual_number ? (
-            <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-              Call{" "}
-              <a
-                href={`tel:${tenant.sautikit_virtual_number}`}
-                className="font-medium text-accent-deep underline decoration-accent/40 underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                {tenant.sautikit_virtual_number}
-              </a>
-            </p>
-          ) : null}
+          ) : saved !== "all" ? (
+            <Link href={contactsHref({ sort })} className={`${btnGhost} mt-6`}>
+              Show all
+            </Link>
+          ) : (
+            <Link href="/contacts/import" className={`${btnPrimary} mt-6`}>
+              Import
+            </Link>
+          )}
         </div>
       ) : (
         <>

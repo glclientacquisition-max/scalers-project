@@ -31,6 +31,7 @@ import { eatYmd } from "@/lib/visitCalendar";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { HomeOverviewHeader } from "@/components/HomeOverviewHeader";
 import { DeskError } from "@/components/ui/DeskError";
+import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
 import { DeskRowHit, deskRowActionClass, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { LivePing } from "@/components/ui/deskRow";
@@ -89,7 +90,7 @@ export default async function HomeOverviewPage() {
     loadOwnerPackageMeter(tenant.id),
   ]);
   if (inbox.error) {
-    return <DeskError>Could not load Overview.</DeskError>;
+    return <DeskLoadError>Could not load Overview.</DeskLoadError>;
   }
   const minutesLeft = remainingCount(pack.minutesIncluded, pack.minutesUsed);
   const packLabel = pack.packageName
@@ -185,12 +186,12 @@ export default async function HomeOverviewPage() {
 
       {inbox.partialError ? (
         <div className="mt-6">
-          <DeskError>{inbox.partialError}</DeskError>
+          <DeskLoadError>{inbox.partialError}</DeskLoadError>
         </div>
       ) : null}
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
-        <div className="min-w-0 lg:col-span-7">
+        <div className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-1">
         <section className="min-w-0" aria-labelledby="work-heading">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2
@@ -361,22 +362,9 @@ export default async function HomeOverviewPage() {
             </>
           ) : null}
         </section>
-
-        <section className="mt-6 min-w-0" aria-labelledby="updates-heading">
-          <h2
-            id="updates-heading"
-            className="flex items-center gap-2 font-display text-xl tracking-tight text-ink"
-          >
-            <LivePing />
-            Updates
-          </h2>
-          <div className="mt-3">
-            <DailyBulletinPanel tenant={tenant} />
-          </div>
-        </section>
         </div>
 
-        <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5">
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">
           <div className="overflow-hidden rounded-2xl border border-line bg-surface">
             <section aria-label="Today" className="px-3 py-3">
               <Link
@@ -429,6 +417,22 @@ export default async function HomeOverviewPage() {
             ) : null}
           </div>
         </aside>
+
+        <section
+          className="min-w-0 lg:col-span-7 lg:col-start-1 lg:row-start-2"
+          aria-labelledby="updates-heading"
+        >
+          <h2
+            id="updates-heading"
+            className="flex items-center gap-2 font-display text-xl tracking-tight text-ink"
+          >
+            <LivePing />
+            Updates
+          </h2>
+          <div className="mt-3">
+            <DailyBulletinPanel tenant={tenant} />
+          </div>
+        </section>
       </div>
     </div>
   );
