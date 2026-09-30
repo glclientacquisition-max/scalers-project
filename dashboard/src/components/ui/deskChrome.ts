@@ -8,10 +8,10 @@ import { deskShiftClass } from "@/lib/deskMotion";
 export { deskShiftClass };
 
 export const focusRing =
-  "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2";
+  "focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2";
 
 export const focusRingVisible =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2";
 
 /** Fill only. Compose with size classes so Tailwind does not fight min-h-11 vs min-h-14. */
 export const btnPrimaryFill =
@@ -84,7 +84,7 @@ export const pendingSpinnerInkClass =
   "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink/20 border-t-ink motion-reduce:animate-none";
 
 export const deskFieldClass =
-  `w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-accent`;
+  `w-full min-h-11 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none ${deskShiftClass} placeholder:text-ink-soft/70 hover:border-accent/35 focus:border-accent focus:ring-2 focus:ring-brand`;
 
 export const deskErrorClass =
   "rounded-2xl border border-warn/40 bg-warn-soft p-6 text-warn";
@@ -121,10 +121,10 @@ export function deskRateCardClass(active: boolean) {
   return [
     "inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-medium",
     deskShiftClass,
-    "focus:outline-none focus:ring-2 focus:ring-[#0096FF]",
+    "focus:outline-none focus:ring-2 focus:ring-brand",
     active
-      ? "bg-[#005CCC] text-white"
-      : "bg-surface-muted text-ink hover:bg-[#0096FF]/10",
+      ? "bg-accent text-accent-on"
+      : "bg-surface-muted text-ink hover:bg-accent-tonal",
   ].join(" ");
 }
 
