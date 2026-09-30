@@ -19,9 +19,10 @@ function fieldTarget(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest("input, textarea, select"));
 }
 
-/** Visible list root. A hidden Activity copy has no client rects and must not refresh. */
+/** Visible list root. A hidden or inert ticket must not refresh. */
 export function pullRootVisible(node: HTMLElement | null): boolean {
   if (!node) return false;
+  if (node.closest("[inert]")) return false;
   return node.getClientRects().length > 0;
 }
 

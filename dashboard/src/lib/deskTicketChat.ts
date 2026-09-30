@@ -32,6 +32,26 @@ export function isDeskTicketChatPath(pathname: string | null | undefined): boole
   return /^\/calls\/[^/]+$/.test(deskPathname(pathname));
 }
 
+/**
+ * A ticket Next kept in a hidden Activity must not take hits or host a pull
+ * after the owner is back on a list. The visible ticket on a live chat stays active.
+ */
+export function markHiddenDeskTickets(shell: Element): void {
+  const live = shell.hasAttribute("data-desk-ticket-chat");
+  for (const node of shell.querySelectorAll("[data-ticket-chat]")) {
+    if (!(node instanceof HTMLElement)) continue;
+    const shown = live && node.getClientRects().length > 0;
+    if (shown) {
+      node.removeAttribute("inert");
+      if (node.getAttribute("aria-hidden") === "true") node.removeAttribute("aria-hidden");
+      continue;
+    }
+    node.setAttribute("inert", "");
+    node.setAttribute("aria-hidden", "true");
+    node.removeAttribute("data-pull-host");
+  }
+}
+
 function settingsSearchTab(search: string | null | undefined): string {
   const raw = String(search || "").replace(/^\?/, "");
   if (!raw) return "";
