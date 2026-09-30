@@ -98,6 +98,21 @@ function load() {
       adjAll: adjacentPileHrefs("all", hrefs),
       adjAnswered: adjacentPileHrefs("answered", hrefs),
       adjArchived: adjacentPileHrefs("archived", hrefs),
+      shopAllNext: adjacentPileHrefs("all", {
+        needs: "/calls?purpose=needs",
+        all: "/calls?purpose=all",
+        hold: "/calls?purpose=hold",
+        human: "/calls?purpose=human",
+        answered: "/calls?purpose=answered",
+      }).next,
+      homeJobNext: adjacentPileHrefs("job", {
+        needs: "/calls?purpose=needs",
+        all: "/calls?purpose=all",
+        job: "/calls?purpose=job",
+        human: "/calls?purpose=human",
+        answered: "/calls?purpose=answered",
+      }).next,
+      homeAllNext: purposeAfterSwipe("all", "next", ["needs", "all", "job", "human", "answered"]),
       paintPending: filterCachedPile(null, "all", () => true),
       paintEmpty: filterCachedPile([{ id: "a" }], "needs", () => false),
       paintRows: filterCachedPile(
@@ -178,6 +193,9 @@ describe("inbox swipe piles", () => {
     assert.equal(out.adjAnswered.prev, "/calls?purpose=human");
     assert.equal(out.adjArchived.next, undefined);
     assert.equal(out.adjArchived.prev, undefined);
+    assert.equal(out.shopAllNext, "/calls?purpose=hold");
+    assert.equal(out.homeAllNext, "job");
+    assert.equal(out.homeJobNext, "/calls?purpose=human");
   });
 
   it("paints the next pile from cache without waiting, pending only with no cache", () => {
@@ -228,6 +246,9 @@ describe("inbox swipe wiring", () => {
     assert.equal((board.match(/<DeskLandScope/g) || []).length, 1);
     assert.doesNotMatch(page, /SWIPE_PILES\.map\([\s\S]{0,300}<ul/);
     assert.match(page, /inboxPileHref\(id, pileHrefOpts\)/);
+    assert.match(page, /purposeFilters\(vertical\)/);
+    assert.match(swipe, /swipeOrder\(pileHrefs\)/);
+    assert.match(helper, /export function swipeOrder/);
     assert.doesNotMatch(page, /max-md/);
     assert.match(board, /scopeKey=\{`\$\{purpose\}:\$\{page\}:\$\{q\}`\}/);
   });

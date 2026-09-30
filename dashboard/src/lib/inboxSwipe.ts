@@ -1,4 +1,4 @@
-/** Touch-swipe Inbox piles. Chips stay the map. Archived is not a stop. */
+/** Touch-swipe Inbox piles. Chips stay the map. A missing href is not a stop. Archived is not a stop. */
 
 export const SWIPE_PILES = [
   "needs",
@@ -17,18 +17,29 @@ export const INBOX_SWIPE_PX = 64;
 /** Live follow-finger cap. Commit finishes a few pixels past this. */
 export const INBOX_SWIPE_FOLLOW_CAP = 96;
 
-export function nextPurpose(current: string): SwipePileId | null {
-  if (current === "archived") return null;
-  const i = (SWIPE_PILES as readonly string[]).indexOf(current);
-  if (i < 0) return null;
-  return SWIPE_PILES[i + 1] ?? null;
+/** Canonical order, minus any pile this pack did not give an href. */
+export function swipeOrder(hrefs: Partial<Record<string, string>>): SwipePileId[] {
+  return SWIPE_PILES.filter((id) => Boolean(hrefs[id]));
 }
 
-export function prevPurpose(current: string): SwipePileId | null {
+export function nextPurpose(
+  current: string,
+  piles: readonly string[] = SWIPE_PILES
+): SwipePileId | null {
   if (current === "archived") return null;
-  const i = (SWIPE_PILES as readonly string[]).indexOf(current);
+  const i = piles.indexOf(current);
+  if (i < 0) return null;
+  return (piles[i + 1] as SwipePileId) ?? null;
+}
+
+export function prevPurpose(
+  current: string,
+  piles: readonly string[] = SWIPE_PILES
+): SwipePileId | null {
+  if (current === "archived") return null;
+  const i = piles.indexOf(current);
   if (i <= 0) return null;
-  return SWIPE_PILES[i - 1] ?? null;
+  return (piles[i - 1] as SwipePileId) ?? null;
 }
 
 export function swipePileCommit(opts: {
@@ -48,10 +59,11 @@ export function swipePileCommit(opts: {
 
 export function purposeAfterSwipe(
   current: string,
-  commit: "next" | "prev" | null
+  commit: "next" | "prev" | null,
+  piles: readonly string[] = SWIPE_PILES
 ): SwipePileId | null {
-  if (commit === "next") return nextPurpose(current);
-  if (commit === "prev") return prevPurpose(current);
+  if (commit === "next") return nextPurpose(current, piles);
+  if (commit === "prev") return prevPurpose(current, piles);
   return null;
 }
 
@@ -59,8 +71,9 @@ export function adjacentPileHrefs(
   current: string,
   hrefs: Partial<Record<string, string>>
 ): { next: string | undefined; prev: string | undefined } {
-  const next = nextPurpose(current);
-  const prev = prevPurpose(current);
+  const piles = swipeOrder(hrefs);
+  const next = nextPurpose(current, piles);
+  const prev = prevPurpose(current, piles);
   return {
     next: next ? hrefs[next] : undefined,
     prev: prev ? hrefs[prev] : undefined,
