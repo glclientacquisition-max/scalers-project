@@ -13,6 +13,7 @@ import {
   type SetStateAction,
 } from "react";
 import { DeskPageSkeleton } from "@/components/DeskPageSkeleton";
+import { nextDeskPendingHref } from "@/lib/deskPending";
 import {
   applyDeskScroll,
   deskListScrollKey,
@@ -30,13 +31,8 @@ const SetPendingHrefContext = createContext<Dispatch<SetStateAction<string | nul
 
 /** Owner-desk nav state. Count and pending route stay in separate contexts so a badge update does not rebuild the shell. */
 export function DeskNavHost({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const [needsCount, setNeedsCount] = useState(0);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-
-  useLayoutEffect(() => {
-    setPendingHref(null);
-  }, [pathname]);
 
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
@@ -53,7 +49,13 @@ export function DeskNavHost({ children }: { children: ReactNode }) {
         path.startsWith("/wallet") ||
         path.startsWith("/settings");
       if (!deskPath) return;
-      setPendingHref(path);
+      setPendingHref((current) =>
+        nextDeskPendingHref(current, {
+          type: "start",
+          href: path,
+          pathname: window.location.pathname,
+        })
+      );
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
@@ -93,16 +95,62 @@ export function useDeskPendingSetter(): Dispatch<SetStateAction<string | null>> 
   return useContext(SetPendingHrefContext);
 }
 
-/** Paints the list skeleton on the click, before the next page's data commits. */
+/**
+ * Paints the list skeleton on the click and holds it until `DeskPageCommit`.
+ * Children stay mounted. The `hidden` attribute is not used: it both revealed
+ * a half-finished server stream and sat on the suspense boundary.
+ */
 export function DeskPendingSlot({ children }: { children: ReactNode }) {
   const pending = useDeskPendingHref();
+  if (!pending) {
+    return <div className="contents">{children}</div>;
+  }
   return (
-    <>
-      <div className={pending ? undefined : "contents"} hidden={pending != null}>
+    <div className="relative min-w-0" aria-busy="true">
+      <div
+        className="pointer-events-none invisible absolute inset-x-0 top-0 w-full"
+        aria-hidden="true"
+        inert
+      >
         {children}
       </div>
-      {pending ? <DeskPageSkeleton /> : null}
-    </>
+      <DeskPageSkeleton />
+    </div>
+  );
+}
+
+function deskSlotConcealed(node: HTMLElement): boolean {
+  const host = node.parentElement;
+  if (!host) return true;
+  return host.closest("[hidden]") != null;
+}
+
+/**
+ * Renders only after the page body resolves, so the tap skeleton can stay
+ * through the URL change. A concealed Activity copy must not clear it.
+ */
+export function DeskPageCommit({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const routeRef = useRef<string | null>(null);
+  const pathname = usePathname();
+  const setPending = useDeskPendingSetter();
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const concealed = deskSlotConcealed(node);
+    if (!concealed && routeRef.current == null) routeRef.current = pathname;
+    const route = routeRef.current;
+    if (!route) return;
+    setPending((current) =>
+      nextDeskPendingHref(current, { type: "committed", pathname: route, concealed })
+    );
+  }, [pathname, setPending]);
+
+  return (
+    <div ref={ref} className="contents">
+      {children}
+    </div>
   );
 }
 

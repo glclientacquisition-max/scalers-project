@@ -81,7 +81,13 @@ describe("desk shell speed", () => {
     }
     assert.match(layout, /export const instant = false/);
     assert.match(layout, /DeskPendingSlot/);
-    assert.match(read("dashboard/src/components/DeskNavState.tsx"), /DeskPageSkeleton/);
+    const nav = read("dashboard/src/components/DeskNavState.tsx");
+    assert.match(nav, /DeskPageSkeleton/);
+    assert.match(nav, /invisible absolute/);
+    assert.doesNotMatch(nav, /hidden=\{/);
+    assert.match(read("dashboard/src/components/DeskPageGate.tsx"), /DeskPageCommit/);
+    assert.match(read("dashboard/src/app/(desk)/error.tsx"), /type: "error"/);
+    assert.match(read("dashboard/src/components/DeskNav.tsx"), /type: "link-idle"/);
     assert.equal(
       fs.existsSync(path.join(__dirname, "..", "dashboard/src/app/(desk)/loading.tsx")),
       false
@@ -143,6 +149,66 @@ describe("desk shell speed", () => {
     assert.equal(view.llm_system_prompt, null);
     assert.equal(view.services_catalog[0].name, "Delivery");
     assert.equal(view.product_catalog[0].name, "Couch");
+  });
+});
+
+describe("desk tap skeleton", () => {
+  it("holds the skeleton after the URL changes until the page body commits", () => {
+    const held = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref("/calls", { type: "link-idle", href: "/calls", pathname: "/calls" })`
+    );
+    assert.equal(held, "/calls");
+    const committed = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref("/calls", { type: "committed", pathname: "/calls", concealed: false })`
+    );
+    assert.equal(committed, null);
+  });
+
+  it("keeps the skeleton when a concealed page commits", () => {
+    const kept = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref("/calls", { type: "committed", pathname: "/calls", concealed: true })`
+    );
+    assert.equal(kept, "/calls");
+  });
+
+  it("does not let the previous page clear the next tap", () => {
+    const kept = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref("/calls", { type: "committed", pathname: "/settings", concealed: false })`
+    );
+    assert.equal(kept, "/calls");
+  });
+
+  it("clears a tap that never left the current page", () => {
+    const cleared = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref("/calls", { type: "link-idle", href: "/calls", pathname: "/settings" })`
+    );
+    assert.equal(cleared, null);
+  });
+
+  it("does not re-arm the skeleton after the URL has arrived", () => {
+    const armed = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref(null, { type: "start", href: "/calls", pathname: "/settings" })`
+    );
+    assert.equal(armed, "/calls");
+    const stayed = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref(null, { type: "start", href: "/calls", pathname: "/calls" })`
+    );
+    assert.equal(stayed, null);
+  });
+
+  it("clears the skeleton when the page errors", () => {
+    const cleared = load(
+      "dashboard/src/lib/deskPending.ts",
+      `mod.nextDeskPendingHref("/calls", { type: "error" })`
+    );
+    assert.equal(cleared, null);
   });
 });
 

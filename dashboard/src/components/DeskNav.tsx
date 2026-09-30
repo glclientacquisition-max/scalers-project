@@ -9,6 +9,7 @@ import {
   useDeskPendingHref,
   useDeskPendingSetter,
 } from "@/components/DeskNavState";
+import { nextDeskPendingHref } from "@/lib/deskPending";
 import { DeskHint } from "@/components/ui/DeskHint";
 import {
   deskNavBadgeClass,
@@ -154,14 +155,19 @@ function inboxLinkAria(label: string, needsCount: number) {
 /** Sets the shared destination before paint. `useLinkStatus` only works inside `Link`. */
 function DeskLinkPending({ href }: { href: string }) {
   const { pending } = useLinkStatus();
+  const pathname = usePathname();
   const setPending = useDeskPendingSetter();
   useLayoutEffect(() => {
     if (pending) {
-      setPending(href);
+      setPending((current) =>
+        nextDeskPendingHref(current, { type: "start", href, pathname })
+      );
       return;
     }
-    setPending((current) => (current === href ? null : current));
-  }, [pending, href, setPending]);
+    setPending((current) =>
+      nextDeskPendingHref(current, { type: "link-idle", href, pathname })
+    );
+  }, [pending, href, pathname, setPending]);
   return null;
 }
 
