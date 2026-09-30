@@ -122,7 +122,7 @@ export default async function WalletPage({
         </p>
       ) : null}
 
-      <section className="mt-6">
+      <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
         <p className="text-sm text-ink-soft">Minutes left</p>
         <p className="mt-1 font-display text-display tabular-nums text-ink">
           {count(minutesLeft)}
@@ -170,7 +170,7 @@ export default async function WalletPage({
         />
       </div>
 
-      <section className="mt-6">
+      <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
         <h2 className="font-display text-xl tracking-tight text-ink">On-demand rates</h2>
         <table className="mt-3 w-full text-left text-sm">
           <caption className="sr-only">Prices past the included amounts</caption>
