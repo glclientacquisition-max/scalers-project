@@ -124,7 +124,7 @@ Tools that write the business: `save_caller_info`, `create_service_request`, `cr
 | `VOICE_LIVE_TRANSFER_IGNORE_HOURS` | off | Lab: Dial when closed. |
 | `VOICE_LIVE_TRANSFER_BETA_OUTBOUND` | off | Lab: allow `POST /v1/calls` while `billing_enforcement=off`. Staging only. |
 | `WALLET_RATE_KES_PER_MINUTE` | 0 | Inbound debit. |
-| `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | 4 | Outbound transfer debit (SautiKit cost 3). Unused while Dial is off. |
+| `WALLET_TRANSFER_RATE_KES_PER_MINUTE` | 4 | Legacy fallback if `consume_call_seconds` is missing. Package outbound is KES 9/min on `billing_rate_card`. Unused while Dial is off. |
 | `POST_CALL_GEMINI_REVIEW` | on | Hangup `owner_review`. |
 | `VOICE_LLM_STREAM` | (env) | Stream Gemini into TTS. |
 
@@ -234,8 +234,8 @@ One prepaid **KES** wallet. AI is inside the minute rate. Dual telecom-KES + AI-
 | Item | Truth |
 | --- | --- |
 | Charge | RPC `charge_call_to_wallet`, idempotent per `call_id`. Voice calls it on completed inbound. |
-| Inbound rate | **KES 0 / min** (SautiKit inbound free). |
-| Outbound transfer | **KES 4 / min** answered on a **second** `calls` row. Not originated in production. |
+| Inbound on-demand | **KES 6 / min** (`billing_rate_card` 0.10/sec) past included minutes. SautiKit inbound is free. |
+| Outbound transfer | **KES 9 / min** stored on the rate card. Not offered and not originated until live transfer. |
 | Beta | `billing_enforcement=off` (default). Meter only. No charge. No outbound PSTN. |
 | Soft / hard | Ops graduates on Admin → Wallets. Hard inbound block **not** shipped. |
 | Line rental | Lazy `apply_line_rental` on Wallet page. Grace then `suspend_line_for_nonpayment`. |

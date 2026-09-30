@@ -82,9 +82,9 @@ export function PackagePrices({ board }: { board: PublicPackageBoard }) {
       </div>
 
       <p className="mt-6 max-w-xl text-sm leading-relaxed text-ink-soft">
-        On-demand, past included: calls KES {formatKes(board.inboundKesPerMinute)}/min in, KES{" "}
-        {formatKes(board.outboundKesPerMinute)}/min out. SMS KES {formatKes(board.smsKes)}. Email KES{" "}
-        {formatKes(board.emailKes)}. WhatsApp KES {formatKes(board.whatsappKes)}.
+        On-demand, past included: calls KES {formatKes(board.inboundKesPerMinute)}/min. SMS KES{" "}
+        {formatKes(board.smsKes)}. Email KES {formatKes(board.emailKes)}. WhatsApp KES{" "}
+        {formatKes(board.whatsappKes)}.
       </p>
 
       <Link

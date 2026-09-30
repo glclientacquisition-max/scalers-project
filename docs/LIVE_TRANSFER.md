@@ -67,7 +67,7 @@ Warm conference is now the **next executor**, not v2. SautiKit’s call-center p
 | F7 | Caller hears progress (“Okay, let me connect you.”) then ringback from Dial. Never silence. |
 | F8 | If Dial is not answered / busy / failed / unauthorized destination: mark transfer failed, keep the escalate notify, tell the caller they will be followed up, then hang up. Do not claim they were connected. |
 | F9 | Call detail shows transfer attempt (pending / bridged / failed / fallback_notify) plus escalate notify channels. |
-| F10 | Wallet: inbound **KES 0**/min, outbound transfer **KES 4**/min. Two SautiKit CDRs, two `calls` rows, `charge_call_to_wallet` per `call_id`. Unanswered outbound is 0 KES. Beta does not originate outbound unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. |
+| F10 | Package rate card: inbound on-demand **KES 6**/min, outbound **KES 9**/min. Outbound is stored and not offered until this executor ships. Two SautiKit CDRs, two `calls` rows. Unanswered outbound is 0 KES. Beta does not originate outbound unless `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on`. |
 | F11 | Feature flag `VOICE_LIVE_TRANSFER=off` (default) until the Stream-stop → Dial lab spike passes on staging. Tenant toggle cannot override a global off. |
 
 ### 3.2 Honesty / speech (non-negotiable)
@@ -215,15 +215,15 @@ SautiKit currently charges the workspace **KES 0 / min inbound** and **KES 3 / m
 
 | Leg | Who is on it | SautiKit (workspace, current) | Scalers tenant wallet |
 | --- | --- | --- | --- |
-| Inbound | Caller → business DID (AI then conference) | **KES 0 / min** | **KES 0 / min**. Meter duration; debit is 0. |
-| Outbound | Business DID → teammate mobile | **KES 3 / min** answered (`POST /v1/calls`) | **KES 4 / min** answered on a separate `calls` row |
+| Inbound | Caller → business DID (AI then conference) | **KES 0 / min** | Included minutes free. On-demand past the cap is **KES 6 / min** on `billing_rate_card`. |
+| Outbound | Business DID → teammate mobile | **KES 3 / min** answered (`POST /v1/calls`) | **KES 9 / min** answered on a separate `calls` row. Stored. Not offered until this executor ships. |
 
-Margin on a connected transfer is KES 1 / min (4 retail minus 3 cost). If SautiKit changes either rate, update `WALLET_RATE_KES_PER_MINUTE` and/or `WALLET_TRANSFER_RATE_KES_PER_MINUTE` before that ships.
+Margin on a connected transfer is KES 6 / min (9 retail minus 3 cost). If SautiKit changes either rate, update `billing_rate_card` before that ships. Env `WALLET_TRANSFER_RATE_KES_PER_MINUTE` (default 4) is only the fallback when `consume_call_seconds` is missing.
 
 Rules:
 
-1. **Inbound is KES 0 on both sides today.** SautiKit does not charge inbound. Scalers does not charge the tenant. Minutes are still stored.
-2. **Outbound is KES 4 / answered minute** to the tenant. SautiKit costs us **KES 3 / min** on that leg. Unanswered outbound stays 0 on both sides.
+1. **SautiKit inbound is KES 0.** Included package minutes are free. On-demand inbound past the cap is KES 6 / min.
+2. **Outbound is KES 9 / answered minute** on the rate card. It is not shown to owners until live transfer ships. SautiKit costs us **KES 3 / min** on that leg. Unanswered outbound stays 0 on both sides.
 3. **Unanswered outbound is free** at SautiKit and must stay 0 minutes on our ledger (`no_answer` / `busy` / `failed` / `canceled`).
 4. **Beta (`billing_enforcement=off`)** meters inbound only and **must not** `POST /v1/calls` in production. Otherwise Scalers eats outbound PSTN. Lab exception: `VOICE_LIVE_TRANSFER_BETA_OUTBOUND=on` on staging only.
 5. **Hard enforcement:** do not originate if prepaid cannot cover one outbound minute. Soft still originates (wallet may go negative). Fallback is callback SMS.

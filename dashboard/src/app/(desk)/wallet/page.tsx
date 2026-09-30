@@ -4,7 +4,6 @@ import { getTenantUsageSummary } from "@/lib/wallet";
 import {
   inboundKesPerMinute,
   loadOwnerPackageMeter,
-  outboundKesPerMinute,
   remainingCount,
 } from "@/lib/packageCatalog";
 import { usageCapNotice } from "@/lib/usageCap";
@@ -75,7 +74,6 @@ export default async function WalletPage({
   const emailLeft = remainingCount(pack.emailIncluded, pack.emailUsed);
   const waLeft = remainingCount(pack.waIncluded, pack.waUsed);
   const inboundMin = inboundKesPerMinute(pack.rates.inboundKesPerSecond);
-  const outboundMin = outboundKesPerMinute(pack.rates.outboundKesPerSecond);
   const capNotice = usageCapNotice({
     isBeta: usage.isBeta,
     onDemand: Boolean(tenant.on_demand_usage_enabled),
@@ -176,12 +174,8 @@ export default async function WalletPage({
           <caption className="sr-only">Prices past the included amounts</caption>
           <tbody>
             <tr className="border-b border-line">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls in</th>
+              <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls</th>
               <td className="py-3 text-right tabular-nums text-ink">KES {kes(inboundMin)}/min</td>
-            </tr>
-            <tr className="border-b border-line">
-              <th scope="row" className="py-3 pr-3 font-normal text-ink">Calls out</th>
-              <td className="py-3 text-right tabular-nums text-ink">KES {kes(outboundMin)}/min</td>
             </tr>
             <tr className="border-b border-line">
               <th scope="row" className="py-3 pr-3 font-normal text-ink">SMS</th>

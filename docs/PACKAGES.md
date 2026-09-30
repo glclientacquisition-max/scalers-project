@@ -12,8 +12,8 @@ A package is a set of **included counters** written onto the tenant. Enforcement
 | Tenant SMS | `sms_included_units` (default 200) | `sms_used_units` via `consume_sms_units` | KES 1 / segment past the cap, on-demand on | **Enforced.** Stop at cap when on-demand is off. On-demand debit after `package_minute_consume.sql`. |
 | Tenant email | `email_included_units` (default 100) | `email_used_units` | Same on-demand when gated | **Reserved.** Meter on `notify_sends`. Do not block yet. |
 | Team seats | `seat_included` (default 5) | Count of `tenant_members` | **No.** Hard cap. | **Reserved.** Do not block invites yet. |
-| Inbound minutes | `minutes_included` | `seconds_used` via `consume_call_seconds` | KES 0.05/sec past the cap, on-demand on | **Metered on hangup** after `package_minute_consume.sql`. Included seconds are free. On-demand off: next call is rejected, no debit. |
-| Line / DID | `line_paid_through` | Monthly `apply_line_rental` | Grace, then suspend | Live |
+| Inbound minutes | `minutes_included` | `seconds_used` via `consume_call_seconds` | KES 0.10/sec (KES 6/min) past the cap, on-demand on | **Metered on hangup** after `package_minute_consume.sql`. Included seconds are free. On-demand off: next call is rejected, no debit. |
+| Line / DID | `dids` (1 on every SKU) | The monthly price includes that one number | No separate number fee inside the package | **Included.** Starter KES 5,000, Growth KES 12,000, Scale KES 25,000. |
 | Staff WhatsApp | `whatsapp_included_units` | `whatsapp_used_units` | KES 2 / send | Catalog. Consume later. Meta bills Scalers. |
 
 Platform wallet and outage messages never consume tenant SMS or email.

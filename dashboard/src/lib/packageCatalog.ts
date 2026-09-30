@@ -63,8 +63,8 @@ export type PublicPackageBoard = {
 };
 
 const DEFAULT_RATES: BillingRateCard = {
-  inboundKesPerSecond: 0.05,
-  outboundKesPerSecond: 0.1,
+  inboundKesPerSecond: 0.1,
+  outboundKesPerSecond: 0.15,
   whatsappKes: 2,
   smsKes: 1,
   emailKes: 1,
@@ -151,12 +151,12 @@ export function emptyOwnerPackageMeter(): OwnerPackageMeter {
   };
 }
 
-export function inboundKesForSeconds(seconds: number, kesPerSecond = 0.05): number {
+export function inboundKesForSeconds(seconds: number, kesPerSecond = 0.1): number {
   const secs = Math.max(0, Math.ceil(Number(seconds) || 0));
   return Math.round(secs * Number(kesPerSecond) * 100) / 100;
 }
 
-export function outboundKesForSeconds(seconds: number, kesPerSecond = 0.1): number {
+export function outboundKesForSeconds(seconds: number, kesPerSecond = 0.15): number {
   const secs = Math.max(0, Math.ceil(Number(seconds) || 0));
   return Math.round(secs * Number(kesPerSecond) * 100) / 100;
 }
@@ -190,9 +190,9 @@ function isMissingCatalog(message: string): boolean {
 }
 
 const STRAW_OFFERS: Array<Omit<PublicPackageOffer, "annualPriceKes">> = [
-  { sku: "starter", name: "Starter", monthlyPriceKes: 0, seats: 2, minutes: 300, sms: 200, email: 100, staffWa: 200, dids: 1 },
-  { sku: "growth", name: "Growth", monthlyPriceKes: 0, seats: 5, minutes: 800, sms: 500, email: 250, staffWa: 500, dids: 1 },
-  { sku: "scale", name: "Scale", monthlyPriceKes: 0, seats: 10, minutes: 2000, sms: 1500, email: 500, staffWa: 1000, dids: 1 },
+  { sku: "starter", name: "Starter", monthlyPriceKes: 5000, seats: 2, minutes: 300, sms: 200, email: 100, staffWa: 200, dids: 1 },
+  { sku: "growth", name: "Growth", monthlyPriceKes: 12000, seats: 5, minutes: 800, sms: 500, email: 250, staffWa: 500, dids: 1 },
+  { sku: "scale", name: "Scale", monthlyPriceKes: 25000, seats: 10, minutes: 2000, sms: 1500, email: 500, staffWa: 1000, dids: 1 },
 ];
 
 export function strawPublicBoard(): PublicPackageBoard {

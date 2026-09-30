@@ -8,15 +8,18 @@ function read(rel) {
 }
 
 describe("package overage math", () => {
-  it("keeps inbound at KES 0.05/sec (KES 3/min) and outbound at KES 0.10/sec", () => {
+  it("keeps inbound at KES 0.10/sec (KES 6/min) and outbound at KES 0.15/sec", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
     const sql = read("docs/supabase/package_catalog.sql");
-    assert.match(catalog, /inboundKesPerSecond: 0\.05/);
-    assert.match(catalog, /outboundKesPerSecond: 0\.1/);
-    assert.match(sql, /inbound_kes_per_second numeric not null default 0\.05/);
-    assert.match(sql, /outbound_kes_per_second numeric not null default 0\.10/);
-    assert.equal(0.05 * 60, 3);
+    const update = read("docs/supabase/package_rate_card_ondemand_6_9.sql");
+    assert.match(catalog, /inboundKesPerSecond: 0\.1/);
+    assert.match(catalog, /outboundKesPerSecond: 0\.15/);
+    assert.match(sql, /inbound_kes_per_second numeric not null default 0\.10/);
+    assert.match(sql, /outbound_kes_per_second numeric not null default 0\.15/);
+    assert.match(update, /inbound_kes_per_second = 0\.10/);
+    assert.match(update, /outbound_kes_per_second = 0\.15/);
     assert.equal(0.1 * 60, 6);
+    assert.equal(0.15 * 60, 9);
   });
 
   it("puts Packages on Super Admin nav behind the existing username and access code", () => {
@@ -40,6 +43,19 @@ describe("package overage math", () => {
     assert.match(panel, /kesPerSecondFromMinute/);
     assert.match(panel, /action: "assign"/);
     assert.match(catalog, /annualDiscountPercent: 17/);
-    assert.equal(3 / 60, 0.05);
+    assert.match(panel, /Hidden until live transfer/);
+    assert.equal(6 / 60, 0.1);
+    assert.equal(9 / 60, 0.15);
+    const prices = read("docs/supabase/package_prices_5_12_25.sql");
+    const sql = read("docs/supabase/package_catalog.sql");
+    assert.match(catalog, /monthlyPriceKes: 5000/);
+    assert.match(catalog, /monthlyPriceKes: 12000/);
+    assert.match(catalog, /monthlyPriceKes: 25000/);
+    assert.match(prices, /when 'starter' then 5000/);
+    assert.match(prices, /when 'growth' then 12000/);
+    assert.match(prices, /when 'scale' then 25000/);
+    assert.match(prices, /dids = 1/);
+    assert.match(sql, /'starter', 'Starter', 5000/);
+    assert.match(sql, /'scale', 'Scale', 25000/);
   });
 });

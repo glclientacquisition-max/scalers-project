@@ -4,7 +4,7 @@
 --          Past the cap, on-demand off: meter a call already in progress, do not debit.
 --          The voice webhook rejects the next inbound call.
 --          Past the cap, on-demand on, enforcement not off: debit overage seconds
---          at billing_rate_card (inbound 0.05/sec, outbound 0.10/sec). Whole seconds.
+--          at billing_rate_card (inbound 0.10/sec, outbound 0.15/sec). Whole seconds.
 --          Beta (billing_enforcement = off): meter only.
 --          On-demand SMS past the cap debits sms_kes. On-demand off still skips tenant SMS
 --          and does not debit (consume_sms_units stop rule is unchanged).
