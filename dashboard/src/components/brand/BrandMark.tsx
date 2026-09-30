@@ -60,6 +60,8 @@ type BrandLockupProps = {
   priority?: boolean;
   /** Icon only. The md+ destination rail uses `sm`. Overview uses the named lockup. */
   markOnly?: boolean;
+  /** Desk rail passes false so the mark does not reset the list scroller. */
+  scroll?: boolean;
 };
 
 /**
@@ -75,6 +77,7 @@ export function BrandLockup({
   className = "",
   priority = false,
   markOnly = false,
+  scroll = true,
 }: BrandLockupProps) {
   const [useFallback, setUseFallback] = useState(false);
   const s = SIZE[size];
@@ -137,6 +140,7 @@ export function BrandLockup({
   return (
     <Link
       href={href}
+      scroll={scroll}
       className="inline-flex min-w-0 rounded-md focus-visible:outline-none focus-visible:shadow-focus"
       aria-label={context ? `${name} · ${context}` : name}
     >

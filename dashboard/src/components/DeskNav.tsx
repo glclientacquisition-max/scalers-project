@@ -1,8 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { useLayoutEffect } from "react";
 import { BrandLockup } from "@/components/brand/BrandMark";
+import {
+  useDeskNeedsCount,
+  useDeskPendingHref,
+  useDeskPendingSetter,
+} from "@/components/DeskNavState";
 import { DeskHint } from "@/components/ui/DeskHint";
 import {
   deskNavBadgeClass,
@@ -136,6 +142,62 @@ function inboxLinkAria(label: string, needsCount: number) {
   return formatInboxNavAriaLabel(needsCount) || undefined;
 }
 
+/** Sets the shared destination before paint. `useLinkStatus` only works inside `Link`. */
+function DeskLinkPending({ href }: { href: string }) {
+  const { pending } = useLinkStatus();
+  const setPending = useDeskPendingSetter();
+  useLayoutEffect(() => {
+    if (pending) {
+      setPending(href);
+      return;
+    }
+    setPending((current) => (current === href ? null : current));
+  }, [pending, href, setPending]);
+  return null;
+}
+
+function DeskDestinationLink({
+  href,
+  label,
+  count,
+  className,
+  activeClassName,
+  idleClassName,
+  labelClassName,
+  ariaLabel,
+}: {
+  href: string;
+  label: string;
+  count: number;
+  className: string;
+  activeClassName: string;
+  idleClassName: string;
+  labelClassName: string;
+  ariaLabel?: string;
+}) {
+  const pathname = usePathname();
+  const pendingHref = useDeskPendingHref();
+  const active = pendingHref ? pendingHref === href : pathActive(pathname, href);
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      aria-current={active ? "page" : undefined}
+      aria-label={ariaLabel}
+      className={[
+        className,
+        deskShiftClass,
+        focusRingVisible,
+        active ? activeClassName : idleClassName,
+      ].join(" ")}
+    >
+      <DeskLinkPending href={href} />
+      <TabIconWithBadge name={label} count={count} />
+      <span className={labelClassName}>{label}</span>
+    </Link>
+  );
+}
+
 /** md+ destination rail. Same DESK_LINKS as DeskTabBar. Sign out lives on Profile. */
 export function DeskRail({
   needsCount = 0,
@@ -144,7 +206,8 @@ export function DeskRail({
   needsCount?: number;
   homeHref?: string;
 }) {
-  const pathname = usePathname();
+  const fromShell = useDeskNeedsCount();
+  const count = needsCount || fromShell;
 
   return (
     <div
@@ -153,34 +216,31 @@ export function DeskRail({
     >
       <div className="flex h-14 items-center justify-center">
         <DeskHint label="Scalers">
-          <BrandLockup href={homeHref} name="Scalers" size="sm" markOnly priority />
+          <BrandLockup
+            href={homeHref}
+            name="Scalers"
+            size="sm"
+            markOnly
+            priority
+            scroll={false}
+            className="min-h-11 min-w-11 justify-center"
+          />
         </DeskHint>
       </div>
       <nav aria-label="Workspace" className="flex flex-1 flex-col items-center gap-1 px-1 pt-1">
-        {DESK_LINKS.map((item) => {
-          const active = pathActive(pathname, item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={inboxLinkAria(item.label, needsCount) || item.label}
-              aria-current={active ? "page" : undefined}
-              className={[
-                "flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5",
-                deskShiftClass,
-                focusRingVisible,
-                active
-                  ? "bg-accent/10 text-accent-deep"
-                  : "text-ink-soft hover:bg-surface-muted hover:text-ink",
-              ].join(" ")}
-            >
-              <TabIconWithBadge name={item.label} count={needsCount} />
-              <span className="max-w-full truncate text-[10px] font-medium leading-none">
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
+        {DESK_LINKS.map((item) => (
+          <DeskDestinationLink
+            key={item.href}
+            href={item.href}
+            label={item.label}
+            count={count}
+            ariaLabel={inboxLinkAria(item.label, count) || item.label}
+            className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
+            activeClassName="bg-accent/10 text-accent-deep"
+            idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
+            labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
+          />
+        ))}
       </nav>
     </div>
   );
@@ -189,6 +249,8 @@ export function DeskRail({
 /** Phone thumb destinations. Same DESK_LINKS as the desktop rail. Hidden on nested insides. */
 export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
   const pathname = usePathname();
+  const fromShell = useDeskNeedsCount();
+  const count = needsCount || fromShell;
   if (isDeskNestedPath(pathname)) return null;
 
   return (
@@ -198,31 +260,20 @@ export function DeskTabBar({ needsCount = 0 }: { needsCount?: number }) {
       className="fixed inset-x-0 bottom-0 z-50 isolate min-h-[calc(var(--desk-tabbar-h)+env(safe-area-inset-bottom,0px))] overflow-visible border-t border-line/80 bg-surface pb-[env(safe-area-inset-bottom)] shadow-none md:hidden"
     >
       <ul className="flex">
-        {DESK_LINKS.map((item) => {
-          const active = pathActive(pathname, item.href);
-          return (
-            <li key={item.href} className="min-w-0 flex-1 overflow-visible">
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                aria-label={inboxLinkAria(item.label, needsCount)}
-                className={[
-                  "flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight",
-                  deskShiftClass,
-                  focusRingVisible,
-                  active
-                    ? "font-semibold text-accent-deep"
-                    : "font-medium text-ink-soft",
-                ].join(" ")}
-              >
-                <TabIconWithBadge name={item.label} count={needsCount} />
-                <span className="max-w-full whitespace-nowrap text-center">
-                  {item.label}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+        {DESK_LINKS.map((item) => (
+          <li key={item.href} className="min-w-0 flex-1 overflow-visible">
+            <DeskDestinationLink
+              href={item.href}
+              label={item.label}
+              count={count}
+              ariaLabel={inboxLinkAria(item.label, count)}
+              className="flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight"
+              activeClassName="font-semibold text-accent-deep"
+              idleClassName="font-medium text-ink-soft"
+              labelClassName="max-w-full whitespace-nowrap text-center"
+            />
+          </li>
+        ))}
       </ul>
     </nav>
   );

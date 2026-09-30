@@ -142,7 +142,7 @@ Page frame is owned by `(desk)/layout.tsx`: `px-4 pt-4 sm:px-6 sm:pt-6`. Below `
 
 | State | Treatment |
 | --- | --- |
-| Loading | `(desk)/loading.tsx`: `pendingSpinnerInkClass` only. No skeletons, no invented numbers |
+| Loading | No `(desk)/loading.tsx`. Client navigation keeps the current page until the next page is ready. Mutation pending stays `pendingSpinnerInkClass` on the control. No skeletons, no invented numbers |
 | Empty | `deskEmptyClass`. Title + one link. No workspace: `DeskNoWorkspace` |
 | Error | `DeskError`: `border-warn/40 bg-warn-soft text-warn`, `role="alert"`. Home inbox load failure uses this, not a zero queue. Call/contact query failure uses this, not 404. Holds or visits failing while calls load: same banner, lists stay. |
 | Crash | `DeskCrash`. Try again. Never a stack trace |
@@ -172,16 +172,16 @@ Map a surface to a type, then to a verb. Do not invent a per-page animation.
 
 | Type | Surfaces | Motion |
 | --- | --- | --- |
-| Shell | `deskShellClass` + `DeskRail` + tab bar | None. Shell is `fixed inset-0 overflow-hidden` (same box as the tab bar). Main (`deskMainClass`) is `min-h-0 overflow-y-auto`. Do not animate the shell or scroll containers. The light body canvas must not show under the desk. |
+| Shell | `deskShellClass` + `DeskRail` + tab bar | None. Shell is `fixed inset-0 overflow-hidden` (same box as the tab bar). One rail and one tab bar stay mounted. Main (`deskMainClass`, `[data-desk-main]`) is `min-h-0 overflow-y-auto`. List scroll is restored per list URL. `DESK_LINKS` use `scroll={false}`. Do not animate the shell or scroll containers. The light body canvas must not show under the desk. |
 | List | Inbox queue, Contacts, wallet ledger | `land` on a live insert after first paint. Row hover/selected: `shift`. Stable keys (`item.id`). No enter-stagger. No layout reorder. |
 | Detail | Ticket transcript, contact profile, action dock | Instant swap. Key the route by record id. Panel chrome does not slide. |
 | Notice | Archive undo, Saved | `DeskNotice` + `useNotify`. Enter `translateY(12px)`, exit `translateY(8px)`, opacity. Transform only. `role="status"`. One pattern. |
 | Modal | `DeskDialog`, overflow menu, `DeskHint` | Enter-static. No scale, no overlay fade. |
 | State | Filter tabs, badges, chips | `shift` / `filterTabClass`. No `layoutId`. |
-| Empty / loading | `deskEmptyClass`, `(desk)/loading.tsx` | Empty is static. Route pending is the ink spinner. No skeleton pulse. No `animate-pulse` except the pronunciation recording dot. |
+| Empty / loading | `deskEmptyClass` | Empty is static. Route changes do not blank the page. Mutation pending is the ink spinner on the control. No skeleton pulse. No `animate-pulse` except the pronunciation recording dot. |
 | Numbers | Wallet balance, Home counts, call duration | Instant `tabular-nums`. No count-up. |
 | Form | Fields, field errors | Focus/border: `shift`. Errors mount instantly next to the field. No shake. |
-| Route | Overview, Inbox, Contacts, Usage, Profile | Instant. The new page's lists land on later inserts only. |
+| Route | Overview, Inbox, Contacts, Usage, Profile | Instant. Previous page stays until the next page is ready. No route spinner. The new page's lists land on later inserts only. |
 
 Landing marketing only: `.landing-rise`, `.landing-drift`. Desk never uses those classes. `DeskDialog` does not animate in. Catalog: `/dev/motion` when `DASHBOARD_OPEN`. Reduced motion: named kills plus a global `animation-duration` / `transition-duration` fallback.
 
