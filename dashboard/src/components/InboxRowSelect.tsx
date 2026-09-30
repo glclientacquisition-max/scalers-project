@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useInboxRowUi } from "@/components/InboxRowUi";
-import { DeskRowHit, deskRowActionClass, deskRowHitClass } from "@/components/ui/deskRowHit";
+import { DeskRowHit, deskRowHitClass } from "@/components/ui/deskRowHit";
 import {
   btnGhost,
   btnPrimary,

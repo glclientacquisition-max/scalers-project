@@ -66,7 +66,7 @@ function isFinePointer() {
   return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }
 
-/** Row body, including the conversation link. Not Call, WhatsApp, Confirm, Done, or More. */
+/** Conversation link and row padding. Action controls stay out of this gesture. */
 function isRowBodyPress(target: EventTarget | null, root: HTMLElement | null) {
   if (!(target instanceof Element) || !root || !root.contains(target)) return false;
   const interactive = target.closest("a, button, input, textarea, select, label");
