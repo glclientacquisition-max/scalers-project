@@ -209,6 +209,10 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const {
+  pickCorrectiveReply,
+  prepareStreamedSpeech,
+} = require('./src/conversation/callCorrectives');
+const {
   visitBlockSpeech,
   coverageAskSpeech,
 } = require('./src/conversation/visitLocation');
@@ -2452,6 +2456,25 @@ mediaWss.on('connection', (ws, req) => {
         return;
       }
 
+      const correctiveLine = pickCorrectiveReply({
+        text: clean,
+        state: brainState,
+        language: callLanguage,
+      });
+      if (correctiveLine) {
+        console.log(
+          `[ws/media][${callKey}] corrective local reply lang=${callLanguage}: ${correctiveLine}`
+        );
+        callTranscript.pushAgent(correctiveLine);
+        messages.push({ role: 'assistant', content: correctiveLine, local: true });
+        turnTiming.markFirstSpokenChunk();
+        await speakText(correctiveLine);
+        spokeThisTurn = true;
+        logTurnTiming(turnTiming, { outcome: 'corrective' });
+        if (activeTurnTiming === turnTiming) activeTurnTiming = null;
+        return;
+      }
+
       const bareCloser = looksLikeBareCloser(clean);
       if (!bareCloser && looksLikePhaticCallerTurn(clean)) {
         const phaticLine = pickPhaticReply({
@@ -2626,7 +2649,7 @@ mediaWss.on('connection', (ws, req) => {
       }
 
       async function onSpokenChunk(chunk) {
-        const text = String(chunk || '').trim();
+        const text = prepareStreamedSpeech(String(chunk || ''));
         if (!text || !tts) return;
         firstSpokenChunk = true;
         spokeThisTurn = true;

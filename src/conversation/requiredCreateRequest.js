@@ -3,6 +3,7 @@
 const { entityValue } = require('./entityExtraction');
 const { offeredVertical } = require('./vertical');
 const { appendVisitNotes } = require('./visitLocation');
+const { looksLikeLeaveIt, looksLikeNonConsentAck } = require('./callCorrectives');
 
 const REQUEST_INTENTS = new Set([
   'hold',
@@ -137,6 +138,15 @@ function ensureRequiredCreateRequest(parsed, state = {}, capabilities = {}) {
   const action = String(state.resolution?.nextBestAction || '');
   if (action !== 'CREATE_REQUEST') return next;
   if (!slotsComplete(state)) return next;
+  const latest = String((state.conversation?.answersReceived || []).slice(-1)[0] || '');
+  if (
+    state.conversation?.nonConsentAck ||
+    state.conversation?.leaveIt ||
+    looksLikeNonConsentAck(latest) ||
+    looksLikeLeaveIt(latest)
+  ) {
+    return next;
+  }
   if (!REQUEST_INTENTS.has(intentId(state))) return next;
 
   if (isHomeVisit(state)) {

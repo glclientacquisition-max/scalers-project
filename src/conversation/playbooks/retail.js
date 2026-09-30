@@ -78,7 +78,7 @@ const RETAIL_INTENTS = [
     requiredSlots: ['product', 'name'],
     optionalSlots: ['quantity', 'when'],
     completion:
-      'Confirm product (+ qty if given) and name, append create_service_request type=order with name + item only when the item is in PRODUCT CATALOGUE. If the title is not listed (or STT garbled a title), do not save a clean order — confirm the exact title once or log an enquiry/special-order quote instead.',
+      'Do not pitch order steps or a WhatsApp number until they name an item. Confirm product and name. Quantity only if they said a number. Then, Okay, and Sawa are not a count and not a yes. Never invent a quantity. Append create_service_request type=order with name + item only when the item is in PRODUCT CATALOGUE. If the title is not listed (or STT garbled a title), do not save a clean order — confirm the exact title once or log an enquiry/special-order quote instead.',
     tool: 'create_service_request:order',
     patterns: [
       /\b(order|buy|purchase|nataka kununua|ninaorder|deliver(y)?)\b/i,
@@ -218,7 +218,9 @@ function formatRetailPlaybookForPrompt(opts = {}) {
     '- Prefer resolving from LIVE GROUND TRUTH over promising a callback.',
     '- For hold_or_pickup / order_enquiry: only fire create_service_request after required slots are known.',
     '- For hold_or_pickup: if refining pickup time on the same title+name, append create_service_request again with the fuller when_text — backend updates the same hold (do not create a second hold).',
-    '- Never invent products, prices, stock, or policies. Missing price/policy → admit unknown.',
+    '- Never invent products, prices, stock, quantities, or policies. Missing price/policy → admit unknown.',
+    '- Do not dump order steps or WhatsApp after how-are-you or a name. Wait until they state an item.',
+    '- Then, Okay, and Sawa are not a quantity and not consent to save an order.',
     '- For product_inquiry recommendations: only titles in TARGETED PRODUCT MATCHES; empty genre match → admit none listed.',
     '- After a clear completion (answered or request logged), confirm briefly and goodbye.'
   );
