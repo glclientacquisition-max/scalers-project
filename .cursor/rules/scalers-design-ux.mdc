@@ -1,42 +1,46 @@
 ---
-description: Scalers platform-wide design & UX mandate — copy, density, CTAs, navigation
+description: Scalers Frontend 2.0 design mandate. Tokens, kit, shell, proof.
 alwaysApply: true
 ---
 
-# SCALERS PLATFORM-WIDE DESIGN & UX MANDATE
+# Scalers Frontend 2.0 mandate
 
-You are the Principal UI/UX Engineer for the Scalers web platform. Apply the following frameworks and constraints to EVERY component, route, and text string you generate or modify. No exceptions.
+Charter: `docs/frontend/FRONTEND_2_0_CHARTER.md`. It wins over older frontend docs. Bar: WhatsApp, Instagram, Truecaller clarity on a mid-range Android at 08:00 EAT.
 
-Brand ribbon: `#0096FF`. Filled primary CTA: `#005CCC` with a white label.
+## Build from the kit
 
-## 1. GLOBAL COPYWRITING: ZERO FLUFF & STRICT TYPOGRAPHY (COGNITIVE LOAD THEORY)
+- Primitives live in `dashboard/src/components/ui/`: `Button`, `IconButton`, `Field`, `Input`, `Textarea`, `Select`, `Segmented`, `Stamp`, `Avatar`, `ListRow`, `PageHeader`, `Sheet`, `Menu`, `Tooltip`, `Empty`, `Skeleton`, `Table`. Use them. Do not compose a new button from class strings.
+- Behavior comes from Base UI. Icons come from Heroicons. No other UI runtime.
+- One `AppShell` for desk and admin. Tabs below `md`, rail on `md+`. Nested routes hide tabs and lead with Back.
 
-- **Absolute ban on sub-explanations:** Never use conversational filler, instructional sub-headers, or hand-holding explanations (e.g. "Train your receptionist in short steps"). Users scan; they do not read. Use stark, utilitarian, action-oriented labels.
-- **The dash rule:** Never use em dashes (—) or en dashes (–) as punctuation in any UI text, subtitle, placeholder, or empty state. Restructure the sentence or use clean terminal punctuation. Hyphens in compound words and CSS class names are fine.
+## Tokens or nothing
 
-## 2. ANTI-CONGESTION & SCANNABILITY (GESTALT PRINCIPLES)
+- Colors: `canvas`, `surface`, `surface-2`, `hairline`, `ink`, `ink-2`, `ink-3`, `accent`, `accent-tonal`, `brand`, `attention`, `ok`, `whatsapp`. No hex in `.tsx`.
+- `#005CCC` (`accent`) is the only filled action color. One filled action per viewport. `#0096FF` (`brand`) is the mark, the focus ring, and the active indicator. Never for text.
+- Radius by role: `rounded-sm` chips and inline fields, `rounded-md` controls, `rounded-lg` sheets and dialogs, `rounded-full` avatars and dots.
+- Type: `text-caption`, `text-meta`, `text-body`, `text-title`, `text-page`, `text-display`. Numbers are `tabular-nums`.
+- System UI font in the app. Sora only on marketing.
 
-- **Zero vertical sprawl:** Never allow forms, cards, or lists to congest the vertical viewport. Hardcode all `textarea` defaults to `rows={2}` with auto-expand.
-- **Preview truncate:** Lists are WhatsApp / Mail / Messenger. Identity plus one ellipsized line (`deskPreviewClass`). Full hangup copy, Want, Done, mood, and next live on the record. Never wrap a paragraph in a list cell. Never use `overflow-wrap: anywhere` on a preview. Table preview cells use `deskPreviewCellClass` (`w-full max-w-0`) so the column takes leftover width and ellipsis can fire. Home queue units stay count nouns, not the call summary.
-- **Data density over cards:** Prefer dense, horizontal data tables or inline rows over massive, padded stacked cards for lists (Calls, Requests, Catalogs, Teams). Tap the row to open the record. Do not add Call, Open, or View columns.
-- **Split-pane enforcement:** When displaying contextual data alongside a transcript or complex detail view, use a side-by-side grid from `lg` (Summary left, Details right). Below `lg`, stack the same two panes. Never invent a second layout for that dataset.
-- **Fluid viewports:** One composition at every width. Phone uses the list row. `md+` uses the table. Text columns `min-w-0`. Hits never shrink below 44px. Every Action control is `deskHitClass` (`h-12 w-12`): Confirm, Done, Call, and WhatsApp. Do not clip, pinch-zoom, or ship a desktop-only control on phone.
+## Composition
 
-## 3. ACTION VELOCITY (FITTS'S LAW)
+- Pages open on the work. No wordmark, greeting, or date block above it.
+- Lists are `ListRow`: identity, one truncated preview line, when, one `Stamp`, compact actions. Tables only for numeric admin data.
+- Row actions: Call and WhatsApp are 44px `IconButton`. Confirm and Done are labeled tonal `Button size="sm"`.
+- Filters are `Segmented` underline tabs.
+- Detail is split pane from `lg`, stacked below.
+- Save docks to the form: sticky footer above the tab bar on phone, end of section on desktop.
+- Every route has a shaped `loading.tsx`, an `Empty` that names the next action, and inline error with retry.
 
-- **Primary CTA:** The primary task-completing action on any screen (e.g. "Reply on WhatsApp", "Save") must be the largest hit area, filled `#005CCC` with a white label. `#0096FF` is the brand ribbon, focus ring, and tab underline.
-- **Action docking:** Submit buttons must be docked tightly to the input fields they control. Global save buttons must be sticky, anchored to the top right of the viewport.
-- **Secondary action muting:** Destructive or secondary actions (Cancel, Archive, Remove) must be muted ghost buttons, text links, or icon-only buttons to reduce visual noise and prevent misclicks.
+## Copy
 
-## 4. NAVIGATION & DECISION FATIGUE (HICK'S LAW)
+- Verbs and nouns the owner already knows. Sentence case. No filler, no instructional subheaders, no exclamation marks.
+- No em dashes or en dashes in UI strings. Hyphens in compound words are fine.
 
-- **Single source of truth:** Never provide two different UI layouts for the exact same dataset.
-- **Primary destinations:** One `DESK_LINKS` list. Bottom tabs below `md`. Icon rail on `md+`.
-- **Sidebar hierarchy:** Nested navigation must use vertical sidebars. Sidebar category titles must be non-clickable headers (`uppercase`, `tracking-wide`, `text-gray-500`, no hover state) so they are immediately distinct from clickable tabs.
+## Motion and access
 
-## 5. TECHNICAL EXECUTION CONSTRAINTS
+- Verbs: pending, live, land, shift, press. Under 300ms, `--ease-out`. Nothing animates on keyboard actions. Reduced motion respected.
+- 44px hit floor. Icon-only controls carry a visible name on hover and focus. Focus ring `ring-2 ring-brand`.
 
-- Use strictly Tailwind CSS utility classes in components. Do not add one-off custom CSS for layout or chrome.
-- Maintain generous, consistent container padding (`p-4` to `p-6`) to enforce whitespace and reduce visual congestion.
-- Apply distinct, consistent focus rings on active inputs: `focus:outline-none focus:ring-2 focus:ring-[#0096FF]`.
-- Spacing and contrast details: `docs/frontend/FRONTEND_CONSTITUTION.md` and `docs/frontend/design-system/MASTER.md` (8px grid, 44px primary targets, `#005CCC` for small links).
+## Proof
+
+- Playwright visual gate at 360, 390, 768, 1280, light and dark, before a PR is ready. Class-string tests are guards, not proof.
