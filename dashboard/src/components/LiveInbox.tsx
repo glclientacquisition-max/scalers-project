@@ -13,8 +13,8 @@ const REFRESH_DEBOUNCE_MS = 1200;
  * leaving Inbox does not drop the subscription. Waits for an owner JWT
  * before subscribe (Realtime RLS). Debounces insert plus terminal update
  * into one refresh. revalidatePath keeps /calls and /home fresh when the
- * current route is elsewhere. Visibility and focus refetch catch events
- * dropped while the tab was hidden.
+ * current route is elsewhere. Returning to the tab does not reload the page.
+ * Pull to refresh still does.
  */
 export function LiveInbox({ tenantId }: { tenantId: string }) {
   const router = useRouter();
@@ -52,10 +52,6 @@ export function LiveInbox({ tenantId }: { tenantId: string }) {
       timer.current = setTimeout(flush, REFRESH_DEBOUNCE_MS);
     };
 
-    const onVisible = () => {
-      if (document.visibilityState === "visible") flush();
-    };
-
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const start = async () => {
@@ -80,14 +76,10 @@ export function LiveInbox({ tenantId }: { tenantId: string }) {
     };
 
     void start();
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
 
     return () => {
       cancelled = true;
       if (timer.current) clearTimeout(timer.current);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
       if (channel) supabase.removeChannel(channel);
     };
   }, [tenantId]);

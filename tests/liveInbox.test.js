@@ -39,10 +39,11 @@ describe("LiveInbox component", () => {
     assert.doesNotMatch(src, /\[tenantId, router\]/);
   });
 
-  it("revalidates Inbox and Home then refreshes, including when the tab returns", () => {
+  it("revalidates Inbox and Home on a work-table event, not when the tab returns", () => {
     assert.match(src, /revalidateLiveDesk/);
-    assert.match(src, /visibilitychange/);
-    assert.match(src, /addEventListener\("focus"/);
+    assert.doesNotMatch(src, /visibilitychange/);
+    assert.doesNotMatch(src, /addEventListener\("focus"/);
+    assert.match(src, /Returning to the tab does not reload/);
   });
 
   it("degrades to refresh-to-update when the browser client cannot start", () => {

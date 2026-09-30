@@ -14,11 +14,14 @@ import {
 } from "@/lib/hoursSchedule";
 import { parseAfterHoursMode } from "@/lib/afterHours";
 import {
+  extractServicesNotes,
   formatServicesForCompiler,
+  normalizeServicesCatalog,
   parseServicesCatalogField,
 } from "@/lib/servicesCatalog";
 import {
   formatProductsForCompiler,
+  normalizeProductCatalog,
   parseProductCatalogField,
   PRODUCT_CATALOG_MAX,
 } from "@/lib/productCatalog";
@@ -44,6 +47,7 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
+import { settingsFieldFromScope } from "@/lib/settingsSaveScope";
 
 export type SettingsCompileState = {
   error?: string;
@@ -69,54 +73,151 @@ export async function saveAndCompileSettings(
     return { error: "Forbidden." };
   }
 
-  const businessName = String(formData.get("business_name") || "").trim();
-  const servicesNotes = String(formData.get("services_notes") || "").trim();
-  const servicesCatalog = parseServicesCatalogField(formData.get("services_catalog"));
-  const productCatalog = parseProductCatalogField(formData.get("product_catalog"));
-  const socialHandles = parseSocialHandlesField(formData.get("social_handles"));
+  const scope = String(formData.get("settings_scope") || "");
+  const pick = <T,>(field: string, fromForm: T, stored: T) =>
+    settingsFieldFromScope(scope, field, fromForm, stored);
+
+  const businessName = pick(
+    "businessName",
+    String(formData.get("business_name") || "").trim(),
+    String(tenant.business_name || "").trim()
+  );
+  const servicesNotes = pick(
+    "servicesNotes",
+    String(formData.get("services_notes") || "").trim(),
+    extractServicesNotes(tenant.services_offered || "")
+  );
+  const servicesCatalog = pick(
+    "servicesCatalog",
+    parseServicesCatalogField(formData.get("services_catalog")),
+    normalizeServicesCatalog(tenant.services_catalog).filter((row) => row.name)
+  );
+  const productCatalog = pick(
+    "productCatalog",
+    parseProductCatalogField(formData.get("product_catalog")),
+    normalizeProductCatalog(tenant.product_catalog).filter((row) => row.name)
+  );
+  const socialHandles = pick(
+    "socialHandles",
+    parseSocialHandlesField(formData.get("social_handles")),
+    parseSocialHandlesField(JSON.stringify(tenant.social_handles || {}))
+  );
   const servicesBlock = formatServicesForCompiler(servicesCatalog, servicesNotes);
   const productsBlock = formatProductsForCompiler(productCatalog);
   const socialBlock = formatSocialHandlesForCompiler(socialHandles);
+  const compiledServices = [
+    servicesBlock,
+    productsBlock,
+    socialBlock ? `Social & web:\n${socialBlock}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  // A Hours save ships empty catalog fields. Keep the stored offer text when
+  // the compiler string is empty so a legacy blob is not replaced by that form.
   const servicesOffered =
-    [servicesBlock, productsBlock, socialBlock ? `Social & web:\n${socialBlock}` : ""]
-      .filter(Boolean)
-      .join("\n\n") ||
-    String(formData.get("services_offered") || "").trim();
-  const agentName =
-    String(formData.get("agent_name") || "").trim() || "Receptionist";
-  const agentTone = parseAgentTone(String(formData.get("agent_tone") || ""));
-  const unknownAnswerFallback = String(
-    formData.get("unknown_answer_fallback") || ""
-  ).trim();
-  const teamDirectory = parseTeamDirectoryField(formData.get("team_directory"));
-  const faqs = parseFaqsField(formData.get("faqs"));
-  const agentTools = parseAgentTools({
-    escalate: String(formData.get("tool_escalate") || "") !== "0",
-    end_call: String(formData.get("tool_end_call") || "") !== "0",
-  });
-
-  const hoursSchedule = parseHoursSchedule(formData.get("hours_schedule"));
-  const locationNotes = String(formData.get("location_notes") || "").trim();
-  const afterHoursMode = parseAfterHoursMode(formData.get("after_hours_mode"));
-  const vertical = parseVertical(formData.get("vertical"));
-  const handoffMode = parseHandoffMode(formData.get("handoff_mode"));
-  const sonioxVoiceId = await parseSonioxVoiceId(formData.get("soniox_voice_id"));
-  const sonioxVoiceLabel = parseSonioxVoiceLabel(formData.get("soniox_voice_label"));
-  const businessLocations = parseBusinessLocationsField(
-    formData.get("business_locations")
+    compiledServices ||
+    pick(
+      "servicesCatalog",
+      String(formData.get("services_offered") || "").trim(),
+      String(tenant.services_offered || "").trim()
+    );
+  const agentName = pick(
+    "agentName",
+    String(formData.get("agent_name") || "").trim() || "Receptionist",
+    String(tenant.agent_name || "").trim() || "Receptionist"
   );
-  const businessPolicies = parseBusinessPoliciesField(
-    formData.get("business_policies")
+  const agentTone = pick(
+    "agentTone",
+    parseAgentTone(String(formData.get("agent_tone") || "")),
+    parseAgentTone(String(tenant.agent_tone || ""))
+  );
+  const unknownAnswerFallback = pick(
+    "unknownAnswerFallback",
+    String(formData.get("unknown_answer_fallback") || "").trim(),
+    String(tenant.unknown_answer_fallback || "").trim()
+  );
+  const teamDirectory = pick(
+    "teamDirectory",
+    parseTeamDirectoryField(formData.get("team_directory")),
+    parseTeamDirectoryField(JSON.stringify(tenant.team_directory || []))
+  );
+  const faqs = pick(
+    "faqs",
+    parseFaqsField(formData.get("faqs")),
+    parseFaqsField(JSON.stringify(tenant.faqs || []))
+  );
+  const agentTools = pick(
+    "agentTools",
+    parseAgentTools({
+      escalate: String(formData.get("tool_escalate") || "") !== "0",
+      end_call: String(formData.get("tool_end_call") || "") !== "0",
+    }),
+    parseAgentTools(tenant.agent_tools)
+  );
+
+  const hoursSchedule = pick(
+    "hoursSchedule",
+    parseHoursSchedule(formData.get("hours_schedule")),
+    parseHoursSchedule(tenant.hours_schedule)
+  );
+  const locationNotes = pick(
+    "locationNotes",
+    String(formData.get("location_notes") || "").trim(),
+    String(parseHoursSchedule(tenant.hours_schedule)?.location || "").trim()
+  );
+  const afterHoursMode = pick(
+    "afterHoursMode",
+    parseAfterHoursMode(formData.get("after_hours_mode")),
+    parseAfterHoursMode(tenant.after_hours_mode)
+  );
+  const vertical = pick(
+    "vertical",
+    parseVertical(formData.get("vertical")),
+    parseVertical(tenant.vertical)
+  );
+  const handoffMode = pick(
+    "handoffMode",
+    parseHandoffMode(formData.get("handoff_mode")),
+    parseHandoffMode(tenant.handoff_mode)
+  );
+  const sonioxVoiceId = pick(
+    "sonioxVoiceId",
+    await parseSonioxVoiceId(formData.get("soniox_voice_id")),
+    await parseSonioxVoiceId(tenant.soniox_voice_id)
+  );
+  const sonioxVoiceLabel = pick(
+    "sonioxVoiceLabel",
+    parseSonioxVoiceLabel(formData.get("soniox_voice_label")),
+    parseSonioxVoiceLabel(tenant.soniox_voice_label)
+  );
+  const businessLocations = pick(
+    "businessLocations",
+    parseBusinessLocationsField(formData.get("business_locations")),
+    parseBusinessLocationsField(JSON.stringify(tenant.business_locations || []))
+  );
+  const businessPolicies = pick(
+    "businessPolicies",
+    parseBusinessPoliciesField(formData.get("business_policies")),
+    parseBusinessPoliciesField(JSON.stringify(tenant.business_policies || {}))
   );
   const ttsLexicon = lexiconForStorage(
-    parseTtsLexicon(formData.get("tts_lexicon"))
+    pick(
+      "ttsLexicon",
+      parseTtsLexicon(formData.get("tts_lexicon")),
+      parseTtsLexicon(tenant.tts_lexicon)
+    )
   );
   const scheduleForSave = hoursSchedule
     ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
     : null;
+  const compiledHours = formatHoursForCompiler(scheduleForSave);
   const businessHours =
-    formatHoursForCompiler(scheduleForSave) ||
-    String(formData.get("business_hours") || "").trim();
+    compiledHours ||
+    pick(
+      "hoursSchedule",
+      String(formData.get("business_hours") || "").trim(),
+      String(tenant.business_hours || "").trim()
+    );
   const locationsText = formatLocationsForCompiler(businessLocations);
   const policiesText = formatPoliciesForCompiler(businessPolicies);
 
