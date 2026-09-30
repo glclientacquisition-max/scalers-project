@@ -5,7 +5,13 @@
 
 const { normalizePolicies } = require('./businessPolicies');
 const { normalizeLocations } = require('./businessLocations');
-const { canonicalPlaceName, countiesMentioned, countiesForPlace } = require('./kenyaPlaces');
+const {
+  canonicalPlaceName,
+  countiesMentioned,
+  countiesForPlace,
+  nearestAllowedPlace,
+  placesInCounties,
+} = require('./kenyaPlaces');
 const { coveredByAreas, readCoverageAreas } = require('./coverageAreas');
 
 const CONFIRM_ACCESS_NOTE = 'confirm access';
@@ -391,19 +397,63 @@ function areaKey(place) {
   return '';
 }
 
+function dropPlaceClause(part) {
+  if (/^(?:shy|yeah|yep|uh|um|ok|okay|great)$/i.test(part)) return true;
+  if (/\bis (?:okay|ok|fine)\b/i.test(part)) return true;
+  if (/^\d{1,2}(?::\d{2})?(?:\s*(?:a\.?m\.?|p\.?m\.?))?$/i.test(part)) return true;
+  return false;
+}
+
+/**
+ * Counties and places this tenant actually serves, plus the other places in
+ * those counties, so a misheard neighbour can bind without searching Kenya.
+ */
+function coverageNeighbourNames(profile = {}) {
+  const selected = readCoverageAreas(profile.businessPolicies);
+  const counties = new Set();
+  const names = new Set();
+  if (selected && selected.length) {
+    for (const id of selected) {
+      const split = id.indexOf(':');
+      const kind = id.slice(0, split);
+      const name = id.slice(split + 1);
+      if (kind === 'county') counties.add(name);
+      if (kind === 'place') names.add(name);
+    }
+  } else if (selected == null) {
+    for (const token of coverageCorpus(profile)) {
+      if (countiesForPlace(token).length && !token.includes(' ')) {
+        const exact = canonicalPlaceName(token);
+        if (exact) names.add(exact);
+      }
+    }
+  }
+  for (const name of names) {
+    for (const county of countiesForPlace(name)) counties.add(county);
+  }
+  for (const name of placesInCounties(counties)) names.add(name);
+  return names;
+}
+
 /**
  * A clipped token ("Ronga") becomes the Kenya name ("Rongai") before coverage.
- * A building does not drop that area.
+ * A misheard neighbour ("Rwangai") binds only inside this tenant's coverage
+ * counties. A building does not drop that area. A clock clause is not a place.
  */
-function foldCanonicalPlace(place) {
+function foldCanonicalPlace(place, profile) {
   const raw = cleanPlace(place, 240);
   if (!raw) return raw;
+  const allowed = profile ? coverageNeighbourNames(profile) : null;
   return raw
     .split(/\s*,\s*/)
-    .map((part) => {
-      const token = part.trim();
-      if (!token || /\s/.test(token)) return token;
-      const name = canonicalPlaceName(token);
+    .map((part) => part.trim())
+    .filter((part) => part && !dropPlaceClause(part))
+    .map((token) => {
+      if (/\s/.test(token)) return token;
+      const name =
+        allowed && allowed.size
+          ? nearestAllowedPlace(token, allowed)
+          : canonicalPlaceName(token);
       return name ? displayPlaceName(name) : token;
     })
     .join(', ');

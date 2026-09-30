@@ -79,6 +79,71 @@ function canonicalPlaceName(token) {
   return prefixed.length === 1 ? prefixed[0] : '';
 }
 
+function editDistance(a, b) {
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > 2) return 3;
+  let prev = new Array(lb + 1);
+  let cur = new Array(lb + 1);
+  for (let j = 0; j <= lb; j += 1) prev[j] = j;
+  for (let i = 1; i <= la; i += 1) {
+    cur[0] = i;
+    let rowMin = cur[0];
+    for (let j = 1; j <= lb; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (cur[j] < rowMin) rowMin = cur[j];
+    }
+    if (rowMin > 2) return 3;
+    const swap = prev;
+    prev = cur;
+    cur = swap;
+  }
+  return prev[lb];
+}
+
+/** Place names whose county is in the set. Used to hear a misheard neighbour. */
+function placesInCounties(counties) {
+  const wanted = counties instanceof Set ? counties : new Set(counties || []);
+  const names = [];
+  if (!wanted.size) return names;
+  for (const name of PLACE_KEYS) {
+    const list = INDEX.places[name];
+    if (!list) continue;
+    for (const county of list) {
+      if (wanted.has(county)) {
+        names.push(name);
+        break;
+      }
+    }
+  }
+  return names;
+}
+
+/**
+ * Exact or one-edit name, or the one allowed name within two edits.
+ * "Rwangai" binds to Rongai only when Rongai is in the allowed set.
+ * Two allowed names at that distance stay unbound.
+ * @param {string} token
+ * @param {Set<string> | string[] | null} allowedNames
+ */
+function nearestAllowedPlace(token, allowedNames) {
+  const key = normalizePlaceKey(token);
+  if (!key || key.includes(' ') || key.length < 5) return '';
+  const allowed = allowedNames instanceof Set ? allowedNames : new Set(allowedNames || []);
+  const exact = canonicalPlaceName(key);
+  if (exact) return !allowed.size || allowed.has(exact) ? exact : '';
+  if (!allowed.size) return '';
+  let hit = '';
+  for (const name of allowed) {
+    if (name.includes(' ') || Math.abs(name.length - key.length) > 2) continue;
+    if (editDistance(key, name) > 2) continue;
+    if (hit) return '';
+    hit = name;
+  }
+  return hit;
+}
+
 function fuzzyCounties(token) {
   const key = normalizePlaceKey(token);
   if (!key || key.length < 5 || key.includes(' ') || INDEX.places[key]) return [];
@@ -126,6 +191,8 @@ function countiesForPlace(text) {
 module.exports = {
   normalizePlaceKey,
   canonicalPlaceName,
+  placesInCounties,
+  nearestAllowedPlace,
   countiesMentioned,
   countiesForPlace,
 };

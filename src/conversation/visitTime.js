@@ -13,6 +13,11 @@ const DAY_CUE =
 const PERIOD_ANSWER = /\b(morning|asubuhi|afternoon|mchana|evening|jioni|noon|midday|saa sita)\b/i;
 const BARE_HOUR = /(?:^|\b(?:at|saa|around|by)\s+)(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:a\.?m|p\.?m|:\d|\s*(?:diaries|books|pieces|kg|k\b)))/i;
 
+function clockPhrase(text) {
+  const hit = String(text || '').match(/\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)/i);
+  return hit ? hit[0].replace(/[\s.]/g, '').toLowerCase() : '';
+}
+
 function whenValue(state) {
   return String(entityValue(state?.entities?.when) || '').trim();
 }
@@ -105,6 +110,7 @@ function timeAskLine({ when = '', pendingHour = null, language = 'en', askCount 
 
 module.exports = {
   DAY_CUE,
+  clockPhrase,
   dayCue,
   isHomeVisitState,
   mergeTimeAnswer,

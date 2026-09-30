@@ -21,7 +21,7 @@ const BARE_CLOSER =
   /^(?:how else can i help(?: you)?(?: today)?|anything else(?: i can (?:help|do)(?: for you)?)?|have a (?:great|good) day|thank you for calling\b.*|goodbye)[.!?]?$/i;
 
 const TRANSFER_CLAIM =
-  /\b(stay on the line|hold the line|(?:i(?:'m| am|'ll| will) )?(?:transferring|connecting|putting) you (?:now|through|to)|i(?:'ve| have) transferred you|let me (?:transfer|connect) you|nakuunganisha|nakuhamisha)\b/i;
+  /\b(stay on the line|hold the line|(?:i(?:'m| am|'ll| will) )?(?:transferring|connecting|putting) you (?:now|through|to)|i(?:'ve| have) transferred you|let me (?:transfer|connect) you|escalat(?:e|ing|ed)|nakuunganisha|nakuhamisha)\b/i;
 
 const COVERAGE_CLAIM =
   /\b(?:[Ww]e|[Tt]una|[Tt]unaweza|[Tt]uta)(?:\s+\w+){0,2}?\s+(?:cover|serve|reach|come(?:\s+out)?\s+to|kuja|kufika)\s+(?:to\s+)?([A-Z][\w'’]*(?:\s+[A-Z][\w'’]*){0,2})/;

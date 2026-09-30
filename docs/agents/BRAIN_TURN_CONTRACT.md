@@ -45,9 +45,9 @@ Set in `brainState.observeCallerTurn` and read by `nextBestAction`,
 | Leave it | "Just leave it", "wacha", "forget it" after a block. | Speak "Okay. Nothing saved." No tool. Block line is not repeated. |
 | Quantity | An order for a catalogue product needs a count the caller said (digits or words, en/sw). | "Then." asks "Diary. How many?" The saved row never carries a guessed count. |
 | Visit time ladder | Day without a clock time asks "What time tomorrow?", then "Morning or afternoon?". A bare hour asks "N in the morning or afternoon?" or "Twelve noon?". | Two asks (or "any time" after one) waive the time: a callback service request is saved with "Visit time to confirm. Place: …". Never a calendar row without a time. |
-| Coverage | `assessCoverage`: `inside` when the place or its county matches Train text; `outside` only when the place resolves to a county that is not covered; `unknown` when nobody can place it. A clipped token that is a one-letter prefix of exactly one Kenya name binds (`Ronga` → Rongai). Two substitutions stay unknown (`rongae`). | Outside speaks the block and offers a callback note. Unknown never refuses. A building replaces a bad token and keeps the resolved area (`The grace apartments, Rongai`). |
+| Coverage | `assessCoverage`: `inside` when the place or its county matches Train text; `outside` only when the place resolves to a county that is not covered; `unknown` when nobody can place it. A clipped token that is a one-letter prefix of exactly one Kenya name binds (`Ronga` → Rongai). A two-edit miss binds only to a place in this tenant's coverage counties (`Rwangai` → Rongai when Kitengela is on file). An empty coverage directory stays unknown. Coverage is judged before hours. | Outside speaks the block and does not ask for a time. Unknown never refuses. A building replaces a bad token and keeps the resolved area (`The grace apartments, Rongai`). |
 | Name particle | When name is open, `Alvin, yeah?` / `eh` / `yes` is the name. | The particle is not stored. |
-| Clock | A clock answer keeps the day already stored. A clock is not a quantity. | `Tomorrow` plus `7:00 AM` stays `tomorrow 7:00 AM`. An hour outside the file is refused and remembered on `actions.refusedHours`. |
+| Clock | A clock answer keeps the day already stored. A clock is not a quantity. A period stays a period. | `Tomorrow` plus `7:00 AM` is refused when it is before open or after close. The slot drops back to the day. `No` does not save that hour. Morning is spoken as morning, not 10:00. The hours line names the open side: after 8 AM, or before 6 PM. |
 | Desk card | "Visit request saved" and a refused clock in want require a succeeded visit. A callback does not authorize the refused hour. | No row means done is None. |
 | Area | A landmark with no area ("near the big church") while coverage is on file. | One ask: "Which area is that in?" Then book, with `area not confirmed, check coverage` in the notes if the caller cannot say. |
 | Urgent contact | "Contact me urgently" needs a name and a concrete need. The name turn is not the need. | Escalate once, after both. Reason reads `Caller says: <need>`. |
@@ -66,7 +66,7 @@ Dropped sentence by sentence:
 - **Saved / booked / noted / "the team will call" / "all set"** unless a tool succeeded
   this turn. A leftover "How else can I help?" after that close is dropped when a slot is still open, so the turn speech guarantee asks the slot.
 - **A locality the slot, the caller, and the file do not hold.** "Rongai" is not spoken from a slot that still says an unbound token.
-- **Transfer claims** ("stay on the line", "transferring you") unless
+- **Transfer and escalate claims** ("stay on the line", "transferring you", "escalating") unless
   `capabilities.liveTransfer`.
 - **Coverage flips** ("we can come to Runda") unless `assessCoverage` says
   inside.

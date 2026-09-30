@@ -11,6 +11,7 @@ const {
   assessCoverage,
   decideVisitPlace,
   preferVisitPlace,
+  foldCanonicalPlace,
   visitBlockSpeech,
   coverageAskSpeech,
 } = require('../src/conversation/visitLocation');
@@ -123,6 +124,13 @@ describe('visit location ladder', () => {
       businessPolicies: { delivery: 'Nairobi', coverage_areas: [] },
     };
     assert.equal(assessCoverage('Runda', cleared), 'unknown');
+    const dusted = {
+      businessPolicies: { coverage_areas: ['county:nairobi', 'place:kitengela'] },
+    };
+    assert.equal(foldCanonicalPlace('Rwangai', dusted), 'Rongai');
+    assert.equal(foldCanonicalPlace('Rwangai'), 'Rwangai');
+    assert.equal(assessCoverage(foldCanonicalPlace('Rwangai', dusted), dusted), 'outside');
+    assert.equal(foldCanonicalPlace('Shy, 7 is okay, Rongai', dusted), 'Rongai');
     assert.match(
       coverageAskSpeech('What about Runda?', { vertical: 'home_services', ...nairobi }, 'en'),
       /Yes, we cover Runda/i

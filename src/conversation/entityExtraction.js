@@ -449,6 +449,15 @@ const NAME_BLOCKLIST = new Set([
   'about',
   'near',
   'opposite',
+  'great',
+  'yeah',
+  'yep',
+  'yup',
+  'monthly',
+  'morning',
+  'afternoon',
+  'charge',
+  'fine',
 ]);
 
 /**
@@ -622,10 +631,9 @@ function extractQuantity(text, intent) {
   if (looksLikeNonConsentAck(text)) return null;
   const raw = String(text || '');
   // A clock is the visit time, not a count. "7:00 AM" must not become quantity 7.
-  const stripped = raw.replace(
-    /\b(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi,
-    ' '
-  );
+  const stripped = raw
+    .replace(/\b(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi, ' ')
+    .replace(/\b\d{1,2}\s+is\s+(?:okay|ok|fine)\b/gi, ' ');
   const digit = /\b(\d{1,3})\b/.exec(stripped);
   if (digit && !/\b(?:at|saa)\s*$/.test(stripped.slice(0, digit.index).toLowerCase())) {
     return digit[1];

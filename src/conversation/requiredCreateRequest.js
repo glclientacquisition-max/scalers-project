@@ -4,7 +4,7 @@ const { entityValue } = require('./entityExtraction');
 const { offeredVertical } = require('./vertical');
 const { appendVisitNotes } = require('./visitLocation');
 const { looksLikeLeaveIt, looksLikeNonConsentAck } = require('./callCorrectives');
-const { dayCue, whenHasClockTime } = require('./visitTime');
+const { clockPhrase, dayCue, whenHasClockTime } = require('./visitTime');
 const { numbersIn } = require('./numberWords');
 
 const REQUEST_INTENTS = new Set([
@@ -111,18 +111,41 @@ function buildServiceRequest(state = {}) {
 }
 
 /** Day known, time never given. Save the visit as a callback note, not a calendar slot. */
+function mentionsRefusedClock(whenText, state) {
+  const clock = clockPhrase(whenText);
+  if (!clock) return false;
+  return (state?.actions?.refusedHours || []).some((item) => clockPhrase(item) === clock);
+}
+
+function withoutRefusedClock(text, state) {
+  let out = String(text || '');
+  for (const item of state?.actions?.refusedHours || []) {
+    const clock = String(item || '').match(/\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)/i);
+    if (!clock) continue;
+    const phrase = clock[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+    out = out.replace(new RegExp(`\\b(?:at\\s+)?${phrase}\\b`, 'ig'), ' ');
+  }
+  return clean(out);
+}
+
 function buildVisitCallback(state = {}) {
   const service = slot(state, ['service', 'product', 'requestedItem']);
   const place = slot(state, ['location', 'landmark']);
+  let whenText = slot(state, ['when']);
+  if (mentionsRefusedClock(whenText, state)) whenText = dayCue(whenText);
   return {
     type: 'callback',
     name: callerName(state),
     phone: callerPhone(state),
     item: service || 'visit',
     quantity: '',
-    whenText: slot(state, ['when']),
+    whenText,
     notes: clean(
-      ['Visit time to confirm.', place ? `Place: ${place}.` : '', state.goal?.description || '']
+      [
+        'Visit time to confirm.',
+        place ? `Place: ${place}.` : '',
+        withoutRefusedClock(state.goal?.description || '', state),
+      ]
         .filter(Boolean)
         .join(' '),
       400
@@ -171,6 +194,24 @@ function guardToolPlan(parsed, state = {}, capabilities = {}) {
     delete next.escalate;
     next.consentBlocked = true;
     return next;
+  }
+  if (next.appointment && typeof next.appointment === 'object') {
+    const whenText = String(next.appointment.whenText || next.appointment.when_text || '');
+    if (mentionsRefusedClock(whenText, state)) delete next.appointment;
+  }
+  if (next.serviceRequest && typeof next.serviceRequest === 'object') {
+    const whenText = String(next.serviceRequest.whenText || next.serviceRequest.when_text || '');
+    if (mentionsRefusedClock(whenText, state)) {
+      if (state.conversation?.timeWaived) {
+        next.serviceRequest = {
+          ...next.serviceRequest,
+          whenText: dayCue(whenText),
+          notes: withoutRefusedClock(next.serviceRequest.notes || '', state),
+        };
+      } else {
+        delete next.serviceRequest;
+      }
+    }
   }
   if (next.serviceRequest && typeof next.serviceRequest === 'object') {
     const request = { ...next.serviceRequest };

@@ -323,12 +323,34 @@ describe('brain simulation: 06:59 call', () => {
     assert.doesNotMatch(lines(sim).join('\n'), /all set/i);
     assert.equal(sim.turns[2].state.entities.quantity, undefined);
     assert.match(String(sim.turns[2].state.entities.when?.value || ''), /tomorrow/i);
-    assert.match(String(sim.turns[2].state.entities.when?.value || ''), /7:00 AM/i);
+    assert.doesNotMatch(String(sim.turns[2].state.entities.when?.value || ''), /7:00 AM/i);
     assert.equal(sim.saved.appointments.length, 0);
     const invalid = sim.turns[2].toolResults.find((row) => row.status === 'invalid');
     assert.equal(invalid?.code, 'outside_hours');
-    assert.match(sim.turns[2].agentLine, /outside our hours/i);
+    assert.match(sim.turns[2].agentLine, /after 8 AM/i);
     assert.ok(sim.state.actions.refusedHours.length > 0);
+    await sim.run(['No.']);
+    assert.equal(sim.saved.serviceRequests.length, 0);
+    assert.equal(sim.saved.appointments.length, 0);
+    assert.doesNotMatch(String(sim.turns[3].state.entities.when?.value || ''), /7:00 AM/i);
+    assert.match(sim.turns[3].agentLine, /morning or afternoon/i);
+    assert.doesNotMatch(lines(sim).join('\n'), /saved your request/i);
+    clean(sim);
+  });
+
+  it('speaks a period as a period and does not invent 10 AM', async () => {
+    const sim = createSimulator({ profile: home, leak: 'none' });
+    await sim.run([
+      'Mattress cleaning tomorrow in Kitengela near the stage.',
+      'Grace.',
+      'Morning is fine.',
+    ]);
+    const spoken = lines(sim).join('\n');
+    assert.doesNotMatch(spoken, /\b10\b/);
+    assert.equal(sim.saved.appointments.length, 1);
+    assert.match(String(sim.saved.appointments[0].whenText || ''), /morning/i);
+    assert.equal(sim.saved.appointments[0].windowStart, '');
+    assert.match(lines(sim).join('\n'), /morning/i);
     clean(sim);
   });
 });
@@ -361,6 +383,13 @@ describe('speech gate', () => {
     assert.equal(
       guardSpokenReply("Stay on the line, I'm transferring you now. May I have your name?", ctx),
       'May I have your name?'
+    );
+    assert.equal(
+      guardSpokenReply(
+        "I've sent that to the team. I am escalating this emergency immediately to Alvin Kiprotich Yegon.",
+        { ...ctx, toolResults: [{ status: 'succeeded', action: 'escalate' }] }
+      ),
+      "I've sent that to the team."
     );
     assert.equal(
       guardSpokenReply("I've saved that.", { ...ctx, toolResults: [{ status: 'succeeded' }] }),

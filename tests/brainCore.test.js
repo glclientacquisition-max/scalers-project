@@ -337,6 +337,11 @@ describe('Brain state and next-best-action', () => {
     });
     assert.equal(contextual.name.value, 'Alvin');
     assert.equal(contextual.name.source, 'contextual_slot_answer');
+    const notAName = extractConversationEntities('Great.', {
+      intent: 'booking',
+      state: { goal: { missingSlots: ['name'] } },
+    });
+    assert.equal(notAName.name, undefined);
   });
 
   it('does not treat hear-again as confirming a contextual name', () => {

@@ -20,6 +20,7 @@ const {
   isHomeVisitState,
   mergeTimeAnswer,
   timeAskCount,
+  clockPhrase,
   dayCue,
   whenHasClockTime,
   whenNeedsClockTime,
@@ -515,7 +516,8 @@ function observeCallerTurn(state, input = {}) {
     const place = foldCanonicalPlace(
       lastAsk === 'area' && previous && incoming && !/[\s,]/.test(incoming.trim())
         ? `${incoming.trim()}, ${previous}`
-        : preferVisitPlace(previous, incoming, text)
+        : preferVisitPlace(previous, incoming, text),
+      input.profile
     );
     const keptSpecific = Boolean(place && incoming && place !== incoming);
     if (keptSpecific) {
@@ -693,7 +695,23 @@ function recordActionResults(state, results = []) {
       if (whenText && !next.actions.refusedHours.includes(whenText)) {
         next.actions.refusedHours.push(whenText);
       }
+      const current = whenValue(next);
+      const refusedClock = clockPhrase(whenText);
+      if (current && refusedClock && clockPhrase(current) === refusedClock) {
+        const day = dayCue(current);
+        if (day) {
+          next.entities.when = {
+            value: day,
+            source: 'caller_explicit',
+            confidence: 0.9,
+            confirmed: false,
+          };
+        }
+      }
     }
+  }
+  if (next.actions.refusedHours.length) {
+    next.goal.missingSlots = missingGoalSlots(next, { vertical: next.vertical });
   }
   if (!Array.isArray(next.actions.savedWork)) next.actions.savedWork = [];
   next.actions.savedWork = mergeWorkResults(
