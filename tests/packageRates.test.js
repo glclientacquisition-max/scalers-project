@@ -46,5 +46,16 @@ describe("package overage math", () => {
     assert.match(panel, /Hidden until live transfer/);
     assert.equal(6 / 60, 0.1);
     assert.equal(9 / 60, 0.15);
+    const prices = read("docs/supabase/package_prices_5_12_25.sql");
+    const sql = read("docs/supabase/package_catalog.sql");
+    assert.match(catalog, /monthlyPriceKes: 5000/);
+    assert.match(catalog, /monthlyPriceKes: 12000/);
+    assert.match(catalog, /monthlyPriceKes: 25000/);
+    assert.match(prices, /when 'starter' then 5000/);
+    assert.match(prices, /when 'growth' then 12000/);
+    assert.match(prices, /when 'scale' then 25000/);
+    assert.match(prices, /dids = 1/);
+    assert.match(sql, /'starter', 'Starter', 5000/);
+    assert.match(sql, /'scale', 'Scale', 25000/);
   });
 });

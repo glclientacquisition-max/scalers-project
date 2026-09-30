@@ -4,7 +4,7 @@ import type { BillingPackage, BillingRateCard, TenantSubscriptionRow } from "@/l
 
 /**
  * Super Admin packages fixture. DASHBOARD_OPEN=true only.
- * Straw prices match the public seed (monthly 0) so the Landing preview shows Not set.
+ * Prices match the public catalog. Each package includes 1 number.
  */
 const RATES: BillingRateCard = {
   inboundKesPerSecond: 0.1,
@@ -20,7 +20,7 @@ const PACKAGES: BillingPackage[] = [
     id: "pkg-starter",
     sku: "starter",
     name: "Starter",
-    monthlyPriceKes: 0,
+    monthlyPriceKes: 5000,
     seats: 2,
     minutes: 300,
     sms: 200,
@@ -34,7 +34,7 @@ const PACKAGES: BillingPackage[] = [
     id: "pkg-growth",
     sku: "growth",
     name: "Growth",
-    monthlyPriceKes: 0,
+    monthlyPriceKes: 12000,
     seats: 5,
     minutes: 800,
     sms: 500,
@@ -48,7 +48,7 @@ const PACKAGES: BillingPackage[] = [
     id: "pkg-scale",
     sku: "scale",
     name: "Scale",
-    monthlyPriceKes: 0,
+    monthlyPriceKes: 25000,
     seats: 10,
     minutes: 2000,
     sms: 1500,

@@ -190,9 +190,9 @@ function isMissingCatalog(message: string): boolean {
 }
 
 const STRAW_OFFERS: Array<Omit<PublicPackageOffer, "annualPriceKes">> = [
-  { sku: "starter", name: "Starter", monthlyPriceKes: 0, seats: 2, minutes: 300, sms: 200, email: 100, staffWa: 200, dids: 1 },
-  { sku: "growth", name: "Growth", monthlyPriceKes: 0, seats: 5, minutes: 800, sms: 500, email: 250, staffWa: 500, dids: 1 },
-  { sku: "scale", name: "Scale", monthlyPriceKes: 0, seats: 10, minutes: 2000, sms: 1500, email: 500, staffWa: 1000, dids: 1 },
+  { sku: "starter", name: "Starter", monthlyPriceKes: 5000, seats: 2, minutes: 300, sms: 200, email: 100, staffWa: 200, dids: 1 },
+  { sku: "growth", name: "Growth", monthlyPriceKes: 12000, seats: 5, minutes: 800, sms: 500, email: 250, staffWa: 500, dids: 1 },
+  { sku: "scale", name: "Scale", monthlyPriceKes: 25000, seats: 10, minutes: 2000, sms: 1500, email: 500, staffWa: 1000, dids: 1 },
 ];
 
 export function strawPublicBoard(): PublicPackageBoard {

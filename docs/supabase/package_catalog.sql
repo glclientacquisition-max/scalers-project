@@ -55,9 +55,9 @@ insert into public.billing_packages (
   sku, name, monthly_price_kes, seats, minutes, sms, email, staff_wa, dids, sort_order
 )
 values
-  ('starter', 'Starter', 0, 2, 300, 200, 100, 200, 1, 10),
-  ('growth', 'Growth', 0, 5, 800, 500, 250, 500, 1, 20),
-  ('scale', 'Scale', 0, 10, 2000, 1500, 500, 1000, 1, 30)
+  ('starter', 'Starter', 5000, 2, 300, 200, 100, 200, 1, 10),
+  ('growth', 'Growth', 12000, 5, 800, 500, 250, 500, 1, 20),
+  ('scale', 'Scale', 25000, 10, 2000, 1500, 500, 1000, 1, 30)
 on conflict (sku) do nothing;
 
 create table if not exists public.tenant_subscriptions (
