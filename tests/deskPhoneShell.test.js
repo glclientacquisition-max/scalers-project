@@ -107,7 +107,7 @@ describe("desk phone shell", () => {
   it("overlays the Inbox count on the tab icon, not as a second control", () => {
     assert.match(nav, /export function DeskTabBar/);
     assert.match(nav, /needsCount = 0/);
-    assert.match(nav, /<TabIconWithBadge name=\{item\.label\} count=\{needsCount\} \/>/);
+    assert.match(nav, /<TabIconWithBadge name=\{label\} count=\{count\} \/>/);
     assert.match(nav, /formatInboxNavAriaLabel\(needsCount\)/);
     assert.match(nav, /deskNavBadgeClass/);
     assert.match(nav, /min-h-12/);
