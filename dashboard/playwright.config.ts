@@ -3,6 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Structural gate for the desk (docs/frontend/FRONTEND_2_0_CHARTER.md §8).
  * Runs against the /dev/* fixtures with DASHBOARD_OPEN=true. No pixel diffs; screenshots are artifacts.
+ * The staging desk only serves this build when scalers-staging production tracks cursor/staging-voice-468b.
  *
  *   npm run test:e2e            starts `next dev` on 3077 and runs every project
  *   E2E_BASE_URL=http://localhost:3020 npm run test:e2e   reuse a running server
