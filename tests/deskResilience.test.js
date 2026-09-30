@@ -8,22 +8,21 @@ function read(rel) {
 }
 
 describe("desk resilience and anti-slop", () => {
-  it("ships crash, loading, and 404 states without leaking diagnostics", () => {
+  it("ships crash and 404 states without a route loading blank", () => {
     const deskError = read("dashboard/src/app/(desk)/error.tsx");
     const rootError = read("dashboard/src/app/error.tsx");
     const globalError = read("dashboard/src/app/global-error.tsx");
-    const loading = read("dashboard/src/app/(desk)/loading.tsx");
     const notFound = read("dashboard/src/app/not-found.tsx");
     const crash = read("dashboard/src/components/ui/DeskCrash.tsx");
+    assert.equal(
+      fs.existsSync(path.join(__dirname, "..", "dashboard/src/app/(desk)/loading.tsx")),
+      false
+    );
     assert.match(deskError, /DeskCrash/);
     assert.match(rootError, /DeskCrash/);
     assert.match(globalError, /Could not load Scalers/);
     assert.match(globalError, /Try again/);
     assert.doesNotMatch(globalError, /error\.message|stack/);
-    assert.match(loading, /Skeleton/);
-    assert.match(loading, /SkeletonRow/);
-    assert.doesNotMatch(loading, /pendingSpinnerInkClass/);
-    assert.doesNotMatch(loading, /KES|85 to return/);
     assert.match(notFound, /Page not found/);
     assert.match(notFound, /href="\/home"/);
     assert.match(crash, /Try again/);
