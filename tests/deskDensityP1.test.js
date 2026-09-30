@@ -76,8 +76,9 @@ describe("desk density P1", () => {
     assert.match(title, /return "Unknown caller"/);
     assert.doesNotMatch(title, /row\.phone/);
     assert.match(subline, /return phone \|\| "No phone"/);
-    assert.match(contactRow, /whitespace-nowrap/);
-    assert.match(contactRow, /lg:hidden/);
+    assert.match(contactRow, /contactListSubline\(row\)/);
+    assert.match(contactRow, /deskPreviewClass/);
+    assert.doesNotMatch(contactRow, /lg:hidden|row\.phone \|\| "No phone"/);
   });
 
   it("hides Catalog products on home services", () => {
@@ -106,11 +107,11 @@ describe("desk density P1", () => {
     assert.match(board, /h-6 w-6/);
   });
 
-  it("tightens desktop inbox and contacts cells without touching the phone row", () => {
+  it("keeps Inbox table cells tight and Contacts on the Inbox phone row", () => {
     assert.match(table, /px-3 py-2 align-top/);
     assert.match(table, /px-4 py-3 first:border-t-0/);
     assert.doesNotMatch(table, /px-5 py-4/);
-    assert.match(contactRow, /lg:px-3 lg:py-2/);
-    assert.doesNotMatch(contactRow, /lg:px-5 lg:py-5/);
+    assert.match(contactRow, /px-4 py-3 first:border-t-0/);
+    assert.doesNotMatch(contactRow, /lg:px-3 lg:py-2|lg:px-5/);
   });
 });

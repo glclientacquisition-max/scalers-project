@@ -66,13 +66,14 @@ describe("endless list slices", () => {
     assert.deepEqual(out.freshIds, ["c"]);
   });
 
-  it("keeps one contacts dataset for phone and desktop, with a quiet loading row", () => {
+  it("keeps one contacts row at every width, with a quiet loading row", () => {
     const list = read("dashboard/src/components/ContactsEndlessList.tsx");
     const sentinel = read("dashboard/src/components/EndlessList.tsx");
     assert.match(list, /ContactPhoneRow/);
-    assert.match(list, /ContactTableRow/);
-    assert.match(list, /md:hidden/);
-    assert.match(list, /hidden min-w-0 md:mt-8 md:block/);
+    assert.doesNotMatch(list, /ContactTableRow/);
+    assert.doesNotMatch(list, /DeskDataTable/);
+    assert.doesNotMatch(list, /md:hidden|lg:hidden/);
+    assert.match(list, /list-none overflow-hidden rounded-2xl border border-line bg-surface/);
     assert.match(list, /appendUniqueById/);
     assert.match(list, /listWindowClass/);
     assert.match(sentinel, /Loading/);

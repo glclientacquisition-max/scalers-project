@@ -59,13 +59,18 @@ describe("universal row anatomy", () => {
     assert.doesNotMatch(inbox, /item\.detail/);
   });
 
-  it("applies the identity circle to Contacts mobile and desktop", () => {
+  it("applies the identity circle to the Contacts row at every width", () => {
     const list = read("dashboard/src/components/ContactListRow.tsx");
     const endless = read("dashboard/src/components/ContactsEndlessList.tsx");
+    const inbox = read("dashboard/src/components/InboxItemRow.tsx");
+    const phone = inbox.slice(inbox.indexOf("export function InboxPhoneRow"));
     const uses = list.match(/RowIdentity/g) || [];
-    assert.ok(uses.length >= 3, `import + mobile + desktop, got ${uses.length}`);
+    assert.ok(uses.length >= 2, `import + row, got ${uses.length}`);
     assert.match(endless, /<ContactPhoneRow/);
-    assert.match(endless, /<ContactTableRow/);
+    assert.doesNotMatch(endless, /ContactTableRow|DeskDataTable/);
+    assert.match(list, /gap-3 overflow-hidden border-t border-line\/70 px-4 py-3/);
+    assert.match(phone, /gap-3 overflow-hidden border-t border-line\/70 px-4 py-3/);
+    assert.doesNotMatch(list, /RowStateDot|InboxRowCheck|break-words|overflow-wrap/);
   });
 
   it("initials skip phone numbers and placeholders", () => {

@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { loadContactsSlice } from "@/app/(desk)/contacts/listActions";
-import { ContactPhoneRow, ContactTableRow } from "@/components/ContactListRow";
+import { ContactPhoneRow } from "@/components/ContactListRow";
 import { EndlessSentinel, scrollDeskWellToTop } from "@/components/EndlessList";
 import { PullRefreshMark, usePhoneListPull } from "@/components/PhonePullRefresh";
-import { DeskDataTable } from "@/components/ui/DeskDataTable";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLandScope } from "@/components/ui/DeskLand";
 import {
@@ -102,7 +101,7 @@ export function ContactsEndlessList({
     <>
       <DeskLandScope ids={merged.map((row) => row.id)} scopeKey={`${saved}:${sort}:${q}`}>
         <ul
-          className={`mt-6 overflow-hidden rounded-2xl border border-line bg-surface md:mt-8 md:hidden ${listWindowClass}`}
+          className={`mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface ${listWindowClass}`}
         >
           {merged.map((row) => (
             <ContactPhoneRow
@@ -112,44 +111,6 @@ export function ContactsEndlessList({
             />
           ))}
         </ul>
-        <div className="mt-6 hidden min-w-0 md:mt-8 md:block">
-          <DeskDataTable minWidthClass="min-w-0">
-            <thead className="border-b border-line bg-surface-muted/60 text-ink-soft">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-3 lg:py-2"
-                >
-                  Name
-                </th>
-                <th
-                  scope="col"
-                  className="hidden px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:table-cell lg:px-3 lg:py-2"
-                >
-                  Phone
-                </th>
-                <th
-                  scope="col"
-                  className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.14em] lg:px-3 lg:py-2"
-                >
-                  Last call
-                </th>
-                <th scope="col" className="w-px px-3 py-3 lg:px-3 lg:py-2">
-                  <span className="sr-only">Call and WhatsApp</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className={listWindowClass}>
-              {merged.map((row) => (
-                <ContactTableRow
-                  key={row.id}
-                  row={row}
-                  href={contactProfileHref(row.id, { saved, sort, q: q || undefined })}
-                />
-              ))}
-            </tbody>
-          </DeskDataTable>
-        </div>
       </DeskLandScope>
       <EndlessSentinel
         hasMore={hasMore}
