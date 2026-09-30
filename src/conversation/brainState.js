@@ -9,6 +9,11 @@ const {
 } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
+const {
+  looksLikeLeaveIt,
+  looksLikeNonConsentAck,
+  looksLikeUrgentContact,
+} = require('./callCorrectives');
 const { mergeWorkResults } = require('./callResolution');
 const {
   applyLiveCallerFile,
@@ -87,6 +92,12 @@ function looksLikeHomeVisitAsk(value) {
   ) {
     return true;
   }
+  if (
+    /\b(carpet|couch|sofa|mattress|house|upholstery|airbnb)\s+clean(?:ing)?\b/.test(value) &&
+    !/\b(how much|price|bei|gharama|cost|do you|mnatoa|mnafanya)\b/.test(value)
+  ) {
+    return true;
+  }
   // Live pack #13: Nataka cleaning kesho. Job nouns may stay English.
   if (
     /\b(nataka|ninataka|naomba)\b/.test(value) &&
@@ -150,6 +161,7 @@ function inferIntent(text, opts = {}) {
   const vertical = String(opts.vertical || '').toLowerCase();
   if (!value) return 'unknown';
   // Human / complaint before other patterns so "talk to the manager" wins.
+  if (looksLikeUrgentContact(value)) return 'human';
   if (
     /\b(human|person|owner|manager|boss|agent|speak to|talk to|kuongea na|let me speak|connect( me)?( to)?|forward( this call)?( to)?|transfer)\b/i.test(
       value
@@ -267,6 +279,8 @@ function createBrainState(profile = {}) {
       answersReceived: [],
       hearAgain: false,
       phatic: false,
+      nonConsentAck: false,
+      leaveIt: false,
       locationDetailAsked: false,
       locationRefusals: 0,
     },
@@ -329,6 +343,8 @@ function observeCallerTurn(state, input = {}) {
         (next.goal.missingSlots.length > 0 ||
           next.handoff?.requested ||
           isBackchannelOrFragment(text) ||
+          looksLikeNonConsentAck(text) ||
+          looksLikeLeaveIt(text) ||
           text.split(/\s+/).length <= 3)));
   const intent = String(
     input.intent || (preserveActiveIntent ? next.intent : inferredIntent)
@@ -340,6 +356,8 @@ function observeCallerTurn(state, input = {}) {
   next.conversation.stage = next.goal.status === 'unknown' ? 'discovery' : 'understanding';
   next.conversation.hearAgain = isHearAgainSignal(text);
   next.conversation.phatic = looksLikePhaticCallerTurn(text);
+  next.conversation.nonConsentAck = looksLikeNonConsentAck(text);
+  next.conversation.leaveIt = looksLikeLeaveIt(text);
   if (text) next.conversation.answersReceived.push(text);
   next.conversation.answersReceived = next.conversation.answersReceived.slice(-8);
 
@@ -695,6 +713,9 @@ function formatBrainStateForPrompt(state) {
     formatNameConfirmForPrompt(value),
     formatHearAgainForPrompt(value),
     formatReturningFileForCallState(value.returning),
+    value.conversation?.nonConsentAck
+      ? '- Acknowledgment only (Then, Okay, Sawa, or leave it). Not a quantity, a time, or a yes. Do not invent a count. Do not say a visit or order is saved.'
+      : '',
     value.conversation?.phatic
       ? speakerPendingOnFile(value.returning)
         ? '- Phatic turn: one short well, then who is calling. Do not list services.'

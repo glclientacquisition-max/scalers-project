@@ -70,6 +70,7 @@ const HOME_INTENTS = [
     patterns: [
       /\b(book|booking|appointment|schedule|visit|come (over|by|tomorrow|today)|nitakuja|njoo|tandika|install|repair|fix)\b/i,
       /\b(clean (my|the|our)|need (a |my )?(clean|carpet|couch|sofa|mattress|upholstery)|carpet clean|mattress clean|house clean|airbnb clean|sofa clean|couch clean)\b/i,
+      /\b(?:carpet|couch|sofa|mattress|house|upholstery|airbnb)\s+clean(?:ing)?\b.*\b(?:tomorrow|today|tonight|kesho|leo|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
     ],
   },
   {
@@ -128,10 +129,10 @@ const HOME_INTENTS = [
     requiredSlots: ['name', 'reason'],
     optionalSlots: [],
     completion:
-      'Follow HANDOFF MODE. Capture name + reason. If escalate enabled, escalate. Never say stay on the line. Never claim a live transfer.',
+      'Follow HANDOFF MODE. On contact urgent, ask name then the need, one question each, then escalate. Do not recite the service list. Never say stay on the line. Never claim a live transfer.',
     tool: 'escalate',
     patterns: [
-      /\b(human|person|someone|owner|manager|boss|agent|speak to|talk to|nipe|nataka kuongea na)\b/i,
+      /\b(human|person|someone|owner|manager|boss|agent|speak to|talk to|nipe|nataka kuongea na|contact urgent|urgent contact)\b/i,
     ],
   },
   {
@@ -235,7 +236,10 @@ function formatHomeServicesPlaybookForPrompt(opts = {}) {
     '- Reschedule: update_appointment with the new when against their latest open visit. Keep the saved location unless they change it.',
     '- Cancel: update_appointment status=cancelled. Attendance confirm is not a new booking. Cancel does not need a location.',
     '- Emergency and human escalate do not wait for a location.',
-    '- Never invent prices, coverage, or ETAs.',
+    '- Never invent prices, coverage, or ETAs. Use the coverage list on file. Do not invent areas.',
+    '- Out of coverage: say so once and offer a callback note. Okay, Sawa, or leave it is not a booking. Do not say you will serve them tomorrow.',
+    '- In coverage: confirm service, day, time, and place, then the tool, then speak only the facts the tool saved.',
+    '- Then, Okay, and Sawa are not a yes and not a time.',
     '- Cleaning, repair, install, pest, and similar jobs share this spine. Use SERVICES names; do not invent a niche that is not listed.',
     '- Bare urgent / ASAP / same-day is not emergency. Escalate only for burst, flood, fire, gas, or shock.',
     '- After a clear completion, confirm briefly and goodbye.'

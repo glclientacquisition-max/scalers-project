@@ -13,6 +13,7 @@ const {
   pickCollisionChoice,
 } = require('./callerNameMatch');
 const { isLocationRefusal } = require('./visitLocation');
+const { looksLikeNonConsentAck } = require('./callCorrectives');
 
 function normalizeText(value) {
   return String(value || '')
@@ -440,7 +441,7 @@ function isBackchannelOrFragment(text) {
   const lower = value.toLowerCase().replace(/[?.!,]+$/g, '').trim();
   const compact = lower.replace(/[\s'-]+/g, '');
   if (
-    /^(yes|no|yeah|yep|nah|okay|ok|sawa|ndiyo|hapana|uh|uhhuh|mm+|hmm+|hello|hi|hey|thanks|thank you|asante|poa|sure|right|alright|continue|go on)$/i.test(
+    /^(yes|no|yeah|yep|nah|okay|ok|sawa|ndiyo|hapana|uh|uhhuh|mm+|hmm+|then|hello|hi|hey|thanks|thank you|asante|poa|sure|right|alright|continue|go on)$/i.test(
       lower
     )
   ) {
@@ -544,6 +545,7 @@ function extractWhen(text) {
 
 function extractQuantity(text, intent) {
   if (!['hold', 'order', 'booking'].includes(intent)) return null;
+  if (looksLikeNonConsentAck(text)) return null;
   const raw = String(text || '');
   const digit = /\b(\d{1,3})\b/.exec(raw);
   if (digit && !/\b(?:at|saa)\s*$/.test(raw.slice(0, digit.index).toLowerCase())) {
@@ -592,6 +594,7 @@ function extractBranch(text, profile = {}) {
 function shortSlotAnswer(text) {
   const value = String(text || '').trim();
   if (!value || value.length > 100) return null;
+  if (looksLikeNonConsentAck(value)) return null;
   const words = value.split(/\s+/);
   if (words.length > 6) return null;
   if (isBackchannelOrFragment(value)) return null;

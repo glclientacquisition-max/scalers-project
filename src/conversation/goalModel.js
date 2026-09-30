@@ -4,6 +4,10 @@ const { normalizeLocations } = require('./businessLocations');
 const { entityValue } = require('./entityExtraction');
 const { returningFileUsable } = require('./callerMemory');
 const { decideVisitPlace } = require('./visitLocation');
+const {
+  hasConcreteUrgentNeed,
+  looksLikeUrgentContact,
+} = require('./callCorrectives');
 
 const GOAL_REQUIREMENTS = Object.freeze({
   price: [{ slot: 'subject', anyOf: ['product', 'service', 'requestedItem'] }],
@@ -64,7 +68,19 @@ function missingGoalSlots(state, profile = {}) {
   if (visitDecision?.ask && !missing.includes('location')) {
     missing.push('location');
   }
+  if (intent === 'human' && urgentContactNeedsReason(state) && !missing.includes('reason')) {
+    missing.push('reason');
+  }
   return missing;
+}
+
+function urgentContactNeedsReason(state) {
+  const desc = String(state?.goal?.description || '');
+  const latest = String((state?.conversation?.answersReceived || []).slice(-1)[0] || '');
+  const urgent =
+    looksLikeUrgentContact(desc) || looksLikeUrgentContact(latest);
+  if (!urgent) return false;
+  return !hasConcreteUrgentNeed(desc) && !hasConcreteUrgentNeed(latest);
 }
 
 function homeVisitDecision(state, profile = {}) {
@@ -157,6 +173,7 @@ function clarificationForSlot(slot) {
     subject: 'Name the product or service you heard, then ask which exact one they mean.',
     service: 'Name the job if you have it, then ask which service they want.',
     name: 'Ask for the caller name only if none is on file. If a name is already known, skip this slot.',
+    reason: 'Ask what they need in one short question. Do not recite the service list.',
     when: 'Name the job you have, then ask for the day and time.',
     when_or_reference: 'Name the open visit if you have it, then ask for the new time or the visit to cancel.',
     branch: 'Ask which branch or location they mean.',
