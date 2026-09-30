@@ -13,7 +13,7 @@
 - One minute pool. Inbound and live-transfer share included minutes.
 - Seats are a hard cap. Never on-demand.
 - One on-demand toggle for minutes, SMS, email, staff WA.
-- Minutes exhaust + on-demand off: the caller still gets an answer. We meter. We do not debit.
+- Minutes exhaust + on-demand off: the next call is rejected. A call already connected can finish. We meter that call. We do not debit.
 - SMS exhaust may fall through to WhatsApp, then email, until that bucket is gone.
 - Beta stays `billing_enforcement = off` until a Free SKU exists. Assigning a package does not leave beta. Wallets Plan still does that.
 - Ops assigns SKUs from Super Admin. Owner checkout is later.
@@ -41,7 +41,6 @@
 - Per-tenant WABA.
 - Marketing WhatsApp templates.
 - Extra DIDs as a v1 add-on.
-- Hard inbound reject when minutes are empty.
 
 ## Straw included defaults (editable in Super Admin)
 

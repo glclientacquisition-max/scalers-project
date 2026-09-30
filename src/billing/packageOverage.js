@@ -1,11 +1,11 @@
 /**
  * Package minute math. Postgres `consume_call_seconds` is the ledger.
- * Keep this function in step with docs/supabase/package_minute_consume.sql.
+ * Keep quoteCallOverage in step with docs/supabase/package_minute_consume.sql.
  *
- * Included seconds are already paid. Past the cap:
- * - on-demand off: meter the seconds, debit 0 (the call still answered)
- * - on-demand on and enforcement not off: debit overage seconds at the rate card
- * - enforcement off (beta): meter, debit 0
+ * Included seconds are already paid. Past the cap with on-demand off:
+ * do not answer another call, do not debit. On-demand on and enforcement
+ * not off: answer and debit overage seconds at the rate card.
+ * Enforcement off still does not debit.
  */
 
 function billableTalkSeconds({ outboundUnanswered, durationSeconds, minutes } = {}) {
@@ -46,7 +46,17 @@ function quoteCallOverage({
   return { meterSeconds, overageSeconds, debitKes, reason };
 }
 
+function inboundOpen({ minutesIncluded = 0, secondsUsed = 0, onDemand = false } = {}) {
+  const includedMinutes = Math.max(0, Math.round(Number(minutesIncluded) || 0));
+  if (includedMinutes <= 0) return { open: true, reason: "no_package_minutes" };
+  const used = Math.max(0, Math.round(Number(secondsUsed) || 0));
+  if (used < includedMinutes * 60) return { open: true, reason: "included" };
+  if (onDemand) return { open: true, reason: "on_demand" };
+  return { open: false, reason: "package_exhausted" };
+}
+
 module.exports = {
   billableTalkSeconds,
   quoteCallOverage,
+  inboundOpen,
 };

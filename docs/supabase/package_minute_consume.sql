@@ -1,7 +1,8 @@
 -- package_minute_consume.sql
 -- Purpose: Hangup meters talk seconds into the shared package pool.
 --          Included seconds are not a wallet debit.
---          Past the cap, on-demand off: keep the meter, do not debit, do not reject the call.
+--          Past the cap, on-demand off: meter a call already in progress, do not debit.
+--          The voice webhook rejects the next inbound call.
 --          Past the cap, on-demand on, enforcement not off: debit overage seconds
 --          at billing_rate_card (inbound 0.05/sec, outbound 0.10/sec). Whole seconds.
 --          Beta (billing_enforcement = off): meter only.

@@ -18,10 +18,14 @@ const empty = {
 describe("usage cap copy", () => {
   it("stays quiet while buckets remain, on beta, and when on-demand is on", () => {
     assert.equal(usageCapNotice(empty), null);
-    assert.equal(usageCapNotice({ ...empty, isBeta: true, minutesLeft: 0, smsLeft: 0 }), null);
+    assert.equal(
+      usageCapNotice({ ...empty, isBeta: true, minutesLeft: 0 }),
+      "Included minutes used. Calls stopped."
+    );
+    assert.equal(usageCapNotice({ ...empty, isBeta: true, smsLeft: 0 }), null);
     assert.equal(usageCapNotice({ ...empty, onDemand: true, minutesLeft: 0 }), null);
     assert.equal(
-      homeMinuteStatus({ isBeta: true, onDemand: false, minutesIncluded: 300, minutesLeft: 0 }),
+      homeMinuteStatus({ isBeta: true, onDemand: false, minutesIncluded: 300, minutesLeft: 12 }),
       null
     );
   });
@@ -29,7 +33,7 @@ describe("usage cap copy", () => {
   it("says calls still answer and tenant SMS stops when those caps are hit", () => {
     assert.equal(
       usageCapNotice({ ...empty, minutesLeft: 0 }),
-      "Included minutes used. Calls answer. No charge."
+      "Included minutes used. Calls stopped."
     );
     assert.equal(
       usageCapNotice({ ...empty, smsLeft: 0 }),
@@ -37,11 +41,15 @@ describe("usage cap copy", () => {
     );
     assert.equal(
       usageCapNotice({ ...empty, minutesLeft: 0, smsLeft: 0 }),
-      "Included used. Calls answer. Tenant SMS stopped. No charge."
+      "Included used. Calls stopped. Tenant SMS stopped."
     );
     assert.equal(
       homeMinuteStatus({ isBeta: false, onDemand: false, minutesIncluded: 300, minutesLeft: 0 }),
-      "Answering"
+      "Stopped"
+    );
+    assert.equal(
+      homeMinuteStatus({ isBeta: true, onDemand: false, minutesIncluded: 300, minutesLeft: 0 }),
+      "Stopped"
     );
     assert.equal(
       homeMinuteStatus({ isBeta: false, onDemand: true, minutesIncluded: 300, minutesLeft: 0 }),

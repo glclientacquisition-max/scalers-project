@@ -66,7 +66,7 @@ Then apply `docs/supabase/package_entitlements.sql` (reserved email + seat inclu
 |---|---|
 | Prepaid balance | Paid wallet money used first for call + line charges |
 | Automatic live alerts | WhatsApp/email when balance drops under `wallet_low_balance_kes` (default 200) and again at ≤ 0. No owner soft-limit setup required. |
-| On-demand usage (opt-in) | Default **off**. Package included minutes and SMS are not a wallet debit. Past the cap with on-demand off: calls still answer, tenant SMS stops, no usage debit. Past the cap with on-demand on: debit the rate card (minutes per second, SMS per segment) once `package_minute_consume.sql` is applied. Until that RPC exists, `charge_call_to_wallet` still runs and pauses only when the prepaid balance is already 0. |
+| On-demand usage (opt-in) | Default **off**. Package included minutes and SMS are not a wallet debit. Past the cap with on-demand off: the next inbound call is rejected, tenant SMS stops, no usage debit. Past the cap with on-demand on: answer and debit the rate card once `package_minute_consume.sql` is applied. Until that RPC exists, `charge_call_to_wallet` still runs and pauses only when the prepaid balance is already 0. |
 | Soft inbound block | Separate hard-enforcement step (not this migration) |
 
 Owners enable on-demand on Desk → Wallet. Alerts fire from the voice charge path after each completed call debit. The same toggle covers included SMS (`sms_allowance.sql`).

@@ -4,7 +4,7 @@
 
 | Mode (`billing_enforcement`) | Charges? | Blocks calls? | Use for |
 |---|---|---|---|
-| `off` | No (meter only) | No | **Beta whitelist** |
+| `off` | No (meter only) | No, until the package minute bucket is used up with on-demand off | **Beta whitelist** |
 | `soft` | Yes | No | Prepaid after graduation |
 | `hard` | Yes | Later (inbound gate) | Paid + enforcement |
 

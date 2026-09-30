@@ -2,7 +2,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
-const { billableTalkSeconds, quoteCallOverage } = require("../src/billing/packageOverage");
+const { billableTalkSeconds, quoteCallOverage, inboundOpen } = require("../src/billing/packageOverage");
 
 function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
@@ -77,6 +77,25 @@ describe("package overage", () => {
     assert.equal(quote.meterSeconds, 40);
     assert.equal(quote.debitKes, 0);
     assert.equal(quote.reason, "beta");
+  });
+
+  it("rejects the next call when the package is used up and on-demand is off", () => {
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60, onDemand: false }),
+      { open: false, reason: "package_exhausted" }
+    );
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60 - 1, onDemand: false }),
+      { open: true, reason: "included" }
+    );
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 300, secondsUsed: 300 * 60, onDemand: true }),
+      { open: true, reason: "on_demand" }
+    );
+    assert.deepEqual(
+      inboundOpen({ minutesIncluded: 0, secondsUsed: 100, onDemand: false }),
+      { open: true, reason: "no_package_minutes" }
+    );
   });
 
   it("does not bill unanswered outbound ring time", () => {

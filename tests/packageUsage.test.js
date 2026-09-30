@@ -56,16 +56,16 @@ describe("package usage meter", () => {
     assert.match(actions, /Past included minutes and SMS, charge the wallet/);
   });
 
-  it("says the line stays up when included minutes are gone and on-demand is off", () => {
+  it("says calls stop when included minutes are gone and on-demand is off", () => {
     const page = read("dashboard/src/app/(desk)/wallet/page.tsx");
     const home = read("dashboard/src/app/(desk)/home/page.tsx");
     const copy = read("dashboard/src/lib/usageCap.ts");
     assert.match(page, /usageCapNotice/);
-    assert.match(copy, /Calls answer\. Tenant SMS stopped\. No charge\./);
-    assert.match(copy, /Included minutes used\. Calls answer\. No charge\./);
+    assert.match(copy, /Calls stopped\. Tenant SMS stopped\./);
+    assert.match(copy, /Included minutes used\. Calls stopped\./);
     assert.match(copy, /Included SMS used\. Tenant SMS stopped\./);
     assert.match(home, /homeMinuteStatus/);
-    assert.match(copy, /return input\.onDemand \? "On-demand" : "Answering"/);
+    assert.match(copy, /if \(!input\.onDemand\) return "Stopped"/);
   });
 
   it("lists the assigned package on Admin Businesses", () => {

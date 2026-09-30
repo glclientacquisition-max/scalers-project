@@ -17,7 +17,7 @@ const DEFAULT_TENANT_ID = process.env.TENANT_ID || null;
 const WALLET_CHARGING_ENABLED = String(process.env.WALLET_CHARGING_ENABLED || 'true').toLowerCase() !== 'false';
 const WALLET_RATE_KES_PER_MINUTE = Number(process.env.WALLET_RATE_KES_PER_MINUTE || 0);
 const { envTransferRateKesPerMin } = require('./billing/liveTransferLegs');
-const { billableTalkSeconds } = require('./billing/packageOverage');
+const { billableTalkSeconds, inboundOpen } = require('./billing/packageOverage');
 
 function throwIfError(context, error) {
   if (error) {
@@ -168,6 +168,41 @@ async function listActiveTenantDids() {
   const fromEnv = [process.env.SAUTIKIT_DID, process.env.TENANT_DID].filter(Boolean);
   const fromDb = (data || []).map((r) => r.sautikit_virtual_number).filter(isAssignableDid);
   return [...new Set([...fromDb, ...fromEnv.filter(isAssignableDid)])];
+}
+
+/**
+ * New inbound calls stop when the package minute bucket is used up and
+ * on-demand is off. Missing columns fail open so a webhook still answers.
+ */
+async function packageInboundOpen({ toNumber, fromNumber, tenantId } = {}) {
+  let resolvedTenantId;
+  try {
+    resolvedTenantId = await resolveTenantId({ toNumber, fromNumber, tenantId });
+  } catch (err) {
+    if (err?.code === 'unassigned_did') return { open: true, reason: 'unassigned' };
+    console.warn('[db] packageInboundOpen tenant:', err?.message || err);
+    return { open: true, reason: 'tenant_lookup_failed' };
+  }
+
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('minutes_included, seconds_used, on_demand_usage_enabled')
+    .eq('id', resolvedTenantId)
+    .maybeSingle();
+
+  if (error) {
+    if (/minutes_included|seconds_used|on_demand_usage_enabled|column|schema cache/i.test(error.message || '')) {
+      return { open: true, reason: 'columns_missing' };
+    }
+    console.warn('[db] packageInboundOpen:', error.message);
+    return { open: true, reason: 'lookup_failed' };
+  }
+
+  return inboundOpen({
+    minutesIncluded: data?.minutes_included,
+    secondsUsed: data?.seconds_used,
+    onDemand: Boolean(data?.on_demand_usage_enabled),
+  });
 }
 
 async function upsertCall({
@@ -2026,6 +2061,7 @@ module.exports = {
   listRecentCallsFromNumber,
   setCallResolution,
   chargeCallToWallet,
+  packageInboundOpen,
   uploadRecordingBuffer,
   getCall,
   getTenantById,
