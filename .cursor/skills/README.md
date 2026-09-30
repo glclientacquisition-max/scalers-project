@@ -27,6 +27,18 @@ Imported and adapted (2026-09):
 | `/next-cache-components-adoption` | [vercel/next.js](https://github.com/vercel/next.js) | Turn on Cache Components and clear blocking routes. |
 | `/next-cache-components-optimizer` | [vercel/next.js](https://github.com/vercel/next.js) | Grow a route's static shell under Cache Components. |
 
+Frontend 2.0 design pack (2026-09-30, charter `docs/frontend/FRONTEND_2_0_CHARTER.md` §7):
+
+| Skill | From | Job |
+| --- | --- | --- |
+| `/frontend-design` | [anthropics/skills](https://github.com/anthropics/skills) | Plan tokens and layout before building a surface. Generated-UI tells list. |
+| `/redesign-existing-projects` | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) | Audit an existing surface. |
+| `/design-taste-frontend`, `/high-end-visual-design`, `/minimalist-ui` | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) | Taste references for type, color, spacing. |
+| `/emil-design-eng`, `/review-animations` | [emilkowalski/skills](https://github.com/emilkowalski/skills) | Motion, press states, sheets, menus. `desk-motion` still owns the verb names. |
+| `/impeccable` | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | Polish pass on a finished surface. |
+| `/accessibility` | [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills) | Before marking a phase ready. |
+| `/shadcn` | [shadcn-ui/ui](https://github.com/shadcn-ui/ui) | Component API and composition patterns. Patterns only, no runtime. |
+
 ## Use with lanes
 
 1. Read `AGENTS.md` and the lane contract first.
@@ -41,9 +53,9 @@ Imported and adapted (2026-09):
 
 - `ckanthony/Chisel` filesystem MCP (Cursor already has Read / Grep / StrReplace).
 - Reticle `init`, license keys, `present: true` HUD, SDK embed in `dashboard/`.
-- ibelick remote taste packs (impeccable, Anthropic frontend-design, shadcn, GSAP).
-- `create-design-md` (MASTER already exists).
+- GSAP packs (desk motion is CSS only).
+- `create-design-md` (charter §4 is the token source).
 - `Euraika-Labs/ai-slopcheck` (Python scanner, no skill).
-- `yetone/kill-ai-slop` wholesale (would restyle brand tokens). Visual tells that match constitution live in `/baseline-ui` and `/no-ai-slop`.
+- `yetone/kill-ai-slop` wholesale (would restyle brand tokens). Visual tells live in `/frontend-design`, `/redesign-existing-projects`, and `/no-ai-slop`.
 
 Do not install GSD / BMAD / Spec-Kit as a second operating system.
