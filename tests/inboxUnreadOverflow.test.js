@@ -289,7 +289,11 @@ describe("inbox unread since last customer event", () => {
     assert.doesNotMatch(row, /RowStateDot show=\{needsYouPile\}/);
     assert.doesNotMatch(row, /deskRowWeightClass\(needsYouPile\)/);
     assert.doesNotMatch(row, /deskRowWeightClass\(item\.needsYou \|\| item\.unread\)/);
-    assert.match(desk, /aria-label="Unread"/);
+    assert.match(desk, /aria-hidden/);
+    assert.match(desk, /data-unread-slot/);
+    assert.match(desk, /bg-brand/);
+    assert.doesNotMatch(desk, /aria-label="Unread"/);
+    assert.match(row, /sr-only">Unread/);
     assert.doesNotMatch(desk, /aria-label="Needs you"/);
   });
 

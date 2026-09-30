@@ -57,16 +57,31 @@ export function LivePing({ label = "Live" }: { label?: string }) {
   );
 }
 
-/** Brand-blue dot for unread rows. Sits with the timestamp. Live unread rows ping. */
+/**
+ * Unread mark. A fixed 10px leading slot on every row so read and unread
+ * share the same x positions. The mark is an 8px brand circle. Live unread
+ * uses the same circle with the live ping. The slot is hidden from assistive
+ * tech. The row name announces Unread.
+ */
 export function RowStateDot({ show, live }: { show: boolean; live?: boolean }) {
-  if (!show) return null;
-  if (live) return <LivePing />;
   return (
     <span
-      role="img"
-      aria-label="Unread"
-      className="h-2 w-2 shrink-0 rounded-full bg-accent"
-    />
+      aria-hidden
+      data-unread-slot=""
+      data-unread={show ? "true" : "false"}
+      className="inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center"
+    >
+      {show ? (
+        live ? (
+          <span className="relative inline-flex h-2 w-2 shrink-0">
+            <span className="desk-live-ping absolute inset-0 rounded-full bg-brand" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
+          </span>
+        ) : (
+          <span data-unread-dot="" className="h-2 w-2 shrink-0 rounded-full bg-brand" />
+        )
+      ) : null}
+    </span>
   );
 }
 

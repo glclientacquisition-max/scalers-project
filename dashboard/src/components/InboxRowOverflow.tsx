@@ -39,7 +39,8 @@ import {
 } from "@/lib/inboxOverflowPlace";
 import type { InboxItem } from "@/lib/inboxPurpose";
 
-const LONG_PRESS_MS = 500;
+const LONG_PRESS_MS = 400;
+const PRESS_HINT_MS = 100;
 const MOVE_CANCEL_PX = 12;
 
 const InboxRowMenuCtx = createContext<{
@@ -65,10 +66,12 @@ function isFinePointer() {
   return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }
 
-function isInteractiveTarget(target: EventTarget | null, root: HTMLElement | null) {
-  if (!(target instanceof Element) || !root) return false;
-  const hit = target.closest("a, button, input, textarea, select");
-  return Boolean(hit && root.contains(hit) && hit !== root);
+/** Row body, including the conversation link. Not Call, WhatsApp, Confirm, Done, or More. */
+function isRowBodyPress(target: EventTarget | null, root: HTMLElement | null) {
+  if (!(target instanceof Element) || !root || !root.contains(target)) return false;
+  const interactive = target.closest("a, button, input, textarea, select, label");
+  if (!interactive || interactive === root || !root.contains(interactive)) return true;
+  return interactive.hasAttribute("data-inbox-row-body");
 }
 
 type ActionId = InboxListActionId;
@@ -91,15 +94,18 @@ export function InboxRowShell({
   const rootRef = useRef<HTMLElement | null>(null);
   const pressRef = useRef<{
     timer: ReturnType<typeof setTimeout> | null;
+    hint: ReturnType<typeof setTimeout> | null;
     x: number;
     y: number;
     armed: boolean;
   }>({
     timer: null,
+    hint: null,
     x: 0,
     y: 0,
     armed: false,
   });
+  const [pressing, setPressing] = useState(false);
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<InboxOverflowAnchor>({ x: 0, y: 0, align: "point" });
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +129,11 @@ export function InboxRowShell({
       clearTimeout(pressRef.current.timer);
       pressRef.current.timer = null;
     }
+    if (pressRef.current.hint) {
+      clearTimeout(pressRef.current.hint);
+      pressRef.current.hint = null;
+    }
+    setPressing(false);
   }, []);
 
   useEffect(() => () => clearPress(), [clearPress]);
@@ -172,9 +183,11 @@ export function InboxRowShell({
           className,
           "group",
           ui?.selected.includes(item.id) ? "bg-accent/[0.06]" : "",
+          pressing ? "opacity-80" : "",
         ]
           .filter(Boolean)
           .join(" ")}
+        data-pressing={pressing ? "true" : undefined}
         rowRef={rootRef}
         onClickCapture={(event: MouseEvent) => {
           if (!pressRef.current.armed) return;
@@ -186,6 +199,7 @@ export function InboxRowShell({
           event.preventDefault();
           if (ui?.selecting) return;
           if (!isFinePointer()) {
+            if (!isRowBodyPress(event.target, rootRef.current)) return;
             ui?.enter(item.id);
             return;
           }
@@ -198,14 +212,19 @@ export function InboxRowShell({
         onPointerDown={(event: ReactPointerEvent) => {
           if (ui?.selecting) return;
           if (event.pointerType !== "touch") return;
-          if (isInteractiveTarget(event.target, rootRef.current)) return;
+          if (!isRowBodyPress(event.target, rootRef.current)) return;
           clearPress();
           pressRef.current.armed = false;
           pressRef.current.x = event.clientX;
           pressRef.current.y = event.clientY;
+          pressRef.current.hint = setTimeout(() => {
+            pressRef.current.hint = null;
+            setPressing(true);
+          }, PRESS_HINT_MS);
           pressRef.current.timer = setTimeout(() => {
             pressRef.current.timer = null;
             pressRef.current.armed = true;
+            setPressing(false);
             ui?.enter(item.id);
           }, LONG_PRESS_MS);
         }}

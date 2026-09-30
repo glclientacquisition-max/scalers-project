@@ -85,8 +85,12 @@ describe("inbox bulk select", () => {
     assert.match(select, /type="checkbox"/);
     assert.match(select, /sr-only/);
     assert.match(select, /Select \{who\}/);
-    assert.match(select, /inline-flex h-11 w-11/);
-    assert.doesNotMatch(select, /hidden md:inline-flex/);
+    assert.match(select, /sr-only md:not-sr-only/);
+    assert.match(select, /max-md:pointer-events-none/);
+    assert.match(select, /relative z-10 inline-flex h-11 w-11/);
+    assert.match(select, /data-inbox-row-body=""/);
+    assert.match(select, />\s*Cancel\s*</);
+    assert.match(select, /className=\{btnGhost\}/);
     assert.match(select, /aria-label=\{allOn \? "Clear" : "Select all"\}/);
     assert.doesNotMatch(read("dashboard/src/components/InboxToolbar.tsx"), /Select all/);
     assert.match(read("dashboard/src/components/InboxPileBoard.tsx"), /function InboxHeaderCheck/);
@@ -97,6 +101,8 @@ describe("inbox bulk select", () => {
     assert.doesNotMatch(verbs, /id: "select"/);
     assert.match(overflow, /inboxOverflowActions\(inboxItemWithLocal\(item, local\)\)/);
     assert.match(overflow, /ui\?\.enter\(item\.id\)/);
+    assert.match(overflow, /LONG_PRESS_MS = 400/);
+    assert.match(overflow, /isRowBodyPress/);
     assert.match(ui, /enter:/);
     assert.match(ui, /toggle:/);
   });
@@ -117,7 +123,10 @@ describe("inbox bulk select", () => {
     assert.match(actions, /updateLeadStatus\(item\.callId, "archived"\)/);
     assert.match(actions, /status", "confirmed"/);
     assert.match(actions, /status", "fulfilled"/);
-    assert.doesNotMatch(select, />\s*Cancel\s*</);
+    assert.match(select, />\s*Cancel\s*</);
+    const cancelAt = select.indexOf(">Cancel<");
+    const cancelClass = select.lastIndexOf("btnGhost", cancelAt);
+    assert.ok(cancelClass > -1 && cancelAt - cancelClass < 80, "Cancel uses the ghost button");
   });
 
   it("shows a header select bar with Close, count, and relevant verbs", () => {

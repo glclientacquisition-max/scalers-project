@@ -43,22 +43,21 @@ function CloseGlyph() {
   );
 }
 
+/**
+ * Select hit. From `md` up it stays in the row. Below `md` it stays in the
+ * tab order (`sr-only`) and out of the layout until selection mode, then every
+ * row reveals the same 44px slot together.
+ */
 export function InboxRowCheck({ item }: { item: InboxItem }) {
   const ui = useInboxRowUi();
   if (!ui) return null;
   const who = item.callerName?.trim() || "Caller";
   const on = ui.selected.includes(item.id);
+  const slot = ui.selecting
+    ? "relative z-10 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
+    : "sr-only md:not-sr-only md:pointer-events-auto md:relative md:z-10 md:inline-flex md:h-11 md:w-11 md:shrink-0 md:items-center md:justify-center md:rounded-lg max-md:pointer-events-none opacity-50 hover:opacity-100 focus-within:opacity-100 has-[:checked]:opacity-100";
   return (
-    <label
-      className={[
-        deskRowActionClass,
-        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg",
-        focusRingVisible,
-        ui.selecting
-          ? ""
-          : "opacity-50 hover:opacity-100 focus-within:opacity-100 has-[:checked]:opacity-100",
-      ].join(" ")}
-    >
+    <label className={[slot, focusRingVisible].join(" ")}>
       <span className="sr-only">Select {who}</span>
       <input
         type="checkbox"
@@ -67,6 +66,22 @@ export function InboxRowCheck({ item }: { item: InboxItem }) {
         className="h-6 w-6 shrink-0 accent-[#005CCC] focus:outline-none focus:ring-2 focus:ring-[#0096FF] lg:h-4 lg:w-4"
       />
     </label>
+  );
+}
+
+/** Matches InboxRowCheck width so the archived folder shifts with the list. */
+export function InboxSelectSpacer() {
+  const ui = useInboxRowUi();
+  const shown = Boolean(ui?.selecting);
+  return (
+    <span
+      aria-hidden
+      className={
+        shown
+          ? "inline-flex h-11 w-11 shrink-0"
+          : "hidden md:inline-flex h-11 w-11 shrink-0"
+      }
+    />
   );
 }
 
@@ -90,7 +105,7 @@ export function InboxRowHit({
       />
     );
   }
-  return <DeskRowHit href={href} label={label} />;
+  return <DeskRowHit href={href} label={label} rowBody />;
 }
 
 export function InboxPhoneOpen({
@@ -122,6 +137,7 @@ export function InboxPhoneOpen({
     <Link
       href={href}
       aria-label="Conversation"
+      data-inbox-row-body=""
       className="flex min-w-0 flex-1 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       {children}
@@ -217,6 +233,7 @@ export function InboxBulkBar({ items }: { items: InboxItem[] }) {
       <button type="button" className={iconHit} disabled={busy} aria-label="Close" onClick={() => clear()}>
         <CloseGlyph />
       </button>
+      <button type="button" className={btnGhost} disabled={busy} onClick={() => clear()}>Cancel</button>
       <p className="min-w-8 text-sm font-medium tabular-nums text-ink">{chosen.length}</p>
       <button
         type="button"

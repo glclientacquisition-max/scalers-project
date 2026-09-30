@@ -34,8 +34,13 @@ describe("universal row anatomy", () => {
   });
 
   it("carries state as a blue dot plus type weight, never opacity", () => {
-    assert.match(row, /rounded-full bg-accent/);
-    assert.match(row, /aria-label="Unread"/);
+    assert.match(row, /rounded-full bg-brand/);
+    assert.match(row, /data-unread-slot/);
+    assert.match(row, /h-2\.5 w-2\.5/);
+    assert.match(row, /h-2 w-2/);
+    assert.match(row, /aria-hidden/);
+    assert.doesNotMatch(row, /aria-label="Unread"/);
+    assert.match(inbox, /sr-only">Unread/);
     assert.match(row, /font-semibold text-ink/);
     assert.match(row, /font-medium text-ink/);
     assert.doesNotMatch(inbox, /opacity-\[0\.92\]/);

@@ -1,3 +1,4 @@
+import { InboxSelectSpacer } from "@/components/InboxRowSelect";
 import { DeskRowHit, deskRowMutedClass } from "@/components/ui/deskRowHit";
 import { deskPreviewClass, deskShiftClass } from "@/components/ui/deskChrome";
 import { inboxArchivedHref, type InboxReturn } from "@/lib/inboxHref";
@@ -43,6 +44,7 @@ export function InboxArchivedPhoneRow({
       ].join(" ")}
     >
       <DeskRowHit href={inboxArchivedHref(ret)} label="Archived" />
+      <InboxSelectSpacer />
       <div className={deskRowMutedClass}>
         <ArchiveMark />
       </div>
