@@ -153,6 +153,8 @@ describe("pronunciation coach chrome", () => {
     assert.doesNotMatch(src, /AI will listen/);
     assert.doesNotMatch(src, /Could not save pronunciation review/);
     assert.match(src, /Listen to the last \{geminiBatch\} recordings\./);
+    assert.match(src, /GEMINI_SCAN_DEFAULT_BATCH/);
+    assert.doesNotMatch(src, /left for review/);
     assert.doesNotMatch(src, /This is paid/);
     assert.doesNotMatch(src, /paid API/);
     assert.doesNotMatch(src, /Gemini Scan/);
@@ -164,20 +166,34 @@ describe("pronunciation coach chrome", () => {
       src.indexOf("{/* 3) Find more */}")
     );
     assert.match(needsReview, /Nothing waiting\./);
+    assert.match(needsReview, /Hear it first/);
+    assert.match(needsReview, /heardReview/);
+    assert.match(needsReview, /deskPreviewClass/);
+    assert.match(needsReview, /reviewRowSpeakable/);
+    assert.match(needsReview, /variant="ghost"/);
+    assert.match(needsReview, /Use this/);
+    assert.match(needsReview, /Dismiss/);
+    assert.doesNotMatch(needsReview, /row\.reasoning|c\.reasoning/);
     assert.doesNotMatch(needsReview, /geminiState\.error/);
     assert.doesNotMatch(needsReview, /Could not save the listen/);
+    const scanBtn = needsReview.slice(
+      needsReview.indexOf("onClick={scanCalls}"),
+      needsReview.indexOf("Scanning")
+    );
+    assert.match(scanBtn, /libraryLinkClass/);
+    assert.doesNotMatch(scanBtn, /btnPrimary/);
+    assert.doesNotMatch(scanBtn, /settingsGhostButtonClass/);
     const afterConfirm = src.slice(src.indexOf("geminiConfirmOpen ?"));
     assert.match(afterConfirm, /geminiState\.error/);
     const findStart = src.indexOf("{/* 3) Find more */}");
     const findMore = src.slice(findStart, src.indexOf("geminiConfirmOpen ?", findStart));
     assert.match(findMore, /AI listen/);
+    assert.match(findMore, /Listening…/);
+    assert.match(findMore, /Save review/);
+    assert.match(findMore, /listenNote/);
     assert.match(findMore, /btnPrimary/);
-    const scanBtn = findMore.slice(
-      findMore.lastIndexOf("onClick={scanCalls}"),
-      findMore.indexOf("Scanning")
-    );
-    assert.match(scanBtn, /settingsGhostButtonClass/);
-    assert.doesNotMatch(scanBtn, /btnPrimary/);
+    assert.doesNotMatch(findMore, /scanCalls/);
+    assert.doesNotMatch(findMore, /left for review/);
 
     const record = src.slice(
       src.indexOf("async function startRecording"),

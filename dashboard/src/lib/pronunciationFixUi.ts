@@ -5,6 +5,14 @@
 
 import type { PronunciationReviewCandidate } from "@/lib/pronunciationGeminiScan";
 
+function reviewNameKey(phrase: string): string {
+  return String(phrase || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export type FixReviewKind = "speech" | "hearing";
 
 export type FixReviewRow = {
@@ -28,7 +36,7 @@ export const PRONUNCIATION_BEST_FLOW = [
   "Practice the pack line. Record line, then Use this take.",
   "Needs review. Hear, then Use this.",
   "Add a word and record it. Typed spelling stays a fallback.",
-  "Find more with Scan or AI listen. Fixes stay on review until Use this.",
+  "Find more with AI listen. Scan stays under the review list. Fixes stay on review until Use this.",
   "Test. Play phone preview, then call the line.",
 ] as const;
 
@@ -74,6 +82,11 @@ export function buildUnifiedFixReviewRows(opts: {
     );
 
   return [...speech, ...hearing];
+}
+
+/** Hearing Hear is optional. A name or a proposed say of at least two letters can be spoken. */
+export function reviewRowSpeakable(phrase: string, say: string): boolean {
+  return reviewNameKey(phrase).length >= 2 || reviewNameKey(say).length >= 2;
 }
 
 export function fixTabHint(pendingReviewCount: number): string {

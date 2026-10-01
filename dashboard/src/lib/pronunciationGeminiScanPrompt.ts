@@ -24,8 +24,8 @@ export const GEMINI_SCAN_MAX_INLINE_AUDIO_BYTES = 12_000_000; // ~12 MB payload 
 /** Max calls per single scan run (hard product cost guard). */
 export const GEMINI_SCAN_MAX_BATCH = 50;
 
-/** Default batch when the owner does not pick a count. */
-export const GEMINI_SCAN_DEFAULT_BATCH = 20;
+/** Default batch when the owner does not pick a count. Opens on Last 10. */
+export const GEMINI_SCAN_DEFAULT_BATCH = 10;
 
 /** Allowed UI batch sizes. */
 export const GEMINI_SCAN_BATCH_OPTIONS = [10, 20, 50] as const;

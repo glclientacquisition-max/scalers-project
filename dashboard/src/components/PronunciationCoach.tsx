@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   useActionState,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -49,6 +50,7 @@ import {
 import {
   buildUnifiedFixReviewRows,
   fixTabHint,
+  reviewRowSpeakable,
 } from "@/lib/pronunciationFixUi";
 import { customTrainingLine } from "@/lib/pronunciationMine";
 import { buildPronunciationPacks } from "@/lib/pronunciationPacks";
@@ -57,7 +59,7 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import { deskShiftClass, filterTabClass, btnPrimary, pendingSpinnerClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
+import { deskShiftClass, filterTabClass, btnPrimary, deskPreviewClass, pendingSpinnerClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 import { settingsGhostButtonClass } from "@/components/settingsUi";
 
 type CallerProofRow = { name: string; say: string };
@@ -204,6 +206,12 @@ export function PronunciationCoach({
   const [geminiNote, setGeminiNote] = useState<string | null>(null);
   const [showTypedSave, setShowTypedSave] = useState(false);
   const [heardEdit, setHeardEdit] = useState<string | null>(null);
+  const [heardReview, setHeardReview] = useState<Record<string, string>>({});
+  const [listenNote, setListenNote] = useState<string | null>(null);
+  const [unsavedReview, setUnsavedReview] = useState(false);
+  const unsavedReviewRef = useRef(false);
+  unsavedReviewRef.current = unsavedReview;
+  const reviewTouchedRef = useRef(false);
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -294,11 +302,20 @@ export function PronunciationCoach({
     startTransition(() => loadQueueAction(fd));
   }, [tenantId]);
 
+  const applyPendingQueue = useCallback((queue: PronunciationReviewCandidate[]) => {
+    const pending = queue.filter((c) => c.status === "pending");
+    setReviewQueue(
+      pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION")
+    );
+    setSttHints(pending.filter((c) => c.type === "LIKELY_MISHEARD"));
+  }, []);
+
   useEffect(() => {
-    if (loadQueueState.ok) {
-      setReviewQueue(loadQueueState.queue || []);
-      setSttHints(loadQueueState.sttHints || []);
+    if (!loadQueueState.ok || unsavedReviewRef.current || reviewTouchedRef.current) {
+      return;
     }
+    setReviewQueue(loadQueueState.queue || []);
+    setSttHints(loadQueueState.sttHints || []);
   }, [loadQueueState]);
 
   useEffect(() => {
@@ -306,21 +323,34 @@ export function PronunciationCoach({
       setGeminiConfirmOpen(true);
       return;
     }
+    if (geminiState.unsaved && Array.isArray(geminiState.queue)) {
+      setGeminiConfirmOpen(false);
+      setUnsavedReview(true);
+      reviewTouchedRef.current = true;
+      if (geminiState.message) setListenNote(geminiState.message);
+      applyPendingQueue(geminiState.queue);
+      return;
+    }
+    if (geminiState.saved) {
+      setGeminiConfirmOpen(false);
+      setUnsavedReview(false);
+      reviewTouchedRef.current = true;
+      if (Array.isArray(geminiState.queue)) applyPendingQueue(geminiState.queue);
+      return;
+    }
     if (geminiState.ok) {
       setGeminiConfirmOpen(false);
-      setGeminiNote(geminiState.message || null);
+      setUnsavedReview(false);
+      setGeminiNote(null);
+      setListenNote(geminiState.message || null);
       if (Array.isArray(geminiState.queue)) {
-        const pending = geminiState.queue.filter((c) => c.status === "pending");
-        setReviewQueue(
-          pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION")
-        );
-        setSttHints(pending.filter((c) => c.type === "LIKELY_MISHEARD"));
+        reviewTouchedRef.current = true;
+        applyPendingQueue(geminiState.queue);
       }
     } else if (geminiState.error) {
       setGeminiConfirmOpen(false);
-      setGeminiNote(null);
     }
-  }, [geminiState]);
+  }, [applyPendingQueue, geminiState]);
 
   useEffect(() => {
     const state = approveState.ok
@@ -333,6 +363,7 @@ export function PronunciationCoach({
       if (dismissState.error) setGeminiNote(dismissState.error);
       return;
     }
+    if (unsavedReviewRef.current) return;
     setReviewQueue(state.queue || []);
     setSttHints(state.sttHints || []);
     if (state.message) setGeminiNote(state.message);
@@ -579,6 +610,13 @@ export function PronunciationCoach({
     if (ok) setHeardEdit(`${match}:${say}`);
   }
 
+  async function hearReviewSay(id: string, say: string) {
+    const spoken = sanitizeSayForm(say);
+    if (!spoken) return;
+    const ok = await hearSavedName(`review:${id}:${spoken}`, spoken);
+    if (ok) setHeardReview((prev) => ({ ...prev, [id]: spoken }));
+  }
+
   async function startRecording() {
     setMicError(null);
     clearCallerHear();
@@ -758,11 +796,20 @@ export function PronunciationCoach({
       setGeminiConfirmOpen(true);
       return;
     }
+    setListenNote(null);
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("current_lexicon", lexiconJson);
     fd.set("batch_size", String(geminiBatch));
     if (confirmed) fd.set("confirmed", "1");
+    geminiAction(fd);
+  }
+
+  function saveHeldReview() {
+    const fd = new FormData();
+    fd.set("id", tenantId);
+    fd.set("save_only", "1");
+    fd.set("review_queue", JSON.stringify([...reviewQueue, ...sttHints]));
     geminiAction(fd);
   }
 
@@ -1330,32 +1377,57 @@ export function PronunciationCoach({
                   const proposed = sanitizeSayForm(
                     (reviewEdits[c.id] ?? c.suggested_form).trim()
                   );
-                  const hearKey = `review:${c.id}:${proposed || row.phrase}`;
+                  const heardThis =
+                    Boolean(proposed) && heardReview[c.id] === proposed;
+                  const hearSay = proposed || row.phrase;
+                  const hearKey = `review:${c.id}:${hearSay}`;
                   const spellingOpen = spellingOpenId === row.id;
+                  const showHear =
+                    row.kind === "speech"
+                      ? Boolean(proposed)
+                      : reviewRowSpeakable(row.phrase, proposed);
                   return (
                     <li
                       key={row.id}
                       className="flex min-w-0 flex-wrap items-center gap-2 py-2"
                     >
-                      <span className="min-w-0 max-w-full truncate text-sm font-medium text-ink">
-                        {row.phrase}
-                      </span>
-                      <span className="text-xs text-ink-soft">{row.confidence}</span>
-                      <span className="text-xs text-ink-soft">{row.kindLabel}</span>
-                      <div className="ms-auto flex flex-wrap items-center gap-2">
-                        <HearButton
-                          name={row.phrase}
-                          variant="ghost"
-                          busy={hearBusyKey === hearKey}
-                          onClick={() =>
-                            void hearSavedName(hearKey, proposed || row.phrase)
-                          }
-                        />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink">
+                          {row.phrase}
+                        </p>
+                        {proposed ? (
+                          <p
+                            className={`${deskPreviewClass} font-mono text-xs text-ink-soft`}
+                          >
+                            {proposed}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="ms-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+                        {showHear ? (
+                          <HearButton
+                            name={row.phrase}
+                            variant="ghost"
+                            busy={hearBusyKey === hearKey}
+                            onClick={() => {
+                              if (row.kind === "speech") {
+                                void hearReviewSay(c.id, proposed);
+                                return;
+                              }
+                              void hearSavedName(hearKey, hearSay);
+                            }}
+                          />
+                        ) : null}
                         {row.primaryAction === "use" ? (
                           <button
                             type="button"
                             onClick={() => approveCandidate(c)}
-                            disabled={approvePending || dismissPending}
+                            disabled={
+                              approvePending ||
+                              dismissPending ||
+                              unsavedReview ||
+                              !heardThis
+                            }
                             className={`${btnPrimary} w-auto shrink-0`}
                           >
                             {approvePending ? "Saving…" : "Use this"}
@@ -1364,7 +1436,7 @@ export function PronunciationCoach({
                           <button
                             type="button"
                             onClick={() => dismissCandidate(c, "rejected")}
-                            disabled={dismissPending}
+                            disabled={dismissPending || unsavedReview}
                             className={`${libraryMutedClass} disabled:opacity-60`}
                           >
                             Dismiss
@@ -1374,7 +1446,8 @@ export function PronunciationCoach({
                           <button
                             type="button"
                             onClick={() => recordCandidateInstead(c)}
-                            className={libraryMutedClass}
+                            disabled={unsavedReview}
+                            className={`${libraryMutedClass} disabled:opacity-60`}
                           >
                             Record
                           </button>
@@ -1390,6 +1463,11 @@ export function PronunciationCoach({
                           >
                             Spelling
                           </button>
+                        ) : null}
+                        {row.primaryAction === "use" && !heardThis ? (
+                          <p className="basis-full text-xs text-ink-soft">
+                            Hear it first.
+                          </p>
                         ) : null}
                       </div>
                       {spellingOpen && row.canApproveSpelling ? (
@@ -1410,6 +1488,28 @@ export function PronunciationCoach({
                 })}
               </ul>
             )}
+            <button
+              type="button"
+              onClick={scanCalls}
+              disabled={minePending || geminiPending || unsavedReview}
+              className={`${libraryLinkClass} disabled:opacity-60`}
+            >
+              {minePending ? "Scanning…" : "Scan"}
+            </button>
+            {mineState.error ? (
+              <p className="text-xs text-warn" role="alert">
+                {mineState.error}
+              </p>
+            ) : null}
+            {mineState.ok ? (
+              <p className="text-xs text-ink-soft" role="status">
+                Scan: {mineState.scannedLines ?? 0} lines
+                {mineState.suggestions?.length
+                  ? ` · ${mineState.suggestions.length} sent to Practice`
+                  : " · nothing new"}
+                .
+              </p>
+            ) : null}
           </div>
 
           {/* 2) Add a fix */}
@@ -1512,21 +1612,29 @@ export function PronunciationCoach({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => runGeminiScan(false)}
+                onClick={() =>
+                  unsavedReview ? saveHeldReview() : runGeminiScan(false)
+                }
                 disabled={geminiPending || minePending}
                 className={`${btnPrimary} w-auto shrink-0 gap-2`}
               >
                 {geminiPending ? (
                   <span className={pendingSpinnerClass} aria-hidden="true" />
                 ) : null}
-                {geminiPending ? "Listening…" : "AI listen"}
+                {geminiPending
+                  ? unsavedReview
+                    ? "Saving…"
+                    : "Listening…"
+                  : unsavedReview
+                    ? "Save review"
+                    : "AI listen"}
               </button>
               <select
                 id="gemini-batch"
                 aria-label="Calls for AI listen"
                 value={geminiBatch}
                 onChange={(e) => setGeminiBatch(Number(e.target.value))}
-                disabled={geminiPending}
+                disabled={geminiPending || unsavedReview}
                 className="min-h-11 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
               >
                 {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
@@ -1535,14 +1643,11 @@ export function PronunciationCoach({
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                onClick={scanCalls}
-                disabled={minePending || geminiPending}
-                className={`${settingsGhostButtonClass} disabled:opacity-60`}
-              >
-                {minePending ? "Scanning…" : "Scan"}
-              </button>
+              {listenNote ? (
+                <p className="text-sm text-ink-soft" role="status">
+                  {listenNote}
+                </p>
+              ) : null}
             </div>
 
             {geminiConfirmOpen ? (
@@ -1578,20 +1683,8 @@ export function PronunciationCoach({
             ) : null}
 
             {geminiState.error ? (
-              <p className="text-xs text-[var(--warn)]" role="alert">
+              <p className="text-xs text-warn" role="alert">
                 {geminiState.error}
-              </p>
-            ) : null}
-            {mineState.error ? (
-              <p className="text-xs text-[var(--warn)]">{mineState.error}</p>
-            ) : null}
-            {mineState.ok ? (
-              <p className="text-xs text-[var(--ink-soft)]" role="status">
-                Scan: {mineState.scannedLines ?? 0} lines
-                {mineState.suggestions?.length
-                  ? ` · ${mineState.suggestions.length} sent to Practice`
-                  : " · nothing new"}
-                .
               </p>
             ) : null}
           </div>
