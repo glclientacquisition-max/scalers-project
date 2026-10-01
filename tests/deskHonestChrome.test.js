@@ -93,13 +93,18 @@ describe("honest chrome P0", () => {
     assert.doesNotMatch(shell, /<KnowledgeIngestPanel[\s\S]{0,80}<CatalogImportPanel/);
   });
 
-  it("labels the three notify toggles SMS, WhatsApp, and Email", () => {
-    assert.match(form, /label: "SMS"/);
-    assert.match(form, /label: "WhatsApp"/);
-    assert.match(form, /label: "Email"/);
-    assert.match(form, /<span>SMS<\/span>/);
-    assert.match(form, /<span>WhatsApp<\/span>/);
-    assert.match(form, /<span>Email<\/span>/);
+  it("labels the three notify toggles Escalate, Inbox, and Ops", () => {
+    assert.match(form, /key: "receives_escalation", label: "Escalate"/);
+    assert.match(form, /key: "receives_inbox", label: "Inbox"/);
+    assert.match(form, /key: "receives_ops", label: "Ops"/);
+    assert.match(form, /SMS, WhatsApp, and email follow Alerts\./);
+    assert.match(form, /hint=\{TEAM_NOTIFY_CHANNEL_NOTE\}/);
+    assert.doesNotMatch(form, /label: "SMS"/);
+    assert.doesNotMatch(form, /label: "WhatsApp"/);
+    assert.doesNotMatch(form, /label: "Email"/);
+    assert.doesNotMatch(form, /<span>SMS<\/span>/);
+    assert.doesNotMatch(form, /<span>WhatsApp<\/span>/);
+    assert.doesNotMatch(form, /Invite teammate|tenant_members/);
   });
 
   it("replaces raw assist and notify dumps with owner lines", () => {

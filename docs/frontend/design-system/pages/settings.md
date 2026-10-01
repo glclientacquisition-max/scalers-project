@@ -189,6 +189,7 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 | Handoff | segmented (2) | `handoff_mode` | Assistant on calls |
 | Name / Handles / Phone / Email | table + inputs | `team_directory` | Whole business + assistant on calls |
 | Escalate / Inbox / Ops | switch | teammate notify flags | Whole business |
+| Channels note | text | none | SMS, WhatsApp, and email follow Alerts. Not a channel pick |
 | Add person | ghost | appends a row | Whole business after Save |
 | Remove person | icon ghost | drops a row | Whole business after Save |
 | Save and train | filled sticky | compile | Assistant on calls |

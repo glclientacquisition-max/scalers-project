@@ -185,14 +185,15 @@ const emptyMember = (): TeamDirectoryEntry => ({
   ...EMPTY_TEAM_NOTIFY_FLAGS,
 });
 
-/** Channel names on the three saved notify flags. Keys stay escalation, inbox, ops. */
+/** Permission kinds on the three saved notify flags. Channels stay on Alerts. */
+const TEAM_NOTIFY_CHANNEL_NOTE = "SMS, WhatsApp, and email follow Alerts.";
 const TEAM_NOTIFY_FLAGS: Array<{
   key: "receives_escalation" | "receives_inbox" | "receives_ops";
   label: string;
 }> = [
-  { key: "receives_escalation", label: "SMS" },
-  { key: "receives_inbox", label: "WhatsApp" },
-  { key: "receives_ops", label: "Email" },
+  { key: "receives_escalation", label: "Escalate" },
+  { key: "receives_inbox", label: "Inbox" },
+  { key: "receives_ops", label: "Ops" },
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
@@ -2010,15 +2011,20 @@ export function TenantForm({
           )}
         </div>
 
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <p className={settingsBlockTitleClass}>People</p>
-          <button
-            type="button"
-            onClick={() => setTeam((prev) => [...prev, emptyMember()])}
-            className={settingsGhostButtonClass}
-          >
-            Add person
-          </button>
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <p className={settingsBlockTitleClass}>People</p>
+            <button
+              type="button"
+              onClick={() => setTeam((prev) => [...prev, emptyMember()])}
+              className={settingsGhostButtonClass}
+            >
+              Add person
+            </button>
+          </div>
+          <p id="team-notify-channels" className="px-1 text-xs text-ink-soft">
+            {TEAM_NOTIFY_CHANNEL_NOTE}
+          </p>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-line">
@@ -2027,10 +2033,12 @@ export function TenantForm({
             <span>Handles</span>
             <span>Phone</span>
             <span>Email</span>
-            <span className="grid w-[13rem] grid-cols-3 gap-1 text-center text-[11px] font-medium normal-case leading-tight tracking-normal">
-              <span>SMS</span>
-              <span>WhatsApp</span>
-              <span>Email</span>
+            <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-caption font-medium normal-case tracking-normal">
+              {TEAM_NOTIFY_FLAGS.map((flag) => (
+                <span key={flag.key} title={TEAM_NOTIFY_CHANNEL_NOTE}>
+                  {flag.label}
+                </span>
+              ))}
             </span>
             <span className="sr-only">Remove</span>
           </div>
@@ -2088,15 +2096,23 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
                 />
               </div>
-              <div className="grid w-[13rem] grid-cols-3 gap-1" role="group" aria-label={`Notify for ${member.name || `teammate ${index + 1}`}`}>
+              <div
+                className="grid w-[15rem] grid-cols-3 gap-1"
+                role="group"
+                aria-label={`Notify for ${member.name || `teammate ${index + 1}`}`}
+                aria-describedby="team-notify-channels"
+              >
                 {TEAM_NOTIFY_FLAGS.map((flag) => {
                   const selected = member[flag.key] === true;
                   return (
                     <div key={flag.key} className="flex min-h-11 flex-col items-center justify-center">
-                      <span className="text-xs font-medium text-ink-soft lg:sr-only">{flag.label}</span>
+                      <span className="text-xs font-medium text-ink-soft lg:sr-only" title={TEAM_NOTIFY_CHANNEL_NOTE}>
+                        {flag.label}
+                      </span>
                       <ToolSwitch
                         checked={selected}
                         label={`${flag.label} for ${member.name || `teammate ${index + 1}`}`}
+                        hint={TEAM_NOTIFY_CHANNEL_NOTE}
                         onChange={(next) => updateTeam(index, flag.key, next)}
                       />
                     </div>
