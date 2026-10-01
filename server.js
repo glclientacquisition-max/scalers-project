@@ -204,9 +204,7 @@ const {
   polishSpokenReply,
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
-const { prepareStreamedSpeech } = require('./src/conversation/callCorrectives');
 const { resolveLocalReply } = require('./src/conversation/turnPolicy');
-const { guardSpokenReply } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -2601,15 +2599,13 @@ mediaWss.on('connection', (ws, req) => {
         // Streamed chunks are spoken before tools run, so a saved claim or a
         // number the caller never said must not reach TTS. Confirmation of a
         // save comes from formatToolConfirmation after the tool result.
-        const text = guardSpokenReply(prepareStreamedSpeech(String(chunk || '')), {
+        const text = polishSpokenReply(String(chunk || ''), {
           callerTurns: brainState.conversation?.answersReceived || [],
           profile: brainProfile,
           toolResults: [],
           capabilities,
-          extra: JSON.stringify(brainState.entities || {}),
           state: brainState,
           language: callLanguage,
-          allowEmpty: true,
         });
         if (!text || !tts) return;
         firstSpokenChunk = true;

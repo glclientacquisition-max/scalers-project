@@ -10,6 +10,11 @@ const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech } = require('./callCorrectives');
 const { guardSpokenReply } = require('./speechGuard');
+const {
+  fileReadLine,
+  looksLikeOfferAsk,
+  sanitizeSpokenFileClaim,
+} = require('./fileRead');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
@@ -323,6 +328,10 @@ function looksLikeSpokenServiceDump(text) {
 
 function trimSpokenServiceDump(text, opts = {}) {
   const raw = String(text || '').trim();
+  const callerText = String(
+    opts.callerText || (opts.callerTurns || []).slice(-1)[0] || ''
+  );
+  if (looksLikeOfferAsk(callerText)) return raw;
   if (!looksLikeSpokenServiceDump(raw)) return raw;
   const lang = confirmationLanguage(opts.language);
   if (lang === 'sw' || lang === 'sheng') {
@@ -383,10 +392,18 @@ function polishSpokenReply(text, opts = {}) {
       allowEmpty: true,
     });
   }
-  return trimSpokenServiceDump(
-    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
-    opts
+  const callerText = String(
+    (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
   );
+  spoken = trimSpokenServiceDump(
+    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
+    { ...opts, callerText }
+  );
+  return sanitizeSpokenFileClaim(spoken, {
+    callerText,
+    state: opts.state,
+    language: opts.language,
+  });
 }
 
 /**
@@ -565,6 +582,14 @@ function planEmptyGeminiSpeech({
   llmDown = false,
   alreadyOffered = false,
 } = {}) {
+  const savedForThem = fileReadLine({
+    text: userText,
+    state: brainState,
+    language,
+  });
+  if (!llmDown && savedForThem) {
+    return { speak: true, kind: 'file_read', line: savedForThem };
+  }
   if (llmDown) {
     if (callerNameAlreadyKnown({ brainState, userText })) {
       return {

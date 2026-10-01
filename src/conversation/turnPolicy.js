@@ -23,6 +23,7 @@ const {
   pickCorrectiveReply,
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
+const { fileReadLine } = require('./fileRead');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -81,6 +82,9 @@ function resolveLocalReply({
       }),
     };
   }
+
+  const savedLine = fileReadLine({ text: clean, state, language });
+  if (savedLine) return { outcome: 'file_read', line: savedLine };
 
   const coverageLine = coverageAskSpeech(clean, profile, language);
   if (coverageLine) return { outcome: 'coverage', line: coverageLine };

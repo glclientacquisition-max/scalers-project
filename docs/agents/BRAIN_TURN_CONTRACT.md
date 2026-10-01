@@ -11,7 +11,11 @@ visit-time ladder, and tool results. A shared line does not order "ask who is
 speaking" on a greeting or a bookings question. The fact card says not to use
 the file name until they say who they are. An empty successful Gemini turn
 says "Sorry, say that again?" once. The downtime name-capture stays the
-credits-down path.
+credits-down path. A file read ("which bookings", "previous booking",
+"read them", "what do I have on hold") is not a new booking. If this
+speaker has nothing saved, Voice says so and does not invent a visit,
+an order, or a service list. Home services and retail use the same gate.
+A bound file with a real visit or hold is still read by the model.
 
 Runtime: `server.js` media loop. Offline twin: `tests/helpers/brainSimulator.js`.
 Proof: `tests/brainSimulation.test.js` (in `npm run test:brain`).

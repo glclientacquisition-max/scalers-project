@@ -9,6 +9,7 @@ const {
 } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
+const { looksLikeFileRead } = require('./fileRead');
 const {
   ackIsConsent,
   looksLikeLeaveIt,
@@ -188,6 +189,8 @@ function inferIntent(text, opts = {}) {
     return 'human';
   }
   if (looksLikeCancelOrReschedule(value)) return 'cancellation';
+  // "Previous booking" / "which ones do I have" is a file read, not a new visit.
+  if (looksLikeFileRead(value)) return 'general_enquiry';
   if (opts.returning?.nextVisit && looksLikeExistingVisitTalk(value)) {
     return 'general_enquiry';
   }

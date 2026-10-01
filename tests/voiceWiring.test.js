@@ -103,8 +103,8 @@ assert.match(
 
 assert.match(
   source,
-  /guardSpokenReply\(prepareStreamedSpeech\(String\(chunk \|\| ''\)\)/,
-  'streamed chunks must pass the speech guard before TTS'
+  /polishSpokenReply\(String\(chunk \|\| ''\)/,
+  'streamed chunks must pass polish (speech guard, menu strip) before TTS'
 );
 
 assert.match(

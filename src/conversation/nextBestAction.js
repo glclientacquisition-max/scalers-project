@@ -8,6 +8,7 @@ const {
   looksLikePastBookingTalk,
 } = require('./visitTalk');
 const { looksLikePaceOnlyTurn } = require('./dynamicSpeech');
+const { looksLikeFileRead, hasReadableFile } = require('./fileRead');
 const {
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
@@ -35,6 +36,14 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       state?.goal?.description ||
       ''
   );
+  if (looksLikeFileRead(latestUtterance) && !hasReadableFile(state)) {
+    return {
+      action: ACTIONS.ANSWER,
+      reason:
+        'Nothing saved for this speaker. Do not use the file name. Say you do not have a booking, order, or hold. Do not list services. Do not invent one. Do not ask for a new slot.',
+    };
+  }
+
   const asksAboutFile =
     looksLikePastBookingTalk(latestUtterance) ||
     looksLikeExistingVisitTalk(latestUtterance);

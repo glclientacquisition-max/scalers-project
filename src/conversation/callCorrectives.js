@@ -283,6 +283,7 @@ function spaceSpokenWords(text) {
   t = t.replace(/\bUkipatakitu\b/g, 'Ukipata kitu');
   t = t.replace(/\bNatakapembamba\b/g, 'Nataka pembamba');
   t = t.replace(/\b(I|We|They)(can|am|have|will)\b/g, '$1 $2');
+  t = t.replace(/\b(Are|Do)(you)\b/gi, '$1 $2');
   t = t.replace(/\b(can)(have)\b/gi, '$1 $2');
   t = t.replace(/\b(understand)(it)\b/gi, '$1 $2');
   t = t.replace(/\b(How|What|When|Where|Which|Got|All)([a-z]{2,})\b/g, (full, head, rest) => {
