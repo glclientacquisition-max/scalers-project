@@ -1989,7 +1989,7 @@ export function TenantForm({
             <span>Handles</span>
             <span>Phone</span>
             <span>Email</span>
-            <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-[11px] font-medium normal-case leading-tight tracking-normal">
+            <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-caption font-medium normal-case tracking-normal">
               {TEAM_NOTIFY_FLAGS.map((flag) => (
                 <span key={flag.key} title={TEAM_NOTIFY_CHANNEL_NOTE}>
                   {flag.label}
