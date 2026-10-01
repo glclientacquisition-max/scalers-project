@@ -138,7 +138,12 @@ function looksLikeEcho(callerText, agentText) {
   }
   const ratio = overlap / aw.size;
   // Short echoes like hearing "how can I help" back as "can I help".
-  return ratio >= 0.7 && overlap >= 2;
+  if (ratio >= 0.7 && overlap >= 2) return true;
+  // Acoustic near-miss while she is still talking: "who is this" over
+  // "who is speaking". One extra token must not cancel the sentence.
+  // Named interrupts are classified before echo and still cut.
+  const unmatched = aw.size - overlap;
+  return aw.size >= 2 && aw.size <= 6 && overlap >= 2 && unmatched <= 1 && ratio >= 0.5;
 }
 
 /**

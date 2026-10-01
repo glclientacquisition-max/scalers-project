@@ -114,7 +114,11 @@ If N1 fails, still run N2 and N3 on the same SHA. The set is the measurement.
 
 Detail: [`LIVE_CALL_FINDINGS.md`](./LIVE_CALL_FINDINGS.md).
 
-**V5 matcher is in code.** `looksLikeBareCloser` rejects bare `Okay` / `ok` / `fine` / `great` and punctuated variants. Those turns are not how-are-you and do not get a thinking-ack or a who-is-calling local line. Named how-are-you (`How are you doing, Shy?`) still does. Wellbeing answers still need `I'm` / `I am`. Do not crank speed or gain. Speech-guarantee on ANSWER is a later Voice ticket.
+**V5 matcher is in code.** `looksLikeBareCloser` rejects bare `Okay` / `ok` / `fine` / `great` and punctuated variants. Those turns are not how-are-you and do not get a thinking-ack or a who-is-calling local line. Named how-are-you (`How are you doing, Shy?`) still does. Wellbeing answers still need `I'm` / `I am`. Do not crank speed or gain.
+
+**Empty ANSWER stays quiet.** When Gemini succeeds with 0 spoken chars on `action=ANSWER`, Voice does not speak and keeps listening. It does not speak a lone `Okay.` (that flush is its own Soniox utterance) and it does not speak `I can't finish that just now. May I have your name so I can reach them?`. That downtime name-capture is only for a real reasoning outage (credits / denied). The first outage speaks it once. The next outage speaks the "still can't finish" line. If the name is already known, the outage confirms the save instead of asking again. Evidence for the miss: `HD_d0f042f5d960`, `HD_b4cb560bae33`. This paragraph is the code contract, not a new freeze score.
+
+**False barge keeps the sentence.** Echo and backchannel (`who is this` over `who is speaking`, `mm-hmm`, `okay`) do not cancel in-flight TTS. A real barge (`wait`, or a new request) cancels TTS and sends `killAudio`. PCM is forwarded only when the frame's Soniox stream id is the active utterance, so a cancelled tail cannot play under the next line. The next reply opens a new stream of whole sentences. A mid-phrase tail of the cancelled line is dropped. `VOICE_STREAM_EARLY_*` stays 0. V1 (one sentence, one flush) stays the pass bar.
 
 ## After the three calls
 

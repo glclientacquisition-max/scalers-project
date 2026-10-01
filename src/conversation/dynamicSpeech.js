@@ -538,6 +538,7 @@ function shouldSpeakHandoffNameAsk({
 /**
  * Spoken line when Gemini emitted 0 chars on a successful turn.
  * Do not use the Gemini-down reach-them name-ask. Ask the next slot.
+ * ANSWER / END stay quiet: a lone "Okay." is its own Soniox utterance.
  */
 function pickSpeechGuaranteeLine({
   nextBestAction = {},
@@ -545,7 +546,9 @@ function pickSpeechGuaranteeLine({
   language,
   userText = '',
 } = {}) {
-  // Closers must not reopen a name ask. ANSWER-with-zero-chars stays a later ticket.
+  const action = String(nextBestAction?.action || '').toUpperCase();
+  if (!action || action === 'ANSWER' || action === 'END') return '';
+  // Closers must not reopen a name ask.
   if (looksLikeBareCloser(userText)) {
     return pickClarifyProgress({ language, slot: '' });
   }

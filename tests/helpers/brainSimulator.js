@@ -326,7 +326,7 @@ function createSimulator({
       );
       agentLine = [spoken, actionConfirmation].filter(Boolean).join(' ').trim();
       if (!agentLine) {
-        // server.js turn speech guarantee: never leave the caller in silence.
+        // Empty successful ANSWER stays quiet. Clarification still asks the next slot.
         agentLine = pickSpeechGuaranteeLine({
           nextBestAction: decision,
           brainState: state,
