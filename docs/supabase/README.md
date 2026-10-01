@@ -118,7 +118,7 @@ Use this order on a new environment or when catching up an older project. Skip f
 
 | # | File | Depends on | Notes |
 | --- | --- | --- | --- |
-| 24 | [`realtime_inbox.sql`](./realtime_inbox.sql) | `contacts_and_requests.sql`, `appointments.sql` | Adds `calls` / `service_requests` / `appointments` to the `supabase_realtime` publication (Live Inbox). Idempotent; no schema, grant, or policy change. |
+| 24 | [`realtime_inbox.sql`](./realtime_inbox.sql) | `contacts_and_requests.sql`, `appointments.sql`, `one_wallet_billing.sql` | Adds `calls` / `service_requests` / `appointments` / `tenants` / `wallet_ledger` / `transcripts` to the `supabase_realtime` publication (Live Inbox and the open ticket). Idempotent; no schema, grant, or policy change. Apply by hand. Deploy does not run it. |
 | 24b | [`realtime_inbox_replica_identity.sql`](./realtime_inbox_replica_identity.sql) | `realtime_inbox.sql` | `REPLICA IDENTITY FULL` on those three tables so `tenant_id` filters match hangup UPDATEs. Idempotent; no publication, grant, or policy change. |
 | 24c | [`notify_send_ledger.sql`](./notify_send_ledger.sql) | `contacts_and_requests.sql` (tenants, calls, `current_user_tenant_ids`) | Append-only `notify_sends`. Staff + caller SMS = tenant. Wallet/outage = platform. Meter only, no charge. |
 | 24d | [`sms_allowance.sql`](./sms_allowance.sql) | `notify_send_ledger.sql`, `line_rental_grace.sql` | Included SMS (default 200). Same `on_demand_usage_enabled` as minutes. Beta never blocks. |

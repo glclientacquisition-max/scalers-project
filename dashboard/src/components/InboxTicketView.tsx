@@ -30,6 +30,7 @@ import {
 } from "@/lib/ticketSplit";
 import { ownerAssistLabel, ownerDeskLine, plainOwnerCopy } from "@/lib/deskTicketChat";
 import { THREAD_PIN_PX, threadScrollAnchor, type ThreadAnchor } from "@/lib/endlessList";
+import { transcriptRefreshTop } from "@/lib/deskFresh";
 import { updateLeadStatus } from "@/app/(desk)/calls/actions";
 import type { InboxPingPerson } from "@/components/InboxPingTeammate";
 import { writeInboxArchiveUndo } from "@/lib/inboxArchiveUndo";
@@ -363,6 +364,16 @@ export function InboxTicketView({
   const paneRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const splitRef = useRef<HTMLDivElement>(null);
+  const threadPlaceRef = useRef<{ anchor: ThreadAnchor; scrollTop: number }>({
+    anchor: "latest",
+    scrollTop: 0,
+  });
+  const threadFreezeRef = useRef(false);
+  const seenTurnsRef = useRef(turns.length);
+  if (seenTurnsRef.current !== turns.length) {
+    seenTurnsRef.current = turns.length;
+    threadFreezeRef.current = true;
+  }
   const [away, setAway] = useState(false);
   const [summaryW, setSummaryW] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -470,7 +481,7 @@ export function InboxTicketView({
     el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let writing = false;
 
     function scrollerEl() {
@@ -488,20 +499,32 @@ export function InboxTicketView({
     function readStick(el: HTMLElement): ThreadAnchor {
       const marked = el.getAttribute("data-thread-stick");
       if (marked === "latest" || marked === "older" || marked === "start") return marked;
-      return "latest";
+      return threadPlaceRef.current.anchor;
     }
 
     function applyStick(el: HTMLElement, stick: ThreadAnchor) {
       writing = true;
       el.setAttribute("data-thread-stick", stick);
-      if (stick === "start") el.scrollTop = 0;
-      else if (stick === "latest") el.scrollTop = el.scrollHeight;
+      const saved =
+        threadPlaceRef.current.anchor === stick ? threadPlaceRef.current.scrollTop : el.scrollTop;
+      const next = transcriptRefreshTop({
+        anchor: stick,
+        scrollTop: saved,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+      });
+      if (el.scrollTop !== next) el.scrollTop = next;
+      threadPlaceRef.current = { anchor: stick, scrollTop: next };
+      threadFreezeRef.current = false;
       writing = false;
     }
 
     function bind() {
       const scroller = scrollerEl();
-      if (!scroller) return () => {};
+      if (!scroller) {
+        threadFreezeRef.current = false;
+        return () => {};
+      }
       const el: HTMLElement = scroller;
       applyStick(el, readStick(el));
       requestAnimationFrame(() => {
@@ -509,13 +532,14 @@ export function InboxTicketView({
         applyStick(el, "latest");
       });
       function onScroll() {
-        if (!writing) {
+        if (!writing && !threadFreezeRef.current) {
           const anchor = threadScrollAnchor({
             scrollTop: el.scrollTop,
             scrollHeight: el.scrollHeight,
             clientHeight: el.clientHeight,
           });
           el.setAttribute("data-thread-stick", anchor);
+          threadPlaceRef.current = { anchor, scrollTop: el.scrollTop };
         }
         measure();
       }
