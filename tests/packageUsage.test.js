@@ -99,7 +99,62 @@ describe("package usage meter", () => {
     assert.match(panel, /assignmentFromBusiness/);
     assert.match(panel, /action: "save_package"/);
     assert.match(panel, /action: "assign"/);
+    assert.match(panel, /usedOfIncluded\(minutesUsedFromSeconds/);
+    assert.match(panel, /row\.gap/);
+    assert.match(panel, /Matches package/);
     assert.doesNotMatch(panel, /Most popular/);
+  });
+
+  it("names when included amounts do not match the assigned package", async () => {
+    const { packageUsageGap, shouldApplyLineRental, usedOfIncluded } = await import(
+      "../dashboard/src/lib/packageUsageAlign.ts"
+    );
+    const starter = { minutes: 300, sms: 200, email: 100, staffWa: 200, seats: 2 };
+    const matched = {
+      minutesIncluded: 300,
+      secondsUsed: 0,
+      smsIncluded: 200,
+      smsUsed: 0,
+      emailIncluded: 100,
+      emailUsed: 0,
+      waIncluded: 200,
+      waUsed: 0,
+      seatsIncluded: 2,
+      seatsUsed: 1,
+    };
+    assert.equal(packageUsageGap({ packageName: "Starter", catalog: starter, usage: matched }), null);
+    assert.equal(
+      packageUsageGap({
+        packageName: null,
+        catalog: null,
+        usage: { ...matched, minutesIncluded: 0, secondsUsed: 107, smsUsed: 47, seatsIncluded: 5 },
+      }),
+      "No package"
+    );
+    assert.equal(
+      packageUsageGap({
+        packageName: "Starter",
+        catalog: starter,
+        usage: { ...matched, minutesIncluded: 0, seatsIncluded: 5 },
+      }),
+      "Minutes included 0, Starter is 300. Seats included 5, Starter is 2"
+    );
+    assert.equal(
+      packageUsageGap({ packageName: "Starter", catalog: null, usage: matched }),
+      "Package is not in the catalog"
+    );
+    assert.equal(usedOfIncluded(47, 200), "47 of 200");
+    assert.equal(shouldApplyLineRental("off", false), false);
+    assert.equal(shouldApplyLineRental("soft", true), false);
+    assert.equal(shouldApplyLineRental("hard", false), true);
+
+    const wallets = read("dashboard/src/components/AdminWalletsPanel.tsx");
+    const wallet = read("dashboard/src/lib/wallet.ts");
+    assert.match(wallets, /Beta: meter the package\. The wallet is not charged\./);
+    assert.match(wallets, /on-demand past included/);
+    assert.doesNotMatch(wallets, /line fees/);
+    assert.match(wallet, /shouldApplyLineRental/);
+    assert.match(wallet, /tenantHasAssignedPackage/);
   });
 
   it("opts into on-demand after included buckets hit zero", () => {

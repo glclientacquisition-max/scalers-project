@@ -9,12 +9,14 @@ import {
   annualPriceKes,
   inboundKesPerMinute,
   kesPerSecondFromMinute,
+  minutesUsedFromSeconds,
   outboundKesPerMinute,
   type BillingPackage,
   type BillingRateCard,
   type TenantSubscriptionRow,
 } from "@/lib/packageCatalog";
 import { assignmentFromBusiness, packagePriceLabel } from "@/lib/packagePriceLabel";
+import { usedOfIncluded } from "@/lib/packageUsageAlign";
 
 function fieldClass() {
   return deskFieldClass;
@@ -335,12 +337,16 @@ export function AdminPackagesPanel({
           <Empty title="No businesses." />
         ) : (
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
+            <table className="w-full min-w-[880px] text-left text-sm">
               <thead className="text-ink-2">
                 <tr className="border-b border-line/70">
                   <th className={adminThClass}>Business</th>
                   <th className={adminThClass}>Package</th>
-                  <th className={adminThClass}>Period</th>
+                  <th className={adminThClass}>Minutes</th>
+                  <th className={adminThClass}>SMS</th>
+                  <th className={adminThClass}>Email</th>
+                  <th className={adminThClass}>WhatsApp</th>
+                  <th className={adminThClass}>Seats</th>
                 </tr>
               </thead>
               <tbody>
@@ -348,13 +354,31 @@ export function AdminPackagesPanel({
                   <tr key={row.tenantId} className="border-t border-line/70">
                     <td className={adminTdClass}>
                       <p className={`font-medium text-ink ${deskPreviewClass}`}>{row.businessName}</p>
-                      <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>
-                        {row.packageName || "None"}
-                        {row.period ? ` · ${row.period}` : ""}
-                      </p>
+                      {row.gap ? (
+                        <p className="mt-0.5 text-meta text-attention">{row.gap}</p>
+                      ) : (
+                        <p className="mt-0.5 text-meta text-ink-2">Matches package</p>
+                      )}
                     </td>
-                    <td className={`${adminTdClass} text-ink-2`}>{row.packageName || "None"}</td>
-                    <td className={`${adminTdClass} text-ink-2`}>{row.period || "None"}</td>
+                    <td className={`${adminTdClass} text-ink-2`}>
+                      {row.packageName || "None"}
+                      {row.period ? ` / ${row.period}` : ""}
+                    </td>
+                    <td className={`${adminTdClass} tabular-nums text-ink`}>
+                      {usedOfIncluded(minutesUsedFromSeconds(row.usage.secondsUsed), row.usage.minutesIncluded)}
+                    </td>
+                    <td className={`${adminTdClass} tabular-nums text-ink`}>
+                      {usedOfIncluded(row.usage.smsUsed, row.usage.smsIncluded)}
+                    </td>
+                    <td className={`${adminTdClass} tabular-nums text-ink`}>
+                      {usedOfIncluded(row.usage.emailUsed, row.usage.emailIncluded)}
+                    </td>
+                    <td className={`${adminTdClass} tabular-nums text-ink`}>
+                      {usedOfIncluded(row.usage.waUsed, row.usage.waIncluded)}
+                    </td>
+                    <td className={`${adminTdClass} tabular-nums text-ink`}>
+                      {usedOfIncluded(row.usage.seatsUsed, row.usage.seatsIncluded)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

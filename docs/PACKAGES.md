@@ -36,3 +36,5 @@ Seats are login accounts (`tenant_members`), not People directory rows (`team_di
 - Prepaid column drop
 
 SQL: [`docs/supabase/package_entitlements.sql`](./supabase/package_entitlements.sql), [`package_catalog.sql`](./supabase/package_catalog.sql). SMS enforcement: [`sms_allowance.sql`](./supabase/sms_allowance.sql). Super Admin: `/admin/packages` after the existing username + access code.
+
+The businesses table shows used and included for minutes, SMS, email, WhatsApp, and seats. A row matches when the included amounts equal the assigned package. Used past included is consumption, not a catalog mismatch. A business with a package does not also pay the old monthly line fee. The number is inside the package price.

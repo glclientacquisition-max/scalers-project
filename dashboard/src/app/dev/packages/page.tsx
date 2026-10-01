@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AdminPhonePull } from "@/components/PhonePullSurface";
 import { AdminPackagesPanel } from "@/components/AdminPackagesPanel";
 import type { BillingPackage, BillingRateCard, TenantSubscriptionRow } from "@/lib/packageCatalog";
+import { emptyPackageUsage } from "@/lib/packageUsageAlign";
 
 /**
  * Super Admin packages fixture. DASHBOARD_OPEN=true only.
@@ -69,13 +70,33 @@ const BUSINESSES: TenantSubscriptionRow[] = [
     packageId: "pkg-starter",
     packageName: "Starter",
     period: "month",
+    usage: {
+      ...emptyPackageUsage(),
+      minutesIncluded: 300,
+      smsIncluded: 200,
+      emailIncluded: 100,
+      waIncluded: 200,
+      seatsIncluded: 2,
+      seatsUsed: 1,
+    },
+    gap: null,
   },
   {
     tenantId: "ten-sample-b",
     businessName: "Sample Stationery",
-    packageId: "pkg-growth",
-    packageName: "Growth",
-    period: "year",
+    packageId: null,
+    packageName: null,
+    period: null,
+    usage: {
+      ...emptyPackageUsage(),
+      secondsUsed: 107,
+      smsIncluded: 200,
+      smsUsed: 47,
+      emailIncluded: 100,
+      seatsIncluded: 5,
+      seatsUsed: 1,
+    },
+    gap: "No package",
   },
 ];
 

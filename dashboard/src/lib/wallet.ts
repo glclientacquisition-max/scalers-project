@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { shouldApplyLineRental } from "@/lib/packageUsageAlign";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 /** Retail rate card (KES). AI usage is bundled into the per-minute rate. */
@@ -189,6 +190,17 @@ export function runwayDaysAtPace(opts: {
   return Math.max(0, Math.round(opts.balanceKes / kesPerDay));
 }
 
+async function tenantHasAssignedPackage(tenantId: string): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+  const res = await admin
+    .from("tenant_subscriptions")
+    .select("package_id")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (res.error) return false;
+  return Boolean(res.data?.package_id);
+}
+
 /** Light runway read for surfaces that only need the pace caption (Home). One calls query. */
 export async function getWalletRunwayDays(
   client: SupabaseClient,
@@ -264,11 +276,14 @@ export async function getTenantUsageSummary(
   const billingEnforcement = wallets.billingEnforcement || "off";
   const isBeta = isBetaBilling(billingEnforcement);
 
-  // Only charge line fee for prepaid workspaces.
+  // A package price includes the number. The old line fee applies only to prepaid businesses with no package.
   if (billingEnforcement !== "off") {
     try {
-      const applied = await ensureLineRentalApplied(tenantId);
-      if (applied != null) walletBalanceKes = applied;
+      const hasPackage = await tenantHasAssignedPackage(tenantId);
+      if (shouldApplyLineRental(billingEnforcement, hasPackage)) {
+        const applied = await ensureLineRentalApplied(tenantId);
+        if (applied != null) walletBalanceKes = applied;
+      }
     } catch {
       // Non-fatal: usage still loads.
     }
