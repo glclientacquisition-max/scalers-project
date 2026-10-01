@@ -33,6 +33,29 @@ export function writeDeskTheme(choice: DeskTheme): void {
   }
 }
 
+/** Inline CSSOM value: `only` blocks UA scheme overrides for explicit picks. */
+export function deskColorSchemeValue(choice: Exclude<DeskTheme, "system">): string {
+  return choice === "dark" ? "dark only" : "light only";
+}
+
+function syncColorSchemeMeta(choice: DeskTheme): void {
+  if (typeof document === "undefined") return;
+  const head = document.head;
+  if (!head) return;
+  let meta = head.querySelector('meta[name="color-scheme"]');
+  if (choice === "system") {
+    meta?.remove();
+    return;
+  }
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "color-scheme");
+    head.appendChild(meta);
+  }
+  // Meta content is light|dark (no `only`; that keyword is CSS-only).
+  meta.setAttribute("content", choice);
+}
+
 export function applyDeskTheme(choice: DeskTheme): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
@@ -40,8 +63,12 @@ export function applyDeskTheme(choice: DeskTheme): void {
     delete root.dataset.theme;
     // Empty inline so prefers-color-scheme wins for native option lists.
     root.style.colorScheme = "";
+    if (document.body) document.body.style.colorScheme = "";
   } else {
     root.dataset.theme = choice;
-    root.style.colorScheme = choice;
+    const scheme = deskColorSchemeValue(choice);
+    root.style.colorScheme = scheme;
+    if (document.body) document.body.style.colorScheme = scheme;
   }
+  syncColorSchemeMeta(choice);
 }
