@@ -41,8 +41,17 @@ describe("desk error navigation", () => {
     assert.match(call, /backLabel="Inbox"/);
     assert.match(contact, /backHref="\/contacts"/);
     assert.match(contact, /backLabel="Contacts"/);
-    assert.doesNotMatch(read("dashboard/src/app/(desk)/calls/page.tsx"), /backHref/);
-    assert.doesNotMatch(read("dashboard/src/app/(desk)/contacts/page.tsx"), /backHref/);
+    for (const list of [
+      "dashboard/src/app/(desk)/calls/page.tsx",
+      "dashboard/src/app/(desk)/contacts/page.tsx",
+      "dashboard/src/app/(desk)/home/page.tsx",
+    ]) {
+      const tags = read(list).match(/<DeskLoadError[\s\S]*?<\/DeskLoadError>/g) || [];
+      assert.ok(tags.length > 0, list);
+      for (const tag of tags) {
+        assert.doesNotMatch(tag, /backHref|backLabel/);
+      }
+    }
     assert.doesNotMatch(read("dashboard/src/components/ui/DeskRecovery.tsx"), /Retry/);
     assert.doesNotMatch(call, DASH);
     assert.doesNotMatch(contact, DASH);
@@ -50,6 +59,7 @@ describe("desk error navigation", () => {
 
   it("picks one root 404 destination from the session", () => {
     const root = read("dashboard/src/app/not-found.tsx");
+    assert.match(root, /export const instant = false/);
     assert.match(root, /getAuthUser\(/);
     assert.match(root, /isLegacyAuthenticated\(/);
     assert.match(root, /href = "\/"/);

@@ -27,7 +27,9 @@ describe("desk resilience and anti-slop", () => {
     assert.match(nav, /scroll=\{false\}/);
     assert.doesNotMatch(nav, /pendingSpinnerInkClass/);
     assert.match(notFound, /Page not found/);
-    assert.match(notFound, /href="\/home"/);
+    assert.match(notFound, /href = "\/home"/);
+    assert.match(notFound, /href = "\/"/);
+    assert.match(notFound, /href = "\/admin"/);
     assert.match(crash, /Try again/);
     assert.doesNotMatch(crash, /error\.message/);
   });

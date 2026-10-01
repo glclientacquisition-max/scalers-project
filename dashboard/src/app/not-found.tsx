@@ -1,6 +1,9 @@
 import { DeskRecovery } from "@/components/ui/DeskRecovery";
 import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 
+// Session cookies decide the one link. Do not prerender a guessed destination.
+export const instant = false;
+
 /** One recovery link from the session. Logged-out typos stay here, not on the desk gate. */
 export default async function NotFound() {
   const owner = await getAuthUser();
