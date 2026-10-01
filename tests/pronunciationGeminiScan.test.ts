@@ -71,6 +71,30 @@ describe("parseGeminiScanIssues", () => {
     assert.ok(rejected.length >= 2);
   });
 
+  it("drops a missing or provider reasoning instead of naming the model", () => {
+    const { issues } = parseGeminiScanIssues(
+      JSON.stringify([
+        {
+          type: "AGENT_MISPRONUNCIATION",
+          word_or_phrase: "Aisha",
+          confidence: "high",
+          suggested_form: "Eye-sha",
+        },
+        {
+          type: "AGENT_MISPRONUNCIATION",
+          word_or_phrase: "Aisha",
+          confidence: "medium",
+          suggested_form: "Eye-sha",
+          reasoning: "Flagged by Gemini Scan.",
+        },
+      ])
+    );
+    assert.equal(issues.length, 2);
+    assert.equal(issues[0].reasoning, "");
+    assert.equal(issues[1].reasoning, "");
+    assert.doesNotMatch(issues.map((issue) => issue.reasoning).join(" "), /gemini/i);
+  });
+
   it("handles empty array and non-json", () => {
     assert.equal(parseGeminiScanIssues("[]").issues.length, 0);
     assert.equal(parseGeminiScanIssues("not json").issues.length, 0);

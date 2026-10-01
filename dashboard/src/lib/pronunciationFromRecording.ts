@@ -208,11 +208,15 @@ export async function deriveLexiconFromRecording(opts: {
 
     if (!matchOk) {
       const reason = String(json.reason || "").trim();
+      const safeReason =
+        reason && !/gemini|api key|this is paid|paid api|GEMINI_API_KEY/i.test(reason)
+          ? reason
+          : "";
       return {
         ok: false,
         heard,
         error:
-          reason ||
+          safeReason ||
           `That didn’t sound like the line we asked for. Please say: “${prompt}”`,
       };
     }

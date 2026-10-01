@@ -185,7 +185,8 @@ export function parseGeminiScanIssues(raw: string): {
       rejected.push({ reason: "bad_confidence", item });
       continue;
     }
-    const reasoning = String(row.reasoning || "").trim() || "Flagged by Gemini Scan.";
+    let reasoning = String(row.reasoning || "").trim();
+    if (/gemini|paid api|api key|this is paid/i.test(reasoning)) reasoning = "";
     let timestamp: number | null = null;
     if (row.timestamp_seconds != null && row.timestamp_seconds !== "") {
       const n = Number(row.timestamp_seconds);

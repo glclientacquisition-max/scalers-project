@@ -34,6 +34,8 @@ function loadWriteError() {
         "listen",
         "column pronunciation_review_queue does not exist"
       ),
+      pronunciationWriteError("listen", "Gemini HTTP 429: quota"),
+      pronunciationWriteError("review", "GEMINI_API_KEY is not configured"),
     ];
     console.log(JSON.stringify(cases));
   `;
@@ -47,12 +49,17 @@ function loadWriteError() {
 }
 
 test("permission denied on a listen save names the listen, not the empty queue", () => {
-  const [listenDenied, reviewDenied, passthrough, missingColumn] = loadWriteError();
+  const [listenDenied, reviewDenied, passthrough, missingColumn, providerListen, providerReview] =
+    loadWriteError();
   assert.equal(listenDenied, "Could not save the listen.");
   assert.equal(reviewDenied, "Could not save the review.");
   assert.equal(passthrough, "Could not save the listen.");
   assert.equal(missingColumn, "Could not save the listen.");
+  assert.equal(providerListen, "Could not save the listen.");
+  assert.equal(providerReview, "Could not save the review.");
   assert.doesNotMatch(listenDenied, /pronunciation review/);
+  assert.doesNotMatch(providerListen, /gemini/i);
+  assert.doesNotMatch(providerReview, /GEMINI_API_KEY/);
   assert.doesNotMatch(listenDenied, /[—–]/);
 });
 
@@ -72,4 +79,15 @@ test("opening Fix loads the queue and does not return a save failure", () => {
   const scan = src.slice(scanStart, scanEnd);
   assert.match(scan, /pronunciationWriteError\("listen"/);
   assert.doesNotMatch(scan, /Could not save pronunciation review/);
+  assert.match(scan, /Listen to the last \$\{batchSize\} recordings\./);
+  assert.match(scan, /Listen is unavailable/);
+  assert.match(scan, /Could not listen/);
+  assert.match(scan, /No recordings to listen to/);
+  assert.doesNotMatch(src, /This is paid/);
+  assert.doesNotMatch(src, /paid API/);
+  assert.doesNotMatch(src, /Gemini Scan/);
+  assert.doesNotMatch(src, /Ask support/);
+  assert.match(src, /Wait a few minutes/);
+  assert.match(src, /Could not load review/);
+  assert.match(src, /pronunciationWriteError\("review"/);
 });
