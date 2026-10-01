@@ -1,9 +1,8 @@
 /**
- * Gemini Scan — listen to call recordings and draft Fix-queue candidates.
+ * AI listen — draft Fix-queue candidates from call recordings.
  *
- * Safe auto-apply: high-confidence AGENT_MISPRONUNCIATION that match known
- * profile names (business / agent / team / places) may write tts_lexicon when
- * stamped with the signed-in owner's id. Free-form guesses stay pending.
+ * Nothing from a listen writes tts_lexicon. High-confidence profile names
+ * and places stay on Needs review until the owner taps Use this.
  */
 
 import {
@@ -64,7 +63,7 @@ export type PronunciationReviewCandidate = {
   approved_at?: string | null;
   /** Edited say-as before approve (AGENT_MISPRONUNCIATION only). */
   edited_say?: string | null;
-  /** True when applied via profile auto-apply or batch approve. */
+  /** Legacy stamp. New listens never set this. */
   auto_applied?: boolean;
 };
 
@@ -186,7 +185,8 @@ export function parseGeminiScanIssues(raw: string): {
       rejected.push({ reason: "bad_confidence", item });
       continue;
     }
-    const reasoning = String(row.reasoning || "").trim() || "Flagged by Gemini Scan.";
+    let reasoning = String(row.reasoning || "").trim();
+    if (/gemini|paid api|api key|this is paid/i.test(reasoning)) reasoning = "";
     let timestamp: number | null = null;
     if (row.timestamp_seconds != null && row.timestamp_seconds !== "") {
       const n = Number(row.timestamp_seconds);
@@ -328,7 +328,7 @@ export function parseScanLogs(raw: unknown): PronunciationGeminiScanLog[] {
 
 /**
  * Lexicon write gate: AGENT_MISPRONUNCIATION only, with approved_by + approved_at.
- * Stamps come from owner Approve, batch approve, or safe profile auto-apply.
+ * The stamp comes from Use this. A listen never stamps a row.
  */
 export function assertApprovedForLexiconWrite(
   candidate: PronunciationReviewCandidate
@@ -339,20 +339,19 @@ export function assertApprovedForLexiconWrite(
   if (candidate.type !== "AGENT_MISPRONUNCIATION") {
     return {
       ok: false,
-      error:
-        "LIKELY_MISHEARD items are STT hints — they never write to tts_lexicon.",
+      error: "Hearing hints do not write.",
     };
   }
   if (candidate.status !== "approved") {
     return {
       ok: false,
-      error: "Candidate must be approved before lexicon write.",
+      error: "Use this before that fix can go live.",
     };
   }
   if (!candidate.approved_by || !candidate.approved_at) {
     return {
       ok: false,
-      error: "Missing approved_by/approved_at — cannot write lexicon.",
+      error: "Could not save that fix.",
     };
   }
   return { ok: true };
@@ -388,21 +387,15 @@ export function matchesProfileHint(
 }
 
 /**
- * Safe auto-apply eligibility: high-confidence speech fix for a known
- * profile name/place — never free-form / blocked commons / STT hints.
+ * Profile-name matches stay on Needs review. A listen never writes tts_lexicon.
  */
 export function canAutoApplyProfileCandidate(
   candidate: PronunciationReviewCandidate,
   profileHints: string[]
 ): boolean {
-  if (candidate.source !== "gemini_scan") return false;
-  if (candidate.type !== "AGENT_MISPRONUNCIATION") return false;
-  if (candidate.status !== "pending") return false;
-  if (candidate.confidence !== "high") return false;
-  const match = matchPatternFromPhrase(candidate.word_or_phrase);
-  if (!match || isBlockedMatch(match)) return false;
-  if (!sanitizeSayForm(candidate.suggested_form || "")) return false;
-  return matchesProfileHint(candidate.word_or_phrase, profileHints);
+  void candidate;
+  void profileHints;
+  return false;
 }
 
 export function stampCandidateApproved(

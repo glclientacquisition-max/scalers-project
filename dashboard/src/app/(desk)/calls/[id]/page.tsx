@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import {
   callResolutionLabel,
   parseCallResolution,
@@ -17,6 +16,8 @@ import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxTicketView } from "@/components/InboxTicketView";
 import { LiveTicket } from "@/components/LiveTicket";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
+import { DeskRecovery } from "@/components/ui/DeskRecovery";
 import {
   followUpWhatsAppMessage,
   formatCallWhenRelative,
@@ -79,10 +80,10 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   const backHref = inboxReturnHref(inboxReturn);
 
   const tenant = await getCurrentTenant();
-  if (!tenant) notFound();
+  if (!tenant) return <DeskNoWorkspace />;
 
   const workspace = await createWorkspaceDataClient();
-  if (!workspace) notFound();
+  if (!workspace) return <DeskNoWorkspace />;
 
   const first = await workspace.client
     .from("calls")
@@ -116,9 +117,21 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   }
 
   if (error) {
-    return <DeskLoadError>Could not load this call.</DeskLoadError>;
+    return (
+      <DeskLoadError backHref="/calls" backLabel="Inbox">
+        Could not load this call.
+      </DeskLoadError>
+    );
   }
-  if (!call) notFound();
+  if (!call) {
+    return (
+      <DeskRecovery
+        title="This call is not in the inbox."
+        href="/calls"
+        action="Inbox"
+      />
+    );
+  }
   const row = call;
   const phoneKeys = storedPhoneCandidates(row.caller_number);
   const { data: person } = phoneKeys.length

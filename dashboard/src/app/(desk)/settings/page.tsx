@@ -1,10 +1,15 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
+import { DESK_MD_COOKIE } from "@/lib/deskMdBoot";
 import {
+  SETTINGS_NAV,
   parseBusinessSettingsPanel,
   parseBusinessSettingsTab,
+  settingsWideDefaultHref,
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
+import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
 import { tenantForSettingsView } from "@/lib/settingsPanelPayload";
 import { getCurrentTenant } from "@/lib/tenant";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -32,6 +37,11 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
   const tabRaw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const panelRaw = Array.isArray(params.panel) ? params.panel[0] : params.panel;
   if (tabRaw === "appearance") redirect("/settings");
+  if (!tabRaw) {
+    const deskMd = (await cookies()).get(DESK_MD_COOKIE)?.value;
+    const wide = settingsWideDefaultHref(tabRaw, deskMd);
+    if (wide) redirect(wide);
+  }
 
   let tenant;
   try {
@@ -62,6 +72,11 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       tab={tab}
       trainPanel={trainPanel}
       curatedVoices={curatedVoices}
+      optionStatus={settingsIndexStatuses(
+        tenant,
+        curatedVoices,
+        SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target))
+      )}
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
     />
   );

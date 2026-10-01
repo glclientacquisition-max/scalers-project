@@ -586,7 +586,7 @@ function formatReturningCallerForPrompt(card) {
     identity = `${who} (bound; not the household file; do not invent their history)`;
   } else if (card.sharedLine) {
     const hint = fileWho ? `file name ${fileWho}; ` : '';
-    identity = `not bound; shared line (${hint}ask who is speaking)`;
+    identity = `not bound; shared line (${hint}nothing is saved for this speaker; do not invent a booking, order, or hold)`;
   } else if (fileWho) {
     identity = `not bound; phone file for ${fileWho}; ask who is speaking; do not use this name or visit until they say it`;
   } else {
@@ -625,7 +625,7 @@ function formatReturningCallerForPrompt(card) {
 
   if (!known) {
     lines.push(
-      '- Use: ask who is speaking. Do not attach Open, Last, or History yet. Do not greet them as the file name.'
+      '- Use: do not ask who is speaking unless you are about to save something. Do not attach Open, Last, or History yet. Do not greet them as the file name. Answer what they just said.'
     );
   } else if (!usable) {
     lines.push(
@@ -656,12 +656,12 @@ function formatReturningFileForCallState(returning) {
   if (!speakerKnownOnFile(returning)) {
     const who = returning.fileOwnerName || returning.name;
     if (returning.sharedLine) {
-      return '- Caller file speaker: not bound. Shared line. Ask who is speaking. Do not use the file name. Do not attach Open or History.';
+      return '- Caller file speaker: not bound. Shared line. Do not ask who is speaking unless you are about to save something. Do not use the file name. Do not attach Open or History. Answer what they just said.';
     }
     if (who) {
-      return `- Caller file speaker: not bound. Phone file for ${who}. Ask who is speaking before using this name or visit.`;
+      return `- Caller file speaker: not bound. Phone file for ${who}. Do not use this name or visit until they say who they are. Answer what they just said.`;
     }
-    return '- Caller file speaker: not bound. Ask who is speaking before attaching a visit.';
+    return '- Caller file speaker: not bound. Do not attach a visit until they say who they are. Answer what they just said.';
   }
   if (!returningFileUsable(returning)) {
     const who = returning.boundName || returning.name || 'this speaker';

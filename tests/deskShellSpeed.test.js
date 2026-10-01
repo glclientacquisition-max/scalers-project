@@ -236,4 +236,224 @@ describe("settings save scope", () => {
     );
     assert.equal(name, "From form");
   });
+
+  it("keeps the stored lexicon on Voice and strips it from Hours", () => {
+    const lexicon = [{ match: "aisha", say: "Eye-sha", label: "Aisha" }];
+    const voice = load(
+      "dashboard/src/lib/settingsPanelPayload.ts",
+      `mod.tenantForSettingsView({
+        id: "t1",
+        business_name: "Westlands Books",
+        tts_lexicon: ${JSON.stringify(lexicon)}
+      }, "train", "tools")`
+    );
+    assert.equal(voice.tts_lexicon[0].say, "Eye-sha");
+    const hours = load(
+      "dashboard/src/lib/settingsPanelPayload.ts",
+      `mod.tenantForSettingsView({
+        id: "t1",
+        business_name: "Westlands Books",
+        tts_lexicon: ${JSON.stringify(lexicon)}
+      }, "train", "hours")`
+    );
+    assert.deepEqual(hours.tts_lexicon, []);
+    const pronunciation = load(
+      "dashboard/src/lib/settingsPanelPayload.ts",
+      `mod.tenantForSettingsView({
+        id: "t1",
+        business_name: "Westlands Books",
+        tts_lexicon: ${JSON.stringify(lexicon)}
+      }, "train", "pronunciation")`
+    );
+    assert.equal(pronunciation.tts_lexicon[0].label, "Aisha");
+  });
+
+  it("does not let a Voice save overwrite the lexicon", () => {
+    const kept = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("tools", "ttsLexicon", [], [{ match: "aisha", say: "Eye-sha" }])`
+    );
+    assert.deepEqual(kept, [{ match: "aisha", say: "Eye-sha" }]);
+    const owned = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("pronunciation", "ttsLexicon", [{ match: "aisha", say: "Eye-sha" }], [])`
+    );
+    assert.equal(owned[0].say, "Eye-sha");
+  });
+
+  it("does not let Identity overwrite places or policies", () => {
+    const places = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("identity", "businessLocations", [{ address: "Form" }], [{ address: "Stored" }])`
+    );
+    assert.deepEqual(places, [{ address: "Stored" }]);
+    const policies = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("identity", "businessPolicies", { delivery: "Form" }, { delivery: "Stored" })`
+    );
+    assert.equal(policies.delivery, "Stored");
+  });
+
+  it("lets Locations own the hours location line and keeps Hours off it", () => {
+    const fromLocations = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("locations", "locationNotes", "Parklands", "Westlands")`
+    );
+    assert.equal(fromLocations, "Parklands");
+    const fromHours = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("hours", "locationNotes", "Parklands", "Westlands")`
+    );
+    assert.equal(fromHours, "Westlands");
+  });
+
+  const invalidEverywhere = {
+    businessName: "",
+    agentName: "A".repeat(41),
+    servicesCatalogCount: 0,
+    productCatalogCount: 0,
+    servicesOfferedLength: 0,
+    productCatalogMax: 500,
+    hasSchedule: false,
+    businessHoursLength: 0,
+    hasTone: false,
+    teamCount: 30,
+    faqCount: 30,
+    submittedVoiceId: "not-a-voice",
+    resolvedVoiceId: null,
+    voiceLabel: "x".repeat(41),
+  };
+
+  it("fails a Hours save only for hours", () => {
+    const err = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("hours", ${JSON.stringify(invalidEverywhere)})`
+    );
+    assert.equal(err, "Set at least one open day in weekly hours.");
+    const ok = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("hours", ${JSON.stringify({
+        ...invalidEverywhere,
+        hasSchedule: true,
+        businessHoursLength: 24,
+      })})`
+    );
+    assert.equal(ok, null);
+  });
+
+  it("fails a Voice save only for voice fields", () => {
+    const err = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("tools", ${JSON.stringify(invalidEverywhere)})`
+    );
+    assert.equal(err, "Pick a voice from the list.");
+    const label = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("tools", ${JSON.stringify({
+        ...invalidEverywhere,
+        submittedVoiceId: "",
+        resolvedVoiceId: null,
+      })})`
+    );
+    assert.equal(label, "Voice label should be under 40 characters.");
+    const ok = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("tools", ${JSON.stringify({
+        ...invalidEverywhere,
+        submittedVoiceId: "",
+        voiceLabel: "Shop voice",
+      })})`
+    );
+    assert.equal(ok, null);
+  });
+
+  it("names assistant and FAQ limits without another panel's error", () => {
+    const faqs = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("faqs", ${JSON.stringify(invalidEverywhere)})`
+    );
+    assert.equal(faqs, "FAQs are limited to 25 pairs.");
+    const name = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsScopeValidationError("identity", ${JSON.stringify({
+        ...invalidEverywhere,
+        businessName: "Westlands Books",
+        hasTone: true,
+      })})`
+    );
+    assert.equal(name, "Assistant name should be under 40 characters.");
+  });
+
+  it("clears an emptied alert phone and says Saved only when the write matches", () => {
+    const cleared = load(
+      "dashboard/src/lib/alertsSave.ts",
+      `mod.alertPhoneWrite("")`
+    );
+    assert.equal(cleared, "");
+    const mismatch = load(
+      "dashboard/src/lib/alertsSave.ts",
+      `mod.alertsPersistMatchesSubmit({ submittedPhone: "", writtenPhone: "+254711111111", submittedEmail: "", writtenEmail: null })`
+    );
+    assert.equal(mismatch, false);
+    const match = load(
+      "dashboard/src/lib/alertsSave.ts",
+      `mod.alertsPersistMatchesSubmit({ submittedPhone: "", writtenPhone: "", submittedEmail: "", writtenEmail: null })`
+    );
+    assert.equal(match, true);
+    const actions = read("dashboard/src/app/(desk)/settings/alertsActions.ts");
+    assert.match(actions, /alertPhoneWrite\(submittedPhone\)/);
+    assert.match(actions, /alertsPersistMatchesSubmit/);
+    assert.doesNotMatch(
+      actions,
+      /tenant\.whatsapp_notification_number/
+    );
+    assert.match(actions, /whatsapp_notification_number: writtenPhone/);
+  });
+
+  it("keeps panel copy on the job and off invented FAQ answers", () => {
+    const form = read("dashboard/src/components/TenantForm.tsx");
+    const save = read("dashboard/src/components/TenantSettingsSaveButton.tsx");
+    const catalog = read("dashboard/src/app/(desk)/settings/catalogActions.ts");
+    const ingest = read("dashboard/src/app/(desk)/settings/ingestActions.ts");
+    assert.match(save, /\bSave\b/);
+    assert.match(save, /Saving/);
+    assert.doesNotMatch(save, /Save and train|Training/);
+    assert.doesNotMatch(form, /Voice option \d/);
+    assert.doesNotMatch(form, /FAQ_STARTERS/);
+    assert.doesNotMatch(form, /free parking behind the building/);
+    assert.match(form, /displaySonioxVoiceLabel\("", voice\.id, voiceOptions\)/);
+    assert.doesNotMatch(catalog, /Open Train to review/);
+    assert.doesNotMatch(ingest, /Open Train to review/);
+    assert.match(catalog, /Catalogue saved for the next call/);
+    assert.match(ingest, /Catalogue saved for the next call/);
+    assert.match(read("dashboard/src/app/(desk)/settings/actions.ts"), /settingsScopeValidationError/);
+  });
+
+  it("puts one short status on the settings list and does not mount the form on the phone index", () => {
+    const hours = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "hours" }, { hours_schedule: { days: { mon: { open: "09:00", close: "17:00" }, tue: { open: "09:00", close: "17:00" } } } })`
+    );
+    assert.equal(hours, "2 days");
+    const voice = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { soniox_voice_label: "Shop voice" }, [])`
+    );
+    assert.equal(voice, "Shop voice");
+    const line = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "test" }, { sautikit_virtual_number: "+254700000000" })`
+    );
+    assert.equal(line, "Line live");
+    const pending = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "test" }, { sautikit_virtual_number: "pending:1" })`
+    );
+    assert.equal(pending, "");
+    const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
+    assert.match(shell, /if \(!md\) return null/);
+    assert.match(shell, /SettingsMdOnly/);
+    assert.match(shell, /data-settings-menu=\{variant\}/);
+    assert.doesNotMatch(shell, /overflow-hidden rounded-xl border border-line bg-surface/);
+  });
 });

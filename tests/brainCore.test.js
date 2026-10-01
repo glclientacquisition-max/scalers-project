@@ -489,7 +489,7 @@ describe('Brain state and next-best-action', () => {
     assert.equal(state.caller.nameCollision, null);
   });
 
-  it('asks who is speaking on a shared line before treating the file as the caller', () => {
+  it('answers a shared-line ask without using the file name or demanding who is speaking', () => {
     const card = {
       name: 'Amina',
       sharedLine: true,
@@ -508,9 +508,10 @@ describe('Brain state and next-best-action', () => {
       capabilities: { saveCallerInfo: true, escalate: true },
     });
     assert.equal(state.caller.name, null);
-    assert.equal(decision.action, 'ASK_CLARIFICATION');
-    assert.equal(decision.slot, 'name');
-    assert.match(decision.reason, /shared line/i);
+    assert.equal(decision.action, 'ANSWER');
+    assert.notEqual(decision.slot, 'name');
+    assert.doesNotMatch(String(decision.reason), /ask who is speaking/i);
+    assert.match(formatBrainStateForPrompt(state), /Do not use the file name/i);
   });
 
   it('pulls up the returning file once a shared-line caller confirms the file name', () => {

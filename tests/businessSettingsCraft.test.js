@@ -2,9 +2,46 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("path");
+const { spawnSync } = require("node:child_process");
 
 function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+}
+
+function loadSettingsNav() {
+  const nav = path.join(__dirname, "../dashboard/src/lib/businessSettingsNav.ts");
+  const script = `
+    import {
+      SETTINGS_NAV,
+      settingsWideDefaultHref,
+      businessSettingsHref,
+      parseBusinessSettingsPanel,
+    } from ${JSON.stringify(nav)};
+    const sections = SETTINGS_NAV.map((section) => ({
+      id: section.id,
+      title: section.title,
+      labels: section.items.map((item) => item.label),
+    }));
+    console.log(JSON.stringify({
+      sections,
+      labels: sections.flatMap((section) => section.labels),
+      hoursWide: settingsWideDefaultHref(undefined, "1"),
+      phoneIndex: settingsWideDefaultHref(undefined, "0"),
+      missingCookie: settingsWideDefaultHref(undefined, undefined),
+      trainStays: settingsWideDefaultHref("train", "1"),
+      testStays: settingsWideDefaultHref("test", "1"),
+      trainHref: businessSettingsHref("train"),
+      testHref: businessSettingsHref("test"),
+      trainPanel: parseBusinessSettingsPanel(undefined, "train"),
+    }));
+  `;
+  const ran = spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", "--input-type=module", "-e", script],
+    { encoding: "utf8" }
+  );
+  assert.equal(ran.status, 0, ran.stderr || ran.stdout);
+  return JSON.parse(ran.stdout.trim().split("\n").at(-1));
 }
 
 describe("business settings craft", () => {
@@ -33,9 +70,10 @@ describe("business settings craft", () => {
     assert.match(ui, /Line live/);
     assert.match(ui, /Number pending/);
     assert.match(form, /Assistant name/);
-    assert.match(form, /Your assistant will use this on the next call/);
+    assert.match(form, /notify\("Saved"\)/);
+    assert.doesNotMatch(form, /Your assistant will use this on the next call/);
     assert.doesNotMatch(form, /Your receptionist/);
-    assert.match(test, /assistant name/);
+    assert.match(test, /previewBusinessAssistantIntro/);
     assert.doesNotMatch(test, /Agent Persona/);
   });
 
@@ -43,15 +81,19 @@ describe("business settings craft", () => {
     assert.match(nav, /id: "business"/);
     assert.match(nav, /id: "assistant"/);
     assert.match(nav, /id: "knowledge"/);
-    assert.match(nav, /id: "alerts"/);
+    assert.match(nav, /id: "people"/);
+    assert.doesNotMatch(nav, /id: "offer"/);
+    assert.doesNotMatch(nav, /id: "alerts"/);
     assert.doesNotMatch(nav, /id: "device"/);
     assert.match(nav, /title: "Business"/);
     assert.match(nav, /title: "Assistant"/);
+    assert.match(nav, /title: "Knowledge"/);
+    assert.doesNotMatch(nav, /title: "Offer"/);
+    assert.match(nav, /title: "People"/);
     assert.doesNotMatch(nav, /label: "Assistant"/);
     assert.doesNotMatch(nav, /id: "receptionist"/);
     assert.doesNotMatch(nav, /title: "Receptionist"/);
-    assert.match(nav, /title: "Knowledge"/);
-    assert.match(nav, /title: "Alerts"/);
+    assert.doesNotMatch(nav, /title: "Alerts"/);
     assert.doesNotMatch(nav, /title: "This device"/);
     assert.match(nav, /label: "Identity"/);
     assert.match(nav, /label: "Hours"/);
@@ -194,15 +236,15 @@ describe("business settings craft", () => {
     assert.match(form, /showBack/);
   });
 
-  it("shows catalog cards below md and the table from md up", () => {
-    assert.doesNotMatch(form, /className="hidden space-y-3 md:hidden"/);
-    assert.match(form, /className="space-y-3 md:hidden"/);
+  it("shows dense catalog rows below lg and the table from lg", () => {
+    assert.doesNotMatch(form, /rounded-xl border border-line bg-surface p-3/);
+    assert.match(form, /lg:hidden/);
     assert.match(form, /svc-name-m-/);
     assert.match(form, /svc-notes-m-/);
     assert.match(form, /svc-oos-m-/);
     assert.match(form, /prod-name-m-/);
     assert.match(form, /prod-cat-m-/);
-    assert.match(form, /className="hidden md:block overflow-hidden rounded-xl border border-line"/);
+    assert.match(form, /className="hidden overflow-hidden rounded-xl border border-line lg:block"/);
     assert.match(form, /table-fixed/);
     assert.doesNotMatch(form, /min-w-\[720px\]/);
     assert.doesNotMatch(form, /min-w-\[640px\]/);
@@ -307,18 +349,69 @@ describe("business settings craft", () => {
     );
   });
 
-  it("selects Identity on the hub rail", () => {
+  it("orders jobs and keeps Team out of the Alerts group", () => {
+    const got = loadSettingsNav();
+    assert.deepEqual(got.labels, [
+      "Identity",
+      "Hours",
+      "Locations",
+      "Policies",
+      "Catalog",
+      "Import",
+      "FAQs",
+      "Voice",
+      "Pronunciation",
+      "Test",
+      "Team",
+      "Alerts",
+    ]);
+    assert.deepEqual(
+      got.sections.map((section) => section.title),
+      ["Business", "Knowledge", "Assistant", "People"]
+    );
+    assert.equal(new Set(got.sections.map((section) => section.id)).size, got.sections.length);
+    assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");
+    assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
+    const people = got.sections.find((section) => section.title === "People");
+    assert.deepEqual(people.labels, ["Team", "Alerts"]);
+    assert.equal(people.id, "people");
+    assert.notEqual(people.id, "alerts");
+    assert.equal(got.sections.some((section) => section.title === "Alerts" || section.id === "alerts"), false);
+    assert.equal(got.hoursWide, "/settings?tab=train&panel=hours");
+    assert.equal(got.phoneIndex, null);
+    assert.equal(got.missingCookie, null);
+    assert.equal(got.trainStays, null);
+    assert.equal(got.testStays, null);
+    assert.equal(got.trainHref, "/settings?tab=train");
+    assert.equal(got.testHref, "/settings?tab=test");
+    assert.equal(got.trainPanel, "identity");
+  });
+
+  it("opens wide /settings on Hours and does not mount Identity on the index", () => {
+    const boot = read("dashboard/src/lib/deskMdBoot.ts");
+    const layout = read("dashboard/src/app/layout.tsx");
     const activeFn = nav.slice(
       nav.indexOf("export function settingsNavItemActive"),
       nav.indexOf("export function settingsNavItems")
     );
-    assert.match(shell, /selectHubIdentity: isRail/);
-    assert.match(shell, /panel="identity"/);
-    assert.match(shell, /showBack=\{false\}/);
+    const menu = shell.slice(shell.indexOf("if (isMenu)"), shell.indexOf("const rail ="));
+    assert.match(page, /settingsWideDefaultHref/);
+    assert.ok(page.indexOf("settingsWideDefaultHref") < page.indexOf("getCurrentTenant()"));
+    assert.match(page, /if \(!tabRaw\)/);
+    assert.match(nav, /export const SETTINGS_HOURS_HREF = businessSettingsHref\("train", "hours"\)/);
+    assert.match(nav, /if \(deskMd !== "1"\) return null/);
+    assert.match(boot, /min-width: 768px/);
+    assert.match(boot, /location\.search/);
+    assert.match(boot, /SETTINGS_HOURS_HREF/);
+    assert.match(layout, /DESK_MD_BOOT_SCRIPT/);
+    assert.doesNotMatch(shell, /SettingsIdentityRedirect/);
+    assert.doesNotMatch(shell, /panel=identity/);
+    assert.doesNotMatch(shell, /panel="identity"/);
+    assert.doesNotMatch(shell, /selectHubIdentity/);
+    assert.doesNotMatch(menu, /TenantForm/);
+    assert.match(menu, /md:hidden/);
     assert.match(activeFn, /tab === "train" && trainPanel === target\.panel/);
-    assert.match(activeFn, /target\.panel === "identity"/);
-    assert.match(activeFn, /selectHubIdentity/);
-    assert.match(activeFn, /tab === "menu"/);
+    assert.doesNotMatch(activeFn, /selectHubIdentity/);
     assert.doesNotMatch(shell, /selectHubAppearance/);
     assert.doesNotMatch(shell, /<AppearancePanel \/>/);
   });
@@ -382,7 +475,7 @@ describe("business settings craft", () => {
 
     const rail = shell.slice(
       shell.indexOf("const isRail = variant === \"rail\""),
-      shell.indexOf('ul className="w-full overflow-hidden')
+      shell.indexOf("const railLinkClass") + "const railLinkClass".length + 240
     );
     assert.match(rail, /inline-flex min-h-11 w-full items-center justify-start/);
     assert.match(rail, /w-max max-w-full space-y-0.5/);

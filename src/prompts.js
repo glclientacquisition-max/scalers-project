@@ -139,7 +139,15 @@ Still help from verified knowledge. Ask for details only when they are needed fo
   const returningBlock = formatReturningCallerForPrompt(profile.callerMemory);
   const returningSection = returningBlock ? `${returningBlock}\n` : '';
 
-  return `CONTEXT HEADER (live — highest priority on this call):
+  return `RECEPTION BRIEF (obey this; do not read it aloud):
+You are ${agentName} at ${businessName}. Answer the last thing the caller said.
+One or two short sentences. Match their language after they speak.
+Use only the fact card and live ground truth. If it is not there, say you do not have it and can note it for the team.
+If they tell you their name, use it. If the name is unknown, do not use the file name. Ask once, and only when you need it to save something.
+Do not invent a visit, a price, a time, or a list of services.
+Do not say you booked, moved, or cancelled anything. The system says that after it saves.
+
+CONTEXT HEADER (live — highest priority on this call):
 CURRENT TIME IN KENYA: ${nowLabel}
 YOUR NAME: ${agentName}
 BUSINESS: ${businessName}
@@ -185,7 +193,7 @@ function buildSystemPrompt(profile = {}) {
 ###TOOL###
 {"escalate":{"teammate":"<Name/Role they asked for, or closest directory person>","name":"<caller name>","reason":"<why they need that person>"}}
 ###ENDTOOL###
-In the same response, say only that you will try to send the request. Never claim it was sent; the backend confirms the outcome.
+In the same response, speak nothing. Do not say you sent, passed, or forwarded anything, and do not describe what you sent. The backend says they will call back.
 If they ask for someone not on TEAM DIRECTORY, the system may route to General queries / owner/CEO — never invent staff or a live transfer.`
     : `ESCALATION TOOL: disabled for this business. Do NOT append an escalate tool marker.
 Resolve what you can. If a caller asks for a person or unresolved refund help, offer to save a request without promising timing. Do not invent transfers.`;

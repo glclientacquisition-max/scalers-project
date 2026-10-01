@@ -8,6 +8,7 @@ const {
   looksLikePastBookingTalk,
 } = require('./visitTalk');
 const { looksLikePaceOnlyTurn } = require('./dynamicSpeech');
+const { looksLikeFileRead, hasReadableFile } = require('./fileRead');
 const {
   looksLikeLeaveIt,
   looksLikeNonConsentAck,
@@ -35,6 +36,29 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       state?.goal?.description ||
       ''
   );
+  if (looksLikeFileRead(latestUtterance) && !hasReadableFile(state)) {
+    return {
+      action: ACTIONS.ANSWER,
+      reason:
+        'Nothing saved for this speaker. Do not use the file name. Say you do not have a booking, order, or hold. Do not list services. Do not invent one. Do not ask for a new slot.',
+    };
+  }
+
+  const asksAboutFile =
+    looksLikePastBookingTalk(latestUtterance) ||
+    looksLikeExistingVisitTalk(latestUtterance);
+  if (
+    asksAboutFile &&
+    speakerPendingOnFile(state?.returning) &&
+    state?.caller?.nameConfirmed !== true
+  ) {
+    return {
+      action: ACTIONS.ANSWER,
+      reason:
+        'Name is unknown. Do not use the file name, open visit, or history. Say you do not have their bookings. Do not list services. Ask their name only if you are about to save something.',
+    };
+  }
+
   if (looksLikePaceOnlyTurn(latestUtterance)) {
     return {
       action: ACTIONS.ANSWER,
@@ -85,19 +109,17 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
 
   if (intent === 'unknown' || intent === 'general_enquiry') {
     const returning = state?.returning;
-    if (speakerPendingOnFile(returning) && state?.caller?.nameConfirmed !== true) {
-      return {
-        action: ACTIONS.ASK_CLARIFICATION,
-        slot: 'name',
-        reason: returning.sharedLine
-          ? 'Shared line. Ask who is speaking. Do not use the file name.'
-          : 'Phone file is a candidate. Ask who is speaking before using the file name or visit.',
-      };
-    }
     const said = String(state?.goal?.description || '');
     const latest = String(
       (state?.conversation?.answersReceived || []).slice(-1)[0] || ''
     );
+    if (state?.conversation?.phatic && speakerPendingOnFile(returning)) {
+      return {
+        action: ACTIONS.ANSWER,
+        reason:
+          'They greeted or asked how you are. One short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.',
+      };
+    }
     const followUp =
       intent === 'unknown' ||
       Boolean(state?.conversation?.phatic) ||

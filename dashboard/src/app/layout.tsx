@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { NotifyHost } from "@/components/ui/DeskNotice";
+import { DESK_MD_BOOT_SCRIPT } from "@/lib/deskMdBoot";
 import { DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
 import "./globals.css";
 
@@ -64,6 +65,7 @@ export default function RootLayout({
               `try{var t=localStorage.getItem(${JSON.stringify(DESK_THEME_STORAGE_KEY)});if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}`,
           }}
         />
+        <script dangerouslySetInnerHTML={{ __html: DESK_MD_BOOT_SCRIPT }} />
         {children}
         <NotifyHost />
       </body>

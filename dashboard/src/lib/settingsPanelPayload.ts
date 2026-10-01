@@ -11,11 +11,18 @@ const KEEP: Record<string, readonly (keyof TenantRow)[]> = {
   hours: [],
   locations: ["business_locations"],
   policies: ["business_policies"],
-  tools: [],
+  // Voice Hear sample reads the stored lexicon. Save scope still omits ttsLexicon.
+  tools: ["tts_lexicon"],
   pronunciation: ["tts_lexicon", "daily_bulletin"],
   team: ["team_directory"],
   faqs: ["faqs"],
-  test: ["services_catalog", "services_offered", "tts_lexicon"],
+  test: [
+    "services_catalog",
+    "services_offered",
+    "product_catalog",
+    "team_directory",
+    "tts_lexicon",
+  ],
   import: [],
   alerts: [],
 };

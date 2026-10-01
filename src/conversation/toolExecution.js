@@ -125,6 +125,13 @@ function rejectBadCallerName(value, identity) {
   };
 }
 
+function escalateAlreadyDone(completed) {
+  for (const fingerprint of completed) {
+    if (String(fingerprint).startsWith('escalate:')) return true;
+  }
+  return false;
+}
+
 function stableFingerprint(action, payload) {
   const normalized = Object.fromEntries(
     Object.entries(payload || {})
@@ -894,7 +901,7 @@ async function executeBrainTools({
         missingSlots: validation.missingSlots || [],
         code: validation.code || null,
       });
-    } else if (completed.has(fingerprint)) {
+    } else if (completed.has(fingerprint) || escalateAlreadyDone(completed)) {
       results.push({ action: 'escalate', status: 'duplicate', fingerprint });
     } else {
       try {
@@ -1210,9 +1217,8 @@ function formatToolConfirmation(results = [], language = 'en') {
   }
 
   if (meaningful.status === 'succeeded') {
-    if (sw) return 'Nimeituma kwa timu.';
-    if (sheng) return "I've sent that to the team.";
-    return "I've sent that to the team.";
+    if (sw || sheng) return 'Sawa. Watakupigia.';
+    return "Okay. They'll call you back.";
   }
   if (meaningful.status === 'invalid') {
     const missing = Array.isArray(meaningful.missingSlots)
@@ -1224,14 +1230,10 @@ function formatToolConfirmation(results = [], language = 'en') {
       return 'Tell me your name so I can reach the team for you.';
     }
   }
-  if (meaningful.status === 'duplicate') {
-    if (sw) return 'Ombi hilo tayari lilitumwa.';
-    if (sheng) return 'Hiyo request tayari ilitumwa.';
-    return 'That request was already sent.';
-  }
-  if (sw) return 'Sijaweza kutuma ombi hilo sasa hivi.';
-  if (sheng) return 'Sijaweza kutuma hiyo request saa hii.';
-  return "I couldn't send that request right now.";
+  if (meaningful.status === 'duplicate') return '';
+  if (sw) return 'Siwezi kuwafikia sasa hivi.';
+  if (sheng) return 'Siwezi kuwafikia saa hii.';
+  return "I can't reach them just now.";
 }
 
 module.exports = {

@@ -208,11 +208,15 @@ export async function deriveLexiconFromRecording(opts: {
 
     if (!matchOk) {
       const reason = String(json.reason || "").trim();
+      const safeReason =
+        reason && !/gemini|api key|this is paid|paid api|GEMINI_API_KEY/i.test(reason)
+          ? reason
+          : "";
       return {
         ok: false,
         heard,
         error:
-          reason ||
+          safeReason ||
           `That didn’t sound like the line we asked for. Please say: “${prompt}”`,
       };
     }
@@ -294,18 +298,10 @@ export async function deriveLexiconFromRecording(opts: {
       return { ok: true, entries: local, source: "local" };
     }
 
-    if (/GEMINI_API_KEY is not configured/i.test(message)) {
+    if (/GEMINI_API_KEY is not configured/i.test(message) || /timed out/i.test(message)) {
       return {
         ok: false,
-        error:
-          "Pronunciation check isn’t configured (missing Gemini). Ask support to set GEMINI_API_KEY.",
-      };
-    }
-    if (/timed out/i.test(message)) {
-      return {
-        ok: false,
-        error:
-          "Verification timed out. Tap Use this take again — or record a shorter, clearer take.",
+        error: "Could not check that take.",
       };
     }
     if (/unsupported|invalid.*(mime|argument)|does not support/i.test(message)) {
@@ -318,8 +314,7 @@ export async function deriveLexiconFromRecording(opts: {
 
     return {
       ok: false,
-      error:
-        "Couldn’t verify your recording right now. Please tap Use this take again in a moment.",
+      error: "Could not check that take.",
     };
   }
 }

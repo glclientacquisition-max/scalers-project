@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { ownerAuthRedirectUrl } from "@/lib/adminHost";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/lib/tenant";
 
@@ -58,7 +59,7 @@ export async function signupAction(
         business_name: businessName,
         whatsapp_notification_number: notificationPhone,
       },
-      emailRedirectTo: undefined,
+      emailRedirectTo: ownerAuthRedirectUrl(),
     },
   });
 

@@ -205,12 +205,12 @@ Reason: Book carpet cleaning
 Intent: book_visit
 Outcome: Visit request saved — confirm on desk.
 Recording: https://…
-Open call: https://scalers-project.vercel.app/calls/{call_id}
+Open call: https://app.scalers.co.ke/calls/{call_id}
 ```
 
 The owner knows who called, what they wanted, and what happened without opening the desk. One tap on `Open call:` opens the exact conversation.
 
-The link is the desk call detail (`/calls/{id}`). Set `DESK_PUBLIC_URL` (or `NEXT_PUBLIC_APP_URL`) on the voice host so the link points at the right desk.
+The link is the desk call detail (`/calls/{id}`). Set `DESK_PUBLIC_URL` (or `NEXT_PUBLIC_APP_URL`) on the voice host to `https://app.scalers.co.ke` so the link opens the owner desk.
 
 Do not put live Brain dump on the SMS. Omit `general_enquiry` intent, greeting/backchannel summaries, and internal resolution notes. Prefer hangup `owner_review` when it is already on the call row. Live vs bar: [`CALL_MESSAGE_GAP.md`](./CALL_MESSAGE_GAP.md).
 

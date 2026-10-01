@@ -10,6 +10,14 @@ const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech } = require('./callCorrectives');
 const { guardSpokenReply } = require('./speechGuard');
+const {
+  fileReadLine,
+  hasReadableFile,
+  looksLikeOfferAsk,
+  nothingOnFileLine,
+  presupposesSavedWork,
+  sanitizeSpokenFileClaim,
+} = require('./fileRead');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
@@ -323,6 +331,10 @@ function looksLikeSpokenServiceDump(text) {
 
 function trimSpokenServiceDump(text, opts = {}) {
   const raw = String(text || '').trim();
+  const callerText = String(
+    opts.callerText || (opts.callerTurns || []).slice(-1)[0] || ''
+  );
+  if (looksLikeOfferAsk(callerText)) return raw;
   if (!looksLikeSpokenServiceDump(raw)) return raw;
   const lang = confirmationLanguage(opts.language);
   if (lang === 'sw' || lang === 'sheng') {
@@ -383,10 +395,22 @@ function polishSpokenReply(text, opts = {}) {
       allowEmpty: true,
     });
   }
-  return trimSpokenServiceDump(
-    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
-    opts
+  const callerText = String(
+    (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
   );
+  spoken = trimSpokenServiceDump(
+    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
+    { ...opts, callerText }
+  );
+  const sanitized = sanitizeSpokenFileClaim(spoken, {
+    callerText,
+    state: opts.state,
+    language: opts.language,
+  });
+  if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
+    return nothingOnFileLine(opts.state, opts.language);
+  }
+  return sanitized;
 }
 
 /**
@@ -548,26 +572,36 @@ function pickSpeechGuaranteeLine({
   });
 }
 
+function emptyTurnRepairLine(language) {
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw' || lang === 'sheng') return 'Samahani, sema tena?';
+  return 'Sorry, say that again?';
+}
+
 /**
- * What to say when a caller turn produced no spoken audio.
- * Successful ANSWER stays quiet and keeps listening (HD_d0f042f5d960,
- * HD_b4cb560bae33). A real Gemini outage still speaks the downtime
- * name-capture once, then the "still can't finish" line. A known name
- * on that outage confirms the save instead of asking again.
+ * Gemini spoke nothing. A real outage still uses the downtime name-capture.
+ * A successful empty turn asks them to say it again once, then stays quiet.
+ * It does not invent the next slot.
  *
  * @returns {{ speak: boolean, kind: string, line: string }}
  */
 function planEmptyGeminiSpeech({
-  nextBestAction = {},
   brainState = {},
   language,
   userText = '',
   llmDown = false,
   alreadyOffered = false,
 } = {}) {
+  const savedForThem = fileReadLine({
+    text: userText,
+    state: brainState,
+    language,
+  });
+  if (!llmDown && savedForThem) {
+    return { speak: true, kind: 'file_read', line: savedForThem };
+  }
   if (llmDown) {
-    const named = callerNameAlreadyKnown({ brainState, userText });
-    if (named) {
+    if (callerNameAlreadyKnown({ brainState, userText })) {
       return {
         speak: true,
         kind: 'reasoning_outage_saved',
@@ -580,20 +614,8 @@ function planEmptyGeminiSpeech({
       line: pickLlmRecoveryLine({ language, alreadyOffered }),
     };
   }
-  const action = String(nextBestAction?.action || '').toUpperCase();
-  if (!action || action === 'ANSWER' || action === 'END') {
-    return { speak: false, kind: 'quiet_continue', line: '' };
-  }
-  const line = pickSpeechGuaranteeLine({
-    nextBestAction,
-    brainState,
-    language,
-    userText,
-  });
-  if (!String(line || '').trim()) {
-    return { speak: false, kind: 'quiet_continue', line: '' };
-  }
-  return { speak: true, kind: 'next_slot', line };
+  if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
 }
 
 /**

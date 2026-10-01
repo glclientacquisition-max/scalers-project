@@ -9,6 +9,10 @@ const SQL_HINT =
 const INTERNAL =
   /row-level security|permission denied|\brls\b|schema cache|column .+ does not exist|relation .+ does not exist|PGRST/i;
 
+/** Production React replaces the real message with a decoder URL. Never show that. */
+const MINIFIED_REACT =
+  /minified react error #\d+|react\.dev\/errors\/\d+|reactjs\.org\/docs\/error-decoder\.html/i;
+
 export function logDeskError(scope: string, raw: unknown): void {
   const message = raw instanceof Error ? raw.message : String(raw ?? "");
   console.error(`[desk:${scope}]`, message || raw);
@@ -16,7 +20,7 @@ export function logDeskError(scope: string, raw: unknown): void {
 
 export function ownerFacingError(raw: unknown, fallback: string): string {
   const message = (raw instanceof Error ? raw.message : String(raw ?? "")).trim();
-  if (!message) return fallback;
+  if (!message || MINIFIED_REACT.test(message)) return fallback;
 
   const stripped = message
     .replace(SQL_HINT, "")
@@ -34,6 +38,20 @@ export function ownerFacingError(raw: unknown, fallback: string): string {
   }
 
   return stripped;
+}
+
+const PROVIDER_LEAK = /gemini|paid api|\bapi key\b|this is paid|GEMINI_API_KEY/i;
+
+/** Owner copy when a review-queue write fails. Loading an empty queue is not a write. */
+export function pronunciationWriteError(
+  kind: "listen" | "review",
+  raw: unknown
+): string {
+  const fallback =
+    kind === "listen" ? "Could not save the listen." : "Could not save the review.";
+  const shown = ownerFacingError(raw, fallback);
+  if (PROVIDER_LEAK.test(shown)) return fallback;
+  return shown;
 }
 
 export function ownerSaveFailed(

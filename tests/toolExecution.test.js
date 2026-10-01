@@ -429,10 +429,8 @@ describe('validated tool execution', () => {
       },
     });
     assert.equal(execution.results[0].status, 'succeeded');
-    assert.equal(
-      formatToolConfirmation(execution.results, 'en'),
-      "I've sent that to the team."
-    );
+    assert.equal(formatToolConfirmation(execution.results, 'en'), "Okay. They'll call you back.");
+    assert.doesNotMatch(formatToolConfirmation(execution.results, 'en'), /sent/i);
   });
 
   it('confirms a visit only after backend success', async () => {
@@ -713,10 +711,8 @@ describe('validated tool execution', () => {
 
     const escalation = execution.results.find((result) => result.action === 'escalate');
     assert.equal(escalation.status, 'failed');
-    assert.equal(
-      formatToolConfirmation(execution.results, 'en'),
-      "I couldn't send that request right now."
-    );
+    assert.equal(formatToolConfirmation(execution.results, 'en'), "I can't reach them just now.");
+    assert.doesNotMatch(formatToolConfirmation(execution.results, 'en'), /sent/i);
   });
 
   it('never promises a live bridge after escalate, even if transfer was queued', async () => {
@@ -732,7 +728,7 @@ describe('validated tool execution', () => {
     });
     assert.equal(execution.results[0].transfer, true);
     const spoken = formatToolConfirmation(execution.results, 'en');
-    assert.equal(spoken, "I've sent that to the team.");
+    assert.equal(spoken, "Okay. They'll call you back.");
     assert.doesNotMatch(spoken, /stay on the line/i);
     assert.doesNotMatch(spoken, /press 0/i);
     assert.doesNotMatch(spoken, /press 1/i);
@@ -750,9 +746,43 @@ describe('validated tool execution', () => {
       formatToolConfirmation([{ action: 'escalate', status: 'succeeded', transfer: true }], 'sheng'),
     ];
     for (const line of lines) {
-      assert.match(line, /sent that to the team|nimeituma kwa timu/i);
+      assert.match(line, /they'll call you back|watakupigia/i);
+      assert.match(line, /^(Okay|Sawa)\b/);
+      assert.doesNotMatch(line, /sent|nimeituma|nimetuma/i);
       assert.doesNotMatch(line, forbidden);
     }
+  });
+
+  it('does not notify or speak a second escalate on the same call', async () => {
+    let calls = 0;
+    const handlers = {
+      escalate: async () => {
+        calls += 1;
+        return { ok: true, channel: 'sms' };
+      },
+    };
+    const first = await executeBrainTools({
+      parsed: parseGeminiResponse(
+        '###TOOL###{"escalate":{"teammate":"Christopher","name":"Alvin","reason":"wants Christopher"}}###ENDTOOL###'
+      ),
+      capabilities,
+      handlers,
+    });
+    assert.equal(calls, 1);
+    assert.equal(first.results[0].status, 'succeeded');
+    assert.equal(formatToolConfirmation(first.results, 'en'), "Okay. They'll call you back.");
+    const second = await executeBrainTools({
+      parsed: parseGeminiResponse(
+        '###TOOL###{"escalate":{"teammate":"Christopher","name":"Alvin","reason":"what was sent"}}###ENDTOOL###'
+      ),
+      capabilities,
+      handlers,
+      completedFingerprints: [first.results[0].fingerprint],
+    });
+    assert.equal(calls, 1);
+    assert.equal(second.results[0].status, 'duplicate');
+    assert.equal(formatToolConfirmation(second.results, 'en'), '');
+    assert.equal(formatToolConfirmation(second.results, 'sw'), '');
   });
 
   it('turns malformed marker JSON into a caller-safe failure', async () => {
@@ -882,7 +912,7 @@ describe('validated tool execution', () => {
         [{ action: 'escalate', status: 'succeeded', channel: 'sms' }],
         'sw'
       ),
-      'Nimeituma kwa timu.'
+      'Sawa. Watakupigia.'
     );
   });
 });

@@ -239,6 +239,6 @@ export async function applyCatalogImportAction(
   revalidatePath("/settings");
   return {
     ok: true,
-    message: `Saved ${merged.length} product${merged.length === 1 ? "" : "s"} to your catalogue. Open Train to review.`,
+    message: "Catalogue saved for the next call.",
   };
 }

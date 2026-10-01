@@ -344,6 +344,7 @@ export function SettingsPageHeader({
   lineLive,
   lineDetail,
   action,
+  alert,
   showBack = false,
   index = false,
   showLine = false,
@@ -353,6 +354,7 @@ export function SettingsPageHeader({
   lineLive: boolean;
   lineDetail?: string;
   action?: ReactNode;
+  alert?: string | null;
   showBack?: boolean;
   index?: boolean;
   showLine?: boolean;
@@ -397,6 +399,11 @@ export function SettingsPageHeader({
         )}
       </div>
       {action}
+      {alert ? (
+        <p className="w-full text-sm text-warn" role="alert">
+          {alert}
+        </p>
+      ) : null}
     </header>
   );
 }

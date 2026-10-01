@@ -10,6 +10,10 @@ const {
   isTimeoutError,
   classifyGeminiError,
   isRetryableGeminiError,
+  isHardGeminiOutage,
+  nextGeminiStreamAttempt,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_BACKUP_MODEL,
   resolvePrefetchedStreamSpeech,
   spokenTextForToolTurn,
 } = require('../src/conversation/geminiVoice');
@@ -176,6 +180,16 @@ describe('spokenTextForToolTurn', () => {
     );
   });
 
+  it('keeps the answer when escalate already happened', () => {
+    assert.equal(
+      spokenTextForToolTurn({
+        spoken: 'What happens next is they call you.',
+        toolResults: [{ action: 'escalate', status: 'duplicate' }],
+      }),
+      'What happens next is they call you.'
+    );
+  });
+
   it('keeps model prose when no outcome tool ran', () => {
     assert.equal(
       spokenTextForToolTurn({
@@ -245,6 +259,71 @@ describe('classifyGeminiError', () => {
     assert.equal(
       isRetryableGeminiError({ status: 429, message: 'RESOURCE_EXHAUSTED overloaded' }),
       true
+    );
+  });
+
+  it('keeps the reach-them line for credits and a denied project only', () => {
+    assert.equal(
+      isHardGeminiOutage({
+        status: 429,
+        message: 'Your prepayment credits are depleted. Please go to AI Studio',
+      }),
+      true
+    );
+    assert.equal(
+      isHardGeminiOutage({ status: 403, message: 'Your project has been denied access' }),
+      true
+    );
+    assert.equal(
+      isHardGeminiOutage({
+        status: 503,
+        message:
+          'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.',
+      }),
+      false
+    );
+    assert.equal(isHardGeminiOutage(new Error('Incomplete JSON segment at the end')), false);
+    assert.equal(isHardGeminiOutage(null), false);
+  });
+});
+
+describe('nextGeminiStreamAttempt', () => {
+  const busy = {
+    status: 503,
+    message: 'This model is currently experiencing high demand.',
+  };
+  const cut = new Error('Incomplete JSON segment at the end');
+  const billing = {
+    status: 429,
+    message: 'Your prepayment credits are depleted.',
+  };
+
+  it('retries a 503 once, then uses the backup once', () => {
+    const first = nextGeminiStreamAttempt({ err: busy, attempt: 0, spoke: false });
+    assert.equal(first.action, 'retry');
+    assert.equal(first.model, DEFAULT_GEMINI_MODEL);
+    const second = nextGeminiStreamAttempt({ err: busy, attempt: 1, spoke: false });
+    assert.equal(second.action, 'backup');
+    assert.equal(second.model, DEFAULT_GEMINI_BACKUP_MODEL);
+    const third = nextGeminiStreamAttempt({ err: busy, attempt: 2, spoke: false });
+    assert.equal(third.action, 'stop');
+  });
+
+  it('retries a cut stream once and does not switch model', () => {
+    const first = nextGeminiStreamAttempt({ err: cut, attempt: 0, spoke: false });
+    assert.equal(first.action, 'retry');
+    const second = nextGeminiStreamAttempt({ err: cut, attempt: 1, spoke: false });
+    assert.equal(second.action, 'stop');
+  });
+
+  it('does not retry after audio started or when credits are gone', () => {
+    assert.equal(
+      nextGeminiStreamAttempt({ err: busy, attempt: 0, spoke: true }).action,
+      'stop'
+    );
+    assert.equal(
+      nextGeminiStreamAttempt({ err: billing, attempt: 0, spoke: false }).action,
+      'stop'
     );
   });
 });

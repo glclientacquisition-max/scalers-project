@@ -239,9 +239,9 @@ const emptyAnswerAfterName = planEmptyGeminiSpeech({
   userText: "Yeah, I'm Alvin.",
   llmDown: false,
 });
-assert.equal(emptyAnswerAfterName.speak, false);
-assert.equal(emptyAnswerAfterName.kind, 'quiet_continue');
-assert.equal(emptyAnswerAfterName.line, '');
+assert.equal(emptyAnswerAfterName.speak, true);
+assert.equal(emptyAnswerAfterName.kind, 'hear_again');
+assert.equal(emptyAnswerAfterName.line, 'Sorry, say that again?');
 assert.equal(
   pickSpeechGuaranteeLine({
     nextBestAction: { action: 'ANSWER' },
@@ -304,8 +304,9 @@ const emptyAnswerNoName = planEmptyGeminiSpeech({
   userText: 'Are you open?',
   llmDown: false,
 });
-assert.equal(emptyAnswerNoName.speak, false);
-assert.equal(emptyAnswerNoName.line, '');
+assert.equal(emptyAnswerNoName.speak, true);
+assert.equal(emptyAnswerNoName.kind, 'hear_again');
+assert.equal(emptyAnswerNoName.line, 'Sorry, say that again?');
 
 // Live leftover HD_bc9f610692de: bookings ask after the name was already in
 // must not speech-guarantee another name ask, and must not invent a when slot.

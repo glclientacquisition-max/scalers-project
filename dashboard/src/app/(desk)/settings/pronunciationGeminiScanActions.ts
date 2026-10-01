@@ -12,24 +12,24 @@ import {
   parseDismissals,
   parseReviewQueue,
   parseScanLogs,
-  partitionAutoApplyCandidates,
   scanCallsWithGemini,
-  stampCandidateApproved,
   type PronunciationReviewCandidate,
   type PronunciationScanDismissal,
 } from "@/lib/pronunciationGeminiScan";
 import {
   GEMINI_SCAN_MAX_BATCH,
 } from "@/lib/pronunciationGeminiScanPrompt";
-import { collectKnownPronunciationHints } from "@/lib/pronunciationMine";
 import {
   lexiconForStorage,
-  mergeLexiconEntries,
   mergeLexiconEntry,
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
-import { logDeskError, ownerFacingError, ownerSaveFailed } from "@/lib/ownerFacingError";
+import {
+  logDeskError,
+  ownerSaveFailed,
+  pronunciationWriteError,
+} from "@/lib/ownerFacingError";
 
 export type GeminiScanState = {
   error?: string;
@@ -44,7 +44,7 @@ export type GeminiScanState = {
   needsConfirm?: boolean;
   estimatedCalls?: number;
   batchSize?: number;
-  /** Profile-name fixes applied automatically after the scan. */
+  /** Always 0. A listen does not write tts_lexicon. */
   autoAppliedCount?: number;
   lexicon?: ReturnType<typeof parseTtsLexicon>;
 };
@@ -60,13 +60,22 @@ export type GeminiScanQueueState = {
 
 const scanHits = new Map<string, number[]>();
 
+function ownerListenError(raw: unknown): string {
+  const message = (raw instanceof Error ? raw.message : String(raw ?? "")).trim();
+  if (/GEMINI_API_KEY|not configured/i.test(message)) return "Listen is unavailable.";
+  if (/\b429\b|rate limit|resource exhausted|quota/i.test(message)) {
+    return "Wait a few minutes.";
+  }
+  return "Could not listen.";
+}
+
 function rateLimitScan(tenantId: string): string | null {
   const now = Date.now();
   const windowMs = 15 * 60 * 1000;
   const max = 6;
   const prev = (scanHits.get(tenantId) || []).filter((t) => now - t < windowMs);
   if (prev.length >= max) {
-    return "Gemini Scan rate limit. Wait a few minutes, or review the queue you already have.";
+    return "Wait a few minutes.";
   }
   prev.push(now);
   scanHits.set(tenantId, prev);
@@ -79,6 +88,24 @@ function tenantQueueFields(tenant: Record<string, unknown>) {
     dismissals: parseDismissals(tenant.pronunciation_scan_dismissals),
     logs: parseScanLogs(tenant.pronunciation_gemini_scan_logs),
   };
+}
+
+/** Settings tenant select omits these columns. Read them here or the queue looks empty. */
+async function readQueueFields(tenantId: string) {
+  const workspace = await createWorkspaceDataClient();
+  if (!workspace) return { error: "Not signed in." as const };
+  const { data, error } = await workspace.client
+    .from("tenants")
+    .select(
+      "pronunciation_review_queue, pronunciation_scan_dismissals, pronunciation_gemini_scan_logs"
+    )
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (error) {
+    logDeskError("pronunciation-review-load", error.message);
+    return { error: "Could not load review." as const };
+  }
+  return tenantQueueFields((data || {}) as Record<string, unknown>);
 }
 
 async function persistQueueFields(opts: {
@@ -104,7 +131,7 @@ async function persistQueueFields(opts: {
     .eq("id", opts.tenantId);
   if (error) {
     logDeskError("pronunciation-scan", error.message);
-    return ownerFacingError(error.message, "Could not save pronunciation review.");
+    return pronunciationWriteError("review", error.message);
   }
   return null;
 }
@@ -114,65 +141,53 @@ export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
-  if (!(await isAuthenticated())) {
-    return { error: "Sign in to load review queue." };
+  try {
+    if (!(await isAuthenticated())) {
+      return { error: "Sign in to load review queue." };
+    }
+    const tenant = await getCurrentTenant();
+    if (!tenant) return { error: "No workspace linked to this account." };
+    const id = String(formData.get("id") || "").trim();
+    if (!id || id !== tenant.id) return { error: "Forbidden." };
+
+    const fields = await readQueueFields(tenant.id);
+    if ("error" in fields) return { error: fields.error };
+    const pending = fields.queue.filter((c) => c.status === "pending");
+    return {
+      ok: true,
+      queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
+      sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
+    };
+  } catch (err) {
+    logDeskError("pronunciation-review-load", err instanceof Error ? err.message : err);
+    return { error: "Could not load review." };
   }
-  const tenant = await getCurrentTenant();
-  if (!tenant) return { error: "No workspace linked to this account." };
-  const id = String(formData.get("id") || "").trim();
-  if (!id || id !== tenant.id) return { error: "Forbidden." };
-
-  const { queue } = tenantQueueFields(tenant as Record<string, unknown>);
-  const pending = queue.filter((c) => c.status === "pending");
-  return {
-    ok: true,
-    queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
-    sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
-  };
-}
-
-function profileHintsFromTenant(tenant: Record<string, unknown>): string[] {
-  const teamRaw = tenant.team_directory;
-  const team = Array.isArray(teamRaw)
-    ? teamRaw.map((m) =>
-        m && typeof m === "object"
-          ? { name: String((m as { name?: string }).name || "") }
-          : { name: String(m || "") }
-      )
-    : [];
-  const locRaw = tenant.business_locations;
-  const locations = Array.isArray(locRaw)
-    ? locRaw.map((l) => {
-        const row = l && typeof l === "object" ? (l as Record<string, unknown>) : {};
-        return {
-          label: String(row.label || ""),
-          address: String(row.address || ""),
-          landmark: String(row.landmark || ""),
-        };
-      })
-    : [];
-  return collectKnownPronunciationHints({
-    businessName: String(tenant.business_name || ""),
-    agentName: String(tenant.agent_name || ""),
-    team,
-    locations,
-  });
 }
 
 /**
- * Run Gemini Scan over recent call recordings.
- * Safe auto-apply: high-confidence profile-name speech fixes write lexicon
- * (stamped with the signed-in owner). Everything else stays pending.
+ * Listen to recent call recordings and queue drafts.
+ * High-confidence profile names stay on Needs review. Nothing writes tts_lexicon here.
  */
 export async function geminiScanRecentCallsAction(
   _prev: GeminiScanState,
   formData: FormData
 ): Promise<GeminiScanState> {
+  try {
+    return await runGeminiScanRecentCalls(formData);
+  } catch (err) {
+    logDeskError("pronunciation-scan", err instanceof Error ? err.message : err);
+    return { error: ownerListenError(err) };
+  }
+}
+
+async function runGeminiScanRecentCalls(
+  formData: FormData
+): Promise<GeminiScanState> {
   if (!(await isAuthenticated())) {
-    return { error: "Sign in to run Gemini Scan." };
+    return { error: "Could not listen." };
   }
   const user = await getAuthUser();
-  if (!user?.id) return { error: "Sign in to run Gemini Scan." };
+  if (!user?.id) return { error: "Could not listen." };
 
   const tenant = await getCurrentTenant();
   if (!tenant) return { error: "No workspace linked to this account." };
@@ -193,7 +208,7 @@ export async function geminiScanRecentCallsAction(
       needsConfirm: true,
       estimatedCalls: batchSize,
       batchSize,
-      message: `Gemini will listen to up to ${batchSize} recent recordings (paid API). Confirm to continue.`,
+      message: `Listen to the last ${batchSize} recordings.`,
     };
   }
 
@@ -201,9 +216,7 @@ export async function geminiScanRecentCallsAction(
   if (limited) return { error: limited };
 
   if (!process.env.GEMINI_API_KEY) {
-    return {
-      error: "Gemini Scan is not available on this workspace.",
-    };
+    return { error: "Listen is unavailable." };
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -217,7 +230,8 @@ export async function geminiScanRecentCallsAction(
     .limit(batchSize);
 
   if (callErr) {
-    return ownerSaveFailed("pronunciation-scan-calls", callErr.message, "Could not load calls.");
+    logDeskError("pronunciation-scan-calls", callErr.message);
+    return { error: ownerListenError(callErr) };
   }
 
   const withRecording = (calls || []).filter((c) =>
@@ -229,12 +243,12 @@ export async function geminiScanRecentCallsAction(
       candidates: [],
       scannedCalls: 0,
       skippedCalls: (calls || []).length,
-      message:
-        "No recent calls with recordings to listen to. Heuristic Scan recent calls still works on transcripts.",
+      message: "No recordings to listen to.",
     };
   }
 
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const lexicon = parseTtsLexicon(
     formData.get("current_lexicon") ??
       (tenant as { tts_lexicon?: unknown }).tts_lexicon
@@ -255,35 +269,11 @@ export async function geminiScanRecentCallsAction(
       existingQueue: fields.queue,
     });
   } catch (err) {
-    return {
-      error:
-        err instanceof Error
-          ? `Gemini Scan failed: ${err.message}`
-          : "Gemini Scan failed.",
-    };
+    logDeskError("pronunciation-scan", err instanceof Error ? err.message : err);
+    return { error: ownerListenError(err) };
   }
 
-  const hints = profileHintsFromTenant(tenant as Record<string, unknown>);
-  const { autoApply, pending: forReview } = partitionAutoApplyCandidates(
-    result.candidates,
-    hints
-  );
-
-  const stampedAuto = autoApply.map((c) =>
-    stampCandidateApproved(c, { approvedBy: user.id, autoApplied: true })
-  );
-  const autoEntries = stampedAuto
-    .map((c) => candidateToLexiconEntry(c))
-    .filter(
-      (e): e is NonNullable<ReturnType<typeof candidateToLexiconEntry>> =>
-        Boolean(e)
-    );
-
-  let nextLexicon = lexicon;
-  if (autoEntries.length) {
-    nextLexicon = parseTtsLexicon(mergeLexiconEntries(lexicon, autoEntries));
-  }
-
+  const forReview = result.candidates;
   const nextQueue = mergeReviewQueue(fields.queue, forReview);
   const nextLogs = appendScanLog(fields.logs, {
     ...result.log,
@@ -295,44 +285,27 @@ export async function geminiScanRecentCallsAction(
       tenant: tenant.id,
       callIds: result.log.call_ids,
       candidates: result.candidates.length,
-      autoApplied: autoEntries.length,
+      autoApplied: 0,
       pendingReview: forReview.length,
       errors: result.errors.length,
       at: result.log.at,
     })
   );
 
-  const storedLexicon = lexiconForStorage(nextLexicon);
   const { error: persistErr } = await workspace.client
     .from("tenants")
     .update({
       pronunciation_review_queue: nextQueue,
       pronunciation_gemini_scan_logs: nextLogs,
-      ...(autoEntries.length ? { tts_lexicon: storedLexicon } : {}),
     })
     .eq("id", tenant.id);
 
   if (persistErr) {
-    return ownerSaveFailed(
-      "pronunciation-scan-persist",
-      persistErr.message,
-      "Could not save pronunciation review."
-    );
+    logDeskError("pronunciation-scan-persist", persistErr.message);
+    return { error: pronunciationWriteError("listen", persistErr.message) };
   }
 
   const pending = nextQueue.filter((c) => c.status === "pending");
-  const parts: string[] = [];
-  if (autoEntries.length) {
-    parts.push(
-      `Auto-applied ${autoEntries.length} high-confidence profile name${autoEntries.length === 1 ? "" : "s"}`
-    );
-  }
-  if (forReview.length) {
-    parts.push(`${forReview.length} left for review`);
-  }
-  if (!parts.length) {
-    parts.push("No new high-confidence issues");
-  }
 
   return {
     ok: true,
@@ -340,10 +313,8 @@ export async function geminiScanRecentCallsAction(
     queue: pending,
     scannedCalls: withRecording.length,
     skippedCalls: (calls || []).length - withRecording.length,
-    errors: result.errors,
-    autoAppliedCount: autoEntries.length,
-    lexicon: nextLexicon,
-    message: `Scan finished. ${parts.join(". ")}.`,
+    autoAppliedCount: 0,
+    message: `${pending.length} left for review.`,
   };
 }
 
@@ -366,7 +337,8 @@ export async function approveGeminiScanCandidateAction(
   const editedSay = String(formData.get("edited_say") || "").trim();
   if (!candidateId) return { error: "Missing candidate." };
 
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const idx = fields.queue.findIndex((c) => c.id === candidateId);
   if (idx < 0) return { error: "Candidate not found (maybe already reviewed)." };
   const candidate = { ...fields.queue[idx] };
@@ -407,8 +379,7 @@ export async function approveGeminiScanCandidateAction(
       const pending = nextQueue.filter((c) => c.status === "pending");
       return {
         ok: true,
-        message:
-          "Dismissed STT hint (not written to pronunciation lexicon).",
+        message: "Dismissed.",
         queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
         sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
       };
@@ -455,7 +426,7 @@ export async function approveGeminiScanCandidateAction(
   const pending = nextQueue.filter((c) => c.status === "pending");
   return {
     ok: true,
-    message: "Approved. Live pronunciation updates on the next call.",
+    message: "Saved.",
     lexicon: merged,
     queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
     sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
@@ -481,7 +452,8 @@ export async function dismissGeminiScanCandidateAction(
       : "rejected";
   if (!candidateId) return { error: "Missing candidate." };
 
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const candidate = fields.queue.find((c) => c.id === candidateId);
   if (!candidate) return { error: "Candidate not found." };
 
@@ -516,96 +488,7 @@ export async function dismissGeminiScanCandidateAction(
 }
 
 /**
- * One-click: approve every pending high-confidence AGENT_MISPRONUNCIATION.
- * Owner stamp required — this is an explicit batch approve, not silent apply.
- */
-export async function batchApproveHighConfidenceGeminiAction(
-  _prev: GeminiScanQueueState,
-  formData: FormData
-): Promise<GeminiScanQueueState> {
-  if (!(await isAuthenticated())) {
-    return { error: "Sign in to approve." };
-  }
-  const user = await getAuthUser();
-  if (!user?.id) return { error: "Sign in to approve." };
-
-  const tenant = await getCurrentTenant();
-  if (!tenant) return { error: "No workspace linked to this account." };
-  const id = String(formData.get("id") || "").trim();
-  if (!id || id !== tenant.id) return { error: "Forbidden." };
-
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
-  const targets = fields.queue.filter(
-    (c) =>
-      c.status === "pending" &&
-      c.type === "AGENT_MISPRONUNCIATION" &&
-      c.confidence === "high" &&
-      c.source === "gemini_scan"
-  );
-  if (!targets.length) {
-    return {
-      ok: true,
-      message: "No high-confidence speech fixes waiting.",
-      queue: fields.queue.filter(
-        (c) => c.status === "pending" && c.type === "AGENT_MISPRONUNCIATION"
-      ),
-      sttHints: fields.queue.filter(
-        (c) => c.status === "pending" && c.type === "LIKELY_MISHEARD"
-      ),
-    };
-  }
-
-  const stamped = targets.map((c) =>
-    stampCandidateApproved(c, { approvedBy: user.id, autoApplied: true })
-  );
-  const entries = stamped
-    .map((c) => candidateToLexiconEntry(c))
-    .filter(Boolean) as NonNullable<ReturnType<typeof candidateToLexiconEntry>>[];
-
-  if (!entries.length) {
-    return { error: "Could not build safe lexicon entries from those suggestions." };
-  }
-
-  const existing = parseTtsLexicon(
-    (tenant as { tts_lexicon?: unknown }).tts_lexicon
-  );
-  const clientLexicon = parseTtsLexicon(formData.get("current_lexicon"));
-  const base = clientLexicon.length ? clientLexicon : existing;
-  const merged = parseTtsLexicon(mergeLexiconEntries(base, entries));
-  const appliedIds = new Set(stamped.map((c) => c.id));
-  const nextQueue = fields.queue.filter((c) => !appliedIds.has(c.id));
-
-  const workspace = await createWorkspaceDataClient();
-  if (!workspace) return { error: "Not signed in." };
-
-  const { error } = await workspace.client
-    .from("tenants")
-    .update({
-      tts_lexicon: lexiconForStorage(merged),
-      pronunciation_review_queue: nextQueue,
-    })
-    .eq("id", tenant.id);
-
-  if (error) {
-    return ownerSaveFailed(
-      "pronunciation-scan-batch",
-      error.message,
-      "Could not save pronunciation."
-    );
-  }
-
-  const pending = nextQueue.filter((c) => c.status === "pending");
-  return {
-    ok: true,
-    message: `Applied ${entries.length} high-confidence fix${entries.length === 1 ? "" : "es"} to live pronunciation.`,
-    lexicon: merged,
-    queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
-    sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
-  };
-}
-
-/**
- * Queue an approved-path recording practice line from a Gemini candidate
+ * Queue a practice line from a listen candidate
  * without writing the AI phonetic guess to the live lexicon.
  */
 export async function queueGeminiCandidateForRecordingAction(
@@ -621,7 +504,8 @@ export async function queueGeminiCandidateForRecordingAction(
   if (!id || id !== tenant.id) return { error: "Forbidden." };
 
   const candidateId = String(formData.get("candidate_id") || "").trim();
-  const fields = tenantQueueFields(tenant as Record<string, unknown>);
+  const fields = await readQueueFields(tenant.id);
+  if ("error" in fields) return { error: fields.error };
   const candidate = fields.queue.find((c) => c.id === candidateId);
   if (!candidate) return { error: "Candidate not found." };
   if (candidate.type !== "AGENT_MISPRONUNCIATION") {
@@ -638,7 +522,6 @@ export async function queueGeminiCandidateForRecordingAction(
     sttHints: fields.queue.filter(
       (c) => c.status === "pending" && c.type === "LIKELY_MISHEARD"
     ),
-    message:
-      "Queued for Practice. Record real audio. That is more reliable than the AI phonetic guess.",
+    message: "Queued for Practice.",
   };
 }

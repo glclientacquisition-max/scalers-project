@@ -5,6 +5,19 @@ general, and any future pack) runs through the same gates. Playbooks change
 what the Brain asks for and what it saves. They cannot change what it is
 allowed to say or when a tool may fire. The gates live in code, not in the
 prompt, so a model that leaks still cannot reach the caller or the database.
+How-are-you, Okay with no job open, and a bare name go to Gemini. The model
+answers the last thing said. Code still speaks the catalogue, hours, coverage,
+leave-it, the visit-time ladder, and tool results. A streamed 503 retries the
+same model once if nothing was spoken, then tries the backup model once.
+Credits and a denied project are not retried. A shared line does not order "ask who is
+speaking" on a greeting or a bookings question. The fact card says not to use
+the file name until they say who they are. An empty successful Gemini turn
+says "Sorry, say that again?" once. The downtime name-capture stays the
+credits-down path. A file read ("which bookings", "previous booking",
+"read them", "what do I have on hold") is not a new booking. If this
+speaker has nothing saved, Voice says so and does not invent a visit,
+an order, or a service list. Home services and retail use the same gate.
+A bound file with a real visit or hold is still read by the model.
 
 Runtime: `server.js` media loop. Offline twin: `tests/helpers/brainSimulator.js`.
 Proof: `tests/brainSimulation.test.js` (in `npm run test:brain`).
@@ -18,7 +31,7 @@ flowchart TD
   ENT --> OBS[observeCallerTurn<br/>slots, consentAck, nonConsentAck,<br/>leaveIt, pendingHour, timeWaived]
   OBS --> NBA[determineNextBestAction<br/>ASK_CLARIFICATION / ANSWER /<br/>CREATE_REQUEST / ESCALATE / END]
   NBA --> LOCAL{resolveLocalReply<br/>turnPolicy}
-  LOCAL -->|identity, coverage ask,<br/>leave it, visit block,<br/>time ladder, corrective, phatic| SPEAK1[Speak fixed line<br/>no model, no tool]
+  LOCAL -->|identity, coverage ask,<br/>leave it, visit block,<br/>time ladder, job corrective| SPEAK1[Speak fixed line<br/>no model, no tool]
   LOCAL -->|nothing local| GEM[Gemini stream]
   GEM --> CHUNK[Every chunk:<br/>prepareStreamedSpeech<br/>guardSpokenReply]
   GEM --> PARSE[parseGeminiResponse<br/>tool markers]
@@ -89,6 +102,10 @@ Runs on the parsed markers plus anything the injectors added.
 - Escalate carries the caller's stated need, not the decision reason.
 - `executeBrainTools` still validates rows (hours, catalogue titles, junk
   names) and returns `invalid` instead of writing.
+- Escalate speaks one callback line (`Okay. They'll call you back.` / `Sawa. Watakupigia.`).
+  Model sentences that narrate the send are dropped, including after the tool
+  succeeds. A second escalate on the same call does not notify again and does
+  not speak again.
 
 ## Invariants the simulator checks after every turn
 

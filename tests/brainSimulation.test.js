@@ -471,12 +471,25 @@ describe('speech gate', () => {
       guardSpokenReply("Stay on the line, I'm transferring you now. May I have your name?", ctx),
       'May I have your name?'
     );
+    const narrated = guardSpokenReply(
+      "I've sent that to the team. I am escalating this emergency immediately to Alvin Kiprotich Yegon.",
+      { ...ctx, toolResults: [{ status: 'succeeded', action: 'escalate' }] }
+    );
+    assert.doesNotMatch(narrated, /sent/i);
+    assert.doesNotMatch(narrated, /escalat/i);
     assert.equal(
       guardSpokenReply(
-        "I've sent that to the team. I am escalating this emergency immediately to Alvin Kiprotich Yegon.",
-        { ...ctx, toolResults: [{ status: 'succeeded', action: 'escalate' }] }
+        'I sent your name, Alvin, along with your request to speak directly with Christopher.',
+        { ...ctx, toolResults: [{ status: 'succeeded', action: 'escalate' }], allowEmpty: true }
       ),
-      "I've sent that to the team."
+      ''
+    );
+    assert.equal(
+      guardSpokenReply('Is there anything else I can help you with right now, Alvin?', {
+        ...ctx,
+        toolResults: [{ status: 'succeeded', action: 'escalate' }],
+      }),
+      'Is there anything else I can help you with right now, Alvin?'
     );
     assert.equal(
       guardSpokenReply("I've saved that.", { ...ctx, toolResults: [{ status: 'succeeded' }] }),

@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { TenantRow } from "@/lib/supabase";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { KnowledgeIngestPanel } from "@/components/KnowledgeIngestPanel";
@@ -19,6 +17,7 @@ import {
   type BusinessSettingsTab,
   type SettingsPanel,
 } from "@/lib/businessSettingsNav";
+import { settingsStatusKey } from "@/lib/settingsOptionStatus";
 import {
   SettingsPageHeader,
   settingsConsoleClass,
@@ -48,25 +47,21 @@ function SettingsChevron() {
   );
 }
 
-function SettingsIdentityRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    if (!window.matchMedia("(min-width: 768px)").matches) return;
-    router.replace("/settings?tab=train&panel=identity");
-  }, [router]);
-  return null;
-}
-
 function SettingsMenu({
   tab,
   trainPanel,
   variant,
+  optionStatus,
 }: {
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
   variant: "index" | "rail";
+  optionStatus: Record<string, string>;
 }) {
   const isRail = variant === "rail";
+  const railListClass = "w-max max-w-full space-y-0.5";
+  const railLinkClass =
+    "inline-flex min-h-11 w-full items-center justify-start gap-2 border-l-2 px-3 text-sm font-medium";
   return (
     <nav
       aria-label="Settings sections"
@@ -75,66 +70,50 @@ function SettingsMenu({
     >
       {SETTINGS_NAV.map((section, index) => (
         <section key={section.id} className={index === 0 ? undefined : "mt-4"}>
-          <h2 className={`${settingsGroupTitleClass} mb-1.5 px-1`}>{section.title}</h2>
-          {isRail ? (
-            <ul className="w-max max-w-full space-y-0.5">
-              {section.items.map((item) => {
-                const active = settingsNavItemActive(item.target, tab, trainPanel, {
-                  selectHubIdentity: isRail,
-                });
-                const key =
-                  item.target.tab === "train"
-                    ? `${item.target.tab}-${item.target.panel}`
-                    : item.target.tab;
-                return (
-                  <li key={key}>
-                    <Link
-                      href={settingsNavHref(item.target)}
-                      aria-current={active ? "page" : undefined}
-                      className={[
-                        `inline-flex min-h-11 w-full items-center justify-start border-l-2 px-3 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`,
-                        active
+          <h2 className={`${settingsGroupTitleClass} mb-1 px-1`}>{section.title}</h2>
+          <ul className={isRail ? railListClass : "w-full"}>
+            {section.items.map((item) => {
+              const active = settingsNavItemActive(item.target, tab, trainPanel);
+              const key = settingsStatusKey(item.target);
+              const status = optionStatus[key] || "";
+              return (
+                <li key={key} className={isRail ? undefined : "border-b border-line"}>
+                  <Link
+                    href={settingsNavHref(item.target)}
+                    aria-current={active ? "page" : undefined}
+                    className={[
+                      isRail
+                        ? `${railLinkClass} ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`
+                        : `flex min-h-12 w-full items-center gap-3 px-1 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent`,
+                      active
+                        ? isRail
                           ? "border-accent text-accent-deep"
-                          : "border-transparent text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
-                      ].join(" ")}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <ul className="w-full overflow-hidden rounded-xl border border-line bg-surface">
-              {section.items.map((item, itemIndex) => {
-                const active = settingsNavItemActive(item.target, tab, trainPanel);
-                const key =
-                  item.target.tab === "train"
-                    ? `${item.target.tab}-${item.target.panel}`
-                    : item.target.tab;
-                return (
-                  <li
-                    key={key}
-                    className={itemIndex === 0 ? undefined : "border-t border-line"}
-                  >
-                    <Link
-                      href={settingsNavHref(item.target)}
-                      aria-current={active ? "page" : undefined}
-                      className={[
-                        `flex min-h-12 items-center justify-between gap-3 px-4 text-sm font-medium ${deskShiftClass} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent`,
-                        active
-                          ? "bg-accent/10 text-accent-deep"
+                          : "text-accent-deep"
+                        : isRail
+                          ? "border-transparent text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]"
                           : "text-ink hover:bg-accent/[0.04] active:bg-accent/[0.08]",
-                      ].join(" ")}
-                    >
+                    ].join(" ")}
+                  >
+                    <span className={isRail ? "max-w-[7.5rem] truncate" : "min-w-0 flex-1 truncate"}>
                       {item.label}
-                      <SettingsChevron />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    </span>
+                    {status ? (
+                      <span
+                        className={
+                          isRail
+                            ? "max-w-[5.5rem] shrink-0 truncate text-xs font-normal text-ink-soft"
+                            : "max-w-[45%] shrink-0 truncate text-sm font-normal text-ink-soft"
+                        }
+                      >
+                        {status}
+                      </span>
+                    ) : null}
+                    {isRail ? null : <SettingsChevron />}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       ))}
     </nav>
@@ -177,12 +156,14 @@ export function BusinessSettingsShell({
   tab,
   trainPanel,
   curatedVoices = [],
+  optionStatus = {},
   liveTransferExecutor = false,
 }: {
   tenant: TenantRow;
   tab: BusinessSettingsTab;
   trainPanel: SettingsPanel;
   curatedVoices?: CuratedSonioxVoice[];
+  optionStatus?: Record<string, string>;
   liveTransferExecutor?: boolean;
 }) {
   const formPanel: SettingsPanel =
@@ -204,42 +185,37 @@ export function BusinessSettingsShell({
     JSON.stringify(tenant.social_handles || {}),
   ].join(":");
 
-  const rail = (
-    <div className={settingsRailWrapClass}>
-      <SettingsMenu tab={tab} trainPanel={trainPanel} variant="rail" />
-    </div>
-  );
-
   if (isMenu) {
     return (
-      <>
-        <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
-          <SettingsPageHeader
-            businessName={businessName}
-            lineLive={lineLive}
-            lineDetail={lineDetail}
-            index
-          />
-          <div className="mt-4">
-            <SettingsMenu tab={tab} trainPanel={trainPanel} variant="index" />
-          </div>
-        </div>
-        <div className="hidden w-full min-w-0 md:block" data-pull-dirty-guard="">
-          <SettingsIdentityRedirect />
-          <TenantForm
-            key={tenantFormKey}
-            tenant={tenant}
-            panel="identity"
-            curatedVoices={curatedVoices}
-            heading="Identity"
-            sidebar={rail}
-            liveTransferExecutor={liveTransferExecutor}
-            showBack={false}
+      <div className="w-full min-w-0 md:hidden" data-settings-console="" data-pull-dirty-guard="">
+        <SettingsPageHeader
+          businessName={businessName}
+          lineLive={lineLive}
+          lineDetail={lineDetail}
+          index
+        />
+        <div className="mt-4">
+          <SettingsMenu
+            tab={tab}
+            trainPanel={trainPanel}
+            variant="index"
+            optionStatus={optionStatus}
           />
         </div>
-      </>
+      </div>
     );
   }
+
+  const rail = (
+    <div className={settingsRailWrapClass}>
+      <SettingsMenu
+        tab={tab}
+        trainPanel={trainPanel}
+        variant="rail"
+        optionStatus={optionStatus}
+      />
+    </div>
+  );
 
   return (
     <div className="w-full min-w-0" data-settings-console="" data-desk-nested="" data-pull-dirty-guard="">

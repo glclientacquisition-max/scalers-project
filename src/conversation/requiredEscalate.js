@@ -95,7 +95,9 @@ function formatEscalateActionDirective(state = {}) {
       connect
         ? 'Spoken line: say only that you will try to connect them. Never claim the transfer is done.'
         : 'Do not only share a WhatsApp or phone number — the escalate tool must fire so the team is notified.',
-      connect ? '' : 'Spoken line: say only that you will try to send the request to the team.',
+      connect
+        ? ''
+        : 'Spoken line: speak nothing. Do not say you sent, passed, or forwarded anything. Do not describe what you sent.',
     ]
       .filter(Boolean)
       .join('\n');
