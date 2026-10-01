@@ -1,16 +1,26 @@
-import Link from "next/link";
-import { btnPrimary, pageTitleClass } from "@/components/ui/deskChrome";
+import { DeskRecovery } from "@/components/ui/DeskRecovery";
+import { getAuthUser, isLegacyAuthenticated } from "@/lib/auth";
 
-export default function NotFound() {
+/** One recovery link from the session. Logged-out typos stay here, not on the desk gate. */
+export default async function NotFound() {
+  const owner = await getAuthUser();
+  let href = "/";
+  let action = "Home";
+  if (owner) {
+    href = "/home";
+    action = "Overview";
+  } else if (await isLegacyAuthenticated()) {
+    href = "/admin";
+    action = "Admin";
+  }
+
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6 py-16">
-      <div className="max-w-md text-center">
-        <h1 className={pageTitleClass}>Page not found</h1>
-        <p className="mt-3 text-sm text-ink-soft">That address is not a Scalers page.</p>
-        <Link href="/home" className={`${btnPrimary} mt-6`}>
-          Overview
-        </Link>
-      </div>
-    </main>
+    <DeskRecovery
+      screen
+      title="Page not found"
+      line="That address is not a Scalers page."
+      href={href}
+      action={action}
+    />
   );
 }

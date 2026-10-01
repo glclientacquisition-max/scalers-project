@@ -68,9 +68,11 @@ describe("desk resilience and anti-slop", () => {
     assert.match(offline, /navigator\.onLine/);
     assert.match(layout, /DeskOffline/);
     assert.match(call, /Could not load this call/);
-    assert.match(call, /if \(!call\) notFound/);
+    assert.match(call, /This call is not in the inbox/);
+    assert.doesNotMatch(call, /notFound\s*\(/);
     assert.match(contact, /Could not load this contact/);
-    assert.match(contact, /if \(!contact\) notFound/);
+    assert.match(contact, /This contact is not in Contacts/);
+    assert.doesNotMatch(contact, /notFound\s*\(/);
     assert.match(load, /partialError/);
     assert.match(load, /Could not load some inbox rows/);
     assert.match(home, /inbox\.partialError/);

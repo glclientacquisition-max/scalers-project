@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { ContactActionDock } from "@/components/ContactActionDock";
 import { ContactFavouriteButton } from "@/components/ContactFavouriteButton";
 import { ContactNameForm } from "@/components/ContactNameForm";
@@ -8,6 +7,8 @@ import { ContactNotesForm } from "@/components/ContactNotesForm";
 import { deskShiftClass } from "@/components/ui/deskChrome";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
+import { DeskNoWorkspace } from "@/components/ui/DeskNoWorkspace";
+import { DeskRecovery } from "@/components/ui/DeskRecovery";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import {
   callFromContactHref,
@@ -114,16 +115,28 @@ async function ContactDetailBody({ params, searchParams }: ContactDetailPageProp
   const historyFilter = resolveContactHistoryFilter(sp.history);
   const historyQ = sanitizeSearchQuery(sp.hq);
   const tenant = await getCurrentTenant();
-  if (!tenant) notFound();
+  if (!tenant) return <DeskNoWorkspace />;
 
   const workspace = await createWorkspaceDataClient();
-  if (!workspace) notFound();
+  if (!workspace) return <DeskNoWorkspace />;
 
   const { contact, error } = await loadContactById(workspace.client, tenant.id, id);
   if (error) {
-    return <DeskLoadError>Could not load this contact.</DeskLoadError>;
+    return (
+      <DeskLoadError backHref="/contacts" backLabel="Contacts">
+        Could not load this contact.
+      </DeskLoadError>
+    );
   }
-  if (!contact) notFound();
+  if (!contact) {
+    return (
+      <DeskRecovery
+        title="This contact is not in Contacts."
+        href="/contacts"
+        action="Contacts"
+      />
+    );
+  }
 
   const timeline = await loadContactTimeline(
     workspace.client,

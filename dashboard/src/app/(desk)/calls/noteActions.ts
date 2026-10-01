@@ -174,7 +174,7 @@ async function sendOwnerCallerSms(
     body,
   });
   if (!sent.ok) {
-    if (sent.reason === "sms_not_configured") return { error: "SMS is not configured." };
+    if (sent.reason === "sms_not_configured") return { error: "Text is unavailable." };
     if (sent.reason === "sms_allowance_exhausted") {
       return { error: "Included SMS used. Enable on-demand on Wallet." };
     }
