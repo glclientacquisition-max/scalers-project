@@ -166,9 +166,10 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 | CSV / Paste / Website (products) | segmented (3) | source mode | This device |
 | Text / URL | textarea `rows={2}` / input | extract payload | This device until Add |
 | Scan | filled, docked | draft | This device |
-| Include / keep switches | switch | apply flags | Whole business on Add |
+| Knowledge include switches | switch, start off | apply flags | Whole business on Add |
+| Row keep switches | switch | selected rows | Whole business on Add |
 | Keep or replace | segmented (2) | `merge_mode` | Whole business on Add |
-| Add to my assistant / Add to catalogue | filled | tenant fields + compile | Whole business + assistant on calls |
+| Add selected / Add to catalogue | filled | checked sections / catalogue | Whole business + assistant on calls |
 | Start over | ghost | clears draft | This device |
 
 ### Alerts (`?tab=alerts`)

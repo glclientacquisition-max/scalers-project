@@ -8,6 +8,7 @@ import type { TenantRow } from "@/lib/supabase";
 import { parseVertical } from "@/lib/vertical";
 import type { IngestDraft } from "@/lib/ingest/extract";
 import { FAQ_ANSWER_MAX, FAQ_QUESTION_MAX } from "@/lib/faqs";
+import { formatHoursForCompiler } from "@/lib/hoursSchedule";
 import {
   applyIngestAction,
   extractKnowledgeAction,
@@ -51,12 +52,12 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
   const [selectedServices, setSelectedServices] = useState<Set<number>>(new Set());
   const [selectedFaqs, setSelectedFaqs] = useState<Set<number>>(new Set());
   const [selectedTeam, setSelectedTeam] = useState<Set<number>>(new Set());
-  const [includeUnknown, setIncludeUnknown] = useState(true);
-  const [includeLocations, setIncludeLocations] = useState(true);
-  const [includeHours, setIncludeHours] = useState(true);
-  const [includePolicies, setIncludePolicies] = useState(true);
-  const [includeVertical, setIncludeVertical] = useState(true);
-  const [includeContactPhone, setIncludeContactPhone] = useState(true);
+  const [includeUnknown, setIncludeUnknown] = useState(false);
+  const [includeLocations, setIncludeLocations] = useState(false);
+  const [includeHours, setIncludeHours] = useState(false);
+  const [includePolicies, setIncludePolicies] = useState(false);
+  const [includeVertical, setIncludeVertical] = useState(false);
+  const [includeContactPhone, setIncludeContactPhone] = useState(false);
   const [renameBusiness, setRenameBusiness] = useState(false);
   const [mergeMode, setMergeMode] = useState<"merge" | "replace_services_faqs">("merge");
 
@@ -75,21 +76,13 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
       setSelectedServices(new Set(extractState.draft.services.map((_, i) => i)));
       setSelectedFaqs(new Set(extractState.draft.faqs.map((_, i) => i)));
       setSelectedTeam(new Set(extractState.draft.team.map((_, i) => i)));
-      setIncludeUnknown(Boolean(extractState.draft.unknownAnswerFallback));
-      setIncludeLocations(Boolean(extractState.draft.locations?.length));
-      setIncludeHours(
-        Boolean(extractState.draft.hoursNotes || extractState.draft.hoursSchedule)
-      );
-      setIncludePolicies(
-        Boolean(
-          extractState.draft.policies &&
-            Object.values(extractState.draft.policies).some((v) =>
-              String(v || "").trim()
-            )
-        )
-      );
-      setIncludeVertical(Boolean(extractState.draft.vertical));
-      setIncludeContactPhone(Boolean(extractState.draft.contactPhone));
+      // Scanned values stay on the rows. Include switches start off.
+      setIncludeUnknown(false);
+      setIncludeLocations(false);
+      setIncludeHours(false);
+      setIncludePolicies(false);
+      setIncludeVertical(false);
+      setIncludeContactPhone(false);
       setRenameBusiness(false);
       // For a full business brief, default to start fresh so headings/junk don't linger.
       const looksLikeBrief =
@@ -106,13 +99,6 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
       setPaste("");
       setUrl("");
       router.refresh();
-      // Bring Train into view so the remounted form is obvious.
-      window.setTimeout(() => {
-        document.getElementById("train")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 250);
     }
   }, [applyState, router]);
 
@@ -128,6 +114,17 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
     () => [...selectedTeam].sort((a, b) => a - b).join(","),
     [selectedTeam]
   );
+  const nothingSelected =
+    selectedServices.size === 0 &&
+    selectedFaqs.size === 0 &&
+    selectedTeam.size === 0 &&
+    !includeUnknown &&
+    !includeLocations &&
+    !includeHours &&
+    !includePolicies &&
+    !includeVertical &&
+    !includeContactPhone &&
+    !renameBusiness;
 
   function toggle(set: Set<number>, index: number, setter: (s: Set<number>) => void) {
     const next = new Set(set);
@@ -309,8 +306,9 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
                   <SettingsRow
                     label="Hours"
                     hint={
-                      draft.hoursNotes ||
-                      "Weekly schedule extracted from the brief"
+                      draft.hoursNotes?.trim() ||
+                      formatHoursForCompiler(draft.hoursSchedule ?? null).trim() ||
+                      undefined
                     }
                     control="switch"
                   >
@@ -569,22 +567,10 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             />
             <button
               type="submit"
-              disabled={
-                applyPending ||
-                (selectedServices.size === 0 &&
-                  selectedFaqs.size === 0 &&
-                  selectedTeam.size === 0 &&
-                  !includeUnknown &&
-                  !includeLocations &&
-                  !includeHours &&
-                  !includePolicies &&
-                  !includeVertical &&
-                  !includeContactPhone &&
-                  !renameBusiness)
-              }
+              disabled={applyPending || nothingSelected}
               className={settingsPrimaryButtonClass}
             >
-              {applyPending ? "Adding…" : "Add to my assistant"}
+              {applyPending ? "Adding…" : "Add selected"}
             </button>
             <button
               type="button"
@@ -594,6 +580,9 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             >
               Start over
             </button>
+            {nothingSelected ? (
+              <p className="w-full text-sm text-ink">Select what to add.</p>
+            ) : null}
           </form>
         </div>
       )}
