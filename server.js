@@ -205,6 +205,7 @@ const {
   looksLikePaceOnlyTurn,
 } = require('./src/conversation/dynamicSpeech');
 const { resolveLocalReply } = require('./src/conversation/turnPolicy');
+const { narratesInternalAction } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
 const {
@@ -2413,6 +2414,7 @@ mediaWss.on('connection', (ws, req) => {
 
     let spokeThisTurn = false;
     let progressAlreadySpoken = false;
+    let hidInternalNarration = false;
     try {
       // One turn contract for every playbook: identity → coverage ask →
       // place block → hours refusal → corrective → visit time ladder → phatic. Gemini only
@@ -2599,6 +2601,9 @@ mediaWss.on('connection', (ws, req) => {
         // Streamed chunks are spoken before tools run, so a saved claim or a
         // number the caller never said must not reach TTS. Confirmation of a
         // save comes from formatToolConfirmation after the tool result.
+        // A sentence that narrates the send ("I've sent that to the team",
+        // "I sent your name") is dropped. It must not become a repeat-ask.
+        const rawChunk = String(chunk || '');
         const text = polishSpokenReply(String(chunk || ''), {
           callerTurns: brainState.conversation?.answersReceived || [],
           profile: brainProfile,
@@ -2607,7 +2612,11 @@ mediaWss.on('connection', (ws, req) => {
           state: brainState,
           language: callLanguage,
         });
-        if (!text || !tts) return;
+        if (!text) {
+          if (rawChunk.trim() && narratesInternalAction(rawChunk)) hidInternalNarration = true;
+          return;
+        }
+        if (!tts) return;
         firstSpokenChunk = true;
         spokeThisTurn = true;
         turnTiming.markFirstSpokenChunk();
@@ -2834,7 +2843,7 @@ mediaWss.on('connection', (ws, req) => {
 
       // Empty Gemini success asks them to repeat once. It does not invent a
       // slot and it does not speak the downtime name-ask. Credits/denied still does.
-      if (!spokeThisTurn && !bargeInActive && tts) {
+      if (!spokeThisTurn && !hidInternalNarration && !bargeInActive && tts) {
         const llmDown = Boolean(result?.timedOut || result?.llmFailed);
         if (llmDown) {
           const guarantee = await resolveLlmRecoverySpeech(clean);

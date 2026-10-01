@@ -176,6 +176,16 @@ describe('spokenTextForToolTurn', () => {
     );
   });
 
+  it('keeps the answer when escalate already happened', () => {
+    assert.equal(
+      spokenTextForToolTurn({
+        spoken: 'What happens next is they call you.',
+        toolResults: [{ action: 'escalate', status: 'duplicate' }],
+      }),
+      'What happens next is they call you.'
+    );
+  });
+
   it('keeps model prose when no outcome tool ran', () => {
     assert.equal(
       spokenTextForToolTurn({

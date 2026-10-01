@@ -100,6 +100,10 @@ Runs on the parsed markers plus anything the injectors added.
 - Escalate carries the caller's stated need, not the decision reason.
 - `executeBrainTools` still validates rows (hours, catalogue titles, junk
   names) and returns `invalid` instead of writing.
+- Escalate speaks one callback line (`Okay. They'll call you back.` / `Sawa. Watakupigia.`).
+  Model sentences that narrate the send are dropped, including after the tool
+  succeeds. A second escalate on the same call does not notify again and does
+  not speak again.
 
 ## Invariants the simulator checks after every turn
 

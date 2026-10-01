@@ -193,7 +193,7 @@ function buildSystemPrompt(profile = {}) {
 ###TOOL###
 {"escalate":{"teammate":"<Name/Role they asked for, or closest directory person>","name":"<caller name>","reason":"<why they need that person>"}}
 ###ENDTOOL###
-In the same response, say only that you will try to send the request. Never claim it was sent; the backend confirms the outcome.
+In the same response, speak nothing. Do not say you sent, passed, or forwarded anything, and do not describe what you sent. The backend says they will call back.
 If they ask for someone not on TEAM DIRECTORY, the system may route to General queries / owner/CEO — never invent staff or a live transfer.`
     : `ESCALATION TOOL: disabled for this business. Do NOT append an escalate tool marker.
 Resolve what you can. If a caller asks for a person or unresolved refund help, offer to save a request without promising timing. Do not invent transfers.`;

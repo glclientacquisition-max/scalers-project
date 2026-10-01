@@ -209,10 +209,11 @@ const OUTCOME_TOOL_ACTIONS = new Set([
  * Model prose must not claim success (or object) before execution finishes.
  */
 function spokenTextForToolTurn({ spoken = '', toolResults = [] } = {}) {
-  const hasOutcomeAction = (Array.isArray(toolResults) ? toolResults : []).some(
-    (result) => OUTCOME_TOOL_ACTIONS.has(result?.action)
+  const freshOutcome = (Array.isArray(toolResults) ? toolResults : []).some(
+    (result) =>
+      OUTCOME_TOOL_ACTIONS.has(result?.action) && result.status !== 'duplicate'
   );
-  if (hasOutcomeAction) return '';
+  if (freshOutcome) return '';
   return String(spoken || '').trim();
 }
 
