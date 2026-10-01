@@ -20,6 +20,7 @@ import {
 import {
   buildUnifiedFixReviewRows,
   fixTabHint,
+  practiceTabHint,
   PRONUNCIATION_BEST_FLOW,
   reviewRowSpeakable,
   validatePhonePreviewRequest,
@@ -97,6 +98,14 @@ describe("Fix tab unified review queue", () => {
   it("Fix tab hint shows backlog count", () => {
     assert.equal(fixTabHint(0), "Clear");
     assert.equal(fixTabHint(3), "3 to review");
+  });
+
+  it("Practice tab hint counts a real queue and stays quiet when empty", () => {
+    assert.equal(practiceTabHint(0), null);
+    assert.equal(practiceTabHint(-1), null);
+    assert.equal(practiceTabHint(Number.NaN), null);
+    assert.equal(practiceTabHint(1), "1 left");
+    assert.equal(practiceTabHint(4), "4 left");
   });
 });
 
