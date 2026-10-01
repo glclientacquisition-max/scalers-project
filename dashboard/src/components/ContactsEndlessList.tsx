@@ -8,11 +8,12 @@ import { EndlessSentinel, scrollDeskWellToTop } from "@/components/EndlessList";
 import { PullRefreshMark, pullRootVisible, usePhoneListPull, usePhoneTabRefresh } from "@/components/PhonePullRefresh";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskLandScope } from "@/components/ui/DeskLand";
+import { contactsSliceOutcome } from "@/lib/deskFresh";
 import {
   appendUniqueById,
+  listAfterPullRefresh,
   listWindowClass,
 } from "@/lib/endlessList";
-import { listAfterPullRefresh } from "@/lib/endlessList";
 import { DEFAULT_PAGE_SIZE } from "@/lib/listPage";
 import {
   contactProfileHref,
@@ -40,6 +41,7 @@ export function ContactsEndlessList({
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const flight = useRef(false);
   const alive = useRef(true);
   const gen = useRef(0);
@@ -53,6 +55,7 @@ export function ContactsEndlessList({
     setExtra([]);
     setPage(1);
     setDone(false);
+    setError(null);
   }
   const sliceExtra = extraFor === signature ? extra : [];
   const merged = appendUniqueById(rows, sliceExtra).rows;
@@ -75,7 +78,16 @@ export function ContactsEndlessList({
     void loadContactsSlice({ page: next, saved, sort, q })
       .then((res) => {
         if (!alive.current || gen.current !== stamp) return;
-        if (res.error || res.rows.length === 0) {
+        const outcome = contactsSliceOutcome({
+          error: res.error,
+          rowCount: res.rows.length,
+        });
+        if (outcome === "retry") {
+          setError("Could not load contacts.");
+          return;
+        }
+        setError(null);
+        if (outcome === "end") {
           setDone(true);
           return;
         }
@@ -90,6 +102,10 @@ export function ContactsEndlessList({
           setPage(next);
         }
         if (batch.added === 0 || res.rows.length < DEFAULT_PAGE_SIZE) setDone(true);
+      })
+      .catch(() => {
+        if (!alive.current || gen.current !== stamp) return;
+        setError("Could not load contacts.");
       })
       .finally(() => {
         flight.current = false;
@@ -112,10 +128,16 @@ export function ContactsEndlessList({
           ))}
         </ul>
       </DeskLandScope>
+      {error ? (
+        <div className="mt-4">
+          <DeskError>{error}</DeskError>
+        </div>
+      ) : null}
       <EndlessSentinel
         hasMore={hasMore}
         loading={loading}
         loaded={merged.length}
+        hold={Boolean(error)}
         onLoad={loadMore}
       />
     </>

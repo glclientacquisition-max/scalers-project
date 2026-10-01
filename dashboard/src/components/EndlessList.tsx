@@ -14,11 +14,14 @@ export function EndlessSentinel({
   hasMore,
   loading,
   loaded,
+  hold = false,
   onLoad,
 }: {
   hasMore: boolean;
   loading: boolean;
   loaded: number;
+  /** After a failed page, wait until the sentinel leaves and comes back. */
+  hold?: boolean;
   onLoad: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -29,12 +32,16 @@ export function EndlessSentinel({
     const node = ref.current;
     if (!node || !hasMore || loading) return;
     const root = node.closest("main");
-    let armed = true;
+    let seenGap = !hold;
     const io = new IntersectionObserver(
       (entries) => {
-        if (!armed) return;
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        armed = false;
+        const hit = entries.some((entry) => entry.isIntersecting);
+        if (!hit) {
+          if (hold) seenGap = true;
+          return;
+        }
+        if (!seenGap) return;
+        seenGap = false;
         onLoadRef.current();
       },
       {
@@ -44,7 +51,7 @@ export function EndlessSentinel({
     );
     io.observe(node);
     return () => io.disconnect();
-  }, [hasMore, loading, loaded]);
+  }, [hasMore, loading, loaded, hold]);
 
   if (!hasMore && !loading) return null;
 

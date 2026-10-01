@@ -249,6 +249,48 @@ describe('deriveCallResolution', () => {
     assert.notEqual(out.primaryIntent, 'book_visit');
   });
 
+  it('follows the visit row on a reschedule or cancel', () => {
+    const requested = deriveCallResolution({
+      brainState: createBrainState(),
+      toolResults: [
+        {
+          action: 'update_appointment',
+          status: 'succeeded',
+          appointmentStatus: 'requested',
+        },
+      ],
+    });
+    assert.equal(requested.primaryIntent, 'book_visit');
+    assert.equal(requested.resolutionNote, VISIT_REQUESTED_NOTE);
+
+    const confirmed = deriveCallResolution({
+      brainState: createBrainState(),
+      toolResults: [
+        {
+          action: 'update_appointment',
+          status: 'succeeded',
+          appointmentStatus: 'confirmed',
+        },
+      ],
+    });
+    assert.equal(confirmed.primaryIntent, 'book_visit');
+    assert.equal(confirmed.resolutionNote, 'Visit confirmed');
+
+    const cancelled = deriveCallResolution({
+      brainState: createBrainState(),
+      toolResults: [
+        {
+          action: 'update_appointment',
+          status: 'succeeded',
+          appointmentStatus: 'cancelled',
+        },
+      ],
+    });
+    assert.equal(cancelled.primaryIntent, 'cancel');
+    assert.match(cancelled.resolutionNote, /cancelled/i);
+    assert.doesNotMatch(cancelled.resolutionNote || '', /confirm on desk/);
+  });
+
   it('keeps last-turn intent when no work row was saved', () => {
     const state = createBrainState();
     state.intent = 'booking';

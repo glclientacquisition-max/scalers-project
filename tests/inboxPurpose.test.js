@@ -359,6 +359,57 @@ describe("inbox purpose", () => {
     );
   });
 
+  it("stamps a reschedule from the visit row status", () => {
+    assert.equal(
+      classify({
+        primaryIntent: "reschedule",
+        resolution: "resolved",
+        job: { id: "a1", status: "requested" },
+      }),
+      "job"
+    );
+    assert.equal(
+      signalLabel({ purpose: "job", job: { status: "requested" } }),
+      "Confirm visit"
+    );
+    assert.equal(
+      classify({
+        primaryIntent: "reschedule",
+        resolution: "resolved",
+        job: { id: "a1", status: "confirmed" },
+      }),
+      "job"
+    );
+    assert.equal(
+      signalLabel({ purpose: "job", job: { status: "confirmed" } }),
+      "Visit"
+    );
+    assert.equal(
+      classify({
+        primaryIntent: "cancel",
+        resolution: "resolved",
+        job: { id: "a1", status: "cancelled" },
+      }),
+      "job"
+    );
+    assert.equal(
+      signalLabel({ purpose: "job", job: { status: "cancelled" } }),
+      "Cancelled"
+    );
+    assert.equal(
+      classify({
+        callStatus: "no_answer",
+        job: { id: "a1", status: "requested" },
+      }),
+      "job"
+    );
+    // No visit row on this call. A resolved reschedule stamps answered. The visit row stays on the original call.
+    assert.equal(
+      classify({ primaryIntent: "reschedule", resolution: "resolved" }),
+      "answered"
+    );
+  });
+
   it("stamps book_visit as job from the Brain id", () => {
     assert.equal(classify({ primaryIntent: "book_visit" }), "job");
     assert.equal(classify({ primaryIntent: "booking" }), "job");

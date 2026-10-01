@@ -15,6 +15,7 @@ import {
 } from "@/lib/callSummarySentence";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { InboxTicketView } from "@/components/InboxTicketView";
+import { LiveTicket } from "@/components/LiveTicket";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
 import {
   followUpWhatsAppMessage,
@@ -247,6 +248,7 @@ async function CallDetailBody({ params, searchParams }: CallDetailPageProps) {
   return (
     <>
       {workLoadError ? <DeskLoadError>Could not load visit or hold.</DeskLoadError> : null}
+      <LiveTicket callId={row.id} />
       <InboxTicketView
         callId={row.id}
         backHref={backHref}
