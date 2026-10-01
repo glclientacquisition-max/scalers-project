@@ -50,6 +50,7 @@ import {
 import {
   buildUnifiedFixReviewRows,
   fixTabHint,
+  practiceTabHint,
   reviewRowSpeakable,
 } from "@/lib/pronunciationFixUi";
 import { customTrainingLine } from "@/lib/pronunciationMine";
@@ -896,11 +897,11 @@ export function PronunciationCoach({
     [reviewQueue, sttHints]
   );
 
-  const modes: Array<{ id: StudioMode; label: string; hint: string }> = [
+  const modes: Array<{ id: StudioMode; label: string; hint: string | null }> = [
     {
       id: "practice",
       label: "Practice",
-      hint: todoItems.length ? `${todoItems.length} left` : "Caught up",
+      hint: practiceTabHint(todoItems.length),
     },
     {
       id: "library",
@@ -962,9 +963,11 @@ export function PronunciationCoach({
               className={`${filterTabClass(selected)} shrink-0`}
             >
               {m.label}
-              <span className="ml-1.5 text-xs font-normal text-ink-soft">
-                {m.hint}
-              </span>
+              {m.hint ? (
+                <span className="ml-1.5 text-xs font-normal text-ink-soft">
+                  {m.hint}
+                </span>
+              ) : null}
             </button>
           );
         })}
