@@ -71,12 +71,6 @@ export function CatalogImportPanel({ tenant }: { tenant: TenantRow }) {
       setPaste("");
       setUrl("");
       router.refresh();
-      window.setTimeout(() => {
-        document.getElementById("train")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 250);
     }
   }, [applyState, router]);
 
