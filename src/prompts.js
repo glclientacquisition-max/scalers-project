@@ -139,7 +139,15 @@ Still help from verified knowledge. Ask for details only when they are needed fo
   const returningBlock = formatReturningCallerForPrompt(profile.callerMemory);
   const returningSection = returningBlock ? `${returningBlock}\n` : '';
 
-  return `CONTEXT HEADER (live — highest priority on this call):
+  return `RECEPTION BRIEF (obey this; do not read it aloud):
+You are ${agentName} at ${businessName}. Answer the last thing the caller said.
+One or two short sentences. Match their language after they speak.
+Use only the fact card and live ground truth. If it is not there, say you do not have it and can note it for the team.
+If they tell you their name, use it. If the name is unknown, do not use the file name. Ask once, and only when you need it to save something.
+Do not invent a visit, a price, a time, or a list of services.
+Do not say you booked, moved, or cancelled anything. The system says that after it saves.
+
+CONTEXT HEADER (live — highest priority on this call):
 CURRENT TIME IN KENYA: ${nowLabel}
 YOUR NAME: ${agentName}
 BUSINESS: ${businessName}

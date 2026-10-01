@@ -193,7 +193,7 @@ const {
   pickContextualAck,
   pickActionProgress,
   pickClarifyProgress,
-  pickSpeechGuaranteeLine,
+  planEmptyGeminiSpeech,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
@@ -1652,6 +1652,7 @@ mediaWss.on('connection', (ws, req) => {
   let speakStartedAt = 0;
   let lastAgentText = '';
   let llmRecoveryOffered = false;
+  let emptyRepairOffered = false;
   let turnBusy = false;
   let utteranceParts = [];
   let utteranceTimer = null;
@@ -2835,28 +2836,46 @@ mediaWss.on('connection', (ws, req) => {
         spokeThisTurn = true;
       }
 
-      // Hard guarantee: every completed caller turn must produce agent audio.
-      // Empty Gemini success asks the next slot. Do not speak the Gemini-down
-      // reach-them name-ask when the caller already named themselves.
+      // Empty Gemini success asks them to repeat once. It does not invent a
+      // slot and it does not speak the downtime name-ask. Credits/denied still does.
       if (!spokeThisTurn && !bargeInActive && tts) {
         const llmDown = Boolean(result?.timedOut || result?.llmFailed);
-        const guarantee = llmDown
-          ? await resolveLlmRecoverySpeech(clean)
-          : pickSpeechGuaranteeLine({
-              nextBestAction,
-              brainState,
-              language: callLanguage,
-              userText: clean,
-            });
-        console.warn(
-          `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}` +
-            ` slot=${nextBestAction.slot || ''} llmDown=${llmDown ? 1 : 0}`
-        );
-        callTranscript.pushAgent(guarantee);
-        turnTiming.markFirstSpokenChunk();
-        await speakText(guarantee);
-        spokeThisTurn = true;
-        turnOutcome = 'speech_guarantee';
+        if (llmDown) {
+          const guarantee = await resolveLlmRecoverySpeech(clean);
+          console.warn(
+            `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}` +
+              ` slot=${nextBestAction.slot || ''} llmDown=1`
+          );
+          callTranscript.pushAgent(guarantee);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(guarantee);
+          spokeThisTurn = true;
+          turnOutcome = 'speech_guarantee';
+        } else {
+          const planned = planEmptyGeminiSpeech({
+            brainState,
+            language: callLanguage,
+            userText: clean,
+            llmDown: false,
+            alreadyOffered: emptyRepairOffered,
+          });
+          if (planned.speak && planned.line) {
+            emptyRepairOffered = true;
+            console.warn(
+              `[ws/media][${sidLabel()}] turn speech repair action=${nextBestAction.action} kind=${planned.kind}`
+            );
+            callTranscript.pushAgent(planned.line);
+            turnTiming.markFirstSpokenChunk();
+            await speakText(planned.line);
+            spokeThisTurn = true;
+            turnOutcome = 'speech_repair';
+          } else {
+            console.log(
+              `[ws/media][${sidLabel()}] turn speech quiet action=${nextBestAction.action} reason=empty_answer`
+            );
+            turnOutcome = 'speech_quiet';
+          }
+        }
       }
 
       if (result?.shouldEndCall && !bargeInActive) {

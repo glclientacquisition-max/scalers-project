@@ -11,7 +11,6 @@ const {
   looksLikePhaticCallerTurn,
   looksLikeRobotQuestion,
   pickIdentityReply,
-  pickPhaticReply,
 } = require('./dynamicSpeech');
 const { coverageAskSpeech, visitBlockSpeech } = require('./visitLocation');
 const { formatVisitTimeProblem } = require('./toolExecution');
@@ -126,14 +125,8 @@ function resolveLocalReply({
   const correctiveLine = pickCorrectiveReply({ text: clean, state, language });
   if (correctiveLine) return { outcome: 'corrective', line: correctiveLine };
 
-  const bareCloser = looksLikeBareCloser(clean);
-  if (!bareCloser && looksLikePhaticCallerTurn(clean)) {
-    return {
-      outcome: 'phatic',
-      line: pickPhaticReply({ language, callerMemory: profile.callerMemory }),
-    };
-  }
-
+  // How-are-you, Okay, and a bare name go to Gemini. Identity, hours,
+  // coverage, leave-it, and the visit-time ladder stay fixed lines.
   return null;
 }
 

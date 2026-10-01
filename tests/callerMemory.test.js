@@ -160,7 +160,7 @@ describe('returning-caller card', () => {
     assert.equal(stale.callerMemory, undefined);
   });
 
-  it('asks who is speaking on a unique line before using the open visit', () => {
+  it('answers hello on an unbound unique line without using the open visit', () => {
     const { observeCallerTurn, inferIntent } = require('../src/conversation/brainState');
     const { extractConversationEntities } = require('../src/conversation/entityExtraction');
     const { determineNextBestAction } = require('../src/conversation/nextBestAction');
@@ -200,9 +200,11 @@ describe('returning-caller card', () => {
       state: hello,
       capabilities: { createServiceRequest: true, createAppointment: true },
     });
-    assert.equal(who.action, 'ASK_CLARIFICATION');
-    assert.equal(who.slot, 'name');
-    assert.match(who.reason, /who is speaking/i);
+    assert.equal(who.action, 'ANSWER');
+    assert.notEqual(who.slot, 'name');
+    assert.match(who.reason, /Do not ask who is speaking/i);
+    assert.match(who.reason, /Do not use the file name/i);
+    assert.doesNotMatch(who.reason, /carpet/i);
 
     const named = observeCallerTurn(seeded, {
       text: 'My name is Alex',
@@ -301,7 +303,8 @@ describe('returning-caller card', () => {
     const profile = { vertical: 'home_services', callerMemory: card };
     const seeded = createBrainState(profile);
     assert.equal(seeded.caller.name, null);
-    assert.match(formatBrainStateForPrompt(seeded), /Ask who is speaking/);
+    assert.match(formatBrainStateForPrompt(seeded), /Do not ask who is speaking/);
+    assert.match(formatBrainStateForPrompt(seeded), /Do not use the file name/);
     assert.doesNotMatch(formatReturningCallerForPrompt(card), /use this name/i);
 
     const named = observeCallerTurn(seeded, {

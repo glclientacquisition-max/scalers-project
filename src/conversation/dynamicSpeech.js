@@ -545,6 +545,44 @@ function pickSpeechGuaranteeLine({
   });
 }
 
+function emptyTurnRepairLine(language) {
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw' || lang === 'sheng') return 'Samahani, sema tena?';
+  return 'Sorry, say that again?';
+}
+
+/**
+ * Gemini spoke nothing. A real outage still uses the downtime name-capture.
+ * A successful empty turn asks them to say it again once, then stays quiet.
+ * It does not invent the next slot.
+ *
+ * @returns {{ speak: boolean, kind: string, line: string }}
+ */
+function planEmptyGeminiSpeech({
+  brainState = {},
+  language,
+  userText = '',
+  llmDown = false,
+  alreadyOffered = false,
+} = {}) {
+  if (llmDown) {
+    if (callerNameAlreadyKnown({ brainState, userText })) {
+      return {
+        speak: true,
+        kind: 'reasoning_outage_saved',
+        line: pickLlmRecoverySaved({ language }),
+      };
+    }
+    return {
+      speak: true,
+      kind: 'reasoning_outage',
+      line: pickLlmRecoveryLine({ language, alreadyOffered }),
+    };
+  }
+  if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
+}
+
 /**
  * Spoken line when Gemini is down. Same family as greeting / closed-message /
  * handoff: Okay opener, contractions, first person, honesty then still help.
@@ -744,6 +782,7 @@ module.exports = {
   pickActionProgress,
   pickClarifyProgress,
   pickSpeechGuaranteeLine,
+  planEmptyGeminiSpeech,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,

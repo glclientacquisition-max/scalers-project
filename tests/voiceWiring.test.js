@@ -445,8 +445,8 @@ assert.match(
 
 assert.match(
   source,
-  /pickSpeechGuaranteeLine/,
-  'empty Gemini success must ask the next slot, not the Gemini-down name-ask'
+  /planEmptyGeminiSpeech/,
+  'empty Gemini success asks them to repeat once, not the downtime name-ask'
 );
 
 assert.match(

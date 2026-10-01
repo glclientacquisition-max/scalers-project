@@ -984,10 +984,10 @@ function formatBrainStateForPrompt(state) {
       : '',
     value.conversation?.phatic
       ? speakerPendingOnFile(value.returning)
-        ? '- Phatic turn: one short well, then who is calling. Do not list services.'
+        ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
-          : '- Phatic turn: they only greeted or asked how you are. One short well, then How can I help. Do not list services, prices, or jobs.'
+          : '- Phatic turn: they only greeted or asked how you are. One short well, then offer help. Do not ask who is speaking. Do not list services, prices, or jobs.'
       : '',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
     `- Resolution: ${value.resolution.status}`,
