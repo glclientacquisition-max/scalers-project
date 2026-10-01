@@ -384,4 +384,32 @@ describe("settings save scope", () => {
     assert.match(ingest, /Catalogue saved for the next call/);
     assert.match(read("dashboard/src/app/(desk)/settings/actions.ts"), /settingsScopeValidationError/);
   });
+
+  it("puts one short status on the settings list and does not mount the form on the phone index", () => {
+    const hours = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "hours" }, { hours_schedule: { days: { mon: { open: "09:00", close: "17:00" }, tue: { open: "09:00", close: "17:00" } } } })`
+    );
+    assert.equal(hours, "2 days");
+    const voice = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { soniox_voice_label: "Shop voice" }, [])`
+    );
+    assert.equal(voice, "Shop voice");
+    const line = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "test" }, { sautikit_virtual_number: "+254700000000" })`
+    );
+    assert.equal(line, "Line live");
+    const pending = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "test" }, { sautikit_virtual_number: "pending:1" })`
+    );
+    assert.equal(pending, "");
+    const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
+    assert.match(shell, /if \(!md\) return null/);
+    assert.match(shell, /SettingsMdOnly/);
+    assert.match(shell, /data-settings-menu=\{variant\}/);
+    assert.doesNotMatch(shell, /overflow-hidden rounded-xl border border-line bg-surface/);
+  });
 });

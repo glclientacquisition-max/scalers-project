@@ -97,7 +97,7 @@ import {
 } from "@/lib/businessPolicies";
 import { CoverageAreaField } from "@/components/CoverageAreaField";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
-import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
+import { deskShiftClass } from "@/components/ui/deskChrome";
 import { notify } from "@/components/ui/DeskNotice";
 import { Pagination } from "@/components/ui/Pagination";
 import {
@@ -838,34 +838,21 @@ export function TenantForm({
 
           {socialHandles.channels.length === 0 ? null : (
             <>
-            <div className="space-y-3 md:hidden">
+            <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
               {socialHandles.channels.map((channel, index) => (
                 <div
                   key={`social-m-${index}`}
-                  className="space-y-2 rounded-xl border border-line bg-surface p-3"
+                  className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_2.75rem] items-center gap-2 px-3 py-2"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                      Contact {index + 1}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => removeSocialChannel(index)}
-                      className={settingsTrashButtonClass}
-                      aria-label={`Remove contact ${index + 1}`}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-kind-m-${index}`}>
+                  <div className="min-w-0">
+                    <label className="sr-only" htmlFor={`social-kind-m-${index}`}>
                       Type
                     </label>
                     <select
                       id={`social-kind-m-${index}`}
                       value={channel.kind}
                       onChange={(e) => updateSocialChannel(index, "kind", e.target.value)}
-                      className={`${denseFieldClass} mt-1`}
+                      className={denseFieldClass}
                     >
                       {SOCIAL_CHANNEL_KINDS.map((k) => (
                         <option key={k.id} value={k.id}>
@@ -874,8 +861,8 @@ export function TenantForm({
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-label-m-${index}`}>
+                  <div className="min-w-0">
+                    <label className="sr-only" htmlFor={`social-label-m-${index}`}>
                       Label
                     </label>
                     <input
@@ -883,11 +870,19 @@ export function TenantForm({
                       value={channel.label}
                       onChange={(e) => updateSocialChannel(index, "label", e.target.value)}
                       placeholder="Main"
-                      className={`${denseFieldClass} mt-1`}
+                      className={denseFieldClass}
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`social-value-m-${index}`}>
+                  <button
+                    type="button"
+                    onClick={() => removeSocialChannel(index)}
+                    className={settingsTrashButtonClass}
+                    aria-label={`Remove contact ${index + 1}`}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                  <div className="col-span-3 min-w-0">
+                    <label className="sr-only" htmlFor={`social-value-m-${index}`}>
                       Handle / URL
                     </label>
                     <input
@@ -898,13 +893,13 @@ export function TenantForm({
                         SOCIAL_CHANNEL_KINDS.find((k) => k.id === channel.kind)
                           ?.placeholder || ""
                       }
-                      className={`${denseFieldClass} mt-1`}
+                      className={denseFieldClass}
                     />
                   </div>
                 </div>
               ))}
             </div>
-            <div className="hidden md:block overflow-hidden rounded-xl border border-line">
+            <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
@@ -1084,48 +1079,45 @@ export function TenantForm({
                 type="button"
                 onClick={applyBulkServices}
                 disabled={!bulkPreview.length}
-                className={btnPrimary}
+                className={settingsGhostButtonClass}
               >
                 Add to services
               </button>
             </div>
           ) : null}
 
-          <div className="space-y-3 md:hidden">
+          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
             {visibleServices.map((service, localIndex) => {
               const index = safeServicePage * SERVICE_PAGE_SIZE + localIndex;
               return (
-                <div key={`service-m-${index}`} className="space-y-2 rounded-xl border border-line bg-surface p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Service {index + 1}</p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setServices((prev) =>
-                          prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
-                        )
-                      }
-                      className={settingsTrashButtonClass}
-                      aria-label={`Remove service ${index + 1}`}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                <div key={`service-m-${index}`} className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2">
+                  <div className="min-w-0">
+                    <label className="sr-only" htmlFor={`svc-name-m-${index}`}>Name</label>
+                    <input id={`svc-name-m-${index}`} value={service.name} onChange={(e) => updateService(index, "name", e.target.value)} placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"} className={denseFieldClass} />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-name-m-${index}`}>Name</label>
-                    <input id={`svc-name-m-${index}`} value={service.name} onChange={(e) => updateService(index, "name", e.target.value)} placeholder={vertical === "retail" ? "Book sourcing / special orders" : "Home cleaning"} className={`${denseFieldClass} mt-1`} />
+                  <div className="min-w-0">
+                    <label className="sr-only" htmlFor={`svc-price-m-${index}`}>Price</label>
+                    <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder="from 2,500 KES" className={denseFieldClass} />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-price-m-${index}`}>Price</label>
-                    <input id={`svc-price-m-${index}`} value={service.price_range} onChange={(e) => updateService(index, "price_range", e.target.value)} placeholder="from 2,500 KES" className={`${denseFieldClass} mt-1`} />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setServices((prev) =>
+                        prev.length <= 1 ? [emptyService()] : prev.filter((_, i) => i !== index)
+                      )
+                    }
+                    className={settingsTrashButtonClass}
+                    aria-label={`Remove service ${index + 1}`}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                  <div className="min-w-0">
+                    <label className="sr-only" htmlFor={`svc-notes-m-${index}`}>Notes</label>
+                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={denseFieldClass} />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-notes-m-${index}`}>Notes</label>
-                    <input id={`svc-notes-m-${index}`} value={service.notes} onChange={(e) => updateService(index, "notes", e.target.value)} placeholder="Free quotation" className={`${denseFieldClass} mt-1`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-ink-soft" htmlFor={`svc-oos-m-${index}`}>Out of scope</label>
-                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} placeholder="No commercial offices" className={`${denseFieldClass} mt-1`} />
+                  <div className="col-span-2 min-w-0">
+                    <label className="sr-only" htmlFor={`svc-oos-m-${index}`}>Out of scope</label>
+                    <input id={`svc-oos-m-${index}`} value={service.out_of_scope} onChange={(e) => updateService(index, "out_of_scope", e.target.value)} placeholder="No commercial offices" className={denseFieldClass} />
                   </div>
                 </div>
               );
@@ -1139,7 +1131,7 @@ export function TenantForm({
             />
           </div>
 
-          <div className="hidden md:block overflow-hidden rounded-xl border border-line">
+          <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
             <div className="overflow-x-auto">
               <table className="w-full table-fixed text-sm">
                 <thead>
@@ -1317,7 +1309,7 @@ export function TenantForm({
                 type="button"
                 onClick={applyBulkProducts}
                 disabled={!bulkProductPreview.length}
-                className={btnPrimary}
+                className={settingsGhostButtonClass}
               >
                 Add to catalogue
               </button>
@@ -1326,32 +1318,29 @@ export function TenantForm({
 
           {products.length === 0 ? null : (
             <>
-            <div className="space-y-3 md:hidden">
+            <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
               {visibleProducts.map((product, localIndex) => {
                 const index = safeProductPage * PRODUCT_PAGE_SIZE + localIndex;
                 return (
-                  <div key={`product-m-${index}`} className="space-y-2 rounded-xl border border-line bg-surface p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Product {index + 1}</p>
-                      <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className={settingsTrashButtonClass} aria-label={`Remove product ${index + 1}`}>
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                  <div key={`product-m-${index}`} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_2.75rem] items-center gap-2 px-3 py-2">
+                    <div className="min-w-0">
+                      <label className="sr-only" htmlFor={`prod-name-m-${index}`}>Name</label>
+                      <input id={`prod-name-m-${index}`} value={product.name} onChange={(e) => updateProduct(index, "name", e.target.value)} placeholder="Atomic Habits" className={denseFieldClass} />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-name-m-${index}`}>Name</label>
-                      <input id={`prod-name-m-${index}`} value={product.name} onChange={(e) => updateProduct(index, "name", e.target.value)} placeholder="Atomic Habits" className={`${denseFieldClass} mt-1`} />
+                    <div className="min-w-0">
+                      <label className="sr-only" htmlFor={`prod-price-m-${index}`}>Price</label>
+                      <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="2,500 KES" className={denseFieldClass} />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-price-m-${index}`}>Price</label>
-                      <input id={`prod-price-m-${index}`} value={product.price} onChange={(e) => updateProduct(index, "price", e.target.value)} placeholder="2,500 KES" className={`${denseFieldClass} mt-1`} />
+                    <button type="button" onClick={() => setProducts((prev) => prev.filter((_, i) => i !== index))} className={settingsTrashButtonClass} aria-label={`Remove product ${index + 1}`}>
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                    <div className="min-w-0">
+                      <label className="sr-only" htmlFor={`prod-cat-m-${index}`}>Category</label>
+                      <input id={`prod-cat-m-${index}`} value={product.category} onChange={(e) => updateProduct(index, "category", e.target.value)} placeholder="Self-help" className={denseFieldClass} />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-cat-m-${index}`}>Category</label>
-                      <input id={`prod-cat-m-${index}`} value={product.category} onChange={(e) => updateProduct(index, "category", e.target.value)} placeholder="Self-help" className={`${denseFieldClass} mt-1`} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-ink-soft" htmlFor={`prod-stock-m-${index}`}>Stock</label>
-                      <select id={`prod-stock-m-${index}`} value={product.in_stock || ""} onChange={(e) => updateProduct(index, "in_stock", e.target.value)} className={`${denseFieldClass} mt-1`}>
+                    <div className="col-span-2 min-w-0">
+                      <label className="sr-only" htmlFor={`prod-stock-m-${index}`}>Stock</label>
+                      <select id={`prod-stock-m-${index}`} value={product.in_stock || ""} onChange={(e) => updateProduct(index, "in_stock", e.target.value)} className={denseFieldClass}>
                         <option value="">Not set</option>
                         <option value="yes">In stock</option>
                         <option value="no">Out of stock</option>
@@ -1369,7 +1358,7 @@ export function TenantForm({
                 onPage={setProductPage}
               />
             </div>
-            <div className="hidden md:block overflow-hidden rounded-xl border border-line">
+            <div className="hidden overflow-hidden rounded-xl border border-line lg:block">
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed text-sm">
                   <thead>

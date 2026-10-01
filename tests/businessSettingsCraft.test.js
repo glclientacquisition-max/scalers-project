@@ -33,9 +33,10 @@ describe("business settings craft", () => {
     assert.match(ui, /Line live/);
     assert.match(ui, /Number pending/);
     assert.match(form, /Assistant name/);
-    assert.match(form, /Your assistant will use this on the next call/);
+    assert.match(form, /notify\("Saved"\)/);
+    assert.doesNotMatch(form, /Your assistant will use this on the next call/);
     assert.doesNotMatch(form, /Your receptionist/);
-    assert.match(test, /assistant name/);
+    assert.match(test, /previewBusinessAssistantIntro/);
     assert.doesNotMatch(test, /Agent Persona/);
   });
 
@@ -194,15 +195,15 @@ describe("business settings craft", () => {
     assert.match(form, /showBack/);
   });
 
-  it("shows catalog cards below md and the table from md up", () => {
-    assert.doesNotMatch(form, /className="hidden space-y-3 md:hidden"/);
-    assert.match(form, /className="space-y-3 md:hidden"/);
+  it("shows dense catalog rows below lg and the table from lg", () => {
+    assert.doesNotMatch(form, /rounded-xl border border-line bg-surface p-3/);
+    assert.match(form, /lg:hidden/);
     assert.match(form, /svc-name-m-/);
     assert.match(form, /svc-notes-m-/);
     assert.match(form, /svc-oos-m-/);
     assert.match(form, /prod-name-m-/);
     assert.match(form, /prod-cat-m-/);
-    assert.match(form, /className="hidden md:block overflow-hidden rounded-xl border border-line"/);
+    assert.match(form, /className="hidden overflow-hidden rounded-xl border border-line lg:block"/);
     assert.match(form, /table-fixed/);
     assert.doesNotMatch(form, /min-w-\[720px\]/);
     assert.doesNotMatch(form, /min-w-\[640px\]/);
@@ -382,7 +383,7 @@ describe("business settings craft", () => {
 
     const rail = shell.slice(
       shell.indexOf("const isRail = variant === \"rail\""),
-      shell.indexOf('ul className="w-full overflow-hidden')
+      shell.indexOf("const railLinkClass") + "const railLinkClass".length + 240
     );
     assert.match(rail, /inline-flex min-h-11 w-full items-center justify-start/);
     assert.match(rail, /w-max max-w-full space-y-0.5/);
