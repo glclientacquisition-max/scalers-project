@@ -91,7 +91,7 @@ Package buckets (email, seats, later SKUs): [`PACKAGES.md`](./PACKAGES.md). Colu
 
 ## Line rental grace (2026-09-03)
 
-Clients pay Scalers a monthly line fee at our retail rate, not SautiKit's cost. Beta is free.
+Clients without a package pay Scalers a monthly line fee at our retail rate, not SautiKit's cost. Beta is free. A business with an assigned package does not get this fee: the monthly price already includes the number.
 
 | State | Condition | Line |
 | --- | --- | --- |

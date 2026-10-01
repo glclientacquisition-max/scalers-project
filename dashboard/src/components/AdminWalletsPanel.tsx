@@ -28,12 +28,12 @@ function planLabel(mode: BillingMode): string {
 
 function planConsequence(mode: BillingMode): string {
   if (mode === "off") {
-    return "Whitelist: meter usage only. Call minutes and line fees are not charged.";
+    return "Beta: meter the package. The wallet is not charged.";
   }
   if (mode === "soft") {
-    return "Prepaid: wallet is debited for calls and line fees. Calls still connect at zero balance.";
+    return "Prepaid: the wallet is charged for on-demand past included. Calls still connect at zero balance.";
   }
-  return "Prepaid: wallet is debited. Inbound block at zero balance is not wired yet. Treat like soft for now.";
+  return "Prepaid: the wallet is charged for on-demand past included. Inbound block at zero balance is not wired yet.";
 }
 
 function defaultModeNote(mode: BillingMode, row?: AdminWalletRow | null): string {
@@ -231,7 +231,7 @@ export function AdminWalletsPanel({
         `Graduate ${modeTarget.business_name} from free beta to ${planLabel(mode)}?\n\n` +
           `${planConsequence(mode)}` +
           balanceLine +
-          `\n\nThis starts real wallet debits for calls and line fees.`
+          `\n\nThis starts wallet debits for on-demand past included.`
       );
       if (!confirmed) return;
     }

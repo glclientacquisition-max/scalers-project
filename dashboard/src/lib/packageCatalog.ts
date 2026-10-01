@@ -1,4 +1,9 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
+import {
+  emptyPackageUsage,
+  packageUsageGap,
+  type PackageUsageCounters,
+} from "@/lib/packageUsageAlign";
 
 export type BillingRateCard = {
   inboundKesPerSecond: number;
@@ -30,6 +35,9 @@ export type TenantSubscriptionRow = {
   packageId: string | null;
   packageName: string | null;
   period: "month" | "year" | null;
+  usage: PackageUsageCounters;
+  /** Set when included amounts do not equal the assigned package. */
+  gap: string | null;
 };
 
 export type PackageCatalog = {
@@ -264,13 +272,32 @@ export async function loadPublicPackageOffers(): Promise<PublicPackageBoard> {
   }
 }
 
+const TENANT_USAGE_SELECT =
+  "id, business_name, minutes_included, seconds_used, sms_included_units, sms_used_units, email_included_units, email_used_units, whatsapp_included_units, whatsapp_used_units, seat_included";
+
+function usageFromTenant(row: Record<string, unknown>): PackageUsageCounters {
+  return {
+    minutesIncluded: num(row.minutes_included),
+    secondsUsed: num(row.seconds_used),
+    smsIncluded: num(row.sms_included_units),
+    smsUsed: num(row.sms_used_units),
+    emailIncluded: num(row.email_included_units),
+    emailUsed: num(row.email_used_units),
+    waIncluded: num(row.whatsapp_included_units),
+    waUsed: num(row.whatsapp_used_units),
+    seatsIncluded: num(row.seat_included),
+    seatsUsed: 0,
+  };
+}
+
 export async function loadPackageCatalog(): Promise<PackageCatalog> {
   const admin = getSupabaseAdmin();
-  const [ratesRes, packsRes, subsRes, tenantsRes] = await Promise.all([
+  const [ratesRes, packsRes, subsRes, tenantsRes, membersRes] = await Promise.all([
     admin.from("billing_rate_card").select("*").eq("id", 1).maybeSingle(),
     admin.from("billing_packages").select("*").order("sort_order", { ascending: true }),
     admin.from("tenant_subscriptions").select("tenant_id, package_id, period"),
-    admin.from("tenants").select("id, business_name").order("business_name", { ascending: true }),
+    admin.from("tenants").select(TENANT_USAGE_SELECT).order("business_name", { ascending: true }),
+    admin.from("tenant_members").select("tenant_id"),
   ]);
 
   const missing = [ratesRes, packsRes, subsRes].some(
@@ -282,7 +309,29 @@ export async function loadPackageCatalog(): Promise<PackageCatalog> {
   if (ratesRes.error) throw ratesRes.error;
   if (packsRes.error) throw packsRes.error;
   if (subsRes.error) throw subsRes.error;
-  if (tenantsRes.error) throw tenantsRes.error;
+
+  let tenantRows: Record<string, unknown>[] = (tenantsRes.data || []) as Record<string, unknown>[];
+  if (
+    tenantsRes.error &&
+    /minutes_included|seconds_used|whatsapp_|email_|seat_included|sms_included/i.test(tenantsRes.error.message)
+  ) {
+    const narrow = await admin
+      .from("tenants")
+      .select("id, business_name")
+      .order("business_name", { ascending: true });
+    if (narrow.error) throw narrow.error;
+    tenantRows = (narrow.data || []) as Record<string, unknown>[];
+  } else if (tenantsRes.error) {
+    throw tenantsRes.error;
+  }
+
+  const seatsByTenant = new Map<string, number>();
+  if (!membersRes.error) {
+    for (const row of membersRes.data || []) {
+      const id = String(row.tenant_id);
+      seatsByTenant.set(id, (seatsByTenant.get(id) || 0) + 1);
+    }
+  }
 
   const rates = mapRates(ratesRes.data || {});
 
@@ -293,17 +342,35 @@ export async function loadPackageCatalog(): Promise<PackageCatalog> {
       { packageId: String(row.package_id), period: String(row.period) },
     ])
   );
-  const packName = new Map(packages.map((pack) => [pack.id, pack.name]));
+  const packById = new Map(packages.map((pack) => [pack.id, pack]));
 
-  const businesses: TenantSubscriptionRow[] = (tenantsRes.data || []).map((row) => {
-    const sub = subByTenant.get(String(row.id));
+  const businesses: TenantSubscriptionRow[] = tenantRows.map((record) => {
+    const sub = subByTenant.get(String(record.id));
     const period = sub?.period === "year" ? "year" : sub?.period === "month" ? "month" : null;
+    const assigned = sub?.packageId ? packById.get(sub.packageId) || null : null;
+    const usage = tenantsRes.error ? emptyPackageUsage() : usageFromTenant(record);
+    usage.seatsUsed = seatsByTenant.get(String(record.id)) || 0;
+    const packageName = assigned?.name || null;
     return {
-      tenantId: String(row.id),
-      businessName: String(row.business_name || "Business"),
+      tenantId: String(record.id),
+      businessName: String(record.business_name || "Business"),
       packageId: sub?.packageId || null,
-      packageName: sub?.packageId ? packName.get(sub.packageId) || null : null,
+      packageName,
       period,
+      usage,
+      gap: packageUsageGap({
+        packageName: sub?.packageId ? packageName || "Package" : null,
+        catalog: assigned
+          ? {
+              minutes: assigned.minutes,
+              sms: assigned.sms,
+              email: assigned.email,
+              staffWa: assigned.staffWa,
+              seats: assigned.seats,
+            }
+          : null,
+        usage,
+      }),
     };
   });
 
