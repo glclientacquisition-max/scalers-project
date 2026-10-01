@@ -490,7 +490,8 @@ export function TenantForm({
   );
 
   useEffect(() => {
-    if (state.ok) notify("Saved");
+    // Compile finished before ok — owners should hear the line was trained, not only "Saved".
+    if (state.ok) notify("Saved · training line");
   }, [state]);
 
   useEffect(() => {
@@ -1963,19 +1964,23 @@ export function TenantForm({
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
         {liveTransferExecutor || handoffMode === "live_transfer" ? (
-          <SettingsGroup>
-            <SettingsRow label="Live connect" control="switch">
-              <ToolSwitch
-                checked={handoffMode === "live_transfer"}
-                label="Live connect"
-                onChange={(next) =>
-                  setHandoffMode(next ? "live_transfer" : "callback")
-                }
-              />
-            </SettingsRow>
-          </SettingsGroup>
+          <>
+            <SettingsGroup>
+              <SettingsRow label="Live connect" control="switch">
+                <ToolSwitch
+                  checked={handoffMode === "live_transfer"}
+                  label="Live connect"
+                  onChange={(next) =>
+                    setHandoffMode(next ? "live_transfer" : "callback")
+                  }
+                />
+              </SettingsRow>
+            </SettingsGroup>
+            <p className="px-1 text-xs text-ink-soft">
+              {liveConnectBlurb(liveDest?.name)}
+            </p>
+          </>
         ) : null}
-        <p className="px-1 text-xs text-ink-soft">{liveConnectBlurb(liveDest?.name)}</p>
 
         <div className="space-y-1">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1996,7 +2001,7 @@ export function TenantForm({
         <div className="overflow-hidden rounded-xl border border-line">
           <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Name</span>
-            <span>Handles</span>
+            <span>Role</span>
             <span>Phone</span>
             <span>Email</span>
             <span className="grid w-[15rem] grid-cols-3 gap-1 text-center text-caption font-medium normal-case tracking-normal">
@@ -2027,7 +2032,7 @@ export function TenantForm({
               </div>
               <div className="min-w-0">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-role-${index}`}>
-                  Handles
+                  Role
                 </label>
                 <input
                   id={`team-role-${index}`}

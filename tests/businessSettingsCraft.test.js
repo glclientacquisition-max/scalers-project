@@ -70,7 +70,8 @@ describe("business settings craft", () => {
     assert.match(ui, /Line live/);
     assert.match(ui, /Number pending/);
     assert.match(form, /Assistant name/);
-    assert.match(form, /notify\("Saved"\)/);
+    assert.match(form, /notify\("Saved · training line"\)/);
+    assert.doesNotMatch(form, /notify\("Saved"\)/);
     assert.doesNotMatch(form, /Your assistant will use this on the next call/);
     assert.doesNotMatch(form, /Your receptionist/);
     assert.match(test, /previewBusinessAssistantIntro/);
@@ -436,6 +437,16 @@ describe("business settings craft", () => {
     assert.match(save, /min-h-11/);
     assert.doesNotMatch(save, /min-h-14/);
     assert.doesNotMatch(save, /w-full/);
+    // Team: callback-only must not mount a filled handoff chip beside Save (#514).
+    const team = form.slice(
+      form.indexOf('panel === "team"'),
+      form.indexOf('panel === "faqs"')
+    );
+    assert.doesNotMatch(team, /HANDOFF_OPTIONS/);
+    assert.doesNotMatch(team, /SettingsSegmented/);
+    assert.doesNotMatch(team, /Message teammate/);
+    assert.doesNotMatch(team, /btnPrimaryFill|settingsPrimaryButtonClass/);
+    assert.doesNotMatch(team, /deskRateCardClass/);
   });
 
   it("truncates dense settings tables and labels team notify", () => {
@@ -454,6 +465,13 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /label: "Email"/);
     assert.doesNotMatch(form, /title=\{flag\.label\}/);
     assert.doesNotMatch(form, /Invite teammate|tenant_members/);
+    const team = form.slice(
+      form.indexOf('panel === "team"'),
+      form.indexOf('panel === "faqs"')
+    );
+    assert.match(team, /<span>Role<\/span>/);
+    assert.match(team, />\s*Role\s*</);
+    assert.doesNotMatch(team, /Handles/);
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {

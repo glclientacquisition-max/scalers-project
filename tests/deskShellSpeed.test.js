@@ -473,6 +473,26 @@ describe("settings save scope", () => {
       `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { soniox_voice_label: "Shop voice" }, [])`
     );
     assert.equal(voice, "Shop voice");
+    const identityBiz = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { business_name: "Done and Dusted", agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
+    );
+    assert.equal(identityBiz, "Done and Dusted");
+    const identityTone = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { agent_name: "Shy", agent_tone: "warm", soniox_voice_label: "Shy" }, [])`
+    );
+    assert.equal(identityTone, "Warm");
+    const identityCollision = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "identity" }, { agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
+    );
+    assert.equal(identityCollision, "");
+    const voiceKeepsLabel = load(
+      "dashboard/src/lib/settingsOptionStatus.ts",
+      `mod.settingsOptionStatus({ tab: "train", panel: "tools" }, { agent_name: "Shy", soniox_voice_label: "Shy" }, [])`
+    );
+    assert.equal(voiceKeepsLabel, "Shy");
     const line = load(
       "dashboard/src/lib/settingsOptionStatus.ts",
       `mod.settingsOptionStatus({ tab: "test" }, { sautikit_virtual_number: "+254700000000" })`
@@ -484,8 +504,10 @@ describe("settings save scope", () => {
     );
     assert.equal(pending, "");
     const shell = read("dashboard/src/components/BusinessSettingsShell.tsx");
-    assert.match(shell, /if \(!md\) return null/);
-    assert.match(shell, /SettingsMdOnly/);
+    // Phone index is md:hidden menu; form mounts only after drill-in (isMenu early return).
+    assert.match(shell, /if \(isMenu\)/);
+    assert.match(shell, /md:hidden/);
+    assert.match(shell, /variant="index"/);
     assert.match(shell, /data-settings-menu=\{variant\}/);
     assert.doesNotMatch(shell, /overflow-hidden rounded-xl border border-line bg-surface/);
   });
