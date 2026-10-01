@@ -48,8 +48,8 @@ Inside each destination, group by owner job. Placeholders are examples, not inst
 | Hours | Open/Closed chip per day; after-hours chips | Day grid with open switches. When closed is segmented Keep helping / Message only |
 | Locations | Places table `lg+`, stacked phone | Unchanged dense table. Add place ghost |
 | Policies | Two-column textarea grid | Grouped Rules stacks. When unsure stack |
-| Team | Handoff chips. Notify chips | Handoff segmented. Escalate / Inbox / Ops switches. People table `lg+` |
-| Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. Tool switches. Hear sample ghost. Handoff read-only |
+| Team | Handoff chips. Notify chips | Live connect switch when transfer can run. People table `lg+`. Status: Rings {name} during open hours. |
+| Voice | Voice chips. Tool switches. Hear sample bordered | Voice select. Tool switches. Hear sample ghost. |
 | Pronunciation | Coach with duplicate heading | Coach. Embedded heading is sr-only. Studio modes use underline tabs |
 | Updates | Duration chips. Live cards | Duration segmented. Live grouped list. Post update filled. Clear ghost |
 | Import | Radio cards. Native checkboxes | Paste / Website segmented. Include flags are switches. Scan / Add filled |
@@ -113,7 +113,6 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Hear sample | ghost | preview blob only | This device |
 | Alert a teammate | switch | `tool_escalate` | Assistant on calls |
 | Hang up after goodbye | switch | `tool_end_call` | Assistant on calls |
-| Handoff mode | read-only + link | none here; change in Team | Assistant on calls |
 | Save and train | filled sticky | compile | Assistant on calls |
 
 ### Pronunciation (`?tab=train&panel=pronunciation`)
@@ -186,7 +185,8 @@ Home only. `DailyBulletinPanel` is not a Settings destination. Old `?tab=updates
 
 | Control | Type | Writes | Affects |
 | --- | --- | --- | --- |
-| Handoff | segmented (2) | `handoff_mode` | Assistant on calls |
+| Live connect | switch, when transfer can run or is already on | `handoff_mode` | Assistant on calls |
+| Team phone | text | none | Rings {name} during open hours. or Add a team phone. |
 | Name / Handles / Phone / Email | table + inputs | `team_directory` | Whole business + assistant on calls |
 | Escalate / Inbox / Ops | switch | teammate notify flags | Whole business |
 | Channels note | text | none | SMS, WhatsApp, and email follow Alerts. Not a channel pick |
