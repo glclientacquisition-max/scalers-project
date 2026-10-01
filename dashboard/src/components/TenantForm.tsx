@@ -1927,6 +1927,7 @@ export function TenantForm({
             }
             initialLexicon={ttsLexicon}
             onLexiconChange={setTtsLexicon}
+            voiceId={tenant.soniox_voice_id ?? null}
             omitLexiconField
           />
         ) : null}

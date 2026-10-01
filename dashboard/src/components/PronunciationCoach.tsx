@@ -31,9 +31,17 @@ import {
   displayLexiconLabel,
   lexiconForStorage,
   parseTtsLexicon,
+  pronunciationHearBody,
   sanitizeSayForm,
   type TtsLexiconEntry,
 } from "@/lib/pronunciationLexicon";
+import {
+  assertPreviewAudioPlayable,
+  isAutoplayBlock,
+  NO_VOICE_SAMPLE_COPY,
+  objectUrlFromPreviewResponse,
+  previewErrorCopy,
+} from "@/lib/previewAudio";
 import type { PronunciationReviewCandidate } from "@/lib/pronunciationGeminiScan";
 import {
   GEMINI_SCAN_BATCH_OPTIONS,
@@ -50,8 +58,35 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import { deskShiftClass, filterTabClass, btnPrimary } from "@/components/ui/deskChrome";
+import { deskShiftClass, filterTabClass, btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
 import { settingsGhostButtonClass } from "@/components/settingsUi";
+
+type CallerProofRow = { name: string; say: string };
+
+function HearButton({
+  name,
+  busy,
+  onClick,
+}: {
+  name: string;
+  busy: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-busy={busy}
+      aria-label={`Hear ${name}`}
+      data-testid="pronunciation-hear"
+      className={`${btnPrimary} shrink-0 gap-2`}
+    >
+      {busy ? <span className={pendingSpinnerClass} aria-hidden="true" /> : null}
+      Hear
+    </button>
+  );
+}
 
 type CoachItem = PronunciationSuggestion & {
   status: "todo" | "done" | "skipped";
@@ -77,6 +112,7 @@ export function PronunciationCoach({
   team,
   initialLexicon,
   onLexiconChange,
+  voiceId = null,
   omitLexiconField = false,
 }: {
   tenantId: string;
@@ -96,6 +132,8 @@ export function PronunciationCoach({
   bulletinTexts?: string[];
   initialLexicon: TtsLexiconEntry[];
   onLexiconChange: (entries: TtsLexiconEntry[]) => void;
+  /** Stored tenant.soniox_voice_id. Preview route resolves the live voice. */
+  voiceId?: string | null;
   /** When embedded in TenantForm, lexicon is submitted via the parent hidden field. */
   omitLexiconField?: boolean;
 }) {
@@ -120,7 +158,13 @@ export function PronunciationCoach({
   const [addError, setAddError] = useState<string | null>(null);
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
   const [editSay, setEditSay] = useState("");
-  const [keepNote, setKeepNote] = useState<string | null>(null);
+  const [callerProof, setCallerProof] = useState<CallerProofRow[] | null>(null);
+  const [hearUrl, setHearUrl] = useState<string | null>(null);
+  const [hearBusyKey, setHearBusyKey] = useState<string | null>(null);
+  const [hearError, setHearError] = useState<string | null>(null);
+  const hearUrlsRef = useRef<Map<string, string>>(new Map());
+  const hearAudioRef = useRef<HTMLAudioElement | null>(null);
+  const hearFlightRef = useRef(false);
 
   const [geminiBatch, setGeminiBatch] = useState<number>(GEMINI_SCAN_DEFAULT_BATCH);
   const [geminiConfirmOpen, setGeminiConfirmOpen] = useState(false);
@@ -135,7 +179,11 @@ export function PronunciationCoach({
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [keptTakeUrl, setKeptTakeUrl] = useState<string | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const keptTakeUrlRef = useRef<string | null>(null);
+  audioUrlRef.current = audioUrl;
   const [micError, setMicError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -344,10 +392,16 @@ export function PronunciationCoach({
       setLexicon(parseTtsLexicon(confirmState.lexicon));
       setRecording(false);
       setAudioBlob(null);
-      setAudioUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      const take = audioUrlRef.current;
+      if (take) {
+        setKeptTakeUrl((current) => {
+          if (current && current !== take) URL.revokeObjectURL(current);
+          return take;
+        });
+        keptTakeUrlRef.current = take;
+        audioUrlRef.current = null;
+      }
+      setAudioUrl(null);
       setMicError(null);
       setAddError(null);
       setExtraItems((prev) =>
@@ -357,22 +411,34 @@ export function PronunciationCoach({
   }, [confirmState]);
 
   useEffect(() => {
-    if (confirmState.ok && confirmState.entries?.length) {
-      const n = confirmState.entries.length;
-      const localNote =
-        confirmState.source === "local"
-          ? " (basic spelling; voice check was unavailable)"
-          : "";
-      setKeepNote(
-        `Saved ${n} pronunciation${n === 1 ? "" : "s"}. Live on the next call.${localNote}`
-      );
+    if (!confirmState.ok || !confirmState.entries?.length) return;
+    const rows = confirmState.entries
+      .map((entry) => ({
+        name: displayLexiconLabel(entry),
+        say: entry.say,
+      }))
+      .filter((row) => row.name);
+    if (!rows.length) return;
+    for (const url of hearUrlsRef.current.values()) URL.revokeObjectURL(url);
+    hearUrlsRef.current.clear();
+    const audio = hearAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
     }
+    setHearUrl(null);
+    setHearError(null);
+    setCallerProof(rows);
   }, [confirmState]);
 
   useEffect(() => {
+    const urls = hearUrlsRef.current;
     return () => {
       stopStream();
       if (audioUrl) URL.revokeObjectURL(audioUrl);
+      for (const url of urls.values()) URL.revokeObjectURL(url);
+      urls.clear();
+      if (keptTakeUrlRef.current) URL.revokeObjectURL(keptTakeUrlRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -400,11 +466,93 @@ export function PronunciationCoach({
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setMicError(null);
-    setKeepNote(null);
+  }
+
+  function clearCallerHear() {
+    hearFlightRef.current = false;
+    for (const url of hearUrlsRef.current.values()) URL.revokeObjectURL(url);
+    hearUrlsRef.current.clear();
+    const audio = hearAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+    }
+    setHearUrl(null);
+    setHearBusyKey(null);
+    setHearError(null);
+    setCallerProof(null);
+    if (keptTakeUrlRef.current) URL.revokeObjectURL(keptTakeUrlRef.current);
+    keptTakeUrlRef.current = null;
+    setKeptTakeUrl(null);
+  }
+
+  async function playHearUrl(url: string) {
+    const audio = hearAudioRef.current;
+    if (!audio) return;
+    if (audio.getAttribute("src") !== url) audio.src = url;
+    else {
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // Metadata may not be ready on the first replay.
+      }
+    }
+    try {
+      await audio.play();
+    } catch (err) {
+      if (!isAutoplayBlock(err)) throw err;
+    }
+  }
+
+  async function hearSavedName(key: string, name: string) {
+    const text = name.trim();
+    if (!text || hearFlightRef.current) return;
+    setHearError(null);
+    const cached = hearUrlsRef.current.get(key);
+    if (cached) {
+      setHearUrl(cached);
+      try {
+        await playHearUrl(cached);
+      } catch (err) {
+        setHearError(previewErrorCopy(err));
+      }
+      return;
+    }
+    hearFlightRef.current = true;
+    setHearBusyKey(key);
+    try {
+      const res = await fetch("/api/pronunciation/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          pronunciationHearBody({
+            name: text,
+            lexicon,
+            voiceId,
+          })
+        ),
+      });
+      const preview = await objectUrlFromPreviewResponse(res);
+      try {
+        await assertPreviewAudioPlayable(preview.url);
+      } catch (probeErr) {
+        URL.revokeObjectURL(preview.url);
+        throw probeErr;
+      }
+      hearUrlsRef.current.set(key, preview.url);
+      setHearUrl(preview.url);
+      await playHearUrl(preview.url);
+    } catch (err) {
+      setHearError(previewErrorCopy(err));
+    } finally {
+      hearFlightRef.current = false;
+      setHearBusyKey(null);
+    }
   }
 
   async function startRecording() {
     setMicError(null);
+    clearCallerHear();
     clearTake();
     if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setMicError("This browser can’t record audio. Try Chrome or Safari.");
@@ -746,6 +894,43 @@ export function PronunciationCoach({
 
       {mode === "practice" ? (
         <div className="space-y-5">
+          {callerProof?.length ? (
+            <div data-testid="caller-proof">
+              <p className="text-sm font-medium text-ink" role="status">
+                Callers hear this
+              </p>
+              <ul className="mt-2 divide-y divide-line border-y border-line">
+                {callerProof.map((row, index) => {
+                  const key = `proof:${row.name}:${row.say}:${index}`;
+                  return (
+                    <li
+                      key={key}
+                      className="flex items-center justify-between gap-3 py-2"
+                    >
+                      <span className="min-w-0 truncate text-sm text-ink">
+                        {row.name}
+                      </span>
+                      <HearButton
+                        name={row.name}
+                        busy={hearBusyKey === key}
+                        onClick={() => void hearSavedName(key, row.name)}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+              {keptTakeUrl ? (
+                <audio
+                  src={keptTakeUrl}
+                  controls
+                  preload="metadata"
+                  className="mt-2 h-10 max-w-full"
+                  data-testid="saved-take-audio"
+                  aria-label="Saved take"
+                />
+              ) : null}
+            </div>
+          ) : null}
           {!todoItems.length && !active ? (
             <div className="rounded-xl border border-dashed border-[var(--line)] bg-surface/60 px-4 py-5">
               <p className="text-sm font-medium text-[var(--ink)]">Nothing left to practice</p>
@@ -874,11 +1059,6 @@ export function PronunciationCoach({
                       ) : null}
                     </div>
                   ) : null}
-                  {keepNote ? (
-                    <p className="mt-3 text-sm text-[var(--ok)]" role="status">
-                      {keepNote}
-                    </p>
-                  ) : null}
                 </div>
               ) : null}
 
@@ -972,31 +1152,29 @@ export function PronunciationCoach({
             </div>
           ) : (
             <>
-              <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
+              <ul className="divide-y divide-line border-y border-line">
                 {visibleLexicon.map((entry) => {
                   const label = displayLexiconLabel(entry);
                   const isEditing = editingMatch === entry.match;
+                  const hearKey = `library:${entry.match}:${entry.say}`;
                   return (
-                  <li
-                    key={entry.match}
-                    className="py-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="min-w-0">
-                      <span className="block text-[var(--ink)]">
-                        {label}
-                      </span>
+                  <li key={entry.match} className="flex flex-wrap items-center gap-2 py-2">
+                    <div className="min-w-0 flex-1 basis-36">
+                      <p className="truncate text-sm font-medium text-ink">{label}</p>
                       {!isEditing ? (
-                        <span className="font-mono text-xs text-[var(--ink-soft)]">
-                          phone says → {entry.say}
-                        </span>
+                        <p className="truncate font-mono text-xs text-ink-soft">{entry.say}</p>
                       ) : null}
-                    </span>
-                    <span className="flex shrink-0 gap-2">
+                    </div>
+                    <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                      <HearButton
+                        name={label}
+                        busy={hearBusyKey === hearKey}
+                        onClick={() => void hearSavedName(hearKey, label)}
+                      />
                       <button
                         type="button"
                         onClick={() => renewEntry(entry)}
-                        className="text-xs font-medium text-[var(--accent-deep)] hover:underline"
+                        className={`${settingsGhostButtonClass} shrink-0`}
                       >
                         Renew
                       </button>
@@ -1012,7 +1190,7 @@ export function PronunciationCoach({
                             setAddError(null);
                           }
                         }}
-                        className="text-xs font-medium text-[var(--ink-soft)] hover:underline"
+                        className={`${settingsGhostButtonClass} shrink-0`}
                       >
                         {isEditing ? "Cancel" : "Edit say"}
                       </button>
@@ -1020,25 +1198,24 @@ export function PronunciationCoach({
                         type="button"
                         onClick={() => removeEntry(entry.match)}
                         disabled={persistPending}
-                        className="text-xs text-[var(--warn)] hover:underline disabled:opacity-60"
+                        className={`${settingsGhostButtonClass} shrink-0 disabled:opacity-60`}
                       >
                         Remove
                       </button>
-                    </span>
                     </div>
                     {isEditing ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div className="flex w-full flex-wrap items-center gap-2">
                         <input
                           value={editSay}
                           onChange={(e) => setEditSay(e.target.value)}
                           aria-label={`Say-as for ${label}`}
-                          className="min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-surface px-3 py-1.5 font-mono text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:border-[var(--accent)]"
+                          className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 font-mono text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         <button
                           type="button"
                           onClick={() => saveEditedSay(entry.match)}
                           disabled={persistPending || !editSay.trim()}
-                          className="rounded-xl bg-accent-fill px-3 py-1.5 text-xs font-medium text-accent-on-fill disabled:opacity-60"
+                          className={`${btnPrimary} shrink-0`}
                         >
                           {persistPending ? "Saving…" : "Save"}
                         </button>
@@ -1408,6 +1585,31 @@ export function PronunciationCoach({
           </div>
         </div>
       ) : null}
+      {hearError ? (
+        <p className="text-sm text-warn" role="alert">
+          {hearError}
+        </p>
+      ) : null}
+      <audio
+        ref={hearAudioRef}
+        controls
+        preload="metadata"
+        aria-label="Callers hear this"
+        aria-hidden={hearUrl ? undefined : true}
+        tabIndex={hearUrl ? 0 : -1}
+        data-testid="pronunciation-hear-audio"
+        className={
+          hearUrl
+            ? "h-10 max-w-full"
+            : "pointer-events-none absolute h-px w-px overflow-hidden"
+        }
+        onError={() => {
+          const src = hearAudioRef.current?.getAttribute("src");
+          if (!src) return;
+          setHearError(NO_VOICE_SAMPLE_COPY);
+          setHearUrl(null);
+        }}
+      />
     </section>
   );
 }

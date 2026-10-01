@@ -359,6 +359,23 @@ export function lexiconForStorage(entries: TtsLexiconEntry[]): Array<{
   });
 }
 
+/** Body for POST /api/pronunciation/preview. Name plus stored lexicon and live voice. */
+export function pronunciationHearBody(input: {
+  name: string;
+  lexicon: TtsLexiconEntry[];
+  voiceId?: string | null;
+}): {
+  text: string;
+  lexicon: ReturnType<typeof lexiconForStorage>;
+  voiceId: string | null;
+} {
+  return {
+    text: String(input.name || "").trim(),
+    lexicon: lexiconForStorage(input.lexicon),
+    voiceId: String(input.voiceId || "").trim() || null,
+  };
+}
+
 /** Plain fallback when Gemini is unavailable: space camelCase, keep readable. */
 export function localSayFallback(phrase: string): string {
   const text = String(phrase || "").trim();
