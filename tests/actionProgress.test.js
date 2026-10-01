@@ -7,6 +7,7 @@ const {
   pickLlmRecoveryLine,
   pickLlmRecoverySaved,
   pickSpeechGuaranteeLine,
+  planEmptyGeminiSpeech,
   shouldSpeakHandoffNameAsk,
   looksLikeCallerName,
   looksLikeBareCloser,
@@ -227,7 +228,7 @@ assert.equal(
   true
 );
 
-const emptyAnswerAfterName = pickSpeechGuaranteeLine({
+const emptyAnswerAfterName = planEmptyGeminiSpeech({
   nextBestAction: { action: 'ANSWER' },
   brainState: {
     intent: 'booking',
@@ -236,10 +237,26 @@ const emptyAnswerAfterName = pickSpeechGuaranteeLine({
   },
   language: 'en',
   userText: "Yeah, I'm Alvin.",
+  llmDown: false,
 });
-assert.doesNotMatch(emptyAnswerAfterName, /can't finish/i);
-assert.doesNotMatch(emptyAnswerAfterName, /name so I can reach them/i);
-assert.match(emptyAnswerAfterName, /^Okay\.?$/i);
+assert.equal(emptyAnswerAfterName.speak, false);
+assert.equal(emptyAnswerAfterName.kind, 'quiet_continue');
+assert.equal(emptyAnswerAfterName.line, '');
+assert.equal(
+  pickSpeechGuaranteeLine({
+    nextBestAction: { action: 'ANSWER' },
+    brainState: {
+      intent: 'booking',
+      caller: { name: 'Alvin' },
+      goal: { missingSlots: ['name'] },
+    },
+    language: 'en',
+    userText: "Yeah, I'm Alvin.",
+  }),
+  ''
+);
+assert.doesNotMatch(emptyAnswerAfterName.line, /can't finish/i);
+assert.doesNotMatch(emptyAnswerAfterName.line, /name so I can reach them/i);
 
 const nextWhenSlot = pickSpeechGuaranteeLine({
   nextBestAction: { action: 'ASK_CLARIFICATION', slot: 'when' },
@@ -271,15 +288,24 @@ assert.match(
   /Tuje wapi/
 );
 
-assert.match(
+assert.equal(
   pickSpeechGuaranteeLine({
     nextBestAction: { action: 'ANSWER' },
     brainState: { intent: 'hours' },
     language: 'en',
     userText: 'Are you open?',
   }),
-  /^Okay\.?$/i
+  ''
 );
+const emptyAnswerNoName = planEmptyGeminiSpeech({
+  nextBestAction: { action: 'ANSWER' },
+  brainState: { intent: 'hours' },
+  language: 'en',
+  userText: 'Are you open?',
+  llmDown: false,
+});
+assert.equal(emptyAnswerNoName.speak, false);
+assert.equal(emptyAnswerNoName.line, '');
 
 // Live leftover HD_bc9f610692de: bookings ask after the name was already in
 // must not speech-guarantee another name ask, and must not invent a when slot.
@@ -297,7 +323,7 @@ assert.doesNotMatch(bookingsGuarantee, /May I have your name/i);
 assert.doesNotMatch(bookingsGuarantee, /day and time|time works/i);
 assert.match(bookingsGuarantee, /^Okay\.?$/i);
 
-assert.match(
+assert.equal(
   pickSpeechGuaranteeLine({
     nextBestAction: { action: 'ANSWER' },
     brainState: {
@@ -308,8 +334,47 @@ assert.match(
     language: 'en',
     userText: "Yeah, I'm Alvin.",
   }),
-  /^Okay\.?$/i
+  ''
 );
+
+const downtimeOnce = planEmptyGeminiSpeech({
+  nextBestAction: { action: 'ANSWER' },
+  brainState: { intent: 'hours' },
+  language: 'en',
+  userText: 'Are you open tomorrow?',
+  llmDown: true,
+  alreadyOffered: false,
+});
+assert.equal(downtimeOnce.speak, true);
+assert.equal(downtimeOnce.kind, 'reasoning_outage');
+assert.equal(
+  downtimeOnce.line,
+  "Okay, I can't finish that just now. May I have your name so I can reach them?"
+);
+const downtimeAgain = planEmptyGeminiSpeech({
+  nextBestAction: { action: 'ANSWER' },
+  brainState: { intent: 'hours' },
+  language: 'en',
+  userText: 'Hello?',
+  llmDown: true,
+  alreadyOffered: true,
+});
+assert.equal(
+  downtimeAgain.line,
+  "Okay, I still can't finish that. May I have your name so I can reach them?"
+);
+assert.notEqual(downtimeOnce.line, downtimeAgain.line);
+const downtimeNamed = planEmptyGeminiSpeech({
+  nextBestAction: { action: 'ANSWER' },
+  brainState: { caller: { name: 'Alvin' }, intent: 'booking' },
+  language: 'en',
+  userText: "Yeah, I'm Alvin.",
+  llmDown: true,
+  alreadyOffered: false,
+});
+assert.equal(downtimeNamed.kind, 'reasoning_outage_saved');
+assert.match(downtimeNamed.line, /I have your name/i);
+assert.doesNotMatch(downtimeNamed.line, /reach them/i);
 
 assert.doesNotMatch(
   polishSpokenReply("Okay, I've booked you for Thursday. Stay on the line."),

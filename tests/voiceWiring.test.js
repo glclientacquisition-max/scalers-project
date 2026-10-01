@@ -445,8 +445,23 @@ assert.match(
 
 assert.match(
   source,
-  /pickSpeechGuaranteeLine/,
-  'empty Gemini success must ask the next slot, not the Gemini-down name-ask'
+  /planEmptyGeminiSpeech/,
+  'empty Gemini ANSWER stays quiet; a real outage still uses the downtime name-capture'
+);
+assert.match(
+  source,
+  /turn speech quiet/,
+  'successful empty ANSWER must log quiet continue instead of speaking the reach-them line'
+);
+assert.match(
+  source,
+  /shouldForwardOutboundPcm/,
+  'barge must drop orphan PCM unless the frame stream id is the active utterance'
+);
+assert.match(
+  source,
+  /isOrphanFragment/,
+  'a cancelled sentence tail must not open a new Soniox stream'
 );
 
 assert.match(

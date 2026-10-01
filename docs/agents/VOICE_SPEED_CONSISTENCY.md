@@ -142,7 +142,7 @@ Look for:
 | `filler=1` often | Reply path still slow — fix LLM/TTS, don’t lower filler forever |
 | Order/escalate silence, then a long confirmation | Action turn with no progress line — expect `action-progress` log before tools |
 | Silent greeting / no talk on answer | TTS not ready — greeting must await `ttsReadyPromise` |
-| Scratchy audio after barge or filler | Orphan filler PCM — cancel filler `stream_id` only + gate `onAudio` by active stream |
+| Scratchy audio after barge or filler | Orphan PCM — cancel the barged TTS, `killAudio`, and forward a frame only when its stream id is the active utterance. Do not re-speak a cancelled tail. Echo and backchannel do not cancel. |
 
 ---
 

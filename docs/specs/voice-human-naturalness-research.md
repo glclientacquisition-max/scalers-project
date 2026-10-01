@@ -203,7 +203,7 @@ Do not batch. Freeze SHA + three DID scripts after each.
 | 2 | EN-only Smart Turn (or LiveKit audio EOT) on silence, SW stays regex | V1/V6 timing | `pipecat-ai/smart-turn` | Enable on `sw` until labeled |
 | 3 | Filler max_steps + cancel when a progress line is already speaking | V7 | LiveKit `_FillerScheduler` | Thinking-ack copy |
 | 4 | Confirm SW-capable clone on language flip | timbre | Rime language-swap | Catalog redesign |
-| 5 | Speech-guarantee on ANSWER (`I can't finish that just now`) | later Voice | Live findings | Not a naturalness MOS |
+| 5 | Speech-guarantee on ANSWER (`I can't finish that just now`) | shipped: successful ANSWER stays quiet; outage still speaks the name-capture once | Live findings | Not a naturalness MOS |
 
 Brain tickets stay Brain: F7 lists, name re-ask, invented holds.
 

@@ -199,11 +199,13 @@ function smokeEmptyGeminiGuarantee() {
     language: 'en',
     userText: "Yeah, I'm Alvin.",
   });
-  checkLine('empty Gemini ANSWER after name', line, {
-    enMidCall: true,
-    mustInclude: [/^Okay\.?$/i],
-    mustNotInclude: [/can't finish/i, /name so I can reach them/i, /day and time|time works/i],
-  });
+  if (line) {
+    fail('empty Gemini ANSWER after name', `expected quiet, got ${line}`);
+  }
+  if (/can't finish|name so I can reach them/i.test(String(line || ''))) {
+    fail('empty Gemini ANSWER after name', 'spoke the downtime reach-them line');
+  }
+  console.log('✓ empty Gemini ANSWER after name stays quiet');
 }
 
 function smokeRecoveryStillMatches() {

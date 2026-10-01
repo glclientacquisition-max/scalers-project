@@ -193,7 +193,7 @@ const {
   pickContextualAck,
   pickActionProgress,
   pickClarifyProgress,
-  pickSpeechGuaranteeLine,
+  planEmptyGeminiSpeech,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
@@ -209,6 +209,10 @@ const { resolveLocalReply } = require('./src/conversation/turnPolicy');
 const { guardSpokenReply } = require('./src/conversation/speechGuard');
 const { planLlmRecovery } = require('./src/conversation/llmRecovery');
 const { prepareForTts } = require('./src/speech/ttsNormalize');
+const {
+  shouldForwardOutboundPcm,
+  isOrphanFragment,
+} = require('./src/speech/outboundPcm');
 const {
   adaptiveFlushMs,
   decideCallerEvent,
@@ -1699,6 +1703,10 @@ mediaWss.on('connection', (ws, req) => {
   let fillerTimer = null;
   /** When true, discard the in-flight Gemini/TTS reply and wait for the caller turn. */
   let bargeInActive = false;
+  /** Sticky for the turn that was barged. The next caller turn clears it. */
+  let suppressReplyRemainder = false;
+  /** Line that was playing when barge cancelled TTS. Tails of it are not re-spoken. */
+  let bargeCancelledText = '';
   let playbackGeneration = 0;
   let activePlaybackGeneration = 0;
   let pendingUtterance = null;
@@ -2038,16 +2046,27 @@ mediaWss.on('connection', (ws, req) => {
       );
       return handleSpeechProviderOutage('tts unavailable');
     }
+    if (isOrphanFragment(bargeCancelledText, text)) {
+      console.log(`[ws/media][${sidLabel()}] drop fragment restart after barge`);
+      return { ok: false, fragment: true };
+    }
     // Starting intentional playback clears a prior barge latch.
     bargeInActive = false;
-    speaking = true;
-    speakStartedAt = Date.now();
+    suppressReplyRemainder = false;
+    if (/[.!?]$/.test(String(text).trim())) bargeCancelledText = '';
     lastAgentText = String(text);
     if (!opts.isFiller && !opts.isReplay) {
       agentReplay.beginSpeech(text);
     }
     activePlaybackGeneration = ++playbackGeneration;
     const gen = activePlaybackGeneration;
+    // Hold a placeholder stream id until Soniox binds the real one.
+    // speaking is true so barge still applies, but orphan PCM from the
+    // cancelled stream cannot match this id.
+    const armId = `arming-${gen}`;
+    activeOutboundStreamId = armId;
+    speaking = true;
+    speakStartedAt = Date.now();
     // One owner for TTS language + pronunciation prep (per-utterance + sticky call lang).
     const extraLexicon = Array.isArray(opts.extraLexicon)
       ? opts.extraLexicon
@@ -2077,6 +2096,19 @@ mediaWss.on('connection', (ws, req) => {
             ttsSpeedScale === 1
         ),
       });
+      if (bargeInActive || activePlaybackGeneration !== gen) {
+        try {
+          session.cancel();
+        } catch {
+          /* ignore */
+        }
+        if (activeOutboundStreamId === armId) activeOutboundStreamId = null;
+        // Supersede this generation so finally does not commit audio the caller never heard.
+        if (activePlaybackGeneration === gen) {
+          activePlaybackGeneration = ++playbackGeneration;
+        }
+        return { ok: false, cancelled: true };
+      }
       activeOutboundStreamId = session.streamId;
       if (opts.isFiller) fillerStreamId = session.streamId;
       const pushed = session.pushText(prepared.text);
@@ -2138,6 +2170,8 @@ mediaWss.on('connection', (ws, req) => {
     clearFillerTimer();
     idleNudge.clear();
     bargeInActive = true;
+    suppressReplyRemainder = true;
+    bargeCancelledText = lastAgentText;
     playbackGeneration += 1;
     speaking = false;
     interimBargeText = '';
@@ -2275,6 +2309,8 @@ mediaWss.on('connection', (ws, req) => {
       pendingUtterance = pendingUtterance ? `${pendingUtterance} ${clean}` : clean;
       return;
     }
+    // A new caller turn may speak. The previous barge must not swallow it.
+    suppressReplyRemainder = false;
 
     const idleDecision = decideCallerEvent({
       text: clean,
@@ -2611,14 +2647,19 @@ mediaWss.on('connection', (ws, req) => {
           allowEmpty: true,
         });
         if (!text || !tts) return;
+        if (suppressReplyRemainder || bargeInActive) return;
+        if (isOrphanFragment(bargeCancelledText, text)) {
+          console.log(`[ws/media][${sidLabel()}] drop fragment restart after barge`);
+          return;
+        }
         firstSpokenChunk = true;
         spokeThisTurn = true;
         turnTiming.markFirstSpokenChunk();
         stopFillerForReply();
-        if (bargeInActive) return;
+        if (bargeInActive || suppressReplyRemainder) return;
 
         const session = await ensureReplySpeakSession();
-        if (!session || bargeInActive) {
+        if (!session || bargeInActive || suppressReplyRemainder) {
           try {
             session?.cancel();
           } catch {
@@ -2628,15 +2669,17 @@ mediaWss.on('connection', (ws, req) => {
           return;
         }
 
-        if (!speaking || activePlaybackGeneration !== playbackGeneration) {
+        const startingPlayback = !speaking || activePlaybackGeneration !== playbackGeneration;
+        if (startingPlayback) {
           const prev = activePlaybackGeneration;
-          speaking = true;
-          speakStartedAt = Date.now();
           activePlaybackGeneration = ++playbackGeneration;
           streamPlaybackGen = activePlaybackGeneration;
+          speakStartedAt = Date.now();
           if (prev > 0) overlapHold.reassignPending(prev, activePlaybackGeneration);
         }
         activeOutboundStreamId = session.streamId;
+        speaking = true;
+        if (/[.!?]$/.test(text)) bargeCancelledText = '';
 
         session.pushText(text);
         spokenChunks.push(text);
@@ -2835,28 +2878,48 @@ mediaWss.on('connection', (ws, req) => {
         spokeThisTurn = true;
       }
 
-      // Hard guarantee: every completed caller turn must produce agent audio.
-      // Empty Gemini success asks the next slot. Do not speak the Gemini-down
-      // reach-them name-ask when the caller already named themselves.
+      // Empty Gemini success on ANSWER stays quiet (keep listening).
+      // A clarification turn still asks the next open slot.
+      // Credits/denied still speaks the downtime name-capture once.
       if (!spokeThisTurn && !bargeInActive && tts) {
         const llmDown = Boolean(result?.timedOut || result?.llmFailed);
-        const guarantee = llmDown
-          ? await resolveLlmRecoverySpeech(clean)
-          : pickSpeechGuaranteeLine({
-              nextBestAction,
-              brainState,
-              language: callLanguage,
-              userText: clean,
-            });
-        console.warn(
-          `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}` +
-            ` slot=${nextBestAction.slot || ''} llmDown=${llmDown ? 1 : 0}`
-        );
-        callTranscript.pushAgent(guarantee);
-        turnTiming.markFirstSpokenChunk();
-        await speakText(guarantee);
-        spokeThisTurn = true;
-        turnOutcome = 'speech_guarantee';
+        if (llmDown) {
+          const guarantee = await resolveLlmRecoverySpeech(clean);
+          console.warn(
+            `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}` +
+              ` slot=${nextBestAction.slot || ''} llmDown=1`
+          );
+          callTranscript.pushAgent(guarantee);
+          turnTiming.markFirstSpokenChunk();
+          await speakText(guarantee);
+          spokeThisTurn = true;
+          turnOutcome = 'speech_guarantee';
+        } else {
+          const planned = planEmptyGeminiSpeech({
+            nextBestAction,
+            brainState,
+            language: callLanguage,
+            userText: clean,
+            llmDown: false,
+          });
+          if (planned.speak && planned.line) {
+            console.warn(
+              `[ws/media][${sidLabel()}] turn speech guarantee fired action=${nextBestAction.action}` +
+                ` slot=${nextBestAction.slot || ''} llmDown=0 kind=${planned.kind}`
+            );
+            callTranscript.pushAgent(planned.line);
+            turnTiming.markFirstSpokenChunk();
+            await speakText(planned.line);
+            spokeThisTurn = true;
+            turnOutcome = 'speech_guarantee';
+          } else {
+            console.log(
+              `[ws/media][${sidLabel()}] turn speech quiet action=${nextBestAction.action}` +
+                ` reason=empty_answer`
+            );
+            turnOutcome = 'speech_quiet';
+          }
+        }
       }
 
       if (result?.shouldEndCall && !bargeInActive) {
@@ -3070,14 +3133,16 @@ mediaWss.on('connection', (ws, req) => {
       callSid: sidLabel(),
       voiceId,
       onAudio: (pcm, meta = {}) => {
-        // Drop outbound audio after barge-in cancel / superseded playback generation.
-        if (!speaking) return;
-        if (activePlaybackGeneration !== playbackGeneration) return;
-        // Drop orphan filler / cancelled-stream PCM that arrives late.
+        // Drop outbound audio after barge-in cancel, a generation change,
+        // or PCM from a stream that is no longer the active utterance.
         if (
-          activeOutboundStreamId &&
-          meta.streamId &&
-          meta.streamId !== activeOutboundStreamId
+          !shouldForwardOutboundPcm({
+            speaking,
+            playbackGeneration,
+            activePlaybackGeneration,
+            activeStreamId: activeOutboundStreamId,
+            frameStreamId: meta.streamId,
+          })
         ) {
           return;
         }

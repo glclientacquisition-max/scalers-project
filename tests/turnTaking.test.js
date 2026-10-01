@@ -15,6 +15,13 @@ const {
 } = require('../src/speech/turnTaking');
 const { isBackchannel } = require('../src/conversation/language');
 const { shouldSkipCallerTurn } = require('../src/conversation/dynamicSpeech');
+const {
+  shouldForwardOutboundPcm,
+  planBargePlayback,
+  isOrphanFragment,
+  planNextReplyAfterBarge,
+} = require('../src/speech/outboundPcm');
+const { splitSpeakableChunks } = require('../src/speech/spokenStreamBuffer');
 
 let passed = 0;
 function test(name, fn) {
@@ -705,6 +712,129 @@ test('skip-turn does not undo barge_listen or answers', () => {
   assert.strictEqual(shouldSkipCallerTurn('actually, tomorrow', { lastAgentText: AGENT_LINE }), false);
   assert.strictEqual(shouldSkipCallerTurn('sawa', { lastAgentText: AGENT_LINE }), true);
   assert.strictEqual(shouldSkipCallerTurn('sawa', { lastAgentText: BOOK_Q }), false);
+});
+
+test('false barge does not cancel a long reply; real barge clears and the next speak is a fresh sentence', () => {
+  const now = Date.now();
+  const longLine =
+    'I am Shy from Done and Dusted Cleaning Services. May I please know who is speaking?';
+  function during(text) {
+    return decideCallerEvent({
+      text,
+      speaking: true,
+      turnBusy: true,
+      speakStartedAt: now - 1500,
+      lastAgentText: longLine,
+      now,
+    });
+  }
+
+  const echo = during('who is this');
+  assert.strictEqual(echo.reason, 'echo');
+  assert.strictEqual(echo.stopTts, false);
+  assert.strictEqual(echo.interrupt, false);
+  assert.strictEqual(planBargePlayback(echo).keepStream, true);
+  assert.strictEqual(planBargePlayback(echo).cancelTts, false);
+  assert.strictEqual(planBargePlayback(echo).clearMedia, false);
+
+  for (const backchannel of ['mm-hmm', 'okay', 'uh-huh']) {
+    const back = during(backchannel);
+    assert.strictEqual(back.stopTts, false, backchannel);
+    assert.strictEqual(back.interrupt, false, backchannel);
+    assert.strictEqual(planBargePlayback(back).keepStream, true, backchannel);
+  }
+
+  const wait = during('wait');
+  assert.strictEqual(wait.reason, 'interrupt_wait');
+  assert.strictEqual(wait.stopTts, true);
+  assert.strictEqual(wait.interrupt, true);
+  const waitPlan = planBargePlayback(wait);
+  assert.strictEqual(waitPlan.cancelTts, true);
+  assert.strictEqual(waitPlan.clearMedia, true);
+  assert.strictEqual(waitPlan.dropOrphanPcm, true);
+
+  const real = during('Pet stain removal Thursday at 10');
+  assert.strictEqual(real.action, 'barge_gemini');
+  assert.strictEqual(real.stopTts, true);
+  assert.strictEqual(planBargePlayback(real).cancelTts, true);
+
+  assert.strictEqual(
+    shouldForwardOutboundPcm({
+      speaking: true,
+      playbackGeneration: 2,
+      activePlaybackGeneration: 2,
+      activeStreamId: 'arming-2',
+      frameStreamId: 'tts-old',
+    }),
+    false
+  );
+  assert.strictEqual(
+    shouldForwardOutboundPcm({
+      speaking: false,
+      playbackGeneration: 3,
+      activePlaybackGeneration: 3,
+      activeStreamId: 'tts-new',
+      frameStreamId: 'tts-old',
+    }),
+    false
+  );
+  assert.strictEqual(
+    shouldForwardOutboundPcm({
+      speaking: true,
+      playbackGeneration: 3,
+      activePlaybackGeneration: 3,
+      activeStreamId: 'tts-new',
+      frameStreamId: 'tts-new',
+    }),
+    true
+  );
+  assert.strictEqual(
+    shouldForwardOutboundPcm({
+      speaking: true,
+      playbackGeneration: 4,
+      activePlaybackGeneration: 3,
+      activeStreamId: 'tts-new',
+      frameStreamId: 'tts-new',
+    }),
+    false
+  );
+
+  assert.strictEqual(isOrphanFragment(longLine, 'is speaking'), true);
+  assert.strictEqual(isOrphanFragment(longLine, 'Who is speaking?'), false);
+  const next = planNextReplyAfterBarge({
+    cancelledStreamId: 'tts-old',
+    nextStreamId: 'tts-new',
+    cancelledText: longLine,
+    sentences: ['is speaking', 'Pet stain removal is Thursday at 10.'],
+  });
+  assert.strictEqual(next.freshStream, true);
+  assert.strictEqual(next.clearTts, true);
+  assert.strictEqual(next.clearMedia, true);
+  assert.deepStrictEqual(next.sentences, ['Pet stain removal is Thursday at 10.']);
+  assert.deepStrictEqual(
+    planNextReplyAfterBarge({
+      cancelledStreamId: 'tts-old',
+      nextStreamId: 'tts-old',
+      cancelledText: longLine,
+      sentences: ['Pet stain removal is Thursday at 10.'],
+    }).sentences,
+    []
+  );
+
+  const prevChars = process.env.VOICE_STREAM_EARLY_CHARS;
+  const prevWords = process.env.VOICE_STREAM_EARLY_WORDS;
+  process.env.VOICE_STREAM_EARLY_CHARS = '0';
+  process.env.VOICE_STREAM_EARLY_WORDS = '0';
+  try {
+    const split = splitSpeakableChunks('May I please know who is speaking?', { final: false });
+    assert.deepStrictEqual(split.chunks, ['May I please know who is speaking?']);
+    assert.strictEqual(split.rest, '');
+  } finally {
+    if (prevChars == null) delete process.env.VOICE_STREAM_EARLY_CHARS;
+    else process.env.VOICE_STREAM_EARLY_CHARS = prevChars;
+    if (prevWords == null) delete process.env.VOICE_STREAM_EARLY_WORDS;
+    else process.env.VOICE_STREAM_EARLY_WORDS = prevWords;
+  }
 });
 
 if (process.exitCode) {

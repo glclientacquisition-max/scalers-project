@@ -67,7 +67,7 @@ Fix: wellbeing answers require `I'm` / `I am`. Bare `Okay.` / `ok` / `fine` / `g
 
 Harden: `looksLikeBareCloser` is the only closer matcher. Media path, thinking-ack, handoff name-ask, and empty-Gemini name-ask all consult it. A closer does not get `I'm well. Who is calling?` or a thinking-ack.
 
-Do not crank TTS speed. Speech-guarantee on ANSWER (`I can't finish that just now`) is a later Voice ticket.
+Do not crank TTS speed. A successful ANSWER with 0 spoken chars stays quiet. The downtime reach-them line is only for a real Gemini outage. See the freeze verdict below.
 
 ---
 
@@ -140,7 +140,7 @@ Script: couch price, then slower, then slower again, then normal speed.
 
 Brain notes (do not retune Voice): shared-line card kept `ASK_CLARIFICATION` / “who is speaking” on every turn after the price, including the speed requests. Caller `Who are you?` got `I am Shy from Done and Dusted Cleaning Services. May I please know who is speaking?`
 
-**Freeze verdict:** do not crank `VOICE_PROFILE` / speed / gain. Next Voice PR is V5 (`looksLikePhaticCallerTurn` must not match bare `Okay` / `ok`). Later Voice ticket: speech-guarantee must not speak the reach-them name-ask on `ANSWER` when Gemini emitted 0 chars (N1/N2).
+**Freeze verdict:** do not crank `VOICE_PROFILE` / speed / gain. V5 (`looksLikePhaticCallerTurn` must not match bare `Okay` / `ok`) is in code. Speech-guarantee on a successful `ANSWER` with 0 spoken chars now stays quiet instead of the reach-them name-ask (N1 `HD_d0f042f5d960`, N2 `HD_b4cb560bae33`). A real Gemini outage still speaks the downtime name-capture once. Echo / backchannel does not cancel a long reply; a real barge clears TTS and media, and the next speak is a new sentence stream. These SIDs stay the freeze evidence. They are not a new scored listen. Staging `/healthz` `gitSha` must be re-read before Alvin runs N2 plus one empty-ANSWER listen. Staging pass is not prod GO.
 
 ---
 

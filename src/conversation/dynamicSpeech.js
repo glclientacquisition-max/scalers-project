@@ -514,6 +514,7 @@ function shouldSpeakHandoffNameAsk({
 /**
  * Spoken line when Gemini emitted 0 chars on a successful turn.
  * Do not use the Gemini-down reach-them name-ask. Ask the next slot.
+ * ANSWER / END stay quiet: a lone "Okay." is its own Soniox utterance.
  */
 function pickSpeechGuaranteeLine({
   nextBestAction = {},
@@ -521,7 +522,9 @@ function pickSpeechGuaranteeLine({
   language,
   userText = '',
 } = {}) {
-  // Closers must not reopen a name ask. ANSWER-with-zero-chars stays a later ticket.
+  const action = String(nextBestAction?.action || '').toUpperCase();
+  if (!action || action === 'ANSWER' || action === 'END') return '';
+  // Closers must not reopen a name ask.
   if (looksLikeBareCloser(userText)) {
     return pickClarifyProgress({ language, slot: '' });
   }
@@ -543,6 +546,54 @@ function pickSpeechGuaranteeLine({
     intent: handoff ? 'human' : '',
     language,
   });
+}
+
+/**
+ * What to say when a caller turn produced no spoken audio.
+ * Successful ANSWER stays quiet and keeps listening (HD_d0f042f5d960,
+ * HD_b4cb560bae33). A real Gemini outage still speaks the downtime
+ * name-capture once, then the "still can't finish" line. A known name
+ * on that outage confirms the save instead of asking again.
+ *
+ * @returns {{ speak: boolean, kind: string, line: string }}
+ */
+function planEmptyGeminiSpeech({
+  nextBestAction = {},
+  brainState = {},
+  language,
+  userText = '',
+  llmDown = false,
+  alreadyOffered = false,
+} = {}) {
+  if (llmDown) {
+    const named = callerNameAlreadyKnown({ brainState, userText });
+    if (named) {
+      return {
+        speak: true,
+        kind: 'reasoning_outage_saved',
+        line: pickLlmRecoverySaved({ language }),
+      };
+    }
+    return {
+      speak: true,
+      kind: 'reasoning_outage',
+      line: pickLlmRecoveryLine({ language, alreadyOffered }),
+    };
+  }
+  const action = String(nextBestAction?.action || '').toUpperCase();
+  if (!action || action === 'ANSWER' || action === 'END') {
+    return { speak: false, kind: 'quiet_continue', line: '' };
+  }
+  const line = pickSpeechGuaranteeLine({
+    nextBestAction,
+    brainState,
+    language,
+    userText,
+  });
+  if (!String(line || '').trim()) {
+    return { speak: false, kind: 'quiet_continue', line: '' };
+  }
+  return { speak: true, kind: 'next_slot', line };
 }
 
 /**
@@ -744,6 +795,7 @@ module.exports = {
   pickActionProgress,
   pickClarifyProgress,
   pickSpeechGuaranteeLine,
+  planEmptyGeminiSpeech,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
