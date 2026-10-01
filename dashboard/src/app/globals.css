@@ -420,6 +420,39 @@ h3,
   animation: landing-drift 18s ease-in-out alternate infinite;
 }
 
+/* One muted product cue on the marketing mock. Opacity only. */
+@keyframes landing-loop {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.landing-loop {
+  animation: landing-loop 2.8s ease-in-out infinite;
+}
+
+.landing-root {
+  font-family: var(--font-landing), var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.landing-wash {
+  background:
+    radial-gradient(
+      90% 70% at 100% 0%,
+      color-mix(in srgb, var(--brand) 12%, transparent),
+      transparent 58%
+    ),
+    var(--canvas);
+}
+
 @keyframes desk-live-ping {
   75%,
   100% {
@@ -486,6 +519,7 @@ h3,
 
   .landing-rise,
   .landing-drift,
+  .landing-loop,
   .desk-live-ping,
   .desk-just-landed::after {
     animation: none;

@@ -3,26 +3,25 @@ import { NotifyHost } from "@/components/ui/DeskNotice";
 import { DESK_THEME_STORAGE_KEY } from "@/lib/deskTheme";
 import "./globals.css";
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://scalers-project.vercel.app";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://scalers.co.ke";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Scalers | Autonomous business assistant for Kenya",
+    default: "Scalers | Business assistant for your phone line",
     template: "%s · Scalers",
   },
   description:
-    "Autonomous business assistant for Kenyan SMEs. Answers when you're busy, after hours, or on-site, then sends leads to WhatsApp.",
+    "Scalers answers missed, busy, and after-hours calls on your business number. Train the facts and work the inbox in Desk. Private beta.",
   applicationName: "Scalers",
   icons: {
     icon: [{ url: "/brand/favicon.png", type: "image/png" }],
     apple: [{ url: "/brand/favicon.png" }],
   },
   openGraph: {
-    title: "Scalers | Autonomous business assistant for Kenya",
+    title: "Scalers | Business assistant for your phone line",
     description:
-      "Answers when you're busy, after hours, or on-site. Captures the caller's name and reason, then sends the lead to WhatsApp.",
+      "Answers missed, busy, and after-hours calls on your business number. Train the facts and work the inbox in Desk. Private beta.",
     siteName: "Scalers",
     images: [
       {
@@ -35,9 +34,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Scalers | Autonomous business assistant for Kenya",
+    title: "Scalers | Business assistant for your phone line",
     description:
-      "Answers when you're busy, after hours, or on-site. Captures the caller's name and reason, then sends the lead to WhatsApp.",
+      "Answers missed, busy, and after-hours calls on your business number. Train the facts and work the inbox in Desk. Private beta.",
     images: ["/og.png"],
   },
 };

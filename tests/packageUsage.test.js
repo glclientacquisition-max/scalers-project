@@ -50,15 +50,15 @@ describe("package usage meter", () => {
     assert.doesNotMatch(page, /daysRemainingAtPace/);
   });
 
-  it("lists package prices on the landing page from the catalog", () => {
+  it("keeps catalog prices off the public landing until billing is published", () => {
     const catalog = read("dashboard/src/lib/packageCatalog.ts");
-    const landing = read("dashboard/src/components/marketing/LandingPage.tsx");
+    const landing = read("dashboard/src/components/landing/LandingPage.tsx");
     const prices = read("dashboard/src/components/marketing/PackagePrices.tsx");
     const home = read("dashboard/src/app/page.tsx");
     assert.match(catalog, /export async function loadPublicPackageOffers/);
     assert.match(catalog, /annualPriceKes\(monthlyPriceKes, rates\.annualDiscountPercent\)/);
-    assert.match(home, /loadPublicPackageOffers/);
-    assert.match(landing, /id="packages"/);
+    assert.doesNotMatch(home, /loadPublicPackageOffers/);
+    assert.doesNotMatch(landing, /PackagePrices|id="packages"/);
     assert.match(prices, /packagePriceLabel/);
     assert.match(prices, /past included/);
     assert.match(prices, /calls KES \{formatKes\(board\.inboundKesPerMinute\)\}\/min\./);
