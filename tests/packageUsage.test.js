@@ -91,7 +91,7 @@ describe("package usage meter", () => {
   it("previews landing prices and follows the selected business on Admin", () => {
     const panel = read("dashboard/src/components/AdminPackagesPanel.tsx");
     assert.match(panel, /packagePriceLabel/);
-    assert.match(panel, />Landing</);
+    assert.match(panel, />Plans</);
     assert.match(panel, /Per year/);
     assert.match(panel, /live on landing/);
     assert.match(panel, /Now \$\{selected\.packageName/);

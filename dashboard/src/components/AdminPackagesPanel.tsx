@@ -2,9 +2,16 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adminTdClass, adminThClass } from "@/components/AdminIdentityList";
-import { btnPrimary, deskFieldClass, deskPreviewClass } from "@/components/ui/deskChrome";
+import { Segmented } from "@/components/ui/Segmented";
 import { Empty } from "@/components/ui/Empty";
+import {
+  btnPrimary,
+  deskFieldClass,
+  deskPreviewCellClass,
+  deskPreviewClass,
+  tableCellClass,
+  tableHeadCellClass,
+} from "@/components/ui/deskChrome";
 import {
   annualPriceKes,
   inboundKesPerMinute,
@@ -14,7 +21,19 @@ import {
   type BillingRateCard,
   type TenantSubscriptionRow,
 } from "@/lib/packageCatalog";
+import { deskShiftClass } from "@/lib/deskMotion";
 import { assignmentFromBusiness, packagePriceLabel } from "@/lib/packagePriceLabel";
+
+type Walk = "rates" | "plans" | "assign";
+
+const COUNT_FIELDS = [
+  ["Seats", "seats"],
+  ["Minutes", "minutes"],
+  ["SMS", "sms"],
+  ["Email", "email"],
+  ["WhatsApp", "staffWa"],
+  ["Number", "dids"],
+] as const;
 
 function fieldClass() {
   return deskFieldClass;
@@ -31,8 +50,10 @@ export function AdminPackagesPanel({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [walk, setWalk] = useState<Walk>("plans");
   const [rates, setRates] = useState(initialRates);
   const [packs, setPacks] = useState(initialPackages);
+  const [planId, setPlanId] = useState(initialPackages[0]?.id || "");
   const opening = assignmentFromBusiness(businesses[0]);
   const [businessId, setBusinessId] = useState(businesses[0]?.tenantId || "");
   const [packageId, setPackageId] = useState(opening.packageId || initialPackages[0]?.id || "");
@@ -42,6 +63,8 @@ export function AdminPackagesPanel({
 
   const inboundMin = inboundKesPerMinute(rates.inboundKesPerSecond);
   const outboundMin = outboundKesPerMinute(rates.outboundKesPerSecond);
+  const plan = packs.find((row) => row.id === planId) || packs[0] || null;
+  const planIndex = plan ? packs.findIndex((row) => row.id === plan.id) : -1;
 
   const selected = useMemo(
     () => businesses.find((row) => row.tenantId === businessId) || null,
@@ -77,7 +100,21 @@ export function AdminPackagesPanel({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      <Segmented
+        label="Packages"
+        onSelect={(key) => {
+          setWalk(key as Walk);
+          setError(null);
+          setStatus(null);
+        }}
+        items={[
+          { key: "rates", label: "Rates", active: walk === "rates" },
+          { key: "plans", label: "Plans", active: walk === "plans" },
+          { key: "assign", label: "Assign", active: walk === "assign" },
+        ]}
+      />
+
       {error ? (
         <p className="text-sm text-warn" role="alert">
           {error}
@@ -89,10 +126,9 @@ export function AdminPackagesPanel({
         </p>
       ) : null}
 
-      <section className="border-b border-line/70 pb-6">
-        <h2 className="text-title font-medium text-ink">On-demand rates</h2>
+      {walk === "rates" ? (
         <form
-          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           onSubmit={(event) => {
             event.preventDefault();
             void post(
@@ -124,9 +160,7 @@ export function AdminPackagesPanel({
                 })
               }
             />
-            <span className="mt-1 block text-xs text-ink-soft">
-              KES {rates.inboundKesPerSecond}/sec
-            </span>
+            <span className="mt-1 block text-xs text-ink-soft">KES {rates.inboundKesPerSecond}/sec</span>
           </label>
           <label className="block text-sm">
             <span className="font-medium text-ink">Outbound KES / min</span>
@@ -200,238 +234,312 @@ export function AdminPackagesPanel({
             </button>
           </div>
         </form>
-      </section>
+      ) : null}
 
-      <section className="border-b border-line/70 pb-6">
-        <h2 className="text-title font-medium text-ink">Landing</h2>
-        {packs.some((pack) => pack.isActive) ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="text-ink-2">
-                <tr className="border-b border-line/70">
-                  <th className={adminThClass}>Package</th>
-                  <th className={adminThClass}>Per month</th>
-                  <th className={adminThClass}>Per year</th>
-                  <th className={adminThClass}>Minutes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {packs
-                  .filter((pack) => pack.isActive)
-                  .map((pack) => (
-                    <tr key={pack.id} className="border-t border-line/70">
-                      <td className={`${adminTdClass} font-medium text-ink`}>{pack.name}</td>
-                      <td className={`${adminTdClass} tabular-nums`}>{packagePriceLabel(pack.monthlyPriceKes)}</td>
-                      <td className={`${adminTdClass} tabular-nums`}>
-                        {packagePriceLabel(annualPriceKes(pack.monthlyPriceKes, rates.annualDiscountPercent))}
-                      </td>
-                      <td className={`${adminTdClass} tabular-nums`}>{pack.minutes.toLocaleString("en-KE")}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
+      {walk === "plans" ? (
+        packs.length === 0 ? (
           <Empty title="None live." />
-        )}
-      </section>
+        ) : (
+          <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
+            <div>
+              <ul className="md:hidden">
+                {packs.map((pack) => {
+                  const on = plan?.id === pack.id;
+                  return (
+                    <li key={pack.id} className="border-b border-line">
+                      <button
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setPlanId(pack.id)}
+                        className={`flex min-h-11 w-full items-center gap-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                          on ? "border-s-[3px] border-brand ps-3" : "ps-0"
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className={`block font-medium text-ink ${deskPreviewClass}`}>{pack.name}</span>
+                          <span className={`mt-0.5 block text-meta text-ink-soft ${deskPreviewClass}`}>
+                            {pack.minutes.toLocaleString("en-KE")} min
+                            {pack.isActive ? " · Live" : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 tabular-nums text-ink">
+                          {packagePriceLabel(pack.monthlyPriceKes)}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-left text-sm">
+                  <caption className="sr-only">Plans</caption>
+                  <thead className="border-b border-line text-ink-soft">
+                    <tr>
+                      <th className={tableHeadCellClass}>Package</th>
+                      <th className={tableHeadCellClass}>Month</th>
+                      <th className={tableHeadCellClass}>Year</th>
+                      <th className={tableHeadCellClass}>Minutes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {packs.map((pack) => {
+                      const on = plan?.id === pack.id;
+                      return (
+                        <tr
+                          key={pack.id}
+                          className={`border-b border-line ${on ? "bg-surface-2" : ""}`}
+                        >
+                          <td className={`${tableCellClass} ${deskPreviewCellClass}`}>
+                            <button
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => setPlanId(pack.id)}
+                              className={`flex min-h-11 w-full items-center text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                                on ? "border-s-[3px] border-brand ps-2" : ""
+                              }`}
+                            >
+                              <span className="min-w-0">
+                                <span className={`block font-medium text-ink ${deskPreviewClass}`}>{pack.name}</span>
+                                {pack.isActive ? (
+                                  <span className="mt-0.5 block text-meta text-ink-soft">Live</span>
+                                ) : null}
+                              </span>
+                            </button>
+                          </td>
+                          <td className={`${tableCellClass} tabular-nums text-ink`}>
+                            {packagePriceLabel(pack.monthlyPriceKes)}
+                          </td>
+                          <td className={`${tableCellClass} tabular-nums text-ink`}>
+                            {packagePriceLabel(annualPriceKes(pack.monthlyPriceKes, rates.annualDiscountPercent))}
+                          </td>
+                          <td className={`${tableCellClass} tabular-nums text-ink`}>
+                            {pack.minutes.toLocaleString("en-KE")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-      <section className="space-y-4">
-        <h2 className="text-title font-medium text-ink">Packages</h2>
-        {packs.map((pack, index) => (
-          <form
-            key={pack.id}
-            className="border-b border-line/70 py-6"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void post(
-                {
-                  action: "save_package",
-                  id: pack.id,
-                  sku: pack.sku,
-                  name: pack.name,
-                  monthly_price_kes: pack.monthlyPriceKes,
-                  seats: pack.seats,
-                  minutes: pack.minutes,
-                  sms: pack.sms,
-                  email: pack.email,
-                  staff_wa: pack.staffWa,
-                  dids: pack.dids,
-                  sort_order: pack.sortOrder,
-                  is_active: pack.isActive,
-                },
-                `${pack.name} saved.`
-              );
-            }}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Name</span>
-                <input
-                  className={`mt-2 ${fieldClass()}`}
-                  value={pack.name}
-                  onChange={(e) => patchPack(index, { name: e.target.value })}
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium text-ink">Monthly KES</span>
-                <input
-                  className={`mt-2 ${fieldClass()}`}
-                  type="number"
-                  min={0}
-                  value={pack.monthlyPriceKes}
-                  onChange={(e) => patchPack(index, { monthlyPriceKes: Number(e.target.value) })}
-                />
-              </label>
-            </div>
-            <p className="mt-3 text-sm tabular-nums text-ink-soft">
-              Per year {packagePriceLabel(annualPriceKes(pack.monthlyPriceKes, rates.annualDiscountPercent))}
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              {(
-                [
-                  ["Seats", "seats", pack.seats],
-                  ["Minutes", "minutes", pack.minutes],
-                  ["SMS", "sms", pack.sms],
-                  ["Email", "email", pack.email],
-                  ["WhatsApp", "staffWa", pack.staffWa],
-                  ["Number", "dids", pack.dids],
-                ] as const
-              ).map(([label, key, value]) => (
-                <label key={key} className="block text-sm">
-                  <span className="font-medium text-ink">{label}</span>
-                  <input
-                    className={`mt-2 ${fieldClass()}`}
-                    type="number"
-                    min={0}
-                    value={value}
-                    onChange={(e) => patchPack(index, { [key]: Number(e.target.value) })}
-                  />
-                </label>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <label className="inline-flex min-h-11 items-center gap-3 text-sm font-medium text-ink">
-                <input
-                  type="checkbox"
-                  className="h-5 w-5"
-                  checked={pack.isActive}
-                  onChange={(e) => patchPack(index, { isActive: e.target.checked })}
-                  aria-label={`${pack.name} live on landing`}
-                />
-                Live
-              </label>
-              <button type="submit" disabled={pending} className={btnPrimary}>
-                Save
-              </button>
-            </div>
-          </form>
-        ))}
-      </section>
+            {plan && planIndex >= 0 ? (
+              <form
+                className="mt-6 lg:mt-0"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void post(
+                    {
+                      action: "save_package",
+                      id: plan.id,
+                      sku: plan.sku,
+                      name: plan.name,
+                      monthly_price_kes: plan.monthlyPriceKes,
+                      seats: plan.seats,
+                      minutes: plan.minutes,
+                      sms: plan.sms,
+                      email: plan.email,
+                      staff_wa: plan.staffWa,
+                      dids: plan.dids,
+                      sort_order: plan.sortOrder,
+                      is_active: plan.isActive,
+                    },
+                    `${plan.name} saved.`
+                  );
+                }}
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">Name</span>
+                    <input
+                      className={`mt-2 ${fieldClass()}`}
+                      value={plan.name}
+                      onChange={(e) => patchPack(planIndex, { name: e.target.value })}
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-ink">Monthly KES</span>
+                    <input
+                      className={`mt-2 ${fieldClass()}`}
+                      type="number"
+                      min={0}
+                      value={plan.monthlyPriceKes}
+                      onChange={(e) => patchPack(planIndex, { monthlyPriceKes: Number(e.target.value) })}
+                    />
+                  </label>
+                </div>
+                <p className="mt-3 text-sm tabular-nums text-ink-soft">
+                  Per year {packagePriceLabel(annualPriceKes(plan.monthlyPriceKes, rates.annualDiscountPercent))}
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  {COUNT_FIELDS.map(([label, key]) => (
+                    <label key={key} className="block text-sm">
+                      <span className="font-medium text-ink">{label}</span>
+                      <input
+                        className={`mt-2 ${fieldClass()}`}
+                        type="number"
+                        min={0}
+                        value={plan[key]}
+                        onChange={(e) => patchPack(planIndex, { [key]: Number(e.target.value) })}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <label className="relative inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-1 text-sm font-medium text-ink focus-within:outline-none focus-within:ring-2 focus-within:ring-brand">
+                    <span
+                      aria-hidden
+                      className={`pointer-events-none relative inline-flex h-7 w-12 shrink-0 items-center rounded-full ${deskShiftClass} ${
+                        plan.isActive ? "bg-accent-fill" : "bg-line"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-surface shadow ${deskShiftClass} ${
+                          plan.isActive ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </span>
+                    Live
+                    <input
+                      type="checkbox"
+                      className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                      checked={plan.isActive}
+                      onChange={(e) => patchPack(planIndex, { isActive: e.target.checked })}
+                      aria-label={`${plan.name} live on landing`}
+                    />
+                  </label>
+                  <button type="submit" disabled={pending} className={btnPrimary}>
+                    Save
+                  </button>
+                </div>
+              </form>
+            ) : null}
+          </div>
+        )
+      ) : null}
 
-      <section>
-        <h2 className="text-title font-medium text-ink">Businesses</h2>
-        {businesses.length === 0 ? (
+      {walk === "assign" ? (
+        businesses.length === 0 ? (
           <Empty title="No businesses." />
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="text-ink-2">
-                <tr className="border-b border-line/70">
-                  <th className={adminThClass}>Business</th>
-                  <th className={adminThClass}>Package</th>
-                  <th className={adminThClass}>Period</th>
-                </tr>
-              </thead>
-              <tbody>
-                {businesses.map((row) => (
-                  <tr key={row.tenantId} className="border-t border-line/70">
-                    <td className={adminTdClass}>
-                      <p className={`font-medium text-ink ${deskPreviewClass}`}>{row.businessName}</p>
-                      <p className={`mt-0.5 text-meta text-ink-2 ${deskPreviewClass}`}>
-                        {row.packageName || "None"}
-                        {row.period ? ` · ${row.period}` : ""}
-                      </p>
-                    </td>
-                    <td className={`${adminTdClass} text-ink-2`}>{row.packageName || "None"}</td>
-                    <td className={`${adminTdClass} text-ink-2`}>{row.period || "None"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
+            <div>
+              <ul className="md:hidden">
+                {businesses.map((row) => {
+                  const on = row.tenantId === businessId;
+                  return (
+                    <li key={row.tenantId} className="border-b border-line">
+                      <button
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => selectBusiness(row.tenantId)}
+                        className={`flex min-h-11 w-full flex-col justify-center py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                          on ? "border-s-[3px] border-brand ps-3" : ""
+                        }`}
+                      >
+                        <span className={`font-medium text-ink ${deskPreviewClass}`}>{row.businessName}</span>
+                        <span className={`mt-0.5 text-meta text-ink-soft ${deskPreviewClass}`}>
+                          {row.packageName || "None"}
+                          {row.period ? ` · ${row.period}` : ""}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[520px] text-left text-sm">
+                  <caption className="sr-only">Businesses</caption>
+                  <thead className="border-b border-line text-ink-soft">
+                    <tr>
+                      <th className={tableHeadCellClass}>Business</th>
+                      <th className={tableHeadCellClass}>Package</th>
+                      <th className={tableHeadCellClass}>Period</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {businesses.map((row) => {
+                      const on = row.tenantId === businessId;
+                      return (
+                        <tr key={row.tenantId} className={`border-b border-line ${on ? "bg-surface-2" : ""}`}>
+                          <td className={`${tableCellClass} ${deskPreviewCellClass}`}>
+                            <button
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => selectBusiness(row.tenantId)}
+                              className={`flex min-h-11 w-full items-center text-left font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                                on ? "border-s-[3px] border-brand ps-2" : ""
+                              } ${deskPreviewClass}`}
+                            >
+                              {row.businessName}
+                            </button>
+                          </td>
+                          <td className={`${tableCellClass} text-ink-soft`}>{row.packageName || "None"}</td>
+                          <td className={`${tableCellClass} text-ink-soft`}>{row.period || "None"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-      <section className="border-t border-line/70 pt-6">
-        <h2 className="text-title font-medium text-ink">Assign</h2>
-        <form
-          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void post(
-              {
-                action: "assign",
-                business_id: businessId,
-                package_id: packageId,
-                period,
-              },
-              "Package assigned."
-            );
-          }}
-        >
-          <label className="block text-sm sm:col-span-2">
-            <span className="font-medium text-ink">Business</span>
-            <select
-              className={`mt-2 ${fieldClass()}`}
-              value={businessId}
-              onChange={(e) => selectBusiness(e.target.value)}
+            <form
+              className="mt-6 grid gap-4 sm:grid-cols-2 lg:mt-0"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void post(
+                  {
+                    action: "assign",
+                    business_id: businessId,
+                    package_id: packageId,
+                    period,
+                  },
+                  "Package assigned."
+                );
+              }}
             >
-              {businesses.map((row) => (
-                <option key={row.tenantId} value={row.tenantId}>
-                  {row.businessName}
-                  {row.packageName ? ` (${row.packageName})` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Package</span>
-            <select
-              className={`mt-2 ${fieldClass()}`}
-              value={packageId}
-              onChange={(e) => setPackageId(e.target.value)}
-            >
-              {packs.filter((pack) => pack.isActive || pack.id === packageId).map((pack) => (
-                <option key={pack.id} value={pack.id}>
-                  {pack.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-ink">Period</span>
-            <select
-              className={`mt-2 ${fieldClass()}`}
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as "month" | "year")}
-            >
-              <option value="month">Month</option>
-              <option value="year">Year</option>
-            </select>
-          </label>
-          <div className="sm:col-span-2 lg:col-span-4">
-            <p className="mb-3 text-sm text-ink">
-              {selected?.packageName
-                ? `Now ${selected.packageName}${selected.period ? ` / ${selected.period}` : ""}`
-                : "Now none"}
-            </p>
-            <button type="submit" disabled={pending || !businessId || !packageId} className={btnPrimary}>
-              Assign
-            </button>
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Package</span>
+                <select
+                  className={`mt-2 ${fieldClass()}`}
+                  value={packageId}
+                  onChange={(e) => setPackageId(e.target.value)}
+                >
+                  {packs
+                    .filter((pack) => pack.isActive || pack.id === packageId)
+                    .map((pack) => (
+                      <option key={pack.id} value={pack.id}>
+                        {pack.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-ink">Period</span>
+                <select
+                  className={`mt-2 ${fieldClass()}`}
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value as "month" | "year")}
+                >
+                  <option value="month">Month</option>
+                  <option value="year">Year</option>
+                </select>
+              </label>
+              <div className="sm:col-span-2">
+                <p className="mb-3 text-sm text-ink">
+                  {selected?.packageName
+                    ? `Now ${selected.packageName}${selected.period ? ` / ${selected.period}` : ""}`
+                    : "Now none"}
+                </p>
+                <button type="submit" disabled={pending || !businessId || !packageId} className={btnPrimary}>
+                  Assign
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </section>
+        )
+      ) : null}
     </div>
   );
 }
