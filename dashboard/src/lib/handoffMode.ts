@@ -1,5 +1,11 @@
 export type HandoffMode = "callback" | "live_transfer";
 
+/** Same sentence under Team when live connect is on, and on every surface that prints this blurb. */
+export function liveConnectBlurb(name?: string | null): string {
+  const who = String(name || "").trim();
+  return who ? `Rings ${who} during open hours.` : "Add a team phone.";
+}
+
 export const HANDOFF_OPTIONS: {
   id: HandoffMode;
   label: string;
@@ -13,7 +19,7 @@ export const HANDOFF_OPTIONS: {
   {
     id: "live_transfer",
     label: "Connect live call",
-    blurb: "Messages a teammate.",
+    blurb: liveConnectBlurb(),
   },
 ];
 

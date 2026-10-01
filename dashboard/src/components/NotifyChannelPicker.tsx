@@ -68,7 +68,6 @@ export function NotifyChannelPicker({
                 ) : null}
               </span>
             }
-            hint={locked ? meta.unavailableLabel : meta.description}
             control="switch"
           >
             <ToolSwitch

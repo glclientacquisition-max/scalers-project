@@ -72,11 +72,11 @@ import {
 import {
   firstDialableTeammate,
   HANDOFF_OPTIONS,
+  liveConnectBlurb,
   parseHandoffMode,
   teamHasDialablePhone,
   type HandoffMode,
 } from "@/lib/handoffMode";
-import { handoffMessageLine } from "@/lib/deskLiveTransfer";
 import {
   displaySonioxVoiceLabel,
   getDefaultSonioxVoiceIdSync,
@@ -196,6 +196,8 @@ const TEAM_NOTIFY_FLAGS: Array<{
 ];
 const emptyFaq = (): FaqEntry => ({ question: "", answer: "" });
 
+type PolicyFieldId = (typeof POLICY_FIELDS)[number]["id"];
+
 /** Pull location prose from legacy free-text hours when schedule.location is empty. */
 function extractLocationFallback(businessHours: string): string {
   const text = String(businessHours || "").trim();
@@ -309,10 +311,8 @@ export function TenantForm({
   const [socialHandles, setSocialHandles] = useState<SocialHandles>(() =>
     normalizeSocialHandles(tenant.social_handles)
   );
-  const [showBulkServices, setShowBulkServices] = useState(false);
   const [bulkServicesText, setBulkServicesText] = useState("");
   const [bulkServicesError, setBulkServicesError] = useState<string | null>(null);
-  const [showBulkProducts, setShowBulkProducts] = useState(false);
   const [bulkProductsText, setBulkProductsText] = useState("");
   const [bulkProductsError, setBulkProductsError] = useState<string | null>(null);
   const [servicePage, setServicePage] = useState(0);
@@ -347,9 +347,16 @@ export function TenantForm({
     const rows = normalizeBusinessLocations(tenant.business_locations);
     return rows.length ? rows : [emptyLocation()];
   });
+  const [openLocationIndexes, setOpenLocationIndexes] = useState<number[]>([]);
   const [policies, setPolicies] = useState<BusinessPolicies>(() =>
     normalizeBusinessPolicies(tenant.business_policies)
   );
+  const [openPolicyIds, setOpenPolicyIds] = useState<PolicyFieldId[]>(() => {
+    const initial = normalizeBusinessPolicies(tenant.business_policies);
+    return POLICY_FIELDS.filter((field) => String(initial[field.id] || "").trim()).map(
+      (field) => field.id
+    );
+  });
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -371,10 +378,7 @@ export function TenantForm({
   });
   const liveDest = firstDialableTeammate(team);
   const canMessageTeam = teamHasDialablePhone(team);
-  const [faqs, setFaqs] = useState<FaqEntry[]>(() => {
-    const rows = normalizeFaqs(tenant.faqs);
-    return rows.length ? rows : [emptyFaq()];
-  });
+  const [faqs, setFaqs] = useState<FaqEntry[]>(() => normalizeFaqs(tenant.faqs));
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
   );
@@ -612,6 +616,22 @@ export function TenantForm({
     }));
   }
 
+  function toggleLocationDetails(index: number) {
+    setOpenLocationIndexes((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+    );
+  }
+
+  function removeLocation(index: number) {
+    setLocations((prev) => prev.filter((_, i) => i !== index));
+    setOpenLocationIndexes((prev) =>
+      prev.flatMap((i) => {
+        if (i === index) return [];
+        return [i > index ? i - 1 : i];
+      })
+    );
+  }
+
   function updateLocation(
     index: number,
     key: keyof BusinessLocation,
@@ -652,7 +672,6 @@ export function TenantForm({
     });
     setBulkServicesText("");
     setBulkServicesError(null);
-    setShowBulkServices(false);
   }
 
   function applyBulkProducts() {
@@ -673,7 +692,6 @@ export function TenantForm({
     });
     setBulkProductsText("");
     setBulkProductsError(null);
-    setShowBulkProducts(false);
   }
 
   function setDayOpen(day: DayKey, open: boolean) {
@@ -761,11 +779,7 @@ export function TenantForm({
               className={denseFieldClass}
             />
           </SettingsRow>
-          <SettingsRow
-            label="Tone"
-            htmlFor="agent_tone"
-            hint={TONE_OPTIONS.find((opt) => opt.id === tone)?.blurb}
-          >
+          <SettingsRow label="Tone" htmlFor="agent_tone">
             <SettingsSelect
               id="agent_tone"
               label="Tone"
@@ -1001,6 +1015,16 @@ export function TenantForm({
               >
                 Add service
               </button>
+            </div>
+          </div>
+
+          <details className="rounded-xl border border-line bg-surface">
+            <summary
+              className={`flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-medium text-ink ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+            >
+              Paste list
+            </summary>
+            <div className="space-y-3 border-t border-line p-3">
               <button
                 type="button"
                 onClick={() => addBlankServiceRows(3)}
@@ -1008,22 +1032,7 @@ export function TenantForm({
               >
                 Add 3
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowBulkServices((v) => !v);
-                  setBulkServicesError(null);
-                }}
-                className={settingsGhostButtonClass}
-              >
-                {showBulkServices ? "Hide paste" : "Paste list"}
-              </button>
-            </div>
-          </div>
-
-          {showBulkServices ? (
-            <div className="space-y-3 rounded-xl border border-line bg-accent-soft/40 p-3">
-              <label className="block text-sm font-medium" htmlFor="bulk_services">
+              <label className="sr-only" htmlFor="bulk_services">
                 Paste list
               </label>
               <textarea
@@ -1083,8 +1092,47 @@ export function TenantForm({
               >
                 Add to services
               </button>
+
+              {vertical === "home_services" ? null : (
+                <div className="space-y-3 border-t border-line pt-3">
+                  <label className="block text-sm font-medium" htmlFor="bulk_products">
+                    Paste products
+                  </label>
+                  <textarea
+                    id="bulk_products"
+                    value={bulkProductsText}
+                    onChange={(e) => {
+                      setBulkProductsText(e.target.value);
+                      if (bulkProductsError) setBulkProductsError(null);
+                    }}
+                    rows={2}
+                    {...compactTextareaExpandHandlers}
+                    placeholder={
+                      "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
+                    }
+                    className={`${denseFieldClass} text-sm leading-relaxed`}
+                  />
+                  {bulkProductPreview.length ? (
+                    <p className="text-xs text-ink-soft">
+                      Ready to add {bulkProductPreview.length} product
+                      {bulkProductPreview.length === 1 ? "" : "s"}
+                    </p>
+                  ) : null}
+                  {bulkProductsError ? (
+                    <p className="text-sm text-warn">{bulkProductsError}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={applyBulkProducts}
+                    disabled={!bulkProductPreview.length}
+                    className={settingsGhostButtonClass}
+                  >
+                    Add to catalogue
+                  </button>
+                </div>
+              )}
             </div>
-          ) : null}
+          </details>
 
           <div className="divide-y divide-line overflow-hidden rounded-xl border border-line lg:hidden">
             {visibleServices.map((service, localIndex) => {
@@ -1268,53 +1316,8 @@ export function TenantForm({
               >
                 Add product
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowBulkProducts((v) => !v);
-                  setBulkProductsError(null);
-                }}
-                className={settingsGhostButtonClass}
-              >
-                {showBulkProducts ? "Hide paste" : "Paste products"}
-              </button>
             </div>
           </div>
-
-          {showBulkProducts ? (
-            <div className="space-y-3 rounded-xl border border-line bg-accent-soft/40 p-3">
-              <textarea
-                value={bulkProductsText}
-                onChange={(e) => {
-                  setBulkProductsText(e.target.value);
-                  if (bulkProductsError) setBulkProductsError(null);
-                }}
-                rows={2}
-                {...compactTextareaExpandHandlers}
-                placeholder={
-                  "name,price,category,in_stock\nAtomic Habits,2500 KES,Self-help,yes\n\nOr:\nAtomic Habits - 2,500 KES"
-                }
-                className={`${denseFieldClass} text-sm leading-relaxed`}
-              />
-              {bulkProductPreview.length ? (
-                <p className="text-xs text-ink-soft">
-                  Ready to add {bulkProductPreview.length} product
-                  {bulkProductPreview.length === 1 ? "" : "s"}
-                </p>
-              ) : null}
-              {bulkProductsError ? (
-                <p className="text-sm text-warn">{bulkProductsError}</p>
-              ) : null}
-              <button
-                type="button"
-                onClick={applyBulkProducts}
-                disabled={!bulkProductPreview.length}
-                className={settingsGhostButtonClass}
-              >
-                Add to catalogue
-              </button>
-            </div>
-          ) : null}
 
           {products.length === 0 ? null : (
             <>
@@ -1486,7 +1489,7 @@ export function TenantForm({
                   />
                 </div>
                 {open && slot ? (
-                  <div className="mt-2 space-y-2 lg:hidden">
+                  <div className="mt-2 grid grid-cols-2 gap-2 lg:hidden">
                     <div className="min-w-0">
                       <label
                         className="block text-xs font-medium text-ink-soft"
@@ -1592,154 +1595,172 @@ export function TenantForm({
           </button>
         </div>
         <div className="overflow-hidden rounded-xl border border-line">
-          <div className="hidden lg:grid lg:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+          <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Label</span>
             <span>Area</span>
-            <span>Landmark</span>
-            <span>Directions</span>
-            <span>{vertical === "home_services" ? "Notes" : "Coverage"}</span>
+            <span className="sr-only">Details</span>
             <span className="sr-only">Remove</span>
           </div>
-          {locations.map((loc, index) => (
-            <div
-              key={`loc-${index}`}
-              className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
-            >
-              <div className="min-w-0 truncate">
-                <label
-                  className="block text-xs font-medium text-ink-soft lg:sr-only"
-                  htmlFor={`loc-label-${index}`}
+          {locations.map((loc, index) => {
+            const placeOpen = openLocationIndexes.includes(index);
+            const placeDetailLabel =
+              vertical === "home_services"
+                ? "Landmark, directions, and notes"
+                : "Landmark, directions, and coverage";
+            return (
+            <div key={`loc-${index}`} className="border-b border-line last:border-b-0">
+              <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_2.75rem_2.75rem] items-center gap-2 px-3 py-2">
+                <div className="min-w-0">
+                  <label className="sr-only" htmlFor={`loc-label-${index}`}>
+                    Label
+                  </label>
+                  <input
+                    id={`loc-label-${index}`}
+                    value={loc.label}
+                    onChange={(e) => {
+                      updateLocation(index, "label", e.target.value);
+                      if (index === 0) {
+                        setLocationNotes(
+                          placeLocationLine({
+                            label: e.target.value,
+                            address: loc.address,
+                            landmark: loc.landmark,
+                          })
+                        );
+                      }
+                    }}
+                    placeholder="Main shop"
+                    className={`${denseFieldClass} min-w-0 truncate`}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <label className="sr-only" htmlFor={`loc-address-${index}`}>
+                    Area
+                  </label>
+                  <ExpandTextarea
+                    id={`loc-address-${index}`}
+                    value={loc.address}
+                    maxLength={200}
+                    onChange={(value) => {
+                      updateLocation(index, "address", value);
+                      if (index === 0) {
+                        setLocationNotes(
+                          placeLocationLine({
+                            label: loc.label,
+                            address: value,
+                            landmark: loc.landmark,
+                          })
+                        );
+                      }
+                    }}
+                    placeholder="Westlands, Nairobi"
+                    className="min-w-0 truncate break-words [overflow-wrap:anywhere]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  aria-expanded={placeOpen}
+                  aria-label={placeDetailLabel}
+                  onClick={() => toggleLocationDetails(index)}
+                  className={`inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-soft ${deskShiftClass} hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
                 >
-                  Label
-                </label>
-                <input
-                  id={`loc-label-${index}`}
-                  value={loc.label}
-                  onChange={(e) => {
-                    updateLocation(index, "label", e.target.value);
-                    if (index === 0) {
-                      setLocationNotes(
-                        placeLocationLine({
-                          label: e.target.value,
-                          address: loc.address,
-                          landmark: loc.landmark,
-                        })
-                      );
-                    }
-                  }}
-                  placeholder="Main shop"
-                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0 truncate">
-                <label
-                  className="block text-xs font-medium text-ink-soft lg:sr-only"
-                  htmlFor={`loc-address-${index}`}
-                >
-                  Area
-                </label>
-                <ExpandTextarea
-                  id={`loc-address-${index}`}
-                  value={loc.address}
-                  maxLength={200}
-                  onChange={(value) => {
-                    updateLocation(index, "address", value);
-                    if (index === 0) {
-                      setLocationNotes(
-                        placeLocationLine({
-                          label: loc.label,
-                          address: value,
-                          landmark: loc.landmark,
-                        })
-                      );
-                    }
-                  }}
-                  placeholder="Westlands, Nairobi"
-                  className="min-w-0 truncate break-words [overflow-wrap:anywhere]"
-                />
-              </div>
-              <div className="min-w-0">
-                <label
-                  className="block text-xs font-medium text-ink-soft lg:sr-only"
-                  htmlFor={`loc-landmark-${index}`}
-                >
-                  Landmark
-                </label>
-                <input
-                  id={`loc-landmark-${index}`}
-                  value={loc.landmark}
-                  onChange={(e) => {
-                    updateLocation(index, "landmark", e.target.value);
-                    if (index === 0) {
-                      setLocationNotes(
-                        placeLocationLine({
-                          label: loc.label,
-                          address: loc.address,
-                          landmark: e.target.value,
-                        })
-                      );
-                    }
-                  }}
-                  placeholder="Opposite Naivas"
-                  className={`${denseFieldClass} mt-1 lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label
-                  className="block text-xs font-medium text-ink-soft lg:sr-only"
-                  htmlFor={`loc-directions-${index}`}
-                >
-                  Directions
-                </label>
-                <textarea
-                  id={`loc-directions-${index}`}
-                  value={loc.directions}
-                  onChange={(e) => updateLocation(index, "directions", e.target.value)}
-                  rows={2}
-                  placeholder="From Waiyaki Way, turn at the Shell. Left side."
-                  className={`${denseFieldClass} mt-1 leading-relaxed lg:mt-0`}
-                />
-              </div>
-              <div className="min-w-0">
-                <label
-                  className="block text-xs font-medium text-ink-soft lg:sr-only"
-                  htmlFor={`loc-coverage-${index}`}
-                >
-                  {vertical === "home_services" ? "Notes" : "Coverage"}
-                </label>
-                <ExpandTextarea
-                  id={`loc-coverage-${index}`}
-                  value={loc.coverage_notes}
-                  maxLength={300}
-                  onChange={(value) =>
-                    updateLocation(index, "coverage_notes", value)
-                  }
-                  placeholder={
-                    vertical === "home_services"
-                      ? "Call ahead for the gate"
-                      : "Kiambu and Ruiru"
-                  }
-                  className="min-w-0 break-words [overflow-wrap:anywhere]"
-                />
-              </div>
-              <div className="flex items-start justify-end lg:pt-1">
-                {locations.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setLocations((prev) => prev.filter((_, i) => i !== index))
-                    }
-                    className={settingsTrashButtonClass}
-                    aria-label={`Remove location ${index + 1}`}
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    className={`h-4 w-4 ${placeOpen ? "rotate-90" : ""}`}
+                    aria-hidden="true"
                   >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <span className="h-11 w-11" aria-hidden />
-                )}
+                    <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <div className="flex items-start justify-end">
+                  {locations.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => removeLocation(index)}
+                      className={settingsTrashButtonClass}
+                      aria-label={`Remove location ${index + 1}`}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <span className="h-11 w-11" aria-hidden />
+                  )}
+                </div>
               </div>
+              {placeOpen ? (
+                <div className="grid grid-cols-1 gap-3 px-3 pb-3">
+                  <div className="min-w-0">
+                    <label
+                      className="block text-xs font-medium text-ink-soft"
+                      htmlFor={`loc-landmark-${index}`}
+                    >
+                      Landmark
+                    </label>
+                    <input
+                      id={`loc-landmark-${index}`}
+                      value={loc.landmark}
+                      onChange={(e) => {
+                        updateLocation(index, "landmark", e.target.value);
+                        if (index === 0) {
+                          setLocationNotes(
+                            placeLocationLine({
+                              label: loc.label,
+                              address: loc.address,
+                              landmark: e.target.value,
+                            })
+                          );
+                        }
+                      }}
+                      placeholder="Opposite Naivas"
+                      className={`${denseFieldClass} mt-1`}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label
+                      className="block text-xs font-medium text-ink-soft"
+                      htmlFor={`loc-directions-${index}`}
+                    >
+                      Directions
+                    </label>
+                    <textarea
+                      id={`loc-directions-${index}`}
+                      value={loc.directions}
+                      onChange={(e) => updateLocation(index, "directions", e.target.value)}
+                      rows={2}
+                      placeholder="From Waiyaki Way, turn at the Shell. Left side."
+                      className={`${denseFieldClass} mt-1 leading-relaxed`}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label
+                      className="block text-xs font-medium text-ink-soft"
+                      htmlFor={`loc-coverage-${index}`}
+                    >
+                      {vertical === "home_services" ? "Notes" : "Coverage"}
+                    </label>
+                    <ExpandTextarea
+                      id={`loc-coverage-${index}`}
+                      value={loc.coverage_notes}
+                      maxLength={300}
+                      onChange={(value) =>
+                        updateLocation(index, "coverage_notes", value)
+                      }
+                      placeholder={
+                        vertical === "home_services"
+                          ? "Call ahead for the gate"
+                          : "Kiambu and Ruiru"
+                      }
+                      className="min-w-0 break-words [overflow-wrap:anywhere]"
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -1758,7 +1779,7 @@ export function TenantForm({
               />
             </SettingsStack>
           ) : null}
-          {POLICY_FIELDS.map((field) => (
+          {POLICY_FIELDS.filter((field) => openPolicyIds.includes(field.id)).map((field) => (
             <SettingsStack
               key={field.id}
               label={field.label}
@@ -1778,6 +1799,35 @@ export function TenantForm({
               />
             </SettingsStack>
           ))}
+          {openPolicyIds.length < POLICY_FIELDS.length ? (
+            <div className="px-4 py-2">
+              <label className="sr-only" htmlFor="add-policy-rule">
+                Add rule
+              </label>
+              <select
+                id="add-policy-rule"
+                aria-label="Add rule"
+                value=""
+                onChange={(e) => {
+                  const id = e.target.value as PolicyFieldId;
+                  if (!id) return;
+                  setOpenPolicyIds((prev) =>
+                    prev.includes(id) ? prev : [...prev, id]
+                  );
+                }}
+                className={`${settingsGhostButtonClass} w-auto`}
+              >
+                <option value="">Add rule</option>
+                {POLICY_FIELDS.filter((field) => !openPolicyIds.includes(field.id)).map(
+                  (field) => (
+                    <option key={field.id} value={field.id}>
+                      {field.label}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+          ) : null}
         </SettingsGroup>
 
         <SettingsGroup title="When unsure">
@@ -1949,13 +1999,7 @@ export function TenantForm({
           />
           {handoffMode === "live_transfer" ? (
             <p className="px-1 text-xs text-[var(--ink-soft)]">
-              {liveTransferExecutor
-                ? liveDest
-                  ? `Rings ${liveDest.name} during open hours.`
-                  : "Add a team phone."
-                : liveDest
-                  ? handoffMessageLine(liveDest.name)
-                  : "Messages a teammate."}
+              {liveConnectBlurb(liveDest?.name)}
             </p>
           ) : (
             <p className="px-1 text-xs text-[var(--ink-soft)]">
@@ -2102,8 +2146,9 @@ export function TenantForm({
           </button>
         </div>
 
+        {faqs.length > 0 ? (
         <div className="overflow-hidden rounded-xl border border-line">
-          <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-center gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Question</span>
             <span>Answer</span>
             <span className="sr-only">Remove</span>
@@ -2113,10 +2158,10 @@ export function TenantForm({
             return (
             <div
               key={`faq-${index}`}
-              className="grid grid-cols-1 gap-2 border-b border-line px-3 py-2.5 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.5rem] lg:items-start lg:gap-x-3"
+              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.75rem] items-start gap-x-3 border-b border-line px-3 py-2.5 last:border-b-0"
             >
               <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`faq-q-${index}`}>
+                <label className="sr-only" htmlFor={`faq-q-${index}`}>
                   Question
                 </label>
                 <input
@@ -2128,7 +2173,7 @@ export function TenantForm({
                   aria-describedby={
                     faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
                   }
-                  className={`${fieldClass} mt-1 py-2 lg:mt-0`}
+                  className={`${fieldClass} py-2`}
                 />
                 {faqDupIndexes.has(index) ? (
                   <p id={`faq-dup-${index}`} className="mt-1 text-xs text-warn" role="status">
@@ -2137,7 +2182,7 @@ export function TenantForm({
                 ) : null}
               </div>
               <div className="min-w-0">
-                <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`faq-a-${index}`}>
+                <label className="sr-only" htmlFor={`faq-a-${index}`}>
                   Answer
                 </label>
                 <textarea
@@ -2146,19 +2191,14 @@ export function TenantForm({
                   maxLength={FAQ_ANSWER_MAX}
                   onChange={(e) => updateFaq(index, "answer", e.target.value)}
                   rows={2}
-                  className={`${fieldClass} mt-1 py-2 leading-relaxed lg:mt-0`}
+                  className={`${fieldClass} py-2 leading-relaxed`}
                 />
-                <p className="mt-0.5 text-xs text-ink-soft">
-                  {faq.answer.length}/{FAQ_ANSWER_MAX}
-                </p>
               </div>
-              <div className="flex items-start justify-end lg:pt-1">
+              <div className="flex items-start justify-end">
                 <button
                   type="button"
                   onClick={() =>
-                    setFaqs((prev) =>
-                      prev.length <= 1 ? [emptyFaq()] : prev.filter((_, i) => i !== index)
-                    )
+                    setFaqs((prev) => prev.filter((_, i) => i !== index))
                   }
                   className={settingsTrashButtonClass}
                   aria-label={`Remove FAQ ${index + 1}`}
@@ -2177,6 +2217,7 @@ export function TenantForm({
             onPage={setFaqPage}
           />
         </div>
+        ) : null}
       </section>
 
         </div>

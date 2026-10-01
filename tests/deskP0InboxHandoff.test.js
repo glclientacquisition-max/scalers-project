@@ -60,15 +60,19 @@ describe("P0 #3 Connect live call honesty", () => {
   const form = read("dashboard/src/components/TenantForm.tsx");
   const server = read("server.js");
 
-  it("never promises Rings when the executor is off", () => {
-    assert.match(handoff, /Messages a teammate\./);
+  it("uses the live connect sentence for the handoff blurb", () => {
+    assert.match(handoff, /export function liveConnectBlurb/);
+    assert.match(handoff, /Rings \$\{who\} during open hours\./);
+    assert.match(handoff, /Add a team phone\./);
+    assert.doesNotMatch(handoff, /Messages a teammate\./);
     assert.doesNotMatch(handoff, /Rings a team phone during open hours/);
     assert.doesNotMatch(handoff, /Coming soon/);
-    assert.match(form, /handoffMessageLine\(liveDest\.name\)/);
+    assert.match(form, /liveConnectBlurb\(liveDest\?\.name\)/);
     assert.match(form, /liveTransferExecutor/);
-    assert.match(form, /liveTransferExecutor\s*\?\s*liveDest/);
-    assert.match(form, /Messages a teammate\./);
+    assert.doesNotMatch(form, /Messages a teammate\./);
     assert.doesNotMatch(form, /Coming soon/);
+    const wizard = read("dashboard/src/app/onboarding/OnboardingWizard.tsx");
+    assert.match(wizard, /liveConnectBlurb\(/);
   });
 
   it("stamps notify-only when live_transfer did not run", () => {

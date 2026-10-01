@@ -214,7 +214,7 @@ export function TestLinePanel({
                     : `${settingsPrimaryButtonClass} w-full sm:w-auto sm:min-w-[12rem]`
                 }
               >
-                {phonePreviewLoading ? "Generating…" : "Generate preview"}
+                {phonePreviewLoading ? "Generating…" : "Hear greeting"}
               </button>
               {phonePreviewUrl ? (
                 <audio

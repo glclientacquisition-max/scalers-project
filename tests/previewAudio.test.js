@@ -109,7 +109,7 @@ test("phone preview uses the same usable-audio gate", () => {
   assert.match(source, /type="audio\/wav"/);
   assert.match(source, /preload="metadata"/);
   assert.match(source, /resolveLiveCallVoiceId/);
-  assert.match(source, /Generate preview/);
+  assert.match(source, /Hear greeting/);
   assert.doesNotMatch(source, /createObjectURL\(blob\)/);
   assert.doesNotMatch(source, /new Audio\([^)]+\)\.play\(/);
   assert.doesNotMatch(source, /autoPlay/);

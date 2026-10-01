@@ -87,7 +87,7 @@ export function settingsScopeValidationError(
     return `Product catalogue is limited to ${input.productCatalogMax} items.`;
   }
   if (scopeOwns(scope, "hoursSchedule") && !input.hasSchedule) {
-    return "Set at least one open day in weekly hours.";
+    return "Set at least one open day.";
   }
   if (scopeOwns(scope, "hoursSchedule") && input.businessHoursLength < 8) {
     return "Add business hours and where you operate.";
