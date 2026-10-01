@@ -103,8 +103,8 @@ assert.match(
 
 assert.match(
   source,
-  /guardSpokenReply\(prepareStreamedSpeech\(String\(chunk \|\| ''\)\)/,
-  'streamed chunks must pass the speech guard before TTS'
+  /polishSpokenReply\(String\(chunk \|\| ''\)/,
+  'streamed chunks must pass polish (speech guard, menu strip) before TTS'
 );
 
 assert.match(
@@ -301,8 +301,17 @@ assert.match(
 
 assert.match(
   source,
-  /not retrying generateContent/,
-  'a hung or failed Gemini stream with no text must not start a second generateContent'
+  /nextGeminiStreamAttempt/,
+  'a failed stream with no audio retries once, then one backup model'
+);
+const streamFn = source.slice(
+  source.indexOf('async function runGeminiTurnStreaming'),
+  source.indexOf('async function runGeminiTurn')
+);
+assert.doesNotMatch(
+  streamFn,
+  /\.generateContent\(/,
+  'the stream path retries generateContentStream, not a second generateContent'
 );
 
 assert.match(
@@ -445,8 +454,8 @@ assert.match(
 
 assert.match(
   source,
-  /pickSpeechGuaranteeLine/,
-  'empty Gemini success must ask the next slot, not the Gemini-down name-ask'
+  /planEmptyGeminiSpeech/,
+  'empty Gemini success asks them to repeat once, not the downtime name-ask'
 );
 
 assert.match(

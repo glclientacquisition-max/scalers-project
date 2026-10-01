@@ -9,6 +9,7 @@ const {
 } = require('./entityExtraction');
 const { missingGoalSlots, formatGoalRequirementsForPrompt, formatVisitSopForPrompt, formatControlVoiceForPrompt } = require('./goalModel');
 const { looksLikePhaticCallerTurn, looksLikePaceOnlyTurn } = require('./dynamicSpeech');
+const { looksLikeFileRead, hasReadableFile } = require('./fileRead');
 const {
   ackIsConsent,
   looksLikeLeaveIt,
@@ -188,6 +189,8 @@ function inferIntent(text, opts = {}) {
     return 'human';
   }
   if (looksLikeCancelOrReschedule(value)) return 'cancellation';
+  // "Previous booking" / "which ones do I have" is a file read, not a new visit.
+  if (looksLikeFileRead(value)) return 'general_enquiry';
   if (opts.returning?.nextVisit && looksLikeExistingVisitTalk(value)) {
     return 'general_enquiry';
   }
@@ -984,11 +987,14 @@ function formatBrainStateForPrompt(state) {
       : '',
     value.conversation?.phatic
       ? speakerPendingOnFile(value.returning)
-        ? '- Phatic turn: one short well, then who is calling. Do not list services.'
+        ? '- Phatic turn: one short well, then offer help. Do not ask who is speaking. Do not use the file name. Do not list services.'
         : value.returning?.nextVisit && returningFileUsable(value.returning)
           ? '- Phatic turn: one short well, then the open visit. Do not list services or start a new book.'
-          : '- Phatic turn: they only greeted or asked how you are. One short well, then How can I help. Do not list services, prices, or jobs.'
+          : '- Phatic turn: they only greeted or asked how you are. One short well, then offer help. Do not ask who is speaking. Do not list services, prices, or jobs.'
       : '',
+    hasReadableFile(value)
+      ? ''
+      : '- FILE: nothing is saved for this speaker. Do not talk as if a booking, order, or hold exists. If they ask again, or sound confused, repeat that nothing is saved. Do not offer to reschedule or cancel.',
     `- Handoff requested: ${value.handoff.requested ? 'yes' : 'no'}`,
     `- Resolution: ${value.resolution.status}`,
     `- NEXT BEST ACTION: ${value.resolution.nextBestAction} — ${value.resolution.reason}`,

@@ -94,17 +94,15 @@ describe('post-V5 call correctives', () => {
     );
   });
 
-  it('opens help after a name or vague small talk and does not pitch', () => {
+  it('lets Gemini answer a name or vague small talk instead of a canned help line', () => {
     let state = createBrainState(retail);
     state = say(state, 'This is Alvin', retail);
     const named = pickCorrectiveReply({ text: 'This is Alvin', state, language: 'en' });
-    assert.equal(named, 'How can I help?');
-    assert.doesNotMatch(named, /order|whatsapp|diaries/i);
+    assert.equal(named, '');
 
     state = say(createBrainState(home), "What's up for me?", home);
     const vague = pickCorrectiveReply({ text: "What's up for me?", state, language: 'en' });
-    assert.equal(vague, 'How can I help?');
-    assert.doesNotMatch(vague, /couch|mattress|carpet/);
+    assert.equal(vague, '');
 
     state = say(createBrainState(home), "Nothing much. I'm just asking.", home);
     const asking = pickCorrectiveReply({
@@ -112,7 +110,7 @@ describe('post-V5 call correctives', () => {
       state,
       language: 'en',
     });
-    assert.equal(asking, 'How can I help?');
+    assert.equal(asking, '');
   });
 
   it('asks name then need on contact urgent and does not list services', () => {

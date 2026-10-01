@@ -252,12 +252,16 @@ function pickCorrectiveReply(opts = {}) {
     if ((intent === 'order' || intent === 'hold') && !quantity) {
       return quantityLine(state, lang);
     }
-    const next = missing.find((slot) => slot !== 'name' || !name) || missing[0];
-    if (next) return missingSlotLine(next, lang);
-    if (intent === 'order' || intent === 'hold' || intent === 'booking') {
-      return missingSlotLine('confirm', lang);
+    // Idle Okay / Sawa is a person talking. Gemini answers. A live order,
+    // hold, or booking still gets the one missing fact from here.
+    if (jobInProgress(state)) {
+      const next = missing.find((slot) => slot !== 'name' || !name) || missing[0];
+      if (next) return missingSlotLine(next, lang);
+      if (intent === 'order' || intent === 'hold' || intent === 'booking') {
+        return missingSlotLine('confirm', lang);
+      }
     }
-    if (!jobInProgress(state)) return helpLine(lang);
+    return '';
   }
 
   const openVisit =
@@ -265,10 +269,10 @@ function pickCorrectiveReply(opts = {}) {
     state.returning?.identityBound &&
     state.returning?.nextVisit;
   if (!jobInProgress(state) && !openVisit && looksLikeNameIntroductionOnly(text)) {
-    return helpLine(lang);
+    return '';
   }
   if (!jobInProgress(state) && !openVisit && looksLikeVagueSmallTalk(text)) {
-    return helpLine(lang);
+    return '';
   }
   return '';
 }
@@ -279,6 +283,7 @@ function spaceSpokenWords(text) {
   t = t.replace(/\bUkipatakitu\b/g, 'Ukipata kitu');
   t = t.replace(/\bNatakapembamba\b/g, 'Nataka pembamba');
   t = t.replace(/\b(I|We|They)(can|am|have|will)\b/g, '$1 $2');
+  t = t.replace(/\b(Are|Do)(you)\b/gi, '$1 $2');
   t = t.replace(/\b(can)(have)\b/gi, '$1 $2');
   t = t.replace(/\b(understand)(it)\b/gi, '$1 $2');
   t = t.replace(/\b(How|What|When|Where|Which|Got|All)([a-z]{2,})\b/g, (full, head, rest) => {

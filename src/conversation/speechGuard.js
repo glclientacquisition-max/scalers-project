@@ -23,6 +23,11 @@ const BARE_CLOSER =
 const TRANSFER_CLAIM =
   /\b(stay on the line|hold the line|(?:i(?:'m| am|'ll| will) )?(?:transferring|connecting|putting) you (?:now|through|to)|i(?:'ve| have) transferred you|let me (?:transfer|connect) you|escalat(?:e|ing|ed)|nakuunganisha|nakuhamisha)\b/i;
 
+// The model narrating its own send. Dropped even after the tool succeeds.
+// The backend speaks one callback line. It does not describe the send.
+const ACTION_NARRATION =
+  /\b(?:i(?:\s*['’]?ve|\s+have|\s+just|\s+also)?\s+sent\b|(?:i(?:'ll| will)|(?:i'm|i am) going to)\s+(?:try to\s+)?send\b|sent (?:that|this|it|your name|your request|your message)\b|(?:passed|forwarded|escalated|notified|relayed) (?:that|this|it|your|them|him|her)\b|along with your request\b|already sent\b|note (?:that |this |it )?for (?:him|her|them)\b|nimeituma|nimetuma|nime-?tuma|tayari (?:lili)?tumwa)\b/i;
+
 const COVERAGE_CLAIM =
   /\b(?:[Ww]e|[Tt]una|[Tt]unaweza|[Tt]uta)(?:\s+\w+){0,2}?\s+(?:cover|serve|reach|come(?:\s+out)?\s+to|kuja|kufika)\s+(?:to\s+)?([A-Z][\w'’]*(?:\s+[A-Z][\w'’]*){0,2})/;
 
@@ -114,6 +119,12 @@ function toolSucceededThisTurn(toolResults = []) {
   );
 }
 
+/** True when every sentence is the model describing its own send or handoff. */
+function narratesInternalAction(text) {
+  const sentences = splitSentences(text);
+  return sentences.length > 0 && sentences.every((sentence) => ACTION_NARRATION.test(sentence));
+}
+
 function unknownFallback(language) {
   const lang = confirmationLanguage(language);
   if (lang === 'sw') return 'Sina hiyo kwenye rekodi. Naweza kuandika kwa timu.';
@@ -172,6 +183,7 @@ function guardSpokenReply(text, ctx = {}) {
   let droppedNumber = false;
   let droppedJob = false;
   for (const sentence of splitSentences(raw)) {
+    if (ACTION_NARRATION.test(sentence)) continue;
     if (!saved && (SAVED_CLAIM.test(sentence) || JOB_CLOSE.test(sentence))) {
       droppedJob = true;
       continue;
@@ -205,6 +217,8 @@ module.exports = {
   SAVED_CLAIM,
   JOB_CLOSE,
   TRANSFER_CLAIM,
+  ACTION_NARRATION,
+  narratesInternalAction,
   guardSpokenReply,
   knownNumbers,
   numbersIn,

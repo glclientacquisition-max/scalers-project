@@ -136,7 +136,8 @@ async function smokeOperationalBooking() {
   );
   checkLine('operational escalate noted', escalateConfirm, {
     enMidCall: true,
-    mustInclude: [/^I've sent that to the team/],
+    mustInclude: [/^Okay\. They'll call you back/],
+    mustNotInclude: [/sent/i],
   });
 
   const handoff = pickClarifyProgress({
@@ -154,7 +155,7 @@ async function smokeOperationalBooking() {
   checkLine('operational ack', ack, { enMidCall: true });
 
   const openers = [progress, saved, hold, escalateProgress, escalateConfirm, handoff];
-  const samePerson = openers.filter((line) => /^(Okay|I've sent that to the team)/i.test(line));
+  const samePerson = openers.filter((line) => /^(Okay|They'll call you back)/i.test(line));
   if (samePerson.length !== openers.length) {
     fail('operational one person', `expected same-person mid-call lines: ${openers.join(' | ')}`);
   }

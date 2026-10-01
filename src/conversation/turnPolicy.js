@@ -11,7 +11,6 @@ const {
   looksLikePhaticCallerTurn,
   looksLikeRobotQuestion,
   pickIdentityReply,
-  pickPhaticReply,
 } = require('./dynamicSpeech');
 const { coverageAskSpeech, visitBlockSpeech } = require('./visitLocation');
 const { formatVisitTimeProblem } = require('./toolExecution');
@@ -24,6 +23,8 @@ const {
   pickCorrectiveReply,
 } = require('./callCorrectives');
 const { timeAskCount, timeAskLine, whenValue } = require('./visitTime');
+const { fileReadLine } = require('./fileRead');
+const { hoursAskLine, offerCatalogueLine } = require('./knownFacts');
 
 const AFFIRMATIVE_OPENER = /^(yes|yeah|yep|okay|ok|sawa|ndio|poa)\b/i;
 
@@ -83,6 +84,12 @@ function resolveLocalReply({
     };
   }
 
+  const savedLine = fileReadLine({ text: clean, state, language });
+  if (savedLine) return { outcome: 'file_read', line: savedLine };
+
+  const offerLine = offerCatalogueLine(clean, profile, language);
+  if (offerLine) return { outcome: 'catalogue', line: offerLine };
+
   const coverageLine = coverageAskSpeech(clean, profile, language);
   if (coverageLine) return { outcome: 'coverage', line: coverageLine };
 
@@ -123,17 +130,14 @@ function resolveLocalReply({
     };
   }
 
+  const hoursLine = hoursAskLine(clean, profile, language);
+  if (hoursLine) return { outcome: 'hours_ask', line: hoursLine };
+
   const correctiveLine = pickCorrectiveReply({ text: clean, state, language });
   if (correctiveLine) return { outcome: 'corrective', line: correctiveLine };
 
-  const bareCloser = looksLikeBareCloser(clean);
-  if (!bareCloser && looksLikePhaticCallerTurn(clean)) {
-    return {
-      outcome: 'phatic',
-      line: pickPhaticReply({ language, callerMemory: profile.callerMemory }),
-    };
-  }
-
+  // How-are-you, Okay, and a bare name go to Gemini. Identity, hours,
+  // the catalogue, coverage, leave-it, and the visit-time ladder stay fixed lines.
   return null;
 }
 

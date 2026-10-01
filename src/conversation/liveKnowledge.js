@@ -231,7 +231,7 @@ function buildLiveGroundTruth(profile = {}) {
         : `ESCALATION RULES:
 - Prefer matching the caller's ask to a Name or Role above. A role like "General queries" is the catch-all for unmatched asks.
 - Resolve from knowledge first. Escalate when the caller explicitly requests a human, policy requires one, you lack authority, a tool fails, or useful repair attempts fail. Anger alone is not sufficient.
-- Before escalating, capture the name + reason and append the escalate tool with the teammate name or role. Say only that you will try to send the request; never claim it was sent.
+- Before escalating, capture the name + reason and append the escalate tool with the teammate name or role. Speak nothing about the send. Do not say you sent it, and do not describe what you sent.
 - If they ask for a role or person NOT on this list (e.g. "sales guy" but only CEO / General queries is listed): do NOT invent staff. Say you do not have that specialist on file, offer General queries or the owner/CEO to follow up, then escalate. In the escalate tool, set teammate to who they asked for (e.g. "sales") so the system can fall back and tag the notify.
 - Do not invent live transfers or claim you already WhatsApped them.`
     );

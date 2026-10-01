@@ -10,6 +10,14 @@ const { confirmationLanguage } = require('./language');
 const { stripSpokenInstructionLeaks } = require('../speech/spokenInstructionLeak');
 const { prepareStreamedSpeech } = require('./callCorrectives');
 const { guardSpokenReply } = require('./speechGuard');
+const {
+  fileReadLine,
+  hasReadableFile,
+  looksLikeOfferAsk,
+  nothingOnFileLine,
+  presupposesSavedWork,
+  sanitizeSpokenFileClaim,
+} = require('./fileRead');
 const { returningFileUsable, speakerKnownOnFile } = require('./callerMemory');
 const { looksLikeFileVisitTalk } = require('./visitTalk');
 const { detectSpeedRequest } = require('../speech/speedControl');
@@ -323,6 +331,10 @@ function looksLikeSpokenServiceDump(text) {
 
 function trimSpokenServiceDump(text, opts = {}) {
   const raw = String(text || '').trim();
+  const callerText = String(
+    opts.callerText || (opts.callerTurns || []).slice(-1)[0] || ''
+  );
+  if (looksLikeOfferAsk(callerText)) return raw;
   if (!looksLikeSpokenServiceDump(raw)) return raw;
   const lang = confirmationLanguage(opts.language);
   if (lang === 'sw' || lang === 'sheng') {
@@ -383,10 +395,22 @@ function polishSpokenReply(text, opts = {}) {
       allowEmpty: true,
     });
   }
-  return trimSpokenServiceDump(
-    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
-    opts
+  const callerText = String(
+    (opts.callerTurns || opts.state?.conversation?.answersReceived || []).slice(-1)[0] || ''
   );
+  spoken = trimSpokenServiceDump(
+    stripPrematureOutcomeClaims(stripSpokenHedges(spoken, opts), opts),
+    { ...opts, callerText }
+  );
+  const sanitized = sanitizeSpokenFileClaim(spoken, {
+    callerText,
+    state: opts.state,
+    language: opts.language,
+  });
+  if (!sanitized && !hasReadableFile(opts.state) && presupposesSavedWork(String(text || ''))) {
+    return nothingOnFileLine(opts.state, opts.language);
+  }
+  return sanitized;
 }
 
 /**
@@ -543,6 +567,52 @@ function pickSpeechGuaranteeLine({
     intent: handoff ? 'human' : '',
     language,
   });
+}
+
+function emptyTurnRepairLine(language) {
+  const lang = confirmationLanguage(language);
+  if (lang === 'sw' || lang === 'sheng') return 'Samahani, sema tena?';
+  return 'Sorry, say that again?';
+}
+
+/**
+ * Gemini spoke nothing. A real outage still uses the downtime name-capture.
+ * A successful empty turn asks them to say it again once, then stays quiet.
+ * It does not invent the next slot.
+ *
+ * @returns {{ speak: boolean, kind: string, line: string }}
+ */
+function planEmptyGeminiSpeech({
+  brainState = {},
+  language,
+  userText = '',
+  llmDown = false,
+  alreadyOffered = false,
+} = {}) {
+  const savedForThem = fileReadLine({
+    text: userText,
+    state: brainState,
+    language,
+  });
+  if (!llmDown && savedForThem) {
+    return { speak: true, kind: 'file_read', line: savedForThem };
+  }
+  if (llmDown) {
+    if (callerNameAlreadyKnown({ brainState, userText })) {
+      return {
+        speak: true,
+        kind: 'reasoning_outage_saved',
+        line: pickLlmRecoverySaved({ language }),
+      };
+    }
+    return {
+      speak: true,
+      kind: 'reasoning_outage',
+      line: pickLlmRecoveryLine({ language, alreadyOffered }),
+    };
+  }
+  if (alreadyOffered) return { speak: false, kind: 'quiet_continue', line: '' };
+  return { speak: true, kind: 'hear_again', line: emptyTurnRepairLine(language) };
 }
 
 /**
@@ -744,6 +814,7 @@ module.exports = {
   pickActionProgress,
   pickClarifyProgress,
   pickSpeechGuaranteeLine,
+  planEmptyGeminiSpeech,
   shouldSpeakHandoffNameAsk,
   pickLlmRecoveryLine,
   pickIdleNudgeLine,
