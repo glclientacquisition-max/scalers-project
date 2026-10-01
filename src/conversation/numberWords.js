@@ -26,11 +26,9 @@ function numbersIn(text) {
   for (const hit of raw.match(STANDALONE_DIGITS) || []) {
     out.add(hit.replace(/,/g, '').replace(/^0+(?=\d)/, ''));
   }
-  // Hours on file are stored as HH:MM. Let the spoken 12-hour form through.
+  // HH:MM contributes its hour. It does not authorize the other 12-hour form.
   for (const hit of raw.matchAll(/\b(\d{1,2}):(\d{2})\b/g)) {
-    const hour = Number(hit[1]);
-    out.add(String(hour));
-    out.add(String(((hour + 11) % 12) + 1));
+    out.add(String(Number(hit[1])));
   }
   for (const hit of raw.match(NUMBER_WORD_RE) || []) {
     out.add(String(NUMBER_WORDS[hit.toLowerCase()]));

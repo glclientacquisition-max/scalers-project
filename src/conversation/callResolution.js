@@ -222,16 +222,48 @@ function highWaterPrimaryIntent({ liveIntent, results = [] } = {}) {
  *   callStatus?: string,
  * }} opts
  */
+function updateAttemptFailed(results) {
+  const rows = Array.isArray(results) ? results : [];
+  const failed = rows.some(
+    (row) =>
+      row?.action === 'update_appointment' &&
+      (row.status === 'failed' || row.status === 'invalid')
+  );
+  if (!failed) return false;
+  return !rows.some(
+    (row) =>
+      (row?.action === 'update_appointment' || row?.action === 'create_appointment') &&
+      (row.status === 'succeeded' || row.status === 'updated')
+  );
+}
+
+/** A succeeded update whose row still belongs to another call. */
+function foreignVisitUpdate(results, callId) {
+  if (!callId) return false;
+  const wanted = String(callId);
+  return (Array.isArray(results) ? results : []).some((row) => {
+    if (row?.action !== 'update_appointment') return false;
+    if (row.status !== 'succeeded' && row.status !== 'updated') return false;
+    const rowCall = row.record?.call_id || row.call_id || '';
+    return rowCall && String(rowCall) !== wanted;
+  });
+}
+
 /** Talked visit, nothing saved, and name, place, or time still open. */
 function ownerMustReturnCall(state) {
   const intent = String(state?.intent || '');
-  if (intent !== 'booking' && intent !== 'book_visit') return false;
+  const change =
+    intent === 'cancellation' || intent === 'cancel' || intent === 'reschedule';
+  if (intent !== 'booking' && intent !== 'book_visit' && !change) return false;
   if (String(state?.goal?.status || '') === 'completed') return false;
   if (String(state?.resolution?.status || '') === 'resolved') return false;
   if (String(state?.resolution?.nextBestAction || '') === 'END') return false;
   const missing = Array.isArray(state?.goal?.missingSlots)
     ? state.goal.missingSlots
     : [];
+  if (change) {
+    return missing.some((slot) => ['when', 'time'].includes(String(slot)));
+  }
   const openSlot = missing.some((slot) =>
     ['name', 'when', 'time', 'location', 'landmark', 'area'].includes(String(slot))
   );
@@ -299,6 +331,12 @@ function deriveCallResolution(opts = {}) {
         r.status === 'succeeded'
     );
     note = appointmentOk ? visitHonestyNote(results) : holdHonestyNote(results);
+    if (appointmentOk && foreignVisitUpdate(results, opts.callId)) {
+      note = 'Answered.';
+    }
+  } else if (updateAttemptFailed(results)) {
+    resolution = 'needs_human';
+    note = '';
   } else if (
     state.resolution?.status === 'resolved' ||
     state.resolution?.nextBestAction === 'END' ||

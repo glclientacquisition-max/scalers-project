@@ -131,7 +131,7 @@ describe('post-V5 call correctives', () => {
     assert.notEqual(decision.action, 'ESCALATE');
   });
 
-  it('treats out-of-coverage leave-it as a callback note only', () => {
+  it('treats out-of-coverage leave-it as outside coverage, not a callback offer', () => {
     let state = say(
       createBrainState(home),
       'Carpet cleaning tomorrow in Rongai, this is Alvin',
@@ -141,8 +141,8 @@ describe('post-V5 call correctives', () => {
     assert.equal(state.visitPlace.blocked, 'outside');
     assert.equal(state.conversation.leaveIt, true);
     const line = pickCorrectiveReply({ text: 'Just leave it.', state, language: 'en' });
-    assert.match(line, /outside our coverage/i);
-    assert.match(line, /callback/i);
+    assert.equal(line, 'That area is outside our coverage.');
+    assert.doesNotMatch(line, /callback/i);
     assert.doesNotMatch(line, /tomorrow|serving|saved|booked/i);
     const decision = determineNextBestAction({
       state,

@@ -444,18 +444,24 @@ function foldCanonicalPlace(place, profile) {
   const raw = cleanPlace(place, 240);
   if (!raw) return raw;
   const allowed = profile ? coverageNeighbourNames(profile) : null;
-  return raw
+  const folded = raw
     .split(/\s*,\s*/)
     .map((part) => part.trim())
     .filter((part) => part && !dropPlaceClause(part))
     .map((token) => {
-      if (/\s/.test(token)) return token;
+      if (/\s/.test(token)) return { text: token, bound: false };
       const name =
         allowed && allowed.size
           ? nearestAllowedPlace(token, allowed)
           : canonicalPlaceName(token);
-      return name ? displayPlaceName(name) : token;
-    })
+      return name
+        ? { text: displayPlaceName(name), bound: true }
+        : { text: token, bound: false };
+    });
+  const anyBound = folded.some((row) => row.bound);
+  return folded
+    .filter((row) => row.bound || !anyBound || /\s/.test(row.text))
+    .map((row) => row.text)
     .join(', ');
 }
 
@@ -524,8 +530,9 @@ function coverageAskPlace(text) {
  */
 function coverageAskSpeech(text, profile = {}, language = 'en') {
   if (String(profile?.vertical || '').toLowerCase() !== 'home_services') return '';
-  const place = coverageAskPlace(text);
-  if (!place) return '';
+  const rawPlace = coverageAskPlace(text);
+  if (!rawPlace) return '';
+  const place = foldCanonicalPlace(rawPlace, profile) || rawPlace;
   const coverage = assessCoverage(place, profile);
   const lang = String(language || 'en').toLowerCase();
   const sw = lang === 'sw' || lang.startsWith('swahili');
@@ -544,9 +551,9 @@ function visitBlockSpeech(blocked, language = 'en') {
   const sw = lang === 'sw' || lang.startsWith('swahili');
   const sheng = lang === 'sheng';
   if (blocked === 'outside') {
-    if (sw) return 'Eneo hilo liko nje. Ninaweza kuandika callback.';
-    if (sheng) return 'Hiyo area iko nje. Naweza andika callback.';
-    return 'That area is outside our coverage. I can note a callback.';
+    if (sw) return 'Eneo hilo liko nje.';
+    if (sheng) return 'Hiyo area iko nje.';
+    return 'That area is outside our coverage.';
   }
   if (blocked === 'unknown_coverage') {
     if (sw) return 'Sina orodha ya maeneo. Ninaweza kuandika hii kwa timu.';

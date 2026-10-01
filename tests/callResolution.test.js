@@ -200,6 +200,55 @@ describe('deriveCallResolution', () => {
     assert.doesNotMatch(out.resolutionNote || '', /permitted end-call|Answered/i);
   });
 
+  it('answers a later call that updated a visit still on the original call', () => {
+    const state = recordActionResults(createBrainState(), [
+      {
+        action: 'update_appointment',
+        status: 'succeeded',
+        appointmentStatus: 'requested',
+        record: {
+          status: 'requested',
+          service_name: 'Carpet cleaning',
+          call_id: 'call-original',
+        },
+      },
+    ]);
+    state.intent = 'cancellation';
+    state.conversation.turnCount = 3;
+    const kept = deriveCallResolution({ brainState: state });
+    assert.equal(kept.resolution, 'resolved');
+    assert.equal(kept.primaryIntent, 'book_visit');
+    assert.equal(kept.resolutionNote, VISIT_REQUESTED_NOTE);
+    const later = deriveCallResolution({
+      brainState: state,
+      callId: 'call-later',
+    });
+    assert.equal(later.resolution, 'resolved');
+    assert.equal(later.primaryIntent, 'book_visit');
+    assert.equal(later.resolutionNote, 'Answered.');
+    const same = deriveCallResolution({
+      brainState: state,
+      callId: 'call-original',
+    });
+    assert.equal(same.resolutionNote, VISIT_REQUESTED_NOTE);
+  });
+
+  it('asks the owner back when a visit update fails', () => {
+    const state = recordActionResults(createBrainState(), [
+      {
+        action: 'update_appointment',
+        status: 'failed',
+        reason: 'No matching open appointment was found to update.',
+      },
+    ]);
+    state.intent = 'cancellation';
+    state.conversation.turnCount = 3;
+    state.goal.missingSlots = ['when'];
+    const out = deriveCallResolution({ brainState: state, callId: 'call-later' });
+    assert.equal(out.resolution, 'needs_human');
+    assert.notEqual(out.primaryIntent, 'book_visit');
+  });
+
   it('keeps last-turn intent when no work row was saved', () => {
     const state = createBrainState();
     state.intent = 'booking';

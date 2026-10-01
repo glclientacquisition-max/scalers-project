@@ -441,7 +441,11 @@ export function classifyInboxPurpose(opts: {
   const resolution = opts.resolution || "unknown";
 
   if (HUMAN_INTENTS.has(intent) || resolution === "needs_human") return "human";
-  if (JOB_INTENTS.has(intent)) return "job";
+  if (JOB_INTENTS.has(intent)) {
+    // A later call can update a visit that still belongs to the original call.
+    if (!opts.job && resolution === "resolved") return "answered";
+    return "job";
+  }
   if (HOLD_INTENTS.has(intent)) return "hold";
   if (resolution === "resolved" || ANSWER_INTENTS.has(intent)) return "answered";
   // Abandoned, unresolved, product inquiry, and a new lead are not Missed.

@@ -18,6 +18,7 @@ const { buildBrainCapabilities } = require('../src/conversation/brainPolicy');
 const { guardToolPlan } = require('../src/conversation/requiredCreateRequest');
 const { guardSpokenReply } = require('../src/conversation/speechGuard');
 const { extractConversationEntities } = require('../src/conversation/entityExtraction');
+const { defaultHoursSchedule } = require('../src/conversation/businessHours');
 
 const home = {
   vertical: 'home_services',
@@ -335,6 +336,92 @@ describe('brain simulation: 06:59 call', () => {
     assert.doesNotMatch(String(sim.turns[3].state.entities.when?.value || ''), /7:00 AM/i);
     assert.match(sim.turns[3].agentLine, /morning or afternoon/i);
     assert.doesNotMatch(lines(sim).join('\n'), /saved your request/i);
+    clean(sim);
+  });
+
+  it('refuses 7:00 AM before a name and keeps only the day', async () => {
+    const sim = createSimulator({
+      profile: { ...home, hoursSchedule: defaultHoursSchedule() },
+      leak: 'none',
+    });
+    await sim.run(['Carpet cleaning tomorrow at 7:00 AM in Kitengela near the stage.']);
+    assert.equal(sim.turns[0].outcome, 'hours');
+    assert.match(sim.turns[0].agentLine, /outside our hours/i);
+    assert.match(sim.turns[0].agentLine, /after 8 AM/i);
+    assert.doesNotMatch(sim.turns[0].agentLine, /name/i);
+    const when = String(sim.turns[0].state.entities.when?.value || '');
+    assert.match(when, /tomorrow/i);
+    assert.doesNotMatch(when, /7/);
+    assert.ok(sim.state.actions.refusedHours.length > 0);
+    assert.equal(sim.saved.appointments.length, 0);
+    assert.equal(sim.turns[0].toolResults.length, 0);
+    clean(sim);
+  });
+
+  it('replaces 7:00 AM with tomorrow morning and does not offer 8 AM', async () => {
+    const profile = { ...home, hoursSchedule: defaultHoursSchedule() };
+    const sim = createSimulator({ profile, leak: 'none' });
+    await sim.run([
+      'Carpet cleaning tomorrow at 7:00 AM in Kitengela near the stage.',
+      'Tomorrow morning.',
+    ]);
+    const when = String(sim.turns[1].state.entities.when?.value || '');
+    assert.match(when, /tomorrow morning/i);
+    assert.doesNotMatch(when, /7:00|7 AM/i);
+    assert.doesNotMatch(sim.turns[1].agentLine, /\b8\s*AM\b/i);
+    assert.doesNotMatch(
+      guardSpokenReply('I can come at 8 AM.', {
+        profile,
+        callerTurns: ['Tomorrow morning.'],
+        language: 'en',
+      }),
+      /8\s*AM/i
+    );
+    assert.match(
+      guardSpokenReply('I can come at 8 AM.', {
+        profile,
+        callerTurns: ['Tomorrow at 8 AM.'],
+        language: 'en',
+      }),
+      /8\s*AM/i
+    );
+    assert.match(
+      guardSpokenReply('I can come at 8 AM.', {
+        profile,
+        callerTurns: ['Tomorrow morning.'],
+        toolResults: [{ hours: { whenText: 'Wednesday at 8:00 AM' } }],
+        language: 'en',
+      }),
+      /8\s*AM/i
+    );
+    clean(sim);
+  });
+
+  it('refuses 7:00 PM after close before a name', async () => {
+    const sim = createSimulator({
+      profile: { ...home, hoursSchedule: defaultHoursSchedule() },
+      leak: 'none',
+    });
+    await sim.run(['Carpet cleaning tomorrow at 7:00 PM in Kitengela near the stage.']);
+    assert.match(sim.turns[0].agentLine, /outside our hours/i);
+    assert.match(sim.turns[0].agentLine, /before 6 PM/i);
+    assert.doesNotMatch(String(sim.turns[0].state.entities.when?.value || ''), /7:00/);
+    clean(sim);
+  });
+
+  it('keeps Rongai from Lurungai, Rungai and does not offer a callback', async () => {
+    const sim = createSimulator({ profile: home, leak: 'none' });
+    await sim.run(['Carpet cleaning tomorrow in Lurungai, Rungai.']);
+    const place = String(sim.turns[0].state.entities.location?.value || '');
+    assert.match(place, /Rongai/);
+    assert.doesNotMatch(place, /Lurungai/);
+    assert.equal(sim.turns[0].agentLine, 'That area is outside our coverage.');
+    assert.doesNotMatch(sim.turns[0].agentLine, /callback/i);
+    await sim.run(['What about Runda?']);
+    assert.match(sim.turns[1].agentLine, /Yes, we cover Runda/i);
+    await sim.run(['Do you do Rungai?']);
+    assert.match(String(sim.turns[2].state.entities.location?.value || ''), /^Rongai$/i);
+    assert.equal(sim.turns[2].agentLine, 'That area is outside our coverage.');
     clean(sim);
   });
 

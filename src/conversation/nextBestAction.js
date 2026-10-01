@@ -152,7 +152,7 @@ function determineNextBestAction({ state, capabilities = {} } = {}) {
       action: ACTIONS.ANSWER,
       reason: ackOnly
         ? 'Out of coverage. Callback note only. Okay, Sawa, or leave it is not a booking. Do not create_appointment. Do not say you will serve them tomorrow.'
-        : 'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Decline or offer to note a callback. Never say landmark.',
+        : 'The area is outside POLICIES/LOCATIONS. Do not create_appointment. Say the area is outside our coverage. Do not offer a callback. Never say landmark.',
     };
   }
   if (placeGate === 'unknown_coverage') {

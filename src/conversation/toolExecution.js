@@ -16,6 +16,7 @@ const {
   appendVisitNotes,
   hasCoverageText,
   mentionsPin,
+  visitBlockSpeech,
 } = require('./visitLocation');
 
 const REQUEST_TYPES = new Set(['hold', 'enquiry', 'order', 'callback', 'other']);
@@ -1063,9 +1064,7 @@ function formatToolConfirmation(results = [], language = 'en') {
       const code = String(meaningful.code || '');
       const hours = meaningful.hours || {};
       if (code === 'outside_coverage') {
-        if (sw) return 'Eneo hilo liko nje. Ninaweza kuandika callback.';
-        if (sheng) return 'Hiyo area iko nje. Naweza andika callback.';
-        return 'That area is outside our coverage. I can note a callback.';
+        return visitBlockSpeech('outside', lang);
       }
       const timeProblem = formatVisitTimeProblem(
         code,
@@ -1251,4 +1250,5 @@ module.exports = {
   validateUpdateAppointment,
   executeBrainTools,
   formatToolConfirmation,
+  formatVisitTimeProblem,
 };

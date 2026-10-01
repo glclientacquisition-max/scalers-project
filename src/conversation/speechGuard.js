@@ -46,17 +46,57 @@ function safeJson(value) {
   }
 }
 
+/** Profile hours are HH:MM. They do not authorize a spoken visit clock. */
+function profileFacts(profile) {
+  return safeJson(profile).replace(/\b\d{1,2}:\d{2}\b/g, ' ');
+}
+
 /** Numbers the agent may say: caller turns, business facts on file, tool results. */
 function knownNumbers({ callerTurns = [], profile = {}, toolResults = [], extra = '' } = {}) {
   const known = numbersIn(
     [
       (Array.isArray(callerTurns) ? callerTurns : []).join(' '),
-      safeJson(profile),
+      profileFacts(profile),
       safeJson(toolResults),
       String(extra || ''),
     ].join(' ')
   );
   return known;
+}
+
+function clockKey(hourRaw, minuteRaw, apRaw) {
+  const hour = String(Number(hourRaw));
+  const minute = minuteRaw == null || minuteRaw === '' ? '' : String(Number(minuteRaw)).padStart(2, '0');
+  const ap = String(apRaw || '').replace(/\./g, '').toLowerCase();
+  if (!minute || minute === '00') return `${hour}${ap}`;
+  return `${hour}:${minute}${ap}`;
+}
+
+/** AM/PM clocks in a text. "8 AM" and "8:00 AM" share one key. */
+function clockKeys(text) {
+  const keys = new Set();
+  const raw = String(text || '');
+  for (const hit of raw.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/gi)) {
+    keys.add(clockKey(hit[1], hit[2], hit[3]));
+  }
+  return keys;
+}
+
+function allowedClocks({ callerTurns = [], toolResults = [], extra = '' } = {}) {
+  return clockKeys(
+    [
+      (Array.isArray(callerTurns) ? callerTurns : []).join(' '),
+      safeJson(toolResults),
+      String(extra || ''),
+    ].join(' ')
+  );
+}
+
+function sentenceHasUnsaidClock(sentence, allowed) {
+  for (const key of clockKeys(sentence)) {
+    if (!allowed.has(key)) return true;
+  }
+  return false;
 }
 
 function sentenceHasNewNumber(sentence, known) {
@@ -117,6 +157,7 @@ function guardSpokenReply(text, ctx = {}) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
   const known = knownNumbers(ctx);
+  const clocks = allowedClocks(ctx);
   const saved = toolSucceededThisTurn(ctx.toolResults);
   const transferOk = Boolean(ctx.capabilities?.liveTransfer || ctx.capabilities?.transfer);
   const missing = Array.isArray(ctx.state?.goal?.missingSlots) ? ctx.state.goal.missingSlots : [];
@@ -142,7 +183,7 @@ function guardSpokenReply(text, ctx = {}) {
       droppedJob = true;
       continue;
     }
-    if (sentenceHasNewNumber(sentence, known)) {
+    if (sentenceHasUnsaidClock(sentence, clocks) || sentenceHasNewNumber(sentence, known)) {
       droppedNumber = true;
       continue;
     }

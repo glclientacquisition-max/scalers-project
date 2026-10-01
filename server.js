@@ -935,7 +935,11 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
   const brainState = callBrainStates.get(callSid);
   if (!brainState) return null;
   try {
-    const derived = deriveCallResolution({ brainState });
+    const call = await db.getCall(callSid);
+    const derived = deriveCallResolution({
+      brainState,
+      callId: call?.id || null,
+    });
     const summary = deriveCallSummary({ brainState });
     const saved = await db.setCallResolution({
       callSid,
@@ -970,7 +974,7 @@ async function persistCallResolution(callSid, source = 'call', opts = {}) {
         vertical: profile.vertical || '',
         derived,
         summary,
-        toolFlags: toolFlagsFromBrain(brainState),
+        toolFlags: toolFlagsFromBrain(brainState, call?.id || null),
         turns: Array.isArray(opts.turns) ? opts.turns : null,
         callStatus: opts.callStatus || null,
       });
@@ -2412,7 +2416,7 @@ mediaWss.on('connection', (ws, req) => {
     let progressAlreadySpoken = false;
     try {
       // One turn contract for every playbook: identity → coverage ask →
-      // place block → corrective → visit time ladder → phatic. Gemini only
+      // place block → hours refusal → corrective → visit time ladder → phatic. Gemini only
       // runs when this returns null. See docs/agents/BRAIN_TURN_CONTRACT.md.
       const localReply = resolveLocalReply({
         text: clean,
