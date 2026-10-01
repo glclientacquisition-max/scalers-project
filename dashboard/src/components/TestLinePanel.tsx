@@ -19,6 +19,8 @@ import {
   objectUrlFromPreviewResponse,
   previewErrorCopy,
 } from "@/lib/previewAudio";
+import Link from "next/link";
+import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import {
   SettingsGroup,
   settingsGhostButtonClass,
@@ -131,7 +133,18 @@ export function TestLinePanel({
             <blockquote className="border-l-2 border-accent/50 pl-4 text-base leading-relaxed text-ink">
               “{greetingPreview}”
             </blockquote>
-          ) : null}
+          ) : (
+            <p className="text-sm text-ink-soft" role="status">
+              Add a business name in{" "}
+              <Link
+                href={businessSettingsHref("train", "identity")}
+                className="font-medium text-accent-deep underline-offset-2 hover:underline"
+              >
+                Identity
+              </Link>{" "}
+              to preview the greeting.
+            </p>
+          )}
           {greetingPreview ? (
             <>
               {voiceLabel ? (

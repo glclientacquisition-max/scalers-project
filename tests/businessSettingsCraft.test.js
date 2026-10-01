@@ -429,11 +429,13 @@ describe("business settings craft", () => {
     );
     assert.match(catalogScan, /settingsActionClass/);
     assert.doesNotMatch(catalogScan, /settingsPrimaryButtonClass/);
-    assert.match(form, /panel === "pronunciation" \? undefined/);
+    assert.match(form, /Saves live - no sticky Save/);
+    assert.doesNotMatch(form, /panel === "pronunciation" \? undefined/);
     assert.match(coach, /btnPrimary/);
+    assert.match(coach, /fixHasUsePrimary/);
     assert.match(form, /settingsGhostButtonClass/);
     assert.match(form, /Add service/);
-    assert.match(form, /Add 3/);
+    assert.match(form, /Add 3 blank rows/);
     assert.match(save, /min-h-11/);
     assert.doesNotMatch(save, /min-h-14/);
     assert.doesNotMatch(save, /w-full/);
@@ -472,6 +474,31 @@ describe("business settings craft", () => {
     assert.match(team, /<span>Role<\/span>/);
     assert.match(team, />\s*Role\s*</);
     assert.doesNotMatch(team, /Handles/);
+    // Batch B: email/name carry title + wrap — no silent truncate data loss.
+    assert.match(team, /title=\{member\.email \|\| undefined\}/);
+    assert.match(team, /title=\{member\.name \|\| undefined\}/);
+    assert.match(team, /break-words \[overflow-wrap:anywhere\]/);
+    assert.doesNotMatch(team, /min-w-0 truncate/);
+  });
+
+  it("recovers empty Policies/Test and clarifies Identity truncation", () => {
+    const policies = form.slice(
+      form.indexOf('panel === "policies"'),
+      form.indexOf('panel === "tools"')
+    );
+    assert.match(policies, /No rules yet\. Add payment or cancellation/);
+    assert.match(policies, /openPolicyIds\.length === 0/);
+    assert.doesNotMatch(policies, /M-Pesa Paybill|30% deposit required/);
+
+    assert.match(test, /Add a business name in/);
+    assert.match(test, /businessSettingsHref\("train", "identity"\)/);
+    assert.match(test, /to preview the greeting/);
+
+    assert.match(form, /id="business_name"[\s\S]*title=\{businessName/);
+    assert.match(ui, /title=\{businessName\}/);
+    assert.match(ui, /break-words text-sm font-medium text-ink/);
+    assert.match(shell, /title=\{status\}/);
+    assert.match(form, /title="Add 3 blank rows"/);
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {

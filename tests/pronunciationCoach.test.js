@@ -191,9 +191,18 @@ describe("pronunciation coach chrome", () => {
     assert.match(findMore, /Listening…/);
     assert.match(findMore, /Save review/);
     assert.match(findMore, /listenNote/);
+    // Batch B: AI listen is ghost unless Save review (unsavedReview) is the Fix primary.
+    assert.match(findMore, /unsavedReview/);
     assert.match(findMore, /btnPrimary/);
+    assert.match(findMore, /libraryMutedClass/);
     assert.doesNotMatch(findMore, /scanCalls/);
     assert.doesNotMatch(findMore, /left for review/);
+
+    assert.match(src, /fixHasUsePrimary/);
+    assert.match(src, /fixHasUsePrimary \|\| unsavedReview \|\| geminiConfirmOpen/);
+    const addFix = src.slice(src.indexOf("{/* 2) Add a fix */}"), src.indexOf("{/* 3) Find more */}"));
+    assert.match(addFix, /Record &amp; train|Record & train/);
+    assert.match(addFix, /fixHasUsePrimary/);
 
     const record = src.slice(
       src.indexOf("async function startRecording"),

@@ -222,4 +222,14 @@ describe("business settings depth", () => {
     assert.match(alerts, /Alert phone/);
     assert.doesNotMatch(alerts, /Add person/);
   });
+
+  it("names Policies empty next step without inventing Train facts", () => {
+    const block = form.slice(
+      form.indexOf('panel === "policies"'),
+      form.indexOf('panel === "tools"')
+    );
+    assert.match(block, /No rules yet\. Add payment or cancellation/);
+    assert.match(block, /Add rule/);
+    assert.doesNotMatch(block, /Paybill|Till number|KES 500|same-day guarantee/);
+  });
 });

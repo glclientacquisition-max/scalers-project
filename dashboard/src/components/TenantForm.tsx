@@ -490,7 +490,7 @@ export function TenantForm({
   );
 
   useEffect(() => {
-    // Compile finished before ok — owners should hear the line was trained, not only "Saved".
+    // Compile finished before ok - owners should hear the line was trained, not only "Saved".
     if (state.ok) notify("Saved · training line");
   }, [state]);
 
@@ -729,7 +729,11 @@ export function TenantForm({
             title={heading}
             alert={state.error}
             action={
-              panel === "pronunciation" ? undefined : (
+              panel === "pronunciation" ? (
+                <p className="max-w-[11rem] text-right text-xs leading-snug text-ink-soft">
+                  Saves live - no sticky Save
+                </p>
+              ) : (
                 <TenantSettingsSaveButton pending={pending} />
               )
             }
@@ -796,7 +800,8 @@ export function TenantForm({
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               placeholder="Westlands Books"
-              className={denseFieldClass}
+              title={businessName || undefined}
+              className={`${denseFieldClass} break-words [overflow-wrap:anywhere]`}
             />
           </SettingsRow>
           <SettingsRow
@@ -1023,9 +1028,10 @@ export function TenantForm({
               <button
                 type="button"
                 onClick={() => addBlankServiceRows(3)}
+                title="Add 3 blank rows"
                 className={settingsGhostButtonClass}
               >
-                Add 3
+                Add 3 blank rows
               </button>
               <label className="sr-only" htmlFor="bulk_services">
                 Paste list
@@ -1774,6 +1780,11 @@ export function TenantForm({
               />
             </SettingsStack>
           ) : null}
+          {openPolicyIds.length === 0 ? (
+            <p className="px-4 py-2 text-sm text-ink-soft" role="status">
+              No rules yet. Add payment or cancellation to start - write what callers should hear.
+            </p>
+          ) : null}
           {POLICY_FIELDS.filter((field) => openPolicyIds.includes(field.id)).map((field) => (
             <SettingsStack
               key={field.id}
@@ -2018,7 +2029,7 @@ export function TenantForm({
               key={`team-${index}`}
               className="grid grid-cols-1 gap-3 border-b border-line px-3 py-3 last:border-b-0 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_2.5rem] lg:items-start lg:gap-x-3 lg:py-2"
             >
-              <div className="min-w-0 truncate">
+              <div className="min-w-0">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-name-${index}`}>
                   Name
                 </label>
@@ -2027,7 +2038,8 @@ export function TenantForm({
                   value={member.name}
                   onChange={(e) => updateTeam(index, "name", e.target.value)}
                   placeholder="Wanjiku Mwangi"
-                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
+                  title={member.name || undefined}
+                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
                 />
               </div>
               <div className="min-w-0">
@@ -2054,7 +2066,7 @@ export function TenantForm({
                   className={`${denseFieldClass} mt-1 lg:mt-0`}
                 />
               </div>
-              <div className="min-w-0 truncate">
+              <div className="min-w-0">
                 <label className="block text-xs font-medium text-ink-soft lg:sr-only" htmlFor={`team-email-${index}`}>
                   Email
                 </label>
@@ -2064,7 +2076,8 @@ export function TenantForm({
                   value={member.email || ""}
                   onChange={(e) => updateTeam(index, "email", e.target.value)}
                   placeholder="wanjiku@shop.co.ke"
-                  className={`${denseFieldClass} mt-1 min-w-0 truncate lg:mt-0`}
+                  title={member.email || undefined}
+                  className={`${denseFieldClass} mt-1 min-w-0 break-words [overflow-wrap:anywhere] lg:mt-0`}
                 />
               </div>
               <div

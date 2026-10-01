@@ -897,6 +897,8 @@ export function PronunciationCoach({
     () => buildUnifiedFixReviewRows({ speech: reviewQueue, hearing: sttHints }),
     [reviewQueue, sttHints]
   );
+  /** Fix mode: one filled primary: Use this when review waits; else Record & train; Save review when held. */
+  const fixHasUsePrimary = fixReviewRows.some((r) => r.primaryAction === "use");
 
   const modes: Array<{ id: StudioMode; label: string; hint: string | null }> = [
     {
@@ -1213,7 +1215,7 @@ export function PronunciationCoach({
               <button
                 type="button"
                 onClick={() => setMode("practice")}
-                className="mt-3 rounded-xl bg-accent-fill px-4 py-2 text-sm font-medium text-accent-on-fill hover:bg-accent-fill-hover"
+                className={`mt-3 ${btnPrimary}`}
               >
                 Start practicing
               </button>
@@ -1428,7 +1430,11 @@ export function PronunciationCoach({
                               unsavedReview ||
                               !heardThis
                             }
-                            className={`${btnPrimary} w-auto shrink-0`}
+                            className={
+                              unsavedReview || geminiConfirmOpen
+                                ? `${libraryMutedClass} disabled:opacity-60`
+                                : `${btnPrimary} w-auto shrink-0`
+                            }
                           >
                             {approvePending ? "Saving…" : "Use this"}
                           </button>
@@ -1540,7 +1546,11 @@ export function PronunciationCoach({
                 type="button"
                 onClick={() => submitQuickAdd("record")}
                 disabled={!addPhrase.trim()}
-                className={btnPrimary}
+                className={
+                  fixHasUsePrimary || unsavedReview || geminiConfirmOpen
+                    ? `${libraryMutedClass} disabled:opacity-60`
+                    : btnPrimary
+                }
               >
                 Record &amp; train
               </button>
@@ -1616,7 +1626,11 @@ export function PronunciationCoach({
                   unsavedReview ? saveHeldReview() : runGeminiScan(false)
                 }
                 disabled={geminiPending || minePending}
-                className={`${btnPrimary} w-auto shrink-0 gap-2`}
+                className={
+                  unsavedReview
+                    ? `${btnPrimary} w-auto shrink-0 gap-2`
+                    : `${libraryMutedClass} disabled:opacity-60`
+                }
               >
                 {geminiPending ? (
                   <span className={pendingSpinnerClass} aria-hidden="true" />
