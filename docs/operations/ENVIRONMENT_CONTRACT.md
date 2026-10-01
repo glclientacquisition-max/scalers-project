@@ -62,6 +62,7 @@
 | `BETTER_AUTH_SECRET` | Better Auth cookie signing | Staging | Super Admin | Never |
 | `ADMIN_ACCESS_CODE` / `ADMIN_OPERATORS` | Super Admin door code(s) | Staging | Super Admin | Never |
 | `ADMIN_HOST` | `admin.scalers.co.ke` | Staging if used | Super Admin host split | `NEXT_PUBLIC_ADMIN_HOST` only |
+| `APP_HOST` | unset (same host as the site) | unset | `app.scalers.co.ke` owner desk. Marketing stays `NEXT_PUBLIC_SITE_URL` | `NEXT_PUBLIC_APP_HOST` only if a client needs the host |
 
 **Rule:** No `NEXT_PUBLIC_*` variable may contain service_role or provider admin keys.
 
@@ -87,7 +88,7 @@
 | --- | --- | --- | --- |
 | Command | `cd dashboard && npm run dev` | Vercel preview or staging project | Vercel production |
 | Root | `dashboard/` | Same | Same |
-| URL | `http://localhost:3000` | `https://scalers-staging.vercel.app` (pin: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md)) | **INFERENCE:** `https://scalers-project.vercel.app` |
+| URL | `http://localhost:3000` | `https://scalers-staging.vercel.app` (pin: [`STAGING_DESK_ALIAS.md`](./STAGING_DESK_ALIAS.md)) | Marketing `https://www.scalers.co.ke`. Owner desk `https://app.scalers.co.ke`. Super Admin `https://admin.scalers.co.ke`. Same Vercel project. |
 | Auth | Supabase Auth | Staging Supabase project | Production Supabase project |
 | Dev bypass | `DASHBOARD_OPEN=true` allowed | **Disable** | **Disable** |
 

@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { adminAccessCode } from "@/lib/admin-auth-plugin";
-import { configuredAdminHost, configuredAppHost } from "@/lib/adminHost";
+import { configuredAdminHost, configuredAppHost, configuredSiteHost } from "@/lib/adminHost";
 
 function adminAuthSecret(): string {
   return (
@@ -46,6 +46,7 @@ export const adminAuth = betterAuth({
       "http://localhost:3000",
       "http://127.0.0.1:3000",
       `https://${configuredAppHost()}`,
+      `https://${configuredSiteHost()}`,
     ]);
     const adminHost = configuredAdminHost();
     if (adminHost) origins.add(`https://${adminHost}`);

@@ -18,7 +18,7 @@ Replace the narrow “DID pool” ops page with a **Super Admin** control center
 Requirements:
 - Super Admin routes must reject business-owner sessions (redirect to `/home`).
 - Ops sign in at `/admin/login` with a username and access code. Not email. Env: `ADMIN_OPERATORS` or `ADMIN_ACCESS_CODE` + `ADMIN_USERNAMES`.
-- When `ADMIN_HOST=admin.scalers.co.ke`, the app host redirects `/admin` there. Add that hostname on the same Vercel project.
+- When `ADMIN_HOST=admin.scalers.co.ke`, the marketing host and the owner desk redirect `/admin` there. Owner desk is `APP_HOST=app.scalers.co.ke`. Add both hostnames on the same Vercel project.
 - All admin mutations use the service-role server client (never expose service key to the browser).
 - Destructive actions require an explicit confirmation step.
 

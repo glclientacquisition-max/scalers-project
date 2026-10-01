@@ -150,6 +150,7 @@ Open http://localhost:3000 (or the port Next prints).
 | `VOICE_INTERNAL_SECRET` | Same secret as Railway — auth for desk → `/api/tts/preview` |
 | `SAUTIKIT_API_BASE` | Optional: defaults to `https://api.sautikit.com` |
 | `ADMIN_HOST` | Optional Super Admin host (`admin.scalers.co.ke`) |
+| `APP_HOST` | Owner desk host (`app.scalers.co.ke`). Unset keeps the desk on the site host. |
 | `ADMIN_ACCESS_CODE` / `ADMIN_USERNAMES` | Shared access code + usernames |
 | `ADMIN_OPERATORS` | Per-user `name:code` list |
 | `BETTER_AUTH_SECRET` | Super Admin session signing |

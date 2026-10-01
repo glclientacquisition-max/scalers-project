@@ -1,4 +1,26 @@
 export const DEFAULT_ADMIN_HOST = "admin.scalers.co.ke";
+export const DEFAULT_APP_HOST = "app.scalers.co.ke";
+export const DEFAULT_SITE_HOST = "www.scalers.co.ke";
+
+/** Owner desk routes. Marketing stays on the site host. */
+const DESK_ROOTS = [
+  "/login",
+  "/signup",
+  "/onboarding",
+  "/home",
+  "/calls",
+  "/contacts",
+  "/wallet",
+  "/requests",
+  "/appointments",
+  "/settings",
+  "/dev",
+  "/api/login",
+  "/api/logout",
+  "/api/tenant",
+  "/api/voices",
+  "/api/pronunciation",
+];
 
 function stripHost(raw: string): string {
   return raw
@@ -20,11 +42,96 @@ export function configuredAdminHost(env: NodeJS.ProcessEnv = process.env): strin
 export function configuredAppHost(env: NodeJS.ProcessEnv = process.env): string {
   const raw = String(env.APP_HOST || env.NEXT_PUBLIC_APP_HOST || "").trim();
   if (raw) return stripHost(raw);
+  return configuredSiteHost(env);
+}
+
+/** Marketing host. Stays on the apex when APP_HOST is the desk subdomain. */
+export function configuredSiteHost(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = String(env.SITE_HOST || env.NEXT_PUBLIC_SITE_URL || `https://${DEFAULT_SITE_HOST}`).trim();
+  if (!raw) return DEFAULT_SITE_HOST;
   try {
-    return new URL(env.NEXT_PUBLIC_SITE_URL || "https://scalers.co.ke").host;
+    if (raw.includes("://")) return new URL(raw).host;
   } catch {
-    return "scalers.co.ke";
+    /* host string */
   }
+  return stripHost(raw) || DEFAULT_SITE_HOST;
+}
+
+function bareHost(host: string): string {
+  return host.replace(/^www\./, "");
+}
+
+/** True when the owner desk host is different from the marketing host. */
+export function appHostSplitEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const app = configuredAppHost(env);
+  const site = configuredSiteHost(env);
+  return Boolean(app && site && app !== site);
+}
+
+export function isSiteHostName(
+  hostname: string,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const host = hostnameOf(hostname);
+  const site = configuredSiteHost(env);
+  return bareHost(host) === bareHost(site);
+}
+
+export function isAppHostName(
+  hostname: string,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  return hostnameOf(hostname) === configuredAppHost(env);
+}
+
+export function isDeskPath(pathname: string): boolean {
+  const path = (pathname.split("?")[0] || "/").replace(/\/+$/, "") || "/";
+  return DESK_ROOTS.some((root) => path === root || path.startsWith(`${root}/`));
+}
+
+export type AppHostRedirect = { host: string; pathname: string };
+
+/**
+ * Desk paths on the marketing host go to the app host.
+ * The app host root is sign-in, not the marketing page.
+ * Unset or equal hosts leave the request alone (local, staging, preview).
+ */
+export function appHostRedirect(
+  hostname: string,
+  pathname: string,
+  env: NodeJS.ProcessEnv = process.env
+): AppHostRedirect | null {
+  if (!appHostSplitEnabled(env)) return null;
+  const host = hostnameOf(hostname);
+  if (isLoopbackHost(host) || isAdminHostName(host, env)) return null;
+  const path = (pathname.split("?")[0] || "/").replace(/\/+$/, "") || "/";
+  const app = configuredAppHost(env);
+  if (isSiteHostName(host, env) && isDeskPath(path)) {
+    return { host: app, pathname: path };
+  }
+  if (isAppHostName(host, env) && path === "/") {
+    return { host: app, pathname: "/login" };
+  }
+  return null;
+}
+
+/** Wordmark and "Scalers home" on the desk point at marketing when the hosts are split. */
+export function marketingHomeHref(env: NodeJS.ProcessEnv = process.env): string {
+  if (!appHostSplitEnabled(env)) return "/";
+  return `https://${configuredSiteHost(env)}/`;
+}
+
+/** Supabase email confirmation lands on the desk host. */
+export function ownerAuthRedirectUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  if (!appHostSplitEnabled(env)) return undefined;
+  return `https://${configuredAppHost(env)}/login`;
+}
+
+/** Auth cookies stay on the host that set them. Never Domain=.scalers.co.ke. */
+export function hostOnlyCookieOptions<T extends { domain?: string }>(options: T): Omit<T, "domain"> {
+  const next = { ...options };
+  delete next.domain;
+  return next;
 }
 
 export function hostnameOf(hostHeader: string | null | undefined): string {

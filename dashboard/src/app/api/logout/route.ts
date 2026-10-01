@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { adminAuth } from "@/lib/admin-auth";
-import { hostnameOf, isAdminHostName } from "@/lib/adminHost";
+import { hostOnlyCookieOptions, hostnameOf, isAdminHostName } from "@/lib/adminHost";
 import { LEGACY_SESSION_COOKIE, SESSION_COOKIE } from "@/lib/auth";
 import { DESK_TENANT_COOKIE } from "@/lib/deskTenantCookie";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
         },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            res.cookies.set(name, value, options);
+            res.cookies.set(name, value, hostOnlyCookieOptions(options));
           });
         },
       },
