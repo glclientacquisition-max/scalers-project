@@ -445,10 +445,15 @@ describe("business settings craft", () => {
     assert.doesNotMatch(form, /min-w-\[640px\]/);
     assert.doesNotMatch(form, /minmax\(10rem,auto\)/);
     assert.match(form, /\{flag\.label\}/);
-    assert.match(form, /label: "SMS"/);
-    assert.match(form, /label: "WhatsApp"/);
-    assert.match(form, /label: "Email"/);
+    assert.match(form, /label: "Escalate"/);
+    assert.match(form, /label: "Inbox"/);
+    assert.match(form, /label: "Ops"/);
+    assert.match(form, /SMS, WhatsApp, and email follow Alerts\./);
+    assert.doesNotMatch(form, /label: "SMS"/);
+    assert.doesNotMatch(form, /label: "WhatsApp"/);
+    assert.doesNotMatch(form, /label: "Email"/);
     assert.doesNotMatch(form, /title=\{flag\.label\}/);
+    assert.doesNotMatch(form, /Invite teammate|tenant_members/);
   });
 
   it("packs Profile sub-strips instead of stretching them across the pane", () => {

@@ -133,17 +133,20 @@ export function ToolSwitch({
   checked,
   onChange,
   label,
+  hint,
   disabled = false,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   label: string;
+  /** Hover note. The switch name stays on aria-label. */
+  hint?: string;
   disabled?: boolean;
 }) {
   return (
     <label
       data-settings-toggle=""
-      title={label}
+      title={hint || label}
       className={[
         "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-accent",
         disabled ? "cursor-not-allowed opacity-60" : "",
