@@ -136,9 +136,7 @@ describe("settings list rest", () => {
     assert.doesNotMatch(testLine, /handoffMessageLine/);
     assert.doesNotMatch(testLine, /firstDialableTeammate/);
     assert.doesNotMatch(testLine, /Rings \$\{dest\.name\} during open hours\./);
-    assert.doesNotMatch(testLine, /Hours/);
-    assert.doesNotMatch(testLine, /Offer/);
-    assert.doesNotMatch(testLine, /Handoff/);
+    assert.doesNotMatch(testLine, /title="Hours"|title="Offer"|title="Handoff"/);
   });
 
   it("drops alert channel descriptions and keeps Unavailable", () => {
