@@ -354,27 +354,29 @@ describe("business settings craft", () => {
     assert.deepEqual(got.labels, [
       "Identity",
       "Hours",
+      "Locations",
+      "Policies",
       "Catalog",
       "Import",
       "FAQs",
-      "Locations",
-      "Policies",
-      "Team",
       "Voice",
       "Pronunciation",
-      "Alerts",
       "Test",
+      "Team",
+      "Alerts",
     ]);
+    assert.deepEqual(
+      got.sections.map((section) => section.title),
+      ["Business", "Offer", "Assistant", "People"]
+    );
+    assert.equal(new Set(got.sections.map((section) => section.id)).size, got.sections.length);
     assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");
-    assert.ok(got.labels.indexOf("Identity") < got.labels.indexOf("Hours"));
-    const team = got.sections.find((section) => section.labels.includes("Team"));
-    const alerts = got.sections.find((section) => section.labels.includes("Alerts"));
-    assert.equal(team.title, "People");
-    assert.notEqual(team.id, "alerts");
-    assert.equal(team.labels.includes("Alerts"), false);
-    assert.equal(alerts.title, "People");
-    assert.equal(alerts.labels.includes("Team"), false);
-    assert.equal(got.sections.some((section) => section.title === "Alerts"), false);
+    assert.equal(got.labels.indexOf("Identity") + 1, got.labels.indexOf("Hours"));
+    const people = got.sections.find((section) => section.title === "People");
+    assert.deepEqual(people.labels, ["Team", "Alerts"]);
+    assert.equal(people.id, "people");
+    assert.notEqual(people.id, "alerts");
+    assert.equal(got.sections.some((section) => section.title === "Alerts" || section.id === "alerts"), false);
     assert.equal(got.hoursWide, "/settings?tab=train&panel=hours");
     assert.equal(got.phoneIndex, null);
     assert.equal(got.missingCookie, null);

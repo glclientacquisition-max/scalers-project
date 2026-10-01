@@ -10,16 +10,13 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 `/settings` is the Settings tab. Bare `/settings` is the hub: destination index. Sign out stays inside the account menu. Each settings row is one destination. Same `?tab=` / `?panel=` routes. Appearance is the theme cluster in the account menu. Opening it does not open Settings and does not wait on the Settings load. It is not a settings row. Old `?tab=appearance` redirects to the hub. No new field screens.
 
 ```text
-Business       Identity · Hours
+Business       Identity · Hours · Locations · Policies
 Offer          Catalog · Import · FAQs
-Business       Locations · Policies
-People         Team
-Assistant      Voice · Pronunciation
-People         Alerts
-Assistant      Test
+Assistant      Voice · Pronunciation · Test
+People         Team · Alerts
 ```
 
-Job order is the phone list and the md rail. A group header repeats when that order returns to the group. Import sits directly under Catalog. Team is People. Alerts is not the parent of Team. Locations and Policies keep those labels. FAQs stay on the offer. Updates stay on Home.
+One header per group. Import sits directly under Catalog. Team is the first People row. Alerts is not the parent of Team. Locations and Policies keep those labels. FAQs stay on the offer. Updates stay on Home.
 
 Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Settings hub keeps tabs. `DeskBack` icon, aria-label Settings (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 

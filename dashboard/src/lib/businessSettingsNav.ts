@@ -86,11 +86,9 @@ export type SettingsNavSection = {
 
 /**
  * Settings destinations. /settings is the phone index.
- * Wide screens open Hours. Phone keeps this list.
- * Job order: Identity, Hours, Catalog, Import, FAQs, Locations, Policies,
- * Team, Voice, Pronunciation, Alerts, Test.
- * A group header repeats when the job order returns to that group.
- * Import sits directly under Catalog. Team is People, not under Alerts.
+ * Wide screens open Hours, the second Business row.
+ * One header each: Business, Offer, Assistant, People.
+ * Import sits directly under Catalog. Team is People, ahead of Alerts.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
  * URLs stay `?tab=` / `?panel=`.
  */
@@ -101,6 +99,8 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     items: [
       { label: "Identity", target: { tab: "train", panel: "identity" } },
       { label: "Hours", target: { tab: "train", panel: "hours" } },
+      { label: "Locations", target: { tab: "train", panel: "locations" } },
+      { label: "Policies", target: { tab: "train", panel: "policies" } },
     ],
   },
   {
@@ -113,35 +113,21 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
   {
-    id: "business",
-    title: "Business",
-    items: [
-      { label: "Locations", target: { tab: "train", panel: "locations" } },
-      { label: "Policies", target: { tab: "train", panel: "policies" } },
-    ],
-  },
-  {
-    id: "people",
-    title: "People",
-    items: [{ label: "Team", target: { tab: "train", panel: "team" } }],
-  },
-  {
     id: "assistant",
     title: "Assistant",
     items: [
       { label: "Voice", target: { tab: "train", panel: "tools" } },
       { label: "Pronunciation", target: { tab: "train", panel: "pronunciation" } },
+      { label: "Test", target: { tab: "test" } },
     ],
   },
   {
     id: "people",
     title: "People",
-    items: [{ label: "Alerts", target: { tab: "alerts" } }],
-  },
-  {
-    id: "assistant",
-    title: "Assistant",
-    items: [{ label: "Test", target: { tab: "test" } }],
+    items: [
+      { label: "Team", target: { tab: "train", panel: "team" } },
+      { label: "Alerts", target: { tab: "alerts" } },
+    ],
   },
 ];
 

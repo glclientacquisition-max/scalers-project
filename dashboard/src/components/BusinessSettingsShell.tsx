@@ -69,7 +69,7 @@ function SettingsMenu({
       className={isRail ? settingsRailClass : "min-w-0 w-full"}
     >
       {SETTINGS_NAV.map((section, index) => (
-        <section key={`${section.id}-${index}`} className={index === 0 ? undefined : "mt-4"}>
+        <section key={section.id} className={index === 0 ? undefined : "mt-4"}>
           <h2 className={`${settingsGroupTitleClass} mb-1 px-1`}>{section.title}</h2>
           <ul className={isRail ? railListClass : "w-full"}>
             {section.items.map((item) => {
