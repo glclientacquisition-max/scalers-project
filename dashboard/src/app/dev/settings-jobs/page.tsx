@@ -35,6 +35,7 @@ const tenant = {
   team_directory: [{ name: "Amina", role: "Desk", phone: "+254700000001" }],
   faqs: [],
   business_locations: [{ label: "Westlands", address: "Opposite Naivas" }],
+  is_active: true,
 } as TenantRow;
 
 type DevSettingsJobsProps = {
