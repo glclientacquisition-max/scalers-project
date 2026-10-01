@@ -28,6 +28,7 @@ import {
   extractKnowledgeFromText,
   isProseServiceName,
   mergeIngestDraft,
+  parseIngestIndexes,
   type IngestDraft,
 } from "@/lib/ingest/extract";
 import type { FaqEntry, TeamDirectoryEntry } from "@/lib/supabase";
@@ -219,12 +220,6 @@ export async function applyIngestAction(
     return { error: "Draft expired. Scan again." };
   }
 
-  const parseIndexes = (raw: FormDataEntryValue | null) =>
-    String(raw || "")
-      .split(",")
-      .map((x) => Number(x.trim()))
-      .filter((n) => Number.isInteger(n) && n >= 0);
-
   const mode =
     String(formData.get("merge_mode") || "merge").trim() === "replace_services_faqs"
       ? "replace_services_faqs"
@@ -242,6 +237,10 @@ export async function applyIngestAction(
   const renameBusiness =
     String(formData.get("rename_business") || "") === "1";
 
+  const selectedServiceIndexes = parseIngestIndexes(formData.get("selected_services"));
+  const selectedFaqIndexes = parseIngestIndexes(formData.get("selected_faqs"));
+  const selectedTeamIndexes = parseIngestIndexes(formData.get("selected_team"));
+
   const existingServices = normalizeServicesCatalog(tenant.services_catalog).filter(
     (s) => s.name && !isProseServiceName(s.name)
   );
@@ -249,33 +248,31 @@ export async function applyIngestAction(
   const existingTeam = normalizeTeam(tenant.team_directory);
   const existingUnknown = String(tenant.unknown_answer_fallback || "").trim();
 
-  const draftServices = (Array.isArray(draft.services) ? draft.services : []).filter(
-    (s) => s?.name && !isProseServiceName(String(s.name))
-  );
-
   const merged = mergeIngestDraft({
     existingServices,
     existingFaqs,
     existingTeam,
     existingUnknown,
     draft: {
-      services: draftServices,
+      // Keep the visible order. Prose is dropped after the index lookup.
+      services: Array.isArray(draft.services) ? draft.services : [],
       faqs: Array.isArray(draft.faqs) ? draft.faqs : [],
       team: Array.isArray(draft.team) ? draft.team : [],
       unknownAnswerFallback: String(draft.unknownAnswerFallback || ""),
       sourceLabel: String(draft.sourceLabel || "import"),
     },
-    selectedServiceIndexes: parseIndexes(formData.get("selected_services")),
-    selectedFaqIndexes: parseIndexes(formData.get("selected_faqs")),
-    selectedTeamIndexes: parseIndexes(formData.get("selected_team")),
+    selectedServiceIndexes,
+    selectedFaqIndexes,
+    selectedTeamIndexes,
     includeUnknown,
     mode,
   });
 
-  // Drop any prose rows that slipped through selection indexes.
-  merged.services = merged.services.filter(
-    (s) => s.name && !isProseServiceName(s.name)
-  );
+  if (merged.touched.services) {
+    merged.services = merged.services.filter(
+      (s) => s.name && !isProseServiceName(s.name)
+    );
+  }
 
   const draftLocations = includeLocations
     ? normalizeBusinessLocations(draft.locations)
@@ -310,7 +307,13 @@ export async function applyIngestAction(
     Boolean(draftPhone) ||
     Boolean(nameSuggestion);
 
-  if (!merged.services.length && !merged.faqs.length && !hasStructuredApply) {
+  if (
+    !merged.touched.services &&
+    !merged.touched.faqs &&
+    !merged.touched.team &&
+    !hasStructuredApply &&
+    !includeUnknown
+  ) {
     return {
       error:
         "No usable catalog items, FAQs, or business details in that selection. For long documents, paste a short overview (or menu / Q&A), then try again.",
@@ -339,12 +342,12 @@ export async function applyIngestAction(
     };
   }
 
-  const businessHours =
-    (includeHours && draftHoursNotes
-      ? draftHoursNotes
-      : formatHoursForCompiler(nextSchedule)) ||
-    String(tenant.business_hours || "").trim() ||
-    "Hours not set yet. Confirm with the team.";
+  const compiledHours =
+    formatHoursForCompiler(nextSchedule) ||
+    String(tenant.business_hours || "").trim();
+  const businessHours = includeHours
+    ? draftHoursNotes || compiledHours || "Hours not set yet. Confirm with the team."
+    : compiledHours;
 
   const existingPolicies = normalizeBusinessPolicies(tenant.business_policies);
   const nextPolicies = policiesFilled
@@ -390,13 +393,19 @@ export async function applyIngestAction(
   if (!workspace) return { error: "Not signed in." };
 
   const patch: Record<string, unknown> = {
-    services_catalog: merged.services,
-    services_offered: servicesOffered,
-    faqs: merged.faqs,
-    team_directory: merged.team,
     unknown_answer_fallback: merged.unknownAnswerFallback || null,
     llm_system_prompt: prompt,
   };
+  if (merged.touched.services) {
+    patch.services_catalog = merged.services;
+    patch.services_offered = servicesOffered;
+  }
+  if (merged.touched.faqs) {
+    patch.faqs = merged.faqs;
+  }
+  if (merged.touched.team) {
+    patch.team_directory = merged.team;
+  }
   // Persist tone if it was missing so future imports/saves don't block.
   if (!tenant.agent_tone) {
     patch.agent_tone = agentTone;
@@ -412,8 +421,6 @@ export async function applyIngestAction(
     if (parsedDraftSchedule) {
       patch.hours_schedule = nextSchedule;
     }
-  } else if (!String(tenant.business_hours || "").trim()) {
-    patch.business_hours = businessHours;
   }
   if (policiesFilled) {
     patch.business_policies = nextPolicies;

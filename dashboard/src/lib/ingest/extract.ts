@@ -589,6 +589,16 @@ function keyTeam(t: TeamDirectoryEntry): string {
   return `${t.name.trim().toLowerCase()}|${t.role.trim().toLowerCase()}`;
 }
 
+/** Visible-list indexes. A blank field is no rows. `Number("") === 0` must not select the first row. */
+export function parseIngestIndexes(raw: unknown): number[] {
+  return String(raw ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map((part) => Number(part))
+    .filter((n) => Number.isInteger(n) && n >= 0);
+}
+
 export function mergeIngestDraft(opts: {
   existingServices: ServiceItem[];
   existingFaqs: FaqEntry[];
@@ -607,17 +617,20 @@ export function mergeIngestDraft(opts: {
   unknownAnswerFallback: string;
   added: { services: number; faqs: number; team: number };
   skippedFaqCap?: number;
+  /** False means that list was entirely off. Do not write the column. */
+  touched: { services: boolean; faqs: boolean; team: boolean };
 } {
+  // Indexes address the list the owner saw, including prose names. Drop prose after the lookup.
   const pickedServices = opts.selectedServiceIndexes
     .map((i) => opts.draft.services[i])
-    .filter(Boolean)
+    .filter((s): s is ServiceItem => Boolean(s))
     .filter((s) => s.name && !isProseServiceName(s.name));
   const pickedFaqs = opts.selectedFaqIndexes
     .map((i) => opts.draft.faqs[i])
-    .filter(Boolean);
+    .filter((f): f is FaqEntry => Boolean(f));
   const pickedTeam = opts.selectedTeamIndexes
     .map((i) => opts.draft.team[i])
-    .filter(Boolean);
+    .filter((t): t is TeamDirectoryEntry => Boolean(t));
 
   let services: ServiceItem[];
   let faqs: FaqEntry[];
@@ -627,11 +640,22 @@ export function mergeIngestDraft(opts: {
   let addedTeam = 0;
 
   if (opts.mode === "replace_services_faqs") {
-    services = pickedServices.slice(0, 40);
-    faqs = pickedFaqs.slice(0, FAQ_MAX);
-    skippedFaqCap = Math.max(0, pickedFaqs.length - faqs.length);
-    addedServices = services.length;
-    addedFaqs = faqs.length;
+    // An off list stays. Hours and the other section switches are not a wipe.
+    if (pickedServices.length > 0) {
+      services = pickedServices.slice(0, 40);
+      addedServices = services.length;
+    } else {
+      services = opts.existingServices;
+      addedServices = 0;
+    }
+    if (pickedFaqs.length > 0) {
+      faqs = pickedFaqs.slice(0, FAQ_MAX);
+      skippedFaqCap = Math.max(0, pickedFaqs.length - faqs.length);
+      addedFaqs = faqs.length;
+    } else {
+      faqs = opts.existingFaqs;
+      addedFaqs = 0;
+    }
   } else {
     const serviceMap = new Map<string, ServiceItem>();
     for (const s of opts.existingServices) {
@@ -690,5 +714,10 @@ export function mergeIngestDraft(opts: {
     unknownAnswerFallback,
     added: { services: addedServices, faqs: addedFaqs, team: addedTeam },
     skippedFaqCap: skippedFaqCap || undefined,
+    touched: {
+      services: pickedServices.length > 0,
+      faqs: pickedFaqs.length > 0,
+      team: pickedTeam.length > 0,
+    },
   };
 }

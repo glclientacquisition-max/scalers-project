@@ -22,11 +22,39 @@ import {
   ToolSwitch,
   settingsActionClass,
   settingsFieldClass,
+  settingsGhostButtonClass,
   settingsPrimaryButtonClass,
   compactTextareaExpandHandlers,
 } from "@/components/settingsUi";
 
 const fieldClass = settingsFieldClass;
+
+function ListSelectAll({
+  selected,
+  total,
+  noun,
+  onClear,
+  onSelectAll,
+}: {
+  selected: number;
+  total: number;
+  noun: string;
+  onClear: () => void;
+  onSelectAll: () => void;
+}) {
+  const allOn = selected > 0 && selected === total;
+  const label = allOn ? "Clear all" : "Select all";
+  return (
+    <button
+      type="button"
+      className={settingsGhostButtonClass}
+      aria-label={allOn ? `Clear all ${total} ${noun}` : `Select all ${total} ${noun}`}
+      onClick={allOn ? onClear : onSelectAll}
+    >
+      {label}
+    </button>
+  );
+}
 
 const extractInitial: IngestExtractState = {};
 const applyInitial: IngestApplyState = {};
@@ -73,10 +101,10 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
   useEffect(() => {
     if (extractState.ok && extractState.draft) {
       setDraft(extractState.draft);
-      setSelectedServices(new Set(extractState.draft.services.map((_, i) => i)));
-      setSelectedFaqs(new Set(extractState.draft.faqs.map((_, i) => i)));
-      setSelectedTeam(new Set(extractState.draft.team.map((_, i) => i)));
-      // Scanned values stay on the rows. Include switches start off.
+      setSelectedServices(new Set());
+      setSelectedFaqs(new Set());
+      setSelectedTeam(new Set());
+      // Scanned values stay on the rows. Row ticks and section switches start off.
       setIncludeUnknown(false);
       setIncludeLocations(false);
       setIncludeHours(false);
@@ -358,21 +386,15 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             <SettingsGroup
               title="Services"
               action={
-                <button
-                  type="button"
-                  className="text-xs font-medium text-accent-deep"
-                  onClick={() =>
-                    setSelectedServices(
-                      selectedServices.size === draft.services.length
-                        ? new Set()
-                        : new Set(draft.services.map((_, i) => i))
-                    )
+                <ListSelectAll
+                  selected={selectedServices.size}
+                  total={draft.services.length}
+                  noun="services"
+                  onClear={() => setSelectedServices(new Set())}
+                  onSelectAll={() =>
+                    setSelectedServices(new Set(draft.services.map((_, i) => i)))
                   }
-                >
-                  {selectedServices.size === draft.services.length
-                    ? "Clear all"
-                    : "Select all"}
-                </button>
+                />
               }
             >
                 {draft.services.map((s, i) => (
@@ -398,24 +420,15 @@ export function KnowledgeIngestPanel({ tenant }: { tenant: TenantRow }) {
             <SettingsGroup
               title="FAQs"
               action={
-                <button
-                  type="button"
-                  className="text-xs font-medium text-accent-deep"
-                  aria-label={
-                    selectedFaqs.size === draft.faqs.length
-                      ? `Clear all ${draft.faqs.length} FAQs`
-                      : `Select all ${draft.faqs.length} FAQs`
+                <ListSelectAll
+                  selected={selectedFaqs.size}
+                  total={draft.faqs.length}
+                  noun="FAQs"
+                  onClear={() => setSelectedFaqs(new Set())}
+                  onSelectAll={() =>
+                    setSelectedFaqs(new Set(draft.faqs.map((_, i) => i)))
                   }
-                  onClick={() =>
-                    setSelectedFaqs(
-                      selectedFaqs.size === draft.faqs.length
-                        ? new Set()
-                        : new Set(draft.faqs.map((_, i) => i))
-                    )
-                  }
-                >
-                  {selectedFaqs.size === draft.faqs.length ? "Clear all" : "Select all"}
-                </button>
+                />
               }
             >
                 {draft.faqs.map((f, i) => (
