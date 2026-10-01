@@ -132,7 +132,10 @@ describe("pronunciation coach chrome", () => {
     const library = src.slice(src.indexOf('mode === "library"'), src.indexOf('mode === "fix"'));
     assert.match(library, /HearButton/);
     assert.match(library, /btnPrimary/);
-    assert.match(library, /settingsGhostButtonClass/);
+    assert.match(library, /libraryMutedClass/);
+    assert.match(library, /basis-full/);
+    assert.match(library, /md:basis-auto/);
+    assert.doesNotMatch(library, /w-full[^"]*Hear|Hear[^"]*w-full/);
     assert.match(library, /Renew/);
     assert.match(library, /Edit say/);
     assert.match(library, /Remove/);

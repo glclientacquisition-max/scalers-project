@@ -63,6 +63,8 @@ import { settingsGhostButtonClass } from "@/components/settingsUi";
 
 type CallerProofRow = { name: string; say: string };
 
+const libraryMutedClass = `${settingsGhostButtonClass} w-auto shrink-0 whitespace-nowrap`;
+
 function HearButton({
   name,
   busy,
@@ -80,7 +82,7 @@ function HearButton({
       aria-busy={busy}
       aria-label={`Hear ${name}`}
       data-testid="pronunciation-hear"
-      className={`${btnPrimary} shrink-0 gap-2`}
+      className={`${btnPrimary} w-auto shrink-0 gap-2`}
     >
       {busy ? <span className={pendingSpinnerClass} aria-hidden="true" /> : null}
       Hear
@@ -1158,23 +1160,25 @@ export function PronunciationCoach({
                   const isEditing = editingMatch === entry.match;
                   const hearKey = `library:${entry.match}:${entry.say}`;
                   return (
-                  <li key={entry.match} className="flex flex-wrap items-center gap-2 py-2">
-                    <div className="min-w-0 flex-1 basis-36">
-                      <p className="truncate text-sm font-medium text-ink">{label}</p>
-                      {!isEditing ? (
-                        <p className="truncate font-mono text-xs text-ink-soft">{entry.say}</p>
-                      ) : null}
-                    </div>
-                    <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <li key={entry.match} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink">{label}</p>
+                        {!isEditing ? (
+                          <p className="truncate font-mono text-xs text-ink-soft">{entry.say}</p>
+                        ) : null}
+                      </div>
                       <HearButton
                         name={label}
                         busy={hearBusyKey === hearKey}
                         onClick={() => void hearSavedName(hearKey, label)}
                       />
+                    </div>
+                    <div className="flex basis-full flex-wrap items-center justify-end gap-1 md:basis-auto md:shrink-0">
                       <button
                         type="button"
                         onClick={() => renewEntry(entry)}
-                        className={`${settingsGhostButtonClass} shrink-0`}
+                        className={libraryMutedClass}
                       >
                         Renew
                       </button>
@@ -1190,7 +1194,7 @@ export function PronunciationCoach({
                             setAddError(null);
                           }
                         }}
-                        className={`${settingsGhostButtonClass} shrink-0`}
+                        className={libraryMutedClass}
                       >
                         {isEditing ? "Cancel" : "Edit say"}
                       </button>
@@ -1198,13 +1202,13 @@ export function PronunciationCoach({
                         type="button"
                         onClick={() => removeEntry(entry.match)}
                         disabled={persistPending}
-                        className={`${settingsGhostButtonClass} shrink-0 disabled:opacity-60`}
+                        className={`${libraryMutedClass} disabled:opacity-60`}
                       >
                         Remove
                       </button>
                     </div>
                     {isEditing ? (
-                      <div className="flex w-full flex-wrap items-center gap-2">
+                      <div className="flex w-full items-center gap-2">
                         <input
                           value={editSay}
                           onChange={(e) => setEditSay(e.target.value)}
@@ -1215,7 +1219,7 @@ export function PronunciationCoach({
                           type="button"
                           onClick={() => saveEditedSay(entry.match)}
                           disabled={persistPending || !editSay.trim()}
-                          className={`${btnPrimary} shrink-0`}
+                          className={`${btnPrimary} w-auto shrink-0`}
                         >
                           {persistPending ? "Saving…" : "Save"}
                         </button>
