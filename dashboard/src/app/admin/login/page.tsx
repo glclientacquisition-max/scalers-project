@@ -1,10 +1,12 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { BrandWordmark } from "@/components/brand/BrandMark";
 import { btnPrimary, deskFieldClass } from "@/components/ui/deskChrome";
 import { isLegacyAuthenticated } from "@/lib/auth";
 
 export const instant = false;
+
+/** Same field box as the owner sign-in, at 16px so the phone does not zoom. */
+const adminLoginFieldClass = deskFieldClass.replace("text-sm", "text-base");
 
 export default async function AdminLoginPage({
   searchParams,
@@ -15,17 +17,15 @@ export default async function AdminLoginPage({
     redirect("/admin");
   }
 
+  const invalid = Boolean((await searchParams).error);
+
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-16">
       <div className="w-full max-w-md">
         <BrandWordmark href="/admin/login" context="Super Admin" variant="lockup" priority />
         <h1 className="sr-only">Super Admin</h1>
 
-        <form
-          action="/api/admin/session"
-          method="post"
-          className="mt-8 space-y-4 rounded-panel border border-line bg-surface p-6"
-        >
+        <form action="/api/admin/session" method="post" className="mt-8 space-y-4 rounded-panel border border-line bg-surface p-6">
           <div>
             <label className="block text-sm font-medium text-ink" htmlFor="username">
               Username
@@ -38,7 +38,9 @@ export default async function AdminLoginPage({
               autoFocus
               autoComplete="username"
               spellCheck={false}
-              className={`mt-2 ${deskFieldClass}`}
+              aria-invalid={invalid || undefined}
+              aria-describedby={invalid ? "admin-login-error" : undefined}
+              className={`mt-2 ${adminLoginFieldClass}`}
               placeholder="kigen"
             />
           </div>
@@ -52,31 +54,21 @@ export default async function AdminLoginPage({
               type="password"
               required
               autoComplete="current-password"
-              className={`mt-2 ${deskFieldClass}`}
+              aria-invalid={invalid || undefined}
+              aria-describedby={invalid ? "admin-login-error" : undefined}
+              className={`mt-2 ${adminLoginFieldClass}`}
             />
           </div>
-          <Suspense fallback={null}>
-            <AdminLoginError searchParams={searchParams} />
-          </Suspense>
+          {invalid ? (
+            <p id="admin-login-error" className="text-sm text-warn" role="alert">
+              Invalid username or access code.
+            </p>
+          ) : null}
           <button type="submit" className={`${btnPrimary} w-full`}>
             Sign in
           </button>
         </form>
       </div>
     </main>
-  );
-}
-
-async function AdminLoginError({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const sp = await searchParams;
-  if (!sp.error) return null;
-  return (
-    <p className="mt-1 text-sm text-warn" role="alert">
-      Invalid username or access code.
-    </p>
   );
 }

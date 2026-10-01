@@ -57,10 +57,10 @@ export function SautikitSyncButton() {
         >
           {busy ? "Syncing…" : "Sync from SautiKit"}
         </button>
-        {status ? <span className="text-xs text-[var(--ink-soft)] text-right">{status}</span> : null}
+        {status ? <span className="text-right text-meta text-ink-2">{status}</span> : null}
       </span>
       {diagnostics ? (
-        <p className="text-[11px] text-[var(--ink-soft)] text-right leading-relaxed">
+        <p className="text-right text-meta leading-relaxed text-ink-2">
           Server key: label “{diagnostics.label || "-"}”, length {diagnostics.length ?? "-"},
           eyJ={diagnostics.startsWithEyJ ? "yes" : "no"}
           {diagnostics.fingerprint ? `, ${diagnostics.fingerprint}` : ""}

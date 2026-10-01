@@ -133,7 +133,7 @@ export function getSautikitKeyDiagnostics(): SautikitKeyDiagnostics {
   const startsWithEyJ = key.startsWith("eyJ");
   if (!startsWithEyJ) {
     issues.push(
-      "Key does not start with eyJ — the Vercel value is malformed (often pasted as SAUTIKIT_API_KEY=eyJ…)."
+      "Key does not start with eyJ. The Vercel value is malformed (often pasted as SAUTIKIT_API_KEY=eyJ…)."
     );
   }
 
@@ -147,10 +147,10 @@ export function getSautikitKeyDiagnostics(): SautikitKeyDiagnostics {
     payload && typeof payload.workspace_id === "string" ? payload.workspace_id : null;
 
   if (!payload) {
-    issues.push("Key is not a readable JWT — check for truncation in Vercel.");
+    issues.push("Key is not a readable JWT. Check for truncation in Vercel.");
   } else {
     if (!workspaceId) {
-      issues.push("Key has no workspace_id — mint a workspace key, not a personal key.");
+      issues.push("Key has no workspace_id. Mint a workspace key, not a personal key.");
     }
     if (!scopes.includes("numbers.read")) {
       issues.push("Key is missing numbers.read scope.");
