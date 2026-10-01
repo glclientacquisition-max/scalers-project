@@ -7,12 +7,16 @@ import {
   assertApprovedForLexiconWrite,
   candidateToLexiconEntry,
   clampScanBatchSize,
+  countNewReviewRows,
   dismissalKey,
+  listenAddedCopy,
+  listenWalkLimit,
   mergeReviewQueue,
   parseDismissals,
   parseReviewQueue,
   parseScanLogs,
   scanCallsWithGemini,
+  takeCallsWithRecordings,
   type PronunciationReviewCandidate,
   type PronunciationScanDismissal,
 } from "@/lib/pronunciationGeminiScan";
@@ -47,6 +51,10 @@ export type GeminiScanState = {
   /** Always 0. A listen does not write tts_lexicon. */
   autoAppliedCount?: number;
   lexicon?: ReturnType<typeof parseTtsLexicon>;
+  /** Persist failed. `queue` is the rows the owner should keep and save again. */
+  unsaved?: boolean;
+  /** Pure save of a queue the client already holds. Not a listen. */
+  saved?: boolean;
 };
 
 export type GeminiScanQueueState = {
@@ -136,6 +144,31 @@ async function persistQueueFields(opts: {
   return null;
 }
 
+/**
+ * Write a queue the client already holds. Does not listen and does not
+ * count against the listen rate limit.
+ */
+async function saveHeldReviewQueue(
+  tenantId: string,
+  raw: unknown
+): Promise<GeminiScanState> {
+  const held = parseReviewQueue(raw).filter((c) => c.status === "pending");
+  const fields = await readQueueFields(tenantId);
+  if ("error" in fields) {
+    return { error: fields.error, unsaved: true, queue: held };
+  }
+  const nextQueue = mergeReviewQueue(fields.queue, held);
+  const pending = nextQueue.filter((c) => c.status === "pending");
+  const persistError = await persistQueueFields({
+    tenantId,
+    queue: nextQueue,
+  });
+  if (persistError) {
+    return { error: persistError, unsaved: true, queue: pending };
+  }
+  return { ok: true, saved: true, queue: pending };
+}
+
 /** Load pending Gemini / review candidates for the Fix tab. */
 export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,
@@ -195,6 +228,10 @@ async function runGeminiScanRecentCalls(
   const id = String(formData.get("id") || "").trim();
   if (!id || id !== tenant.id) return { error: "Forbidden." };
 
+  if (String(formData.get("save_only") || "") === "1") {
+    return saveHeldReviewQueue(tenant.id, formData.get("review_queue"));
+  }
+
   const batchSize = clampScanBatchSize(formData.get("batch_size"));
   if (batchSize > GEMINI_SCAN_MAX_BATCH) {
     return { error: `Max ${GEMINI_SCAN_MAX_BATCH} calls per scan.` };
@@ -227,15 +264,16 @@ async function runGeminiScanRecentCalls(
     .select("id, recording_url")
     .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false })
-    .limit(batchSize);
+    .limit(listenWalkLimit(batchSize));
 
   if (callErr) {
     logDeskError("pronunciation-scan-calls", callErr.message);
     return { error: ownerListenError(callErr) };
   }
 
-  const withRecording = (calls || []).filter((c) =>
-    String((c as { recording_url?: string }).recording_url || "").trim()
+  const { selected: withRecording, walked } = takeCallsWithRecordings(
+    (calls || []) as Array<{ id: string; recording_url?: string | null }>,
+    batchSize
   );
   if (!withRecording.length) {
     return {
@@ -275,6 +313,8 @@ async function runGeminiScanRecentCalls(
 
   const forReview = result.candidates;
   const nextQueue = mergeReviewQueue(fields.queue, forReview);
+  const added = countNewReviewRows(fields.queue, nextQueue);
+  const addedCopy = listenAddedCopy(added);
   const nextLogs = appendScanLog(fields.logs, {
     ...result.log,
     candidates_returned: result.candidates.length,
@@ -300,21 +340,27 @@ async function runGeminiScanRecentCalls(
     })
     .eq("id", tenant.id);
 
+  const pending = nextQueue.filter((c) => c.status === "pending");
+
   if (persistErr) {
     logDeskError("pronunciation-scan-persist", persistErr.message);
-    return { error: pronunciationWriteError("listen", persistErr.message) };
+    return {
+      error: pronunciationWriteError("listen", persistErr.message),
+      unsaved: true,
+      candidates: result.candidates,
+      queue: pending,
+      message: addedCopy,
+    };
   }
-
-  const pending = nextQueue.filter((c) => c.status === "pending");
 
   return {
     ok: true,
     candidates: result.candidates,
     queue: pending,
     scannedCalls: withRecording.length,
-    skippedCalls: (calls || []).length - withRecording.length,
+    skippedCalls: Math.max(0, walked - withRecording.length),
     autoAppliedCount: 0,
-    message: `${pending.length} left for review.`,
+    message: addedCopy,
   };
 }
 

@@ -83,6 +83,22 @@ test("opening Fix loads the queue and does not return a save failure", () => {
   assert.match(scan, /Listen is unavailable/);
   assert.match(scan, /Could not listen/);
   assert.match(scan, /No recordings to listen to/);
+  assert.match(scan, /listenWalkLimit/);
+  assert.match(scan, /listenAddedCopy/);
+  assert.match(scan, /unsaved: true/);
+  assert.doesNotMatch(scan, /left for review/);
+  const saveOnlyAt = scan.indexOf('save_only');
+  const rateAt = scan.indexOf("rateLimitScan");
+  assert.ok(saveOnlyAt >= 0 && rateAt > saveOnlyAt);
+
+  const saveFn = src.slice(
+    src.indexOf("async function saveHeldReviewQueue"),
+    src.indexOf("export async function loadPronunciationReviewQueueAction")
+  );
+  assert.match(saveFn, /parseReviewQueue/);
+  assert.doesNotMatch(saveFn, /rateLimitScan/);
+  assert.doesNotMatch(saveFn, /scanCallsWithGemini/);
+  assert.doesNotMatch(saveFn, /tts_lexicon/);
   assert.doesNotMatch(src, /This is paid/);
   assert.doesNotMatch(src, /paid API/);
   assert.doesNotMatch(src, /Gemini Scan/);

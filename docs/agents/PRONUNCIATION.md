@@ -39,7 +39,7 @@ Open-ended “learn every word from my recording” produced entries like:
 | 1 | **Practice** | Run Greeting / Location / Team packs. **Use this take** saves to live lexicon. |
 | 2 | **Fix → Needs review** | Hear the proposed say, then **Use this** writes that one fix. Record and Spelling stay ghost and do not write alone. Hearing rows use muted Dismiss. |
 | 3 | **Fix → Add a fix** | Type the bad name → **Record & train**. Typed spelling is a fallback (“Or save a spelling…”). |
-| 4 | **Fix → Find more** | **Scan** (ghost) reads transcripts into Practice. **AI listen** (filled) drafts a review queue. Last 10 starts immediately. Last 20 and Last 50 confirm with "Listen to the last N recordings." Nothing from a listen writes `tts_lexicon`. |
+| 4 | **Fix → Find more** | **AI listen** (filled) is the only control on that row. It opens on Last 10 and starts immediately. Last 20 and Last 50 confirm with "Listen to the last N recordings." **Scan** is a muted text control under the review list and reads transcripts into Practice. Nothing from a listen writes `tts_lexicon`. |
 | 5 | **Test** | **Play phone preview** (same Soniox path as calls), then tap the live DID. |
 
 **Do not** train common English (`where`, `city`, …). **Do** prefer real audio over AI phonetic guesses for unfamiliar words.
@@ -48,7 +48,7 @@ Open-ended “learn every word from my recording” produced entries like:
 
 1. **Library** — every live `say`; Renew / Edit say / Remove.
 2. **Practice** — packs + mined / renew / record-from-review items.
-3. **Fix** — Needs review → Add a fix → Find more (Quick scan + AI listen).
+3. **Fix.** Needs review, then Add a fix, then Find more (AI listen). Scan sits under the review list.
 
 ## Gemini Scan apply policy
 
@@ -56,13 +56,15 @@ Lexicon writes still require `approved_by` + `approved_at` (enforced in `assertA
 
 | Path | What happens |
 | --- | --- |
-| **Listen** | Every candidate, including high-confidence profile names and places, lands on Needs review. Status is a count left for review. |
+| **Listen** | Every candidate, including high-confidence profile names and places, lands on Needs review. The line next to AI listen counts new rows from that tap ("3 new." or "Nothing new."). The same name from several calls is one row. A failed save keeps those rows on screen. **Save review** writes them without listening again. |
 | **Use this** | The only control that writes that fix to `tts_lexicon`. Owner stamp (`approved_by` + `approved_at`) is still required. |
 | **Record / Spelling** | Ghost. They do not write the AI guess by themselves. |
 | **Never from a listen** | Blocked commons, `LIKELY_MISHEARD`, and any row the owner has not confirmed with Use this. |
 
 - Reject / Snooze records a dismissal key so the same call+word does not resurface.
-- Heuristic **Scan recent calls** remains a separate candidate source feeding Practice.
+- Heuristic **Scan recent calls** remains a separate candidate source feeding Practice. It is a muted text control under the review list, not on the Find more row.
+- AI listen walks recent calls until it has that many recordings. The walk stops at 4 times the count or 200 calls, whichever is smaller. None found: "No recordings to listen to."
+- The waiting list holds at most 80 names. Names from the listen that just finished stay, then older rows, newest first.
 
 Apply `docs/supabase/pronunciation_gemini_scan.sql` for the queue / dismissal / log columns and the `authenticated` UPDATE grant. Without that grant, a confirmed listen fails with "Could not save the listen." An empty Needs review line stays "Nothing waiting." The Fix tab reads `pronunciation_review_queue` on its own. The settings tenant select does not include it.
 

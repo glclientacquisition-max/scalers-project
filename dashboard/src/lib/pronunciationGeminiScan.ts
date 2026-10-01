@@ -85,7 +85,16 @@ export type PronunciationGeminiScanLog = {
   cost?: unknown;
 };
 
-const QUEUE_MAX = 80;
+/** Waiting list cap. New names from the listen are kept first, then older rows, newest first. */
+export const REVIEW_QUEUE_MAX = 80;
+const QUEUE_MAX = REVIEW_QUEUE_MAX;
+const LISTEN_WALK_MAX_CALLS = 200;
+
+const CONFIDENCE_RANK: Record<GeminiScanConfidence, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
 const DISMISS_MAX = 200;
 const LOG_MAX = 10;
 
@@ -104,6 +113,71 @@ export function clampScanBatchSize(raw: unknown): number {
   const n = Number(raw);
   if (!Number.isFinite(n)) return GEMINI_SCAN_DEFAULT_BATCH;
   return Math.min(GEMINI_SCAN_MAX_BATCH, Math.max(1, Math.floor(n)));
+}
+
+/** How many recent calls to walk while collecting `requested` recordings. */
+export function listenWalkLimit(requested: number): number {
+  const n = Math.max(1, Math.floor(Number(requested) || 0));
+  return Math.min(n * 4, LISTEN_WALK_MAX_CALLS);
+}
+
+/**
+ * Walk newest-first until `needed` calls have a recording, or the list ends.
+ * Calls without a recording do not count toward `needed`.
+ */
+export function takeCallsWithRecordings<T extends { recording_url?: string | null }>(
+  calls: T[],
+  needed: number
+): { selected: T[]; walked: number } {
+  const selected: T[] = [];
+  const cap = Math.max(0, Math.floor(Number(needed) || 0));
+  let walked = 0;
+  if (!cap) return { selected, walked };
+  for (const call of calls) {
+    if (selected.length >= cap) break;
+    walked += 1;
+    if (String(call.recording_url || "").trim()) selected.push(call);
+  }
+  return { selected, walked };
+}
+
+/** Owner line for one listen. Counts new rows, not the waiting total. */
+export function listenAddedCopy(added: number): string {
+  const n = Math.max(0, Math.floor(Number(added) || 0));
+  if (n === 0) return "Nothing new.";
+  return `${n} new.`;
+}
+
+export function countNewReviewRows(
+  before: PronunciationReviewCandidate[],
+  after: PronunciationReviewCandidate[]
+): number {
+  const beforeKeys = new Set(
+    before
+      .filter((c) => c.status === "pending")
+      .map((c) => normalizePhraseKey(c.word_or_phrase))
+      .filter(Boolean)
+  );
+  const seen = new Set<string>();
+  let added = 0;
+  for (const row of after) {
+    if (row.status !== "pending") continue;
+    const key = normalizePhraseKey(row.word_or_phrase);
+    if (!key || seen.has(key) || beforeKeys.has(key)) continue;
+    seen.add(key);
+    added += 1;
+  }
+  return added;
+}
+
+function preferReviewCandidate(
+  current: PronunciationReviewCandidate,
+  incoming: PronunciationReviewCandidate
+): PronunciationReviewCandidate {
+  if (CONFIDENCE_RANK[incoming.confidence] > CONFIDENCE_RANK[current.confidence]) {
+    return incoming;
+  }
+  return current;
 }
 
 /** Extract a JSON array from model text (tolerates fences / leading prose). */
@@ -271,7 +345,11 @@ export function parseReviewQueue(raw: unknown): PronunciationReviewCandidate[] {
       auto_applied: Boolean(row.auto_applied),
     });
   }
-  return out.slice(0, QUEUE_MAX);
+  return out
+    .toSorted((a, b) =>
+      a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0
+    )
+    .slice(0, QUEUE_MAX);
 }
 
 export function parseDismissals(raw: unknown): PronunciationScanDismissal[] {
@@ -514,18 +592,50 @@ export function issuesToCandidates(opts: {
   return out;
 }
 
+/**
+ * One pending row per normalized name.
+ * Higher confidence wins. Equal confidence keeps the row already held.
+ * Does not write tts_lexicon.
+ *
+ * Cap: this listen's new names stay, then older rows, newest first, up to
+ * REVIEW_QUEUE_MAX. If the new set itself is over the cap, keep its newest names.
+ */
 export function mergeReviewQueue(
   existing: PronunciationReviewCandidate[],
   incoming: PronunciationReviewCandidate[]
 ): PronunciationReviewCandidate[] {
-  const byId = new Map<string, PronunciationReviewCandidate>();
-  for (const c of existing) byId.set(c.id, c);
-  for (const c of incoming) {
-    if (!byId.has(c.id)) byId.set(c.id, c);
+  const beforeKeys = new Set(
+    existing
+      .filter((c) => c.status === "pending")
+      .map((c) => normalizePhraseKey(c.word_or_phrase))
+      .filter(Boolean)
+  );
+  const byName = new Map<string, PronunciationReviewCandidate>();
+
+  function put(row: PronunciationReviewCandidate) {
+    if (row.status !== "pending") return;
+    const key = normalizePhraseKey(row.word_or_phrase);
+    if (!key) return;
+    const prev = byName.get(key);
+    byName.set(key, prev ? preferReviewCandidate(prev, row) : row);
   }
-  return [...byId.values()]
-    .filter((c) => c.status === "pending")
-    .slice(0, QUEUE_MAX);
+
+  for (const row of existing) put(row);
+  for (const row of incoming) put(row);
+
+  const fresh: PronunciationReviewCandidate[] = [];
+  const older: PronunciationReviewCandidate[] = [];
+  for (const [key, row] of byName) {
+    if (beforeKeys.has(key)) older.push(row);
+    else fresh.push(row);
+  }
+  const newestFirst = (
+    a: PronunciationReviewCandidate,
+    b: PronunciationReviewCandidate
+  ) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
+  fresh.sort(newestFirst);
+  older.sort(newestFirst);
+  return [...fresh, ...older].slice(0, QUEUE_MAX);
 }
 
 export function appendScanLog(

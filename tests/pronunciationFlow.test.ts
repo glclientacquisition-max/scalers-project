@@ -8,8 +8,10 @@ import { describe, it } from "node:test";
 import {
   assertApprovedForLexiconWrite,
   candidateToLexiconEntry,
+  countNewReviewRows,
   dismissalKey,
   issuesToCandidates,
+  listenAddedCopy,
   mergeReviewQueue,
   parseGeminiScanIssues,
   scanCallsWithGemini,
@@ -19,6 +21,7 @@ import {
   buildUnifiedFixReviewRows,
   fixTabHint,
   PRONUNCIATION_BEST_FLOW,
+  reviewRowSpeakable,
   validatePhonePreviewRequest,
 } from "../dashboard/src/lib/pronunciationFixUi.ts";
 import {
@@ -271,6 +274,67 @@ describe("Gemini Scan → approve gate → lexicon (integration-style)", () => {
       existingQueue: [],
     });
     assert.equal(created[0].source, "gemini_scan");
+  });
+});
+
+describe("AI listen merge across calls", () => {
+  it("one name from two recordings is one pending row and does not write the lexicon", async () => {
+    const medium = JSON.stringify([
+      {
+        type: "AGENT_MISPRONUNCIATION",
+        word_or_phrase: "Aisha",
+        confidence: "medium",
+        suggested_form: "Ay-sha",
+        reasoning: "Flat.",
+      },
+    ]);
+    const high = JSON.stringify([
+      {
+        type: "AGENT_MISPRONUNCIATION",
+        word_or_phrase: "aisha",
+        confidence: "high",
+        suggested_form: "Eye-sha",
+        reasoning: "Clearer.",
+      },
+    ]);
+    const result = await scanCallsWithGemini({
+      tenantId: "t1",
+      calls: [
+        { id: "c1", recording_url: "https://example.com/1.wav" },
+        { id: "c2", recording_url: "https://example.com/2.wav" },
+      ],
+      lexiconExamples: [],
+      dismissals: [],
+      existingQueue: [],
+      mockAnalyze: async ({ callId }) => ({ raw: callId === "c2" ? high : medium }),
+    });
+    const queue = mergeReviewQueue([], result.candidates);
+    assert.equal(queue.length, 1);
+    assert.equal(queue[0].confidence, "high");
+    assert.equal(queue[0].status, "pending");
+    assert.equal(candidateToLexiconEntry(queue[0]), null);
+    assert.equal(countNewReviewRows([], queue), 1);
+    assert.equal(listenAddedCopy(1), "1 new.");
+    assert.equal(listenAddedCopy(0), "Nothing new.");
+  });
+
+  it("hears a speech say and only speaks a hearing row that has a word", () => {
+    assert.equal(reviewRowSpeakable("Aisha", "Eye-sha"), true);
+    assert.equal(reviewRowSpeakable("Ruiru", ""), true);
+    assert.equal(reviewRowSpeakable("!", ""), false);
+    const rows = buildUnifiedFixReviewRows({
+      speech: [pendingSpeech()],
+      hearing: [
+        pendingSpeech({
+          id: "h1",
+          type: "LIKELY_MISHEARD",
+          word_or_phrase: "Ruiru",
+          suggested_form: "Ruiru",
+        }),
+      ],
+    });
+    assert.equal(rows[0].primaryAction, "use");
+    assert.equal(rows[1].primaryAction, "dismiss");
   });
 });
 
