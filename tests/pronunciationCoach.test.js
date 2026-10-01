@@ -139,8 +139,27 @@ describe("pronunciation coach chrome", () => {
     assert.match(library, /Renew/);
     assert.match(library, /Edit say/);
     assert.match(library, /Remove/);
+    assert.match(library, /libraryLinkClass/);
+    assert.match(library, /Hear it first/);
     assert.match(library, /\{entry\.say\}/);
     assert.doesNotMatch(library, /phone says/);
+    assert.doesNotMatch(src, /Apply all high-confidence/);
+    assert.doesNotMatch(src, /Auto-applied/);
+    assert.doesNotMatch(src, /Approve spelling/);
+    assert.doesNotMatch(src, /Phone says wrong/);
+    assert.doesNotMatch(src, /Opening line/);
+    assert.match(src, /Nothing waiting/);
+    assert.match(src, /Listen to the last \{geminiBatch\} recordings\. This is paid\./);
+    const findStart = src.indexOf("{/* 3) Find more */}");
+    const findMore = src.slice(findStart, src.indexOf("geminiConfirmOpen ?", findStart));
+    assert.match(findMore, /AI listen/);
+    assert.match(findMore, /btnPrimary/);
+    const scanBtn = findMore.slice(
+      findMore.lastIndexOf("onClick={scanCalls}"),
+      findMore.indexOf("Scanning")
+    );
+    assert.match(scanBtn, /settingsGhostButtonClass/);
+    assert.doesNotMatch(scanBtn, /btnPrimary/);
 
     const record = src.slice(
       src.indexOf("async function startRecording"),

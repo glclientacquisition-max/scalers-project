@@ -78,7 +78,7 @@ describe("parseGeminiScanIssues", () => {
   });
 });
 
-describe("review gate + safe profile auto-apply", () => {
+describe("review gate", () => {
   it("blocks lexicon write without approved_by/approved_at", () => {
     const pending: PronunciationReviewCandidate = {
       id: "gemini_scan:c1:AGENT_MISPRONUNCIATION:aisha",
@@ -129,7 +129,7 @@ describe("review gate + safe profile auto-apply", () => {
     assert.equal(candidateToLexiconEntry(stt), null);
   });
 
-  it("auto-applies only high-confidence profile-name speech fixes", () => {
+  it("keeps high-confidence profile names on review", () => {
     const hints = [
       "ChapterOne Bookstore",
       "Aisha",
@@ -165,22 +165,23 @@ describe("review gate + safe profile auto-apply", () => {
       confidence: "medium",
     };
 
-    assert.equal(canAutoApplyProfileCandidate(aisha, hints), true);
+    assert.equal(canAutoApplyProfileCandidate(aisha, hints), false);
     assert.equal(canAutoApplyProfileCandidate(random, hints), false);
     assert.equal(canAutoApplyProfileCandidate(medium, hints), false);
+    assert.equal(candidateToLexiconEntry(aisha), null);
 
     const { autoApply, pending } = partitionAutoApplyCandidates(
       [aisha, random, medium],
       hints
     );
-    assert.equal(autoApply.length, 1);
-    assert.equal(pending.length, 2);
+    assert.equal(autoApply.length, 0);
+    assert.equal(pending.length, 3);
 
     const stamped = stampCandidateApproved(aisha, {
       approvedBy: "owner-1",
-      autoApplied: true,
+      autoApplied: false,
     });
-    assert.equal(stamped.auto_applied, true);
+    assert.equal(stamped.auto_applied, false);
     assert.equal(assertApprovedForLexiconWrite(stamped).ok, true);
     assert.ok(candidateToLexiconEntry(stamped));
   });

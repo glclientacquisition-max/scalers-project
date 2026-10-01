@@ -37,9 +37,9 @@ Open-ended “learn every word from my recording” produced entries like:
 | Step | Where | What |
 | --- | --- | --- |
 | 1 | **Practice** | Run Greeting / Location / Team packs. **Use this take** saves to live lexicon. |
-| 2 | **Fix → Needs review** | Clear remaining AI drafts. Primary: **Record**. Secondary: **Approve spelling** / **Apply all high-confidence**. Reject/Snooze under More. |
+| 2 | **Fix → Needs review** | Hear the proposed say, then **Use this** writes that one fix. Record and Spelling stay ghost and do not write alone. Hearing rows use muted Dismiss. |
 | 3 | **Fix → Add a fix** | Type the bad name → **Record & train**. Typed spelling is a fallback (“Or save a spelling…”). |
-| 4 | **Fix → Find more** | **Quick scan** = transcripts → Practice. **AI listen** = Gemini on recordings; high-confidence **profile names** auto-apply, everything else → Needs review. |
+| 4 | **Fix → Find more** | **Scan** (ghost) reads transcripts into Practice. **AI listen** (filled) drafts a review queue. Last 10 starts immediately. Last 20 and Last 50 confirm. Nothing from a listen writes `tts_lexicon`. |
 | 5 | **Test** | **Play phone preview** (same Soniox path as calls), then tap the live DID. |
 
 **Do not** train common English (`where`, `city`, …). **Do** prefer real audio over AI phonetic guesses for unfamiliar words.
@@ -56,10 +56,10 @@ Lexicon writes still require `approved_by` + `approved_at` (enforced in `assertA
 
 | Path | What happens |
 | --- | --- |
-| **Safe auto-apply** | After AI listen: **high-confidence** `AGENT_MISPRONUNCIATION` that match **profile names/places** (business, agent, team, locations) are stamped with the signed-in owner and written to `tts_lexicon`. |
-| **Batch approve** | Owner clicks **Apply all high-confidence** for remaining speech fixes (explicit stamp). |
-| **Single Approve** | Owner reviews / edits say-as, then Approves. |
-| **Never auto** | Free-form guesses, medium/low confidence, blocked commons, `LIKELY_MISHEARD` (STT hints only). |
+| **Listen** | Every candidate, including high-confidence profile names and places, lands on Needs review. Status is a count left for review. |
+| **Use this** | The only control that writes that fix to `tts_lexicon`. Owner stamp (`approved_by` + `approved_at`) is still required. |
+| **Record / Spelling** | Ghost. They do not write the AI guess by themselves. |
+| **Never from a listen** | Blocked commons, `LIKELY_MISHEARD`, and any row the owner has not confirmed with Use this. |
 
 - Reject / Snooze records a dismissal key so the same call+word does not resurface.
 - Heuristic **Scan recent calls** remains a separate candidate source feeding Practice.

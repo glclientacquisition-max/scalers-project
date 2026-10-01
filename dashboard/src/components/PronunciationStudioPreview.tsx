@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
+import type { PronunciationReviewCandidate } from "@/lib/pronunciationGeminiScan";
 import {
   parseTtsLexicon,
   type TtsLexiconEntry,
@@ -24,6 +25,34 @@ const FIXTURE = {
   services: [{ name: "White Paper Books" }],
   faqs: [] as Array<{ question: string; answer: string }>,
   bulletinTexts: ["White Paper Books are 3 for 1000 shillings."],
+  initialReview: [
+    {
+      id: "fixture-speech-aisha",
+      source: "gemini_scan",
+      type: "AGENT_MISPRONUNCIATION",
+      word_or_phrase: "Aisha",
+      suggested_form: "Eye-sha",
+      confidence: "high",
+      reasoning: "",
+      timestamp_seconds: 4,
+      call_id: "fixture-call",
+      status: "pending",
+      created_at: "2026-10-01T08:00:00.000Z",
+    },
+    {
+      id: "fixture-hearing-ruiru",
+      source: "gemini_scan",
+      type: "LIKELY_MISHEARD",
+      word_or_phrase: "Ruiru",
+      suggested_form: "Ruiru",
+      confidence: "medium",
+      reasoning: "",
+      timestamp_seconds: 12,
+      call_id: "fixture-call",
+      status: "pending",
+      created_at: "2026-10-01T08:00:00.000Z",
+    },
+  ] satisfies PronunciationReviewCandidate[],
   initialLexicon: parseTtsLexicon([
     {
       match: "aisha",
@@ -47,10 +76,7 @@ export function PronunciationStudioPreview() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <p className="mb-4 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)]/40 px-3 py-2 text-xs text-[var(--ink-soft)]">
-        Local Pronunciation studio preview (DASHBOARD_OPEN). ChapterOne fixture —
-        Keep / Scan still need a signed-in workspace to persist.
-      </p>
+      <p className="mb-4 text-xs text-ink-soft">Local preview. ChapterOne fixture.</p>
       <PronunciationCoach
         tenantId={FIXTURE.tenantId}
         businessName={FIXTURE.businessName}
@@ -62,6 +88,9 @@ export function PronunciationStudioPreview() {
         bulletinTexts={FIXTURE.bulletinTexts}
         initialLexicon={lexicon}
         onLexiconChange={setLexicon}
+        initialMode="fix"
+        initialReview={FIXTURE.initialReview}
+        voiceId="Kenya-A"
       />
     </div>
   );

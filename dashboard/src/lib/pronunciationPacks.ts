@@ -171,7 +171,7 @@ export function buildPronunciationPacks(
         id: "pack:greeting",
         label: "Greeting",
         prompt: `Hello, you've reached ${businessName}, this is ${agentName} speaking`,
-        reason: "Opening line callers hear first — business name and agent name.",
+        reason: "",
         targets,
         priority: 100,
       });
@@ -184,7 +184,7 @@ export function buildPronunciationPacks(
         id: "pack:greeting",
         label: "Greeting",
         prompt: `Thank you for calling ${businessName}`,
-        reason: "Opening line — trains your business name.",
+        reason: "",
         targets,
         priority: 98,
       });
@@ -225,7 +225,7 @@ export function buildPronunciationPacks(
         id: "pack:location",
         label: "Location",
         prompt,
-        reason: "One clear place line — only hard place names are learned.",
+        reason: "",
         targets: locTargets,
         priority: 92,
       });
@@ -252,7 +252,7 @@ export function buildPronunciationPacks(
       id: "pack:team",
       label: "Team",
       prompt,
-      reason: "Callback / transfer line — team names only.",
+        reason: "",
       targets: teamTargets,
       priority: 88,
     });

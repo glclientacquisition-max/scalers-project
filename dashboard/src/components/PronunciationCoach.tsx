@@ -20,7 +20,6 @@ import {
 } from "@/app/(desk)/settings/pronunciationActions";
 import {
   approveGeminiScanCandidateAction,
-  batchApproveHighConfidenceGeminiAction,
   dismissGeminiScanCandidateAction,
   geminiScanRecentCallsAction,
   loadPronunciationReviewQueueAction,
@@ -58,22 +57,26 @@ import {
   type PronunciationSuggestion,
 } from "@/lib/pronunciationSuggest";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
-import { deskShiftClass, filterTabClass, btnPrimary, pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { deskShiftClass, filterTabClass, btnPrimary, pendingSpinnerClass, pendingSpinnerInkClass } from "@/components/ui/deskChrome";
 import { settingsGhostButtonClass } from "@/components/settingsUi";
 
 type CallerProofRow = { name: string; say: string };
 
 const libraryMutedClass = `${settingsGhostButtonClass} w-auto shrink-0 whitespace-nowrap`;
+const libraryLinkClass = `inline-flex min-h-11 items-center justify-center px-3 text-sm font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline ${deskShiftClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`;
 
 function HearButton({
   name,
   busy,
   onClick,
+  variant = "primary",
 }: {
   name: string;
   busy: boolean;
   onClick: () => void;
+  variant?: "primary" | "ghost";
 }) {
+  const filled = variant === "primary";
   return (
     <button
       type="button"
@@ -82,9 +85,18 @@ function HearButton({
       aria-busy={busy}
       aria-label={`Hear ${name}`}
       data-testid="pronunciation-hear"
-      className={`${btnPrimary} w-auto shrink-0 gap-2`}
+      className={
+        filled
+          ? `${btnPrimary} w-auto shrink-0 gap-2`
+          : `${settingsGhostButtonClass} w-auto shrink-0 gap-2`
+      }
     >
-      {busy ? <span className={pendingSpinnerClass} aria-hidden="true" /> : null}
+      {busy ? (
+        <span
+          className={filled ? pendingSpinnerClass : pendingSpinnerInkClass}
+          aria-hidden="true"
+        />
+      ) : null}
       Hear
     </button>
   );
@@ -116,6 +128,8 @@ export function PronunciationCoach({
   onLexiconChange,
   voiceId = null,
   omitLexiconField = false,
+  initialMode = "practice",
+  initialReview = [],
 }: {
   tenantId: string;
   businessName: string;
@@ -138,6 +152,10 @@ export function PronunciationCoach({
   voiceId?: string | null;
   /** When embedded in TenantForm, lexicon is submitted via the parent hidden field. */
   omitLexiconField?: boolean;
+  /** Dev fixture only. Owner desk stays on Practice. */
+  initialMode?: StudioMode;
+  /** Dev fixture queue. A signed-in load replaces it. */
+  initialReview?: PronunciationReviewCandidate[];
 }) {
   const rawInitialCount = Array.isArray(initialLexicon)
     ? initialLexicon.length
@@ -151,7 +169,7 @@ export function PronunciationCoach({
   const [extraItems, setExtraItems] = useState<PronunciationSuggestion[]>([]);
   const [skippedIds, setSkippedIds] = useState<Set<string>>(() => new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [mode, setMode] = useState<StudioMode>("practice");
+  const [mode, setMode] = useState<StudioMode>(initialMode);
   const [lexiconPage, setLexiconPage] = useState(0);
   const [showFullQueue, setShowFullQueue] = useState(false);
 
@@ -171,13 +189,21 @@ export function PronunciationCoach({
   const [geminiBatch, setGeminiBatch] = useState<number>(GEMINI_SCAN_DEFAULT_BATCH);
   const [geminiConfirmOpen, setGeminiConfirmOpen] = useState(false);
   const [reviewQueue, setReviewQueue] = useState<PronunciationReviewCandidate[]>(
-    []
+    () =>
+      initialReview.filter(
+        (c) => c.status === "pending" && c.type === "AGENT_MISPRONUNCIATION"
+      )
   );
-  const [sttHints, setSttHints] = useState<PronunciationReviewCandidate[]>([]);
+  const [sttHints, setSttHints] = useState<PronunciationReviewCandidate[]>(() =>
+    initialReview.filter(
+      (c) => c.status === "pending" && c.type === "LIKELY_MISHEARD"
+    )
+  );
   const [reviewEdits, setReviewEdits] = useState<Record<string, string>>({});
+  const [spellingOpenId, setSpellingOpenId] = useState<string | null>(null);
   const [geminiNote, setGeminiNote] = useState<string | null>(null);
   const [showTypedSave, setShowTypedSave] = useState(false);
-  const [openMoreId, setOpenMoreId] = useState<string | null>(null);
+  const [heardEdit, setHeardEdit] = useState<string | null>(null);
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -213,10 +239,6 @@ export function PronunciationCoach({
   );
   const [approveState, approveAction, approvePending] = useActionState(
     approveGeminiScanCandidateAction,
-    geminiQueueInitial
-  );
-  const [batchState, batchAction, batchPending] = useActionState(
-    batchApproveHighConfidenceGeminiAction,
     geminiQueueInitial
   );
   const [dismissState, dismissAction, dismissPending] = useActionState(
@@ -282,15 +304,11 @@ export function PronunciationCoach({
   useEffect(() => {
     if (geminiState.needsConfirm) {
       setGeminiConfirmOpen(true);
-      setGeminiNote(geminiState.message || null);
       return;
     }
     if (geminiState.ok) {
       setGeminiConfirmOpen(false);
       setGeminiNote(geminiState.message || null);
-      if (geminiState.lexicon) {
-        setLexicon(parseTtsLexicon(geminiState.lexicon));
-      }
       if (Array.isArray(geminiState.queue)) {
         const pending = geminiState.queue.filter((c) => c.status === "pending");
         setReviewQueue(
@@ -306,14 +324,11 @@ export function PronunciationCoach({
   useEffect(() => {
     const state = approveState.ok
       ? approveState
-      : batchState.ok
-        ? batchState
-        : dismissState.ok
-          ? dismissState
-          : null;
+      : dismissState.ok
+        ? dismissState
+        : null;
     if (!state) {
       if (approveState.error) setGeminiNote(approveState.error);
-      if (batchState.error) setGeminiNote(batchState.error);
       if (dismissState.error) setGeminiNote(dismissState.error);
       return;
     }
@@ -323,7 +338,7 @@ export function PronunciationCoach({
     if (state.lexicon) {
       setLexicon(parseTtsLexicon(state.lexicon));
     }
-  }, [approveState, batchState, dismissState]);
+  }, [approveState, dismissState]);
 
   useEffect(() => {
     if (quickState.ok && quickState.lexicon) {
@@ -506,19 +521,20 @@ export function PronunciationCoach({
     }
   }
 
-  async function hearSavedName(key: string, name: string) {
+  async function hearSavedName(key: string, name: string): Promise<boolean> {
     const text = name.trim();
-    if (!text || hearFlightRef.current) return;
+    if (!text || hearFlightRef.current) return false;
     setHearError(null);
     const cached = hearUrlsRef.current.get(key);
     if (cached) {
       setHearUrl(cached);
       try {
         await playHearUrl(cached);
+        return true;
       } catch (err) {
         setHearError(previewErrorCopy(err));
+        return false;
       }
-      return;
     }
     hearFlightRef.current = true;
     setHearBusyKey(key);
@@ -544,12 +560,21 @@ export function PronunciationCoach({
       hearUrlsRef.current.set(key, preview.url);
       setHearUrl(preview.url);
       await playHearUrl(preview.url);
+      return true;
     } catch (err) {
       setHearError(previewErrorCopy(err));
+      return false;
     } finally {
       hearFlightRef.current = false;
       setHearBusyKey(null);
     }
+  }
+
+  async function hearEditedSay(match: string) {
+    const say = sanitizeSayForm(editSay);
+    if (!say) return;
+    const ok = await hearSavedName(`edit:${match}:${say}`, say);
+    if (ok) setHeardEdit(`${match}:${say}`);
   }
 
   async function startRecording() {
@@ -632,6 +657,7 @@ export function PronunciationCoach({
       setAddError("Enter how the phone should say it.");
       return;
     }
+    if (heardEdit !== `${match}:${say}`) return;
     const next = lexicon.map((e) =>
       e.match === match
         ? { ...e, say, label: displayLexiconLabel(e) }
@@ -650,7 +676,7 @@ export function PronunciationCoach({
     const line = customTrainingLine({
       phrase,
       idPrefix: "renew",
-      reason: `Renew “${entry.say}”. Record a clearer take.`,
+      reason: "",
     });
     if (!line) {
       setAddError(
@@ -678,7 +704,7 @@ export function PronunciationCoach({
     const line = customTrainingLine({
       phrase,
       idPrefix: "custom",
-      reason: "You flagged this as sounding wrong.",
+      reason: "",
     });
     if (!line) {
       setAddError(
@@ -758,7 +784,7 @@ export function PronunciationCoach({
   function recordCandidateInstead(c: PronunciationReviewCandidate) {
     const line = customTrainingLine({
       phrase: c.word_or_phrase,
-      reason: `AI-suggested (record real audio; more reliable than “${c.suggested_form}”)`,
+      reason: "",
       idPrefix: "gemini-record",
     });
     if (!line) {
@@ -770,9 +796,6 @@ export function PronunciationCoach({
     );
     setMode("practice");
     setActiveId(line.id);
-    setGeminiNote(
-      "Queued in Practice. Record real audio rather than trusting the AI phonetic guess."
-    );
   }
 
   function submitQuickAdd(modeAdd: "record" | "save") {
@@ -973,27 +996,14 @@ export function PronunciationCoach({
                   >
                     {active.prompt}
                   </p>
-                  <p className="mt-2 text-sm text-[var(--ink-soft)]">{active.reason}</p>
-                  {active.targets?.length ? (
-                    <p className="mt-2 text-xs text-[var(--ink-soft)]">
-                      Learns:{" "}
-                      <span className="font-medium text-[var(--ink)]">
-                        {active.targets.map((t) => t.label).join(" · ")}
-                      </span>
-                    </p>
-                  ) : null}
 
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
                     {!recording && !audioBlob ? (
                       <button
                         type="button"
                         onClick={startRecording}
-                        className={`inline-flex items-center gap-2 rounded-xl bg-accent-fill px-5 py-3 text-sm font-medium text-accent-on-fill ${deskShiftClass} hover:bg-accent-fill-hover`}
+                        className={`${btnPrimary} w-auto shrink-0 gap-2`}
                       >
-                        <span
-                          aria-hidden="true"
-                          className={`h-2.5 w-2.5 rounded-full bg-surface ${recording ? "animate-pulse" : ""}`}
-                        />
                         Record line
                       </button>
                     ) : null}
@@ -1001,11 +1011,11 @@ export function PronunciationCoach({
                       <button
                         type="button"
                         onClick={stopRecording}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--warn)] px-5 py-3 text-sm font-medium text-accent-on-fill"
+                        className={`${btnPrimary} w-auto shrink-0 gap-2`}
                       >
                         <span
                           aria-hidden="true"
-                          className="h-2.5 w-2.5 animate-pulse rounded-full bg-surface"
+                          className="h-2.5 w-2.5 animate-pulse rounded-full bg-accent-on-fill"
                         />
                         Stop
                       </button>
@@ -1021,7 +1031,7 @@ export function PronunciationCoach({
                         <button
                           type="button"
                           onClick={startRecording}
-                          className="rounded-xl border border-[var(--line)] bg-surface px-4 py-2.5 text-sm font-medium"
+                          className={libraryMutedClass}
                         >
                           Retry
                         </button>
@@ -1029,8 +1039,11 @@ export function PronunciationCoach({
                           type="button"
                           onClick={keepRecording}
                           disabled={confirmPending}
-                          className="rounded-xl bg-[var(--ok)] px-5 py-2.5 text-sm font-medium text-accent-on-fill disabled:opacity-60"
+                          className={`${btnPrimary} w-auto shrink-0 gap-2`}
                         >
+                          {confirmPending ? (
+                            <span className={pendingSpinnerClass} aria-hidden="true" />
+                          ) : null}
                           {confirmPending ? "Checking…" : "Use this take"}
                         </button>
                       </>
@@ -1038,7 +1051,7 @@ export function PronunciationCoach({
                     <button
                       type="button"
                       onClick={skipActive}
-                      className="text-sm text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                      className={libraryLinkClass}
                     >
                       Skip for now
                     </button>
@@ -1170,8 +1183,19 @@ export function PronunciationCoach({
                       </div>
                       <HearButton
                         name={label}
-                        busy={hearBusyKey === hearKey}
-                        onClick={() => void hearSavedName(hearKey, label)}
+                        busy={
+                          hearBusyKey ===
+                          (isEditing
+                            ? `edit:${entry.match}:${sanitizeSayForm(editSay)}`
+                            : hearKey)
+                        }
+                        onClick={() => {
+                          if (isEditing) {
+                            void hearEditedSay(entry.match);
+                            return;
+                          }
+                          void hearSavedName(hearKey, label);
+                        }}
                       />
                     </div>
                     <div className="flex basis-full flex-wrap items-center justify-end gap-1 md:basis-auto md:shrink-0">
@@ -1188,9 +1212,11 @@ export function PronunciationCoach({
                           if (isEditing) {
                             setEditingMatch(null);
                             setEditSay("");
+                            setHeardEdit(null);
                           } else {
                             setEditingMatch(entry.match);
                             setEditSay(entry.say);
+                            setHeardEdit(null);
                             setAddError(null);
                           }
                         }}
@@ -1202,13 +1228,13 @@ export function PronunciationCoach({
                         type="button"
                         onClick={() => removeEntry(entry.match)}
                         disabled={persistPending}
-                        className={`${libraryMutedClass} disabled:opacity-60`}
+                        className={`${libraryLinkClass} disabled:opacity-60`}
                       >
                         Remove
                       </button>
                     </div>
                     {isEditing ? (
-                      <div className="flex w-full items-center gap-2">
+                      <div className="flex w-full flex-wrap items-center gap-2">
                         <input
                           value={editSay}
                           onChange={(e) => setEditSay(e.target.value)}
@@ -1218,11 +1244,18 @@ export function PronunciationCoach({
                         <button
                           type="button"
                           onClick={() => saveEditedSay(entry.match)}
-                          disabled={persistPending || !editSay.trim()}
+                          disabled={
+                            persistPending ||
+                            !sanitizeSayForm(editSay) ||
+                            heardEdit !== `${entry.match}:${sanitizeSayForm(editSay)}`
+                          }
                           className={`${btnPrimary} w-auto shrink-0`}
                         >
                           {persistPending ? "Saving…" : "Save"}
                         </button>
+                        {heardEdit === `${entry.match}:${sanitizeSayForm(editSay)}` ? null : (
+                          <p className="w-full text-xs text-ink-soft">Hear it first.</p>
+                        )}
                       </div>
                     ) : null}
                   </li>
@@ -1257,26 +1290,7 @@ export function PronunciationCoach({
       {mode === "fix" ? (
         <div className="space-y-8">
           <div className="space-y-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h3 className="font-medium text-[var(--ink)]">Needs review</h3>
-              </div>
-              {reviewQueue.some((c) => c.confidence === "high") ? (
-                <button
-                  type="button"
-                  disabled={batchPending || approvePending || dismissPending}
-                  onClick={() => {
-                    const fd = new FormData();
-                    fd.set("id", tenantId);
-                    fd.set("current_lexicon", lexiconJson);
-                    batchAction(fd);
-                  }}
-                  className="rounded-lg border border-[var(--accent)]/40 px-3 py-1.5 text-xs font-medium text-[var(--accent-deep)] hover:bg-[var(--accent-soft)] disabled:opacity-60"
-                >
-                  {batchPending ? "Applying…" : "Apply all high-confidence"}
-                </button>
-              ) : null}
-            </div>
+            <h3 className="font-medium text-ink">Needs review</h3>
 
             {geminiNote ? (
               <p
@@ -1292,117 +1306,93 @@ export function PronunciationCoach({
             ) : null}
 
             {fixReviewRows.length === 0 ? (
-              <p className="text-sm text-[var(--ink-soft)]" role="status">
-                Nothing waiting. Add a fix below, or find more from recent calls.
+              <p className="text-sm text-ink" role="status">
+                Nothing waiting.
               </p>
             ) : (
               <ul
-                className="divide-y divide-[var(--line)] border-y border-[var(--line)]"
+                className="divide-y divide-line border-y border-line"
                 aria-label="Pronunciation review queue"
               >
                 {fixReviewRows.map((row) => {
                   const c = row.candidate;
-                  const moreOpen = openMoreId === row.id;
+                  const proposed = sanitizeSayForm(
+                    (reviewEdits[c.id] ?? c.suggested_form).trim()
+                  );
+                  const hearKey = `review:${c.id}:${proposed || row.phrase}`;
+                  const spellingOpen = spellingOpenId === row.id;
                   return (
-                    <li key={row.id} className="py-3">
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--ink-soft)]">
-                          {row.kindLabel}
-                        </span>
-                        <span className="text-[11px] text-[var(--ink-soft)]">
-                          {row.confidence}
-                        </span>
-                        <span className="text-sm font-medium text-[var(--ink)]">
-                          {row.phrase}
-                        </span>
-                        {row.kind === "hearing" ? (
-                          <span className="text-xs text-[var(--ink-soft)]">
-                            → {row.suggested}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                        {row.reasoning}
-                      </p>
-
-                      {row.canApproveSpelling ? (
-                        <label className="mt-2 block text-xs text-[var(--ink-soft)]">
-                          Say like
-                          <input
-                            value={reviewEdits[c.id] ?? c.suggested_form}
-                            onChange={(e) =>
-                              setReviewEdits((prev) => ({
-                                ...prev,
-                                [c.id]: e.target.value,
-                              }))
-                            }
-                            className="mt-1 w-full max-w-md rounded-lg border border-[var(--line)] px-2 py-1.5 text-sm"
-                          />
-                        </label>
-                      ) : (
-                        <p className="mt-1 text-[11px] text-[var(--ink-soft)]">
-                          Not a phone-speech fix. Dismiss so it does not keep coming back.
-                        </p>
-                      )}
-
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {row.primaryAction === "record" ? (
+                    <li
+                      key={row.id}
+                      className="flex min-w-0 flex-wrap items-center gap-2 py-2"
+                    >
+                      <span className="min-w-0 max-w-full truncate text-sm font-medium text-ink">
+                        {row.phrase}
+                      </span>
+                      <span className="text-xs text-ink-soft">{row.confidence}</span>
+                      <span className="text-xs text-ink-soft">{row.kindLabel}</span>
+                      <div className="ms-auto flex flex-wrap items-center gap-2">
+                        <HearButton
+                          name={row.phrase}
+                          variant="ghost"
+                          busy={hearBusyKey === hearKey}
+                          onClick={() =>
+                            void hearSavedName(hearKey, proposed || row.phrase)
+                          }
+                        />
+                        {row.primaryAction === "use" ? (
                           <button
                             type="button"
-                            onClick={() => recordCandidateInstead(c)}
-                            className="rounded-lg bg-accent-fill px-3 py-1.5 text-xs font-medium text-accent-on-fill"
+                            onClick={() => approveCandidate(c)}
+                            disabled={approvePending || dismissPending}
+                            className={`${btnPrimary} w-auto shrink-0`}
                           >
-                            Record
+                            {approvePending ? "Saving…" : "Use this"}
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => dismissCandidate(c, "rejected")}
                             disabled={dismissPending}
-                            className="rounded-lg bg-accent-fill px-3 py-1.5 text-xs font-medium text-accent-on-fill disabled:opacity-60"
+                            className={`${libraryMutedClass} disabled:opacity-60`}
                           >
                             Dismiss
                           </button>
                         )}
+                        {row.primaryAction === "use" ? (
+                          <button
+                            type="button"
+                            onClick={() => recordCandidateInstead(c)}
+                            className={libraryMutedClass}
+                          >
+                            Record
+                          </button>
+                        ) : null}
                         {row.canApproveSpelling ? (
                           <button
                             type="button"
-                            onClick={() => approveCandidate(c)}
-                            disabled={approvePending || dismissPending}
-                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                            aria-pressed={spellingOpen}
+                            onClick={() =>
+                              setSpellingOpenId(spellingOpen ? null : row.id)
+                            }
+                            className={libraryMutedClass}
                           >
-                            Approve spelling
+                            Spelling
                           </button>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenMoreId(moreOpen ? null : row.id)
-                          }
-                          className="text-xs font-medium text-[var(--ink-soft)] underline-offset-2 hover:underline"
-                        >
-                          More
-                        </button>
                       </div>
-                      {moreOpen ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => dismissCandidate(c, "rejected")}
-                            disabled={dismissPending}
-                            className="text-xs text-[var(--ink-soft)] underline-offset-2 hover:underline disabled:opacity-60"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => dismissCandidate(c, "snoozed")}
-                            disabled={dismissPending}
-                            className="text-xs text-[var(--ink-soft)] underline-offset-2 hover:underline disabled:opacity-60"
-                          >
-                            Snooze
-                          </button>
-                        </div>
+                      {spellingOpen && row.canApproveSpelling ? (
+                        <input
+                          value={reviewEdits[c.id] ?? c.suggested_form}
+                          onChange={(e) =>
+                            setReviewEdits((prev) => ({
+                              ...prev,
+                              [c.id]: e.target.value,
+                            }))
+                          }
+                          aria-label={`Spelling for ${row.phrase}`}
+                          className="min-h-11 w-40 max-w-full rounded-xl border border-line bg-surface px-3 font-mono text-sm text-ink outline-none focus:outline-none focus:ring-2 focus:ring-brand"
+                        />
                       ) : null}
                     </li>
                   );
@@ -1511,11 +1501,14 @@ export function PronunciationCoach({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={scanCalls}
-                disabled={minePending || geminiPending}
-                className={btnPrimary}
+                onClick={() => runGeminiScan(false)}
+                disabled={geminiPending || minePending}
+                className={`${btnPrimary} w-auto shrink-0 gap-2`}
               >
-                {minePending ? "Scanning…" : "Scan"}
+                {geminiPending ? (
+                  <span className={pendingSpinnerClass} aria-hidden="true" />
+                ) : null}
+                {geminiPending ? "Listening…" : "AI listen"}
               </button>
               <select
                 id="gemini-batch"
@@ -1523,7 +1516,7 @@ export function PronunciationCoach({
                 value={geminiBatch}
                 onChange={(e) => setGeminiBatch(Number(e.target.value))}
                 disabled={geminiPending}
-                className="rounded-xl border border-[var(--line)] bg-surface px-2 py-2 text-sm"
+                className="min-h-11 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand"
               >
                 {GEMINI_SCAN_BATCH_OPTIONS.map((n) => (
                   <option key={n} value={n}>
@@ -1533,23 +1526,22 @@ export function PronunciationCoach({
               </select>
               <button
                 type="button"
-                onClick={() => runGeminiScan(false)}
-                disabled={geminiPending || minePending}
+                onClick={scanCalls}
+                disabled={minePending || geminiPending}
                 className={`${settingsGhostButtonClass} disabled:opacity-60`}
               >
-                {geminiPending ? "Listening…" : "AI listen"}
+                {minePending ? "Scanning…" : "Scan"}
               </button>
             </div>
 
             {geminiConfirmOpen ? (
               <div
-                className="rounded-xl border border-[var(--warn)]/40 px-3 py-3 text-sm"
+                className="rounded-xl border border-warn/40 px-3 py-3 text-sm"
                 role="alertdialog"
                 aria-label="Confirm AI listen cost"
               >
-                <p className="text-[var(--ink)]">
-                  {geminiState.message ||
-                    `AI will listen to up to ${geminiBatch} recordings (paid).`}
+                <p className="text-ink">
+                  Listen to the last {geminiBatch} recordings. This is paid.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button

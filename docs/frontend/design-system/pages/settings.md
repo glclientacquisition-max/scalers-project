@@ -123,8 +123,9 @@ One filled `#005CCC` per viewport. Booleans are `ToolSwitch`. Two or three exclu
 | Practice / Library / Fix | segmented underline | studio tab only | This device |
 | Record and train | filled | `tts_lexicon` | Assistant on calls |
 | Save spelling | ghost | `tts_lexicon` | Assistant on calls |
-| Scan | filled | suggestion queue | This device until Save |
-| AI listen | ghost, then filled confirm | Gemini review queue | This device until Save |
+| Scan | ghost | suggestion queue | This device until Practice |
+| AI listen | filled. Last 20 and Last 50 confirm | review queue | This device until Use this |
+| Use this | filled, label-sized | `tts_lexicon` | Assistant on calls |
 | Save and train | filled sticky | `tts_lexicon` compile | Assistant on calls |
 
 ### Updates
