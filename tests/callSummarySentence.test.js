@@ -154,6 +154,34 @@ describe('call chat card occasions', () => {
     assert.equal(card.bannerWhen, '');
   });
 
+  it('shows Confirm the visit when the owner still must confirm', () => {
+    const card = shapeTicketChat({
+      silence: false,
+      want: 'Mary wants a mattress cleaning visit.',
+      done: 'Visit request saved — confirm on desk.',
+      mood: 'calm',
+      next: 'Confirm the visit.',
+      needsYou: true,
+      stamp: 'Visit',
+    });
+    assert.equal(card.urgency, 'Confirm the visit.');
+    assert.equal(card.done, 'Visit request saved — confirm on desk.');
+  });
+
+  it('hides None on a confirmed visit', () => {
+    const card = shapeTicketChat({
+      silence: false,
+      want: 'Mary moved the visit to Friday at 2 PM.',
+      done: 'Visit confirmed.',
+      mood: 'calm',
+      next: 'None.',
+      needsYou: false,
+      stamp: 'Visit',
+    });
+    assert.equal(card.urgency, '');
+    assert.equal(card.done, 'Visit confirmed.');
+  });
+
   it('leaves the banner off when the receptionist finished the call', () => {
     const card = shapeTicketChat({
       silence: false,

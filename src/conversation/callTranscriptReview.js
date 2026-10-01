@@ -81,9 +81,9 @@ Return ONLY valid JSON (no markdown fences):
 
 Rules:
 - want: name the caller if known. State the last place and the last time they still wanted. If they only said hello, "No clear ask." A refused hour (snapshot refusedWhen) is never the visit time. A refused place (snapshot refusedPlaces) is not the place to go. If callerName is none, do not invent a name.
-- done: Visit request saved — confirm on desk ONLY when the snapshot says visitSaved or visitRequested. Hold saved only when holdSaved. Hours answered. Escalation sent only if SMS/WhatsApp/email delivered. Notify failed if not. Or "None." If nothing was saved, done is None. Never say booked for a visit that is only requested. Never say a callback was noted unless callbackSaved is true.
+- done: Visit request saved — confirm on desk ONLY when the snapshot says visitSaved or visitRequested. Hold saved only when holdSaved. Hours answered. Escalation sent only if SMS/WhatsApp/email delivered. Notify failed if not. Or "None." If nothing was saved, done is None. Never say booked for a visit that is only requested. Never say a callback was noted unless callbackSaved is true. The desk sets done to "Hold saved; awaiting owner Done." while a non-callback hold row is open.
 - mood: how they came across. unknown if you cannot tell. Not a medical label.
-- next: "Call them back." only when name, place, or time is still missing and the caller did not hang up on a finished answer. Otherwise "None." or "Hours were answered." or "Confirm the visit." Never say a callback was noted unless callbackSaved is true.
+- next: The desk overwrites next from the snapshot. Requested visit: "Confirm the visit." Saved callback, or nothing saved with name, place, or time still missing: "Call them back." Any other saved visit or hold: "None." A finished hours answer may be "Hours were answered." Never say a callback was noted unless callbackSaved is true.
 - reason: Inbox one-liner. Same truth as want. For a requested visit use exactly: Visit request saved — confirm on desk. Use that line only when visitSaved or visitRequested is true. Otherwise do not say a visit was saved.
 - needs_human: true only if a person still must return the call (callback, complaint, asked for a human, failed save). False when hours/FAQ was answered or a hold/visit was confirmed saved.
 - needs_owner: true if the receptionist guessed, deferred, or lacked a fact the owner should add later. That alone is not a return call.
@@ -232,6 +232,26 @@ function unfinishedWant(flags) {
   }
   if (!/[.!?]$/.test(ask)) ask += '.';
   return `${ask} No name.`;
+}
+
+/**
+ * Next and open-hold Done come from the saved row. The model still writes Want, mood, and reason.
+ * Requested visit confirms. Callback or an unfinished unsaved visit calls back. Other saved work is None.
+ */
+function applySnapshotCard(out, flags) {
+  if (flags?.holdOpen && !flags?.callbackSaved && !flags?.visitRequested) {
+    out.done = HOLD_OPEN_NOTE;
+    out.applied.card = true;
+  }
+  let next = '';
+  if (flags?.visitRequested) next = 'Confirm the visit.';
+  else if (flags?.callbackSaved) next = 'Call them back.';
+  else if (flags?.visitSaved || flags?.holdSaved) next = 'None.';
+  if (next) {
+    out.next = next;
+    out.applied.card = true;
+  }
+  return out;
 }
 
 function ownerMustDial(flags, derived) {
@@ -580,7 +600,7 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
     }
     if (/visit request saved/i.test(out.done)) out.done = 'None.';
   }
-  if (!flags.visitSaved && Array.isArray(flags.refusedWhen) && flags.refusedWhen.length) {
+  if (Array.isArray(flags.refusedWhen) && flags.refusedWhen.length) {
     out.want = stripRefusedClocks(out.want, flags.refusedWhen);
     out.reason = stripRefusedClocks(out.reason, flags.refusedWhen);
   }
@@ -606,6 +626,8 @@ function mergeTranscriptReview({ derived, summary, toolFlags, review } = {}) {
   } else {
     out.mood = mood;
   }
+
+  applySnapshotCard(out, flags);
 
   if (ownerMustDial(flags, derived)) return applyUnfinishedReturn(out, flags);
 

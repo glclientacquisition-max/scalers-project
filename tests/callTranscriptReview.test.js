@@ -296,6 +296,191 @@ describe('mergeTranscriptReview', () => {
     assert.match(merged.done, /callback was noted/i);
   });
 
+  it('sets Confirm the visit while the visit is still requested', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
+      summary: { reason: 'Visit request saved — confirm on desk.' },
+      toolFlags: { ...visitFlags, visitRequested: true },
+      review: {
+        reason: 'Mary wants a mattress cleaning visit tomorrow.',
+        want: 'Mary wants a mattress cleaning visit tomorrow.',
+        done: 'Visit booked.',
+        next: 'Call them back.',
+        mood: 'calm',
+        primary_intent: 'book_visit',
+        needs_human: true,
+        confidence: 0.95,
+      },
+    });
+    assert.equal(merged.next, 'Confirm the visit.');
+    assert.equal(merged.done, 'Visit request saved — confirm on desk.');
+    assert.equal(merged.mood, 'calm');
+    assert.match(merged.want, /mattress cleaning/);
+  });
+
+  it('does not confirm a reschedule that is already confirmed', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
+      summary: { reason: 'Visit confirmed' },
+      toolFlags: { ...visitFlags, visitRequested: false },
+      review: {
+        reason: 'Mary moved the carpet cleaning visit to Friday at 2 PM.',
+        want: 'Mary moved the carpet cleaning visit to Friday at 2 PM.',
+        done: 'Visit confirmed.',
+        next: 'Confirm the visit.',
+        mood: 'calm',
+        primary_intent: 'book_visit',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.next, 'None.');
+    assert.equal(merged.done, 'Visit confirmed.');
+    assert.match(merged.want, /Friday at 2 PM/);
+  });
+
+  it('does not call back after a cancelled visit', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'cancel', resolution: 'resolved' },
+      summary: { reason: 'Visit updated (cancelled)' },
+      toolFlags: { ...visitFlags, visitRequested: false },
+      review: {
+        reason: 'Mary cancelled the carpet cleaning visit.',
+        want: 'Mary cancelled the carpet cleaning visit.',
+        done: 'Visit updated (cancelled).',
+        next: 'Call them back.',
+        mood: 'calm',
+        primary_intent: 'cancel',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.next, 'None.');
+    assert.match(merged.done, /cancelled/i);
+    assert.notEqual(merged.next, 'Confirm the visit.');
+  });
+
+  it('sets the open hold done line and clears a false callback', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'hold_or_pickup', resolution: 'resolved' },
+      summary: { reason: 'Brian left a hold.' },
+      toolFlags: { ...holdFlags, holdOpen: true, callbackSaved: false },
+      review: {
+        reason: 'Brian left a hold for Atomic Habits. Pickup tomorrow at 5pm.',
+        want: 'Brian wants Atomic Habits held for pickup tomorrow at 5pm.',
+        done: 'The book is ready.',
+        next: 'Call them back.',
+        mood: 'calm',
+        primary_intent: 'hold_or_pickup',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.done, 'Hold saved; awaiting owner Done.');
+    assert.equal(merged.next, 'None.');
+    assert.match(merged.want, /Atomic Habits/);
+  });
+
+  it('keeps Call them back for a saved callback', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'callback', resolution: 'resolved' },
+      summary: { reason: 'Callback was noted.' },
+      toolFlags: {
+        holdSaved: true,
+        holdOpen: true,
+        callbackSaved: true,
+        visitSaved: false,
+        visitRequested: false,
+      },
+      review: {
+        reason: 'Callback was noted for a quote.',
+        want: 'Callback was noted for a quote.',
+        done: 'Callback was noted.',
+        next: 'None.',
+        primary_intent: 'human',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.next, 'Call them back.');
+    assert.match(merged.done, /callback was noted/i);
+    assert.notEqual(merged.done, 'Hold saved; awaiting owner Done.');
+  });
+
+  it('does not reopen a hold that is already done', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'hold_or_pickup', resolution: 'resolved' },
+      summary: { reason: 'Hold done' },
+      toolFlags: {
+        holdSaved: true,
+        holdOpen: false,
+        callbackSaved: false,
+        visitSaved: false,
+        visitRequested: false,
+      },
+      review: {
+        reason: 'Brian collected Atomic Habits.',
+        want: 'Brian collected Atomic Habits.',
+        done: 'Hold done.',
+        next: 'Call them back.',
+        primary_intent: 'hold_or_pickup',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.next, 'None.');
+    assert.equal(merged.done, 'Hold done.');
+  });
+
+  it('strips a refused hour from Want after a visit row is saved', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'book_visit', resolution: 'resolved' },
+      summary: { reason: 'Visit request saved — confirm on desk.' },
+      toolFlags: {
+        ...visitFlags,
+        visitRequested: true,
+        refusedWhen: ['7:00 AM'],
+        refusedPlaces: ['Rongai'],
+      },
+      review: {
+        reason: 'Mary wants carpet cleaning in Rongai tomorrow at 7:00 AM.',
+        want: 'Mary wants carpet cleaning in Rongai tomorrow at 7:00 AM and at 10:00 AM in Kilimani.',
+        done: 'Visit request saved — confirm on desk.',
+        next: 'Call them back.',
+        primary_intent: 'book_visit',
+        needs_human: false,
+        confidence: 0.9,
+      },
+    });
+    assert.equal(merged.next, 'Confirm the visit.');
+    assert.doesNotMatch(merged.want, /7:00 AM/i);
+    assert.doesNotMatch(merged.want, /Rongai/i);
+    assert.match(merged.want, /10:00 AM/);
+    assert.match(merged.want, /Kilimani/);
+    assert.doesNotMatch(merged.reason, /7:00 AM/i);
+  });
+
+  it('keeps a return line when a person was asked and nothing was saved', () => {
+    const merged = mergeTranscriptReview({
+      derived: { primaryIntent: 'human', resolution: 'needs_human' },
+      summary: { reason: 'Amina asked for the owner.' },
+      toolFlags: escalateFlags,
+      review: {
+        reason: 'Amina asked to speak to the owner about a leak.',
+        want: 'Amina asked to speak to the owner about a leak.',
+        done: 'Escalation sent.',
+        next: 'Call them back.',
+        mood: 'urgent',
+        primary_intent: 'human',
+        needs_human: true,
+        confidence: 0.92,
+      },
+    });
+    assert.equal(merged.primaryIntent, 'human');
+    assert.equal(merged.next, 'Call them back.');
+    assert.equal(merged.done, 'Escalation sent.');
+  });
+
   it('does not ask for a callback after a finished answer', () => {
     const merged = mergeTranscriptReview({
       derived: { primaryIntent: 'hours_open', resolution: 'resolved' },
@@ -492,6 +677,44 @@ describe('toolFlagsFromBrain', () => {
     assert.equal(flags.visitSaved, false);
     assert.ok(flags.refusedWhen.some((row) => /7:00 AM/i.test(row)));
     assert.ok(flags.refusedPlaces.some((row) => /Rongai/i.test(row)));
+  });
+
+  it('keeps a reschedule on the existing visit status', () => {
+    const requested = toolFlagsFromBrain(
+      recordActionResults(createBrainState(), [
+        {
+          action: 'update_appointment',
+          status: 'succeeded',
+          appointmentStatus: 'requested',
+        },
+      ])
+    );
+    assert.equal(requested.visitSaved, true);
+    assert.equal(requested.visitRequested, true);
+
+    const confirmed = toolFlagsFromBrain(
+      recordActionResults(createBrainState(), [
+        {
+          action: 'update_appointment',
+          status: 'succeeded',
+          appointmentStatus: 'confirmed',
+        },
+      ])
+    );
+    assert.equal(confirmed.visitSaved, true);
+    assert.equal(confirmed.visitRequested, false);
+
+    const cancelled = toolFlagsFromBrain(
+      recordActionResults(createBrainState(), [
+        {
+          action: 'update_appointment',
+          status: 'succeeded',
+          appointmentStatus: 'cancelled',
+        },
+      ])
+    );
+    assert.equal(cancelled.visitSaved, true);
+    assert.equal(cancelled.visitRequested, false);
   });
 
   it('keeps visitRequested after a later non-visit tool turn', () => {
