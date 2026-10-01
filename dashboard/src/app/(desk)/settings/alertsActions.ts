@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { parseNotifyChannelsField } from "@/lib/notifyChannels";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
+import { alertPhoneWrite, alertsPersistMatchesSubmit } from "@/lib/alertsSave";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
 
 export type AlertsActionState = {
@@ -30,16 +31,29 @@ export async function saveAlertsAction(
     return { error: "Forbidden." };
   }
 
-  const notificationPhone = String(
+  const submittedPhone = String(
     formData.get("whatsapp_notification_number") || ""
   ).trim();
-  const alertEmail = String(formData.get("alert_email") || "")
+  const submittedEmail = String(formData.get("alert_email") || "")
     .trim()
     .toLowerCase();
   const notifyChannels = parseNotifyChannelsField(formData.get("notify_channels"));
+  const writtenPhone = alertPhoneWrite(submittedPhone);
+  const writtenEmail = submittedEmail || null;
 
-  if (alertEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alertEmail)) {
+  if (submittedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submittedEmail)) {
     return { error: "Alert email looks invalid." };
+  }
+
+  if (
+    !alertsPersistMatchesSubmit({
+      submittedPhone,
+      writtenPhone,
+      submittedEmail,
+      writtenEmail,
+    })
+  ) {
+    return { error: "Alert contact was not saved." };
   }
 
   const workspace = await createWorkspaceDataClient();
@@ -50,9 +64,8 @@ export async function saveAlertsAction(
   const { error } = await workspace.client
     .from("tenants")
     .update({
-      whatsapp_notification_number:
-        notificationPhone || tenant.whatsapp_notification_number,
-      alert_email: alertEmail || null,
+      whatsapp_notification_number: writtenPhone,
+      alert_email: writtenEmail,
       notify_channels: notifyChannels,
     })
     .eq("id", tenant.id);
@@ -62,5 +75,5 @@ export async function saveAlertsAction(
   }
 
   revalidatePath("/settings");
-  return { ok: true, message: "Saved." };
+  return { ok: true, message: "Saved" };
 }

@@ -133,10 +133,6 @@ export function CallFaqSuggestions({
           >
             FAQ ideas from this call
           </h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]" id="call-faq-help">
-            If the caller asked something useful, we&apos;ll suggest a Golden FAQ. You
-            edit and approve. Nothing goes live on its own.
-          </p>
         </div>
       )}
 
@@ -147,9 +143,7 @@ export function CallFaqSuggestions({
           <button
             type="submit"
             disabled={suggestPending || !hasTranscript}
-            aria-describedby={
-              !hasTranscript ? "call-faq-no-transcript" : thread ? undefined : "call-faq-help"
-            }
+            aria-describedby={!hasTranscript ? "call-faq-no-transcript" : undefined}
             className={
               thread
                 ? "min-h-11 text-xs font-medium text-ink-soft focus:outline-none focus:ring-2 focus:ring-[#0096FF] disabled:opacity-50"
@@ -329,7 +323,7 @@ export function CallFaqSuggestions({
             <p id="call-faq-add-help" className="w-full text-xs text-[var(--ink-soft)]">
               {selectedReady === 0
                 ? "Tick a FAQ with both a question and answer to enable Add."
-                : "Selected FAQs are added to your Golden FAQs for the next call."}
+                : "Selected FAQs are added for the next call."}
             </p>
           </form>
         </div>

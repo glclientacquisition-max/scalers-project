@@ -59,7 +59,6 @@ import {
   FAQ_ANSWER_MAX,
   FAQ_MAX,
   FAQ_QUESTION_MAX,
-  FAQ_STARTERS,
   normalizeFaqKey,
 } from "@/lib/faqs";
 import { SERVICES_PASTE_POOLS, placeholderPool } from "@/lib/deskPlaceholders";
@@ -96,10 +95,10 @@ import {
   POLICY_FIELDS,
   type BusinessPolicies,
 } from "@/lib/businessPolicies";
-import { areasFromPlainText } from "@/lib/coverageAreas";
 import { CoverageAreaField } from "@/components/CoverageAreaField";
 import { PronunciationCoach } from "@/components/PronunciationCoach";
 import { btnPrimary, deskShiftClass } from "@/components/ui/deskChrome";
+import { notify } from "@/components/ui/DeskNotice";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   ExpandTextarea,
@@ -208,6 +207,13 @@ function extractLocationFallback(businessHours: string): string {
     return "";
   }
   return text;
+}
+
+function placeLocationLine(loc: Pick<BusinessLocation, "label" | "address" | "landmark">): string {
+  return [loc.label, loc.address, loc.landmark]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" · ");
 }
 
 const initial: SettingsCompileState = {};
@@ -339,33 +345,11 @@ export function TenantForm({
   );
   const [locations, setLocations] = useState<BusinessLocation[]>(() => {
     const rows = normalizeBusinessLocations(tenant.business_locations);
-    if (rows.length) return rows;
-    const fallback =
-      scheduleForForm(tenant.hours_schedule, "").location ||
-      extractLocationFallback(tenant.business_hours || "");
-    return fallback
-      ? [
-          {
-            label: "Main",
-            address: fallback,
-            landmark: "",
-            directions: "",
-            coverage_notes: "",
-          },
-        ]
-      : [emptyLocation()];
+    return rows.length ? rows : [emptyLocation()];
   });
-  const [policies, setPolicies] = useState<BusinessPolicies>(() => {
-    const next = normalizeBusinessPolicies(tenant.business_policies);
-    if (parseVertical(tenant.vertical) !== "home_services" || next.coverage_areas) {
-      return next;
-    }
-    const rows = normalizeBusinessLocations(tenant.business_locations);
-    const text = [next.delivery, ...rows.map((row) => row.coverage_notes)]
-      .filter(Boolean)
-      .join(" ");
-    return { ...next, coverage_areas: areasFromPlainText(text) };
-  });
+  const [policies, setPolicies] = useState<BusinessPolicies>(() =>
+    normalizeBusinessPolicies(tenant.business_policies)
+  );
   const [agentTools, setAgentTools] = useState<AgentTools>(() =>
     parseAgentTools(tenant.agent_tools)
   );
@@ -395,7 +379,6 @@ export function TenantForm({
     parseTtsLexicon(tenant.tts_lexicon)
   );
   const [state, formAction, pending] = useActionState(saveAndCompileSettings, initial);
-  const [flash, setFlash] = useState<string | null>(null);
 
   const ttsLexiconJson = useMemo(
     () => JSON.stringify(lexiconForStorage(ttsLexicon)),
@@ -509,9 +492,7 @@ export function TenantForm({
   );
 
   useEffect(() => {
-    if (state.ok) {
-      setFlash("Saved. Your assistant will use this on the next call.");
-    }
+    if (state.ok) notify("Saved");
   }, [state]);
 
   useEffect(() => {
@@ -718,6 +699,10 @@ export function TenantForm({
     });
   }
 
+  const firstPlaceLine = placeLocationLine(locations[0] || emptyLocation());
+  const locationNotesField =
+    panel === "locations" && firstPlaceLine ? firstPlaceLine : locationNotes;
+
   return (
     <form id={TENANT_SETTINGS_FORM_ID} action={formAction}>
       <div className={settingsConsoleClass}>
@@ -729,6 +714,7 @@ export function TenantForm({
             lineLive={false}
             showBack={showBack}
             title={heading}
+            alert={state.error}
             action={
               panel === "pronunciation" ? undefined : (
                 <TenantSettingsSaveButton pending={pending} />
@@ -746,7 +732,7 @@ export function TenantForm({
       <input type="hidden" name="services_notes" value={servicesNotes} />
       <input type="hidden" name="business_hours" value={businessHoursSummary} />
       <input type="hidden" name="hours_schedule" value={hoursScheduleJson} />
-      <input type="hidden" name="location_notes" value={locationNotes} />
+      <input type="hidden" name="location_notes" value={locationNotesField} />
       <input type="hidden" name="after_hours_mode" value={afterHoursMode} />
       <input type="hidden" name="vertical" value={vertical} />
       <input type="hidden" name="handoff_mode" value={handoffMode} />
@@ -813,20 +799,7 @@ export function TenantForm({
               id="business_vertical"
               label="Business type"
               value={vertical}
-              onChange={(next) => {
-                setVertical(next);
-                if (next !== "home_services") return;
-                setPolicies((prev) => {
-                  if (prev.coverage_areas) return prev;
-                  const text = [
-                    prev.delivery,
-                    ...locations.map((row) => row.coverage_notes),
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
-                  return { ...prev, coverage_areas: areasFromPlainText(text) };
-                });
-              }}
+              onChange={setVertical}
               options={verticalSettingsOptions(vertical).map((opt) => ({
                 id: opt.id,
                 label: opt.label,
@@ -1657,10 +1630,11 @@ export function TenantForm({
                     updateLocation(index, "label", e.target.value);
                     if (index === 0) {
                       setLocationNotes(
-                        [e.target.value, loc.address, loc.landmark]
-                          .map((s) => s.trim())
-                          .filter(Boolean)
-                          .join(" · ") || locationNotes
+                        placeLocationLine({
+                          label: e.target.value,
+                          address: loc.address,
+                          landmark: loc.landmark,
+                        })
                       );
                     }
                   }}
@@ -1682,12 +1656,12 @@ export function TenantForm({
                   onChange={(value) => {
                     updateLocation(index, "address", value);
                     if (index === 0) {
-                      const next = { ...loc, address: value };
                       setLocationNotes(
-                        [next.label, next.address, next.landmark]
-                          .map((s) => s.trim())
-                          .filter(Boolean)
-                          .join(" · ")
+                        placeLocationLine({
+                          label: loc.label,
+                          address: value,
+                          landmark: loc.landmark,
+                        })
                       );
                     }
                   }}
@@ -1708,15 +1682,12 @@ export function TenantForm({
                   onChange={(e) => {
                     updateLocation(index, "landmark", e.target.value);
                     if (index === 0) {
-                      const next = {
-                        ...loc,
-                        landmark: e.target.value,
-                      };
                       setLocationNotes(
-                        [next.label, next.address, next.landmark]
-                          .map((s) => s.trim())
-                          .filter(Boolean)
-                          .join(" · ")
+                        placeLocationLine({
+                          label: loc.label,
+                          address: loc.address,
+                          landmark: e.target.value,
+                        })
                       );
                     }
                   }}
@@ -1841,9 +1812,9 @@ export function TenantForm({
                 label="Phone voice profile"
                 value={sonioxVoiceId}
                 onChange={setSonioxVoiceId}
-                options={voiceOptions.map((voice, index) => ({
+                options={voiceOptions.map((voice) => ({
                   id: voice.id,
-                  label: `Voice option ${index + 1}`,
+                  label: displaySonioxVoiceLabel("", voice.id, voiceOptions),
                 }))}
               />
             ) : (
@@ -2141,34 +2112,6 @@ export function TenantForm({
           </button>
         </div>
 
-        {filledFaqCount === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-surface/70 px-4 py-3">
-            <p className="text-sm text-ink-soft">Common questions</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {FAQ_STARTERS.map((starter) => (
-                <button
-                  key={starter.question}
-                  type="button"
-                  onClick={() =>
-                    setFaqs((prev) => {
-                      const next = [...prev];
-                      const blank = next.findIndex(
-                        (f) => !f.question.trim() && !f.answer.trim()
-                      );
-                      if (blank >= 0) next[blank] = { ...starter };
-                      else if (next.length < FAQ_MAX) next.push({ ...starter });
-                      return next;
-                    })
-                  }
-                  className={`${settingsGhostButtonClass} text-left`}
-                >
-                  {starter.question}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         <div className="overflow-hidden rounded-xl border border-line">
           <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.5rem] lg:items-center lg:gap-x-3 border-b border-line bg-surface-canvas px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
             <span>Question</span>
@@ -2191,7 +2134,6 @@ export function TenantForm({
                   value={faq.question}
                   maxLength={FAQ_QUESTION_MAX}
                   onChange={(e) => updateFaq(index, "question", e.target.value)}
-                  placeholder="Do you have parking?"
                   aria-invalid={faqDupIndexes.has(index) || undefined}
                   aria-describedby={
                     faqDupIndexes.has(index) ? `faq-dup-${index}` : undefined
@@ -2214,7 +2156,6 @@ export function TenantForm({
                   maxLength={FAQ_ANSWER_MAX}
                   onChange={(e) => updateFaq(index, "answer", e.target.value)}
                   rows={2}
-                  placeholder="Yes, free parking behind the building."
                   className={`${fieldClass} mt-1 py-2 leading-relaxed lg:mt-0`}
                 />
                 <p className="mt-0.5 text-xs text-ink-soft">
@@ -2248,16 +2189,6 @@ export function TenantForm({
         </div>
       </section>
 
-      {state.error ? (
-        <p className="text-sm text-warn" role="alert">
-          {state.error}
-        </p>
-      ) : null}
-      {flash && !state.error ? (
-        <p className="text-sm text-ok" role="status">
-          {flash}
-        </p>
-      ) : null}
         </div>
       </div>
     </form>

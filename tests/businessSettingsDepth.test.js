@@ -71,7 +71,8 @@ describe("business settings depth", () => {
     assert.match(bulletin, /type="time"/);
     assert.match(form, /useMountedPoolPick/);
     assert.match(form, /SERVICES_PASTE_POOLS/);
-    assert.match(faqs, /Westlands, opposite Naivas/);
+    assert.match(faqs, /export const FAQ_STARTERS: FaqEntry\[\] = \[\]/);
+    assert.doesNotMatch(faqs, /Westlands, opposite Naivas|free parking|M-Pesa|within Nairobi/);
     assert.doesNotMatch(bulletin, /Out of chicken today/);
     assert.doesNotMatch(form, /Plumbing\\nElectrical/);
     assert.doesNotMatch(ingest, /Home cleaning from 2,500 KES/);

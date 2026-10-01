@@ -463,22 +463,21 @@ export async function applyIngestAction(
         } could not fit (max 25).`
       : "";
 
-  if (mode === "replace_services_faqs") {
+  if (mode === "replace_services_faqs" || parts.length > 0) {
     return {
       ok: true,
       source,
-      message: `Saved a fresh catalog from this import (${parts.join(", ") || "no new rows"}). Train below should refresh. Open Train to review. Live on the next call.${capNote}`,
+      message: capNote.trim()
+        ? `Catalogue saved for the next call.${capNote}`
+        : "Catalogue saved for the next call.",
     };
   }
 
   return {
     ok: true,
     source,
-    message:
-      parts.length > 0
-        ? `Added ${parts.join(" and ")}. Open Train below to review (it refreshes after import). Live on the next call.${capNote}`
-        : capNote
-          ? `Nothing new fit.${capNote}`
-          : "Nothing new to add (those items were already on file).",
+    message: capNote
+      ? `Nothing new fit.${capNote}`
+      : "Nothing new to add (those items were already on file).",
   };
 }

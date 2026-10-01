@@ -26,13 +26,10 @@ export function TenantSettingsSaveButton({ pending = false }: { pending?: boolea
       {pending ? (
         <>
           <span aria-hidden="true" className={pendingSpinnerClass} />
-          Training
+          Saving
         </>
       ) : (
-        <>
-          <span className="sm:hidden">Save</span>
-          <span className="hidden sm:inline">Save and train</span>
-        </>
+        "Save"
       )}
     </button>
   );
