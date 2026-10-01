@@ -80,19 +80,19 @@ describe("business settings craft", () => {
   it("groups settings by owner job without dropping shipped destinations", () => {
     assert.match(nav, /id: "business"/);
     assert.match(nav, /id: "assistant"/);
-    assert.match(nav, /id: "offer"/);
+    assert.match(nav, /id: "knowledge"/);
     assert.match(nav, /id: "people"/);
-    assert.doesNotMatch(nav, /id: "knowledge"/);
+    assert.doesNotMatch(nav, /id: "offer"/);
     assert.doesNotMatch(nav, /id: "alerts"/);
     assert.doesNotMatch(nav, /id: "device"/);
     assert.match(nav, /title: "Business"/);
     assert.match(nav, /title: "Assistant"/);
-    assert.match(nav, /title: "Offer"/);
+    assert.match(nav, /title: "Knowledge"/);
+    assert.doesNotMatch(nav, /title: "Offer"/);
     assert.match(nav, /title: "People"/);
     assert.doesNotMatch(nav, /label: "Assistant"/);
     assert.doesNotMatch(nav, /id: "receptionist"/);
     assert.doesNotMatch(nav, /title: "Receptionist"/);
-    assert.doesNotMatch(nav, /title: "Knowledge"/);
     assert.doesNotMatch(nav, /title: "Alerts"/);
     assert.doesNotMatch(nav, /title: "This device"/);
     assert.match(nav, /label: "Identity"/);
@@ -367,7 +367,7 @@ describe("business settings craft", () => {
     ]);
     assert.deepEqual(
       got.sections.map((section) => section.title),
-      ["Business", "Offer", "Assistant", "People"]
+      ["Business", "Knowledge", "Assistant", "People"]
     );
     assert.equal(new Set(got.sections.map((section) => section.id)).size, got.sections.length);
     assert.equal(got.labels[got.labels.indexOf("Catalog") + 1], "Import");

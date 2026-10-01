@@ -79,7 +79,7 @@ export type SettingsNavItem = {
 };
 
 export type SettingsNavSection = {
-  id: "business" | "offer" | "assistant" | "people";
+  id: "business" | "knowledge" | "assistant" | "people";
   title: string;
   items: SettingsNavItem[];
 };
@@ -87,7 +87,7 @@ export type SettingsNavSection = {
 /**
  * Settings destinations. /settings is the phone index.
  * Wide screens open Hours, the second Business row.
- * One header each: Business, Offer, Assistant, People.
+ * One header each: Business, Knowledge, Assistant, People.
  * Import sits directly under Catalog. Team is People, ahead of Alerts.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
  * URLs stay `?tab=` / `?panel=`.
@@ -104,8 +104,8 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
   {
-    id: "offer",
-    title: "Offer",
+    id: "knowledge",
+    title: "Knowledge",
     items: [
       { label: "Catalog", target: { tab: "catalog" } },
       { label: "Import", target: { tab: "import" } },
