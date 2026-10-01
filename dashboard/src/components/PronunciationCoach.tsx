@@ -291,7 +291,7 @@ export function PronunciationCoach({
   useEffect(() => {
     const fd = new FormData();
     fd.set("id", tenantId);
-    loadQueueAction(fd);
+    startTransition(() => loadQueueAction(fd));
   }, [tenantId]);
 
   useEffect(() => {
@@ -752,6 +752,10 @@ export function PronunciationCoach({
 
   function runGeminiScan(confirmed: boolean) {
     setGeminiNote(null);
+    if (geminiBatch > 10 && !confirmed) {
+      setGeminiConfirmOpen(true);
+      return;
+    }
     const fd = new FormData();
     fd.set("id", tenantId);
     fd.set("current_lexicon", lexiconJson);

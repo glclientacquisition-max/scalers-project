@@ -110,21 +110,26 @@ export async function loadPronunciationReviewQueueAction(
   _prev: GeminiScanQueueState,
   formData: FormData
 ): Promise<GeminiScanQueueState> {
-  if (!(await isAuthenticated())) {
-    return { error: "Sign in to load review queue." };
-  }
-  const tenant = await getCurrentTenant();
-  if (!tenant) return { error: "No workspace linked to this account." };
-  const id = String(formData.get("id") || "").trim();
-  if (!id || id !== tenant.id) return { error: "Forbidden." };
+  try {
+    if (!(await isAuthenticated())) {
+      return { error: "Sign in to load review queue." };
+    }
+    const tenant = await getCurrentTenant();
+    if (!tenant) return { error: "No workspace linked to this account." };
+    const id = String(formData.get("id") || "").trim();
+    if (!id || id !== tenant.id) return { error: "Forbidden." };
 
-  const { queue } = tenantQueueFields(tenant as Record<string, unknown>);
-  const pending = queue.filter((c) => c.status === "pending");
-  return {
-    ok: true,
-    queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
-    sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
-  };
+    const { queue } = tenantQueueFields(tenant as Record<string, unknown>);
+    const pending = queue.filter((c) => c.status === "pending");
+    return {
+      ok: true,
+      queue: pending.filter((c) => c.type === "AGENT_MISPRONUNCIATION"),
+      sttHints: pending.filter((c) => c.type === "LIKELY_MISHEARD"),
+    };
+  } catch (err) {
+    logDeskError("pronunciation-review-load", err instanceof Error ? err.message : err);
+    return { error: "Could not load review." };
+  }
 }
 
 /**
@@ -133,6 +138,17 @@ export async function loadPronunciationReviewQueueAction(
  */
 export async function geminiScanRecentCallsAction(
   _prev: GeminiScanState,
+  formData: FormData
+): Promise<GeminiScanState> {
+  try {
+    return await runGeminiScanRecentCalls(formData);
+  } catch (err) {
+    logDeskError("pronunciation-scan", err instanceof Error ? err.message : err);
+    return { error: "Could not listen." };
+  }
+}
+
+async function runGeminiScanRecentCalls(
   formData: FormData
 ): Promise<GeminiScanState> {
   if (!(await isAuthenticated())) {
