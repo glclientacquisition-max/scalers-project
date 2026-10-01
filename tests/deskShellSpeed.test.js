@@ -281,6 +281,39 @@ describe("settings save scope", () => {
     assert.equal(owned[0].say, "Eye-sha");
   });
 
+  it("does not let a Voice save overwrite team, catalogs, or FAQs", () => {
+    const team = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("tools", "teamDirectory", [], [{ name: "Wanjiku" }])`
+    );
+    assert.deepEqual(team, [{ name: "Wanjiku" }]);
+    const handoff = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("tools", "handoffMode", "callback", "live_transfer")`
+    );
+    assert.equal(handoff, "live_transfer");
+    const catalogs = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("tools", "servicesCatalog", [], [{ name: "Delivery" }])`
+    );
+    assert.deepEqual(catalogs, [{ name: "Delivery" }]);
+    const products = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("tools", "productCatalog", [], [{ name: "Atlas" }])`
+    );
+    assert.deepEqual(products, [{ name: "Atlas" }]);
+    const faqs = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("tools", "faqs", [], [{ q: "Hours?", a: "Nine to five." }])`
+    );
+    assert.equal(faqs[0].q, "Hours?");
+    const teamOwnsHandoff = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("team", "handoffMode", "live_transfer", "callback")`
+    );
+    assert.equal(teamOwnsHandoff, "live_transfer");
+  });
+
   it("does not let Identity overwrite places or policies", () => {
     const places = load(
       "dashboard/src/lib/settingsSaveScope.ts",

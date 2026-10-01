@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
 import type { FaqEntry, TeamDirectoryEntry, TenantRow } from "@/lib/supabase";
 import {
   canonicalizeAgentTone,
@@ -71,10 +70,8 @@ import {
 } from "@/lib/vertical";
 import {
   firstDialableTeammate,
-  HANDOFF_OPTIONS,
   liveConnectBlurb,
   parseHandoffMode,
-  teamHasDialablePhone,
   type HandoffMode,
 } from "@/lib/handoffMode";
 import {
@@ -139,10 +136,7 @@ import {
   EMPTY_TEAM_NOTIFY_FLAGS,
   normalizeTeamDirectory,
 } from "@/lib/teamNotify";
-import {
-  businessSettingsHref,
-  type SettingsPanel,
-} from "@/lib/businessSettingsNav";
+import type { SettingsPanel } from "@/lib/businessSettingsNav";
 
 export type { SettingsPanel } from "@/lib/businessSettingsNav";
 
@@ -378,7 +372,6 @@ export function TenantForm({
     return rows.length ? rows : [emptyMember()];
   });
   const liveDest = firstDialableTeammate(team);
-  const canMessageTeam = teamHasDialablePhone(team);
   const [faqs, setFaqs] = useState<FaqEntry[]>(() => normalizeFaqs(tenant.faqs));
   const [ttsLexicon, setTtsLexicon] = useState<TtsLexiconEntry[]>(() =>
     parseTtsLexicon(tenant.tts_lexicon)
@@ -1938,22 +1931,6 @@ export function TenantForm({
             );
           })}
         </SettingsGroup>
-        <SettingsGroup title="Handoff">
-          <SettingsRow label="Mode">
-            <p className="text-sm font-medium text-ink">
-              {HANDOFF_OPTIONS.find((opt) => opt.id === handoffMode)?.label ||
-                "Message teammate"}
-            </p>
-          </SettingsRow>
-          <div className="px-4 py-2">
-            <Link
-              href={businessSettingsHref("train", "team")}
-              className={`inline-flex min-h-11 items-center text-sm font-medium text-accent-deep ${deskShiftClass} hover:text-accent-deep-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`}
-            >
-              Change in Team
-            </Link>
-          </div>
-        </SettingsGroup>
       </section>
 
 <section
@@ -1985,31 +1962,20 @@ export function TenantForm({
       </section>
 
       <section className={panel === "team" ? "space-y-4" : "hidden"}>
-        <div className="space-y-1.5">
-          <h3 className={`${settingsBlockTitleClass} px-1`}>Handoff</h3>
-          <SettingsSegmented
-            label="Handoff mode"
-            value={handoffMode}
-            options={HANDOFF_OPTIONS.filter(
-              (opt) =>
-                opt.id === "callback" ||
-                liveTransferExecutor ||
-                handoffMode === "live_transfer"
-            ).map((opt) => ({ id: opt.id, label: opt.label }))}
-            onChange={setHandoffMode}
-          />
-          {handoffMode === "live_transfer" ? (
-            <p className="px-1 text-xs text-[var(--ink-soft)]">
-              {liveConnectBlurb(liveDest?.name)}
-            </p>
-          ) : (
-            <p className="px-1 text-xs text-[var(--ink-soft)]">
-              {canMessageTeam
-                ? "SMS, WhatsApp, or email."
-                : "Add a team phone or email."}
-            </p>
-          )}
-        </div>
+        {liveTransferExecutor || handoffMode === "live_transfer" ? (
+          <SettingsGroup>
+            <SettingsRow label="Live connect" control="switch">
+              <ToolSwitch
+                checked={handoffMode === "live_transfer"}
+                label="Live connect"
+                onChange={(next) =>
+                  setHandoffMode(next ? "live_transfer" : "callback")
+                }
+              />
+            </SettingsRow>
+          </SettingsGroup>
+        ) : null}
+        <p className="px-1 text-xs text-ink-soft">{liveConnectBlurb(liveDest?.name)}</p>
 
         <div className="space-y-1">
           <div className="flex flex-wrap items-end justify-between gap-3">

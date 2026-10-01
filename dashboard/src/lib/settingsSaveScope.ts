@@ -5,6 +5,8 @@
  *
  * Identity does not own places or policies. The hours location line is owned by
  * Locations, which is the screen that edits it. Hours owns the weekly grid only.
+ * Voice (`tools`) posts handoff_mode with the rest of the form. Team owns that
+ * field, so a Voice save keeps the stored mode, directory, lexicon, catalogs, and FAQs.
  */
 const SETTINGS_SCOPE_FIELDS: Record<string, readonly string[]> = {
   identity: [

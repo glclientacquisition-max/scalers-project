@@ -179,10 +179,39 @@ describe("business settings depth", () => {
     assert.doesNotMatch(compileActions, /alert_email/);
   });
 
-  it("edits handoff only on Team", () => {
-    assert.match(form, /label="Handoff mode"/);
-    assert.match(form, /Change in Team/);
-    assert.equal((form.match(/setHandoffMode/g) || []).length, 2);
-    assert.doesNotMatch(form, /aria-label="Handoff"/);
+  it("keeps handoff off Voice and drops the one-item Team picker", () => {
+    const voiceStart = form.indexOf('panel === "tools"');
+    const voice = form.slice(
+      voiceStart,
+      form.indexOf('panel === "pronunciation"', voiceStart)
+    );
+    assert.match(voice, /title="Voice"/);
+    assert.match(voice, /title="Tools"/);
+    assert.match(voice, /Hear sample/);
+    assert.match(voice, /htmlFor="soniox_voice_id"/);
+    assert.match(voice, /htmlFor="soniox_voice_label"/);
+    assert.doesNotMatch(voice, /Handoff/);
+    assert.doesNotMatch(voice, /HANDOFF_OPTIONS/);
+    assert.doesNotMatch(voice, /Change in Team/);
+    assert.doesNotMatch(voice, /label="Handoff mode"/);
+
+    const team = form.slice(
+      form.indexOf('panel === "team"'),
+      form.indexOf('panel === "faqs"')
+    );
+    assert.match(team, /Add person/);
+    assert.match(team, /liveConnectBlurb\(liveDest\?\.name\)/);
+    assert.match(team, /label="Live connect"/);
+    assert.match(team, /<ToolSwitch/);
+    assert.match(team, /setHandoffMode\(next \? "live_transfer" : "callback"\)/);
+    assert.doesNotMatch(team, /HANDOFF_OPTIONS/);
+    assert.doesNotMatch(team, /SettingsSegmented/);
+    assert.doesNotMatch(team, /label="Handoff mode"/);
+    assert.doesNotMatch(team, /Message teammate/);
+    assert.doesNotMatch(team, />Handoff</);
+    assert.match(form, /name="handoff_mode"/);
+    assert.doesNotMatch(team, /Alert phone/);
+    assert.match(alerts, /Alert phone/);
+    assert.doesNotMatch(alerts, /Add person/);
   });
 });
