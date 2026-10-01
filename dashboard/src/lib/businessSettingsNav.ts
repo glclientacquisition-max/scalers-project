@@ -79,16 +79,18 @@ export type SettingsNavItem = {
 };
 
 export type SettingsNavSection = {
-  id: "business" | "assistant" | "knowledge" | "alerts";
+  id: "business" | "knowledge" | "assistant" | "people";
   title: string;
   items: SettingsNavItem[];
 };
 
 /**
  * Settings destinations. /settings is the phone index.
- * Business → Assistant → Knowledge → Alerts.
+ * Wide screens open Hours, the second Business row.
+ * One header each: Business, Knowledge, Assistant, People.
+ * Import sits directly under Catalog. Team is People, ahead of Alerts.
  * Appearance is the account-menu theme cluster. It is not a settings tab.
- * Extra shipped panels sit in the closest group. URLs stay `?tab=` / `?panel=`.
+ * URLs stay `?tab=` / `?panel=`.
  */
 export const SETTINGS_NAV: SettingsNavSection[] = [
   {
@@ -102,6 +104,15 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
   {
+    id: "knowledge",
+    title: "Knowledge",
+    items: [
+      { label: "Catalog", target: { tab: "catalog" } },
+      { label: "Import", target: { tab: "import" } },
+      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
+    ],
+  },
+  {
     id: "assistant",
     title: "Assistant",
     items: [
@@ -111,23 +122,31 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
   {
-    id: "knowledge",
-    title: "Knowledge",
+    id: "people",
+    title: "People",
     items: [
-      { label: "FAQs", target: { tab: "train", panel: "faqs" } },
-      { label: "Catalog", target: { tab: "catalog" } },
-      { label: "Import", target: { tab: "import" } },
-    ],
-  },
-  {
-    id: "alerts",
-    title: "Alerts",
-    items: [
-      { label: "Alerts", target: { tab: "alerts" } },
       { label: "Team", target: { tab: "train", panel: "team" } },
+      { label: "Alerts", target: { tab: "alerts" } },
     ],
   },
 ];
+
+/** Wide-screen destination for `/settings` with no tab. */
+export const SETTINGS_HOURS_HREF = businessSettingsHref("train", "hours");
+
+/**
+ * md+ visits to `/settings` with no tab open Hours.
+ * No cookie (phone, or a first paint the server cannot see) stays on the index.
+ * `?tab=train` stays Identity so Home Train does not jump to Hours.
+ */
+export function settingsWideDefaultHref(
+  tabRaw: string | undefined | null,
+  deskMd: string | undefined | null
+): string | null {
+  if (tabRaw) return null;
+  if (deskMd !== "1") return null;
+  return SETTINGS_HOURS_HREF;
+}
 
 export function settingsNavHref(target: SettingsNavTarget): string {
   return target.tab === "train"
@@ -138,16 +157,10 @@ export function settingsNavHref(target: SettingsNavTarget): string {
 export function settingsNavItemActive(
   target: SettingsNavTarget,
   tab: BusinessSettingsTab,
-  trainPanel: SettingsPanel,
-  options?: { selectHubIdentity?: boolean }
+  trainPanel: SettingsPanel
 ): boolean {
   if (target.tab === "train") {
-    if (tab === "train" && trainPanel === target.panel) return true;
-    return (
-      target.panel === "identity" &&
-      Boolean(options?.selectHubIdentity) &&
-      tab === "menu"
-    );
+    return tab === "train" && trainPanel === target.panel;
   }
   return tab === target.tab;
 }

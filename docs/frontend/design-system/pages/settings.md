@@ -11,18 +11,18 @@ See [`MASTER.md`](../MASTER.md) Components. Settings primitives live in `setting
 
 ```text
 Business       Identity · Hours · Locations · Policies
+Knowledge      Catalog · Import · FAQs
 Assistant      Voice · Pronunciation · Test
-Knowledge      FAQs · Catalog · Import
-Alerts         Alerts · Team
+People         Team · Alerts
 ```
 
-Shipped panels that do not map 1:1 sit in the closest group. Locations and Policies stay under Business. Test stays under Assistant. Team stays under Alerts. Import stays under Knowledge. Updates stay on Home.
+One header per group. Import sits directly under Catalog. Team is the first People row. Alerts is not the parent of Team. Locations and Policies keep those labels. FAQs stay in Knowledge. Updates stay on Home.
 
 Phone: dense index rows. Tap a row to drill in. Nested panels hide the bottom tab bar (`data-desk-nested`). The Settings hub keeps tabs. `DeskBack` icon, aria-label Settings (`lg:hidden`). The `md+` rail stays packed (`md:w-max md:max-w-[13.5rem] shrink-0`, group headers + tabs) beside a fluid panel (`min-w-0 flex-1`). `SettingsSegmented` uses Inbox rate cards (`deskRateCardClass`). No `max-w-xl` or `max-w-5xl` dead zone. Headers are not links. Active rail tab uses a left `accent` bar and `text-accent-deep`, not a filled pill.
 
 Sticky Save on Catalog and Train panels, top-right of the panel header. Alerts, Import, and Test use the same menu without a second compile save. Alerts Save is the panel primary. Test has one filled control: Call when the line is live, otherwise Generate preview.
 
-Bare `/settings` is the hub. lg+ hub shows Identity in the panel. `?tab=updates`, `?tab=today`, and `?tab=appearance` open the hub. Updates stay on Home. Appearance stays on the account menu. `?tab=alerts` is Alerts. Hash `#train` is not routed. `Train` is the verb on Save.
+Bare `/settings` is the phone index. md+ `/settings` with no tab redirects to Hours (`?tab=train&panel=hours`) before a form renders. `?tab=train` still opens Identity. Test line still opens Test. `?tab=updates`, `?tab=today`, and `?tab=appearance` open the hub, then a wide screen follows the Hours redirect. Updates stay on Home. Appearance stays on the account menu. `?tab=alerts` is Alerts. Hash `#train` is not routed. `Train` is the verb on Save.
 
 ## Chrome
 
