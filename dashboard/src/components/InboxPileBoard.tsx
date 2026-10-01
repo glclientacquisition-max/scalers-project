@@ -6,7 +6,7 @@ import { EndlessSentinel } from "@/components/EndlessList";
 import { PullRefreshMark, pullRootVisible, usePhoneListPull, usePhoneTabRefresh } from "@/components/PhonePullRefresh";
 import { DeskError } from "@/components/ui/DeskError";
 import { DeskDataTable } from "@/components/ui/DeskDataTable";
-import { listWindowClass } from "@/lib/endlessList";
+import { inboxPhoneWindowClass, listWindowClass } from "@/lib/endlessList";
 import { businessSettingsHref } from "@/lib/businessSettingsNav";
 import { callsHref } from "@/lib/callsTriage";
 import { nicheCopy } from "@/lib/inboxNiche";
@@ -225,7 +225,7 @@ export function InboxPileBoard({
               ids={pageRows.map((item) => item.id)}
               scopeKey={`${purpose}:${page}:${q}`}
             >
-              <ul className={`mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden ${listWindowClass}`}>
+              <ul className={`mt-8 list-none overflow-hidden rounded-2xl border border-line bg-surface lg:hidden ${inboxPhoneWindowClass}`}>
                 {showArchivedEntry ? (
                   <InboxArchivedPhoneRow count={counts.archived} ret={ret} />
                 ) : null}

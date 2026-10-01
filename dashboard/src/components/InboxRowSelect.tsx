@@ -123,7 +123,7 @@ export function InboxPhoneOpen({
       <button
         type="button"
         aria-label="Toggle selection"
-        className="flex min-w-0 flex-1 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="flex min-w-0 w-full flex-1 items-stretch rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         onClick={() => ui.toggle(itemId)}
       >
         {children}
@@ -131,14 +131,14 @@ export function InboxPhoneOpen({
     );
   }
   if (!href) {
-    return <div className="flex min-w-0 flex-1 items-center">{children}</div>;
+    return <div className="flex min-w-0 w-full flex-1 items-stretch">{children}</div>;
   }
   return (
     <Link
       href={href}
       aria-label="Conversation"
       data-inbox-row-body=""
-      className="flex min-w-0 flex-1 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="flex min-w-0 w-full flex-1 items-stretch rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       {children}
     </Link>
