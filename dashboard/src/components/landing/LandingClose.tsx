@@ -6,10 +6,12 @@ export function LandingClose() {
     <>
       <section className="landing-wash border-t border-hairline" aria-labelledby="close-title">
         <div className="mx-auto max-w-desk px-4 py-16 sm:px-6 lg:py-24">
-          <h2 id="close-title" className="max-w-[16ch] font-display text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
-            Put the phone on your business assistant.
+          <h2 id="close-title" className="max-w-[18ch] font-display text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
+            Your business assistant helps you run the business.
           </h2>
-          <p className="mt-4 max-w-[65ch] text-base leading-7 text-ink-2">Private beta. Invite only.</p>
+          <p className="mt-4 max-w-[65ch] text-base leading-7 text-ink-2">
+            Request beta access. Signup is how you join.
+          </p>
           <div className="mt-8 flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-4">
             <LandingCta size="lg" />
             <HowItWorksLink />
@@ -21,7 +23,7 @@ export function LandingClose() {
           <div>
             <p className="font-display text-title text-ink">Scalers</p>
             <p className="mt-1 max-w-[65ch] text-base leading-7 text-ink-2">
-              Business assistant, starting with voice and Desk.
+              A business assistant that helps you run the business.
             </p>
             <a
               href={SELL_URL}

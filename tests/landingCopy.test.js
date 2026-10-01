@@ -26,15 +26,25 @@ describe("marketing landing honesty", () => {
     assert.match(source, /See how it works/);
     assert.match(source, /Private beta\. Invite only\./);
     assert.match(source, /https:\/\/scalers\.co\.ke/);
+    assert.match(source, /helps you run the business/);
+    assert.match(source, /business knowledge/);
+    assert.match(source, /Scalers app/);
+    assert.match(source, /unique Scalers number/);
+    assert.match(source, /forwarding missed, busy, and off/);
+    assert.match(source, /SMS, WhatsApp, and email/);
   });
 
   it("fails closed on fake proof, prices, and unshipped claims", () => {
     assert.doesNotMatch(source, /Get [Ss]tarted|Open Desk|Start free trial|Book a walkthrough/);
     assert.doesNotMatch(source, /vercel\.app/i);
     assert.doesNotMatch(source, /AI-powered|trusted by|logo wall/i);
-    assert.doesNotMatch(source, /KES\s|≥\s*90|90%|live transfer|M-Pesa|Mpesa|multi-agent/i);
+    assert.doesNotMatch(source, /\bKES\b|≥\s*90|90%|live transfer|M-Pesa|\bMpesa\b|multi-agent/i);
     assert.doesNotMatch(source, /PackagePrices|id="packages"/);
     assert.doesNotMatch(source, /[—–]/);
+    assert.doesNotMatch(source, /\bDesk\b|\bTrain\b|\btrain\b/);
+    assert.doesNotMatch(source, /Kenya|Kenyan|Kenya-first/);
+    assert.doesNotMatch(source, /business line you already use|Put the phone/);
+    assert.doesNotMatch(source, /Done and Dusted|Dusted/);
   });
 
   it("keeps the section order and one product mock", () => {
@@ -48,6 +58,6 @@ describe("marketing landing honesty", () => {
     }
     assert.match(page, /<main id="main">/);
     assert.match(source, /id="how"/);
-    assert.match(source, /id="desk"/);
+    assert.match(source, /id="app"/);
   });
 });

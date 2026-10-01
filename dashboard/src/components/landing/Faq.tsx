@@ -3,27 +3,31 @@ import { LandingCta } from "@/components/landing/LandingCta";
 const QUESTIONS = [
   {
     q: "What is live today?",
-    a: "Answering missed, busy, and after-hours calls on your business number. Train for the facts you enter. Desk for the inbox. WhatsApp or email when a caller needs a person.",
+    a: "A business assistant on a unique Scalers number. It answers from the business knowledge you enter. You are notified by SMS, WhatsApp, and email. The work lands in the Scalers app.",
   },
   {
     q: "Who is it for?",
-    a: "Service businesses first, including people who go to the customer. Shops second. We started in Kenya.",
-  },
-  {
-    q: "What if the caller needs a person?",
-    a: "You get a WhatsApp or email. The call stays in Desk so you can call them back.",
-  },
-  {
-    q: "How do I join?",
-    a: "Request beta access. Scalers is in private beta, by invite.",
+    a: "Service businesses first, including people who go to the customer. Shops second.",
   },
   {
     q: "Where do the answers come from?",
-    a: "From the facts you enter in Train: hours, services, and what the line may say.",
+    a: "From your business knowledge in the app: hours, services, policies, and the questions you have already answered.",
+  },
+  {
+    q: "How am I notified?",
+    a: "By SMS, WhatsApp, and email. The same work shows up in the Scalers app.",
+  },
+  {
+    q: "Which number do callers use?",
+    a: "We give you a unique Scalers number. Prefer forwarding missed, busy, and off calls from your business phone. We walk you through that. You can also publish the Scalers number so the assistant takes every call.",
   },
   {
     q: "What does it cost?",
-    a: "Package prices are not published here. Access is private beta, by invite.",
+    a: "Prices are not published. Access is by invite during the private beta.",
+  },
+  {
+    q: "How do I join?",
+    a: "Request beta access. Signup is how you join the private beta.",
   },
 ];
 

@@ -8,20 +8,20 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://scalers.co.ke";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Scalers | Business assistant for your phone line",
+    default: "Scalers | Business assistant",
     template: "%s · Scalers",
   },
   description:
-    "Scalers answers missed, busy, and after-hours calls on your business number. Train the facts and work the inbox in Desk. Private beta.",
+    "A business assistant that helps you run the business. It answers from your business knowledge, notifies you by SMS, WhatsApp, and email, and keeps the work in the Scalers app. Private beta.",
   applicationName: "Scalers",
   icons: {
     icon: [{ url: "/brand/favicon.png", type: "image/png" }],
     apple: [{ url: "/brand/favicon.png" }],
   },
   openGraph: {
-    title: "Scalers | Business assistant for your phone line",
+    title: "Scalers | Business assistant",
     description:
-      "Answers missed, busy, and after-hours calls on your business number. Train the facts and work the inbox in Desk. Private beta.",
+      "A business assistant that helps you run the business. It answers from your business knowledge, notifies you by SMS, WhatsApp, and email, and keeps the work in the Scalers app. Private beta.",
     siteName: "Scalers",
     images: [
       {
@@ -34,9 +34,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Scalers | Business assistant for your phone line",
+    title: "Scalers | Business assistant",
     description:
-      "Answers missed, busy, and after-hours calls on your business number. Train the facts and work the inbox in Desk. Private beta.",
+      "A business assistant that helps you run the business. It answers from your business knowledge, notifies you by SMS, WhatsApp, and email, and keeps the work in the Scalers app. Private beta.",
     images: ["/og.png"],
   },
 };

@@ -2,16 +2,16 @@ import { LandingCta } from "@/components/landing/LandingCta";
 
 const OUTCOMES = [
   {
-    title: "The line gets an answer",
-    text: "Missed, busy, and after-hours calls are picked up on your number.",
+    title: "You stay with the customer",
+    text: "The business still answers while you are on a job or after you have closed.",
   },
   {
-    title: "You keep the facts",
-    text: "Train holds the hours and services you enter. Desk holds the inbox.",
+    title: "Callers hear your business",
+    text: "Hours, services, and policies come from what you entered.",
   },
   {
-    title: "You hear when it needs you",
-    text: "WhatsApp or email when a caller needs a person. You call them back from Desk.",
+    title: "The work is waiting for you",
+    text: "You open the Scalers app and see what needs you, already notified.",
   },
 ];
 

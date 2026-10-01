@@ -34,8 +34,8 @@ export function LandingNav() {
           <a href="#how" className={linkClass}>
             How it works
           </a>
-          <a href="#desk" className={linkClass}>
-            Desk
+          <a href="#app" className={linkClass}>
+            The app
           </a>
         </nav>
         <LandingCta />

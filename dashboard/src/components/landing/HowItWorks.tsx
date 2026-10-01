@@ -1,23 +1,23 @@
 const STEPS = [
   {
-    title: "Your number",
-    text: "Calls come in on the business line you already use.",
+    title: "Scalers number",
+    text: "We give you a unique Scalers number. Prefer forwarding missed, busy, and off calls from your actual business phone. We walk you through it. Or publish that Scalers number if you want the assistant on every call.",
   },
   {
-    title: "Train",
-    text: "You write hours, services, and what the line may say.",
+    title: "Business knowledge",
+    text: "You enter hours, services, policies, and the questions customers ask. Answers use what your business knows.",
   },
   {
     title: "Answer",
-    text: "Scalers picks up missed, busy, and after-hours calls.",
+    text: "When you cannot pick up, the assistant answers from that knowledge.",
   },
   {
     title: "Notify",
-    text: "When a caller needs a person, you get WhatsApp or email.",
+    text: "You hear about the work by SMS, WhatsApp, and email.",
   },
   {
-    title: "Desk",
-    text: "Needs you, return calls, and contacts sit in one inbox.",
+    title: "Scalers app",
+    text: "Needs you, return calls, and contacts land in the Scalers app.",
   },
 ];
 

@@ -1,6 +1,6 @@
 const SITUATIONS = [
   {
-    label: "Missed",
+    label: "On the job",
     text: "You are on site, or the handset is in another room.",
   },
   {
@@ -9,7 +9,7 @@ const SITUATIONS = [
   },
   {
     label: "After hours",
-    text: "The business is shut. The line still rings.",
+    text: "The business is shut. The phone still rings.",
   },
 ];
 
@@ -22,7 +22,7 @@ export function Problem() {
             The phone rings while you are on the job.
           </h2>
           <p className="mt-4 text-base leading-7 text-ink-2">
-            Home services first, then shop counters. The call does not wait until you are free.
+            Service businesses first, then shops. The call does not wait until you are free.
           </p>
         </div>
         <dl className="mt-10 max-w-3xl divide-y divide-hairline border-y border-hairline">

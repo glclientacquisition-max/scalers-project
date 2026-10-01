@@ -29,18 +29,18 @@ const ROWS = [
 ];
 
 /**
- * Static Desk inbox. Labels match the product (Needs you, Return calls, Contacts).
+ * Static inbox in the Scalers app. Labels match the product (Needs you, Return calls, Contacts).
  * No customer names, counts, or percentages.
  */
-export function DeskMock() {
+export function AppMock() {
   return (
     <figure
-      id="desk"
+      id="app"
       className="scroll-mt-28 overflow-hidden rounded-2xl border border-hairline bg-surface shadow-sheet"
     >
       <figcaption className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-3">
         <span className="font-display text-title text-ink">Inbox</span>
-        <span className="text-meta text-ink-3">Desk</span>
+        <span className="text-meta text-ink-3">Scalers app</span>
       </figcaption>
       <div className="flex gap-4 border-b border-hairline px-4 text-meta" aria-hidden="true">
         <span className="border-b-2 border-brand py-3 font-medium text-ink">Needs you</span>
