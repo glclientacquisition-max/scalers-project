@@ -74,7 +74,7 @@ All is newest first. No visit backlog, no urgent pin. Needs you still pins urgen
 
 `hold_or_pickup` and `order_enquiry` are Holds. Bare `product_inquiry` with no attached visit or hold is an active lead on Needs you, not Answered. An attached appointment is a booking and wins as a visit.
 
-**Live subscribe:** `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page. Coming back to the tab does not reload the page. Pull to refresh still does. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update.
+**Live subscribe:** `LiveInbox` mounts once in the desk shell and stays subscribed on Settings, a call, and every other desk route. It waits for an owner JWT, then listens to `calls` / `service_requests` / `appointments` for the tenant (Supabase Realtime, member RLS governs what an owner receives). After a 1.2s debounce it `revalidatePath`s `/calls` and `/home` and re-runs the current page. Coming back to the tab does not reload the page. Pull to refresh still does. Without the publication, replica identity FULL, or an owner session the page stays refresh-to-update. The same `supabase_realtime` publication also includes `tenants`, `wallet_ledger`, and `transcripts`. Apply `realtime_inbox.sql` by hand.
 
 Columns (`lg+` table, same data as the phone row; phone rows stay through `md` so the Action dock is not clipped):
 - Mixed filters: Work / Needed / When / Action.

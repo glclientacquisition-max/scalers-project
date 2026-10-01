@@ -156,7 +156,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 31c | `service_request_windows.sql` | `contacts_and_requests.sql` |
 | 32 | `product_catalog_and_social.sql` | `business_operating_model.sql` |
 | 33 | `appointments.sql` | **`contacts_and_requests.sql`** (FK to contacts) |
-| 33b | `realtime_inbox.sql` | `contacts_and_requests.sql`, `appointments.sql` |
+| 33b | `realtime_inbox.sql` | `contacts_and_requests.sql`, `appointments.sql`, `one_wallet_billing.sql` |
 | 33c | `realtime_inbox_replica_identity.sql` | `realtime_inbox.sql` |
 | 33d | `notify_send_ledger.sql` | `contacts_and_requests.sql` (`tenants`, `calls`, `current_user_tenant_ids`) |
 | 33e | `sms_allowance.sql` | `notify_send_ledger.sql`, **`line_rental_grace.sql`** (widens protect trigger) |
@@ -165,7 +165,7 @@ This document is the **executable** apply sequence for greenfield / full staging
 | 33h | `package_minute_consume.sql` | `package_catalog.sql` (README 24g) |
 
 **Blocker:** `appointments.sql` before `contacts_and_requests.sql` → `relation "public.contacts" does not exist`.
-`realtime_inbox.sql` adds the three work tables to `supabase_realtime`. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.
+`realtime_inbox.sql` adds `calls`, `service_requests`, `appointments`, `tenants`, `wallet_ledger`, and `transcripts` to `supabase_realtime`. Apply that file by hand. Deploy does not run it. `realtime_inbox_replica_identity.sql` sets `REPLICA IDENTITY FULL` so `tenant_id` filters match hangup UPDATEs.
 
 ---
 

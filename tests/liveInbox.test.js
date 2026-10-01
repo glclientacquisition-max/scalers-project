@@ -82,8 +82,15 @@ describe("live desk revalidation", () => {
 describe("realtime publication script", () => {
   const sql = read("docs/supabase/realtime_inbox.sql");
 
-  it("publishes exactly the three work tables", () => {
-    for (const table of ["calls", "service_requests", "appointments"]) {
+  it("publishes the work tables plus tenants, wallet_ledger, and transcripts", () => {
+    for (const table of [
+      "calls",
+      "service_requests",
+      "appointments",
+      "tenants",
+      "wallet_ledger",
+      "transcripts",
+    ]) {
       assert.ok(sql.includes(`'${table}'`), `publishes ${table}`);
     }
     assert.match(sql, /alter publication supabase_realtime add table/i);
