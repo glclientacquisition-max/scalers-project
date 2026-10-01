@@ -88,6 +88,18 @@
 }
 
 /*
+ * Native option lists follow the document color-scheme. Tokens stay on
+ * .desk-theme / .admin-theme. System leaves this unset so the OS wins.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+/*
  * Dark palette for the owner desk and the Super Admin shell. Marketing, auth,
  * and onboarding stay light. Activation: <html data-theme="dark">, or
  * system dark with no explicit choice. The two blocks must stay in sync.
@@ -124,6 +136,11 @@
   background: var(--canvas);
 }
 
+:root[data-theme="dark"] .desk-theme select,
+:root[data-theme="dark"] .admin-theme select {
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .desk-theme,
   :root:not([data-theme="light"]) .admin-theme {
@@ -155,6 +172,11 @@
     --tw-ring-offset-color: var(--surface);
     color-scheme: dark;
     background: var(--canvas);
+  }
+
+  :root:not([data-theme="light"]) .desk-theme select,
+  :root:not([data-theme="light"]) .admin-theme select {
+    color-scheme: dark;
   }
 }
 

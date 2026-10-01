@@ -38,7 +38,10 @@ export function applyDeskTheme(choice: DeskTheme): void {
   const root = document.documentElement;
   if (choice === "system") {
     delete root.dataset.theme;
+    // Empty inline so prefers-color-scheme wins for native option lists.
+    root.style.colorScheme = "";
   } else {
     root.dataset.theme = choice;
+    root.style.colorScheme = choice;
   }
 }

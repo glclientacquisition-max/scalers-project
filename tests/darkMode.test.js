@@ -89,7 +89,23 @@ describe("theme activation", () => {
     assert.match(layout, /DESK_THEME_STORAGE_KEY/);
     assert.match(layout, /localStorage\.getItem\(\$\{JSON\.stringify\(DESK_THEME_STORAGE_KEY\)\}\)/);
     assert.match(layout, /document\.documentElement\.dataset\.theme/);
+    assert.match(layout, /document\.documentElement\.style\.colorScheme=t/);
     assert.match(layout, /dangerouslySetInnerHTML/);
+  });
+
+  it("pins the document color-scheme so native option lists match the card", () => {
+    const css = read("dashboard/src/app/globals.css");
+    const themeLib = read("dashboard/src/lib/deskTheme.ts");
+    const master = read("docs/frontend/design-system/MASTER.md");
+    assert.match(themeLib, /root\.style\.colorScheme = choice/);
+    assert.match(themeLib, /root\.style\.colorScheme = ""/);
+    assert.match(css, /:root\[data-theme="dark"\] \{\s*color-scheme: dark;\s*\}/);
+    assert.match(css, /:root\[data-theme="light"\] \{\s*color-scheme: light;\s*\}/);
+    assert.match(css, /:root\[data-theme="dark"\] \.desk-theme select,\s*:root\[data-theme="dark"\] \.admin-theme select \{\s*color-scheme: dark;\s*\}/);
+    assert.match(css, /:root:not\(\[data-theme="light"\]\) \.desk-theme select,\s*:root:not\(\[data-theme="light"\]\) \.admin-theme select \{\s*color-scheme: dark;\s*\}/);
+    assert.match(css, /\.desk-theme option,\s*\.admin-theme option \{\s*color: var\(--ink\);\s*background-color: var\(--card\);/);
+    assert.match(master, /color-scheme` is on `html` so native option lists match the card/);
+    assert.doesNotMatch(css, /:root\[data-theme="dark"\] \{\s*--canvas/);
   });
 
   it("scopes the desk layout and the dev bench to the theme", () => {

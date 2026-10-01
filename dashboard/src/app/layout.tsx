@@ -62,7 +62,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              `try{var t=localStorage.getItem(${JSON.stringify(DESK_THEME_STORAGE_KEY)});if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}`,
+              `try{var t=localStorage.getItem(${JSON.stringify(DESK_THEME_STORAGE_KEY)});if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;}}catch(e){}`,
           }}
         />
         <script dangerouslySetInnerHTML={{ __html: DESK_MD_BOOT_SCRIPT }} />
