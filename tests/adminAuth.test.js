@@ -29,6 +29,19 @@ describe("Super Admin Better Auth", () => {
     assert.doesNotMatch(auth, /database:/);
   });
 
+  it("keeps Super Admin sign-in off the owner login route", () => {
+    const owner = read("dashboard/src/app/login/page.tsx");
+    assert.match(login, /action="\/api\/admin\/session"/);
+    assert.match(owner, /action="\/api\/login"/);
+    assert.doesNotMatch(login, /action="\/api\/login"/);
+    assert.doesNotMatch(login, /href="\/login"/);
+    assert.doesNotMatch(owner, /action="\/api\/admin\/session"/);
+    assert.doesNotMatch(owner, /name="accessCode"/);
+    assert.match(login, /name="username"/);
+    assert.match(login, /text-base/);
+    assert.doesNotMatch(login, /—|–/);
+  });
+
   it("signs Super Admin in with username plus access code, not email", () => {
     assert.match(plugin, /sign-in\/access-code/);
     assert.match(plugin, /verifyAdminAccess/);

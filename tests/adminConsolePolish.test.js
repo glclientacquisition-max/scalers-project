@@ -133,6 +133,19 @@ describe("admin console polish", () => {
     assert.match(panel, /Assign next available/);
   });
 
+  it("renders SautiKit diagnostics as a dense table, not a padded card", () => {
+    const panel = read("dashboard/src/components/SautikitTelecomPanel.tsx");
+    assert.match(panel, /adminThClass/);
+    assert.match(panel, /Telecom \(SautiKit\)/);
+    assert.match(panel, /Line rental \/ month/);
+    assert.match(panel, /getSautikitKeyDiagnostics/);
+    assert.doesNotMatch(panel, /rounded-2xl/);
+    assert.doesNotMatch(panel, /font-display text-2xl/);
+    assert.doesNotMatch(panel, /\bp-6\b/);
+    assert.doesNotMatch(panel, /bg-white/);
+    assert.doesNotMatch(panel, /—|–/);
+  });
+
   it("uses the desk list title on admin list roots", () => {
     for (const rel of [
       "dashboard/src/app/admin/(console)/wallets/page.tsx",

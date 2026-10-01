@@ -185,21 +185,21 @@ export function AdminRail({ operatorName }: { operatorName: string }) {
             pendingHref={pendingHref}
             setPendingHref={setPendingHref}
             className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5"
-            activeClassName="bg-accent/10 text-accent"
-            idleClassName="text-ink-2 hover:bg-surface-2 hover:text-ink"
+            activeClassName="bg-accent/10 text-accent-deep"
+            idleClassName="text-ink-soft hover:bg-surface-muted hover:text-ink"
             labelClassName="max-w-full truncate text-[10px] font-medium leading-none"
           />
         ))}
       </nav>
       <div className="flex flex-col items-center gap-1 px-1 pb-3">
-        <p className="w-full truncate px-1 text-center text-[10px] font-medium uppercase tracking-wide text-ink-3">
+        <p className="w-full truncate px-1 text-center text-[10px] font-medium text-ink-2">
           {operatorName}
         </p>
         <form action="/api/logout" method="post" className="w-full">
           <button
             type="submit"
             className={[
-              "flex min-h-11 w-full items-center justify-center rounded-xl text-[10px] font-medium text-ink-2",
+              "flex min-h-11 w-full items-center justify-center rounded-xl text-meta font-medium text-ink-2",
               deskShiftClass,
               focusRingVisible,
               "hover:bg-surface-2 hover:text-ink",
@@ -242,9 +242,9 @@ export function AdminTabBar() {
               setPendingHref={setPendingHref}
               onRetap={retapAdminTab}
               className="flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 overflow-visible px-0.5 pt-1.5 text-[10px] leading-tight"
-              activeClassName="font-semibold text-accent"
-              idleClassName="font-medium text-ink-2"
-              labelClassName="max-w-full truncate text-center"
+              activeClassName="font-semibold text-accent-deep"
+              idleClassName="font-medium text-ink-soft"
+              labelClassName="max-w-full whitespace-nowrap text-center"
             />
           </li>
         ))}
@@ -304,7 +304,7 @@ export function AdminShell({
     <div data-admin-shell="" data-admin-nested={nested ? "" : undefined} className={adminShellClass}>
       <AdminRail operatorName={operatorName} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line/80 px-4 md:hidden">
+        <div className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 md:hidden">
           <p className="min-w-0 truncate text-meta text-ink-2">{operatorName}</p>
           <form action="/api/logout" method="post">
             <button

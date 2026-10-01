@@ -147,7 +147,6 @@ describe("desk token hygiene", () => {
     "components/AdminWalletsPanel.tsx",
     "components/AdminBusinessesPanel.tsx",
     "components/DidPoolManager.tsx",
-    "components/SautikitTelecomPanel.tsx",
   ]);
 
   it("leaves no hardcoded hex or white surfaces inside the desk scope", () => {
