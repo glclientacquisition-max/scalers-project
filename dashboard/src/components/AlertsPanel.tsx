@@ -20,6 +20,8 @@ import {
   saveAlertsAction,
   type AlertsActionState,
 } from "@/app/(desk)/settings/alertsActions";
+import { pendingSpinnerClass } from "@/components/ui/deskChrome";
+import { notify } from "@/components/ui/DeskNotice";
 
 const initial: AlertsActionState = {};
 
@@ -53,11 +55,11 @@ export function AlertsPanel({
   ]);
 
   useEffect(() => {
-    if (state.ok) router.refresh();
+    if (state.ok) {
+      notify(state.message || "Saved");
+      router.refresh();
+    }
   }, [state, router]);
-
-  const flash = state.error || state.message;
-  const flashIsError = Boolean(state.error);
 
   return (
     <section className="min-w-0 w-full space-y-6">
@@ -66,14 +68,22 @@ export function AlertsPanel({
         lineLive={false}
         showBack
         title="Alerts"
+        alert={state.error}
         action={
           <button
             type="submit"
             form={ALERTS_SETTINGS_FORM_ID}
             disabled={pending}
-            className={settingsPrimaryButtonClass}
+            className={`${settingsPrimaryButtonClass} gap-2`}
           >
-            {pending ? "Saving…" : "Save"}
+            {pending ? (
+              <>
+                <span aria-hidden="true" className={pendingSpinnerClass} />
+                Saving
+              </>
+            ) : (
+              "Save"
+            )}
           </button>
         }
       />
@@ -143,15 +153,6 @@ export function AlertsPanel({
             />
           </SettingsRow>
         </SettingsGroup>
-
-        {flash ? (
-          <p
-            className={`text-sm [overflow-wrap:anywhere] ${flashIsError ? "text-warn" : "text-ok"}`}
-            role={flashIsError ? "alert" : undefined}
-          >
-            {flash}
-          </p>
-        ) : null}
       </form>
     </section>
   );

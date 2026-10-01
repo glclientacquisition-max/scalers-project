@@ -31,6 +31,7 @@ import {
 } from "@/lib/socialHandles";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { parseAgentTools } from "@/lib/agentTools";
+import { DEFAULT_AGENT_TONE } from "@/lib/onboarding";
 import { parseVertical } from "@/lib/vertical";
 import { parseHandoffMode } from "@/lib/handoffMode";
 import { parseSonioxVoiceId, parseSonioxVoiceLabel } from "@/lib/sonioxVoiceCatalog";
@@ -47,7 +48,10 @@ import {
   parseTtsLexicon,
 } from "@/lib/pronunciationLexicon";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
-import { settingsFieldFromScope } from "@/lib/settingsSaveScope";
+import {
+  settingsFieldFromScope,
+  settingsScopeValidationError,
+} from "@/lib/settingsSaveScope";
 
 export type SettingsCompileState = {
   error?: string;
@@ -207,8 +211,15 @@ export async function saveAndCompileSettings(
       parseTtsLexicon(tenant.tts_lexicon)
     )
   );
+  const storedHours = parseHoursSchedule(tenant.hours_schedule);
+  const ownsLocationLine = settingsFieldFromScope(scope, "locationNotes", true, false);
   const scheduleForSave = hoursSchedule
-    ? { ...hoursSchedule, location: locationNotes || hoursSchedule.location }
+    ? {
+        ...hoursSchedule,
+        location: ownsLocationLine
+          ? locationNotes
+          : String(storedHours?.location || "").trim(),
+      }
     : null;
   const compiledHours = formatHoursForCompiler(scheduleForSave);
   const businessHours =
@@ -221,51 +232,29 @@ export async function saveAndCompileSettings(
   const locationsText = formatLocationsForCompiler(businessLocations);
   const policiesText = formatPoliciesForCompiler(businessPolicies);
 
-  if (!businessName) {
-    return { error: "Business name is required." };
-  }
-  if (agentName.length > 40) {
-    return { error: "Agent name should be under 40 characters." };
-  }
-  if (
-    !servicesCatalog.length &&
-    !productCatalog.length &&
-    servicesOffered.length < 12
-  ) {
-    return {
-      error:
-        "Add at least one service or product, or extra service notes.",
-    };
-  }
-  if (servicesCatalog.length > 40) {
-    return { error: "Services are limited to 40 items." };
-  }
-  if (productCatalog.length > PRODUCT_CATALOG_MAX) {
-    return {
-      error: `Product catalogue is limited to ${PRODUCT_CATALOG_MAX} items.`,
-    };
-  }
-  if (!scheduleForSave) {
-    return { error: "Set at least one open day in weekly hours." };
-  }
-  if (businessHours.length < 8) {
-    return { error: "Add business hours and where you operate." };
-  }
-  if (!agentTone) {
-    return { error: "Pick a tone of voice." };
-  }
-  if (teamDirectory.length > 20) {
-    return { error: "Team directory is limited to 20 people." };
-  }
-  if (faqs.length > 25) {
-    return { error: "Golden FAQs are limited to 25 pairs." };
-  }
+  const scopeError = settingsScopeValidationError(scope, {
+    businessName,
+    agentName,
+    servicesCatalogCount: servicesCatalog.length,
+    productCatalogCount: productCatalog.length,
+    servicesOfferedLength: servicesOffered.length,
+    productCatalogMax: PRODUCT_CATALOG_MAX,
+    hasSchedule: Boolean(scheduleForSave),
+    businessHoursLength: businessHours.length,
+    hasTone: Boolean(agentTone),
+    teamCount: teamDirectory.length,
+    faqCount: faqs.length,
+    submittedVoiceId: String(formData.get("soniox_voice_id") || "").trim(),
+    resolvedVoiceId: sonioxVoiceId,
+    voiceLabel: String(formData.get("soniox_voice_label") || "").trim(),
+  });
+  if (scopeError) return { error: scopeError };
 
   const { prompt, source } = await compileReceptionistPrompt({
     businessName,
     servicesOffered,
     businessHours,
-    agentTone,
+    agentTone: agentTone ?? DEFAULT_AGENT_TONE,
     agentName,
     teamDirectory,
     faqs,

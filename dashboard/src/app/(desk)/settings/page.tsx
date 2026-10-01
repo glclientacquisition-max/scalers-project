@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { BusinessSettingsShell } from "@/components/BusinessSettingsShell";
 import {
+  SETTINGS_NAV,
   parseBusinessSettingsPanel,
   parseBusinessSettingsTab,
 } from "@/lib/businessSettingsNav";
 import { listCuratedSonioxVoices, type CuratedSonioxVoice } from "@/lib/sonioxVoiceCatalog";
+import { settingsIndexStatuses } from "@/lib/settingsOptionStatus";
 import { tenantForSettingsView } from "@/lib/settingsPanelPayload";
 import { getCurrentTenant } from "@/lib/tenant";
 import { DeskLoadError } from "@/components/ui/DeskLoadError";
@@ -62,6 +64,11 @@ async function SettingsBody({ searchParams }: SettingsPageProps) {
       tab={tab}
       trainPanel={trainPanel}
       curatedVoices={curatedVoices}
+      optionStatus={settingsIndexStatuses(
+        tenant,
+        curatedVoices,
+        SETTINGS_NAV.flatMap((section) => section.items.map((item) => item.target))
+      )}
       liveTransferExecutor={deskLiveTransferExecutorEnabled()}
     />
   );

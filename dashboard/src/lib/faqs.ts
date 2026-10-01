@@ -4,25 +4,8 @@ export const FAQ_MAX = 25;
 export const FAQ_QUESTION_MAX = 200;
 export const FAQ_ANSWER_MAX = 400;
 
-/** Starter ideas for Kenyan SME owners with an empty FAQ list. */
-export const FAQ_STARTERS: FaqEntry[] = [
-  {
-    question: "Do you have parking?",
-    answer: "Yes, free parking is available for customers.",
-  },
-  {
-    question: "Do you accept M-Pesa?",
-    answer: "Yes, we accept M-Pesa. You can pay on arrival or when booking.",
-  },
-  {
-    question: "Where are you located?",
-    answer: "Westlands, opposite Naivas.",
-  },
-  {
-    question: "Do you deliver?",
-    answer: "Yes, we deliver within Nairobi. Delivery fee depends on the area.",
-  },
-];
+/** No invented answers. An empty FAQ list stays empty until the owner writes one. */
+export const FAQ_STARTERS: FaqEntry[] = [];
 
 export function normalizeFaqKey(question: string): string {
   return String(question || "")
@@ -130,7 +113,7 @@ export function formatFaqMergeMessage(result: FaqMergeResult): string {
   }
   if (!parts.length) {
     if (result.skippedCap) {
-      return `Your Golden FAQs are full (max ${FAQ_MAX}). Remove one in Business settings, then try again.`;
+      return `FAQs are full (max ${FAQ_MAX}). Remove one, then try again.`;
     }
     return "Those FAQs are already on file. Nothing new to add.";
   }
