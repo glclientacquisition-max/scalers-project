@@ -193,7 +193,13 @@ export function SettingsGroup({
   return (
     <section className="min-w-0 w-full space-y-1.5">
       {title || action ? (
-        <div className="flex min-h-8 items-end justify-between gap-3 px-1">
+        <div
+          className={
+            action
+              ? "flex min-h-11 items-center justify-between gap-3 px-1"
+              : "flex min-h-8 items-end justify-between gap-3 px-1"
+          }
+        >
           {title ? <h3 className={settingsGroupTitleClass}>{title}</h3> : <span />}
           {action}
         </div>
