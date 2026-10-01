@@ -65,8 +65,9 @@ describe("contacts chrome pill ACCEPT", () => {
     assert.match(page, /<ContactSortSelect/);
     const sort = read("dashboard/src/components/ContactSortSelect.tsx");
     assert.match(sort, /aria-label="Sort contacts"/);
-    assert.match(sort, />Last call</);
-    assert.match(sort, />Name</);
+    assert.match(sort, /Last call/);
+    assert.match(sort, /Name/);
+    assert.match(sort, /DeskSelect/);
   });
 
   it("keeps one opened-only Call and WhatsApp pair as top icons on the person file", () => {

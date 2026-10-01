@@ -88,8 +88,40 @@ describe("theme activation", () => {
     assert.match(themeLib, /localStorage\.removeItem\(DESK_THEME_STORAGE_KEY\)/);
     assert.match(layout, /DESK_THEME_STORAGE_KEY/);
     assert.match(layout, /localStorage\.getItem\(\$\{JSON\.stringify\(DESK_THEME_STORAGE_KEY\)\}\)/);
-    assert.match(layout, /document\.documentElement\.dataset\.theme/);
+    assert.match(layout, /var r=document\.documentElement;r\.dataset\.theme=t/);
+    assert.match(layout, /style\.colorScheme=s/);
+    assert.match(layout, /dark only/);
+    assert.match(layout, /meta\[name="color-scheme"\]/);
     assert.match(layout, /dangerouslySetInnerHTML/);
+  });
+
+  it("pins the document color-scheme so native option lists match the card", () => {
+    const css = read("dashboard/src/app/globals.css");
+    const themeLib = read("dashboard/src/lib/deskTheme.ts");
+    const master = read("docs/frontend/design-system/MASTER.md");
+    assert.match(themeLib, /deskColorSchemeValue/);
+    assert.match(themeLib, /root\.style\.colorScheme = scheme/);
+    assert.match(themeLib, /root\.style\.colorScheme = ""/);
+    assert.match(themeLib, /document\.body\.style\.colorScheme/);
+    assert.match(themeLib, /meta\[name="color-scheme"\]/);
+    assert.match(themeLib, /"dark only"/);
+    assert.match(themeLib, /"light only"/);
+    assert.match(css, /:root\[data-theme="dark"\] \{\s*color-scheme: dark only;\s*\}/);
+    assert.match(css, /:root\[data-theme="light"\] \{\s*color-scheme: light only;\s*\}/);
+    assert.match(css, /:root\[data-theme="dark"\] body \{\s*color-scheme: dark only;\s*\}/);
+    assert.match(css, /:root\[data-theme="light"\] body \{\s*color-scheme: light only;\s*\}/);
+    assert.match(css, /color-scheme: dark only;/);
+    assert.match(
+      css,
+      /:root\[data-theme="dark"\] \.desk-theme select,\s*:root\[data-theme="dark"\] \.desk-theme select option,\s*:root\[data-theme="dark"\] \.admin-theme select,\s*:root\[data-theme="dark"\] \.admin-theme select option \{\s*color-scheme: inherit;\s*\}/,
+    );
+    assert.match(
+      css,
+      /:root:not\(\[data-theme="light"\]\) \.desk-theme select,\s*:root:not\(\[data-theme="light"\]\) \.desk-theme select option,\s*:root:not\(\[data-theme="light"\]\) \.admin-theme select,\s*:root:not\(\[data-theme="light"\]\) \.admin-theme select option \{\s*color-scheme: inherit;\s*\}/,
+    );
+    assert.match(css, /\.desk-theme option,\s*\.desk-theme optgroup,\s*\.admin-theme option,\s*\.admin-theme optgroup \{\s*color: var\(--ink\);\s*background-color: var\(--card\);/);
+    assert.match(master, /color-scheme: dark only/);
+    assert.doesNotMatch(css, /:root\[data-theme="dark"\] \{\s*--canvas/);
   });
 
   it("scopes the desk layout and the dev bench to the theme", () => {

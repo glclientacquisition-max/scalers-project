@@ -7,6 +7,7 @@
  */
 
 import type { ReactNode } from "react";
+import { DeskSelect } from "@/components/ui/DeskSelect";
 import { DeskBack, DeskRecordLead } from "@/components/ui/DeskBack";
 import {
   btnPrimary,
@@ -316,24 +317,15 @@ export function SettingsSelect<T extends string>({
   placeholder?: string;
 }) {
   return (
-    <select
+    <DeskSelect
       id={id}
       value={value}
       aria-label={label}
-      onChange={(e) => onChange(e.target.value as T)}
+      placeholder={placeholder}
       className={`${settingsDenseFieldClass} min-w-0`}
-    >
-      {placeholder || value === "" ? (
-        <option value="" disabled={value !== ""}>
-          {placeholder || "Select"}
-        </option>
-      ) : null}
-      {options.map((opt) => (
-        <option key={opt.id} value={opt.id}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      options={options.map((opt) => ({ value: opt.id, label: opt.label }))}
+      onChange={onChange}
+    />
   );
 }
 

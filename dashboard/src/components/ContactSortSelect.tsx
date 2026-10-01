@@ -1,12 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { DeskSelect } from "@/components/ui/DeskSelect";
 import { deskFieldClass } from "@/components/ui/deskChrome";
 import {
   contactsHref,
   type ContactSavedFilter,
   type ContactSort,
 } from "@/lib/contactsLoad";
+
+const SORT_OPTIONS = [
+  { value: "recent" as const, label: "Last call" },
+  { value: "name" as const, label: "Name" },
+];
 
 export function ContactSortSelect({
   saved,
@@ -22,12 +28,12 @@ export function ContactSortSelect({
   return (
     <label className="inline-flex min-h-11 min-w-0 items-center gap-2 text-sm text-ink-soft">
       <span className="shrink-0">Sort</span>
-      <select
+      <DeskSelect
         aria-label="Sort contacts"
         value={sort}
         className={`${deskFieldClass} w-auto min-w-[8.5rem] py-1.5`}
-        onChange={(event) => {
-          const next = event.currentTarget.value === "name" ? "name" : "recent";
+        options={SORT_OPTIONS}
+        onChange={(next) => {
           router.replace(
             contactsHref({
               saved,
@@ -36,10 +42,7 @@ export function ContactSortSelect({
             })
           );
         }}
-      >
-        <option value="recent">Last call</option>
-        <option value="name">Name</option>
-      </select>
+      />
     </label>
   );
 }

@@ -62,7 +62,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              `try{var t=localStorage.getItem(${JSON.stringify(DESK_THEME_STORAGE_KEY)});if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}`,
+              `try{var t=localStorage.getItem(${JSON.stringify(DESK_THEME_STORAGE_KEY)});if(t==="dark"||t==="light"){var r=document.documentElement;r.dataset.theme=t;var s=t==="dark"?"dark only":"light only";r.style.colorScheme=s;if(document.body)document.body.style.colorScheme=s;var m=document.querySelector('meta[name="color-scheme"]');if(!m){m=document.createElement("meta");m.name="color-scheme";document.head.appendChild(m);}m.content=t;}}catch(e){}`,
           }}
         />
         <script dangerouslySetInnerHTML={{ __html: DESK_MD_BOOT_SCRIPT }} />

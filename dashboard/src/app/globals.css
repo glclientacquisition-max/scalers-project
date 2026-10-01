@@ -88,6 +88,27 @@
 }
 
 /*
+ * Native option lists follow the document color-scheme. Tokens stay on
+ * .desk-theme / .admin-theme. System leaves this unset so the OS wins.
+ * `only` forbids UA scheme overrides when the owner picked an explicit theme.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark only;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light only;
+}
+
+:root[data-theme="dark"] body {
+  color-scheme: dark only;
+}
+
+:root[data-theme="light"] body {
+  color-scheme: light only;
+}
+
+/*
  * Dark palette for the owner desk and the Super Admin shell. Marketing, auth,
  * and onboarding stay light. Activation: <html data-theme="dark">, or
  * system dark with no explicit choice. The two blocks must stay in sync.
@@ -120,8 +141,15 @@
   --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
   --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
   --tw-ring-offset-color: var(--surface);
-  color-scheme: dark;
+  color-scheme: dark only;
   background: var(--canvas);
+}
+
+:root[data-theme="dark"] .desk-theme select,
+:root[data-theme="dark"] .desk-theme select option,
+:root[data-theme="dark"] .admin-theme select,
+:root[data-theme="dark"] .admin-theme select option {
+  color-scheme: inherit;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -153,8 +181,15 @@
     --shadow-sheet: 0 12px 32px -12px rgb(0 0 0 / 0.6);
     --shadow-menu: 0 8px 24px -8px rgb(0 0 0 / 0.55);
     --tw-ring-offset-color: var(--surface);
-    color-scheme: dark;
+    color-scheme: dark only;
     background: var(--canvas);
+  }
+
+  :root:not([data-theme="light"]) .desk-theme select,
+  :root:not([data-theme="light"]) .desk-theme select option,
+  :root:not([data-theme="light"]) .admin-theme select,
+  :root:not([data-theme="light"]) .admin-theme select option {
+    color-scheme: inherit;
   }
 }
 
@@ -258,7 +293,9 @@ html:has([data-admin-shell]) body {
 }
 
 .desk-theme option,
-.admin-theme option {
+.desk-theme optgroup,
+.admin-theme option,
+.admin-theme optgroup {
   color: var(--ink);
   background-color: var(--card);
 }
