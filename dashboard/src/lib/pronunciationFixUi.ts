@@ -17,19 +17,19 @@ export type FixReviewRow = {
   confidence: PronunciationReviewCandidate["confidence"];
   reasoning: string;
   candidate: PronunciationReviewCandidate;
-  /** Primary CTA label */
-  primaryAction: "record" | "dismiss";
-  /** Whether Approve spelling is offered */
+  /** Filled control when present. Hearing rows have no filled control. */
+  primaryAction: "use" | "dismiss";
+  /** Ghost spelling field. It does not write until Use this. */
   canApproveSpelling: boolean;
 };
 
-/** Recommended owner path — used in UI copy and docs. */
+/** Recommended owner path. Not rendered as a subtitle. */
 export const PRONUNCIATION_BEST_FLOW = [
-  "Practice pack lines (Greeting / Location / Team) and Keep good takes.",
-  "On Fix: clear Needs review first (Record preferred, or Approve spelling).",
-  "Add a word you heard wrong → Record it (typed spelling is a fallback).",
-  "Find more: Scan (transcripts) for names; AI listen (Gemini) for audio drafts.",
-  "Verify on Test → Play phone preview, then call the live DID.",
+  "Practice the pack line. Record line, then Use this take.",
+  "Needs review. Hear, then Use this.",
+  "Add a word and record it. Typed spelling stays a fallback.",
+  "Find more with Scan or AI listen. Fixes stay on review until Use this.",
+  "Test. Play phone preview, then call the line.",
 ] as const;
 
 /**
@@ -45,13 +45,13 @@ export function buildUnifiedFixReviewRows(opts: {
       (c): FixReviewRow => ({
         id: c.id,
         kind: "speech",
-        kindLabel: "Phone says wrong",
+        kindLabel: "Speech",
         phrase: c.word_or_phrase,
         suggested: c.suggested_form,
         confidence: c.confidence,
         reasoning: c.reasoning,
         candidate: c,
-        primaryAction: "record",
+        primaryAction: "use",
         canApproveSpelling: true,
       })
     );
@@ -62,7 +62,7 @@ export function buildUnifiedFixReviewRows(opts: {
       (c): FixReviewRow => ({
         id: c.id,
         kind: "hearing",
-        kindLabel: "Likely misheard",
+        kindLabel: "Hearing",
         phrase: c.word_or_phrase,
         suggested: c.suggested_form,
         confidence: c.confidence,

@@ -40,6 +40,16 @@ export function ownerFacingError(raw: unknown, fallback: string): string {
   return stripped;
 }
 
+/** Owner copy when a review-queue write fails. Loading an empty queue is not a write. */
+export function pronunciationWriteError(
+  kind: "listen" | "review",
+  raw: unknown
+): string {
+  const fallback =
+    kind === "listen" ? "Could not save the listen." : "Could not save the review.";
+  return ownerFacingError(raw, fallback);
+}
+
 export function ownerSaveFailed(
   scope: string,
   raw: unknown,

@@ -237,6 +237,50 @@ describe("settings save scope", () => {
     assert.equal(name, "From form");
   });
 
+  it("keeps the stored lexicon on Voice and strips it from Hours", () => {
+    const lexicon = [{ match: "aisha", say: "Eye-sha", label: "Aisha" }];
+    const voice = load(
+      "dashboard/src/lib/settingsPanelPayload.ts",
+      `mod.tenantForSettingsView({
+        id: "t1",
+        business_name: "Westlands Books",
+        tts_lexicon: ${JSON.stringify(lexicon)}
+      }, "train", "tools")`
+    );
+    assert.equal(voice.tts_lexicon[0].say, "Eye-sha");
+    const hours = load(
+      "dashboard/src/lib/settingsPanelPayload.ts",
+      `mod.tenantForSettingsView({
+        id: "t1",
+        business_name: "Westlands Books",
+        tts_lexicon: ${JSON.stringify(lexicon)}
+      }, "train", "hours")`
+    );
+    assert.deepEqual(hours.tts_lexicon, []);
+    const pronunciation = load(
+      "dashboard/src/lib/settingsPanelPayload.ts",
+      `mod.tenantForSettingsView({
+        id: "t1",
+        business_name: "Westlands Books",
+        tts_lexicon: ${JSON.stringify(lexicon)}
+      }, "train", "pronunciation")`
+    );
+    assert.equal(pronunciation.tts_lexicon[0].label, "Aisha");
+  });
+
+  it("does not let a Voice save overwrite the lexicon", () => {
+    const kept = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("tools", "ttsLexicon", [], [{ match: "aisha", say: "Eye-sha" }])`
+    );
+    assert.deepEqual(kept, [{ match: "aisha", say: "Eye-sha" }]);
+    const owned = load(
+      "dashboard/src/lib/settingsSaveScope.ts",
+      `mod.settingsFieldFromScope("pronunciation", "ttsLexicon", [{ match: "aisha", say: "Eye-sha" }], [])`
+    );
+    assert.equal(owned[0].say, "Eye-sha");
+  });
+
   it("does not let Identity overwrite places or policies", () => {
     const places = load(
       "dashboard/src/lib/settingsSaveScope.ts",

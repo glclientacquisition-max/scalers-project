@@ -76,7 +76,7 @@ describe("Fix tab unified review queue", () => {
     });
     assert.equal(rows.length, 2);
     assert.equal(rows[0].kind, "speech");
-    assert.equal(rows[0].primaryAction, "record");
+    assert.equal(rows[0].primaryAction, "use");
     assert.equal(rows[0].canApproveSpelling, true);
     assert.equal(rows[1].kind, "hearing");
     assert.equal(rows[1].primaryAction, "dismiss");
