@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { isAuthenticated } from "@/lib/auth";
 import { createWorkspaceDataClient, getCurrentTenant } from "@/lib/tenant";
 import { ownerSaveFailed } from "@/lib/ownerFacingError";
@@ -52,6 +53,8 @@ export async function saveOnDemandUsage(
   }
 
   const row = Array.isArray(data) ? data[0] : data;
+  revalidatePath("/wallet");
+  revalidatePath("/home");
   return {
     ok: true,
     enabled: Boolean(row?.on_demand_usage_enabled),

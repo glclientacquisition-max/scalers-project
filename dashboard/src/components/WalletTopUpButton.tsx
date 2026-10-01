@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   initiateWalletTopUp,
   type WalletTopUpState,
@@ -22,19 +21,16 @@ export function WalletTopUpButton({
   topUpEnabled: boolean;
   presets?: readonly number[];
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number>(presets[1] ?? 1000);
   const [state, formAction, pending] = useActionState(initiateWalletTopUp, initial);
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
-    if (state.ok) {
-      router.refresh();
-      const t = window.setTimeout(() => setOpen(false), 1200);
-      return () => window.clearTimeout(t);
-    }
-  }, [state.ok, router]);
+    if (!state.ok) return;
+    const t = window.setTimeout(() => setOpen(false), 1200);
+    return () => window.clearTimeout(t);
+  }, [state.ok]);
 
   return (
     <>
