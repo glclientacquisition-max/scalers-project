@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   useActionState,
@@ -1023,13 +1024,9 @@ export function PronunciationCoach({
                 >
                   Fix a word
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("library")}
-                  className="text-sm font-medium text-[var(--ink-soft)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
-                >
+                <Button variant="ghost" onClick={() => setMode("library")}>
                   Open library
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
