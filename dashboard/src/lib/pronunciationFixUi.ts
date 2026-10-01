@@ -94,6 +94,15 @@ export function fixTabHint(pendingReviewCount: number): string {
   return "Clear";
 }
 
+/**
+ * Practice tab meta. A count only when the queue has lines to record.
+ * An empty queue has no meta: the pane already says nothing is left.
+ */
+export function practiceTabHint(todoCount: number): string | null {
+  if (!Number.isFinite(todoCount) || todoCount <= 0) return null;
+  return `${Math.floor(todoCount)} left`;
+}
+
 /** Desk preview request body checks (mirrors API route rules). */
 export function validatePhonePreviewRequest(body: {
   text?: unknown;
